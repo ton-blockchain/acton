@@ -218,7 +218,7 @@ macro_rules! pop_args {
 }
 
 #[macro_export]
-macro_rules! ext_args {
+macro_rules! extension {
     ($fn_name:ident, ($an:ident : $ty:ty), $body:expr ) => {
         unsafe extern "C" fn $fn_name(ptr: *const c_char) -> *const c_char {
             unsafe {
@@ -281,15 +281,6 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
     f(&mut tuple);
 
     cell_to_ffi_boc64(serialize_tuple(&tuple).unwrap())
-}
-
-#[macro_export]
-macro_rules! ext {
-    ($fn_name:ident, $body:expr) => {
-        unsafe extern "C" fn $fn_name(ptr: *const c_char) -> *const c_char {
-            unsafe { with_tuple(ptr, $body) }
-        }
-    };
 }
 
 #[macro_export]
