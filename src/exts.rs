@@ -23,7 +23,6 @@ extension!(assert_equal, (left: Tuple, right: Tuple), |stack: &mut Tuple, (left,
     if left == right {
         stack.push_bool_as_int(true);
     } else {
-        eprintln!("Assertion failed: incompatible values for comparison");
         stack.push_bool_as_int(false);
     }
 });
