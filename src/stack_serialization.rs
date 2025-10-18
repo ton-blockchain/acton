@@ -44,6 +44,16 @@ pub enum TupleItem {
     },
     Builder(ArcCell),
     Tuple(Vec<TupleItem>),
+    TypedTuple {
+        type_name: String,
+        items: Vec<TupleItem>,
+    },
+}
+
+impl Default for TupleItem {
+    fn default() -> Self {
+        TupleItem::Null
+    }
 }
 
 impl fmt::Display for TupleItem {
@@ -66,6 +76,20 @@ impl fmt::Display for TupleItem {
                     write!(f, "{}", items[0])
                 } else {
                     write!(f, "(")?;
+                    for (i, item) in items.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", item)?;
+                    }
+                    write!(f, ")")
+                }
+            }
+            TupleItem::TypedTuple { type_name, items } => {
+                if items.len() == 1 {
+                    write!(f, "{}", items[0])
+                } else {
+                    write!(f, "{} (", type_name)?;
                     for (i, item) in items.iter().enumerate() {
                         if i > 0 {
                             write!(f, ", ")?;
@@ -156,6 +180,9 @@ pub fn serialize_tuple_item(
             if let Some(t) = &tail {
                 builder.store_reference(t)?;
             }
+        }
+        TupleItem::TypedTuple { items, .. } => {
+            serialize_tuple_item(&TupleItem::Tuple(items.clone()), builder)?
         }
     }
     Ok(())

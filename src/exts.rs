@@ -58,9 +58,14 @@ pub fn is_capturing_test_output() -> bool {
     *CAPTURE_TEST_OUTPUT.lock().unwrap()
 }
 
-extension!(print, (s: TupleItem), |_stack: &mut Tuple, (s,)| {
+extension!(print, (s: TupleItem, type_name: String), |_stack: &mut Tuple, (s, type_name)| {
     if is_capturing_test_output() {
-        TEST_OUTPUT_BUFFER.lock().unwrap().push_str(&format!("{}\n", s));
+        let typed_tuple = if let TupleItem::Tuple(tuple) = &s {
+            TupleItem::TypedTuple { type_name, items: tuple.clone() }
+        } else {
+            s
+        };
+        TEST_OUTPUT_BUFFER.lock().unwrap().push_str(&format!("{}\n", typed_tuple));
     } else {
         println!("{}", s);
     }
