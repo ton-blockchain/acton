@@ -1,3 +1,19 @@
+//! This crates provides a Tolk language compiler.
+//!
+//! ## Example
+//!
+//! ```
+//! let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
+//! match compilation_result {
+//!     tolkc::CompilerResult::Success(result) => {
+//!         // ... use result.code_boc64
+//!     }
+//!     tolkc::CompilerResult::Error(error) => {
+//!         eprintln!("Cannot compile test file {}", error.message); // :(
+//!     }
+//! }
+//! ```
+
 pub mod compiler;
 
 pub use compiler::{Compiler, CompilerResult, compile};

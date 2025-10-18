@@ -1,6 +1,7 @@
 [package]
 name = "tolkc"
 version = "0.1.0"
+description = "Tolk compiler crate"
 edition = "2024"
 
 [dependencies]

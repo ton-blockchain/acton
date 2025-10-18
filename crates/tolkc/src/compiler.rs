@@ -5,35 +5,69 @@ use std::fs::{canonicalize, read_to_string};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub fn compile(path: &Path) -> serde_json::Result<CompilerResult> {
-    Compiler::new().compile(path)
+/// Compiles passed file with Tolk compiler.
+///
+/// Returns successful result with `code_boc64` or error with `message`.
+///
+/// ## Example
+///
+/// ```
+/// let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
+/// match compilation_result {
+///     tolkc::CompilerResult::Success(result) => {
+///         // ... use result.code_boc64
+///     }
+///     tolkc::CompilerResult::Error(error) => {
+///         eprintln!("Cannot compile test file {}", error.message); // :(
+///     }
+/// }
+/// ```
+pub fn compile(path: &Path) -> CompilerResult {
+    Compiler::new(
+        2,
+        "/Users/petrmakhnev/emulator-rs/crates/tolkc/assets/fift/".to_string(),
+    )
+    .compile(path)
 }
 
+/// Simple wrapper over C++ implemented Tolk compiler.
 pub struct Compiler {
-    opt_level: i64,
-    fift_path: Option<String>,
+    /// Level of optimizations, 0 – no optimizations, 2 – all optimizations.
+    pub opt_level: i64,
+    /// Path to folder with Fift implementation files.
+    pub fift_path: String,
+    /// Show comments with stack for instructions in Fift code.
+    pub with_stack_comments: bool,
+    /// Show comments with Tolk source file references in Fift code.
+    pub with_src_line_comments: bool,
+    /// Other experimental options.
+    pub experimental_options: String,
 }
 
 impl Compiler {
-    pub fn new() -> Self {
+    pub fn new(opt_level: i64, fift_path: String) -> Self {
         Self {
-            opt_level: 2,
-            fift_path: None,
-        }
-    }
-
-    pub fn compile(&self, path: &Path) -> serde_json::Result<CompilerResult> {
-        let config = serde_json::to_string(&CompilerConfig {
-            entrypoint_file_name: path.to_string_lossy().to_string(),
-            optimization_level: self.opt_level,
+            opt_level,
+            fift_path,
             with_stack_comments: false,
             with_src_line_comments: false,
             experimental_options: "".to_string(),
-            fift_path: self
-                .fift_path
-                .clone()
-                .unwrap_or("/Users/petrmakhnev/emulator-rs/crates/tolkc/assets/fift/".to_string()),
-        })?;
+        }
+    }
+
+    /// Compiles passed file with Tolk compiler.
+    ///
+    /// Returns successful result with `code_boc64` or error with `message`.
+    pub fn compile(&self, path: &Path) -> CompilerResult {
+        let config = serde_json::to_string(&CompilerConfig {
+            entrypoint_file_name: path.to_string_lossy().to_string(),
+            optimization_level: self.opt_level,
+            with_stack_comments: self.with_stack_comments,
+            with_src_line_comments: self.with_src_line_comments,
+            experimental_options: self.experimental_options,
+            fift_path: self.fift_path,
+        })
+        .expect("Critical error, cannot serializer path to JSON, should not happen");
 
         let compilation_result = unsafe {
             unsafe extern "C" fn read_callback(
@@ -119,8 +153,9 @@ impl Compiler {
                 }
             }
 
-            let config_str = CString::new(config).unwrap();
-            tolk_compile(config_str.as_ptr(), Some(read_callback))
+            let config_cstr =
+                CString::new(config).expect("Cannot convert JSON to CString, should not happen");
+            tolk_compile(config_cstr.as_ptr(), Some(read_callback))
         };
 
         let compilation_result_str = unsafe {
@@ -129,7 +164,12 @@ impl Compiler {
                 .to_string()
         };
 
-        serde_json::from_str::<CompilerResult>(&compilation_result_str)
+        let result = serde_json::from_str::<CompilerResult>(&compilation_result_str);
+        result.unwrap_or_else(|err| {
+            CompilerResult::Error(CompilerResultError {
+                message: err.to_string(),
+            })
+        })
     }
 }
 
@@ -153,29 +193,32 @@ pub struct CompilerConfig {
 #[serde(untagged)]
 pub enum CompilerResult {
     Success(CompilerResultSuccess),
-    Error(ResultError),
+    Error(CompilerResultError),
 }
 
 #[derive(Deserialize)]
 pub struct CompilerResultSuccess {
     #[serde(rename = "fiftCode")]
-    pub _fift_code: String,
+    pub fift_code: String,
     #[serde(rename = "codeBoc64")]
     pub code_boc64: String,
     #[serde(rename = "codeHashHex")]
-    pub _code_hash_hex: String,
+    pub code_hash_hex: String,
 }
 
 #[derive(Deserialize)]
-pub struct ResultError {
+pub struct CompilerResultError {
     pub message: String,
 }
 
+/// We embed the whole standard library in binary for easier distribution.
 static TOLK_STDLIB_DIR: Dir = include_dir!("./crates/tolkc/assets/tolk-stdlib");
 
 fn read_stdlib_file(path: &str) -> Option<&'static str> {
     TOLK_STDLIB_DIR.get_file(path)?.contents_utf8()
 }
+
+// C FFI declarations
 
 unsafe extern "C" {
     pub fn tolk_compile(
@@ -184,7 +227,7 @@ unsafe extern "C" {
     ) -> *const ::std::os::raw::c_char;
 }
 
-pub type WasmFsReadCallback = Option<
+type WasmFsReadCallback = Option<
     unsafe extern "C" fn(
         kind: ::std::os::raw::c_int,
         data: *const ::std::os::raw::c_char,

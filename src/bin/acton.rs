@@ -65,17 +65,13 @@ fn main() {
 
             let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
             match compilation_result {
-                Ok(tolkc::CompilerResult::Success(result)) => {
+                tolkc::CompilerResult::Success(result) => {
                     let code_cell = ArcCell::from_boc_b64(&*result.code_boc64).unwrap();
                     let data_cell = ArcCell::default();
                     run_all_tests(&file, tests, &code_cell, &data_cell);
                 }
-                Ok(tolkc::CompilerResult::Error(error)) => {
+                tolkc::CompilerResult::Error(error) => {
                     eprintln!("Cannot compile test file {}", error.message);
-                    process::exit(1);
-                }
-                Err(error) => {
-                    eprintln!("Cannot compile test file {}", error);
                     process::exit(1);
                 }
             }

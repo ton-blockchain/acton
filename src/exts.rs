@@ -207,16 +207,12 @@ extension!(assert_equal, (location: String, message: String, right: Tuple, right
 extension!(build, (path: String), |stack: &mut Tuple, (path,): (String,)| {
     let result = tolkc::compile(Path::new(&path));
     match result {
-        Ok(tolkc::CompilerResult::Success(success)) => {
+        tolkc::CompilerResult::Success(success) => {
             let code_cell = ArcCell::from_boc_b64(&*success.code_boc64).unwrap();
             stack.push(TupleItem::Cell(code_cell))
         }
-        Ok(tolkc::CompilerResult::Error(error)) => {
+        tolkc::CompilerResult::Error(error) => {
             println!("Compilation failed: {}", error.message);
-            return;
-        }
-        Err(e) => {
-            println!("Failed to parse compilation result: {}", e);
             return;
         }
     };
