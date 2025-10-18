@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use emulator::exit_codes;
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::tuple::stack::{Tuple, TupleItem};
-use emulator_rs::context::Context;
+use emulator_rs::context::{AssertFailure, Context};
 use emulator_rs::{asserts_exts, exts, io_exts};
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
@@ -112,14 +112,13 @@ fn run_all_tests(
             continue;
         }
 
-        asserts_exts::clear_last_assert_failure();
-
         let start_time = Instant::now();
         let result = execute_test(test, &code_cell, &data_cell, &dest_address);
         let duration = start_time.elapsed();
         let TestResult {
             captured_stdout,
             captured_stderr,
+            assert_failure,
             ..
         } = result;
 
@@ -158,7 +157,7 @@ fn run_all_tests(
                 GetMethodResult::Success(result) => {
                     let exit_code = result.vm_exit_code as i64;
 
-                    if let Some(assert_failure) = asserts_exts::get_last_assert_failure()
+                    if let Some(assert_failure) = assert_failure
                         && exit_code == 567
                     {
                         let diff_output = format_tuple_diff(
@@ -285,6 +284,7 @@ struct TestResult {
     get_result: GetMethodResult,
     captured_stdout: String,
     captured_stderr: String,
+    assert_failure: Option<AssertFailure>,
 }
 
 fn execute_test(
@@ -316,6 +316,7 @@ fn execute_test(
         stdout_buffer: "".to_string(),
         stderr_buffer: "".to_string(),
         capture_test_output: true,
+        assert_failure: &mut None,
     };
 
     exts::register_get_extensions(
@@ -336,6 +337,7 @@ fn execute_test(
         get_result: result,
         captured_stdout: ctx.stdout_buffer,
         captured_stderr: ctx.stderr_buffer,
+        assert_failure: (*ctx.assert_failure).clone(),
     }
 }
 
