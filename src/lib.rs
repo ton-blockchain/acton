@@ -1,4 +1,3 @@
-pub mod compiler;
 pub mod config;
 pub mod executor;
 pub mod exit_codes;

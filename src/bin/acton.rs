@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use emulator_rs::compiler::{Compiler, TolkCompilerResult};
 use emulator_rs::exts::{
     clear_last_assert_failure, get_last_assert_failure, get_struct_field_names,
     get_struct_field_types, register_get_extensions, start_capturing_test_output,
@@ -64,15 +63,14 @@ fn main() {
 
             fs::write(&tmp_test_filename, executable_code).unwrap();
 
-            let compiler = Compiler::new();
-            let compilation_result = compiler.compile(Path::new(&tmp_test_filename));
+            let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
             match compilation_result {
-                Ok(TolkCompilerResult::Success(result)) => {
+                Ok(tolkc::CompilerResult::Success(result)) => {
                     let code_cell = ArcCell::from_boc_b64(&*result.code_boc64).unwrap();
                     let data_cell = ArcCell::default();
                     run_all_tests(&file, tests, &code_cell, &data_cell);
                 }
-                Ok(TolkCompilerResult::Error(error)) => {
+                Ok(tolkc::CompilerResult::Error(error)) => {
                     eprintln!("Cannot compile test file {}", error.message);
                     process::exit(1);
                 }

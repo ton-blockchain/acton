@@ -1,14 +1,12 @@
-use crate::tolk_compile;
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use std::ffi::{CStr, CString, c_char};
 use std::fs::{canonicalize, read_to_string};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
-static TOLK_STDLIB_DIR: Dir = include_dir!("libtolk/tolk-stdlib");
-
-fn read_stdlib_file(path: &str) -> Option<&'static str> {
-    TOLK_STDLIB_DIR.get_file(path)?.contents_utf8()
+pub fn compile(path: &Path) -> serde_json::Result<CompilerResult> {
+    Compiler::new().compile(path)
 }
 
 pub struct Compiler {
@@ -24,8 +22,8 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&self, path: &Path) -> serde_json::Result<TolkCompilerResult> {
-        let config = serde_json::to_string(&TolkCompilerConfig {
+    pub fn compile(&self, path: &Path) -> serde_json::Result<CompilerResult> {
+        let config = serde_json::to_string(&CompilerConfig {
             entrypoint_file_name: path.to_string_lossy().to_string(),
             optimization_level: self.opt_level,
             with_stack_comments: false,
@@ -34,7 +32,7 @@ impl Compiler {
             fift_path: self
                 .fift_path
                 .clone()
-                .unwrap_or("/Users/petrmakhnev/emulator-rs/libtolk/fift/".to_string()),
+                .unwrap_or("/Users/petrmakhnev/emulator-rs/crates/tolkc/assets/fift/".to_string()),
         })?;
 
         let compilation_result = unsafe {
@@ -131,12 +129,12 @@ impl Compiler {
                 .to_string()
         };
 
-        serde_json::from_str::<TolkCompilerResult>(&compilation_result_str)
+        serde_json::from_str::<CompilerResult>(&compilation_result_str)
     }
 }
 
 #[derive(Serialize)]
-pub struct TolkCompilerConfig {
+pub struct CompilerConfig {
     #[serde(rename = "entrypointFileName")]
     pub entrypoint_file_name: String,
     #[serde(rename = "optimizationLevel")]
@@ -153,13 +151,13 @@ pub struct TolkCompilerConfig {
 
 #[derive(Deserialize)]
 #[serde(untagged)]
-pub enum TolkCompilerResult {
-    Success(TolkCompilerResultSuccess),
-    Error(TolkResultError),
+pub enum CompilerResult {
+    Success(CompilerResultSuccess),
+    Error(ResultError),
 }
 
 #[derive(Deserialize)]
-pub struct TolkCompilerResultSuccess {
+pub struct CompilerResultSuccess {
     #[serde(rename = "fiftCode")]
     pub _fift_code: String,
     #[serde(rename = "codeBoc64")]
@@ -169,6 +167,28 @@ pub struct TolkCompilerResultSuccess {
 }
 
 #[derive(Deserialize)]
-pub struct TolkResultError {
+pub struct ResultError {
     pub message: String,
 }
+
+static TOLK_STDLIB_DIR: Dir = include_dir!("./crates/tolkc/assets/tolk-stdlib");
+
+fn read_stdlib_file(path: &str) -> Option<&'static str> {
+    TOLK_STDLIB_DIR.get_file(path)?.contents_utf8()
+}
+
+unsafe extern "C" {
+    pub fn tolk_compile(
+        config_json: *const ::std::os::raw::c_char,
+        callback: WasmFsReadCallback,
+    ) -> *const ::std::os::raw::c_char;
+}
+
+pub type WasmFsReadCallback = Option<
+    unsafe extern "C" fn(
+        kind: ::std::os::raw::c_int,
+        data: *const ::std::os::raw::c_char,
+        dest_contents: *mut *mut ::std::os::raw::c_char,
+        dest_error: *mut *mut ::std::os::raw::c_char,
+    ),
+>;

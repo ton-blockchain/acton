@@ -1,4 +1,3 @@
-use crate::compiler::{Compiler, TolkCompilerResult};
 use crate::executor::{EXECUTOR, EmulationResult, Executor, get_account, update_account};
 use crate::exts_lib::Tuple;
 use crate::get_executor::{GetExecutor, GetMethodArgs, GetMethodInternalParams, GetMethodResult};
@@ -206,14 +205,13 @@ extension!(assert_equal, (location: String, message: String, right: Tuple, right
 });
 
 extension!(build, (path: String), |stack: &mut Tuple, (path,): (String,)| {
-    let compiler = Compiler::new();
-    let result = compiler.compile(Path::new(&path));
+    let result = tolkc::compile(Path::new(&path));
     match result {
-        Ok(TolkCompilerResult::Success(success)) => {
+        Ok(tolkc::CompilerResult::Success(success)) => {
             let code_cell = ArcCell::from_boc_b64(&*success.code_boc64).unwrap();
             stack.push(TupleItem::Cell(code_cell))
         }
-        Ok(TolkCompilerResult::Error(error)) => {
+        Ok(tolkc::CompilerResult::Error(error)) => {
             println!("Compilation failed: {}", error.message);
             return;
         }

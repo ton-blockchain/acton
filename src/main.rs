@@ -1,4 +1,3 @@
-mod compiler;
 mod config;
 mod executor;
 mod exit_codes;
@@ -7,11 +6,11 @@ mod exts_lib;
 mod get_executor;
 mod stack_serialization;
 
-use crate::compiler::{Compiler, TolkCompilerResult};
 use crate::executor::{EmulationResult, Executor};
 use crate::exts::register_extensions;
 use num_bigint::BigUint;
 use std::path::Path;
+use tolk::{Compiler, CompilerResult};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
@@ -31,7 +30,7 @@ fn main() {
     let compiler = Compiler::new();
     let compilation_result = compiler.compile(Path::new("main.tolk"));
     let code_cell = match compilation_result {
-        Ok(TolkCompilerResult::Success(success)) => {
+        Ok(CompilerResult::Success(success)) => {
             // println!("Compilation successful!");
             // println!("Fift code {}", success._fift_code);
             // println!("Code BOC64: {}", success.code_boc64);
@@ -39,7 +38,7 @@ fn main() {
 
             ArcCell::from_boc_b64(&*success.code_boc64).unwrap()
         }
-        Ok(TolkCompilerResult::Error(error)) => {
+        Ok(CompilerResult::Error(error)) => {
             println!("Compilation failed: {}", error.message);
             return;
         }

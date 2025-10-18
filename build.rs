@@ -4,7 +4,6 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo:rustc-link-search=native=/Users/petrmakhnev/emulator-rs/libemulator/");
     // println!("cargo:rustc-link-search=native=/Users/petrmakhnev/emulator-rs/libemulator-opt/");
-    println!("cargo:rustc-link-search=native=/Users/petrmakhnev/emulator-rs/libtolk/");
 
     pkg_config::Config::new().probe("openssl").unwrap();
     pkg_config::Config::new().probe("libsodium").unwrap();
@@ -34,14 +33,6 @@ fn main() {
     println!("cargo:rustc-link-lib=static=absl_throw_delegate");
     println!("cargo:rustc-link-lib=static=crc32c");
     println!("cargo:rustc-link-lib=static=blst");
-
-    // Tolk
-    println!("cargo:rustc-link-lib=static=tolkfiftlib");
-    println!("cargo:rustc-link-lib=static=fift");
-
-    // Release
-    // println!("cargo:rustc-link-lib=static=tolkfiftlib-opt");
-    // println!("cargo:rustc-link-lib=static=fift-opt");
 
     println!("cargo:rustc-link-lib=dylib=ssl");
 
