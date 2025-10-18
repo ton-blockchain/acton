@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "abi"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "tree-sitter",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -294,6 +302,7 @@ dependencies = [
 name = "emulator"
 version = "0.1.0"
 dependencies = [
+ "abi",
  "anyhow",
  "num-bigint",
  "once_cell",
@@ -309,6 +318,7 @@ dependencies = [
 name = "emulator-rs"
 version = "0.1.0"
 dependencies = [
+ "abi",
  "base64",
  "clap",
  "crc",

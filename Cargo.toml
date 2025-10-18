@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 # local creates
+abi = { path = "crates/abi" }
 tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }
 tolk_parser = { path = "crates/tolk_parser" }

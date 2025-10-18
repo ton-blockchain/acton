@@ -1,7 +1,6 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tree_sitter::Node;
 
 #[derive(Debug, Clone)]
 pub struct FieldDescription {
@@ -19,32 +18,18 @@ lazy_static! {
         Mutex::new(HashMap::new());
 }
 
-pub fn get_struct_field_names(type_name: &str) -> Option<Vec<String>> {
-    STRUCT_DEFINITIONS
-        .lock()
-        .unwrap()
-        .get(type_name)
-        .map(|desc| desc.fields.iter().map(|f| f.name.clone()).collect())
+pub fn get_struct_description(type_name: &str) -> Option<StructDescription> {
+    STRUCT_DEFINITIONS.lock().unwrap().get(type_name).cloned()
 }
 
-pub fn get_struct_field_types(type_name: &str) -> Option<Vec<String>> {
-    STRUCT_DEFINITIONS
-        .lock()
-        .unwrap()
-        .get(type_name)
-        .map(|desc| desc.fields.iter().map(|f| f.type_name.clone()).collect())
-}
-
-pub fn process_struct_definitions(node: &Node, content: &str, file_path: &str) {
+pub fn process_struct_definitions(node: &tree_sitter::Node, content: &str, file_path: &str) {
     let mut struct_defs = HashMap::new();
     analyze_structs_recursive(&node, content, file_path, &mut struct_defs);
     *STRUCT_DEFINITIONS.lock().unwrap() = struct_defs;
-    emulator::tuple::stack::set_struct_field_getter(get_struct_field_names);
-    emulator::tuple::stack::set_struct_field_type_getter(get_struct_field_types);
 }
 
 fn analyze_structs_recursive(
-    node: &Node,
+    node: &tree_sitter::Node,
     content: &str,
     file_path: &str,
     struct_defs: &mut HashMap<String, StructDescription>,

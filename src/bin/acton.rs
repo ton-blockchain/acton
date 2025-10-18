@@ -410,7 +410,8 @@ fn inject_locations_into_expect_calls(content: &str, file_path: &str) -> String 
     let tree = tolk_parser::parser::parse(content);
     let root_node = tree.root_node();
 
-    emulator_rs::abi::process_struct_definitions(&root_node, content, file_path);
+    abi::process_struct_definitions(&root_node, content, file_path);
+    emulator::tuple::stack::set_struct_description_getter(abi::get_struct_description);
 
     let mut replacements = Vec::new();
     find_expect_calls(&root_node, content, file_path, &mut replacements);
@@ -506,37 +507,31 @@ fn format_tuple_item_diff(left: &TupleItem, right: &TupleItem) -> String {
                 return format!("{} != {}", left, right);
             }
 
-            let field_names = emulator_rs::abi::get_struct_field_names(left_type);
-            let field_types = emulator_rs::abi::get_struct_field_types(left_type);
-
-            if let (Some(field_names), Some(field_types)) = (field_names, field_types) {
-                if left_items.len() == field_names.len()
-                    && right_items.len() == field_names.len()
-                    && left_items.len() == field_types.len()
-                {
+            if let Some(struct_desc) = abi::get_struct_description(left_type) {
+                if left_items.len() == struct_desc.fields.len() {
                     let mut result = format!("{} {{\n", left_type);
 
-                    for ((field_name, left_item), right_item) in field_names
+                    for (field, (left_item, right_item)) in struct_desc
+                        .fields
                         .iter()
-                        .zip(left_items.iter())
-                        .zip(right_items.iter())
+                        .zip(left_items.iter().zip(right_items.iter()))
                     {
                         if left_item != right_item {
                             result.push_str(&format!(
                                 "    {}: {}\n",
-                                field_name.yellow(),
+                                field.name.yellow(),
                                 left_item.red()
                             ));
                             result.push_str(&format!(
                                 "    {:<width$}  {}\n",
                                 "",
                                 right_item.green(),
-                                width = field_name.len()
+                                width = field.name.len()
                             ));
                         } else {
                             result.push_str(&format!(
                                 "    {}{} {}\n",
-                                field_name.dimmed(),
+                                field.name.dimmed(),
                                 ":".dimmed(),
                                 left_item.dimmed()
                             ));

@@ -1,3 +1,4 @@
+use abi::StructDescription;
 use anyhow::anyhow;
 use num_bigint::{BigInt, BigUint};
 use std::fmt;
@@ -73,15 +74,11 @@ impl Tuple {
     }
 }
 
-static STRUCT_FIELD_GETTER: Mutex<Option<fn(&str) -> Option<Vec<String>>>> = Mutex::new(None);
-static STRUCT_FIELD_TYPE_GETTER: Mutex<Option<fn(&str) -> Option<Vec<String>>>> = Mutex::new(None);
+static STRUCT_DESCRIPTION_GETTER: Mutex<Option<fn(&str) -> Option<StructDescription>>> =
+    Mutex::new(None);
 
-pub fn set_struct_field_getter(getter: fn(&str) -> Option<Vec<String>>) {
-    *STRUCT_FIELD_GETTER.lock().unwrap() = Some(getter);
-}
-
-pub fn set_struct_field_type_getter(getter: fn(&str) -> Option<Vec<String>>) {
-    *STRUCT_FIELD_TYPE_GETTER.lock().unwrap() = Some(getter);
+pub fn set_struct_description_getter(getter: fn(&str) -> Option<StructDescription>) {
+    *STRUCT_DESCRIPTION_GETTER.lock().unwrap() = Some(getter);
 }
 
 /// Helper function to load a small uint as u64
@@ -180,26 +177,21 @@ impl fmt::Display for TupleItem {
                 if items.len() == 1 {
                     write!(f, "{}", items[0])
                 } else {
-                    if let Some(getter) = *STRUCT_FIELD_GETTER.lock().unwrap()
-                        && let Some(field_names) = getter(&type_name)
-                        && let Some(type_getter) = *STRUCT_FIELD_TYPE_GETTER.lock().unwrap()
-                        && let Some(field_types) = type_getter(&type_name)
+                    if let Some(getter) = *STRUCT_DESCRIPTION_GETTER.lock().unwrap()
+                        && let Some(struct_desc) = getter(&type_name)
                     {
-                        if items.len() == field_names.len() && items.len() == field_types.len() {
+                        if items.len() == struct_desc.fields.len() {
                             write!(f, "{} {{\n", type_name)?;
-                            for (i, ((field_name, item), field_type)) in field_names
-                                .iter()
-                                .zip(items.iter())
-                                .zip(field_types.iter())
-                                .enumerate()
+                            for (i, (field, item)) in
+                                struct_desc.fields.iter().zip(items.iter()).enumerate()
                             {
                                 write!(
                                     f,
                                     "    {}: {}",
-                                    field_name,
-                                    format_item_with_type(item, field_type)
+                                    field.name,
+                                    format_item_with_type(item, &field.type_name)
                                 )?;
-                                if i < field_names.len() - 1 {
+                                if i < struct_desc.fields.len() - 1 {
                                     write!(f, ",")?;
                                 }
                                 write!(f, "\n")?;
