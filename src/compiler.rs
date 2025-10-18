@@ -1,8 +1,15 @@
 use crate::tolk_compile;
+use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use std::ffi::{CStr, CString, c_char};
 use std::fs::{canonicalize, read_to_string};
 use std::path::{Path, PathBuf};
+
+static TOLK_STDLIB_DIR: Dir = include_dir!("libtolk/tolk-stdlib");
+
+fn read_stdlib_file(path: &str) -> Option<&'static str> {
+    TOLK_STDLIB_DIR.get_file(path)?.contents_utf8()
+}
 
 pub struct Compiler {
     opt_level: i64,
@@ -43,11 +50,7 @@ impl Compiler {
                     }
 
                     if path.starts_with("@stdlib/") {
-                        let file_name = path.strip_prefix("@stdlib/").unwrap();
-                        let relative_path =
-                            "./libtolk/tolk-stdlib/".to_string() + file_name.to_str().unwrap();
-                        let abs_path = canonicalize(relative_path)?;
-                        return Ok(abs_path.to_string_lossy().into_owned());
+                        return Ok(path.to_string_lossy().to_string());
                     }
 
                     let abs_path = canonicalize(path)?;
@@ -81,20 +84,38 @@ impl Compiler {
                     1 => {
                         let file_path = unsafe { CStr::from_ptr(data_ptr).to_str().unwrap() };
 
-                        let content = read_to_string(file_path);
-                        match content {
-                            Ok(content) => {
-                                let raw_str = CString::new(content).unwrap();
-                                unsafe { *dest_contents = raw_str.into_raw() }
-                            }
-                            Err(error) => {
-                                let raw_str = CString::new(error.to_string()).unwrap();
-                                unsafe {
-                                    *dest_error = raw_str.into_raw();
+                        let content = if file_path.contains("@stdlib/") {
+                            let filename = file_path
+                                .strip_prefix("@stdlib/")
+                                .unwrap_or_else(|| file_path);
+                            match read_stdlib_file(filename).map(|s| s.to_string()) {
+                                Some(content) => content,
+                                None => {
+                                    let raw_str = CString::new(
+                                        "Cannot read standard library file, file not found",
+                                    )
+                                    .unwrap();
+                                    unsafe {
+                                        *dest_error = raw_str.into_raw();
+                                    }
+                                    return;
                                 }
-                                return;
                             }
-                        }
+                        } else {
+                            match read_to_string(file_path) {
+                                Ok(content) => content,
+                                Err(error) => {
+                                    let raw_str = CString::new(error.to_string()).unwrap();
+                                    unsafe {
+                                        *dest_error = raw_str.into_raw();
+                                    }
+                                    return;
+                                }
+                            }
+                        };
+
+                        let raw_str = CString::new(content).unwrap();
+                        unsafe { *dest_contents = raw_str.into_raw() }
                     }
                     _ => {}
                 }
