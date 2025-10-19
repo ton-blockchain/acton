@@ -113,6 +113,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    if: false
 
     steps:
       - name: Check out emulator-rs repository
@@ -216,3 +217,43 @@ jobs:
         with:
           name: acton-linux-binary
           path: target/release/acton
+
+  create-nightly-release:
+    needs: [build-macos]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Download macOS binary
+        uses: actions/download-artifact@v4
+        with:
+          name: acton-macos-binary
+          path: binaries/macos/
+
+      - name: Make binaries executable
+        run: |
+          chmod +x binaries/macos/acton
+
+      - name: Generate nightly tag
+        id: nightly-tag
+        run: |
+          echo "tag=nightly-$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Create nightly release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.nightly-tag.outputs.tag }}
+          name: Nightly Build ${{ steps.nightly-tag.outputs.tag }}
+          body: |
+            Automated nightly build of emulator-rs.
+
+            ## Binaries
+            - `acton` - macOS binary
+
+            Built from commit: ${{ github.sha }}
+          files: |
+            binaries/macos/acton
+          prerelease: true
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
