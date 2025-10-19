@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-macos:
     runs-on: macos-latest
 
     steps:
@@ -124,7 +124,7 @@ jobs:
       - name: Install required system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16
+          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
       - name: Clone tree-sitter-tolk repository
@@ -180,6 +180,10 @@ jobs:
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
+          export CC=clang-16
+          export CXX=clang++-16
+          export AR=llvm-ar-16
+          export RANLIB=llvm-ranlib-16
           cd ton-repo
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
@@ -197,6 +201,10 @@ jobs:
 
       - name: Build acton binary
         run: |
+          export CC=clang-16
+          export CXX=clang++-16
+          export AR=llvm-ar-16
+          export RANLIB=llvm-ranlib-16
           cargo build --release --bin acton
 
       - name: Test acton binary
