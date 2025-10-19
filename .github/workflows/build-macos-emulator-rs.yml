@@ -61,3 +61,51 @@ jobs:
         with:
           name: acton-macos-binary
           path: target/release/acton
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out emulator-rs repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install required system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git cmake ninja-build zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16
+
+      - name: Clone TON repository
+        run: |
+          git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch ton-repo
+          cd ton-repo
+          git submodule update --init --recursive
+
+      - name: Build TON static libraries
+        run: |
+          cd ton-repo
+          cp assembly/native/build-ubuntu-static.sh .
+          chmod +x build-ubuntu-static.sh
+          ./build-ubuntu-static.sh -a
+
+      - name: Copy TON artifacts to objs directory
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
+      - name: Build acton binary
+        run: |
+          cargo build --release --bin acton
+
+      - name: Test acton binary
+        run: |
+          ./target/release/acton --help
+
+      - name: Upload acton binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: acton-linux-binary
+          path: target/release/acton
