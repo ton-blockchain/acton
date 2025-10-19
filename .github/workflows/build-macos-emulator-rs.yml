@@ -29,6 +29,10 @@ jobs:
           brew update
           brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16
 
+      - name: Clone tree-sitter-tolk repository
+        run: |
+          git clone https://github.com/ton-blockchain/tree-sitter-tolk.git tree-sitter-tolk
+
       - name: Clone TON repository
         run: |
           git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch ton-repo
@@ -122,6 +126,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+
+      - name: Clone tree-sitter-tolk repository
+        run: |
+          git clone https://github.com/ton-blockchain/tree-sitter-tolk.git tree-sitter-tolk
 
       - name: Clone TON repository
         run: |
