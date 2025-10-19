@@ -46,18 +46,9 @@ fn main() {
         },
     };
 
-    exts::register_extensions(
-        &mut blockchain.executor,
-        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
-    );
-    io_exts::register_extensions(
-        &mut blockchain.executor,
-        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
-    );
-    asserts_exts::register_extensions(
-        &mut blockchain.executor,
-        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
-    );
+    exts::register_extensions(&mut blockchain.executor, &mut ctx);
+    io_exts::register_extensions(&mut blockchain.executor, &mut ctx);
+    asserts_exts::register_extensions(&mut blockchain.executor, &mut ctx);
 
     let state_init = CellBuilder::new()
         .store_bit(false)

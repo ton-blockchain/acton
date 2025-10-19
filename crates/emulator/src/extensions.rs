@@ -249,7 +249,7 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
 macro_rules! register_ext_methods {
     ($executor:expr, $ctx:expr, { $($id:expr => $fname:ident),+ $(,)? }) => {{
         $(
-            $executor.register_ext_method($id, $ctx, $fname);
+            $executor.register_ext_method($id, ($ctx) as *mut _ as *mut std::ffi::c_void, $fname);
         )+
     }};
 }

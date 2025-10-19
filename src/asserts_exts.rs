@@ -30,13 +30,13 @@ fn assert_equal_impl(
     }
 }
 
-pub fn register_extensions(executor: &mut Executor, ctx: *mut std::ffi::c_void) {
+pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         4 => assert_equal,
     });
 }
 
-pub fn register_get_extensions(executor: &mut GetExecutor, ctx: *mut std::ffi::c_void) {
+pub fn register_get_extensions(executor: &mut GetExecutor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         4 => assert_equal,
     });

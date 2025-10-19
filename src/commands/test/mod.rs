@@ -314,18 +314,9 @@ fn execute_test(
         abi: (*abi).clone(),
     };
 
-    exts::register_get_extensions(
-        &mut get_executor,
-        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
-    );
-    io_exts::register_get_extensions(
-        &mut get_executor,
-        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
-    );
-    asserts_exts::register_get_extensions(
-        &mut get_executor,
-        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
-    );
+    exts::register_get_extensions(&mut get_executor, &mut ctx);
+    io_exts::register_get_extensions(&mut get_executor, &mut ctx);
+    asserts_exts::register_get_extensions(&mut get_executor, &mut ctx);
 
     let result = get_executor.run_get_method(Default::default(), params);
     TestResult {

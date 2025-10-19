@@ -32,14 +32,14 @@ fn eprint_impl(ctx: &mut Context, _stack: &mut Tuple, s: String) {
     }
 }
 
-pub fn register_extensions(executor: &mut Executor, ctx: *mut std::ffi::c_void) {
+pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         1 => print,
         2 => eprint,
     });
 }
 
-pub fn register_get_extensions(executor: &mut GetExecutor, ctx: *mut std::ffi::c_void) {
+pub fn register_get_extensions(executor: &mut GetExecutor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         1 => print,
         2 => eprint,
