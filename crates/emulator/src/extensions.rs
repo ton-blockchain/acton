@@ -1,6 +1,6 @@
 //! This module defines a simple DSL for defining extension functions for the emulator.
 
-use crate::tuple::stack::{Tuple, TupleItem, parse_tuple, serialize_tuple};
+use crate::tuple::stack::{Tuple, TupleItem, TupleSLice, parse_tuple, serialize_tuple};
 use num_bigint::BigInt;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -33,12 +33,12 @@ impl FromStack for TupleItem {
 impl FromStack for String {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
         match item {
-            TupleItem::Slice {
+            TupleItem::Slice(TupleSLice {
                 cell,
                 start_bits,
                 end_bits,
                 ..
-            } => {
+            }) => {
                 let mut p = cell.parser();
                 p.skip_bits(start_bits as usize)
                     .map_err(|_| ArgError::CellParse)?;
@@ -57,12 +57,12 @@ impl FromStack for String {
 impl FromStack for Vec<u8> {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
         match item {
-            TupleItem::Slice {
+            TupleItem::Slice(TupleSLice {
                 cell,
                 start_bits,
                 end_bits,
                 ..
-            } => {
+            }) => {
                 let mut p = cell.parser();
                 p.skip_bits(start_bits as usize)
                     .map_err(|_| ArgError::CellParse)?;

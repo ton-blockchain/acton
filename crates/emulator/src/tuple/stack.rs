@@ -55,13 +55,13 @@ impl Tuple {
     pub fn push_string(&mut self, s: &str) {
         let mut b = CellBuilder::new();
         b.store_bits(s.len() * 8, s.as_bytes()).unwrap();
-        self.push(TupleItem::Slice {
+        self.push(TupleItem::Slice(TupleSLice {
             cell: ArcCell::from(b.build().unwrap()),
             start_bits: 0,
             end_bits: (s.len() * 8) as u32,
             end_refs: 0,
             start_refs: 0,
-        });
+        }));
     }
 
     pub fn push_bool(&mut self, v: bool) {
@@ -73,6 +73,15 @@ impl Tuple {
     }
 }
 
+#[derive(Debug, Clone, Eq)]
+pub struct TupleSLice {
+    pub cell: ArcCell,
+    pub start_bits: u32,
+    pub end_bits: u32,
+    pub start_refs: u32,
+    pub end_refs: u32,
+}
+
 /// Represents a stack value in TON VM
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TupleItem {
@@ -80,13 +89,7 @@ pub enum TupleItem {
     Int(BigInt),
     Nan,
     Cell(ArcCell),
-    Slice {
-        cell: ArcCell,
-        start_bits: u32,
-        end_bits: u32,
-        start_refs: u32,
-        end_refs: u32,
-    },
+    Slice(TupleSLice),
     Builder(ArcCell),
     Tuple(Vec<TupleItem>),
     TypedTuple {
@@ -94,6 +97,57 @@ pub enum TupleItem {
         items: Vec<TupleItem>,
         abi: Option<StructDescription>,
     },
+}
+
+impl PartialEq for TupleSLice {
+    fn eq(&self, other: &Self) -> bool {
+        let self_bits_len = (self.end_bits - self.start_bits) as usize;
+        let other_bits_len = (other.end_bits - other.start_bits) as usize;
+        let self_refs_count = (self.end_refs - self.start_refs) as usize;
+        let other_refs_count = (other.end_refs - other.start_refs) as usize;
+
+        if self_bits_len != other_bits_len || self_refs_count != other_refs_count {
+            // fast path
+            return false;
+        }
+
+        let mut self_parser = self.cell.parser();
+        let mut other_parser = other.cell.parser();
+
+        if self_parser.skip_bits(self.start_bits as usize).is_err()
+            || other_parser.skip_bits(other.start_bits as usize).is_err()
+        {
+            return false;
+        }
+
+        match (
+            self_parser.load_bits(self_bits_len),
+            other_parser.load_bits(other_bits_len),
+        ) {
+            (Ok(self_data), Ok(other_data)) => {
+                if self_data != other_data {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+
+        let mut self_parser = self.cell.parser();
+        let mut other_parser = other.cell.parser();
+
+        for _ in 0..self_refs_count {
+            match (self_parser.next_reference(), other_parser.next_reference()) {
+                (Ok(self_ref), Ok(other_ref)) => {
+                    if self_ref.cell_hash() != other_ref.cell_hash() {
+                        return false;
+                    }
+                }
+                _ => return false,
+            }
+        }
+
+        true
+    }
 }
 
 impl Default for TupleItem {
@@ -130,12 +184,12 @@ impl fmt::Display for TupleItem {
             TupleItem::Null => write!(f, "null"),
             TupleItem::Nan => write!(f, "NaN"),
             TupleItem::Cell(cell) => write!(f, "{:?}", cell),
-            TupleItem::Slice {
+            TupleItem::Slice(TupleSLice {
                 cell,
                 start_bits,
                 end_bits,
                 ..
-            } => {
+            }) => {
                 let mut parser = cell.parser();
                 if let Ok(()) = parser.skip_bits(*start_bits as usize) {
                     if let Ok(data) = parser.load_bits((*end_bits - *start_bits) as usize) {
@@ -241,13 +295,13 @@ pub fn serialize_tuple_item(
             builder.store_u8(8, 0x03)?;
             builder.store_reference(&cell)?;
         }
-        TupleItem::Slice {
+        TupleItem::Slice(TupleSLice {
             cell,
             start_bits,
             end_bits,
             start_refs,
             end_refs,
-        } => {
+        }) => {
             builder.store_u8(8, 0x04)?;
             builder.store_u32(10, *start_bits)?;
             builder.store_u32(10, *end_bits)?;
@@ -327,13 +381,13 @@ pub fn parse_tuple_item(parser: &mut CellParser) -> Result<TupleItem, anyhow::Er
 
             let cell_ref = parser.next_reference()?;
 
-            Ok(TupleItem::Slice {
+            Ok(TupleItem::Slice(TupleSLice {
                 cell: cell_ref,
                 start_bits,
                 end_bits,
                 start_refs,
                 end_refs,
-            })
+            }))
         }
         5 => {
             let cell = parser.next_reference()?;
@@ -481,13 +535,13 @@ mod tests {
         builder.store_u8(8, 43).unwrap();
         let test_cell = ArcCell::new(builder.build().unwrap());
 
-        roundtrip_test(TupleItem::Slice {
+        roundtrip_test(TupleItem::Slice(TupleSLice {
             cell: test_cell,
             start_bits: 0,
             end_bits: 16,
             start_refs: 0,
             end_refs: 0,
-        });
+        }));
     }
 
     #[test]

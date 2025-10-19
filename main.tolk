@@ -152,7 +152,7 @@ fun main() {
     // register_test("test-third");
 
     // expect(10).toEqual(30);
-    expect(null).isNotNull();
+    expect(null).toBeNotNull();
     expect(Data{
         value: 0, is_set: false
     }).toEqual(Data{
