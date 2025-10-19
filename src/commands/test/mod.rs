@@ -146,18 +146,8 @@ fn run_all_tests(
                 GetMethodResult::Success(result) => {
                     let exit_code = result.vm_exit_code as i64;
 
-                    if let Some(assert_failure) = assert_failure
-                        && exit_code == 567
-                    {
-                        let diff_output = format_tuple_diff(
-                            &assert_failure.left,
-                            &assert_failure.right,
-                            &assert_failure.left_type,
-                            &assert_failure.right_type,
-                            &abi,
-                        );
-
-                        if let Some(message) = &assert_failure.message {
+                    if let Some(assert_failure) = assert_failure {
+                        if let Some(message) = &assert_failure.message() {
                             if !message.is_empty() {
                                 let highlighted_message = highlight_actual_expected(message);
                                 println!(
@@ -173,11 +163,21 @@ fn run_all_tests(
                             println!("    {}", "└─".dimmed());
                         }
 
-                        for line in diff_output.lines() {
-                            println!("        {}", line);
+                        if let AssertFailure::Bin(assert_failure) = &assert_failure {
+                            let diff_output = format_tuple_diff(
+                                &assert_failure.left,
+                                &assert_failure.right,
+                                &assert_failure.left_type,
+                                &assert_failure.right_type,
+                                &abi,
+                            );
+
+                            for line in diff_output.lines() {
+                                println!("        {}", line);
+                            }
                         }
 
-                        if let Some(location) = &assert_failure.location {
+                        if let Some(location) = &assert_failure.location() {
                             if !location.is_empty() {
                                 println!("      {} at {}", "└─".dimmed(), location.dimmed());
                             }

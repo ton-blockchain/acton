@@ -22,7 +22,14 @@ fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: 
     }
 }
 
+fun Assert.fail(message: slice = "", location: slice = "") {
+    assert_fail(message, location);
+    throw ASSERTION_FAILED;
+}
+
 fun assert_equal<V1, V2>(left_name: slice, left: V1, right_name: slice, right: V2, message: slice = "", location: slice = ""): bool asm "4 EXTCALL"
+
+fun assert_fail(message: slice = "", location: slice = ""): bool asm "100 EXTCALL"
 
 struct Expectation<T> {
     private value: T

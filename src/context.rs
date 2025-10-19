@@ -3,13 +3,41 @@ use emulator::blockchain::Blockchain;
 use emulator::tuple::stack::Tuple;
 
 #[derive(Debug, Clone)]
-pub struct AssertFailure {
+pub struct AssertBinFailure {
     pub left: Tuple,
     pub left_type: String,
     pub right: Tuple,
     pub right_type: String,
     pub message: Option<String>,
     pub location: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FailAssertFailure {
+    pub message: Option<String>,
+    pub location: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum AssertFailure {
+    Bin(AssertBinFailure),
+    Fail(FailAssertFailure),
+}
+
+impl AssertFailure {
+    pub fn message(&self) -> Option<String> {
+        match self {
+            AssertFailure::Bin(arg) => arg.message.clone(),
+            AssertFailure::Fail(arg) => arg.message.clone(),
+        }
+    }
+
+    pub fn location(&self) -> Option<String> {
+        match self {
+            AssertFailure::Bin(arg) => arg.location.clone(),
+            AssertFailure::Fail(arg) => arg.location.clone(),
+        }
+    }
 }
 
 pub struct Context<'a> {
