@@ -139,6 +139,21 @@ fn find_test_files_recursively(dir_path: &str) -> Result<Vec<String>, anyhow::Er
     Ok(test_files)
 }
 
+fn has_entry_function(root_node: &Node, content: &str) -> bool {
+    let mut cursor = root_node.walk();
+    for child in root_node.children(&mut cursor) {
+        if child.kind() == "function_declaration" {
+            if let Some(name_node) = child.child_by_field_name("name") {
+                let name = name_node.utf8_text(content.as_bytes()).unwrap_or("");
+                if name == "main" || name == "onInternalMessage" {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 #[derive(Debug)]
 struct TestStats {
     passed: usize,
@@ -168,7 +183,7 @@ fn run_tests_for_file(file: &str, filter: Option<&str>) -> Result<TestStats, any
     fs::write(&tmp_test_filename, executable_code)?;
 
     let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
-    match compilation_result {
+    let result = match compilation_result {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64).unwrap();
             let data_cell = ArcCell::default();
@@ -179,7 +194,11 @@ fn run_tests_for_file(file: &str, filter: Option<&str>) -> Result<TestStats, any
         tolkc::CompilerResult::Error(error) => {
             Err(anyhow!("Cannot compile test file {}", error.message))
         }
-    }
+    };
+
+    let _ = fs::remove_file(&tmp_test_filename);
+
+    result
 }
 
 fn run_all_tests(
@@ -597,7 +616,11 @@ fn inject_locations_into_expect_calls(content: &str, file_path: &str) -> String 
         result.replace_range(start..end, &replacement);
     }
 
-    result + "\n\nfun main() {}"
+    if !has_entry_function(&root_node, &result) {
+        result + "\n\nfun main() {}"
+    } else {
+        result
+    }
 }
 
 fn find_expect_calls(
