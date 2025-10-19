@@ -123,17 +123,17 @@ jobs:
           sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
-      - name: Get TON commit hash
-        id: ton-commit
-        run: |
-          TON_COMMIT=$(git ls-remote https://github.com/i582/ton.git pmakhnev/acton | cut -f1)
-          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
-
       - name: Clone TON repository
         run: |
           git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch ton-repo
           cd ton-repo
           git submodule update --init --recursive
+
+      - name: Get TON commit hash
+        id: ton-commit
+        run: |
+          TON_COMMIT=$(git ls-remote https://github.com/i582/ton.git pmakhnev/acton | cut -f1)
+          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
 
       - name: Cache TON build directory
         id: cache-ton-build
