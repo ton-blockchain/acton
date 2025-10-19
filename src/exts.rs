@@ -1,5 +1,7 @@
 use crate::context::Context;
-use emulator::executor::{EmulationResult, Executor, StoreExt};
+use emulator::executor::{
+    EmulationResult, Executor, ExecutorVerbosity, RunTransactionArgs, StoreExt,
+};
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::tuple::stack::{Tuple, TupleItem, parse_tuple};
 use emulator::{extension, pop_args, register_ext_methods};
@@ -66,9 +68,22 @@ fn send_message_impl(ctx: &mut Context, stack: &mut Tuple, mode: BigInt, message
     }
 
     let account = blockchain.get_account(dst_addr.to_string());
+
+    let params = RunTransactionArgs {
+        config: emulator::config::DEFAULT_CONFIG.to_string(),
+        libs: None,
+        verbosity: ExecutorVerbosity::Short,
+        shard_account: account,
+        now: 0,
+        lt: Default::default(),
+        random_seed: None,
+        ignore_chksig: false,
+        debug_enabled: true,
+        prev_blocks_info: None,
+    };
     let result = blockchain
         .executor
-        .run_transaction_cell(account, mode, msg2.to_cell());
+        .run_transaction(msg2.to_cell(), mode, params);
 
     match result {
         EmulationResult::Success(result) => {

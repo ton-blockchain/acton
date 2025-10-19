@@ -304,6 +304,7 @@ version = "0.1.0"
 dependencies = [
  "abi",
  "anyhow",
+ "hex",
  "num-bigint",
  "once_cell",
  "pkg-config",

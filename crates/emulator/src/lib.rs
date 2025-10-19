@@ -1,5 +1,5 @@
 pub mod blockchain;
-mod config;
+pub mod config;
 pub mod executor;
 pub mod exit_codes;
 pub mod extensions;

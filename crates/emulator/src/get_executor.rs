@@ -1,4 +1,4 @@
-use crate::config::CONFIG;
+use crate::config::DEFAULT_CONFIG;
 use crate::executor::ExtFunc;
 use crate::tuple::stack::{Tuple, serialize_tuple};
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ impl GetExecutor {
 
     pub fn run_get_method(&self, stack: Tuple, params: GetMethodParams) -> GetMethodResult {
         let params_str = serde_json::to_string(&params).unwrap();
-        let config_cstr = CString::new(CONFIG)
+        let config_cstr = CString::new(DEFAULT_CONFIG)
             .expect("Cannot convert Config string to CString, should not happen");
 
         let stack = serialize_tuple(&**stack).unwrap();
