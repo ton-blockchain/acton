@@ -163,7 +163,9 @@ fn run_all_tests(
                             println!("    {}", "└─".dimmed());
                         }
 
-                        if let AssertFailure::Bin(assert_failure) = &assert_failure {
+                        if let AssertFailure::Bin(assert_failure) = &assert_failure
+                            && assert_failure.operator == "=="
+                        {
                             let diff_output = format_tuple_diff(
                                 &assert_failure.left,
                                 &assert_failure.right,
@@ -175,6 +177,21 @@ fn run_all_tests(
                             for line in diff_output.lines() {
                                 println!("        {}", line);
                             }
+                        }
+
+                        if let AssertFailure::Bin(assert_failure) = &assert_failure
+                            && assert_failure.operator == "!="
+                        {
+                            println!(
+                                "       {}",
+                                "Values are equal but expected to be different:"
+                            );
+                            let value = format_tuple_value(
+                                &assert_failure.left,
+                                &assert_failure.left_type,
+                                &abi,
+                            );
+                            println!("         {}", value.dimmed());
                         }
 
                         if let Some(location) = &assert_failure.location() {
@@ -520,6 +537,32 @@ fn highlight_actual_expected(message: &str) -> String {
         .replace("expected", &"expected".green().to_string());
 
     result.to_string()
+}
+
+fn add_indent_to_lines(text: &str, indent: usize) -> String {
+    let indent_str = " ".repeat(indent);
+    text.lines()
+        .map(|line| format!("{}{}", indent_str, line))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn format_tuple_value(tuple: &Tuple, type_name: &String, abi: &ABI) -> String {
+    let item = TupleItem::TypedTuple {
+        abi: abi.find_type(type_name),
+        type_name: type_name.to_string(),
+        items: (**tuple).clone(),
+    };
+    let raw_str = format!("{}", item);
+
+    if !raw_str.contains("\n") {
+        return raw_str;
+    }
+
+    let lines: Vec<_> = raw_str.lines().collect();
+    let mut result = lines[0].to_string() + "\n";
+    result += &add_indent_to_lines(&lines[1..].join("\n"), 8);
+    result
 }
 
 fn format_tuple_item_diff(left: &TupleItem, right: &TupleItem) -> String {

@@ -4,6 +4,7 @@ use emulator::tuple::stack::Tuple;
 
 #[derive(Debug, Clone)]
 pub struct AssertBinFailure {
+    pub operator: String,
     pub left: Tuple,
     pub left_type: String,
     pub right: Tuple,

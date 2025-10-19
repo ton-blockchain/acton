@@ -3,7 +3,8 @@ const ASSERTION_FAILED = 567
 struct Assert
 
 fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
-    if (!assert_equal(
+    if (!assert_bin(
+        "==",
         __typeName(left), left.__toTuple(),
         __typeName(right), right.__toTuple(),
         message, location)
@@ -13,7 +14,8 @@ fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: sli
 }
 
 fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
-    if (assert_equal(
+    if (!assert_bin(
+        "!=",
         __typeName(left), left.__toTuple(),
         __typeName(right), right.__toTuple(),
         message, location)
@@ -27,7 +29,15 @@ fun Assert.fail(message: slice = "", location: slice = "") {
     throw ASSERTION_FAILED;
 }
 
-fun assert_equal<V1, V2>(left_name: slice, left: V1, right_name: slice, right: V2, message: slice = "", location: slice = ""): bool asm "4 EXTCALL"
+fun assert_bin<V1, V2>(
+    op: slice,
+    left_name: slice,
+    left: V1,
+    right_name: slice,
+    right: V2,
+    message: slice = "",
+    location: slice = ""
+): bool asm "101 EXTCALL"
 
 fun assert_fail(message: slice = "", location: slice = ""): bool asm "100 EXTCALL"
 
