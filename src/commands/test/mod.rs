@@ -123,7 +123,10 @@ fn run_all_tests(
             (duration.as_micros().to_string(), "μs")
         };
 
-        if exit_code == 0 {
+        let expected_exit_code = test.expected_exit_code.unwrap_or(0);
+        let test_passed = exit_code == expected_exit_code;
+
+        if test_passed {
             println!(
                 "  {} {} {}{}",
                 "✓".green(),
@@ -200,15 +203,26 @@ fn run_all_tests(
                             }
                         }
                     } else {
-                        println!(
-                            "    {} exit_code={}",
-                            "└─".dimmed(),
-                            exit_code.to_string().yellow()
-                        );
+                        if let Some(expected) = test.expected_exit_code
+                            && expected != 0
+                        {
+                            println!(
+                                "    {} Expected exit_code={}, got={}",
+                                "└─".dimmed(),
+                                expected.to_string().green(),
+                                exit_code.to_string().bright_red()
+                            );
+                        } else {
+                            println!(
+                                "    {} exit_code={}",
+                                "└─".dimmed(),
+                                exit_code.to_string().yellow()
+                            );
 
-                        if let Some(info) = exit_codes::get_exit_code_info(exit_code) {
-                            println!("      {} {}", "├─".dimmed(), info.description.dimmed());
-                            println!("      {} Phase: {}", "└─".dimmed(), info.phase.dimmed());
+                            if let Some(info) = exit_codes::get_exit_code_info(exit_code) {
+                                println!("      {} {}", "├─".dimmed(), info.description.dimmed());
+                                println!("      {} Phase: {}", "└─".dimmed(), info.phase.dimmed());
+                            }
                         }
                     }
                 }
@@ -364,11 +378,18 @@ fn contract_address(code: &Arc<Cell>) -> TonAddress {
 }
 
 #[derive(Debug)]
+struct TestAnnotations {
+    pub annotations: Vec<String>,
+    pub expected_exit_code: Option<i32>,
+}
+
+#[derive(Debug)]
 struct TestDescriptor {
     pub file: String,
     pub id: i32,
     pub name: String,
     pub annotations: Vec<String>,
+    pub expected_exit_code: Option<i32>,
 }
 
 fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
@@ -396,12 +417,14 @@ fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
 
                 if name.starts_with("test") {
                     let id = (CRC16.checksum(name.as_bytes()) & 0xff_ff) as i32 | 0x1_00_00;
+                    let test_annotations = find_test_annotations(content, child);
 
                     return vec![TestDescriptor {
                         file: file.clone(),
                         id,
                         name: name.to_string(),
-                        annotations: find_test_annotations(content, child),
+                        annotations: test_annotations.annotations,
+                        expected_exit_code: test_annotations.expected_exit_code,
                     }];
                 }
             };
@@ -411,10 +434,14 @@ fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
         .collect()
 }
 
-fn find_test_annotations(content: &String, child: Node) -> Vec<String> {
+fn find_test_annotations(content: &String, child: Node) -> TestAnnotations {
     let mut annotations = Vec::new();
+    let mut expected_exit_code = None;
     let Some(annotations_node) = child.child_by_field_name("annotations") else {
-        return vec![];
+        return TestAnnotations {
+            annotations,
+            expected_exit_code,
+        };
     };
 
     let mut cursor = annotations_node.walk();
@@ -432,13 +459,39 @@ fn find_test_annotations(content: &String, child: Node) -> Vec<String> {
                 continue;
             };
 
-            let args_text = args_node.utf8_text(content.as_bytes()).unwrap_or("");
-            if args_text.contains("\"skip\"") {
+            let mut arg_cursor = args_node.walk();
+            let mut args = Vec::new();
+
+            for child in args_node.children(&mut arg_cursor) {
+                match child.kind() {
+                    "string_literal" => {
+                        let text = child.utf8_text(content.as_bytes()).unwrap_or("");
+                        let unquoted = text.trim_matches('"');
+                        args.push(unquoted.to_string());
+                    }
+                    "number_literal" => {
+                        let text = child.utf8_text(content.as_bytes()).unwrap_or("");
+                        args.push(text.to_string());
+                    }
+                    _ => {}
+                }
+            }
+
+            if args.len() >= 1 && args[0] == "skip" {
                 annotations.push("skip".to_string());
+            }
+
+            if args.len() >= 2 && args[0] == "fail_with" {
+                if let Ok(code) = args[1].parse::<i32>() {
+                    expected_exit_code = Some(code);
+                }
             }
         }
     }
-    annotations
+    TestAnnotations {
+        annotations,
+        expected_exit_code,
+    }
 }
 
 fn inject_locations_into_expect_calls(content: &str, file_path: &str) -> String {
