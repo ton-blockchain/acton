@@ -28,6 +28,21 @@ target/debug/acton test foo_test.tolk
 
 Copy `lib/` with the functions into your project.
 
+To define test, use `get fun test_*() {}` syntax:
+
+```tolk
+import "./lib/testing/expect"
+
+get fun test_something() {
+    expect(5 + 5).toEqual(10)
+}
+
+@custom("skip")
+get fun test_todo() {
+    // ...
+}
+```
+
 ```
 acton test foo_test.tolk            # single file
 acton test .                        # all test files in dir and subdirs
@@ -38,14 +53,14 @@ acton test --filter "test_Foo_.*" . # all test with `test_Foo` prefix
 
 #### skip — Skip the test
 
-```
+```tolk
 @custom("skip")
 get fun test_something() {}
 ```
 
 #### fail_with — Requires termination with the given exit code
 
-```
+```tolk
 @custom("fail_with", 10)
 get fun test_something() {}
 ```
