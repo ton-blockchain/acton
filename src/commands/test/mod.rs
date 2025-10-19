@@ -265,9 +265,12 @@ fn run_all_tests(
             ..
         } = result;
 
-        let exit_code = match &result.get_result {
-            GetMethodResult::Success(result) => result.vm_exit_code,
-            GetMethodResult::Error(_) => 999,
+        let (exit_code, gas_used) = match &result.get_result {
+            GetMethodResult::Success(result) => {
+                let gas_used = result.gas_used.parse::<u64>().unwrap_or(0);
+                (result.vm_exit_code, gas_used)
+            }
+            GetMethodResult::Error(_) => (999, 0),
         };
 
         let duration_ms = duration.as_millis();
@@ -278,7 +281,18 @@ fn run_all_tests(
         };
 
         let expected_exit_code = test.expected_exit_code.unwrap_or(0);
-        let test_passed = exit_code == expected_exit_code;
+        let mut test_passed = exit_code == expected_exit_code;
+
+        let gas_limit_exceeded = if let Some(limit) = test.gas_limit {
+            if gas_used > limit {
+                test_passed = false;
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         if test_passed {
             println!(
@@ -303,7 +317,14 @@ fn run_all_tests(
                 GetMethodResult::Success(result) => {
                     let exit_code = result.vm_exit_code as i64;
 
-                    if let Some(assert_failure) = assert_failure {
+                    if gas_limit_exceeded {
+                        println!(
+                            "    {} Gas limit exceeded: used {}, limit {}",
+                            "└─".dimmed(),
+                            gas_used.to_string().red(),
+                            test.gas_limit.unwrap().to_string().green()
+                        );
+                    } else if let Some(assert_failure) = assert_failure {
                         if let Some(message) = &assert_failure.message() {
                             if !message.is_empty() {
                                 let highlighted_message = highlight_actual_expected(message);
@@ -488,6 +509,7 @@ fn contract_address(code: &Arc<Cell>) -> TonAddress {
 struct TestAnnotations {
     pub annotations: Vec<String>,
     pub expected_exit_code: Option<i32>,
+    pub gas_limit: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -497,6 +519,7 @@ struct TestDescriptor {
     pub name: String,
     pub annotations: Vec<String>,
     pub expected_exit_code: Option<i32>,
+    pub gas_limit: Option<u64>,
 }
 
 fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
@@ -532,6 +555,7 @@ fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
                         name: name.to_string(),
                         annotations: test_annotations.annotations,
                         expected_exit_code: test_annotations.expected_exit_code,
+                        gas_limit: test_annotations.gas_limit,
                     }];
                 }
             };
@@ -544,10 +568,12 @@ fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
 fn find_test_annotations(content: &String, child: Node) -> TestAnnotations {
     let mut annotations = Vec::new();
     let mut expected_exit_code = None;
+    let mut gas_limit = None;
     let Some(annotations_node) = child.child_by_field_name("annotations") else {
         return TestAnnotations {
             annotations,
             expected_exit_code,
+            gas_limit,
         };
     };
 
@@ -593,11 +619,18 @@ fn find_test_annotations(content: &String, child: Node) -> TestAnnotations {
                     expected_exit_code = Some(code);
                 }
             }
+
+            if args.len() >= 2 && args[0] == "gas_limit" {
+                if let Ok(limit) = args[1].parse::<u64>() {
+                    gas_limit = Some(limit);
+                }
+            }
         }
     }
     TestAnnotations {
         annotations,
         expected_exit_code,
+        gas_limit,
     }
 }
 

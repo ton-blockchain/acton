@@ -66,3 +66,10 @@ get fun test_something() {}
 ```
 
 > Note: number literals only for now!
+
+#### gas_limit — Set the gas limit for the test
+
+```tolk
+@custom("gas_limit", 10000)
+get fun test_something() {}
+```

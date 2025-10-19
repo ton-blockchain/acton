@@ -241,7 +241,7 @@ fun Expectation<address>.toBeNoneAddress(self) {
 /// ```
 fun Expectation<address>.toBeExternalAddress(self) {
     if (!self.value.isExternal()) {
-        Assert.fail("Expected address to be external", self.location)
+        Assert.fail("Expected address to be external", self.location);
     }
 }
 
