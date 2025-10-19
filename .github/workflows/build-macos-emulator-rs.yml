@@ -1,11 +1,17 @@
 name: Build emulator-rs with TON static libraries
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
-    branches: [ master ]
+    branches:
+      - master
+  push:
+    branches:
+      - master
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
