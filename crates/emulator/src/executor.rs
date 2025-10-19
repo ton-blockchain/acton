@@ -1,11 +1,12 @@
-use crate::config::CONFIG;
+use crate::config::DEFAULT_CONFIG;
+use hex;
 use num_bigint::BigInt;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::ffi::{CString, c_void};
 use std::ptr::null;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellFamily, Store};
-use tycho_types::models::{Message, ShardAccount};
+use tycho_types::models::ShardAccount;
 use tycho_types::prelude::CellBuilder;
 
 pub struct Executor {
@@ -30,7 +31,7 @@ impl<T: Store + ?Sized> StoreExt for T {
 
 impl Executor {
     pub fn new() -> Self {
-        let config_cstr = CString::new(CONFIG).unwrap();
+        let config_cstr = CString::new(DEFAULT_CONFIG).unwrap();
         Executor {
             inner: unsafe { create_emulator(config_cstr.as_ptr(), 5) },
         }
@@ -38,42 +39,33 @@ impl Executor {
 
     pub fn run_transaction(
         &self,
-        account: ShardAccount,
-        mode: BigInt,
-        message: Message,
-    ) -> EmulationResult {
-        let msg_cell = message.to_cell();
-        self.run_transaction_cell(account, mode, msg_cell)
-    }
-
-    pub fn run_transaction_cell(
-        &self,
-        account: ShardAccount,
-        mode: BigInt,
         message: Cell,
+        mode: BigInt,
+        params: RunTransactionArgs,
     ) -> EmulationResult {
         let message = CString::new(Boc::encode_base64(message)).unwrap();
 
-        let shard_account_cell = account.to_cell();
+        let shard_account_cell = params.shard_account.to_cell();
         let shard_account_b64 = Boc::encode_base64(shard_account_cell);
         let shard_account_b64_cst = CString::new(shard_account_b64).unwrap();
 
-        let params = CString::new(r#"{"utime":0,"lt":"0","rand_seed":"0000000000000000000000000000000000000000000000000000000000000000","ignore_chksig":false,"debug_enabled":true}"#).unwrap();
+        let params = run_common_args_to_internal_params(&params);
+        let params_str = serde_json::to_string(&params).unwrap();
+        let params_cstr = CString::new(params_str).unwrap();
 
-        let result = unsafe {
+        let result_cstr = unsafe {
             emulate_with_emulator(
                 self.inner,
                 null(),
                 shard_account_b64_cst.as_ptr(),
                 message.as_ptr(),
-                params.as_ptr(),
+                params_cstr.as_ptr(),
             )
         };
 
-        let output_cstr = unsafe { CString::from_raw(result).to_string_lossy().to_string() };
-
-        let output = serde_json::from_str::<EmulationInternalResult>(&output_cstr).unwrap();
-        output.output
+        let output_str = unsafe { CString::from_raw(result_cstr).to_string_lossy().to_string() };
+        let result = serde_json::from_str::<EmulationInternalResult>(&output_str).unwrap();
+        result.output
     }
 
     pub fn register_ext_method(
@@ -86,6 +78,75 @@ impl Executor {
             transaction_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
         };
     }
+}
+
+pub fn run_common_args_to_internal_params(args: &RunTransactionArgs) -> EmulationInternalParams {
+    let rand_seed = match &args.random_seed {
+        Some(seed) => hex::encode(seed),
+        None => String::new(),
+    };
+
+    let prev_blocks_info = match &args.prev_blocks_info {
+        Some(_info) => {
+            panic!("TODO: Implement prev_blocks_info serialization")
+        }
+        None => None,
+    };
+
+    EmulationInternalParams {
+        utime: args.now,
+        lt: args.lt.to_string(),
+        rand_seed,
+        ignore_chksig: args.ignore_chksig,
+        debug_enabled: args.debug_enabled,
+        is_tick_tock: None,
+        is_tock: None,
+        prev_blocks_info,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ExecutorVerbosity {
+    Short = 0,
+    Full = 1,
+    FullLocation = 2,
+    FullLocationGas = 3,
+    FullLocationStack = 4,
+    FullLocationStackVerbose = 5,
+}
+
+#[derive(Debug, Clone)]
+pub struct PrevBlocksInfo {
+    // TODO: Add fields based on actual requirements
+}
+
+#[derive(Debug, Clone)]
+pub struct RunTransactionArgs {
+    pub config: String,
+    pub libs: Option<Cell>,
+    pub verbosity: ExecutorVerbosity,
+    pub shard_account: ShardAccount,
+    pub now: u32,
+    pub lt: BigInt,
+    pub random_seed: Option<Vec<u8>>,
+    pub ignore_chksig: bool,
+    pub debug_enabled: bool,
+    pub prev_blocks_info: Option<PrevBlocksInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmulationInternalParams {
+    pub utime: u32,
+    pub lt: String,
+    pub rand_seed: String,
+    pub ignore_chksig: bool,
+    pub debug_enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_tick_tock: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_tock: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prev_blocks_info: Option<String>,
 }
 
 #[derive(Deserialize)]

@@ -1,7 +1,11 @@
+use abi::ABI;
 use emulator::blockchain::Blockchain;
-use emulator::executor::{EmulationResult, Executor};
+use emulator::config::DEFAULT_CONFIG;
+use emulator::executor::{EmulationResult, Executor, ExecutorVerbosity, RunTransactionArgs};
+use emulator_rs::context::Context;
 use emulator_rs::{asserts_exts, exts, io_exts};
 use num_bigint::{BigInt, BigUint};
+use std::collections::HashMap;
 use std::path::Path;
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
@@ -29,9 +33,31 @@ fn main() {
     };
 
     let mut blockchain = Blockchain::new(Executor::new());
-    exts::register_extensions(&mut blockchain.executor, std::ptr::null_mut());
-    io_exts::register_extensions(&mut blockchain.executor, std::ptr::null_mut());
-    asserts_exts::register_extensions(&mut blockchain.executor, std::ptr::null_mut());
+
+    let mut test_blockchain = Blockchain::new(Executor::new());
+    let mut ctx = Context {
+        stdout_buffer: "".to_string(),
+        stderr_buffer: "".to_string(),
+        capture_test_output: true,
+        assert_failure: &mut None,
+        blockchain: &mut test_blockchain,
+        abi: ABI {
+            structs: HashMap::new(),
+        },
+    };
+
+    exts::register_extensions(
+        &mut blockchain.executor,
+        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
+    );
+    io_exts::register_extensions(
+        &mut blockchain.executor,
+        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
+    );
+    asserts_exts::register_extensions(
+        &mut blockchain.executor,
+        (&mut ctx) as *mut _ as *mut std::ffi::c_void,
+    );
 
     let state_init = CellBuilder::new()
         .store_bit(false)
@@ -78,9 +104,21 @@ fn main() {
 
     let msg_cell = Boc::decode_base64(msg.to_boc_b64(false).unwrap()).unwrap();
     let account = blockchain.get_account("".to_string());
+    let params = RunTransactionArgs {
+        config: DEFAULT_CONFIG.to_string(),
+        libs: None,
+        verbosity: ExecutorVerbosity::Short,
+        shard_account: account,
+        now: 0,
+        lt: Default::default(),
+        random_seed: None,
+        ignore_chksig: false,
+        debug_enabled: true,
+        prev_blocks_info: None,
+    };
     let output = blockchain
         .executor
-        .run_transaction_cell(account, BigInt::from(0), msg_cell);
+        .run_transaction(msg_cell, BigInt::from(0), params);
     match output {
         EmulationResult::Success(result) => {
             #[allow(deprecated)]
