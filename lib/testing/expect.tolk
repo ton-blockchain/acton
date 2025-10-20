@@ -414,8 +414,131 @@ fun Expectation<tuple>.toNotContain<U>(self, expected: U) {
 /// tuple.push(2);
 /// tuple.push(3);
 /// expect(tuple).toHaveLength(3);
+/// ```
 fun Expectation<tuple>.toHaveLength(self, length: int) {
     Assert.equal(self.value.size(), length, "expect(actual).toHaveLength(expected)", self.location);
+}
+
+/// Asserts that actual value represeneted as map contains the expected key.
+/// 
+/// Example:
+/// ```tolk
+/// var map = createEmptyMap<int32, int32>();
+/// map.set(1, 2);
+/// map.set(2, 3);
+/// expect(map).toContainKey(2);
+/// ```
+fun Expectation<map<K, V>>.toContainKey(self, key: K) {
+    val result = self.value.get(key);
+    if (!result.isFound) {
+        Assert.fail(format1("expect(actual).toContainKey(expected): Key '{}' not found in the map", key), self.location)
+    }
+}
+
+/// Asserts that actual value represeneted as map does NOT contain the expected key.
+/// 
+/// Example:
+/// ```tolk
+/// var map = createEmptyMap<int32, int32>();
+/// map.set(1, 2);
+/// map.set(2, 3);
+/// expect(map).toNotContainKey(4);
+/// ```
+fun Expectation<map<K, V>>.toNotContainKey(self, key: K) {
+    val result = self.value.get(key);
+    if (result.isFound) {
+        Assert.fail(format1("expect(actual).toNotContainKey(expected): Key '{}' is found in the map", key), self.location)
+    }
+}
+
+/// Asserts that actual value represeneted as map contains the expected value.
+/// 
+/// Example:
+/// ```tolk
+/// var map = createEmptyMap<int32, int32>();
+/// map.set(1, 2);
+/// map.set(2, 3);
+/// expect(map).toContainValue(2);
+/// ```
+fun Expectation<map<K, V>>.toContainValue(self, value: V) {
+    var r = self.value.findFirst();
+    while (r.isFound) {
+        val map_value = r.loadValue();
+        if (map_value == value) {
+            return;
+        }
+        r = self.value.iterateNext(r)
+    }
+
+    Assert.fail(format1("expect(actual).toContainValue(expected): Value '{}' not found in the map", value), self.location)
+}
+
+/// Asserts that actual value represeneted as map does NOT contain the expected value.
+/// 
+/// Example:
+/// ```tolk
+/// var map = createEmptyMap<int32, int32>();
+/// map.set(1, 2);
+/// map.set(2, 3);
+/// expect(map).toNotContainValue(4);
+/// ```
+fun Expectation<map<K, V>>.toNotContainValue(self, value: V) {
+    var r = self.value.findFirst();
+    while (r.isFound) {
+        val map_value = r.loadValue();
+        if (map_value == value) {
+            Assert.fail(format1("expect(actual).toNotContainValue(expected): Value '{}' is found in the map", value), self.location)
+        }
+        r = self.value.iterateNext(r)
+    }
+}
+
+/// Asserts that actual value represeneted as map is empty.
+/// 
+/// Example:
+/// ```tolk
+/// var map = createEmptyMap<int32, int32>();
+/// expect(map).toBeEmpty();
+/// ```
+fun Expectation<map<K, V>>.toBeEmpty(self) {
+    if (!self.value.isEmpty()) {
+        Assert.fail("expect(actual).toBeEmpty(): Map is not empty", self.location)
+    }
+}
+
+/// Asserts that actual value represeneted as map is not empty.
+/// 
+/// Example:
+/// ```tolk
+/// var map = createEmptyMap<int32, int32>();
+/// map.set(1, 2);
+/// map.set(2, 3);
+/// expect(map).toBeNonEmpty();
+/// ```
+fun Expectation<map<K, V>>.toBeNonEmpty(self) {
+    if (self.value.isEmpty()) {
+        Assert.fail("expect(actual).toBeNonEmpty(): Map is empty", self.location)
+    }
+}
+
+/// Asserts that actual value represeneted as map has the expected length.
+/// 
+/// Example:
+/// ```tolk
+/// var map = createEmptyMap<int32, int32>();
+/// map.set(1, 2);
+/// map.set(2, 3);
+/// expect(map).toHaveLength(2);
+/// ```
+fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
+    var map_length = 0;
+    var r = self.value.findFirst();
+    while (r.isFound) {
+        map_length += 1;
+        r = self.value.iterateNext(r)
+    }
+
+    Assert.equal(length, map_length, "expect(actual).toHaveLength(expected)", self.location)
 }
 
 /// Creates a new expectation for the given value.
