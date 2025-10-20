@@ -1,10 +1,15 @@
 use abi::StructDescription;
 use anyhow::anyhow;
 use num_bigint::{BigInt, BigUint};
+use owo_colors::OwoColorize;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 use tonlib_core::cell::{ArcCell, CellBuilder, CellParser};
 use tonlib_core::tlb_types::tlb::TLB;
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, Load};
+use tycho_types::models::{AccountStatus, ComputePhase, IntAddr, MsgInfo, Transaction, TxInfo};
 
 #[derive(Default, Debug, Clone)]
 pub struct Tuple(pub Vec<TupleItem>);
@@ -267,6 +272,10 @@ impl fmt::Display for TupleItem {
                     return write!(f, "{}", format_item_with_type(addr, type_name));
                 }
 
+                if type_name == "TransactionList" && items.len() == 1 {
+                    return write!(f, "{}", format_transaction_list(&items));
+                }
+
                 if items.len() == 1 {
                     write!(f, "{}", items[0])
                 } else {
@@ -306,6 +315,123 @@ impl fmt::Display for TupleItem {
             }
         }
     }
+}
+
+fn show_addr(addr: &IntAddr) -> String {
+    let raw = addr.as_std().unwrap().display_base64(false).to_string();
+    raw[..6].to_string() + ".." + &raw[raw.len() - 6..]
+}
+
+fn format_transaction_list(items: &&Vec<TupleItem>) -> String {
+    let item = &items[0];
+    let TupleItem::Tuple(items) = item else {
+        return format!("{}", items[0]);
+    };
+
+    let txs = items
+        .iter()
+        .filter_map(|el| match el {
+            TupleItem::Cell(cell) => Some(cell),
+            _ => None,
+        })
+        .map(|x| {
+            let result = x.to_boc_b64(false).unwrap();
+            let tx_cell: Cell = Boc::decode_base64(&result).unwrap();
+            let mut tx_slice = tx_cell.as_slice().unwrap();
+            Transaction::load_from(&mut tx_slice).unwrap()
+        })
+        .collect::<Vec<_>>();
+
+    let mut builder = "".to_string();
+
+    let mut known_contracts: HashSet<IntAddr> = HashSet::new();
+
+    for tx in &txs {
+        let in_msg = tx.load_in_msg().unwrap();
+        if let Some(in_msg) = &in_msg
+            && let MsgInfo::Int(info) = &in_msg.info
+        {
+            known_contracts.insert(info.src.clone());
+            known_contracts.insert(info.dst.clone());
+        }
+    }
+
+    let mut contract_letters: HashMap<IntAddr, String> = HashMap::new();
+
+    for (index, addr) in known_contracts.iter().enumerate() {
+        let letter = char::from_u32('A' as u32 + index as u32)
+            .unwrap_or_else(|| char::from_digit(index as u32, 10).unwrap());
+        contract_letters.insert(addr.clone(), letter.to_string());
+    }
+
+    for tx in txs {
+        let mut tx_builder = "\x1b[0m".to_string();
+
+        if tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active {
+            tx_builder += "account created\n"
+        }
+        if tx.orig_status == AccountStatus::Active && tx.end_status == AccountStatus::NotExists {
+            tx_builder += "account destroyed\n"
+        }
+
+        tx_builder += "\x1b[0m";
+        let in_msg = tx.load_in_msg().unwrap();
+        if let Some(in_msg) = &in_msg
+            && let MsgInfo::Int(info) = &in_msg.info
+        {
+            if info.bounced {
+                tx_builder += "(!) ".red().to_string().as_str()
+            }
+
+            let mut body = in_msg.body.clone();
+            let mut opcode = body.load_u32().unwrap_or(0);
+            if opcode == 0xFFFFFFFF {
+                // if bounce read another 32 bit to get actual opcode
+                opcode = body.load_u32().unwrap_or(0);
+            }
+
+            let amount = info.value.tokens.into_inner() as f64 / 1e9;
+            tx_builder += format!("0x{:x}", opcode)
+                .purple()
+                .bold()
+                .to_string()
+                .as_str();
+            tx_builder += " ";
+            tx_builder += show_addr(&info.src).dimmed().to_string().as_str();
+            tx_builder += " ";
+            tx_builder += &format!("{} TON", amount.to_string()).green().to_string();
+            tx_builder += " -> ";
+            tx_builder += show_addr(&info.dst).dimmed().to_string().as_str();
+
+            let letter = contract_letters.get(&info.dst);
+            if let Some(letter) = letter {
+                tx_builder += format!(" {}  ", letter.bold()).as_str();
+            }
+        }
+
+        let TxInfo::Ordinary(info) = tx.load_info().unwrap() else {
+            panic!("tick-tock message is unexpected")
+        };
+
+        if let ComputePhase::Executed(compute) = info.compute_phase {
+            tx_builder += format!(" gas={}", compute.gas_used.to_string().as_str())
+                .dimmed()
+                .to_string()
+                .as_str();
+
+            if compute.exit_code != 0 {
+                tx_builder += format!(" exit_code={}", compute.exit_code)
+                    .red()
+                    .to_string()
+                    .as_str();
+            }
+        }
+
+        builder.push_str(&tx_builder);
+        builder.push_str("\n");
+    }
+
+    builder
 }
 
 /// Serialize a tuple item to a cell builder

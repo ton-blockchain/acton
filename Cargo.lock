@@ -307,6 +307,7 @@ dependencies = [
  "hex",
  "num-bigint",
  "once_cell",
+ "owo-colors",
  "pkg-config",
  "serde",
  "serde_json",

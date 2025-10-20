@@ -39,7 +39,7 @@ impl Emulator {
                 verbosity: ExecutorVerbosity::FullLocation,
                 shard_account: dest_account,
                 now: 0,
-                lt: Default::default(),
+                lt: net.get_lt(),
                 random_seed: None,
                 ignore_chksig: false,
                 debug_enabled: true,
