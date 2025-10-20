@@ -1,3 +1,5 @@
+import "../fmt"
+
 const ASSERTION_FAILED = 567
 
 /// Root module for the assertion API.
@@ -136,7 +138,13 @@ fun Expectation<T>.toNotEqual<U>(self, expected: U) {
 /// expect(5).toBeLess(10);
 /// ```
 fun Expectation<int>.toBeLess<U>(self, expected: U) {
-    __assert_comparison(self.value, expected, "<", "expect(actual).toBeLess(expected)", self.location);
+    __assert_comparison(
+        self.value,
+        expected,
+        "<",
+        "expect(actual).toBeLess(expected)",
+        self.location
+    );
 }
 
 /// Asserts that actual value is greater than expected value.
@@ -146,7 +154,13 @@ fun Expectation<int>.toBeLess<U>(self, expected: U) {
 /// expect(10).toBeGreater(5);
 /// ```
 fun Expectation<int>.toBeGreater<U>(self, expected: U) {
-    __assert_comparison(self.value, expected, ">", "expect(actual).toBeGreater(expected)", self.location);
+    __assert_comparison(
+        self.value,
+        expected,
+        ">",
+        "expect(actual).toBeGreater(expected)",
+        self.location
+    );
 }
 
 /// Asserts that actual value is less than or equal to expected value.
@@ -157,7 +171,13 @@ fun Expectation<int>.toBeGreater<U>(self, expected: U) {
 /// expect(10).toBeLessOrEqual(10);
 /// ```
 fun Expectation<int>.toBeLessOrEqual<U>(self, expected: U) {
-    __assert_comparison(self.value, expected, "<=", "expect(actual).toBeLessOrEqual(expected)", self.location);
+    __assert_comparison(
+        self.value,
+        expected,
+        "<=",
+        "expect(actual).toBeLessOrEqual(expected)",
+        self.location
+    );
 }
 
 /// Asserts that actual value is greater than or equal to expected value.
@@ -168,7 +188,62 @@ fun Expectation<int>.toBeLessOrEqual<U>(self, expected: U) {
 /// expect(10).toBeGreaterOrEqual(10);
 /// ```
 fun Expectation<int>.toBeGreaterOrEqual<U>(self, expected: U) {
-    __assert_comparison(self.value, expected, ">=", "expect(actual).toBeGreaterOrEqual(expected)", self.location);
+    __assert_comparison(
+        self.value,
+        expected,
+        ">=",
+        "expect(actual).toBeGreaterOrEqual(expected)",
+        self.location
+    );
+}
+
+/// Asserts that actual value is approximately equal to expected value using absolute difference.
+/// 
+/// Example:
+/// ```tolk
+/// expect(10).toBeApproxEqAbs(15, 10); // ok, difference is 5, which is less than maximum allowed difference of 10
+/// expect(10).toBeApproxEqAbs(20, 5); // error, difference is 10, which is greater than maximum allowed difference of 5
+/// ```
+fun Expectation<int>.toBeApproxEqAbs(self, expected: int, max_delta: int) {
+    val real_delta = abs(self.value - expected);
+    if (real_delta > max_delta) {
+        __assert_fail(
+            format4(
+                "{} !~= {} (max delta: {}, real delta: {}",
+                self.value,
+                expected,
+                max_delta,
+                real_delta
+            ),
+            self.location
+        );
+        throw ASSERTION_FAILED;
+    }
+}
+
+/// Asserts that actual value is approximately equal to expected value using difference in percentage.
+/// 
+/// Example:
+/// ```tolk
+/// expect(10).toBeApproxEqRel(15, 60); // ok, difference is 50%, which is less than maximum allowed difference of 60%
+/// expect(10).toBeApproxEqRel(20, 50); // error, difference is 100%, which is greater than maximum allowed difference of 50%
+/// ```
+fun Expectation<int>.toBeApproxEqRel(self, expected: int, max_delta: int) {
+    val value_delta = abs(self.value - expected);
+    val percent = mulDivFloor(value_delta, 100, self.value);
+    if (percent > max_delta) {
+        __assert_fail(
+            format4(
+                "{} !~= {} (max delta: {}%, real delta: {}%",
+                self.value,
+                expected,
+                max_delta,
+                percent
+            ),
+            self.location
+        );
+        throw ASSERTION_FAILED;
+    }
 }
 
 /// Asserts that actual value is null.
@@ -393,23 +468,17 @@ fun __nan(): int
 /// Internal helper function for comparison assertions.
 ///
 /// Don't use this function directly. Use comparison methods instead.
-fun __assert_comparison<V1, V2>(
-    left: V1,
-    right: V2,
-    op: slice,
-    message: slice,
-    location: slice
-) {
+fun __assert_comparison<V1, V2>(left: V1, right: V2, op: slice, message: slice, location: slice) {
     if (
-    !__assert_bin(
-        op,
-        __typeName(left),
-        left.__toTuple(),
-        __typeName(right),
-        right.__toTuple(),
-        message,
-        location
-    )
+        !__assert_bin(
+            op,
+            __typeName(left),
+            left.__toTuple(),
+            __typeName(right),
+            right.__toTuple(),
+            message,
+            location
+        )
     ) {
         throw ASSERTION_FAILED;
     }
