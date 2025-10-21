@@ -1,19 +1,21 @@
-import "../contracts/errors"
-import "../contracts/messages"
-import "../contracts/storage"
+// Acton library imports
 import "../../lib/emulation/methods"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/types/transaction"
 import "../../lib/testing/transaction_expect"
 
+// Jetton contract imports
+import "../contracts/errors"
+import "../contracts/messages"
+import "../contracts/storage"
+
 struct JettonWallet {
     address: address
-    init: ContractState?
 }
 
 fun JettonWallet.fromAddress(addr: address) {
-    return JettonWallet { address: addr, init: null }
+    return JettonWallet { address: addr }
 }
 
 fun JettonWallet.getJettonBalance(self, net: Network): coins {
