@@ -19,11 +19,11 @@ struct SendParams {
     value: int
 }
 
-fun Network.send(self, message: OutMessage, mode: int): TransactionList {
+fun Network.sendFromNull(self, message: OutMessage, mode: int): TransactionList {
     return sendMessage(message.messageCell, mode)!
 }
 
-fun Network.sendFrom(self, from: address, message: OutMessage, mode: int): TransactionList {
+fun Network.send(self, from: address, message: OutMessage, mode: int): TransactionList {
     return sendMessageFrom(message.messageCell, from.toCell(), mode)!
 }
 
@@ -48,7 +48,7 @@ fun Network.treasury(self, name: slice): Treasury {
         },
     });
     // Deploy treasury
-    self.send(msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    self.sendFromNull(msg, SEND_MODE_PAY_FEES_SEPARATELY);
     return Treasury { address }
 }
 

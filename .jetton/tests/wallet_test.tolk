@@ -40,7 +40,7 @@ fun JettonWallet.sendTransfer(self, net: Network, from: address, value: int, jet
             forwardPayload: beginCell().storeMaybeRef(forwardPayload.toCell()).endCell().beginParse(),
         },
     });
-    return net.sendFrom(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonWallet.sendBurn(self, net: Network, from: address, value: int, jettonAmount: int, responseAddress: address, customPayload: cell?): TransactionList {
@@ -55,7 +55,7 @@ fun JettonWallet.sendBurn(self, net: Network, from: address, value: int, jettonA
             customPayload: customPayload,
         },
     });
-    return net.sendFrom(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.sendDiscovery(self, net: Network, from: address, ownerAddress: address, includeOwnerAddress: bool): TransactionList {
@@ -69,7 +69,7 @@ fun JettonMinter.sendDiscovery(self, net: Network, from: address, ownerAddress: 
             includeOwnerAddress: includeOwnerAddress,
         },
     });
-    return net.sendFrom(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.sendChangeContent(self, net: Network, from: address, newContent: cell): TransactionList {
@@ -82,7 +82,7 @@ fun JettonMinter.sendChangeContent(self, net: Network, from: address, newContent
             newContent: newContent,
         },
     });
-    return net.sendFrom(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 struct JettonMinter {
@@ -113,7 +113,7 @@ fun JettonMinter.sendDeploy(self, net: Network, params: SendParams) {
             stateInit: self.init,
         },
     });
-    return net.sendFrom( net.treasury("trasury").address, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(net.treasury("trasury").address, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.sendMint(self, net: Network, from: address, recipient: address, jetton_amount: int, forward_ton_amount: int, total_ton_amount: int) {
@@ -135,7 +135,7 @@ fun JettonMinter.sendMint(self, net: Network, from: address, recipient: address,
             }.toCell(),
         },
     });
-    return net.sendFrom(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.sendChangeAdmin(self, net: Network, from: address, new_owner: address) {
@@ -148,7 +148,7 @@ fun JettonMinter.sendChangeAdmin(self, net: Network, from: address, new_owner: a
             newAdminAddress: new_owner,
         },
     });
-    return net.sendFrom(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.getJettonData(self, net: Network): JettonDataReply {
@@ -578,7 +578,7 @@ get fun `test-check-revert-on-not-enough-tons-for-forward`() {
         dest: deployer_jetton_wallet.address,
         body: createEmptySlice(),
     });
-    net.sendFrom(deployer.address, ton_transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    net.send(deployer.address, ton_transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY);
 
     val sent_amount = ton("0.1");
     val forward_amount = ton("0.3");
@@ -642,7 +642,7 @@ get fun `test-wallet-does-not-accept-internal-transfer-not-from-wallet`() {
         }
     });
 
-    val send_result = net.sendFrom(not_deployer.address, internal_transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val send_result = net.send(not_deployer.address, internal_transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY);
 
     expect(send_result).toHaveFailedTx({
         from: not_deployer.address,
@@ -804,7 +804,7 @@ get fun `test-minter-should-only-accept-burn-messages-from-jetton-wallets`() {
         }
     });
 
-    val send_result_wrong = net.sendFrom(deployer_jetton_wallet.address, burn_notification_wrong, SEND_MODE_PAY_FEES_SEPARATELY);
+    val send_result_wrong = net.send(deployer_jetton_wallet.address, burn_notification_wrong, SEND_MODE_PAY_FEES_SEPARATELY);
 
     expect(send_result_wrong).toHaveFailedTx({
         from: deployer_jetton_wallet.address,
@@ -825,7 +825,7 @@ get fun `test-minter-should-only-accept-burn-messages-from-jetton-wallets`() {
         }
     });
 
-    val send_result_correct = net.sendFrom(deployer_jetton_wallet.address, burn_notification_correct, SEND_MODE_PAY_FEES_SEPARATELY);
+    val send_result_correct = net.send(deployer_jetton_wallet.address, burn_notification_correct, SEND_MODE_PAY_FEES_SEPARATELY);
 
     expect(send_result_correct).toHaveSuccesfulTx({
         from: deployer_jetton_wallet.address,
@@ -901,7 +901,7 @@ get fun `test-wallet-should-restore-balance-on-internal-transfer-bounce`() {
         }.toCell(),
     });
 
-    val transfer_result = net.sendFrom(deployer.address, transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val transfer_result = net.send(deployer.address, transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY);
     expect(transfer_result).toHaveSuccesfulTx({
         from: deployer.address,
         to: deployer_jetton_wallet.address
@@ -918,7 +918,7 @@ get fun `test-wallet-should-restore-balance-on-internal-transfer-bounce`() {
         body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(beginCell().storeUint(0x178d4519, 32).storeUint(0, 64).storeCoins(tx_amount).storeAddress(deployer.address).storeAddress(deployer.address).storeCoins(ton("0.05")).storeUint(0, 1).endCell().beginParse()).endCell(),
     });
 
-    val bounce_result = net.sendFrom(not_deployer_jetton_wallet.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val bounce_result = net.send(not_deployer_jetton_wallet.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
     expect(bounce_result).toHaveSuccesfulTx({
         from: not_deployer_jetton_wallet.address,
         to: deployer_jetton_wallet.address
@@ -960,7 +960,7 @@ get fun `test-wallet-should-restore-balance-on-burn-notification-bounce`() {
         }.toCell(),
     });
 
-    val burn_result = net.sendFrom(deployer.address, burn_msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val burn_result = net.send(deployer.address, burn_msg, SEND_MODE_PAY_FEES_SEPARATELY);
     expect(burn_result).toHaveSuccesfulTx({
         from: deployer.address,
         to: deployer_jetton_wallet.address
@@ -977,7 +977,7 @@ get fun `test-wallet-should-restore-balance-on-burn-notification-bounce`() {
         body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(beginCell().storeUint(0x7bdd97de, 32).storeUint(0, 64).storeCoins(burn_amount).storeAddress(deployer.address).storeAddress(deployer.address).endCell().beginParse()).endCell(),
     });
 
-    val bounce_result = net.sendFrom(minter.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val bounce_result = net.send(minter.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
     expect(bounce_result).toHaveSuccesfulTx({
         from: minter.address,
         to: deployer_jetton_wallet.address
