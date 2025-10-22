@@ -3,6 +3,8 @@ struct (0b01) Frozen
 struct (0b10) Active
 struct (0b11) NonExisting
 
+type TransactionList = tuple
+
 type AccountStatus = Uninitialized | Frozen | Active | NonExisting
 
 struct Transaction {

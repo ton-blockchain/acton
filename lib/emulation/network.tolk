@@ -1,5 +1,5 @@
 import "../build/build"
-import "../testing/transaction_expect"
+import "../types/transaction"
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679

@@ -210,7 +210,7 @@ get fun `test-can-mint`() {
     expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: wallet.address });
 
     // excesses
-    expect(mint_result).toHaveSuccesfulTx({ from: wallet.address, to: minter.address }, 65535);
+    expect(mint_result).toHaveSuccesfulTx({ from: wallet.address, to: minter.address, exit_code: 65535 });
 
     // check state
     expect(wallet.getJettonBalance(net)).toEqual(initial_jetton_balance);
@@ -917,8 +917,9 @@ get fun `test-wallet-should-restore-balance-on-internal-transfer-bounce`() {
     val bounce_result = net.send(not_deployer_jetton_wallet.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
     expect(bounce_result).toHaveSuccesfulTx({
         from: not_deployer_jetton_wallet.address,
-        to: deployer_jetton_wallet.address
-    }, 0xFFFF);
+        to: deployer_jetton_wallet.address,
+        exit_code: 0xFFFF,
+    });
 
     // Balance should be restored
     expect(deployer_jetton_wallet.getJettonBalance(net)).toEqual(balance_before);
@@ -976,8 +977,9 @@ get fun `test-wallet-should-restore-balance-on-burn-notification-bounce`() {
     val bounce_result = net.send(minter.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
     expect(bounce_result).toHaveSuccesfulTx({
         from: minter.address,
-        to: deployer_jetton_wallet.address
-    }, 0xFFFF);
+        to: deployer_jetton_wallet.address,
+        exit_code: 0xFFFF,
+    });
 
     // Balance should be restored
     expect(deployer_jetton_wallet.getJettonBalance(net)).toEqual(balance_before);
