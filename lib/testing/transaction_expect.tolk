@@ -1,4 +1,5 @@
 import "expect"
+import "assert"
 import "../types/transaction"
 
 /// Represents a set of parameters to search for a transaction in the transaction list.
