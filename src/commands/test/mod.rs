@@ -380,7 +380,6 @@ fn run_all_tests(
         };
 
         if test_passed {
-            TeamcityReporter::on_test_finished(&test.name, file_path, duration_ms);
             println!(
                 "  {} {} {}{}",
                 "✓".green(),
@@ -599,6 +598,8 @@ fn run_all_tests(
                 println!("       {}", line.bright_red());
             }
         }
+
+        TeamcityReporter::on_test_finished(&test.name, file_path, duration_ms);
     }
 
     if !filtered_tests.is_empty() && teamcity {
