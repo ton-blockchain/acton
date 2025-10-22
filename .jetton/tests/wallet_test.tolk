@@ -1,9 +1,9 @@
 // Acton library imports
-import "../../lib/emulation/methods"
+import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
-import "../../lib/types/transaction"
 import "../../lib/testing/transaction_expect"
+import "../../lib/types/transaction"
 
 // Jetton contract imports
 import "../contracts/errors"
