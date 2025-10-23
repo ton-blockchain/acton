@@ -1,4 +1,5 @@
 import "../build/build"
+import "../ffi/ffi"
 import "../types/transaction"
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
@@ -42,7 +43,7 @@ struct SendParams {
 
 /// Internal method, don't use it directly.
 fun Network.sendFromNull(self, message: OutMessage, mode: int): TransactionList {
-    return __sendMessage(message.messageCell, mode)!
+    return ffi.sendMessage(message.messageCell, mode)!
 }
 
 /// Send a message from a specified address with specified mode.
@@ -60,7 +61,7 @@ fun Network.sendFromNull(self, message: OutMessage, mode: int): TransactionList 
 /// }
 /// ```
 fun Network.send(self, from: address, message: OutMessage, mode: int): TransactionList {
-    return __sendMessageFrom(message.messageCell, from.toCell(), mode)!
+    return ffi.sendMessageFrom(message.messageCell, from.toCell(), mode)!
 }
 
 /// Treasury is a special contract that is used to deploy other contracts.
@@ -163,20 +164,20 @@ fun Network.runGetMethodById<Ret, Args = tuple>(self, addr: address, id: int, ar
     }
 
     val args_to_send = args == null ? createEmptyTuple() : args.__toTuple();
-    val res = __runGetMethod(addr.toCell(), code, id, Ret.__typeName2(), args_to_send);
+    val res = ffi.runGetMethod(addr.toCell(), code, id, Ret.__typeName2(), args_to_send);
     return Ret.fromTuple(res)
 }
 
 /// Check if a contract with a specified address is deployed.
 fun Network.isDeployed(self, addr: address): bool {
-    return __isDeployed(addr.toCell())
+    return ffi.isDeployed(addr.toCell())
 }
 
 /// Get the code of a deployed contract by its address.
 /// 
 /// If the contract is not deployed, returns null.
 fun Network.getDeployedCode(self, addr: address): cell? {
-    return __getDeployedCode(addr.toCell())
+    return ffi.getDeployedCode(addr.toCell())
 }
 
 /// Calculate the CRC16 checksum of a slice.
@@ -198,8 +199,8 @@ fun __treasuryCode(): cell asm """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
-fun __sendMessage(msg: cell, mode: int): TransactionList? asm "7 EXTCALL"
-fun __sendMessageFrom(msg: cell, from: cell, mode: int): TransactionList? asm "9 EXTCALL"
-fun __runGetMethod(addr: cell, code: cell, id: int, return_type: slice, args: tuple): tuple asm "8 EXTCALL"
-fun __isDeployed(addr: cell): bool asm "11 EXTCALL"
-fun __getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
+fun ffi.sendMessage(msg: cell, mode: int): TransactionList? asm "7 EXTCALL"
+fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): TransactionList? asm "9 EXTCALL"
+fun ffi.runGetMethod(addr: cell, code: cell, id: int, return_type: slice, args: tuple): tuple asm "8 EXTCALL"
+fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
+fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"

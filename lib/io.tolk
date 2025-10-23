@@ -1,3 +1,5 @@
+import "ffi/ffi"
+
 /// Prints the given value to the standard output.
 /// 
 /// Example:
@@ -11,7 +13,7 @@
 /// });
 /// ```
 fun println<T>(value: T): void {
-    __println_impl(__typeName(value), value.__toTuple());
+    ffi.println(__typeName(value), value.__toTuple());
 }
 
 /// Prints the given slice string to the standard error output.
@@ -21,10 +23,10 @@ fun println<T>(value: T): void {
 /// eprintln("Something went wrong");
 /// ```
 fun eprintln(str: slice): void {
-    __eprintln_impl(str);
+    ffi.eprintln(str);
 }
 
-fun __println_impl(type_name: slice, str: tuple): void
+fun ffi.println(type_name: slice, str: tuple): void
     asm "1 EXTCALL"
-fun __eprintln_impl(str: slice): void
+fun ffi.eprintln(str: slice): void
     asm "2 EXTCALL"

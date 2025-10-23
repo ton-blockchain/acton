@@ -140,7 +140,6 @@ fun OutMessage.outActions(self, mode: int): OutActionList {
 }
 
 fun vm.outActions(): OutActionList {
-    // val actions = OutAction.fromCell(vm.getC5());
     var result = createEmptyTuple();
 
     val root = vm.getC5() as Cell<OutList>;

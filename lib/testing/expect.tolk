@@ -1,5 +1,6 @@
 import "assert"
 import "../fmt"
+import "../ffi/ffi"
 
 /// Internal struct to represent an expectation for a value.
 /// 
@@ -62,7 +63,7 @@ fun Expectation<T>.toNotEqual<U>(self, expected: U) {
 /// expect(5).toBeLess(10);
 /// ```
 fun Expectation<int>.toBeLess<U>(self, expected: U) {
-    __assert_comparison(
+    ffi.assert_comparison(
         self.value,
         expected,
         "<",
@@ -78,7 +79,7 @@ fun Expectation<int>.toBeLess<U>(self, expected: U) {
 /// expect(10).toBeGreater(5);
 /// ```
 fun Expectation<int>.toBeGreater<U>(self, expected: U) {
-    __assert_comparison(
+    ffi.assert_comparison(
         self.value,
         expected,
         ">",
@@ -95,7 +96,7 @@ fun Expectation<int>.toBeGreater<U>(self, expected: U) {
 /// expect(10).toBeLessOrEqual(10);
 /// ```
 fun Expectation<int>.toBeLessOrEqual<U>(self, expected: U) {
-    __assert_comparison(
+    ffi.assert_comparison(
         self.value,
         expected,
         "<=",
@@ -112,7 +113,7 @@ fun Expectation<int>.toBeLessOrEqual<U>(self, expected: U) {
 /// expect(10).toBeGreaterOrEqual(10);
 /// ```
 fun Expectation<int>.toBeGreaterOrEqual<U>(self, expected: U) {
-    __assert_comparison(
+    ffi.assert_comparison(
         self.value,
         expected,
         ">=",
@@ -131,7 +132,7 @@ fun Expectation<int>.toBeGreaterOrEqual<U>(self, expected: U) {
 fun Expectation<int>.toBeApproxEqAbs(self, expected: int, max_delta: int) {
     val real_delta = abs(self.value - expected);
     if (real_delta > max_delta) {
-        __assert_fail(
+        ffi.assert_fail(
             format4(
                 "{} !~= {} (max delta: {}, real delta: {}",
                 self.value,
@@ -156,7 +157,7 @@ fun Expectation<int>.toBeApproxEqRel(self, expected: int, max_delta: int) {
     val value_delta = abs(self.value - expected);
     val percent = mulDivFloor(value_delta, 100, self.value);
     if (percent > max_delta) {
-        __assert_fail(
+        ffi.assert_fail(
             format4(
                 "{} !~= {} (max delta: {}%, real delta: {}%",
                 self.value,
@@ -217,7 +218,7 @@ fun Expectation<slice>.toBeEmpty(self) {
 /// expect(nan()).toBeNaN();
 /// ```
 fun Expectation<int>.toBeNaN(self) {
-    Assert.equal(self.value, __nan(), "expect(actual).toBeNaN()", self.location);
+    Assert.equal(self.value, ffi.nan(), "expect(actual).toBeNaN()", self.location);
 }
 
 /// Asserts that actual value is not NaN.
@@ -227,7 +228,7 @@ fun Expectation<int>.toBeNaN(self) {
 /// expect(nan()).toBeNonNaN();
 /// ```
 fun Expectation<int>.toBeNonNaN(self) {
-    Assert.notEqual(self.value, __nan(), "expect(actual).toBeNonNaN()", self.location);
+    Assert.notEqual(self.value, ffi.nan(), "expect(actual).toBeNonNaN()", self.location);
 }
 
 /// Asserts that actual value is true.
@@ -507,17 +508,17 @@ fun expectToEndWithExitCode(code: int): void
 /// 
 /// Example:
 /// ```tolk
-/// expect(nan()).toBeNaN();
+/// expect(ffi.nan()).toBeNaN();
 /// ```
-fun __nan(): int
+fun ffi.nan(): int
     asm "PUSHNAN"
 
 /// Internal helper function for comparison assertions.
 ///
 /// Don't use this function directly. Use comparison methods instead.
-fun __assert_comparison<V1, V2>(left: V1, right: V2, op: slice, message: slice, location: slice) {
+fun ffi.assert_comparison<V1, V2>(left: V1, right: V2, op: slice, message: slice, location: slice) {
     if (
-        !__assert_bin(
+        !ffi.assert_bin(
             op,
             __typeName(left),
             left.__toTuple(),

@@ -1,5 +1,6 @@
 import "@stdlib/gas-payments"
 import "../fmt"
+import "../ffi/ffi"
 
 const ASSERTION_FAILED = 567
 
@@ -30,7 +31,7 @@ struct Assert
 /// with automatic location tracking.
 fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
     if (
-    !__assert_bin(
+    !ffi.assert_bin(
         "==",
         __typeName(left),
         left.__toTuple(),
@@ -54,7 +55,7 @@ fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: sli
 /// with automatic location tracking.
 fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
     if (
-    !__assert_bin(
+    !ffi.assert_bin(
         "!=",
         __typeName(left),
         left.__toTuple(),
@@ -74,7 +75,7 @@ fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: 
 /// Optional location can be provided to specify the location of the failure to
 /// be printed in the error message.
 fun Assert.fail(message: slice = "", location: slice = ""): never {
-    __assert_fail(message, location);
+    ffi.assert_fail(message, location);
     throw ASSERTION_FAILED;
 }
 
@@ -99,7 +100,7 @@ fun Assert.fail(message: slice = "", location: slice = ""): never {
 fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn();
-    __assert_consumed_les(start, expected);
+    ffi.assert_consumed_less(start, expected);
     return result;
 }
 
@@ -122,7 +123,7 @@ fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
 fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1);
-    __assert_consumed_les(start, expected);
+    ffi.assert_consumed_less(start, expected);
     return result;
 }
 
@@ -143,7 +144,7 @@ fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected:
 fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(fn: (Arg1, Arg2) -> Ret, arg1: Arg1, arg2: Arg2, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2);
-    __assert_consumed_les(start, expected);
+    ffi.assert_consumed_less(start, expected);
     return result;
 }
 
@@ -164,14 +165,14 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(fn: (Arg1, Arg2) -> Ret, arg1: Arg
 fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(fn: (Arg1, Arg2, Arg3) -> Ret, arg1: Arg1, arg2: Arg2, arg3: Arg3, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2, arg3);
-    __assert_consumed_les(start, expected);
+    ffi. assert_consumed_less(start, expected);
     return result;
 }
 
 /// Internal function to assert that the function consumed less than the expected amount of gas.
 /// 
 /// NOT FOR PUBLIC USE.
-fun __assert_consumed_les(start: int, expected: int) {
+fun ffi.assert_consumed_less(start: int, expected: int) {
     val consumed = getGasConsumedAtTheMoment() - start;
     if (consumed > expected) {
         Assert.fail(format2("Gas consumption was expected to be less than or equal to {}, but {} was consumed", expected, consumed))
@@ -181,7 +182,7 @@ fun __assert_consumed_les(start: int, expected: int) {
 /// Internal function to assert two values are equal or not equal.
 ///
 /// NOT FOR PUBLIC USE.
-fun __assert_bin<V1, V2>(
+fun ffi.assert_bin<V1, V2>(
     op: slice,
     left_name: slice,
     left: V1,
@@ -195,5 +196,5 @@ fun __assert_bin<V1, V2>(
 /// Internal function to fail the test with the given message and location.
 ///
 /// NOT FOR PUBLIC USE.
-fun __assert_fail(message: slice = "", location: slice = ""): bool
+fun ffi.assert_fail(message: slice = "", location: slice = ""): bool
     asm "100 EXTCALL"
