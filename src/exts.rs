@@ -118,7 +118,10 @@ fn find_transaction_by_params_impl(
 
     let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
         Some(value) => value,
-        None => return,
+        None => {
+            stack.push(TupleItem::Null);
+            return;
+        }
     };
 
     let found = parsed_txs.iter().filter_map(|tx| {
@@ -168,6 +171,8 @@ fn find_transaction_by_params_impl(
                     return None;
                 }
             }
+        } else {
+            return None;
         }
 
         return Some(tx);

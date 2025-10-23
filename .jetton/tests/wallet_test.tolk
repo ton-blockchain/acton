@@ -987,6 +987,16 @@ get fun `test-can-not-send-to-masterchain`() {
     val (minter, deployer, _) = setup_test();
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
+
+    val mint_result = minter.sendMint(
+        deployer.address,
+        deployer.address,
+        ton("2"),
+        ton("0.05"),
+        ton("1")
+    );
+    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+
     val sent_amount = ton("0.5");
     val forward_amount = ton("0.05");
 
