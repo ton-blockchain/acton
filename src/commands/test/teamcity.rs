@@ -126,7 +126,7 @@ impl TeamcityReporter {
             }
 
             println!(
-                "##teamcity[testFailed name='{}' nodeId='test_{}' duration='{}' message='Test failed' details='{}']",
+                "##teamcity[testFailed name='{}' nodeId='test_{}' duration='{}' message='Assertion failed' details='{}']",
                 name,
                 name,
                 duration_ms,
