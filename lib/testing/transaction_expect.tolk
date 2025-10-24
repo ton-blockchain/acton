@@ -26,11 +26,11 @@ struct SearchParams {
 /// Example:
 /// 
 /// ```
-/// expect(txs).toHaveSuccesfulDeploy({
+/// expect(txs).toHaveSuccessfulDeploy({
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<TransactionList>.toHaveSuccesfulDeploy(self, params: SearchParams) {
+fun Expectation<TransactionList>.toHaveSuccessfulDeploy(self, params: SearchParams) {
     params.exit_code = 0;
     params.deploy = true;
 
@@ -38,7 +38,7 @@ fun Expectation<TransactionList>.toHaveSuccesfulDeploy(self, params: SearchParam
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
-            "expect(actual).toHaveSuccesfulDeploy(expected)",
+            "expect(actual).toHaveSuccessfulDeploy(expected)",
             self.value,
             params.__toTuple()
         );
@@ -53,12 +53,12 @@ fun Expectation<TransactionList>.toHaveSuccesfulDeploy(self, params: SearchParam
 /// 
 /// Example:
 /// ```
-/// expect(txs).toHaveSuccesfulTx({
+/// expect(txs).toHaveSuccessfulTx({
 ///     from: deployer.address,
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<TransactionList>.toHaveSuccesfulTx(self, params: SearchParams) {
+fun Expectation<TransactionList>.toHaveSuccessfulTx(self, params: SearchParams) {
     if (params.exit_code == null) {
         params.exit_code = 0;
     }
@@ -67,7 +67,7 @@ fun Expectation<TransactionList>.toHaveSuccesfulTx(self, params: SearchParams) {
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
-            "expect(actual).toHaveSuccesfulTx(expected)",
+            "expect(actual).toHaveSuccessfulTx(expected)",
             self.value,
             params.__toTuple()
         );

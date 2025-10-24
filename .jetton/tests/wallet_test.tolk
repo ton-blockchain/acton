@@ -183,7 +183,7 @@ fun setup_test(): (JettonMinter, Treasury, Treasury) {
     });
 
     val transactions = minter.sendDeploy({ value: ton("10") });
-    expect(transactions).toHaveSuccesfulDeploy({ to: minter.address });
+    expect(transactions).toHaveSuccessfulDeploy({ to: minter.address });
 
     val not_deployer = net.treasury("not_deployer");
 
@@ -204,10 +204,10 @@ get fun `test-can-mint`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: wallet.address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: wallet.address });
 
     // excesses
-    expect(mint_result).toHaveSuccesfulTx({ from: wallet.address, to: minter.address, exit_code: 65535 });
+    expect(mint_result).toHaveSuccessfulTx({ from: wallet.address, to: minter.address, exit_code: 65535 });
 
     // check state
     expect(wallet.getJettonBalance()).toEqual(initial_jetton_balance);
@@ -240,7 +240,7 @@ get fun `test-minter-admin-can-change-admin`() {
     expect(admin_before).toEqual(deployer.address);
 
     val changeAdminResult = minter.sendChangeAdmin(deployer.address, not_deployer.address);
-    expect(changeAdminResult).toHaveSuccesfulTx({ from: deployer.address, to: minter.address });
+    expect(changeAdminResult).toHaveSuccessfulTx({ from: deployer.address, to: minter.address });
 
     val admin_after = minter.getAdminAddress();
     expect(admin_after).toEqual(not_deployer.address);
@@ -272,7 +272,7 @@ get fun `test-minter-admin-can-change-content`() {
 
     // Change content as admin
     val change_result = minter.sendChangeContent(deployer.address, new_content);
-    expect(change_result).toHaveSuccesfulTx({
+    expect(change_result).toHaveSuccessfulTx({
         from: deployer.address,
         to: minter.address
     });
@@ -282,7 +282,7 @@ get fun `test-minter-admin-can-change-content`() {
 
     // Change back to original content
     val change_back_result = minter.sendChangeContent(deployer.address, initial_content);
-    expect(change_back_result).toHaveSuccesfulTx({
+    expect(change_back_result).toHaveSuccessfulTx({
         from: deployer.address,
         to: minter.address
     });
@@ -322,7 +322,7 @@ get fun `test-wallet-owner-should-be-able-to-send-jettons`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -345,8 +345,8 @@ get fun `test-wallet-owner-should-be-able-to-send-jettons`() {
         null
     );
 
-    expect(send_result).toHaveSuccesfulTx({ from: not_deployer_jetton_wallet.address, to: deployer.address }); // excesses
-    expect(send_result).toHaveSuccesfulTx({ from: not_deployer_jetton_wallet.address, to: not_deployer.address }); // notification
+    expect(send_result).toHaveSuccessfulTx({ from: not_deployer_jetton_wallet.address, to: deployer.address }); // excesses
+    expect(send_result).toHaveSuccessfulTx({ from: not_deployer_jetton_wallet.address, to: not_deployer.address }); // notification
 
     expect(deployer_jetton_wallet.getJettonBalance()).toEqual(initial_jetton_balance - sent_amount);
     expect(not_deployer_jetton_wallet.getJettonBalance()).toEqual(initial_jetton_balance_2 + sent_amount);
@@ -364,7 +364,7 @@ get fun `test-not-wallet-owner-should-not-be-able-to-send-jettons`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -408,7 +408,7 @@ get fun `test-impossible-to-send-too-much-jettons`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -451,7 +451,7 @@ get fun `test-correctly-sends-forward-payload`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -474,12 +474,12 @@ get fun `test-correctly-sends-forward-payload`() {
         forward_payload
     );
 
-    expect(send_result).toHaveSuccesfulTx({
+    expect(send_result).toHaveSuccessfulTx({
         from: not_deployer_jetton_wallet.address,
         to: deployer.address
     }); // excesses
 
-    expect(send_result).toHaveSuccesfulTx({
+    expect(send_result).toHaveSuccessfulTx({
         from: not_deployer_jetton_wallet.address,
         to: not_deployer.address
     }); // notification
@@ -499,7 +499,7 @@ get fun `test-no-forward-ton-amount-no-forward`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -522,7 +522,7 @@ get fun `test-no-forward-ton-amount-no-forward`() {
         forward_payload
     );
 
-    expect(send_result).toHaveSuccesfulTx({
+    expect(send_result).toHaveSuccessfulTx({
         from: not_deployer_jetton_wallet.address,
         to: deployer.address
     }); // excesses
@@ -547,7 +547,7 @@ get fun `test-check-revert-on-not-enough-tons-for-forward`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -601,7 +601,7 @@ get fun `test-wallet-does-not-accept-internal-transfer-not-from-wallet`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -643,7 +643,7 @@ get fun `test-wallet-owner-should-be-able-to-burn-jettons`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -659,12 +659,12 @@ get fun `test-wallet-owner-should-be-able-to-burn-jettons`() {
         null // custom payload
     );
 
-    expect(send_result).toHaveSuccesfulTx({
+    expect(send_result).toHaveSuccessfulTx({
         from: deployer_jetton_wallet.address,
         to: minter.address
     }); // burn notification
 
-    expect(send_result).toHaveSuccesfulTx({
+    expect(send_result).toHaveSuccessfulTx({
         from: minter.address,
         to: deployer.address
     }); // excesses
@@ -684,7 +684,7 @@ get fun `test-not-wallet-owner-should-not-be-able-to-burn-jettons`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -721,7 +721,7 @@ get fun `test-wallet-owner-can-not-burn-more-jettons-than-it-has`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val initial_jetton_balance = deployer_jetton_wallet.getJettonBalance();
@@ -758,7 +758,7 @@ get fun `test-minter-should-only-accept-burn-messages-from-jetton-wallets`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val burn_amount = ton("1");
@@ -799,7 +799,7 @@ get fun `test-minter-should-only-accept-burn-messages-from-jetton-wallets`() {
 
     val send_result_correct = net.send(deployer_jetton_wallet.address, burn_notification_correct, SEND_MODE_PAY_FEES_SEPARATELY);
 
-    expect(send_result_correct).toHaveSuccesfulTx({
+    expect(send_result_correct).toHaveSuccessfulTx({
         from: deployer_jetton_wallet.address,
         to: minter.address
     });
@@ -812,7 +812,7 @@ get fun `test-report-correct-discovery-address`() {
     val discovery_result_deployer = minter.sendDiscovery(deployer.address, deployer.address, true);
     val _ = userWallet(minter, deployer.address);
 
-    expect(discovery_result_deployer).toHaveSuccesfulTx({
+    expect(discovery_result_deployer).toHaveSuccessfulTx({
         from: minter.address,
         to: deployer.address
     });
@@ -822,7 +822,7 @@ get fun `test-report-correct-discovery-address`() {
     val _ = userWallet(minter, not_deployer.address);
     // TODO: way to check body
 
-    expect(discovery_result_not_deployer).toHaveSuccesfulTx({
+    expect(discovery_result_not_deployer).toHaveSuccessfulTx({
         from: minter.address,
         to: deployer.address
     });
@@ -830,7 +830,7 @@ get fun `test-report-correct-discovery-address`() {
     // Test discovery with includeOwnerAddress = false
     val discovery_result_no_include = minter.sendDiscovery(deployer.address, not_deployer.address, false);
 
-    expect(discovery_result_no_include).toHaveSuccesfulTx({
+    expect(discovery_result_no_include).toHaveSuccessfulTx({
         from: minter.address,
         to: deployer.address
     });
@@ -848,7 +848,7 @@ get fun `test-wallet-should-restore-balance-on-internal-transfer-bounce`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val not_deployer_jetton_wallet = userWallet(minter, not_deployer.address);
@@ -873,7 +873,7 @@ get fun `test-wallet-should-restore-balance-on-internal-transfer-bounce`() {
     });
 
     val transfer_result = net.send(deployer.address, transfer_msg, SEND_MODE_PAY_FEES_SEPARATELY);
-    expect(transfer_result).toHaveSuccesfulTx({
+    expect(transfer_result).toHaveSuccessfulTx({
         from: deployer.address,
         to: deployer_jetton_wallet.address
     });
@@ -890,7 +890,7 @@ get fun `test-wallet-should-restore-balance-on-internal-transfer-bounce`() {
     });
 
     val bounce_result = net.send(not_deployer_jetton_wallet.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
-    expect(bounce_result).toHaveSuccesfulTx({
+    expect(bounce_result).toHaveSuccessfulTx({
         from: not_deployer_jetton_wallet.address,
         to: deployer_jetton_wallet.address,
         exit_code: 0xFFFF,
@@ -912,7 +912,7 @@ get fun `test-wallet-should-restore-balance-on-burn-notification-bounce`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val deployer_jetton_wallet = userWallet(minter, deployer.address);
     val balance_before = deployer_jetton_wallet.getJettonBalance();
@@ -932,7 +932,7 @@ get fun `test-wallet-should-restore-balance-on-burn-notification-bounce`() {
     });
 
     val burn_result = net.send(deployer.address, burn_msg, SEND_MODE_PAY_FEES_SEPARATELY);
-    expect(burn_result).toHaveSuccesfulTx({
+    expect(burn_result).toHaveSuccessfulTx({
         from: deployer.address,
         to: deployer_jetton_wallet.address
     });
@@ -949,7 +949,7 @@ get fun `test-wallet-should-restore-balance-on-burn-notification-bounce`() {
     });
 
     val bounce_result = net.send(minter.address, bounced_msg, SEND_MODE_PAY_FEES_SEPARATELY);
-    expect(bounce_result).toHaveSuccesfulTx({
+    expect(bounce_result).toHaveSuccessfulTx({
         from: minter.address,
         to: deployer_jetton_wallet.address,
         exit_code: 0xFFFF,
@@ -969,7 +969,7 @@ get fun `test-correctly-handles-not-valid-address-in-discovery`() {
     // Test discovery with bad address and includeOwnerAddress = false
     val discovery_result_bad_no_include = minter.sendDiscovery(deployer.address, bad_address, false);
 
-    expect(discovery_result_bad_no_include).toHaveSuccesfulTx({
+    expect(discovery_result_bad_no_include).toHaveSuccessfulTx({
         from: minter.address,
         to: deployer.address
     });
@@ -977,7 +977,7 @@ get fun `test-correctly-handles-not-valid-address-in-discovery`() {
     // Test discovery with bad address and includeOwnerAddress = true
     val discovery_result_bad_include = minter.sendDiscovery(deployer.address, bad_address, true);
 
-    expect(discovery_result_bad_include).toHaveSuccesfulTx({
+    expect(discovery_result_bad_include).toHaveSuccessfulTx({
         from: minter.address,
         to: deployer.address
     });
@@ -995,7 +995,7 @@ get fun `test-can-not-send-to-masterchain`() {
         ton("0.05"),
         ton("1")
     );
-    expect(mint_result).toHaveSuccesfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
+    expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: userWallet(minter, deployer.address).address });
 
     val sent_amount = ton("0.5");
     val forward_amount = ton("0.05");

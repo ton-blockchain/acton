@@ -6,8 +6,6 @@ const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
 
 /// Abstraction representing a blockchain and methods of interacting with it.
-/// 
-/// To acquire a network, use the `accuireNet()` function.
 struct net
 
 /// Represents a set of parameters for creating a message.
