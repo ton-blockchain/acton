@@ -126,6 +126,39 @@ pub struct CompilationResult {
     pub code_hash: String,
 }
 
+pub struct KnownAddress {
+    pub name: String,
+}
+
+pub struct KnownAddresses {
+    pub addresses: HashMap<IntAddr, KnownAddress>,
+}
+
+impl KnownAddresses {
+    pub fn new() -> Self {
+        Self {
+            addresses: HashMap::new(),
+        }
+    }
+
+    pub fn to_tuple_known_addresses(&self) -> emulator::tuple::stack::KnownAddresses {
+        emulator::tuple::stack::KnownAddresses {
+            addresses: self
+                .addresses
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        emulator::tuple::stack::KnownAddress {
+                            name: v.name.clone(),
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
 pub struct Context<'a> {
     pub stdout_buffer: String,
     pub stderr_buffer: String,
@@ -135,5 +168,15 @@ pub struct Context<'a> {
     pub blockchain: &'a mut Blockchain,
     pub emulator: &'a mut Emulator,
     pub build_cache: &'a mut BuildCache,
+    pub known_addresses: &'a mut KnownAddresses,
     pub abi: ContractAbi,
+}
+
+impl<'a> Context<'a> {
+    pub fn fail(&mut self, message: String) {
+        *self.assert_failure = Some(AssertFailure::Fail(FailAssertFailure {
+            message: Some(message),
+            location: None,
+        }));
+    }
 }

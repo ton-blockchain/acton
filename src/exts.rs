@@ -1,5 +1,5 @@
 use crate::asserts_exts::process_txs_and_search_params;
-use crate::context::Context;
+use crate::context::{Context, KnownAddress};
 use crc::{CRC_16_XMODEM, Crc};
 use emulator::emulator::SendMessageResult;
 use emulator::executor::{Executor, StoreExt};
@@ -15,7 +15,9 @@ use tonlib_core::tlb_types::block::msg_address::MsgAddrIntStd;
 use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, Load};
-use tycho_types::models::{AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, TxInfo};
+use tycho_types::models::{
+    AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, ShardAccount, TxInfo,
+};
 
 extension!(read_file in (Context) with (path: String) using read_file_impl);
 fn read_file_impl(_ctx: &mut Context, stack: &mut Tuple, path: String) {
@@ -88,7 +90,19 @@ fn send_message_from_impl(
 
     let from_cell = Boc::decode_base64(from.to_boc_b64(false).unwrap()).unwrap();
     let mut from_slice = from_cell.as_slice().unwrap();
-    let src_addr = IntAddr::load_from(&mut from_slice).unwrap();
+    let src_addr = IntAddr::load_from(&mut from_slice);
+    let src_addr = match src_addr {
+        Ok(src_addr) => src_addr,
+        Err(err) => {
+            ctx.fail(format!(
+                "Failed to decode src address from x{{{}}} with length={}: {}",
+                from_slice.display_data(),
+                from_slice.size_bits(),
+                err
+            ));
+            return;
+        }
+    };
 
     let emulations = emulator.send_message(blockchain, msg_cell, Some(src_addr));
 
@@ -259,6 +273,7 @@ fn run_get_method_impl(
                 items: tuple,
                 accounts: blockchain.get_accounts().clone(),
                 build_cache: ctx.build_cache.to_tuple_build_cache(),
+                known_addresses: ctx.known_addresses.to_tuple_known_addresses(),
             })
         }
         GetMethodResult::Error(result) => {
@@ -340,6 +355,18 @@ fn type_name_by_opcode_impl(ctx: &mut Context, stack: &mut Tuple, id: BigInt) {
     }
 }
 
+extension!(register_address in (Context) with (name: String, address: ArcCell) using register_address_impl);
+fn register_address_impl(ctx: &mut Context, stack: &mut Tuple, name: String, address: ArcCell) {
+    let address_cell = Boc::decode_base64(address.to_boc_b64(false).unwrap()).unwrap();
+    let mut address_slice = address_cell.parse().unwrap();
+
+    let addr = IntAddr::load_from(&mut address_slice).unwrap();
+
+    ctx.known_addresses
+        .addresses
+        .insert(addr, KnownAddress { name });
+}
+
 pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         3 => read_file,
@@ -352,6 +379,7 @@ pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
         12 => get_deployed_code,
         13 => crc16,
         14 => type_name_by_opcode,
+        15 => register_address,
     });
 }
 
@@ -367,5 +395,6 @@ pub fn register_get_extensions(executor: &mut GetExecutor, ctx: &mut Context) {
         12 => get_deployed_code,
         13 => crc16,
         14 => type_name_by_opcode,
+        15 => register_address,
     });
 }

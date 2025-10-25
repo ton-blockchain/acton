@@ -17,6 +17,7 @@ fn println_impl(ctx: &mut Context, _stack: &mut Tuple, s: TupleItem, type_name: 
             type_name,
             accounts: ctx.blockchain.get_accounts().clone(),
             build_cache: ctx.build_cache.to_tuple_build_cache(),
+            known_addresses: ctx.known_addresses.to_tuple_known_addresses(),
         }
     } else {
         s
@@ -160,6 +161,7 @@ fn format_args(ctx: &mut Context, mut fmt: String, args: Vec<(String, TupleItem)
                 type_name,
                 accounts: ctx.blockchain.get_accounts().clone(),
                 build_cache: ctx.build_cache.to_tuple_build_cache(),
+                known_addresses: ctx.known_addresses.to_tuple_known_addresses(),
             }
         } else {
             arg

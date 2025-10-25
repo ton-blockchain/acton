@@ -63,6 +63,7 @@ fun net.treasury(name: slice): Treasury {
     };
 
     val address = address.fromValidBuilder(AutoDeployAddress { stateInit: state_init }.buildAddress());
+    net.registerAddress(address, name);
 
     val msg = createMessage({
         bounce: false,
@@ -153,6 +154,51 @@ fun net.getDeployedCode(addr: address): cell? {
     return ffi.getDeployedCode(addr.toCell())
 }
 
+/// Generate a random address.
+/// 
+/// If a name is provided, the address will be registered with the given name.
+/// This allows test runner to show the name instead of the address in the test output.
+/// 
+/// Example:
+/// ```
+/// val address = net.randomAddress("random_user");
+/// ```
+fun net.randomAddress(name: slice? = null): address {
+    var builder = beginCell();
+    builder.storeUint(0b10, 2);
+    builder.storeUint(0b0, 1);
+    builder.storeUint(0b0, 8);
+
+    var i = 0;
+    while (i < 32) {
+        val num = random.range(256);
+        builder.storeUint(num, 8);
+        i += 1;
+    }
+
+    val address = address.fromValidBuilder(builder);
+    if (name != null) {
+        net.registerAddress(address, name);
+    }
+    return address;
+}
+
+/// Register an address with a name.
+/// 
+/// This allows test runner to show the name instead of the address in the test output.
+/// 
+/// For example, if your contract is not deployed yet, without calling this method, 
+/// the test runner will show raw address in the test output. In this case, you 
+/// likely want to call this method to register the address with a name.
+/// 
+/// Example:
+/// ```
+/// net.registerAddress(address, "my_address");
+/// ```
+fun net.registerAddress(addr: address, name: slice) {
+    ffi.registerAddress(addr.toCell(), name);
+}
+
 /// Calculate the CRC16 checksum of a slice.
 /// 
 /// Example:
@@ -177,3 +223,4 @@ fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): TransactionList? asm 
 fun ffi.runGetMethod(addr: cell, code: cell, id: int, return_type: slice, args: tuple): tuple asm "8 EXTCALL"
 fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
+fun ffi.registerAddress(address: cell, name: slice): void asm "15 EXTCALL"

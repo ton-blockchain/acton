@@ -1,4 +1,7 @@
-use crate::context::{AssertFailure, BuildCache, Context, TransactionGenericAssertFailure};
+use crate::context::{
+    AssertFailure, BuildCache, Context, KnownAddress, KnownAddresses,
+    TransactionGenericAssertFailure,
+};
 use crate::{asserts_exts, exts, io_exts};
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
@@ -300,6 +303,7 @@ fn run_all_tests(
     let mut todo = 0;
 
     let mut build_cache = BuildCache::new();
+    let mut known_addresses = KnownAddresses::new();
 
     for test in filtered_tests.iter() {
         if teamcity {
@@ -339,6 +343,7 @@ fn run_all_tests(
             &data_cell,
             &dest_address,
             &mut build_cache,
+            &mut known_addresses,
             abi,
         );
         let duration = start_time.elapsed();
@@ -440,6 +445,7 @@ fn run_all_tests(
                                 &abi,
                                 &accounts,
                                 &build_cache,
+                                &known_addresses,
                             );
 
                             for line in diff_output.lines() {
@@ -460,6 +466,7 @@ fn run_all_tests(
                                 &accounts,
                                 &abi,
                                 &build_cache,
+                                &known_addresses,
                                 8,
                             );
                             println!("         {}", value.dimmed());
@@ -474,6 +481,7 @@ fn run_all_tests(
                                 &accounts,
                                 &abi,
                                 &build_cache,
+                                &known_addresses,
                                 8,
                             );
 
@@ -483,6 +491,7 @@ fn run_all_tests(
                                 &accounts,
                                 &abi,
                                 &build_cache,
+                                &known_addresses,
                                 8,
                             );
 
@@ -681,6 +690,7 @@ fn execute_test(
     data_cell: &Arc<Cell>,
     dest_address: &TonAddress,
     build_cache: &mut BuildCache,
+    known_addresses: &mut KnownAddresses,
     abi: &ContractAbi,
 ) -> TestResult {
     // thread::sleep(Duration::from_secs(2));
@@ -713,6 +723,7 @@ fn execute_test(
         blockchain: &mut blockchain,
         emulator: &mut emulator,
         build_cache,
+        known_addresses,
         abi: (*abi).clone(),
         expected_exit_code: &mut Some(BigInt::from(0)),
     };
@@ -1083,6 +1094,7 @@ fn format_tuple_diff(
     abi: &ContractAbi,
     accounts: &HashMap<String, ShardAccount>,
     build_cache: &BuildCache,
+    known_addresses: &KnownAddresses,
 ) -> String {
     let left_type_str = left_type.to_string();
     let left_item = TupleItem::TypedTuple {
@@ -1092,6 +1104,7 @@ fn format_tuple_diff(
         items: (**left).clone(),
         accounts: accounts.clone(),
         build_cache: build_cache.to_tuple_build_cache(),
+        known_addresses: known_addresses.to_tuple_known_addresses(),
     };
     let right_type_str = right_type.to_string();
     let right_item = TupleItem::TypedTuple {
@@ -1101,6 +1114,7 @@ fn format_tuple_diff(
         items: (**right).clone(),
         accounts: accounts.clone(),
         build_cache: build_cache.to_tuple_build_cache(),
+        known_addresses: known_addresses.to_tuple_known_addresses(),
     };
 
     format_tuple_item_diff(&left_item, &right_item)
@@ -1128,6 +1142,7 @@ fn format_tuple_value(
     accounts: &HashMap<String, ShardAccount>,
     abi: &ContractAbi,
     build_cache: &BuildCache,
+    known_addresses: &KnownAddresses,
     indent: usize,
 ) -> String {
     let item = TupleItem::TypedTuple {
@@ -1137,6 +1152,7 @@ fn format_tuple_value(
         items: (**tuple).clone(),
         accounts: accounts.clone(),
         build_cache: build_cache.to_tuple_build_cache(),
+        known_addresses: known_addresses.to_tuple_known_addresses(),
     };
     let raw_str = format!("{}", item);
 
@@ -1159,6 +1175,7 @@ fn format_tuple_item_diff(left: &TupleItem, right: &TupleItem) -> String {
             contract_abi,
             accounts,
             build_cache,
+            ..
         },
         TupleItem::TypedTuple {
             type_name: right_type,

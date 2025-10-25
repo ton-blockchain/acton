@@ -1,4 +1,4 @@
-use crate::context::{BuildCache, Context};
+use crate::context::{BuildCache, Context, KnownAddresses};
 use crate::{asserts_exts, exts, io_exts};
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
@@ -82,6 +82,7 @@ fn execute_script(code_cell: &ArcCell, data_cell: &ArcCell, abi: &ContractAbi) -
     let mut emulator = Emulator::new();
     let mut blockchain = Blockchain::new();
     let mut build_cache = BuildCache::new();
+    let mut known_addresses = KnownAddresses::new();
 
     let mut ctx = Context {
         stdout_buffer: "".to_string(),
@@ -91,6 +92,7 @@ fn execute_script(code_cell: &ArcCell, data_cell: &ArcCell, abi: &ContractAbi) -
         blockchain: &mut blockchain,
         emulator: &mut emulator,
         build_cache: &mut build_cache,
+        known_addresses: &mut known_addresses,
         abi: (*abi).clone(),
         expected_exit_code: &mut None,
     };

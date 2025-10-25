@@ -17,6 +17,14 @@ fun vm.getC5(): cell
 fun vm.setC5(cell: cell): void
     asm "c5 PUSHCTR";
 
+/// Generic helper to get a single config parameter.
+@inline
+fun vm.getConfigParam<T>(index: int): T {
+    var c7 = vm.getC7();
+    var params: tuple = c7.get(0);
+    return params.get(index);
+}
+
 /// Generic helper to overwrite a single config parameter.
 @inline
 fun vm.setConfigParam<T>(value: T, index: int) {

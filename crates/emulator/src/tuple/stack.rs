@@ -170,6 +170,16 @@ pub struct BuildCache {
     pub built: HashMap<String, CompilationResult>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KnownAddress {
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KnownAddresses {
+    pub addresses: HashMap<IntAddr, KnownAddress>,
+}
+
 /// Represents a stack value in TON VM
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TupleItem {
@@ -187,6 +197,7 @@ pub enum TupleItem {
         contract_abi: ContractAbi,
         accounts: HashMap<String, ShardAccount>,
         build_cache: BuildCache,
+        known_addresses: KnownAddresses,
     },
 }
 
@@ -342,6 +353,7 @@ impl fmt::Display for TupleItem {
                 contract_abi,
                 accounts,
                 build_cache,
+                known_addresses,
             } => {
                 if type_name == "address" && items.len() == 1 {
                     let addr = &items[0];
@@ -352,7 +364,13 @@ impl fmt::Display for TupleItem {
                     return write!(
                         f,
                         "{}",
-                        format_transaction_list(&items, contract_abi, accounts, build_cache)
+                        format_transaction_list(
+                            &items,
+                            contract_abi,
+                            accounts,
+                            build_cache,
+                            known_addresses
+                        )
                     );
                 }
 
@@ -463,6 +481,7 @@ fn format_transaction_list(
     contract_abi: &ContractAbi,
     accounts: &HashMap<String, ShardAccount>,
     build_cache: &BuildCache,
+    known_addresses: &KnownAddresses,
 ) -> String {
     let item = &items[0];
     let TupleItem::Tuple(items) = item else {
@@ -536,7 +555,8 @@ fn format_transaction_list(
 
             let amount = info.value.tokens.into_inner() as f64 / 1e9;
 
-            let src_contract_type = get_contract_type(accounts, build_cache, &info.src);
+            let src_contract_type =
+                get_contract_type(accounts, build_cache, known_addresses, &info.src);
             if src_contract_type != "" {
                 tx_builder += format!("{}", src_contract_type.cyan()).as_str();
             } else {
@@ -573,7 +593,8 @@ fn format_transaction_list(
             tx_builder += &format!("{} TON", amount.to_string()).green().to_string();
             tx_builder += " -> ";
 
-            let dst_contract_type = get_contract_type(accounts, build_cache, &info.dst);
+            let dst_contract_type =
+                get_contract_type(accounts, build_cache, known_addresses, &info.dst);
             if dst_contract_type != "" {
                 tx_builder += format!("{}", dst_contract_type.cyan()).as_str();
             } else {
@@ -617,6 +638,8 @@ fn format_transaction_list(
                 tx_builder += "└─".dimmed().to_string().as_str();
                 tx_builder += " account destroyed"
             }
+        } else {
+            tx_builder += format!(" {}", "compute phase skipped".dimmed()).as_str();
         }
 
         builder.push_str(&tx_builder);
@@ -629,8 +652,18 @@ fn format_transaction_list(
 fn get_contract_type(
     accounts: &HashMap<String, ShardAccount>,
     build_cache: &BuildCache,
+    known_addresses: &KnownAddresses,
     addr: &IntAddr,
 ) -> String {
+    let known_address = known_addresses.addresses.iter().find(|(address, _info)| {
+        let a1 = address.to_string();
+        let s2 = addr.to_string();
+        a1 == s2
+    });
+    if let Some(known_address) = known_address {
+        return known_address.1.name.clone();
+    }
+
     let account = accounts.get(&addr.to_string());
     let Some(account) = account else {
         return "".to_string();

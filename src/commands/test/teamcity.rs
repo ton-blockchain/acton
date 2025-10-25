@@ -1,5 +1,5 @@
 use crate::commands::test;
-use crate::context::{AssertFailure, BuildCache};
+use crate::context::{AssertFailure, BuildCache, KnownAddresses};
 use abi::ContractAbi;
 use std::collections::HashMap;
 
@@ -92,6 +92,7 @@ impl TeamcityReporter {
                         &HashMap::new(), // empty accounts for simple formatting
                         &abi,
                         &BuildCache::new(),
+                        &KnownAddresses::new(),
                         0,
                     );
                     let actual = test::format_tuple_value(
@@ -100,6 +101,7 @@ impl TeamcityReporter {
                         &HashMap::new(),
                         &abi,
                         &BuildCache::new(),
+                        &KnownAddresses::new(),
                         0,
                     );
 
