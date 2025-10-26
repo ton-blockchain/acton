@@ -72,7 +72,7 @@ pub struct EntryPoint {
     pub pos: Option<Pos>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, Default, PartialEq)]
 pub struct ContractAbi {
     pub name: String,
     pub entry_point: Option<EntryPoint>,

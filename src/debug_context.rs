@@ -153,6 +153,8 @@ impl DebugContext {
             Command::Launch(args) => {
                 println!("Launching {:?}", args);
 
+                self.next(true, true);
+
                 self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
                     thread_id: Some(1),
@@ -201,11 +203,27 @@ impl DebugContext {
                 let variables = current_loc
                     .variables
                     .iter()
+                    .rev()
                     .enumerate()
-                    .map(|(index, variable)| Variable {
-                        name: variable.name.clone(),
-                        value: format!("{}", stack.get(index).unwrap_or(&TupleItem::Null)),
-                        ..Default::default()
+                    .map(|(index, variable)| {
+                        let value = stack
+                            .get(stack.len() - 1 - index)
+                            .unwrap_or(&TupleItem::Null);
+                        let value2 = TupleItem::TypedTuple {
+                            contract_abi: Default::default(),
+                            abi: None,
+                            items: vec![value.clone()],
+                            type_name: variable.var_type.clone(),
+                            accounts: HashMap::new(),
+                            build_cache: Default::default(),
+                            known_addresses: Default::default(),
+                        };
+                        Variable {
+                            name: variable.name.clone(),
+                            type_field: Some(variable.var_type.clone()),
+                            value: format!("{}", value2),
+                            ..Default::default()
+                        }
                     })
                     .collect::<Vec<_>>();
 
@@ -261,7 +279,7 @@ impl DebugContext {
                 let rsp = req.success(ResponseBody::StepIn);
                 self.send_response(rsp)?;
 
-                let is_end = self.next(true);
+                let is_end = self.next(true, true);
                 if is_end {
                     return Ok(true);
                 }
@@ -280,7 +298,7 @@ impl DebugContext {
                 let rsp = req.success(ResponseBody::Next);
                 self.send_response(rsp)?;
 
-                let is_end = self.next(false);
+                let is_end = self.next(false, false);
                 if is_end {
                     return Ok(true);
                 }
@@ -306,7 +324,7 @@ impl DebugContext {
         Ok(false)
     }
 
-    pub(crate) fn next(&mut self, step_in: bool) -> bool {
+    pub(crate) fn next(&mut self, step_in: bool, stop_on_first: bool) -> bool {
         let executor = &self.executors[self.current_executor_id].clone();
 
         if self.pseudo_step + 1 >= self.locations.len() as i64 {
@@ -321,6 +339,12 @@ impl DebugContext {
                 if let Some(locations) = locations {
                     // Locations are like pseudo steps
                     self.locations = locations;
+
+                    if stop_on_first {
+                        self.pseudo_step = 0;
+                        return false;
+                    }
+
                     self.pseudo_step = -1;
                     // Step until reach some Tolk code
                     break;

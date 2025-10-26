@@ -478,6 +478,7 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
 /// Optional location can be provided to specify the location of the expectation to
 /// be printed in the error message. You likely don't want to set this manually,
 /// as the location will be automatically set by the test framework.
+@noinline
 fun expect<T>(value: T, location: slice = "") {
     return Expectation<T>.create(value, __typeName(value), location);
 }

@@ -165,7 +165,7 @@ pub struct CompilationResult {
     pub code_hash: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct BuildCache {
     pub built: HashMap<String, CompilationResult>,
 }
@@ -175,7 +175,7 @@ pub struct KnownAddress {
     pub name: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct KnownAddresses {
     pub addresses: HashMap<IntAddr, KnownAddress>,
 }
