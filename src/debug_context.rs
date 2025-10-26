@@ -11,10 +11,8 @@ use dap::types::{
     Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread,
     ThreadEventReason, Variable,
 };
-use emulator::step_get_executor::StepGetExecutor;
 use emulator::tuple::stack::{TupleItem, parse_tuple};
-use std::collections::HashMap;
-use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
+use tolkc::source_map::{DebugLocation, SourceMap};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 
