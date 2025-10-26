@@ -1,4 +1,5 @@
 use crate::context::AnyExecutor;
+use crate::dap::DapMessage;
 use anyhow::anyhow;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
@@ -23,16 +24,14 @@ pub struct DebugContext {
     pub source_maps: Vec<SourceMap>,
     pub locations: Vec<DebugLocation>,
     pub pseudo_step: i64,
-    pub response_sender: Sender<Response>,
-    pub event_sender: Sender<Event>,
+    pub dap_sender: Sender<DapMessage>,
     pub req_receiver: Receiver<Request>,
 }
 
 impl DebugContext {
     pub fn empty() -> DebugContext {
         let (_, req_receiver) = unbounded::<Request>();
-        let (response_sender, _) = unbounded::<Response>();
-        let (event_sender, _) = unbounded::<Event>();
+        let (dap_sender, _) = unbounded::<DapMessage>();
 
         DebugContext {
             executors: vec![],
@@ -50,8 +49,7 @@ impl DebugContext {
             }],
             locations: vec![],
             pseudo_step: 0,
-            response_sender,
-            event_sender,
+            dap_sender,
             req_receiver,
         }
     }
@@ -60,8 +58,7 @@ impl DebugContext {
         executor: AnyExecutor,
         source_map: &SourceMap,
         req_receiver: &Receiver<Request>,
-        response_sender: Sender<Response>,
-        event_sender: Sender<Event>,
+        dap_sender: Sender<DapMessage>,
     ) -> DebugContext {
         DebugContext {
             executors: vec![executor],
@@ -69,10 +66,19 @@ impl DebugContext {
             source_maps: vec![(*source_map).clone()],
             locations: vec![],
             pseudo_step: 0,
-            response_sender,
-            event_sender,
+            dap_sender,
             req_receiver: req_receiver.clone(),
         }
+    }
+
+    pub fn send_response(&self, response: Response) -> anyhow::Result<()> {
+        self.dap_sender.send(DapMessage::Response(response))?;
+        Ok(())
+    }
+
+    pub fn send_event(&self, event: Event) -> anyhow::Result<()> {
+        self.dap_sender.send(DapMessage::Event(event))?;
+        Ok(())
     }
 
     pub fn begin_thread(
@@ -81,30 +87,28 @@ impl DebugContext {
         executor: AnyExecutor,
         source_map: Option<SourceMap>,
         name: String,
-    ) {
+    ) -> anyhow::Result<()> {
         self.executors.push(executor);
 
         self.source_maps
             .push(source_map.unwrap_or(SourceMap::default()));
 
         self.current_executor_id += 1;
-        self.event_sender
-            .send(Event::Thread(ThreadEventBody {
-                reason: ThreadEventReason::Started,
-                thread_id: id,
-            }))
-            .unwrap();
-        self.event_sender
-            .send(Event::Stopped(StoppedEventBody {
-                reason: StoppedEventReason::Entry,
-                description: Some(name),
-                thread_id: Some(id),
-                preserve_focus_hint: None,
-                text: None,
-                all_threads_stopped: None,
-                hit_breakpoint_ids: None,
-            }))
-            .unwrap();
+        self.send_event(Event::Thread(ThreadEventBody {
+            reason: ThreadEventReason::Started,
+            thread_id: id,
+        }))?;
+        self.send_event(Event::Stopped(StoppedEventBody {
+            reason: StoppedEventReason::Entry,
+            description: Some(name),
+            thread_id: Some(id),
+            preserve_focus_hint: None,
+            text: None,
+            all_threads_stopped: None,
+            hit_breakpoint_ids: None,
+        }))?;
+
+        Ok(())
     }
 
     pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
@@ -116,7 +120,7 @@ impl DebugContext {
             let is_end = self.on_request(req)?;
             if is_end {
                 if terminate_at_end {
-                    self.event_sender.send(Event::Terminated(None))?;
+                    self.send_event(Event::Terminated(None))?;
                 }
                 break;
             }
@@ -125,17 +129,16 @@ impl DebugContext {
         Ok(())
     }
 
-    pub fn finish_thread(&mut self, id: i64) {
+    pub fn finish_thread(&mut self, id: i64) -> anyhow::Result<()> {
         self.executors.pop().unwrap();
         self.locations = vec![];
         self.pseudo_step = 0;
         self.current_executor_id -= 1;
-        self.event_sender
-            .send(Event::Thread(ThreadEventBody {
-                reason: ThreadEventReason::Exited,
-                thread_id: id,
-            }))
-            .unwrap();
+        self.send_event(Event::Thread(ThreadEventBody {
+            reason: ThreadEventReason::Exited,
+            thread_id: id,
+        }))?;
+        Ok(())
     }
 
     pub(crate) fn on_request(&mut self, req: Request) -> anyhow::Result<bool> {
@@ -144,13 +147,13 @@ impl DebugContext {
                 let rsp = req.success(ResponseBody::Initialize(types::Capabilities {
                     ..Default::default()
                 }));
-                self.response_sender.send(rsp)?;
-                self.event_sender.send(Event::Initialized)?;
+                self.send_response(rsp)?;
+                self.send_event(Event::Initialized)?;
             }
             Command::Launch(args) => {
                 println!("Launching {:?}", args);
 
-                self.event_sender.send(Event::Stopped(StoppedEventBody {
+                self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
                     thread_id: Some(1),
                     description: None,
@@ -173,7 +176,7 @@ impl DebugContext {
                         },
                     ],
                 }));
-                self.response_sender.send(rsp)?;
+                self.send_response(rsp)?;
             }
             Command::Scopes(_args) => {
                 let rsp = req.success(ResponseBody::Scopes(ScopesResponse {
@@ -185,7 +188,7 @@ impl DebugContext {
                         ..Default::default()
                     }],
                 }));
-                self.response_sender.send(rsp)?;
+                self.send_response(rsp)?;
             }
             Command::Variables(_args) => {
                 let current_loc = &self.locations[self.pseudo_step as usize];
@@ -207,7 +210,7 @@ impl DebugContext {
                     .collect::<Vec<_>>();
 
                 let rsp = req.success(ResponseBody::Variables(VariablesResponse { variables }));
-                self.response_sender.send(rsp)?;
+                self.send_response(rsp)?;
             }
             Command::StackTrace(_args) => {
                 if self.locations.is_empty() {
@@ -217,7 +220,7 @@ impl DebugContext {
                         }],
                         total_frames: None,
                     }));
-                    self.response_sender.send(rsp)?;
+                    self.send_response(rsp)?;
                     return Ok(false);
                 };
 
@@ -239,26 +242,26 @@ impl DebugContext {
                     }],
                     total_frames: None,
                 }));
-                self.response_sender.send(rsp)?;
+                self.send_response(rsp)?;
             }
             Command::Continue(_args) => {
                 let rsp = req.success(ResponseBody::Continue(ContinueResponse {
                     all_threads_continued: Some(true),
                 }));
-                self.response_sender.send(rsp)?;
+                self.send_response(rsp)?;
 
                 self.continue_execution_while(|_| true)?;
             }
             Command::StepIn(_args) => {
                 let rsp = req.success(ResponseBody::StepIn);
-                self.response_sender.send(rsp)?;
+                self.send_response(rsp)?;
 
                 let is_end = self.next(true);
                 if is_end {
                     return Ok(true);
                 }
 
-                self.event_sender.send(Event::Stopped(StoppedEventBody {
+                self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
                     thread_id: Some(1),
                     description: None,
@@ -270,14 +273,14 @@ impl DebugContext {
             }
             Command::Next(_args) => {
                 let rsp = req.success(ResponseBody::Next);
-                self.response_sender.send(rsp)?;
+                self.send_response(rsp)?;
 
                 let is_end = self.next(false);
                 if is_end {
                     return Ok(true);
                 }
 
-                self.event_sender.send(Event::Stopped(StoppedEventBody {
+                self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
                     thread_id: Some(1),
                     description: None,

@@ -8,6 +8,12 @@ use std::thread;
 use std::time::Duration;
 
 #[derive(Debug)]
+pub enum DapMessage {
+    Response(Response),
+    Event(Event),
+}
+
+#[derive(Debug)]
 enum ServerState {
     /// Expecting a header
     Header,
@@ -78,10 +84,9 @@ pub fn poll_request(
     }
 }
 
-pub fn start_dap_server() -> (Receiver<Request>, Sender<Response>, Sender<Event>) {
+pub fn start_dap_server() -> (Receiver<Request>, Sender<DapMessage>) {
     let (req_sender, req_receiver) = unbounded::<Request>();
-    let (response_sender, response_receiver) = unbounded::<Response>();
-    let (event_sender, event_receiver) = unbounded::<Event>();
+    let (dap_message_sender, dap_message_receiver) = unbounded::<DapMessage>();
 
     thread::spawn(move || {
         let listener = TcpListener::bind("127.0.0.1:12345").unwrap();
@@ -93,15 +98,16 @@ pub fn start_dap_server() -> (Receiver<Request>, Sender<Response>, Sender<Event>
         let input_stream = stream.try_clone().unwrap();
         let mut input = BufReader::new(input_stream);
 
-        let req_sender_1 = req_sender.clone();
+        let req_sender_for_reader = req_sender.clone();
 
+        // Since `poll_request` is blocking, run it in the separate thread
         let reader_thread = thread::spawn(move || {
             loop {
                 let req = poll_request(&mut input);
                 println!("{:?}", req);
                 match req {
                     Ok(Some(req)) => {
-                        req_sender_1.send(req.clone()).unwrap();
+                        req_sender_for_reader.send(req.clone()).unwrap();
                     }
                     Ok(None) => {
                         // No more requests, connection might be closed
@@ -115,22 +121,25 @@ pub fn start_dap_server() -> (Receiver<Request>, Sender<Response>, Sender<Event>
             }
         });
 
-        let cursor = Cursor::new("".as_bytes());
-        let dummy_input = BufReader::new(cursor);
+        // Server require an input, pass dummy one, that's safe since we never call `pull_request`
+        // on server, since we use thread above.
+        let dummy_input = BufReader::new(Cursor::new("".as_bytes()));
         let output_stream = stream;
         let output = BufWriter::new(output_stream);
         let mut server = Server::new(dummy_input, output);
 
         loop {
             crossbeam_channel::select! {
-                recv(response_receiver) -> msg => {
-                    let Ok(rsp) = msg else { break };
-                    server.respond(rsp).unwrap();
-                }
-
-                recv(event_receiver) -> msg => {
-                    let Ok(event) = msg else { break };
-                    server.send_event(event).unwrap();
+                recv(dap_message_receiver) -> msg => {
+                    let Ok(dap_msg) = msg else { break };
+                    match dap_msg {
+                        DapMessage::Response(rsp) => {
+                            server.respond(rsp).unwrap();
+                        }
+                        DapMessage::Event(event) => {
+                            server.send_event(event).unwrap();
+                        }
+                    }
                 }
 
                 default(Duration::from_millis(10)) => {
@@ -143,5 +152,5 @@ pub fn start_dap_server() -> (Receiver<Request>, Sender<Response>, Sender<Event>
 
         println!("Connection closed");
     });
-    (req_receiver, response_sender, event_sender)
+    (req_receiver, dap_message_sender)
 }

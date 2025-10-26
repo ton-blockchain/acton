@@ -144,12 +144,14 @@ fn send_message_from_impl(
             .result_for_code(code)
             .map(|res| res.1.source_map);
 
-        ctx.dbg_ctx.begin_thread(
-            2,
-            AnyExecutor::Message(step_executor.clone()),
-            source_map,
-            "Send internal message".to_string(),
-        );
+        ctx.dbg_ctx
+            .begin_thread(
+                2,
+                AnyExecutor::Message(step_executor.clone()),
+                source_map,
+                "Send internal message".to_string(),
+            )
+            .unwrap();
 
         let msg_cell = Emulator::patch_src_addr(msg_cell, Some(src_addr));
         let prepare_result = step_executor.prepare_transaction(
@@ -179,7 +181,7 @@ fn send_message_from_impl(
 
         let result = step_executor.finish_transaction();
 
-        ctx.dbg_ctx.finish_thread(2);
+        ctx.dbg_ctx.finish_thread(2).unwrap();
 
         let result = match result {
             EmulationResult::Success(result) => result,
@@ -371,12 +373,14 @@ fn run_get_method_impl(
             .result_for_code(Some(code))
             .map(|res| res.1.source_map);
 
-        ctx.dbg_ctx.begin_thread(
-            2,
-            AnyExecutor::Get(step_get_executor.clone()),
-            source_map,
-            "Send internal message".to_string(),
-        );
+        ctx.dbg_ctx
+            .begin_thread(
+                2,
+                AnyExecutor::Get(step_get_executor.clone()),
+                source_map,
+                "Send internal message".to_string(),
+            )
+            .unwrap();
 
         step_get_executor.run_get_method(method_id, Default::default());
 
@@ -384,7 +388,7 @@ fn run_get_method_impl(
         ctx.dbg_ctx.next(false);
 
         ctx.dbg_ctx.process_incoming_requests(false).unwrap();
-        ctx.dbg_ctx.finish_thread(2);
+        ctx.dbg_ctx.finish_thread(2).unwrap();
 
         step_get_executor.finish_get_method()
     } else {

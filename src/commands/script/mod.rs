@@ -121,14 +121,13 @@ fn execute_script(
         io_exts::register_extensions(&mut get_executor, &mut ctx);
         asserts_exts::register_extensions(&mut get_executor, &mut ctx);
 
-        let (req_receiver, response_sender, event_sender) = crate::dap::start_dap_server();
+        let (req_receiver, dap_sender) = crate::dap::start_dap_server();
 
         let mut dbg_ctx = DebugContext::new(
             AnyExecutor::Get(get_executor.clone()),
             source_map,
             &req_receiver,
-            response_sender,
-            event_sender,
+            dap_sender,
         );
 
         ctx.dbg_ctx = &mut dbg_ctx;
