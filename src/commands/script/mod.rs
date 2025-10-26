@@ -135,7 +135,7 @@ fn execute_script(
 
         get_executor.run_get_method(0, Default::default());
 
-        ctx.dbg_ctx.process_incoming_requests()?;
+        ctx.dbg_ctx.process_incoming_requests(true)?;
 
         let result = get_executor.finish_get_method();
         return Ok(ScriptResult { get_result: result });

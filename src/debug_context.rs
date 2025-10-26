@@ -107,7 +107,7 @@ impl DebugContext {
             .unwrap();
     }
 
-    pub fn process_incoming_requests(&mut self) -> anyhow::Result<()> {
+    pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
         for req in self.req_receiver.clone().iter() {
             if let Command::Disconnect(req) = &req.command {
                 println!("Disconnecting: {:?}", req);
@@ -115,7 +115,9 @@ impl DebugContext {
             }
             let is_end = self.on_request(req)?;
             if is_end {
-                self.event_sender.send(Event::Terminated(None))?;
+                if terminate_at_end {
+                    self.event_sender.send(Event::Terminated(None))?;
+                }
                 break;
             }
         }
