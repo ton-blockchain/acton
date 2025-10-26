@@ -33,6 +33,8 @@ enum Commands {
         filter: Option<String>,
         #[arg(long, help = "Output in TeamCity format for IDE integration")]
         teamcity: bool,
+        #[arg(long, help = "Enable debug mode")]
+        debug: bool,
     },
     #[command(about = "Execute a Tolk script file")]
     Script {
@@ -72,8 +74,9 @@ fn main() {
             path,
             filter,
             teamcity,
+            debug,
         } => {
-            let result = test_cmd(&path, filter.as_deref(), teamcity);
+            let result = test_cmd(&path, filter.as_deref(), teamcity, debug);
             if let Err(err) = result {
                 eprintln!("{} {}", "Error:".red(), err);
             }

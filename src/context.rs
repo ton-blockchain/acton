@@ -9,8 +9,7 @@ use emulator::tuple::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use std::collections::HashMap;
 use tolkc::source_map::SourceMap;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
+use tycho_types::cell::Cell;
 use tycho_types::models::{IntAddr, Transaction};
 
 #[derive(Debug, Clone)]
@@ -115,11 +114,12 @@ impl BuildCache {
         );
     }
 
-    pub fn result_for_code(&self, code: Option<ArcCell>) -> Option<(String, CompilationResult)> {
+    pub fn result_for_code(&self, code: Option<Cell>) -> Option<(String, CompilationResult)> {
         let Some(code) = code else { return None };
+        let code_hash = code.repr_hash().to_string().to_uppercase();
         self.built
             .iter()
-            .find(|(_, result)| result.code_boc64 == code.to_boc_b64(false).unwrap())
+            .find(|(_, result)| result.code_hash == code_hash)
             .map(|(name, result)| ((*name).clone(), (*result).clone()))
     }
 

@@ -35,7 +35,7 @@ pub fn compile_debug(path: &Path) -> CompilerResult {
 }
 
 pub fn compile_fast(path: &Path) -> CompilerResult {
-    Compiler::new(0).compile(path, false)
+    Compiler::new(0).compile(path, true)
 }
 
 /// Simple wrapper over C++ implemented Tolk compiler.
@@ -191,27 +191,15 @@ impl Compiler {
 
         match result {
             Ok(CompilerInternalResult::Success(result)) => {
-                if with_debug_info {
-                    CompilerResult::Success(CompilerResultSuccess {
-                        fift_code: result.fift_code,
-                        code_boc64: result.debug_mark_base64,
-                        code_hash_hex: result.code_hash_hex,
-                        source_map: result.source_map.map(|source_map| SourceMap {
-                            high_level: source_map,
-                            debug_marks: parse_marks_dict(&result.code_boc64),
-                        }),
-                    })
-                } else {
-                    CompilerResult::Success(CompilerResultSuccess {
-                        fift_code: result.fift_code,
-                        code_boc64: result.code_boc64,
-                        code_hash_hex: result.code_hash_hex,
-                        source_map: result.source_map.map(|source_map| SourceMap {
-                            high_level: source_map,
-                            debug_marks: parse_marks_dict(&result.debug_mark_base64),
-                        }),
-                    })
-                }
+                CompilerResult::Success(CompilerResultSuccess {
+                    fift_code: result.fift_code,
+                    code_boc64: result.code_boc64,
+                    code_hash_hex: result.code_hash_hex,
+                    source_map: result.source_map.map(|source_map| SourceMap {
+                        high_level: source_map,
+                        debug_marks: parse_marks_dict(&result.debug_mark_base64),
+                    }),
+                })
             }
             Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
             Err(err) => CompilerResult::Error(CompilerResultError {

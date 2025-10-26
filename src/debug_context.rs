@@ -234,7 +234,12 @@ impl DebugContext {
                         source: Some(Source {
                             name: Some("script.tolk".to_string()),
                             path: Some(
-                                current_loc.loc.file.to_string().replace("_script.tolk", ""),
+                                current_loc
+                                    .loc
+                                    .file
+                                    .to_string()
+                                    .replace("_script.tolk", "")
+                                    .replace("_test.tolk_test.tolk", "_test.tolk"),
                             ),
                             ..Default::default()
                         }),

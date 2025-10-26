@@ -46,7 +46,12 @@ struct CustomAnnotationValues {
     todo_description: Option<String>,
 }
 
-pub fn test_cmd(path: &String, filter: Option<&str>, teamcity: bool) -> Result<(), anyhow::Error> {
+pub fn test_cmd(
+    path: &String,
+    filter: Option<&str>,
+    teamcity: bool,
+    debug: bool,
+) -> Result<(), anyhow::Error> {
     let metadata = fs::metadata(path)?;
     let test_files = if metadata.is_file() {
         if !path.ends_with("_test.tolk") {
@@ -79,7 +84,7 @@ pub fn test_cmd(path: &String, filter: Option<&str>, teamcity: bool) -> Result<(
     let mut total_todo = 0;
 
     for (index, file) in test_files.iter().enumerate() {
-        let result = run_tests_for_file(&file, filter, teamcity);
+        let result = run_tests_for_file(&file, filter, teamcity, debug);
         match result {
             Ok(stats) => {
                 total_passed += stats.passed;
@@ -215,6 +220,7 @@ fn run_tests_for_file(
     file: &str,
     filter: Option<&str>,
     teamcity: bool,
+    debug: bool,
 ) -> Result<TestStats, anyhow::Error> {
     let content = match fs::read_to_string(file) {
         Ok(content) => content,
@@ -240,7 +246,17 @@ fn run_tests_for_file(
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64)?;
             let data_cell = ArcCell::default();
 
-            let stats = run_all_tests(file, tests, &code_cell, &data_cell, &abi, filter, teamcity);
+            let stats = run_all_tests(
+                file,
+                tests,
+                &code_cell,
+                &data_cell,
+                &abi,
+                &result.source_map.unwrap(),
+                filter,
+                teamcity,
+                debug,
+            );
             Ok(stats)
         }
         tolkc::CompilerResult::Error(error) => {
@@ -260,8 +276,10 @@ fn run_all_tests(
     code_cell: &Arc<Cell>,
     data_cell: &Arc<Cell>,
     abi: &ContractAbi,
+    source_map: &SourceMap,
     filter: Option<&str>,
     teamcity: bool,
+    debug: bool,
 ) -> TestStats {
     let filtered_tests = if let Some(pattern) = filter {
         let regex = match Regex::new(pattern) {
@@ -351,6 +369,8 @@ fn run_all_tests(
             &mut build_cache,
             &mut known_addresses,
             abi,
+            source_map,
+            debug,
         );
         let duration = start_time.elapsed();
         let TestResult {
@@ -698,6 +718,8 @@ fn execute_test(
     build_cache: &mut BuildCache,
     known_addresses: &mut KnownAddresses,
     abi: &ContractAbi,
+    source_map: &SourceMap,
+    debug: bool,
 ) -> TestResult {
     // thread::sleep(Duration::from_secs(2));
 
@@ -733,24 +755,68 @@ fn execute_test(
         abi: (*abi).clone(),
         expected_exit_code: &mut Some(BigInt::from(0)),
         dbg_ctx: &mut DebugContext::empty(),
-        debug: false,
+        debug,
     };
 
-    exts::register_extensions(&mut get_executor, &mut ctx);
-    io_exts::register_extensions(&mut get_executor, &mut ctx);
-    asserts_exts::register_extensions(&mut get_executor, &mut ctx);
+    let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) = if debug {
+        let mut get_executor = StepGetExecutor::new(Default::default(), params.clone());
 
-    let result = get_executor.run_get_method(Default::default(), params);
+        exts::register_extensions(&mut get_executor, &mut ctx);
+        io_exts::register_extensions(&mut get_executor, &mut ctx);
+        asserts_exts::register_extensions(&mut get_executor, &mut ctx);
+
+        let (req_receiver, dap_sender) = crate::dap::start_dap_server();
+
+        let mut dbg_ctx = DebugContext::new(
+            AnyExecutor::Get(get_executor.clone()),
+            source_map,
+            &req_receiver,
+            dap_sender,
+        );
+
+        ctx.dbg_ctx = &mut dbg_ctx;
+
+        get_executor.run_get_method(test.id, Default::default());
+
+        ctx.dbg_ctx.process_incoming_requests(true).unwrap();
+
+        let get_result = get_executor.finish_get_method();
+
+        (
+            get_result,
+            ctx.stdout_buffer,
+            ctx.stderr_buffer,
+            (*ctx.assert_failure).clone(),
+            ctx.expected_exit_code
+                .clone()
+                .map(|value| value.to_i32())
+                .unwrap_or(None),
+        )
+    } else {
+        exts::register_extensions(&mut get_executor, &mut ctx);
+        io_exts::register_extensions(&mut get_executor, &mut ctx);
+        asserts_exts::register_extensions(&mut get_executor, &mut ctx);
+
+        let get_result = get_executor.run_get_method(Default::default(), params);
+
+        (
+            get_result,
+            ctx.stdout_buffer,
+            ctx.stderr_buffer,
+            (*ctx.assert_failure).clone(),
+            ctx.expected_exit_code
+                .clone()
+                .map(|value| value.to_i32())
+                .unwrap_or(None),
+        )
+    };
+
     TestResult {
         get_result: result,
-        captured_stdout: ctx.stdout_buffer,
-        captured_stderr: ctx.stderr_buffer,
-        assert_failure: (*ctx.assert_failure).clone(),
-        expected_exit_code: ctx
-            .expected_exit_code
-            .clone()
-            .map(|value| value.to_i32())
-            .unwrap_or(None),
+        captured_stdout,
+        captured_stderr,
+        assert_failure,
+        expected_exit_code,
         accounts: blockchain.get_accounts().clone(),
     }
 }
