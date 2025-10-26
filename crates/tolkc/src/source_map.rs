@@ -1,8 +1,9 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellFamily, CellSlice, Load};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
+use tycho_types::prelude::DynCell;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourceMap {
@@ -112,8 +113,101 @@ pub struct DebugInfo {
     pub line_off: String,
 }
 
-pub fn parse_marks_dict(code_boc64: &String) -> HashMap<String, Vec<(i32, i32)>> {
-    let debug_marks_cell = Boc::decode_base64(&*code_boc64).unwrap();
+fn slice_to_string(slice: &mut CellSlice, len: usize) -> String {
+    let mut out = String::new();
+    for _ in 0..len {
+        let bit = slice.load_bit().unwrap();
+        out.push(if bit { '1' } else { '0' });
+    }
+    out
+}
+
+fn read_label(slice: &mut CellSlice, m: usize) -> String {
+    if slice.load_bit().unwrap() {
+        if slice.load_bit().unwrap() {
+            let bit = slice.load_bit().unwrap();
+            let len_bits = (m as f64 + 1.0).log2().ceil() as usize;
+            let len = slice.load_uint(len_bits as u16).unwrap() as usize;
+            (if bit { "1" } else { "0" }).repeat(len)
+        } else {
+            let len_bits = (m as f64 + 1.0).log2().ceil() as usize;
+            let len = slice.load_uint(len_bits as u16).unwrap() as usize;
+            slice_to_string(slice, len)
+        }
+    } else {
+        let mut len = 0;
+        while slice.load_bit().unwrap() {
+            len += 1;
+        }
+        slice_to_string(slice, len)
+    }
+}
+
+fn get_final_slice(dc: &Cell, key: &str) -> Cell {
+    let mut dict = dc.as_slice().unwrap();
+    let lbl = read_label(&mut dict, key.len());
+
+    if !key.starts_with(&lbl) {
+        panic!("Invalid label");
+    }
+
+    if lbl.len() == key.len() {
+        return dc.clone();
+    }
+
+    let mut child = dyn_cell_to_cell(dict.load_reference().unwrap());
+    if key.chars().nth(lbl.len()) == Some('1') {
+        child = dyn_cell_to_cell(dict.load_reference().unwrap());
+    }
+
+    get_final_slice(&child, &key[(lbl.len() + 1)..])
+}
+
+fn dyn_cell_to_cell(cell: &DynCell) -> Cell {
+    Boc::decode_base64(Boc::encode_base64(cell)).unwrap()
+}
+
+fn get_real_code_hashes(code: &Cell) -> HashMap<String, (String, i32)> {
+    let mut dict_c = code.as_slice().unwrap();
+    let dict_cell = dyn_cell_to_cell(dict_c.load_reference().unwrap());
+    let mut dict_slice = dict_cell.as_slice().unwrap();
+    let d = RawDict::<19>::load_from_root_ext(&mut dict_slice, Cell::empty_context()).unwrap();
+
+    let mut r = HashMap::new();
+
+    for kv in d.iter() {
+        let kv = kv.unwrap();
+        let mut key_slice = kv.0.as_data_slice();
+
+        let mut builder = CellBuilder::new();
+        builder.store_slice(kv.1);
+        let v = builder.build().unwrap();
+
+        let idx_key = slice_to_string(&mut key_slice, 19);
+
+        let final_slice = get_final_slice(&dict_cell, &idx_key);
+
+        r.insert(
+            v.repr_hash().to_string().to_uppercase(),
+            (
+                final_slice.repr_hash().to_string().to_uppercase(),
+                final_slice.bit_len() as i32 - key_slice.size_bits() as i32,
+            ),
+        );
+    }
+
+    r
+}
+
+pub fn parse_marks_dict(
+    marks_boc64: &String,
+    code_boc64: &String,
+) -> HashMap<String, Vec<(i32, i32)>> {
+    let code_cell = Boc::decode_base64(&*code_boc64).unwrap();
+
+    let real_code_hashes = get_real_code_hashes(&code_cell);
+
+    let debug_marks_cell = Boc::decode_base64(&*marks_boc64).unwrap();
 
     let dict = RawDict::<256>::from(Some(debug_marks_cell));
     let mut marks = HashMap::<String, Vec<(i32, i32)>>::new();
@@ -125,6 +219,15 @@ pub fn parse_marks_dict(code_boc64: &String) -> HashMap<String, Vec<(i32, i32)>>
 
         let mut slice = kv.1;
         let is_normal = slice.load_bit().unwrap();
+
+        let final_hash = if is_normal {
+            hash.clone()
+        } else if real_code_hashes.contains_key(&hash) {
+            real_code_hashes.get(&hash).unwrap().0.clone()
+        } else {
+            return;
+        };
+
         let dict_inner = Dict::<u32, CellSlice>::load_from(&mut slice).unwrap();
 
         dict_inner.iter().for_each(|kv| {
@@ -138,11 +241,18 @@ pub fn parse_marks_dict(code_boc64: &String) -> HashMap<String, Vec<(i32, i32)>>
                 let kv = kv.unwrap();
                 let offset = kv.0.as_data_slice().load_uint(10).unwrap();
 
-                let old_value = marks.get_mut(&hash);
+                let adjusted_offset = offset as i32
+                    + (if is_normal {
+                        0
+                    } else {
+                        real_code_hashes.get(&hash).map(|r| r.1).unwrap_or(0)
+                    });
+
+                let old_value = marks.get_mut(&final_hash);
                 if let Some(old_value) = old_value {
-                    old_value.push((offset as i32, debug_id as i32))
+                    old_value.push((adjusted_offset, debug_id as i32))
                 } else {
-                    marks.insert(hash.clone(), vec![(offset as i32, debug_id as i32)]);
+                    marks.insert(final_hash.clone(), vec![(adjusted_offset, debug_id as i32)]);
                 }
             });
         });

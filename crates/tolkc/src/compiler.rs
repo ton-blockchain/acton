@@ -191,13 +191,14 @@ impl Compiler {
 
         match result {
             Ok(CompilerInternalResult::Success(result)) => {
+                let debug_marks = parse_marks_dict(&result.debug_mark_base64, &result.code_boc64);
                 CompilerResult::Success(CompilerResultSuccess {
                     fift_code: result.fift_code,
                     code_boc64: result.code_boc64,
                     code_hash_hex: result.code_hash_hex,
                     source_map: result.source_map.map(|source_map| SourceMap {
                         high_level: source_map,
-                        debug_marks: parse_marks_dict(&result.debug_mark_base64),
+                        debug_marks,
                     }),
                 })
             }
