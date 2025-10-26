@@ -14,14 +14,13 @@ use dap::types::{
 use emulator::step_get_executor::StepGetExecutor;
 use emulator::tuple::stack::{TupleItem, parse_tuple};
 use std::collections::HashMap;
-use tolkc::source_map::{DebugLocation, SourceMap};
+use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 
 pub struct DebugContext {
     pub executors: Vec<AnyExecutor>,
     pub current_executor_id: usize,
-    pub marks: Vec<HashMap<String, Vec<(i32, i32)>>>,
     pub source_maps: Vec<SourceMap>,
     pub locations: Vec<DebugLocation>,
     pub pseudo_step: i64,
@@ -33,7 +32,6 @@ pub struct DebugContext {
 impl DebugContext {
     pub fn create_empty(
         executor: AnyExecutor,
-        marks: &HashMap<String, Vec<(i32, i32)>>,
         source_map: &SourceMap,
         req_receiver: &Receiver<Request>,
         response_sender: Sender<Response>,
@@ -42,7 +40,6 @@ impl DebugContext {
         DebugContext {
             executors: vec![executor],
             current_executor_id: 0,
-            marks: vec![marks.clone()],
             source_maps: vec![(*source_map).clone()],
             locations: vec![],
             pseudo_step: 0,
@@ -251,9 +248,8 @@ impl DebugContext {
                     return true;
                 }
 
-                let marks = &self.marks[self.current_executor_id];
                 let source_map = &self.source_maps[self.current_executor_id];
-                let locations = get_locations(executor, marks, &source_map);
+                let locations = get_locations(executor, &source_map);
                 if let Some(locations) = locations {
                     // Locations are like pseudo steps
                     self.locations = locations;
@@ -306,9 +302,8 @@ impl DebugContext {
                     return true;
                 }
 
-                let mark = &self.marks[self.current_executor_id];
                 let source_map = &self.source_maps[self.current_executor_id];
-                let locations = get_locations(executor, mark, &source_map);
+                let locations = get_locations(executor, &source_map);
                 if let Some(locations) = locations {
                     // Locations are like pseudo steps
                     self.locations = locations;
@@ -347,9 +342,8 @@ impl DebugContext {
                         return Ok(true);
                     }
 
-                    let mark = &self.marks[self.current_executor_id];
                     let source_map = &self.source_maps[self.current_executor_id];
-                    let locations = get_locations(&executor, mark, &source_map);
+                    let locations = get_locations(&executor, &source_map);
                     if let Some(locations) = locations {
                         // Locations are like pseudo steps
                         self.locations = locations.clone();
@@ -363,16 +357,12 @@ impl DebugContext {
     }
 }
 
-fn get_locations(
-    executor: &AnyExecutor,
-    marks: &HashMap<String, Vec<(i32, i32)>>,
-    source_map: &SourceMap,
-) -> Option<Vec<DebugLocation>> {
+fn get_locations(executor: &AnyExecutor, source_map: &SourceMap) -> Option<Vec<DebugLocation>> {
     let pos = executor.get_code_pos();
     let (hash, offset) = pos.split_once(":").unwrap();
     let offset = offset.parse::<i32>().unwrap();
 
-    let Some(marks) = marks.get(hash) else {
+    let Some(marks) = source_map.debug_marks.get(hash) else {
         return None;
     };
 
@@ -382,6 +372,7 @@ fn get_locations(
         .collect::<Vec<_>>();
 
     let locs = source_map
+        .high_level
         .locations
         .iter()
         .filter(|loc| {

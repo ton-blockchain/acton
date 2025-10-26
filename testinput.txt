@@ -1,0 +1,11 @@
+Content-Length: 198
+
+{
+    "seq": 152,
+    "type": "request",
+    "command": "initialize",
+    "arguments": {
+        "adapterID": "0001e357-72c7-4f03-ae8f-c5b54bd8dabf",
+        "clientName": "Some Cool Editor"
+    }
+}

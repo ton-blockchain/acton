@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use crossbeam_channel::{Receiver, Sender};
 use dap::events::Event;
 use dap::prelude::{Command, Request, Response};
+use dap::types::Source;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::get_executor::{GetMethodParams, GetMethodResult};
@@ -15,7 +16,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
-use tolkc::source_map::SourceMap;
+use tolkc::source_map::{HighLevelSourceMap, SourceMap};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
@@ -48,13 +49,8 @@ fn run_script_file(file_path: &str, content: &str) -> Result<(), anyhow::Error> 
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64).unwrap();
             let data_cell = ArcCell::default();
 
-            let script_result = execute_script(
-                &code_cell,
-                &data_cell,
-                &abi,
-                &result.debug_marks,
-                &result.source_map.unwrap(),
-            );
+            let script_result =
+                execute_script(&code_cell, &data_cell, &abi, &result.source_map.unwrap());
             print_script_result(script_result?);
             Ok(())
         }
@@ -76,7 +72,6 @@ fn execute_script(
     code_cell: &ArcCell,
     data_cell: &ArcCell,
     abi: &ContractAbi,
-    marks: &HashMap<String, Vec<(i32, i32)>>,
     source_map: &SourceMap,
 ) -> anyhow::Result<ScriptResult> {
     let dest_address = contract_address(code_cell);
@@ -104,7 +99,6 @@ fn execute_script(
 
     let mut dbg_ctx = DebugContext::create_empty(
         AnyExecutor::Get(get_executor.clone()),
-        marks,
         source_map,
         &req_receiver,
         response_sender,
