@@ -10,8 +10,17 @@ pub struct SourceMap {
     pub debug_marks: HashMap<String, Vec<(i32, i32)>>,
 }
 
+impl Default for SourceMap {
+    fn default() -> Self {
+        Self {
+            high_level: Default::default(),
+            debug_marks: Default::default(),
+        }
+    }
+}
+
 /// Source map data structure for Tolk compiler output
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct HighLevelSourceMap {
     pub version: String,
     pub language: Option<String>,

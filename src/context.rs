@@ -115,7 +115,8 @@ impl BuildCache {
         );
     }
 
-    pub fn result_for_code(&self, code: ArcCell) -> Option<(String, CompilationResult)> {
+    pub fn result_for_code(&self, code: Option<ArcCell>) -> Option<(String, CompilationResult)> {
+        let Some(code) = code else { return None };
         self.built
             .iter()
             .find(|(_, result)| result.code_boc64 == code.to_boc_b64(false).unwrap())
@@ -230,6 +231,7 @@ pub struct Context<'a> {
     pub build_cache: &'a mut BuildCache,
     pub known_addresses: &'a mut KnownAddresses,
     pub abi: ContractAbi,
+    pub debug: bool,
     pub dbg_ctx: &'a mut DebugContext,
 }
 

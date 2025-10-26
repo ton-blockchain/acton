@@ -75,7 +75,19 @@ impl DebugContext {
         }
     }
 
-    pub fn begin_thread(&mut self, id: i64, name: String) {
+    pub fn begin_thread(
+        &mut self,
+        id: i64,
+        executor: AnyExecutor,
+        source_map: Option<SourceMap>,
+        name: String,
+    ) {
+        self.executors.push(executor);
+
+        self.source_maps
+            .push(source_map.unwrap_or(SourceMap::default()));
+
+        self.current_executor_id += 1;
         self.event_sender
             .send(Event::Thread(ThreadEventBody {
                 reason: ThreadEventReason::Started,
@@ -95,11 +107,31 @@ impl DebugContext {
             .unwrap();
     }
 
+    pub fn process_incoming_requests(&mut self) -> anyhow::Result<()> {
+        for req in self.req_receiver.clone().iter() {
+            if let Command::Disconnect(req) = &req.command {
+                println!("Disconnecting: {:?}", req);
+                break;
+            }
+            let is_end = self.on_request(req)?;
+            if is_end {
+                self.event_sender.send(Event::Terminated(None))?;
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn finish_thread(&mut self, id: i64) {
+        self.executors.pop().unwrap();
+        self.locations = vec![];
+        self.pseudo_step = 0;
+        self.current_executor_id -= 1;
         self.event_sender
             .send(Event::Thread(ThreadEventBody {
                 reason: ThreadEventReason::Exited,
-                thread_id: 2,
+                thread_id: id,
             }))
             .unwrap();
     }

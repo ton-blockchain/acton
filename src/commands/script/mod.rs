@@ -112,6 +112,7 @@ fn execute_script(
         abi: (*abi).clone(),
         expected_exit_code: &mut None,
         dbg_ctx: &mut DebugContext::empty(),
+        debug,
     };
 
     if debug {
@@ -134,17 +135,7 @@ fn execute_script(
 
         get_executor.run_get_method(0, Default::default());
 
-        for req in req_receiver.iter() {
-            if let Command::Disconnect(req) = &req.command {
-                println!("Disconnecting: {:?}", req);
-                break;
-            }
-            let is_end = ctx.dbg_ctx.on_request(req)?;
-            if is_end {
-                ctx.dbg_ctx.event_sender.send(Event::Terminated(None))?;
-                break;
-            }
-        }
+        ctx.dbg_ctx.process_incoming_requests()?;
 
         let result = get_executor.finish_get_method();
         return Ok(ScriptResult { get_result: result });

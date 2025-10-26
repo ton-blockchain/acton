@@ -733,6 +733,7 @@ fn execute_test(
         abi: (*abi).clone(),
         expected_exit_code: &mut Some(BigInt::from(0)),
         dbg_ctx: &mut DebugContext::empty(),
+        debug: false,
     };
 
     exts::register_extensions(&mut get_executor, &mut ctx);

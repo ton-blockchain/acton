@@ -5,7 +5,7 @@ use dap::prelude::Command;
 use emulator::config::DEFAULT_CONFIG;
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use emulator::executor::{EmulationResult, ExecutorVerbosity, RunTransactionArgs, StoreExt};
-use emulator::get_executor::{GetMethodParams, GetMethodResult};
+use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_executor::StepExecutor;
 use emulator::step_get_executor::StepGetExecutor;
 use emulator::traits::BaseExecutor;
@@ -119,13 +119,6 @@ fn send_message_from_impl(
         }
     };
 
-    let step_executor = StepExecutor::new();
-
-    ctx.dbg_ctx
-        .executors
-        .push(AnyExecutor::Message(step_executor.clone()));
-    ctx.dbg_ctx.current_executor_id += 1;
-
     let RelaxedMsgInfo::Int(int_message) = message_obj.info else {
         panic!("Emulator only supports internal messages for now");
     };
@@ -144,14 +137,18 @@ fn send_message_from_impl(
         }
     };
 
-    if let Some(code) = code
-        && let Some(result) = ctx.build_cache.result_for_code(code)
-    {
-        ctx.dbg_ctx.source_maps.push(result.1.source_map.clone());
-    }
+    let step_executor = StepExecutor::new();
+    let source_map = ctx
+        .build_cache
+        .result_for_code(code)
+        .map(|res| res.1.source_map);
 
-    ctx.dbg_ctx
-        .begin_thread(2, "Send internal message".to_string());
+    ctx.dbg_ctx.begin_thread(
+        2,
+        AnyExecutor::Message(step_executor.clone()),
+        source_map,
+        "Send internal message".to_string(),
+    );
 
     let msg_cell = Emulator::patch_src_addr(msg_cell, Some(src_addr));
     let prepare_result = step_executor.prepare_transaction(
@@ -175,22 +172,9 @@ fn send_message_from_impl(
     // Step to update internal state
     ctx.dbg_ctx.next(false);
 
-    for req in ctx.dbg_ctx.req_receiver.clone().iter() {
-        if let Command::Disconnect(req) = &req.command {
-            break;
-        }
-        let is_end = ctx.dbg_ctx.on_request(req).unwrap();
-        if is_end {
-            break;
-        }
-    }
+    ctx.dbg_ctx.process_incoming_requests().unwrap();
 
     let result = step_executor.finish_transaction();
-
-    ctx.dbg_ctx.executors.pop().unwrap();
-    ctx.dbg_ctx.current_executor_id -= 1;
-    ctx.dbg_ctx.locations = vec![];
-    ctx.dbg_ctx.pseudo_step = 0;
 
     ctx.dbg_ctx.finish_thread(2);
 
@@ -373,47 +357,34 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
-    let step_get_executor = StepGetExecutor::new(Default::default(), params.clone());
+    let result = if ctx.debug {
+        let step_get_executor = StepGetExecutor::new(Default::default(), params.clone());
 
-    ctx.dbg_ctx
-        .executors
-        .push(AnyExecutor::Get(step_get_executor.clone()));
-    ctx.dbg_ctx.current_executor_id += 1;
+        let source_map = ctx
+            .build_cache
+            .result_for_code(Some(code))
+            .map(|res| res.1.source_map);
 
-    if let Some(result) = ctx.build_cache.result_for_code(code) {
-        ctx.dbg_ctx.source_maps.push(result.1.source_map.clone());
-    }
+        ctx.dbg_ctx.begin_thread(
+            2,
+            AnyExecutor::Get(step_get_executor.clone()),
+            source_map,
+            "Send internal message".to_string(),
+        );
 
-    ctx.dbg_ctx
-        .begin_thread(2, "Send internal message".to_string());
+        step_get_executor.run_get_method(method_id, Default::default());
 
-    step_get_executor.run_get_method(method_id, Default::default());
+        // Step to update internal state
+        ctx.dbg_ctx.next(false);
 
-    // Step to update internal state
-    ctx.dbg_ctx.next(false);
+        ctx.dbg_ctx.process_incoming_requests().unwrap();
+        ctx.dbg_ctx.finish_thread(2);
 
-    for req in ctx.dbg_ctx.req_receiver.clone().iter() {
-        if let Command::Disconnect(req) = &req.command {
-            break;
-        }
-        let is_end = ctx.dbg_ctx.on_request(req).unwrap();
-        if is_end {
-            break;
-        }
-    }
-
-    let result = step_get_executor.finish_get_method();
-
-    ctx.dbg_ctx.executors.pop().unwrap();
-    ctx.dbg_ctx.current_executor_id -= 1;
-    ctx.dbg_ctx.locations = vec![];
-    ctx.dbg_ctx.pseudo_step = 0;
-
-    ctx.dbg_ctx.finish_thread(2);
-
-    // let executor = GetExecutor::new(params.clone());
-    //
-    // let result = executor.run_get_method(args, params);
+        step_get_executor.finish_get_method()
+    } else {
+        let executor = GetExecutor::new(params.clone());
+        executor.run_get_method(args, params)
+    };
 
     match result {
         GetMethodResult::Success(result) => {
