@@ -1,9 +1,5 @@
 use crate::debug_context::DebugContext;
 use abi::ContractAbi;
-use crossbeam_channel::{Receiver, Sender};
-use dap::events::{Event, StoppedEventBody, ThreadEventBody};
-use dap::prelude::{Request, Response};
-use dap::types::{Source, StoppedEventReason, ThreadEventReason};
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::step_by_step_trait::StepSyStepExecutor;
@@ -12,7 +8,7 @@ use emulator::step_get_executor::StepGetExecutor;
 use emulator::tuple::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use std::collections::HashMap;
-use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
+use tolkc::source_map::SourceMap;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::models::{IntAddr, Transaction};

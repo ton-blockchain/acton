@@ -9,7 +9,6 @@ use anyhow::anyhow;
 use crossbeam_channel::unbounded;
 use dap::events::Event;
 use dap::prelude::{Request, Response};
-use dap::types::Source;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::exit_codes;
