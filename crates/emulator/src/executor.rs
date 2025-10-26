@@ -1,4 +1,5 @@
 use crate::config::DEFAULT_CONFIG;
+use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use hex;
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,23 @@ impl<T: Store + ?Sized> StoreExt for T {
         self.store_into(&mut builder, Cell::empty_context())
             .unwrap();
         builder.build().unwrap()
+    }
+}
+
+impl BaseExecutor for Executor {
+    fn step(&self) -> bool {
+        false
+    }
+
+    fn register_ext_method(
+        &mut self,
+        id: i32,
+        ctx: *mut std::os::raw::c_void,
+        callback: RegisterExtMethodCallback,
+    ) {
+        let _ = unsafe {
+            transaction_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
+        };
     }
 }
 
@@ -66,17 +84,6 @@ impl Executor {
         let output_str = unsafe { CString::from_raw(result_cstr).to_string_lossy().to_string() };
         let result = serde_json::from_str::<EmulationInternalResult>(&output_str).unwrap();
         result.output
-    }
-
-    pub fn register_ext_method(
-        &mut self,
-        id: i32,
-        ctx: *mut std::os::raw::c_void,
-        callback: RegisterExtMethodCallback,
-    ) {
-        let _ = unsafe {
-            transaction_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
-        };
     }
 }
 
@@ -226,8 +233,3 @@ unsafe extern "C" {
         callback: ExtFunc,
     ) -> *const std::os::raw::c_char;
 }
-
-pub type RegisterExtMethodCallback = unsafe extern "C" fn(
-    ctx: *mut std::os::raw::c_void,
-    arg1: *const std::os::raw::c_char,
-) -> *const std::os::raw::c_char;

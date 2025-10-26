@@ -1,11 +1,10 @@
 use crate::config::DEFAULT_CONFIG;
 use crate::executor::{
-    EmulationResult, RegisterExtMethodCallback, RunTransactionArgs, StoreExt, create_emulator,
-    em_sbs_c7, em_sbs_code_pos, em_sbs_result, em_sbs_stack, em_sbs_step, emulate_sbs,
-    emulate_with_emulator, run_common_args_to_internal_params,
+    EmulationResult, RunTransactionArgs, StoreExt, create_emulator, em_sbs_c7, em_sbs_code_pos,
+    em_sbs_result, em_sbs_stack, em_sbs_step, emulate_sbs, run_common_args_to_internal_params,
     transaction_emulator_register_extmethod,
 };
-use crate::step_by_step_trait::StepSyStepExecutor;
+use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use num_bigint::BigInt;
 use serde::Deserialize;
 use std::ffi::{CString, c_void};
@@ -21,11 +20,22 @@ pub struct StepExecutor {
 unsafe impl Send for StepExecutor {}
 unsafe impl Sync for StepExecutor {}
 
-impl StepSyStepExecutor for StepExecutor {
+impl BaseExecutor for StepExecutor {
     /// Return true if execution is finished and false otherwise.
     fn step(&self) -> bool {
         let res = unsafe { em_sbs_step(self.inner) };
         res
+    }
+
+    fn register_ext_method(
+        &mut self,
+        id: i32,
+        ctx: *mut std::os::raw::c_void,
+        callback: RegisterExtMethodCallback,
+    ) {
+        let _ = unsafe {
+            transaction_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
+        };
     }
 }
 
@@ -96,17 +106,6 @@ impl StepExecutor {
         let output_str = unsafe { CString::from_raw(result_cstr).to_string_lossy().to_string() };
         let result = serde_json::from_str::<EmulationResult>(&output_str).unwrap();
         result
-    }
-
-    pub fn register_ext_method(
-        &mut self,
-        id: i32,
-        ctx: *mut std::os::raw::c_void,
-        callback: RegisterExtMethodCallback,
-    ) {
-        let _ = unsafe {
-            transaction_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
-        };
     }
 }
 

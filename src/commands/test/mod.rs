@@ -759,9 +759,9 @@ fn execute_test(
         },
     };
 
-    exts::register_get_extensions(&mut get_executor, &mut ctx);
-    io_exts::register_get_extensions(&mut get_executor, &mut ctx);
-    asserts_exts::register_get_extensions(&mut get_executor, &mut ctx);
+    exts::register_extensions(&mut get_executor, &mut ctx);
+    io_exts::register_extensions(&mut get_executor, &mut ctx);
+    asserts_exts::register_extensions(&mut get_executor, &mut ctx);
 
     let result = get_executor.run_get_method(Default::default(), params);
     TestResult {

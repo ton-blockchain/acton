@@ -2,8 +2,8 @@ use crate::blockchain::Blockchain;
 use crate::executor::{
     EmulationResult, Executor, ExecutorVerbosity, ResultError, RunTransactionArgs, StoreExt,
 };
-use crate::step_by_step_trait::StepSyStepExecutor;
 use crate::step_executor::StepExecutor;
+use crate::traits::BaseExecutor;
 use num_bigint::BigInt;
 use serde::Deserialize;
 use tycho_types::boc::Boc;

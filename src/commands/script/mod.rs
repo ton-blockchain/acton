@@ -94,7 +94,7 @@ fn execute_script(
 
     let (req_receiver, response_sender, event_sender) = crate::dap::start_dap_server();
 
-    let mut dbg_ctx = DebugContext::create_empty(
+    let mut dbg_ctx = DebugContext::new(
         AnyExecutor::Get(get_executor.clone()),
         source_map,
         &req_receiver,
@@ -121,9 +121,9 @@ fn execute_script(
         dbg_ctx: &mut dbg_ctx,
     };
 
-    exts::register_step_get_extensions(&mut get_executor, &mut ctx);
-    io_exts::register_step_get_extensions(&mut get_executor, &mut ctx);
-    asserts_exts::register_step_get_extensions(&mut get_executor, &mut ctx);
+    exts::register_extensions(&mut get_executor, &mut ctx);
+    io_exts::register_extensions(&mut get_executor, &mut ctx);
+    asserts_exts::register_extensions(&mut get_executor, &mut ctx);
 
     get_executor.run_get_method(0, Default::default());
 
@@ -140,6 +140,7 @@ fn execute_script(
     }
 
     let result = get_executor.finish_get_method();
+
     // let result = get_executor.run_get_method(Default::default(), params);
 
     Ok(ScriptResult { get_result: result })

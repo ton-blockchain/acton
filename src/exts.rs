@@ -4,12 +4,11 @@ use crc::{CRC_16_XMODEM, Crc};
 use dap::prelude::Command;
 use emulator::config::DEFAULT_CONFIG;
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use emulator::executor::{
-    EmulationResult, Executor, ExecutorVerbosity, RunTransactionArgs, StoreExt,
-};
-use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
+use emulator::executor::{EmulationResult, ExecutorVerbosity, RunTransactionArgs, StoreExt};
+use emulator::get_executor::{GetMethodParams, GetMethodResult};
 use emulator::step_executor::StepExecutor;
 use emulator::step_get_executor::StepGetExecutor;
+use emulator::traits::BaseExecutor;
 use emulator::tuple::stack::{Tuple, TupleItem, parse_tuple};
 use emulator::{extension, pop_args, register_ext_methods};
 use num_bigint::BigInt;
@@ -531,45 +530,13 @@ fn register_address_impl(ctx: &mut Context, stack: &mut Tuple, name: String, add
         .insert(addr, KnownAddress { name });
 }
 
-pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
+pub fn register_extensions(executor: &mut dyn BaseExecutor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         3 => read_file,
         6 => build,
         7 => send_message,
         8 => run_get_method,
         9 => send_message_from,
-        10 => find_transaction_by_params,
-        11 => is_deployed,
-        12 => get_deployed_code,
-        13 => crc16,
-        14 => type_name_by_opcode,
-        15 => register_address,
-    });
-}
-
-pub fn register_get_extensions(executor: &mut GetExecutor, ctx: &mut Context) {
-    register_ext_methods!(executor, ctx, {
-        3 => read_file,
-        6 => build,
-        7 => send_message,
-        9 => send_message_from,
-        8 => run_get_method,
-        10 => find_transaction_by_params,
-        11 => is_deployed,
-        12 => get_deployed_code,
-        13 => crc16,
-        14 => type_name_by_opcode,
-        15 => register_address,
-    });
-}
-
-pub fn register_step_get_extensions(executor: &mut StepGetExecutor, ctx: &mut Context) {
-    register_ext_methods!(executor, ctx, {
-        3 => read_file,
-        6 => build,
-        7 => send_message,
-        9 => send_message_from,
-        8 => run_get_method,
         10 => find_transaction_by_params,
         11 => is_deployed,
         12 => get_deployed_code,

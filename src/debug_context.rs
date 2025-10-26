@@ -28,7 +28,7 @@ pub struct DebugContext {
 }
 
 impl DebugContext {
-    pub fn create_empty(
+    pub fn new(
         executor: AnyExecutor,
         source_map: &SourceMap,
         req_receiver: &Receiver<Request>,

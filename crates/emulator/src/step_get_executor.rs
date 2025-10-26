@@ -3,7 +3,7 @@ use crate::executor::ExtFunc;
 use crate::get_executor::{
     GetMethodParams, GetMethodResult, create_tvm_emulator, tvm_emulator_set_gas_limit,
 };
-use crate::step_by_step_trait::StepSyStepExecutor;
+use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use crate::tuple::stack::{Tuple, serialize_tuple};
 use serde::Deserialize;
 use std::ffi::{CString, c_void};
@@ -17,11 +17,22 @@ pub struct StepGetExecutor {
 unsafe impl Send for StepGetExecutor {}
 unsafe impl Sync for StepGetExecutor {}
 
-impl StepSyStepExecutor for StepGetExecutor {
+impl BaseExecutor for StepGetExecutor {
     /// Return true if execution is finished and false otherwise.
     fn step(&self) -> bool {
         let res = unsafe { sbs_step(self.inner) };
         res
+    }
+
+    fn register_ext_method(
+        &mut self,
+        id: i32,
+        ctx: *mut std::os::raw::c_void,
+        callback: RegisterExtMethodCallback,
+    ) {
+        let _ = unsafe {
+            tvm_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
+        };
     }
 }
 
@@ -99,28 +110,12 @@ impl StepGetExecutor {
             .expect("Failed to parse output, should not happen");
         result
     }
-
-    pub fn register_ext_method(
-        &mut self,
-        id: i32,
-        ctx: *mut std::os::raw::c_void,
-        callback: RegisterExtMethodCallback,
-    ) {
-        let _ = unsafe {
-            tvm_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
-        };
-    }
 }
 
 #[derive(Deserialize, Debug)]
 struct GetInternalResult {
     output: GetMethodResult,
 }
-
-type RegisterExtMethodCallback = unsafe extern "C" fn(
-    ctx: *mut std::os::raw::c_void,
-    arg1: *const std::os::raw::c_char,
-) -> *const std::os::raw::c_char;
 
 unsafe extern "C" {
     pub fn setup_sbs_get_method(

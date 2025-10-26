@@ -1,5 +1,6 @@
 use crate::config::DEFAULT_CONFIG;
 use crate::executor::ExtFunc;
+use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use crate::tuple::stack::{Tuple, serialize_tuple};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -8,6 +9,23 @@ use tonlib_core::tlb_types::tlb::TLB;
 
 pub struct GetExecutor {
     inner: *mut c_void,
+}
+
+impl BaseExecutor for GetExecutor {
+    fn step(&self) -> bool {
+        false
+    }
+
+    fn register_ext_method(
+        &mut self,
+        id: i32,
+        ctx: *mut std::os::raw::c_void,
+        callback: RegisterExtMethodCallback,
+    ) {
+        let _ = unsafe {
+            tvm_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
+        };
+    }
 }
 
 impl GetExecutor {
@@ -48,17 +66,6 @@ impl GetExecutor {
         //     println!("{}", result.vm_log);
         // }
         result.output
-    }
-
-    pub fn register_ext_method(
-        &mut self,
-        id: i32,
-        ctx: *mut std::os::raw::c_void,
-        callback: RegisterExtMethodCallback,
-    ) {
-        let _ = unsafe {
-            tvm_emulator_register_extmethod(self.inner, id, ctx, Some(callback));
-        };
     }
 }
 
@@ -129,11 +136,6 @@ unsafe extern "C" {
         config: *const std::os::raw::c_char,
     ) -> *mut std::os::raw::c_char;
 }
-
-type RegisterExtMethodCallback = unsafe extern "C" fn(
-    ctx: *mut std::os::raw::c_void,
-    arg1: *const std::os::raw::c_char,
-) -> *const std::os::raw::c_char;
 
 unsafe extern "C" {
     pub fn tvm_emulator_set_gas_limit(

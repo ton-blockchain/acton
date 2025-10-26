@@ -1,8 +1,6 @@
 use crate::context::Context;
-use emulator::executor::Executor;
 use emulator::extensions::FromStack;
-use emulator::get_executor::GetExecutor;
-use emulator::step_get_executor::StepGetExecutor;
+use emulator::traits::BaseExecutor;
 use emulator::tuple::stack::{Tuple, TupleItem};
 use emulator::{extension, pop_args, register_ext_methods};
 use inquire::{Confirm, Select, Text};
@@ -232,37 +230,7 @@ fn confirm_impl(
     stack.push_bool(res);
 }
 
-pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
-    register_ext_methods!(executor, ctx, {
-        1 => println,
-        2 => eprintln,
-        200 => format1,
-        201 => format2,
-        202 => format3,
-        203 => format4,
-        204 => format5,
-        205 => prompt,
-        206 => select,
-        207 => confirm,
-    });
-}
-
-pub fn register_get_extensions(executor: &mut GetExecutor, ctx: &mut Context) {
-    register_ext_methods!(executor, ctx, {
-        1 => println,
-        2 => eprintln,
-        200 => format1,
-        201 => format2,
-        202 => format3,
-        203 => format4,
-        204 => format5,
-        205 => prompt,
-        206 => select,
-        207 => confirm,
-    });
-}
-
-pub fn register_step_get_extensions(executor: &mut StepGetExecutor, ctx: &mut Context) {
+pub fn register_extensions(executor: &mut dyn BaseExecutor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         1 => println,
         2 => eprintln,
