@@ -1,6 +1,6 @@
 use crate::context::AnyExecutor;
 use anyhow::anyhow;
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
 use dap::prelude::{Command, Request, Response, ResponseBody};
 use dap::responses::{
@@ -12,7 +12,8 @@ use dap::types::{
     ThreadEventReason, Variable,
 };
 use emulator::tuple::stack::{TupleItem, parse_tuple};
-use tolkc::source_map::{DebugLocation, SourceMap};
+use std::collections::HashMap;
+use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 
@@ -28,6 +29,33 @@ pub struct DebugContext {
 }
 
 impl DebugContext {
+    pub fn empty() -> DebugContext {
+        let (_, req_receiver) = unbounded::<Request>();
+        let (response_sender, _) = unbounded::<Response>();
+        let (event_sender, _) = unbounded::<Event>();
+
+        DebugContext {
+            executors: vec![],
+            current_executor_id: 0,
+            source_maps: vec![SourceMap {
+                debug_marks: HashMap::new(),
+                high_level: HighLevelSourceMap {
+                    version: "".to_string(),
+                    language: None,
+                    compiler_version: None,
+                    files: vec![],
+                    globals: vec![],
+                    locations: vec![],
+                },
+            }],
+            locations: vec![],
+            pseudo_step: 0,
+            response_sender,
+            event_sender,
+            req_receiver,
+        }
+    }
+
     pub fn new(
         executor: AnyExecutor,
         source_map: &SourceMap,

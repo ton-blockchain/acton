@@ -373,7 +373,7 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
-    let step_get_executor = StepGetExecutor::prepare_get_method(Default::default(), params.clone());
+    let step_get_executor = StepGetExecutor::new(Default::default(), params.clone());
 
     ctx.dbg_ctx
         .executors

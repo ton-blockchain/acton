@@ -37,15 +37,7 @@ impl BaseExecutor for StepGetExecutor {
 }
 
 impl StepGetExecutor {
-    pub fn new(params: GetMethodParams) -> Self {
-        let params = serde_json::to_string(&params).unwrap();
-        let params_cstr = CString::new(params.as_str()).unwrap();
-        StepGetExecutor {
-            inner: unsafe { create_tvm_emulator(params_cstr.as_ptr()) },
-        }
-    }
-
-    pub fn prepare_get_method(stack: Tuple, params: GetMethodParams) -> Self {
+    pub fn new(stack: Tuple, params: GetMethodParams) -> Self {
         let params_str = serde_json::to_string(&params).unwrap();
         let config_cstr = CString::new(config::DEFAULT_CONFIG)
             .expect("Cannot convert Config string to CString, should not happen");

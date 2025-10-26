@@ -721,11 +721,6 @@ fn execute_test(
     let mut emulator = Emulator::new();
     let mut blockchain = Blockchain::new();
 
-    let (req_sender, req_receiver) = unbounded::<Request>();
-    let (response_sender, response_receiver) = unbounded::<Response>();
-    let (event_sender, event_receiver) = unbounded::<Event>();
-
-    let debug_get_executor = StepGetExecutor::new(params.clone());
     let mut ctx = Context {
         stdout_buffer: "".to_string(),
         stderr_buffer: "".to_string(),
@@ -737,26 +732,7 @@ fn execute_test(
         known_addresses,
         abi: (*abi).clone(),
         expected_exit_code: &mut Some(BigInt::from(0)),
-        dbg_ctx: &mut DebugContext {
-            executors: vec![AnyExecutor::Get(debug_get_executor)],
-            current_executor_id: 0,
-            source_maps: vec![SourceMap {
-                debug_marks: HashMap::new(),
-                high_level: HighLevelSourceMap {
-                    version: "".to_string(),
-                    language: None,
-                    compiler_version: None,
-                    files: vec![],
-                    globals: vec![],
-                    locations: vec![],
-                },
-            }],
-            locations: vec![],
-            pseudo_step: 0,
-            response_sender,
-            event_sender,
-            req_receiver,
-        },
+        dbg_ctx: &mut DebugContext::empty(),
     };
 
     exts::register_extensions(&mut get_executor, &mut ctx);

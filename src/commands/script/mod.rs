@@ -7,7 +7,7 @@ use dap::events::Event;
 use dap::prelude::Command;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
-use emulator::get_executor::{GetMethodParams, GetMethodResult};
+use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
 
-pub fn script_cmd(path: &String) -> Result<(), anyhow::Error> {
+pub fn script_cmd(path: &String, debug: bool) -> Result<(), anyhow::Error> {
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() {
         return Err(anyhow!("Path '{}' is not a file", path));
@@ -29,10 +29,10 @@ pub fn script_cmd(path: &String) -> Result<(), anyhow::Error> {
     }
 
     let content = fs::read_to_string(path)?;
-    run_script_file(path, &content)
+    run_script_file(path, &content, debug)
 }
 
-fn run_script_file(file_path: &str, content: &str) -> Result<(), anyhow::Error> {
+fn run_script_file(file_path: &str, content: &str, debug: bool) -> Result<(), anyhow::Error> {
     let abi = contract_abi(content, file_path);
 
     let executable_code = content.to_string();
@@ -46,8 +46,13 @@ fn run_script_file(file_path: &str, content: &str) -> Result<(), anyhow::Error> 
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64).unwrap();
             let data_cell = ArcCell::default();
 
-            let script_result =
-                execute_script(&code_cell, &data_cell, &abi, &result.source_map.unwrap());
+            let script_result = execute_script(
+                &code_cell,
+                &data_cell,
+                &abi,
+                &result.source_map.unwrap(),
+                debug,
+            );
             print_script_result(script_result?);
             Ok(())
         }
@@ -70,6 +75,7 @@ fn execute_script(
     data_cell: &ArcCell,
     abi: &ContractAbi,
     source_map: &SourceMap,
+    debug: bool,
 ) -> anyhow::Result<ScriptResult> {
     let dest_address = contract_address(code_cell);
 
@@ -89,19 +95,6 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    // let mut get_executor = GetExecutor::new(params.clone());
-    let mut get_executor = StepGetExecutor::prepare_get_method(Default::default(), params.clone());
-
-    let (req_receiver, response_sender, event_sender) = crate::dap::start_dap_server();
-
-    let mut dbg_ctx = DebugContext::new(
-        AnyExecutor::Get(get_executor.clone()),
-        source_map,
-        &req_receiver,
-        response_sender,
-        event_sender,
-    );
-
     let mut emulator = Emulator::new();
     let mut blockchain = Blockchain::new();
     let mut build_cache = BuildCache::new();
@@ -118,30 +111,51 @@ fn execute_script(
         known_addresses: &mut known_addresses,
         abi: (*abi).clone(),
         expected_exit_code: &mut None,
-        dbg_ctx: &mut dbg_ctx,
+        dbg_ctx: &mut DebugContext::empty(),
     };
 
+    if debug {
+        let mut get_executor = StepGetExecutor::new(Default::default(), params.clone());
+        exts::register_extensions(&mut get_executor, &mut ctx);
+        io_exts::register_extensions(&mut get_executor, &mut ctx);
+        asserts_exts::register_extensions(&mut get_executor, &mut ctx);
+
+        let (req_receiver, response_sender, event_sender) = crate::dap::start_dap_server();
+
+        let mut dbg_ctx = DebugContext::new(
+            AnyExecutor::Get(get_executor.clone()),
+            source_map,
+            &req_receiver,
+            response_sender,
+            event_sender,
+        );
+
+        ctx.dbg_ctx = &mut dbg_ctx;
+
+        get_executor.run_get_method(0, Default::default());
+
+        for req in req_receiver.iter() {
+            if let Command::Disconnect(req) = &req.command {
+                println!("Disconnecting: {:?}", req);
+                break;
+            }
+            let is_end = ctx.dbg_ctx.on_request(req)?;
+            if is_end {
+                ctx.dbg_ctx.event_sender.send(Event::Terminated(None))?;
+                break;
+            }
+        }
+
+        let result = get_executor.finish_get_method();
+        return Ok(ScriptResult { get_result: result });
+    }
+
+    let mut get_executor = GetExecutor::new(params.clone());
     exts::register_extensions(&mut get_executor, &mut ctx);
     io_exts::register_extensions(&mut get_executor, &mut ctx);
     asserts_exts::register_extensions(&mut get_executor, &mut ctx);
 
-    get_executor.run_get_method(0, Default::default());
-
-    for req in req_receiver.iter() {
-        if let Command::Disconnect(req) = &req.command {
-            println!("Disconnecting: {:?}", req);
-            break;
-        }
-        let is_end = ctx.dbg_ctx.on_request(req)?;
-        if is_end {
-            ctx.dbg_ctx.event_sender.send(Event::Terminated(None))?;
-            break;
-        }
-    }
-
-    let result = get_executor.finish_get_method();
-
-    // let result = get_executor.run_get_method(Default::default(), params);
+    let result = get_executor.run_get_method(Default::default(), params);
 
     Ok(ScriptResult { get_result: result })
 }

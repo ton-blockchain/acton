@@ -38,6 +38,8 @@ enum Commands {
     Script {
         #[arg(help = "Script file to execute")]
         path: String,
+        #[arg(long, help = "Enable debug mode")]
+        debug: bool,
     },
     #[command(about = "Compile a Tolk file")]
     Compile {
@@ -76,8 +78,8 @@ fn main() {
                 eprintln!("{} {}", "Error:".red(), err);
             }
         }
-        Commands::Script { path } => {
-            let result = script_cmd(&path);
+        Commands::Script { path, debug } => {
+            let result = script_cmd(&path, debug);
             if let Err(err) = result {
                 eprintln!("{} {}", "Error:".red(), err);
             }
