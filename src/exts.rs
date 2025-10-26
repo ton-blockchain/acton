@@ -119,101 +119,107 @@ fn send_message_from_impl(
         }
     };
 
-    let RelaxedMsgInfo::Int(int_message) = message_obj.info else {
-        panic!("Emulator only supports internal messages for now");
-    };
+    let successful_emulations = if ctx.debug {
+        let RelaxedMsgInfo::Int(int_message) = message_obj.info else {
+            panic!("Emulator only supports internal messages for now");
+        };
 
-    let dest_account = blockchain.get_account(&int_message.dst.to_string());
-    let code = match get_address_code(&dest_account) {
-        Some(code) => Some(code),
-        None => {
-            if let Some(init) = message_obj.init
-                && let Some(code) = init.code
-            {
-                Some(ArcCell::from_boc_b64(&Boc::encode_base64(code)).unwrap())
-            } else {
-                None
+        let dest_account = blockchain.get_account(&int_message.dst.to_string());
+        let code = match get_address_code(&dest_account) {
+            Some(code) => Some(code),
+            None => {
+                if let Some(init) = message_obj.init
+                    && let Some(code) = init.code
+                {
+                    Some(ArcCell::from_boc_b64(&Boc::encode_base64(code)).unwrap())
+                } else {
+                    None
+                }
             }
+        };
+
+        let step_executor = StepExecutor::new();
+        let source_map = ctx
+            .build_cache
+            .result_for_code(code)
+            .map(|res| res.1.source_map);
+
+        ctx.dbg_ctx.begin_thread(
+            2,
+            AnyExecutor::Message(step_executor.clone()),
+            source_map,
+            "Send internal message".to_string(),
+        );
+
+        let msg_cell = Emulator::patch_src_addr(msg_cell, Some(src_addr));
+        let prepare_result = step_executor.prepare_transaction(
+            msg_cell.clone(),
+            BigInt::from(0),
+            RunTransactionArgs {
+                config: DEFAULT_CONFIG.to_string(),
+                libs: None,
+                verbosity: ExecutorVerbosity::FullLocation,
+                shard_account: dest_account.clone(),
+                now: 0,
+                lt: blockchain.get_lt(),
+                random_seed: None,
+                ignore_chksig: false,
+                debug_enabled: true,
+                prev_blocks_info: None,
+            },
+        );
+        if !prepare_result.success {
+            panic!("Failed to prepare Emulator in debug mode");
         }
+
+        // Step to update internal state
+        ctx.dbg_ctx.next(false);
+
+        ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+
+        let result = step_executor.finish_transaction();
+
+        ctx.dbg_ctx.finish_thread(2);
+
+        let result = match result {
+            EmulationResult::Success(result) => result,
+            EmulationResult::Error(err) => {
+                stack.push(TupleItem::Tuple(vec![]));
+                return;
+            }
+        };
+
+        let shard_account_after = &result.shard_account;
+        let shard_account_cell = Boc::decode_base64(shard_account_after).unwrap();
+        let mut shard_account_slice = shard_account_cell.as_slice().unwrap();
+        let shard_account = ShardAccount::load_from(&mut shard_account_slice).unwrap();
+
+        blockchain.update_account(&int_message.dst.to_string(), &shard_account);
+
+        let tx_cell: Cell = Boc::decode_base64(&result.transaction).unwrap();
+        let mut tx_slice = tx_cell.as_slice().unwrap();
+        let transaction = Transaction::load_from(&mut tx_slice).unwrap();
+
+        let send_result = SendMessageResultSuccess {
+            raw_transaction: result.transaction,
+            transaction: transaction.clone(),
+            parent_transaction: None,
+            shard_account,
+            vm_log: result.vm_log,
+            actions: result.actions,
+        };
+        vec![send_result]
+    } else {
+        let emulations = emulator.send_message(blockchain, msg_cell, Some(src_addr));
+
+        let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
+            SendMessageResult::Success(res) => Some((*res).clone()),
+            SendMessageResult::Error(_) => None,
+        });
+        successful_emulations.collect::<Vec<_>>()
     };
 
-    let step_executor = StepExecutor::new();
-    let source_map = ctx
-        .build_cache
-        .result_for_code(code)
-        .map(|res| res.1.source_map);
-
-    ctx.dbg_ctx.begin_thread(
-        2,
-        AnyExecutor::Message(step_executor.clone()),
-        source_map,
-        "Send internal message".to_string(),
-    );
-
-    let msg_cell = Emulator::patch_src_addr(msg_cell, Some(src_addr));
-    let prepare_result = step_executor.prepare_transaction(
-        msg_cell.clone(),
-        BigInt::from(0),
-        RunTransactionArgs {
-            config: DEFAULT_CONFIG.to_string(),
-            libs: None,
-            verbosity: ExecutorVerbosity::FullLocation,
-            shard_account: dest_account.clone(),
-            now: 0,
-            lt: blockchain.get_lt(),
-            random_seed: None,
-            ignore_chksig: false,
-            debug_enabled: true,
-            prev_blocks_info: None,
-        },
-    );
-    println!("{:?}", prepare_result);
-
-    // Step to update internal state
-    ctx.dbg_ctx.next(false);
-
-    ctx.dbg_ctx.process_incoming_requests().unwrap();
-
-    let result = step_executor.finish_transaction();
-
-    ctx.dbg_ctx.finish_thread(2);
-
-    let result = match result {
-        EmulationResult::Success(result) => result,
-        EmulationResult::Error(err) => {
-            stack.push(TupleItem::Tuple(vec![]));
-            return;
-        }
-    };
-
-    let shard_account_after = &result.shard_account;
-    let shard_account_cell = Boc::decode_base64(shard_account_after).unwrap();
-    let mut shard_account_slice = shard_account_cell.as_slice().unwrap();
-    let shard_account = ShardAccount::load_from(&mut shard_account_slice).unwrap();
-
-    blockchain.update_account(&int_message.dst.to_string(), &shard_account);
-
-    let tx_cell: Cell = Boc::decode_base64(&result.transaction).unwrap();
-    let mut tx_slice = tx_cell.as_slice().unwrap();
-    let transaction = Transaction::load_from(&mut tx_slice).unwrap();
-
-    let send_result = SendMessageResultSuccess {
-        raw_transaction: result.transaction,
-        transaction: transaction.clone(),
-        parent_transaction: None,
-        shard_account,
-        vm_log: result.vm_log,
-        actions: result.actions,
-    };
-
-    // let emulations = emulator.send_message(blockchain, msg_cell, Some(src_addr));
-    //
-    // let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
-    //     SendMessageResult::Success(res) => Some(res),
-    //     SendMessageResult::Error(_) => None,
-    // });
-
-    let transaction_cells = vec![send_result]
+    let transaction_cells = successful_emulations
         .iter()
         .filter_map(|emulation| ArcCell::from_boc_b64(&*emulation.raw_transaction).ok())
         .map(|tx| TupleItem::Cell(tx))
@@ -377,7 +383,7 @@ fn run_get_method_impl(
         // Step to update internal state
         ctx.dbg_ctx.next(false);
 
-        ctx.dbg_ctx.process_incoming_requests().unwrap();
+        ctx.dbg_ctx.process_incoming_requests(false).unwrap();
         ctx.dbg_ctx.finish_thread(2);
 
         step_get_executor.finish_get_method()
