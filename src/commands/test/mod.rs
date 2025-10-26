@@ -1,7 +1,8 @@
 use crate::context::{
-    AnyExecutor, AssertFailure, BuildCache, Context, DebugContext, KnownAddress, KnownAddresses,
+    AnyExecutor, AssertFailure, BuildCache, Context, KnownAddresses,
     TransactionGenericAssertFailure,
 };
+use crate::debug_context::DebugContext;
 use crate::{asserts_exts, exts, io_exts};
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;

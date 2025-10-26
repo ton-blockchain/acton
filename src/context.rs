@@ -1,3 +1,4 @@
+use crate::debug_context::DebugContext;
 use abi::ContractAbi;
 use crossbeam_channel::{Receiver, Sender};
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
@@ -222,49 +223,6 @@ impl AnyExecutor {
             AnyExecutor::Get(get) => get.get_c7(),
             AnyExecutor::Message(msg) => msg.get_c7(),
         }
-    }
-}
-
-pub struct DebugContext {
-    pub executors: Vec<AnyExecutor>,
-    pub current_executor_id: usize,
-    pub marks: Vec<HashMap<String, Vec<(i32, i32)>>>,
-    pub source_maps: Vec<SourceMap>,
-    pub locations: Vec<DebugLocation>,
-    pub pseudo_step: i64,
-    pub response_sender: Sender<Response>,
-    pub event_sender: Sender<Event>,
-    pub req_receiver: Receiver<Request>,
-}
-
-impl DebugContext {
-    pub fn begin_thread(&mut self, id: i64, name: String) {
-        self.event_sender
-            .send(Event::Thread(ThreadEventBody {
-                reason: ThreadEventReason::Started,
-                thread_id: id,
-            }))
-            .unwrap();
-        self.event_sender
-            .send(Event::Stopped(StoppedEventBody {
-                reason: StoppedEventReason::Entry,
-                description: Some(name),
-                thread_id: Some(id),
-                preserve_focus_hint: None,
-                text: None,
-                all_threads_stopped: None,
-                hit_breakpoint_ids: None,
-            }))
-            .unwrap();
-    }
-
-    pub fn finish_thread(&mut self, id: i64) {
-        self.event_sender
-            .send(Event::Thread(ThreadEventBody {
-                reason: ThreadEventReason::Exited,
-                thread_id: 2,
-            }))
-            .unwrap();
     }
 }
 
