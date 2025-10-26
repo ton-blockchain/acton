@@ -87,63 +87,61 @@ pub fn start_dap_server() -> (Receiver<Request>, Sender<Response>, Sender<Event>
         let listener = TcpListener::bind("127.0.0.1:12345").unwrap();
         println!("Debugger server listening on 127.0.0.1:12345");
 
-        for stream in listener.incoming() {
-            let stream = stream.unwrap();
-            println!("New connection established");
+        let stream = listener.incoming().next().unwrap().unwrap();
+        println!("New connection established");
 
-            let input_stream = stream.try_clone().unwrap();
-            let mut input = BufReader::new(input_stream);
+        let input_stream = stream.try_clone().unwrap();
+        let mut input = BufReader::new(input_stream);
 
-            let req_sender_1 = req_sender.clone();
+        let req_sender_1 = req_sender.clone();
 
-            let reader_thread = thread::spawn(move || {
-                loop {
-                    let req = poll_request(&mut input);
-                    println!("{:?}", req);
-                    match req {
-                        Ok(Some(req)) => {
-                            req_sender_1.send(req.clone()).unwrap();
-                        }
-                        Ok(None) => {
-                            // No more requests, connection might be closed
-                            println!("Request is closed");
-                            break;
-                        }
-                        Err(e) => {
-                            eprintln!("Error handling request: {}", e);
-                        }
-                    }
-                }
-            });
-
-            let cursor = Cursor::new("".as_bytes());
-            let dummy_input = BufReader::new(cursor);
-            let output_stream = stream;
-            let output = BufWriter::new(output_stream);
-            let mut server = Server::new(dummy_input, output);
-
+        let reader_thread = thread::spawn(move || {
             loop {
-                crossbeam_channel::select! {
-                    recv(response_receiver) -> msg => {
-                        let Ok(rsp) = msg else { break };
-                        server.respond(rsp).unwrap();
+                let req = poll_request(&mut input);
+                println!("{:?}", req);
+                match req {
+                    Ok(Some(req)) => {
+                        req_sender_1.send(req.clone()).unwrap();
                     }
-
-                    recv(event_receiver) -> msg => {
-                        let Ok(event) = msg else { break };
-                        server.send_event(event).unwrap();
+                    Ok(None) => {
+                        // No more requests, connection might be closed
+                        println!("Request is closed");
+                        break;
                     }
-
-                    default(Duration::from_millis(10)) => {
-                        continue
+                    Err(e) => {
+                        eprintln!("Error handling request: {}", e);
                     }
                 }
             }
+        });
 
-            reader_thread.join().unwrap();
+        let cursor = Cursor::new("".as_bytes());
+        let dummy_input = BufReader::new(cursor);
+        let output_stream = stream;
+        let output = BufWriter::new(output_stream);
+        let mut server = Server::new(dummy_input, output);
 
-            println!("Connection closed");
+        loop {
+            crossbeam_channel::select! {
+                recv(response_receiver) -> msg => {
+                    let Ok(rsp) = msg else { break };
+                    server.respond(rsp).unwrap();
+                }
+
+                recv(event_receiver) -> msg => {
+                    let Ok(event) = msg else { break };
+                    server.send_event(event).unwrap();
+                }
+
+                default(Duration::from_millis(10)) => {
+                    continue
+                }
+            }
         }
+
+        reader_thread.join().unwrap();
+
+        println!("Connection closed");
     });
     (req_receiver, response_sender, event_sender)
 }
