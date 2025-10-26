@@ -1,4 +1,4 @@
-use crate::source_map::SourceMap;
+use crate::source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -196,16 +196,20 @@ impl Compiler {
                         fift_code: result.fift_code,
                         code_boc64: result.debug_mark_base64,
                         code_hash_hex: result.code_hash_hex,
-                        debug_marks: Self::parse_marks_dict(&result.code_boc64),
-                        source_map: result.source_map,
+                        source_map: result.source_map.map(|source_map| SourceMap {
+                            high_level: source_map,
+                            debug_marks: parse_marks_dict(&result.code_boc64),
+                        }),
                     })
                 } else {
                     CompilerResult::Success(CompilerResultSuccess {
                         fift_code: result.fift_code,
                         code_boc64: result.code_boc64,
                         code_hash_hex: result.code_hash_hex,
-                        debug_marks: Self::parse_marks_dict(&result.debug_mark_base64),
-                        source_map: result.source_map,
+                        source_map: result.source_map.map(|source_map| SourceMap {
+                            high_level: source_map,
+                            debug_marks: parse_marks_dict(&result.debug_mark_base64),
+                        }),
                     })
                 }
             }
@@ -214,44 +218,6 @@ impl Compiler {
                 message: err.to_string(),
             }),
         }
-    }
-
-    fn parse_marks_dict(code_boc64: &String) -> HashMap<String, Vec<(i32, i32)>> {
-        let debug_marks_cell = Boc::decode_base64(&*code_boc64).unwrap();
-
-        let dict = RawDict::<256>::from(Some(debug_marks_cell));
-        let mut marks = HashMap::<String, Vec<(i32, i32)>>::new();
-
-        dict.iter().for_each(|kv| {
-            let kv = kv.unwrap();
-            let hash = kv.0.as_data_slice().load_biguint(256).unwrap();
-            let hash = format!("{:x}", hash).to_uppercase();
-
-            let mut slice = kv.1;
-            let is_normal = slice.load_bit().unwrap();
-            let dict_inner = Dict::<u32, CellSlice>::load_from(&mut slice).unwrap();
-
-            dict_inner.iter().for_each(|kv| {
-                let mut kv = kv.unwrap();
-                let debug_id = kv.0;
-                let mut ref_ = kv.1.load_reference().unwrap().as_slice().unwrap();
-                let dict_marks_inner =
-                    RawDict::<10>::load_from_root_ext(&mut ref_, Cell::empty_context()).unwrap();
-
-                dict_marks_inner.iter().for_each(|kv| {
-                    let kv = kv.unwrap();
-                    let offset = kv.0.as_data_slice().load_uint(10).unwrap();
-
-                    let old_value = marks.get_mut(&hash);
-                    if let Some(old_value) = old_value {
-                        old_value.push((offset as i32, debug_id as i32))
-                    } else {
-                        marks.insert(hash.clone(), vec![(offset as i32, debug_id as i32)]);
-                    }
-                });
-            });
-        });
-        marks
     }
 }
 
@@ -282,7 +248,6 @@ pub struct CompilerResultSuccess {
     pub fift_code: String,
     pub code_boc64: String,
     pub code_hash_hex: String,
-    pub debug_marks: HashMap<String, Vec<(i32, i32)>>,
     pub source_map: Option<SourceMap>,
 }
 
@@ -304,7 +269,7 @@ pub struct CompilerInternalResultSuccess {
     #[serde(rename = "debugMarkBase64")]
     pub debug_mark_base64: String,
     #[serde(rename = "sourceMap")]
-    pub source_map: Option<SourceMap>,
+    pub source_map: Option<HighLevelSourceMap>,
 }
 
 #[derive(Debug, Deserialize)]

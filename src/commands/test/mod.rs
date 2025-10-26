@@ -9,6 +9,7 @@ use anyhow::anyhow;
 use crossbeam_channel::unbounded;
 use dap::events::Event;
 use dap::prelude::{Request, Response};
+use dap::types::Source;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::exit_codes;
@@ -25,7 +26,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use teamcity::TeamcityReporter;
-use tolkc::source_map::SourceMap;
+use tolkc::source_map::{HighLevelSourceMap, SourceMap};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
@@ -740,14 +741,16 @@ fn execute_test(
         dbg_ctx: &mut DebugContext {
             executors: vec![AnyExecutor::Get(debug_get_executor)],
             current_executor_id: 0,
-            marks: vec![Default::default()],
             source_maps: vec![SourceMap {
-                version: "".to_string(),
-                language: None,
-                compiler_version: None,
-                files: vec![],
-                globals: vec![],
-                locations: vec![],
+                debug_marks: HashMap::new(),
+                high_level: HighLevelSourceMap {
+                    version: "".to_string(),
+                    language: None,
+                    compiler_version: None,
+                    files: vec![],
+                    globals: vec![],
+                    locations: vec![],
+                },
             }],
             locations: vec![],
             pseudo_step: 0,

@@ -3,7 +3,7 @@ use abi::ContractAbi;
 use crossbeam_channel::{Receiver, Sender};
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
 use dap::prelude::{Request, Response};
-use dap::types::{StoppedEventReason, ThreadEventReason};
+use dap::types::{Source, StoppedEventReason, ThreadEventReason};
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::step_by_step_trait::StepSyStepExecutor;
@@ -12,7 +12,7 @@ use emulator::step_get_executor::StepGetExecutor;
 use emulator::tuple::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use std::collections::HashMap;
-use tolkc::source_map::{DebugLocation, SourceMap};
+use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::models::{IntAddr, Transaction};
@@ -106,7 +106,6 @@ impl BuildCache {
         path: &String,
         code: &String,
         code_hash: &String,
-        marks_dict: HashMap<String, Vec<(i32, i32)>>,
         source_map: SourceMap,
     ) {
         self.built.insert(
@@ -115,7 +114,6 @@ impl BuildCache {
                 name: name.clone(),
                 code_boc64: code.clone(),
                 code_hash: code_hash.clone(),
-                marks_dict,
                 source_map,
             },
         );
@@ -153,7 +151,6 @@ pub struct CompilationResult {
     pub name: String,
     pub code_boc64: String,
     pub code_hash: String,
-    pub marks_dict: HashMap<String, Vec<(i32, i32)>>,
     pub source_map: SourceMap,
 }
 

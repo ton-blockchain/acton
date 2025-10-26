@@ -51,7 +51,6 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, path: String, name: String) 
                 &path,
                 &success.code_boc64,
                 &success.code_hash_hex,
-                success.debug_marks,
                 success.source_map.unwrap(),
             );
             let code_cell = ArcCell::from_boc_b64(&*success.code_boc64).unwrap();
@@ -149,7 +148,6 @@ fn send_message_from_impl(
     if let Some(code) = code
         && let Some(result) = ctx.build_cache.result_for_code(code)
     {
-        ctx.dbg_ctx.marks.push(result.1.marks_dict.clone());
         ctx.dbg_ctx.source_maps.push(result.1.source_map.clone());
     }
 
@@ -191,7 +189,6 @@ fn send_message_from_impl(
     let result = step_executor.finish_transaction();
 
     ctx.dbg_ctx.executors.pop().unwrap();
-    ctx.dbg_ctx.marks.pop().unwrap();
     ctx.dbg_ctx.current_executor_id -= 1;
     ctx.dbg_ctx.locations = vec![];
     ctx.dbg_ctx.pseudo_step = 0;
@@ -385,7 +382,6 @@ fn run_get_method_impl(
     ctx.dbg_ctx.current_executor_id += 1;
 
     if let Some(result) = ctx.build_cache.result_for_code(code) {
-        ctx.dbg_ctx.marks.push(result.1.marks_dict.clone());
         ctx.dbg_ctx.source_maps.push(result.1.source_map.clone());
     }
 
@@ -410,7 +406,6 @@ fn run_get_method_impl(
     let result = step_get_executor.finish_get_method();
 
     ctx.dbg_ctx.executors.pop().unwrap();
-    ctx.dbg_ctx.marks.pop().unwrap();
     ctx.dbg_ctx.current_executor_id -= 1;
     ctx.dbg_ctx.locations = vec![];
     ctx.dbg_ctx.pseudo_step = 0;

@@ -1,8 +1,18 @@
 use serde::Deserialize;
+use std::collections::HashMap;
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellFamily, CellSlice, Load};
+use tycho_types::dict::{Dict, RawDict};
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SourceMap {
+    pub high_level: HighLevelSourceMap,
+    pub debug_marks: HashMap<String, Vec<(i32, i32)>>,
+}
 
 /// Source map data structure for Tolk compiler output
 #[derive(Debug, Clone, Deserialize)]
-pub struct SourceMap {
+pub struct HighLevelSourceMap {
     pub version: String,
     pub language: Option<String>,
     pub compiler_version: Option<String>,
@@ -91,4 +101,42 @@ pub struct DebugInfo {
     pub opcode: String,
     pub line_str: String,
     pub line_off: String,
+}
+
+pub fn parse_marks_dict(code_boc64: &String) -> HashMap<String, Vec<(i32, i32)>> {
+    let debug_marks_cell = Boc::decode_base64(&*code_boc64).unwrap();
+
+    let dict = RawDict::<256>::from(Some(debug_marks_cell));
+    let mut marks = HashMap::<String, Vec<(i32, i32)>>::new();
+
+    dict.iter().for_each(|kv| {
+        let kv = kv.unwrap();
+        let hash = kv.0.as_data_slice().load_biguint(256).unwrap();
+        let hash = format!("{:x}", hash).to_uppercase();
+
+        let mut slice = kv.1;
+        let is_normal = slice.load_bit().unwrap();
+        let dict_inner = Dict::<u32, CellSlice>::load_from(&mut slice).unwrap();
+
+        dict_inner.iter().for_each(|kv| {
+            let mut kv = kv.unwrap();
+            let debug_id = kv.0;
+            let mut ref_ = kv.1.load_reference().unwrap().as_slice().unwrap();
+            let dict_marks_inner =
+                RawDict::<10>::load_from_root_ext(&mut ref_, Cell::empty_context()).unwrap();
+
+            dict_marks_inner.iter().for_each(|kv| {
+                let kv = kv.unwrap();
+                let offset = kv.0.as_data_slice().load_uint(10).unwrap();
+
+                let old_value = marks.get_mut(&hash);
+                if let Some(old_value) = old_value {
+                    old_value.push((offset as i32, debug_id as i32))
+                } else {
+                    marks.insert(hash.clone(), vec![(offset as i32, debug_id as i32)]);
+                }
+            });
+        });
+    });
+    marks
 }
