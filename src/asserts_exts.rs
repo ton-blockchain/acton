@@ -4,6 +4,7 @@ use crate::context::{
 };
 use emulator::executor::Executor;
 use emulator::get_executor::GetExecutor;
+use emulator::step_get_executor::StepGetExecutor;
 use emulator::tuple::stack::{Tuple, TupleItem, TupleSLice};
 use emulator::{extension, pop_args, register_ext_methods};
 use num_bigint::BigInt;
@@ -281,6 +282,16 @@ pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
 }
 
 pub fn register_get_extensions(executor: &mut GetExecutor, ctx: &mut Context) {
+    register_ext_methods!(executor, ctx, {
+        100 => assert_fail,
+        101 => assert_bin,
+        102 => expect_to_end_with_exit_code,
+        103 => fail_to_find_transaction_by_params,
+        104 => fail_to_not_find_transaction_by_params,
+    });
+}
+
+pub fn register_step_get_extensions(executor: &mut StepGetExecutor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         100 => assert_fail,
         101 => assert_bin,

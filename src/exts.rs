@@ -1,12 +1,19 @@
 use crate::asserts_exts::process_txs_and_search_params;
-use crate::context::{Context, KnownAddress};
+use crate::context::{AnyExecutor, Context, KnownAddress};
 use crc::{CRC_16_XMODEM, Crc};
-use emulator::emulator::SendMessageResult;
-use emulator::executor::{Executor, StoreExt};
+use dap::prelude::Command;
+use emulator::config::DEFAULT_CONFIG;
+use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
+use emulator::executor::{
+    EmulationResult, Executor, ExecutorVerbosity, RunTransactionArgs, StoreExt,
+};
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
-use emulator::tuple::stack::{Tuple, TupleItem, TupleSLice, parse_tuple};
+use emulator::step_executor::StepExecutor;
+use emulator::step_get_executor::StepGetExecutor;
+use emulator::tuple::stack::{Tuple, TupleItem, parse_tuple};
 use emulator::{extension, pop_args, register_ext_methods};
 use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 use std::collections::HashMap;
 use std::path::Path;
 use tonlib_core::TonAddress;
@@ -16,7 +23,8 @@ use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, Load};
 use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, ShardAccount, TxInfo,
+    AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
+    ShardAccount, Transaction, TxInfo,
 };
 
 extension!(read_file in (Context) with (path: String) using read_file_impl);
@@ -35,11 +43,17 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, path: String, name: String) 
         return;
     }
 
-    let result = tolkc::compile(Path::new(&path));
+    let result = tolkc::compile_debug(Path::new(&path));
     match result {
         tolkc::CompilerResult::Success(success) => {
-            ctx.build_cache
-                .memoize(&name, &path, &success.code_boc64, &success.code_hash_hex);
+            ctx.build_cache.memoize(
+                &name,
+                &path,
+                &success.code_boc64,
+                &success.code_hash_hex,
+                success.debug_marks,
+                success.source_map.unwrap(),
+            );
             let code_cell = ArcCell::from_boc_b64(&*success.code_boc64).unwrap();
             stack.push(TupleItem::Cell(code_cell))
         }
@@ -88,6 +102,9 @@ fn send_message_from_impl(
     let msg_b64 = message.to_boc_b64(false).unwrap();
     let msg_cell = Boc::decode_base64(msg_b64).unwrap();
 
+    let mut msg_slice = msg_cell.as_slice().unwrap();
+    let message_obj = RelaxedMessage::load_from(&mut msg_slice).unwrap();
+
     let from_cell = Boc::decode_base64(from.to_boc_b64(false).unwrap()).unwrap();
     let mut from_slice = from_cell.as_slice().unwrap();
     let src_addr = IntAddr::load_from(&mut from_slice);
@@ -104,14 +121,120 @@ fn send_message_from_impl(
         }
     };
 
-    let emulations = emulator.send_message(blockchain, msg_cell, Some(src_addr));
+    let step_executor = StepExecutor::new();
 
-    let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
-        SendMessageResult::Success(res) => Some(res),
-        SendMessageResult::Error(_) => None,
-    });
+    ctx.dbg_ctx
+        .executors
+        .push(AnyExecutor::Message(step_executor.clone()));
+    ctx.dbg_ctx.current_executor_id += 1;
 
-    let transaction_cells = successful_emulations
+    let RelaxedMsgInfo::Int(int_message) = message_obj.info else {
+        panic!("Emulator only supports internal messages for now");
+    };
+
+    let dest_account = blockchain.get_account(&int_message.dst.to_string());
+    let code = match get_address_code(&dest_account) {
+        Some(code) => Some(code),
+        None => {
+            if let Some(init) = message_obj.init
+                && let Some(code) = init.code
+            {
+                Some(ArcCell::from_boc_b64(&Boc::encode_base64(code)).unwrap())
+            } else {
+                None
+            }
+        }
+    };
+
+    if let Some(code) = code
+        && let Some(result) = ctx.build_cache.result_for_code(code)
+    {
+        ctx.dbg_ctx.marks.push(result.1.marks_dict.clone());
+        ctx.dbg_ctx.source_maps.push(result.1.source_map.clone());
+    }
+
+    ctx.dbg_ctx
+        .begin_thread(2, "Send internal message".to_string());
+
+    let msg_cell = Emulator::patch_src_addr(msg_cell, Some(src_addr));
+    let prepare_result = step_executor.prepare_transaction(
+        msg_cell.clone(),
+        BigInt::from(0),
+        RunTransactionArgs {
+            config: DEFAULT_CONFIG.to_string(),
+            libs: None,
+            verbosity: ExecutorVerbosity::FullLocation,
+            shard_account: dest_account.clone(),
+            now: 0,
+            lt: blockchain.get_lt(),
+            random_seed: None,
+            ignore_chksig: false,
+            debug_enabled: true,
+            prev_blocks_info: None,
+        },
+    );
+    println!("{:?}", prepare_result);
+
+    // Step to update internal state
+    ctx.dbg_ctx.next(false);
+
+    for req in ctx.dbg_ctx.req_receiver.clone().iter() {
+        if let Command::Disconnect(req) = &req.command {
+            break;
+        }
+        let is_end = ctx.dbg_ctx.on_request(req).unwrap();
+        if is_end {
+            break;
+        }
+    }
+
+    let result = step_executor.finish_transaction();
+
+    ctx.dbg_ctx.executors.pop().unwrap();
+    ctx.dbg_ctx.marks.pop().unwrap();
+    ctx.dbg_ctx.current_executor_id -= 1;
+    ctx.dbg_ctx.locations = vec![];
+    ctx.dbg_ctx.pseudo_step = 0;
+
+    ctx.dbg_ctx.finish_thread(2);
+
+    let result = match result {
+        EmulationResult::Success(result) => result,
+        EmulationResult::Error(err) => {
+            stack.push(TupleItem::Tuple(vec![]));
+            return;
+        }
+    };
+
+    let shard_account_after = &result.shard_account;
+    let shard_account_cell = Boc::decode_base64(shard_account_after).unwrap();
+    let mut shard_account_slice = shard_account_cell.as_slice().unwrap();
+    let shard_account = ShardAccount::load_from(&mut shard_account_slice).unwrap();
+
+    blockchain.update_account(&int_message.dst.to_string(), &shard_account);
+
+    let tx_cell: Cell = Boc::decode_base64(&result.transaction).unwrap();
+    let mut tx_slice = tx_cell.as_slice().unwrap();
+    let transaction = Transaction::load_from(&mut tx_slice).unwrap();
+
+    let send_result = SendMessageResultSuccess {
+        raw_transaction: result.transaction,
+        transaction: transaction.clone(),
+        parent_transaction: None,
+        shard_account,
+        vm_log: result.vm_log,
+        actions: result.actions,
+    };
+
+    // let emulations = emulator.send_message(blockchain, msg_cell, Some(src_addr));
+    //
+    // let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
+    //     SendMessageResult::Success(res) => Some(res),
+    //     SendMessageResult::Error(_) => None,
+    // });
+
+    let transaction_cells = vec![send_result]
+        .iter()
         .filter_map(|emulation| ArcCell::from_boc_b64(&*emulation.raw_transaction).ok())
         .map(|tx| TupleItem::Cell(tx))
         .collect::<Vec<_>>();
@@ -237,6 +360,7 @@ fn run_get_method_impl(
         Cell::default()
     };
 
+    let method_id = id.to_i32().unwrap_or(0);
     let params = GetMethodParams {
         code: code.to_boc_b64(false).unwrap().to_string(),
         data: Boc::encode_base64(data),
@@ -247,19 +371,55 @@ fn run_get_method_impl(
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         gas_limit: "0".to_string(),
-        method_id: if id == BigInt::default() {
-            0
-        } else {
-            id.to_u64_digits().1[0] as i32
-        },
+        method_id,
         debug_enabled: true,
         extra_currencies: HashMap::new(),
         prev_blocks_info: None,
     };
 
-    let executor = GetExecutor::new(params.clone());
+    let step_get_executor = StepGetExecutor::prepare_get_method(Default::default(), params.clone());
 
-    let result = executor.run_get_method(args, params);
+    ctx.dbg_ctx
+        .executors
+        .push(AnyExecutor::Get(step_get_executor.clone()));
+    ctx.dbg_ctx.current_executor_id += 1;
+
+    if let Some(result) = ctx.build_cache.result_for_code(code) {
+        ctx.dbg_ctx.marks.push(result.1.marks_dict.clone());
+        ctx.dbg_ctx.source_maps.push(result.1.source_map.clone());
+    }
+
+    ctx.dbg_ctx
+        .begin_thread(2, "Send internal message".to_string());
+
+    step_get_executor.run_get_method(method_id, Default::default());
+
+    // Step to update internal state
+    ctx.dbg_ctx.next(false);
+
+    for req in ctx.dbg_ctx.req_receiver.clone().iter() {
+        if let Command::Disconnect(req) = &req.command {
+            break;
+        }
+        let is_end = ctx.dbg_ctx.on_request(req).unwrap();
+        if is_end {
+            break;
+        }
+    }
+
+    let result = step_get_executor.finish_get_method();
+
+    ctx.dbg_ctx.executors.pop().unwrap();
+    ctx.dbg_ctx.marks.pop().unwrap();
+    ctx.dbg_ctx.current_executor_id -= 1;
+    ctx.dbg_ctx.locations = vec![];
+    ctx.dbg_ctx.pseudo_step = 0;
+
+    ctx.dbg_ctx.finish_thread(2);
+
+    // let executor = GetExecutor::new(params.clone());
+    //
+    // let result = executor.run_get_method(args, params);
 
     match result {
         GetMethodResult::Success(result) => {
@@ -315,24 +475,33 @@ fn get_deployed_code_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell
     }
 
     let account = ctx.blockchain.get_account(&dst_addr_str);
-    let state = account.account.load().unwrap().0.map(|s| s.state);
-
-    let Some(AccountState::Active(state)) = state else {
-        stack.push(TupleItem::Null);
-        return;
-    };
-
-    let Some(code) = state.code else {
-        stack.push(TupleItem::Null);
-        return;
-    };
-
-    let Ok(cell) = ArcCell::from_boc_b64(&Boc::encode_base64(code)) else {
-        stack.push(TupleItem::Null);
-        return;
+    let cell = match get_address_code(&account) {
+        Some(value) => value,
+        None => {
+            stack.push(TupleItem::Null);
+            return;
+        }
     };
 
     stack.push(TupleItem::Cell(cell));
+}
+
+fn get_address_code(account: &ShardAccount) -> Option<ArcCell> {
+    let state = account.account.load().unwrap().0.map(|s| s.state);
+
+    let Some(AccountState::Active(state)) = state else {
+        return None;
+    };
+
+    let Some(code) = state.code else {
+        return None;
+    };
+
+    let Ok(cell) = ArcCell::from_boc_b64(&Boc::encode_base64(code)) else {
+        return None;
+    };
+
+    Some(cell)
 }
 
 extension!(crc16 in (Context) with (data: String) using crc16_impl);
@@ -384,6 +553,22 @@ pub fn register_extensions(executor: &mut Executor, ctx: &mut Context) {
 }
 
 pub fn register_get_extensions(executor: &mut GetExecutor, ctx: &mut Context) {
+    register_ext_methods!(executor, ctx, {
+        3 => read_file,
+        6 => build,
+        7 => send_message,
+        9 => send_message_from,
+        8 => run_get_method,
+        10 => find_transaction_by_params,
+        11 => is_deployed,
+        12 => get_deployed_code,
+        13 => crc16,
+        14 => type_name_by_opcode,
+        15 => register_address,
+    });
+}
+
+pub fn register_step_get_extensions(executor: &mut StepGetExecutor, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         3 => read_file,
         6 => build,

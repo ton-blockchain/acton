@@ -155,14 +155,14 @@ struct EmulationInternalResult {
     pub logs: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum EmulationResult {
     Success(ResultSuccess),
     Error(ResultError),
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ResultSuccess {
     pub transaction: String,
     pub shard_account: String,
@@ -170,7 +170,7 @@ pub struct ResultSuccess {
     pub actions: Option<String>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct ResultError {
     pub error: String,
     pub vm_log: Option<String>,
@@ -201,6 +201,24 @@ unsafe extern "C" {
     ) -> *mut std::os::raw::c_char;
 }
 unsafe extern "C" {
+    pub fn emulate_sbs(
+        em: *mut std::os::raw::c_void,
+        libs: *const std::os::raw::c_char,
+        account: *const std::os::raw::c_char,
+        message: *const std::os::raw::c_char,
+        params: *const std::os::raw::c_char,
+    ) -> *mut std::os::raw::c_char;
+}
+unsafe extern "C" {
+    pub fn em_sbs_step(em: *mut std::os::raw::c_void) -> bool;
+}
+unsafe extern "C" {
+    pub fn em_sbs_result(em: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
+    pub fn em_sbs_code_pos(em: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
+    pub fn em_sbs_stack(em: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
+    pub fn em_sbs_c7(em: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
+}
+unsafe extern "C" {
     pub fn transaction_emulator_register_extmethod(
         transaction_emulator: *mut std::os::raw::c_void,
         id: std::os::raw::c_int,
@@ -209,7 +227,7 @@ unsafe extern "C" {
     ) -> *const std::os::raw::c_char;
 }
 
-type RegisterExtMethodCallback = unsafe extern "C" fn(
+pub type RegisterExtMethodCallback = unsafe extern "C" fn(
     ctx: *mut std::os::raw::c_void,
     arg1: *const std::os::raw::c_char,
 ) -> *const std::os::raw::c_char;

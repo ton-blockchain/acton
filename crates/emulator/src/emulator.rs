@@ -2,6 +2,8 @@ use crate::blockchain::Blockchain;
 use crate::executor::{
     EmulationResult, Executor, ExecutorVerbosity, ResultError, RunTransactionArgs, StoreExt,
 };
+use crate::step_by_step_trait::StepSyStepExecutor;
+use crate::step_executor::StepExecutor;
 use num_bigint::BigInt;
 use serde::Deserialize;
 use tycho_types::boc::Boc;
@@ -50,14 +52,16 @@ impl Emulator {
         };
 
         let dest_account = net.get_account(&int_message.dst.to_string());
-        let result = self.executor.run_transaction(
-            message,
+
+        let executor = StepExecutor::new();
+        executor.prepare_transaction(
+            message.clone(),
             BigInt::from(0),
             RunTransactionArgs {
                 config: crate::config::DEFAULT_CONFIG.to_string(),
                 libs: None,
                 verbosity: ExecutorVerbosity::FullLocation,
-                shard_account: dest_account,
+                shard_account: dest_account.clone(),
                 now: 0,
                 lt: net.get_lt(),
                 random_seed: None,
@@ -66,9 +70,36 @@ impl Emulator {
                 prev_blocks_info: None,
             },
         );
+
+        while !executor.step() {
+            // println!("{}", executor.get_code_pos());
+        }
+
+        // dbg!(executor.finish_transaction());
+
+        let result = executor.finish_transaction();
+        // let result = self.executor.run_transaction(
+        //     message,
+        //     BigInt::from(0),
+        //     RunTransactionArgs {
+        //         config: crate::config::DEFAULT_CONFIG.to_string(),
+        //         libs: None,
+        //         verbosity: ExecutorVerbosity::FullLocation,
+        //         shard_account: dest_account,
+        //         now: 0,
+        //         lt: net.get_lt(),
+        //         random_seed: None,
+        //         ignore_chksig: false,
+        //         debug_enabled: true,
+        //         prev_blocks_info: None,
+        //     },
+        // );
         let result = match result {
             EmulationResult::Success(result) => result,
-            EmulationResult::Error(err) => return vec![SendMessageResult::Error(err)],
+            EmulationResult::Error(err) => {
+                dbg!(&err);
+                return vec![SendMessageResult::Error(err)];
+            }
         };
 
         let shard_account_after = &result.shard_account;
@@ -101,7 +132,7 @@ impl Emulator {
     }
 
     /// Set custom `src` address if it is None.
-    fn patch_src_addr(message: Cell, src_addr: Option<IntAddr>) -> Cell {
+    pub fn patch_src_addr(message: Cell, src_addr: Option<IntAddr>) -> Cell {
         let Some(from) = src_addr else { return message };
 
         let mut slice = message.as_slice().unwrap();

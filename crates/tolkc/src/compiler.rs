@@ -1,8 +1,13 @@
+use crate::source_map::SourceMap;
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_char};
 use std::fs::{canonicalize, read_to_string};
 use std::path::{Path, PathBuf};
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellFamily, CellSlice, Load};
+use tycho_types::dict::{Dict, RawDict};
 
 /// Compiles passed file with Tolk compiler.
 ///
@@ -22,11 +27,15 @@ use std::path::{Path, PathBuf};
 /// }
 /// ```
 pub fn compile(path: &Path) -> CompilerResult {
-    Compiler::new(2).compile(path)
+    Compiler::new(2).compile(path, false)
+}
+
+pub fn compile_debug(path: &Path) -> CompilerResult {
+    Compiler::new(2).compile(path, true)
 }
 
 pub fn compile_fast(path: &Path) -> CompilerResult {
-    Compiler::new(0).compile(path)
+    Compiler::new(0).compile(path, false)
 }
 
 /// Simple wrapper over C++ implemented Tolk compiler.
@@ -54,13 +63,14 @@ impl Compiler {
     /// Compiles passed file with Tolk compiler.
     ///
     /// Returns successful result with `code_boc64` or error with `message`.
-    pub fn compile(&self, path: &Path) -> CompilerResult {
+    pub fn compile(&self, path: &Path, with_debug_info: bool) -> CompilerResult {
         let config = serde_json::to_string(&CompilerConfig {
             entrypoint_file_name: path.to_string_lossy().to_string(),
             optimization_level: self.opt_level,
             with_stack_comments: self.with_stack_comments,
             with_src_line_comments: self.with_src_line_comments,
             experimental_options: self.experimental_options.clone(),
+            collect_source_map: with_debug_info,
         })
         .expect("Critical error, cannot serializer path to JSON, should not happen");
 
@@ -177,12 +187,71 @@ impl Compiler {
                 .to_string()
         };
 
-        let result = serde_json::from_str::<CompilerResult>(&compilation_result_str);
-        result.unwrap_or_else(|err| {
-            CompilerResult::Error(CompilerResultError {
+        let result = serde_json::from_str::<CompilerInternalResult>(&compilation_result_str);
+
+        match result {
+            Ok(CompilerInternalResult::Success(result)) => {
+                if with_debug_info {
+                    CompilerResult::Success(CompilerResultSuccess {
+                        fift_code: result.fift_code,
+                        code_boc64: result.debug_mark_base64,
+                        code_hash_hex: result.code_hash_hex,
+                        debug_marks: Self::parse_marks_dict(&result.code_boc64),
+                        source_map: result.source_map,
+                    })
+                } else {
+                    CompilerResult::Success(CompilerResultSuccess {
+                        fift_code: result.fift_code,
+                        code_boc64: result.code_boc64,
+                        code_hash_hex: result.code_hash_hex,
+                        debug_marks: Self::parse_marks_dict(&result.debug_mark_base64),
+                        source_map: result.source_map,
+                    })
+                }
+            }
+            Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
+            Err(err) => CompilerResult::Error(CompilerResultError {
                 message: err.to_string(),
-            })
-        })
+            }),
+        }
+    }
+
+    fn parse_marks_dict(code_boc64: &String) -> HashMap<String, Vec<(i32, i32)>> {
+        let debug_marks_cell = Boc::decode_base64(&*code_boc64).unwrap();
+
+        let dict = RawDict::<256>::from(Some(debug_marks_cell));
+        let mut marks = HashMap::<String, Vec<(i32, i32)>>::new();
+
+        dict.iter().for_each(|kv| {
+            let kv = kv.unwrap();
+            let hash = kv.0.as_data_slice().load_biguint(256).unwrap();
+            let hash = format!("{:x}", hash).to_uppercase();
+
+            let mut slice = kv.1;
+            let is_normal = slice.load_bit().unwrap();
+            let dict_inner = Dict::<u32, CellSlice>::load_from(&mut slice).unwrap();
+
+            dict_inner.iter().for_each(|kv| {
+                let mut kv = kv.unwrap();
+                let debug_id = kv.0;
+                let mut ref_ = kv.1.load_reference().unwrap().as_slice().unwrap();
+                let dict_marks_inner =
+                    RawDict::<10>::load_from_root_ext(&mut ref_, Cell::empty_context()).unwrap();
+
+                dict_marks_inner.iter().for_each(|kv| {
+                    let kv = kv.unwrap();
+                    let offset = kv.0.as_data_slice().load_uint(10).unwrap();
+
+                    let old_value = marks.get_mut(&hash);
+                    if let Some(old_value) = old_value {
+                        old_value.push((offset as i32, debug_id as i32))
+                    } else {
+                        marks.insert(hash.clone(), vec![(offset as i32, debug_id as i32)]);
+                    }
+                });
+            });
+        });
+        marks
     }
 }
 
@@ -198,23 +267,44 @@ pub struct CompilerConfig {
     pub with_src_line_comments: bool,
     #[serde(rename = "experimentalOptions")]
     pub experimental_options: String,
+    #[serde(rename = "collectSourceMap")]
+    pub collect_source_map: bool,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug)]
 pub enum CompilerResult {
     Success(CompilerResultSuccess),
     Error(CompilerResultError),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct CompilerResultSuccess {
+    pub fift_code: String,
+    pub code_boc64: String,
+    pub code_hash_hex: String,
+    pub debug_marks: HashMap<String, Vec<(i32, i32)>>,
+    pub source_map: Option<SourceMap>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum CompilerInternalResult {
+    Success(CompilerInternalResultSuccess),
+    Error(CompilerResultError),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CompilerInternalResultSuccess {
     #[serde(rename = "fiftCode")]
     pub fift_code: String,
     #[serde(rename = "codeBoc64")]
     pub code_boc64: String,
     #[serde(rename = "codeHashHex")]
     pub code_hash_hex: String,
+    #[serde(rename = "debugMarkBase64")]
+    pub debug_mark_base64: String,
+    #[serde(rename = "sourceMap")]
+    pub source_map: Option<SourceMap>,
 }
 
 #[derive(Debug, Deserialize)]

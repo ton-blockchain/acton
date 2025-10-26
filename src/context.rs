@@ -1,9 +1,19 @@
 use abi::ContractAbi;
+use crossbeam_channel::{Receiver, Sender};
+use dap::events::{Event, StoppedEventBody, ThreadEventBody};
+use dap::prelude::{Request, Response};
+use dap::types::{StoppedEventReason, ThreadEventReason};
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
+use emulator::step_by_step_trait::StepSyStepExecutor;
+use emulator::step_executor::StepExecutor;
+use emulator::step_get_executor::StepGetExecutor;
 use emulator::tuple::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use std::collections::HashMap;
+use tolkc::source_map::{DebugLocation, SourceMap};
+use tonlib_core::cell::ArcCell;
+use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::models::{IntAddr, Transaction};
 
 #[derive(Debug, Clone)]
@@ -89,15 +99,32 @@ impl BuildCache {
         }
     }
 
-    pub fn memoize(&mut self, name: &String, path: &String, code: &String, code_hash: &String) {
+    pub fn memoize(
+        &mut self,
+        name: &String,
+        path: &String,
+        code: &String,
+        code_hash: &String,
+        marks_dict: HashMap<String, Vec<(i32, i32)>>,
+        source_map: SourceMap,
+    ) {
         self.built.insert(
             path.clone(),
             CompilationResult {
                 name: name.clone(),
                 code_boc64: code.clone(),
                 code_hash: code_hash.clone(),
+                marks_dict,
+                source_map,
             },
         );
+    }
+
+    pub fn result_for_code(&self, code: ArcCell) -> Option<(String, CompilationResult)> {
+        self.built
+            .iter()
+            .find(|(_, result)| result.code_boc64 == code.to_boc_b64(false).unwrap())
+            .map(|(name, result)| ((*name).clone(), (*result).clone()))
     }
 
     pub fn to_tuple_build_cache(&self) -> emulator::tuple::stack::BuildCache {
@@ -120,10 +147,13 @@ impl BuildCache {
     }
 }
 
+#[derive(Clone)]
 pub struct CompilationResult {
     pub name: String,
     pub code_boc64: String,
     pub code_hash: String,
+    pub marks_dict: HashMap<String, Vec<(i32, i32)>>,
+    pub source_map: SourceMap,
 }
 
 pub struct KnownAddress {
@@ -159,6 +189,85 @@ impl KnownAddresses {
     }
 }
 
+#[derive(Clone)]
+pub enum AnyExecutor {
+    Get(StepGetExecutor),
+    Message(StepExecutor),
+}
+
+impl AnyExecutor {
+    pub fn step(&self) -> bool {
+        match self {
+            AnyExecutor::Get(get) => get.step(),
+            AnyExecutor::Message(msg) => msg.step(),
+        }
+    }
+
+    pub fn get_code_pos(&self) -> String {
+        match self {
+            AnyExecutor::Get(get) => get.get_code_pos(),
+            AnyExecutor::Message(msg) => msg.get_code_pos(),
+        }
+    }
+
+    pub fn get_stack(&self) -> String {
+        match self {
+            AnyExecutor::Get(get) => get.get_stack(),
+            AnyExecutor::Message(msg) => msg.get_stack(),
+        }
+    }
+
+    pub fn get_c7(&self) -> String {
+        match self {
+            AnyExecutor::Get(get) => get.get_c7(),
+            AnyExecutor::Message(msg) => msg.get_c7(),
+        }
+    }
+}
+
+pub struct DebugContext {
+    pub executors: Vec<AnyExecutor>,
+    pub current_executor_id: usize,
+    pub marks: Vec<HashMap<String, Vec<(i32, i32)>>>,
+    pub source_maps: Vec<SourceMap>,
+    pub locations: Vec<DebugLocation>,
+    pub pseudo_step: i64,
+    pub response_sender: Sender<Response>,
+    pub event_sender: Sender<Event>,
+    pub req_receiver: Receiver<Request>,
+}
+
+impl DebugContext {
+    pub fn begin_thread(&mut self, id: i64, name: String) {
+        self.event_sender
+            .send(Event::Thread(ThreadEventBody {
+                reason: ThreadEventReason::Started,
+                thread_id: id,
+            }))
+            .unwrap();
+        self.event_sender
+            .send(Event::Stopped(StoppedEventBody {
+                reason: StoppedEventReason::Entry,
+                description: Some(name),
+                thread_id: Some(id),
+                preserve_focus_hint: None,
+                text: None,
+                all_threads_stopped: None,
+                hit_breakpoint_ids: None,
+            }))
+            .unwrap();
+    }
+
+    pub fn finish_thread(&mut self, id: i64) {
+        self.event_sender
+            .send(Event::Thread(ThreadEventBody {
+                reason: ThreadEventReason::Exited,
+                thread_id: 2,
+            }))
+            .unwrap();
+    }
+}
+
 pub struct Context<'a> {
     pub stdout_buffer: String,
     pub stderr_buffer: String,
@@ -170,6 +279,7 @@ pub struct Context<'a> {
     pub build_cache: &'a mut BuildCache,
     pub known_addresses: &'a mut KnownAddresses,
     pub abi: ContractAbi,
+    pub dbg_ctx: &'a mut DebugContext,
 }
 
 impl<'a> Context<'a> {

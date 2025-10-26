@@ -854,6 +854,10 @@ pub fn parse_tuple_item(parser: &mut CellParser) -> Result<TupleItem, anyhow::Er
 
             Ok(TupleItem::Tuple(items))
         }
+        6 => {
+            // TODO: support continuation
+            Ok(TupleItem::Null)
+        }
         _ => Err(anyhow!("Unsupported stack item kind: {}", kind).into()),
     }
 }

@@ -44,6 +44,9 @@ impl GetExecutor {
 
         let result = serde_json::from_str::<GetInternalResult>(&output_str)
             .expect("Failed to parse output, should not happen");
+        // if let GetMethodResult::Success(result) = &result.output {
+        //     println!("{}", result.vm_log);
+        // }
         result.output
     }
 

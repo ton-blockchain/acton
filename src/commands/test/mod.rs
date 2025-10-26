@@ -1,14 +1,18 @@
 use crate::context::{
-    AssertFailure, BuildCache, Context, KnownAddress, KnownAddresses,
+    AnyExecutor, AssertFailure, BuildCache, Context, DebugContext, KnownAddress, KnownAddresses,
     TransactionGenericAssertFailure,
 };
 use crate::{asserts_exts, exts, io_exts};
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
+use crossbeam_channel::unbounded;
+use dap::events::Event;
+use dap::prelude::{Request, Response};
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::exit_codes;
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
+use emulator::step_get_executor::StepGetExecutor;
 use emulator::tuple::stack::{Tuple, TupleItem, format_item_with_type};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -20,6 +24,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use teamcity::TeamcityReporter;
+use tolkc::source_map::SourceMap;
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
@@ -715,6 +720,11 @@ fn execute_test(
     let mut emulator = Emulator::new();
     let mut blockchain = Blockchain::new();
 
+    let (req_sender, req_receiver) = unbounded::<Request>();
+    let (response_sender, response_receiver) = unbounded::<Response>();
+    let (event_sender, event_receiver) = unbounded::<Event>();
+
+    let debug_get_executor = StepGetExecutor::new(params.clone());
     let mut ctx = Context {
         stdout_buffer: "".to_string(),
         stderr_buffer: "".to_string(),
@@ -726,6 +736,24 @@ fn execute_test(
         known_addresses,
         abi: (*abi).clone(),
         expected_exit_code: &mut Some(BigInt::from(0)),
+        dbg_ctx: &mut DebugContext {
+            executors: vec![AnyExecutor::Get(debug_get_executor)],
+            current_executor_id: 0,
+            marks: vec![Default::default()],
+            source_maps: vec![SourceMap {
+                version: "".to_string(),
+                language: None,
+                compiler_version: None,
+                files: vec![],
+                globals: vec![],
+                locations: vec![],
+            }],
+            locations: vec![],
+            pseudo_step: 0,
+            response_sender,
+            event_sender,
+            req_receiver,
+        },
     };
 
     exts::register_get_extensions(&mut get_executor, &mut ctx);

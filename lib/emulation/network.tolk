@@ -127,6 +127,7 @@ fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? 
 /// ```
 /// 
 /// See [Network.runGetMethod] for more information.
+@noinline
 fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? = null): Ret {
     if (!net.isDeployed(addr)) {
         throw CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT;
