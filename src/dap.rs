@@ -85,7 +85,7 @@ pub fn start_dap_server() -> (Receiver<Request>, Sender<Response>, Sender<Event>
 
     thread::spawn(move || {
         let listener = TcpListener::bind("127.0.0.1:12345").unwrap();
-        println!("Server listening on 127.0.0.1:12345");
+        println!("Debugger server listening on 127.0.0.1:12345");
 
         for stream in listener.incoming() {
             let stream = stream.unwrap();
@@ -105,8 +105,8 @@ pub fn start_dap_server() -> (Receiver<Request>, Sender<Response>, Sender<Event>
                             req_sender_1.send(req.clone()).unwrap();
                         }
                         Ok(None) => {
-                            println!("Request is closed");
                             // No more requests, connection might be closed
+                            println!("Request is closed");
                             break;
                         }
                         Err(e) => {
