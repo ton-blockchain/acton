@@ -3,8 +3,6 @@ use crate::debug_context::DebugContext;
 use crate::{asserts_exts, exts, io_exts};
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
-use dap::events::Event;
-use dap::prelude::Command;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};

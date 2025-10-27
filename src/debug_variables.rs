@@ -182,9 +182,7 @@ impl DebugContext {
                     }
                 })
                 .collect(),
-            TupleItem::TypedTuple {
-                items, type_name, ..
-            } => items
+            TupleItem::TypedTuple { items, .. } => items
                 .iter()
                 .enumerate()
                 .map(|(index, item)| {
