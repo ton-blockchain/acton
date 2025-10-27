@@ -571,6 +571,7 @@ impl DebugContext {
             }
             Command::SetExceptionBreakpoints(_) => {}
             Command::Disconnect(_) => {} // do nothing, should be handled in the request loop
+            Command::Evaluate(_) => {}
             _ => {
                 eprintln!("Unhandled command: {:?}", req.command);
                 return Err(anyhow!("Unhandled command: {:?}", req.command));

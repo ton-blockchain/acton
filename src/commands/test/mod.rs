@@ -20,10 +20,10 @@ use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use regex::Regex;
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
+use std::{fs, process};
 use teamcity::TeamcityReporter;
 use tolkc::source_map::{HighLevelSourceMap, SourceMap};
 use tonlib_core::TonAddress;
@@ -166,6 +166,9 @@ pub fn test_cmd(
         TeamcityReporter::on_testing_finished();
     }
 
+    if total_failed > 0 {
+        process::exit(1)
+    }
     Ok(())
 }
 
@@ -238,7 +241,7 @@ fn run_tests_for_file(
 
     fs::write(&tmp_test_filename, executable_code)?;
 
-    let compilation_result = tolkc::compile_fast(Path::new(&tmp_test_filename));
+    let compilation_result = tolkc::compile_fast(Path::new(&tmp_test_filename), debug);
     let result = match compilation_result {
         tolkc::CompilerResult::Success(result) => {
             let _ = fs::remove_file(&tmp_test_filename);
@@ -252,7 +255,7 @@ fn run_tests_for_file(
                 &code_cell,
                 &data_cell,
                 &abi,
-                &result.source_map.unwrap(),
+                &result.source_map.unwrap_or(Default::default()),
                 filter,
                 teamcity,
                 debug,

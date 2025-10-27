@@ -26,16 +26,12 @@ use tycho_types::dict::{Dict, RawDict};
 ///     }
 /// }
 /// ```
-pub fn compile(path: &Path) -> CompilerResult {
-    Compiler::new(2).compile(path, false)
+pub fn compile(path: &Path, debug: bool) -> CompilerResult {
+    Compiler::new(2).compile(path, debug)
 }
 
-pub fn compile_debug(path: &Path) -> CompilerResult {
-    Compiler::new(2).compile(path, true)
-}
-
-pub fn compile_fast(path: &Path) -> CompilerResult {
-    Compiler::new(0).compile(path, true)
+pub fn compile_fast(path: &Path, debug: bool) -> CompilerResult {
+    Compiler::new(0).compile(path, debug)
 }
 
 /// Simple wrapper over C++ implemented Tolk compiler.
@@ -191,7 +187,11 @@ impl Compiler {
 
         match result {
             Ok(CompilerInternalResult::Success(result)) => {
-                let debug_marks = parse_marks_dict(&result.debug_mark_base64, &result.code_boc64);
+                let debug_marks = if with_debug_info {
+                    parse_marks_dict(&result.debug_mark_base64, &result.code_boc64)
+                } else {
+                    HashMap::new()
+                };
                 CompilerResult::Success(CompilerResultSuccess {
                     fift_code: result.fift_code,
                     code_boc64: result.code_boc64,

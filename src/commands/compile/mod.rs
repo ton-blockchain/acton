@@ -18,7 +18,7 @@ pub fn compile_cmd(path: &String, json: bool, base64_only: bool) -> Result<(), a
         println!("  {} {}", "Compiling".bold().cyan(), path.dimmed());
     }
 
-    let compilation_result = tolkc::compile(Path::new(path));
+    let compilation_result = tolkc::compile(Path::new(path), false);
 
     match compilation_result {
         tolkc::CompilerResult::Success(result) => {

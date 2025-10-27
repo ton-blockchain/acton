@@ -40,7 +40,7 @@ fn run_script_file(file_path: &str, content: &str, debug: bool) -> Result<(), an
 
     fs::write(&tmp_script_filename, executable_code)?;
 
-    let compilation_result = tolkc::compile_debug(Path::new(&tmp_script_filename));
+    let compilation_result = tolkc::compile(Path::new(&tmp_script_filename), debug);
     let result = match compilation_result {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64).unwrap();
@@ -50,7 +50,7 @@ fn run_script_file(file_path: &str, content: &str, debug: bool) -> Result<(), an
                 &code_cell,
                 &data_cell,
                 &abi,
-                &result.source_map.unwrap(),
+                &result.source_map.unwrap_or(Default::default()),
                 debug,
             );
             print_script_result(script_result?);

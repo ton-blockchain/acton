@@ -42,7 +42,7 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, path: String, name: String) 
         return;
     }
 
-    let result = tolkc::compile_debug(Path::new(&path));
+    let result = tolkc::compile(Path::new(&path), ctx.debug);
     match result {
         tolkc::CompilerResult::Success(success) => {
             ctx.build_cache.memoize(
@@ -50,7 +50,7 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, path: String, name: String) 
                 &path,
                 &success.code_boc64,
                 &success.code_hash_hex,
-                success.source_map.unwrap(),
+                success.source_map.unwrap_or(Default::default()),
             );
             let code_cell = ArcCell::from_boc_b64(&*success.code_boc64).unwrap();
             stack.push(TupleItem::Cell(code_cell))
