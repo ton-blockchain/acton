@@ -12,11 +12,14 @@ use dap::types::{
     Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread,
     ThreadEventReason, Variable,
 };
-use emulator::tuple::stack::{TupleItem, parse_tuple};
+use emulator::tuple::stack::{TupleItem, parse_tuple, parse_tuple_item};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
+
+static VARIABLE_REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(1000);
 
 pub struct DebugContext {
     pub executors: Vec<AnyExecutor>,
@@ -26,6 +29,7 @@ pub struct DebugContext {
     pub pseudo_step: i64,
     pub dap_sender: Sender<DapMessage>,
     pub req_receiver: Receiver<Request>,
+    pub tuple_variables: HashMap<i64, TupleItem>,
 }
 
 impl DebugContext {
@@ -51,6 +55,7 @@ impl DebugContext {
             pseudo_step: 0,
             dap_sender,
             req_receiver,
+            tuple_variables: HashMap::new(),
         }
     }
 
@@ -68,6 +73,7 @@ impl DebugContext {
             pseudo_step: 0,
             dap_sender,
             req_receiver: req_receiver.clone(),
+            tuple_variables: HashMap::new(),
         }
     }
 
@@ -134,6 +140,7 @@ impl DebugContext {
         self.locations = vec![];
         self.pseudo_step = 0;
         self.current_executor_id -= 1;
+        self.tuple_variables.clear();
         self.send_event(Event::Thread(ThreadEventBody {
             reason: ThreadEventReason::Exited,
             thread_id: id,
@@ -182,50 +189,83 @@ impl DebugContext {
             }
             Command::Scopes(_args) => {
                 let rsp = req.success(ResponseBody::Scopes(ScopesResponse {
-                    scopes: vec![Scope {
-                        name: "Variables".to_string(),
-                        variables_reference: 1,
-                        expensive: false,
-                        presentation_hint: Some(ScopePresentationhint::Locals),
-                        ..Default::default()
-                    }],
+                    scopes: vec![
+                        Scope {
+                            name: "Variables".to_string(),
+                            variables_reference: 1,
+                            expensive: false,
+                            presentation_hint: Some(ScopePresentationhint::Locals),
+                            ..Default::default()
+                        },
+                        Scope {
+                            name: "Registers".to_string(),
+                            variables_reference: 2,
+                            expensive: false,
+                            presentation_hint: Some(ScopePresentationhint::Registers),
+                            ..Default::default()
+                        },
+                    ],
                 }));
                 self.send_response(rsp)?;
             }
-            Command::Variables(_args) => {
+            Command::Variables(args) => {
                 let current_loc = &self.locations[self.pseudo_step as usize];
 
                 let executor = &self.executors[self.current_executor_id];
 
-                let stack = executor.get_stack();
-                let stack = parse_tuple(&ArcCell::from_boc_b64(&stack)?)?;
+                let variables = if args.variables_reference == 1 {
+                    let stack = executor.get_stack();
+                    let stack = parse_tuple(&ArcCell::from_boc_b64(&stack)?)?;
 
-                let variables = current_loc
-                    .variables
-                    .iter()
-                    .rev()
-                    .enumerate()
-                    .map(|(index, variable)| {
-                        let value = stack
-                            .get(stack.len() - 1 - index)
-                            .unwrap_or(&TupleItem::Null);
-                        let value2 = TupleItem::TypedTuple {
-                            contract_abi: Default::default(),
-                            abi: None,
-                            items: vec![value.clone()],
-                            type_name: variable.var_type.clone(),
-                            accounts: HashMap::new(),
-                            build_cache: Default::default(),
-                            known_addresses: Default::default(),
-                        };
-                        Variable {
-                            name: variable.name.clone(),
-                            type_field: Some(variable.var_type.clone()),
-                            value: format!("{}", value2),
-                            ..Default::default()
-                        }
-                    })
-                    .collect::<Vec<_>>();
+                    current_loc
+                        .variables
+                        .iter()
+                        .rev()
+                        .enumerate()
+                        .map(|(index, variable)| {
+                            let value = stack
+                                .get(stack.len() - 1 - index)
+                                .unwrap_or(&TupleItem::Null);
+                            let value2 = TupleItem::TypedTuple {
+                                contract_abi: Default::default(),
+                                abi: None,
+                                items: vec![value.clone()],
+                                type_name: variable.var_type.clone(),
+                                accounts: HashMap::new(),
+                                build_cache: Default::default(),
+                                known_addresses: Default::default(),
+                            };
+                            Variable {
+                                name: variable.name.clone(),
+                                type_field: Some(variable.var_type.clone()),
+                                value: format!("{}", value2),
+                                ..Default::default()
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                } else if args.variables_reference == 2 {
+                    let c7 = executor.get_c7();
+                    let c7_cell = &ArcCell::from_boc_b64(&c7)?;
+                    let mut c7_slice = c7_cell.parser();
+                    let c7_tuple = parse_tuple_item(&mut c7_slice)?;
+                    let c7_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+                    self.tuple_variables.insert(c7_ref, c7_tuple.clone());
+                    vec![Variable {
+                        name: "c7".to_string(),
+                        type_field: Some("tuple".to_string()),
+                        value: format!("{}", c7_tuple),
+                        variables_reference: c7_ref,
+                        ..Default::default()
+                    }]
+                } else if args.variables_reference > 2 {
+                    if let Some(tuple_item) = self.tuple_variables.get(&args.variables_reference) {
+                        self.build_tuple_children(&tuple_item.clone())
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                };
 
                 let rsp = req.success(ResponseBody::Variables(VariablesResponse { variables }));
                 self.send_response(rsp)?;
@@ -445,6 +485,73 @@ impl DebugContext {
                     }
                 }
             }
+        }
+    }
+
+    fn build_tuple_children(&mut self, tuple_item: &TupleItem) -> Vec<Variable> {
+        match tuple_item {
+            TupleItem::Tuple(items) => items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    let item_ref = if Self::has_children(item) {
+                        let ref_id =
+                            VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+                        self.tuple_variables.insert(ref_id, item.clone());
+                        ref_id
+                    } else {
+                        0
+                    };
+                    Variable {
+                        name: format!("[{}]", index),
+                        type_field: Some(Self::get_item_type(item)),
+                        value: format!("{}", item),
+                        variables_reference: item_ref,
+                        ..Default::default()
+                    }
+                })
+                .collect(),
+            TupleItem::TypedTuple {
+                items, type_name, ..
+            } => items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    let item_ref = if Self::has_children(item) {
+                        let ref_id =
+                            VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+                        self.tuple_variables.insert(ref_id, item.clone());
+                        ref_id
+                    } else {
+                        0
+                    };
+                    Variable {
+                        name: format!("[{}]", index),
+                        type_field: Some(Self::get_item_type(item)),
+                        value: format!("{}", item),
+                        variables_reference: item_ref,
+                        ..Default::default()
+                    }
+                })
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    fn has_children(item: &TupleItem) -> bool {
+        matches!(item, TupleItem::Tuple(_) | TupleItem::TypedTuple { .. })
+    }
+
+    fn get_item_type(item: &TupleItem) -> String {
+        match item {
+            TupleItem::Null => "null".to_string(),
+            TupleItem::Int(_) => "int".to_string(),
+            TupleItem::Nan => "nan".to_string(),
+            TupleItem::Cell(_) => "cell".to_string(),
+            TupleItem::Slice(_) => "slice".to_string(),
+            TupleItem::Builder(_) => "builder".to_string(),
+            TupleItem::Tuple(_) => "tuple".to_string(),
+            TupleItem::TypedTuple { type_name, .. } => type_name.clone(),
         }
     }
 }
