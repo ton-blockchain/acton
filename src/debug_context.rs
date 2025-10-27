@@ -9,15 +9,31 @@ use dap::responses::{
 };
 use dap::types;
 use dap::types::{
-    Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread, ThreadEventReason,
+    Breakpoint, Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread,
+    ThreadEventReason,
 };
 use emulator::tuple::stack::TupleItem;
 use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
-use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
+use tolkc::source_map::{DebugLocation, SourceMap};
 use tycho_types::models::{OutAction, OwnedRelaxedMessage, RelaxedMsgInfo, StateInit};
 
 pub static VARIABLE_REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(1000);
+
+#[derive(Debug, Clone)]
+pub struct SourceBreakpoint {
+    pub line: i64,
+    pub column: Option<i64>,
+    pub verified: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct BreakpointInfo {
+    pub id: i64,
+    pub source_path: PathBuf,
+    pub breakpoint: SourceBreakpoint,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepMode {
@@ -188,6 +204,8 @@ pub struct DebugContext {
     pub msg_info_variables: HashMap<i64, RelaxedMsgInfo>,
     pub state_init_variables: HashMap<i64, StateInit>,
     pub performing_step: Option<StepMode>,
+    pub breakpoints: HashMap<PathBuf, Vec<BreakpointInfo>>,
+    pub next_breakpoint_id: i64,
 }
 
 impl DebugContext {
@@ -207,6 +225,8 @@ impl DebugContext {
             msg_info_variables: HashMap::new(),
             state_init_variables: HashMap::new(),
             performing_step: None,
+            breakpoints: HashMap::new(),
+            next_breakpoint_id: 1,
         }
     }
 
@@ -229,6 +249,8 @@ impl DebugContext {
             msg_info_variables: HashMap::new(),
             state_init_variables: HashMap::new(),
             performing_step: None,
+            breakpoints: HashMap::new(),
+            next_breakpoint_id: 1,
         }
     }
 
@@ -320,25 +342,18 @@ impl DebugContext {
 
     pub(crate) fn on_request(&mut self, req: Request) -> anyhow::Result<bool> {
         match &req.command {
-            Command::Initialize(args) => {
+            Command::Initialize(_args) => {
                 let rsp = req.success(ResponseBody::Initialize(types::Capabilities {
+                    supports_configuration_done_request: Some(true),
+                    supports_breakpoint_locations_request: Some(false),
                     ..Default::default()
                 }));
                 self.send_response(rsp)?;
                 self.send_event(Event::Initialized)?;
             }
             Command::Launch(_args) => {
-                self.step(StepMode::StepIn);
-
-                self.send_event(Event::Stopped(StoppedEventBody {
-                    reason: StoppedEventReason::Step,
-                    thread_id: Some(1),
-                    description: None,
-                    preserve_focus_hint: None,
-                    text: None,
-                    all_threads_stopped: None,
-                    hit_breakpoint_ids: None,
-                }))?;
+                let rsp = req.success(ResponseBody::Launch);
+                self.send_response(rsp)?;
             }
             Command::Threads => {
                 let rsp = req.success(ResponseBody::Threads(ThreadsResponse {
@@ -489,6 +504,71 @@ impl DebugContext {
                     hit_breakpoint_ids: None,
                 }))?;
             }
+            Command::SetBreakpoints(args) => {
+                let source_path = args
+                    .source
+                    .path
+                    .as_ref()
+                    .map(PathBuf::from)
+                    .unwrap_or_default();
+
+                let mut breakpoints = Vec::new();
+
+                if let Some(source_breakpoints) = &args.breakpoints {
+                    self.breakpoints.remove(&source_path);
+                    let mut file_breakpoints = Vec::new();
+
+                    for bp in source_breakpoints {
+                        let bp_id = self.next_breakpoint_id;
+                        self.next_breakpoint_id += 1;
+
+                        let breakpoint_info = BreakpointInfo {
+                            id: bp_id,
+                            source_path: source_path.clone(),
+                            breakpoint: SourceBreakpoint {
+                                line: bp.line,
+                                column: bp.column,
+                                verified: true,
+                            },
+                        };
+
+                        file_breakpoints.push(breakpoint_info.clone());
+
+                        breakpoints.push(Breakpoint {
+                            id: Some(bp_id),
+                            verified: true,
+                            line: Some(bp.line),
+                            column: bp.column,
+                            ..Default::default()
+                        });
+                    }
+
+                    if !file_breakpoints.is_empty() {
+                        self.breakpoints.insert(source_path, file_breakpoints);
+                    }
+                }
+
+                let rsp = req.success(ResponseBody::SetBreakpoints(
+                    dap::responses::SetBreakpointsResponse { breakpoints },
+                ));
+                self.send_response(rsp)?;
+            }
+            Command::ConfigurationDone => {
+                let rsp = req.success(ResponseBody::ConfigurationDone);
+                self.send_response(rsp)?;
+
+                self.step(StepMode::StepIn);
+
+                self.send_event(Event::Stopped(StoppedEventBody {
+                    reason: StoppedEventReason::Step,
+                    thread_id: Some(1),
+                    description: None,
+                    preserve_focus_hint: None,
+                    text: None,
+                    all_threads_stopped: None,
+                    hit_breakpoint_ids: None,
+                }))?;
+            }
             Command::SetExceptionBreakpoints(_) => {}
             Command::Disconnect(_) => {} // do nothing, should be handled in the request loop
             _ => {
@@ -502,6 +582,36 @@ impl DebugContext {
 
     pub(crate) fn need_to_stop_child_thread_on_start(&self) -> bool {
         self.performing_step == Some(StepMode::StepIn)
+    }
+
+    fn check_breakpoint(&self, step: &DebugStep) -> Option<i64> {
+        let loc = step.loc.as_ref()?;
+        let file_path = PathBuf::from(&loc.loc.file);
+
+        let normalized_path = if file_path.to_string_lossy().ends_with("_script.tolk") {
+            PathBuf::from(file_path.to_string_lossy().replace("_script.tolk", ""))
+        } else if file_path
+            .to_string_lossy()
+            .ends_with("_test.tolk_test.tolk")
+        {
+            PathBuf::from(
+                file_path
+                    .to_string_lossy()
+                    .replace("_test.tolk_test.tolk", "_test.tolk"),
+            )
+        } else {
+            file_path
+        };
+
+        let file_breakpoints = self.breakpoints.get(&normalized_path)?;
+
+        for bp_info in file_breakpoints {
+            if bp_info.breakpoint.line == loc.loc.line + 1 {
+                return Some(bp_info.id);
+            }
+        }
+
+        None
     }
 
     pub(crate) fn step(&mut self, mode: StepMode) -> bool {
@@ -649,24 +759,44 @@ impl DebugContext {
     fn continue_impl(&mut self) -> bool {
         self.performing_step = Some(StepMode::Continue);
 
-        let stepper = match &mut self.stepper {
-            Some(s) => s,
-            None => return true,
-        };
+        loop {
+            let step = {
+                let stepper = match &mut self.stepper {
+                    Some(s) => s,
+                    None => return true,
+                };
 
-        while let Some(step) = stepper.next() {
-            if let Some(loc) = &step.loc {
-                println!("Continue step: {:?}", loc.idx);
+                match stepper.next() {
+                    Some(s) => s,
+                    None => return true,
+                }
+            };
+
+            if let Some(bp_id) = self.check_breakpoint(&step) {
+                self.last_step = Some(step.clone());
+
+                if let Err(e) = self.send_event(Event::Stopped(StoppedEventBody {
+                    reason: StoppedEventReason::Breakpoint,
+                    thread_id: Some(step.thread_id),
+                    description: Some("Breakpoint hit".to_string()),
+                    preserve_focus_hint: None,
+                    text: None,
+                    all_threads_stopped: Some(true),
+                    hit_breakpoint_ids: Some(vec![bp_id]),
+                })) {
+                    eprintln!("Failed to send breakpoint event: {:?}", e);
+                }
+
+                return false;
             }
         }
-        true
     }
 }
 
 fn skip_inlined_function_new(
     stepper: &mut Stepper,
     func_name: String,
-    current_line: Option<i64>,
+    _current_line: Option<i64>,
 ) -> Option<DebugStep> {
     let mut depth = 1;
 
@@ -694,7 +824,7 @@ fn skip_inlined_function_new(
 fn skip_function_new(
     stepper: &mut Stepper,
     func_name: String,
-    current_line: Option<i64>,
+    _current_line: Option<i64>,
 ) -> Option<DebugStep> {
     let mut depth = 1;
 
