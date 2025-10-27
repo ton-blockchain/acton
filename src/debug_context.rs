@@ -635,7 +635,11 @@ impl DebugContext {
 
             let out_actions = OutActionsRevIter::new(c5_slice)
                 .filter_map(|action| action.ok())
-                .collect::<Vec<_>>();
+                .collect::<Vec<_>>()
+                .iter()
+                .rev()
+                .cloned()
+                .collect();
 
             Ok(out_actions)
         } else {
