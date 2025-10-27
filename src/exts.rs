@@ -144,12 +144,15 @@ fn send_message_from_impl(
             .result_for_code(code)
             .map(|res| res.1.source_map);
 
+        let need_to_stop_on_entry = ctx.dbg_ctx.need_to_stop_child_thread_on_start();
+
         ctx.dbg_ctx
             .begin_thread(
                 2,
                 AnyExecutor::Message(step_executor.clone()),
                 source_map,
                 "Send internal message".to_string(),
+                need_to_stop_on_entry,
             )
             .unwrap();
 
@@ -175,9 +178,16 @@ fn send_message_from_impl(
         }
 
         // Step to update internal state
-        ctx.dbg_ctx.step(StepMode::StepIn, true);
+        if need_to_stop_on_entry {
+            ctx.dbg_ctx.step(StepMode::StepIn);
+        } else {
+            ctx.dbg_ctx.step(StepMode::Continue);
+        }
 
-        ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+        if ctx.dbg_ctx.stepper.as_ref().map(|s| s.is_terminated()) == Some(false) {
+            // Process requests only if we have something to execute and generates a requests
+            ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+        }
 
         let result = step_executor.finish_transaction();
 
@@ -381,15 +391,23 @@ fn run_get_method_impl(
                 AnyExecutor::Get(step_get_executor.clone()),
                 source_map,
                 "Send internal message".to_string(),
+                ctx.dbg_ctx.need_to_stop_child_thread_on_start(),
             )
             .unwrap();
 
         step_get_executor.run_get_method(method_id, Default::default());
 
         // Step to update internal state
-        ctx.dbg_ctx.step(StepMode::StepIn, true);
+        if ctx.dbg_ctx.need_to_stop_child_thread_on_start() {
+            ctx.dbg_ctx.step(StepMode::StepIn);
+        } else {
+            ctx.dbg_ctx.step(StepMode::Continue);
+        }
 
-        ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+        if ctx.dbg_ctx.stepper.as_ref().map(|s| s.is_terminated()) == Some(false) {
+            ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+        }
+
         ctx.dbg_ctx.finish_thread(2).unwrap();
 
         step_get_executor.finish_get_method()
