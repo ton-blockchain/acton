@@ -273,21 +273,15 @@ impl DebugContext {
                 } else if args.variables_reference == 2 {
                     let mut variables = Vec::new();
 
-                    // c7 register
-                    let c7 = executor.get_c7();
-                    let c7_cell = &ArcCell::from_boc_b64(&c7)?;
-                    let mut c7_slice = c7_cell.parser();
-                    let c7_tuple = parse_tuple_item(&mut c7_slice)?;
-                    let c7_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
-                    self.tuple_variables.insert(c7_ref, c7_tuple.clone());
-
-                    variables.push(Variable {
-                        name: "c7".to_string(),
-                        type_field: Some("tuple".to_string()),
-                        value: format!("{}", c7_tuple),
-                        variables_reference: c7_ref,
-                        ..Default::default()
-                    });
+                    // c4 register (storage)
+                    if let Ok(out_actions) = self.get_storage(executor) {
+                        variables.push(Variable {
+                            name: "c4 (storage)".to_string(),
+                            type_field: Some("storage".to_string()),
+                            value: out_actions.to_boc_hex(false).unwrap(),
+                            ..Default::default()
+                        });
+                    }
 
                     // c5 register (out actions)
                     if let Ok(out_actions) = self.get_out_actions(executor) {
@@ -297,13 +291,29 @@ impl DebugContext {
                             .insert(c5_ref, out_actions.clone());
 
                         variables.push(Variable {
-                            name: "c5".to_string(),
+                            name: "c5 (output actions)".to_string(),
                             type_field: Some("out_actions".to_string()),
                             value: format!("{} out actions", out_actions.len()),
                             variables_reference: c5_ref,
                             ..Default::default()
                         });
                     }
+
+                    // c7 register
+                    let c7 = executor.get_c7();
+                    let c7_cell = &ArcCell::from_boc_b64(&c7)?;
+                    let mut c7_slice = c7_cell.parser();
+                    let c7_tuple = parse_tuple_item(&mut c7_slice)?;
+                    let c7_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+                    self.tuple_variables.insert(c7_ref, c7_tuple.clone());
+
+                    variables.push(Variable {
+                        name: "c7 (temporary data)".to_string(),
+                        type_field: Some("tuple".to_string()),
+                        value: format!("{}", c7_tuple),
+                        variables_reference: c7_ref,
+                        ..Default::default()
+                    });
 
                     variables
                 } else if args.variables_reference > 2 {
@@ -621,6 +631,18 @@ impl DebugContext {
             TupleItem::Builder(_) => "builder".to_string(),
             TupleItem::Tuple(_) => "tuple".to_string(),
             TupleItem::TypedTuple { type_name, .. } => type_name.clone(),
+        }
+    }
+
+    fn get_storage(&self, executor: &AnyExecutor) -> anyhow::Result<ArcCell> {
+        let c4 = executor.get_control_register(4);
+        let c4_cell = &ArcCell::from_boc_b64(&c4)?;
+        let mut c4_slice = c4_cell.parser();
+
+        if let TupleItem::Cell(c4_tuple) = parse_tuple_item(&mut c4_slice)? {
+            Ok(c4_tuple)
+        } else {
+            Ok(ArcCell::default())
         }
     }
 
