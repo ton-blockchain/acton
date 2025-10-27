@@ -12,16 +12,19 @@ use dap::types::{
     Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread,
     ThreadEventReason, Variable,
 };
+use emulator::executor::StoreExt;
 use emulator::tuple::stack::{TupleItem, parse_tuple, parse_tuple_item};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
-use tonlib_core::cell::ArcCell;
+use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::Boc;
 use tycho_types::models::{
-    CurrencyCollection, OutAction, OutActionsRevIter, ReserveCurrencyFlags, SendMsgFlags,
+    CurrencyCollection, IntAddr, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
+    ReserveCurrencyFlags, SendMsgFlags, StateInit,
 };
+use tycho_types::num::Tokens;
 
 static VARIABLE_REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(1000);
 
@@ -36,6 +39,9 @@ pub struct DebugContext {
     pub tuple_variables: HashMap<i64, TupleItem>,
     pub out_actions_variables: HashMap<i64, Vec<OutAction>>,
     pub out_action_variables: HashMap<i64, OutAction>,
+    pub message_variables: HashMap<i64, OwnedRelaxedMessage>,
+    pub msg_info_variables: HashMap<i64, RelaxedMsgInfo>,
+    pub state_init_variables: HashMap<i64, StateInit>,
 }
 
 impl DebugContext {
@@ -64,6 +70,9 @@ impl DebugContext {
             tuple_variables: HashMap::new(),
             out_actions_variables: HashMap::new(),
             out_action_variables: HashMap::new(),
+            message_variables: HashMap::new(),
+            msg_info_variables: HashMap::new(),
+            state_init_variables: HashMap::new(),
         }
     }
 
@@ -84,6 +93,9 @@ impl DebugContext {
             tuple_variables: HashMap::new(),
             out_actions_variables: HashMap::new(),
             out_action_variables: HashMap::new(),
+            message_variables: HashMap::new(),
+            msg_info_variables: HashMap::new(),
+            state_init_variables: HashMap::new(),
         }
     }
 
@@ -153,6 +165,9 @@ impl DebugContext {
         self.tuple_variables.clear();
         self.out_actions_variables.clear();
         self.out_action_variables.clear();
+        self.message_variables.clear();
+        self.msg_info_variables.clear();
+        self.state_init_variables.clear();
         self.send_event(Event::Thread(ThreadEventBody {
             reason: ThreadEventReason::Exited,
             thread_id: id,
@@ -301,7 +316,19 @@ impl DebugContext {
                     } else if let Some(out_action) =
                         self.out_action_variables.get(&args.variables_reference)
                     {
-                        self.build_out_action_children(out_action)
+                        self.build_out_action_children(&out_action.clone())
+                    } else if let Some(message) =
+                        self.message_variables.get(&args.variables_reference)
+                    {
+                        self.build_message_children(&message.clone())
+                    } else if let Some(msg_info) =
+                        self.msg_info_variables.get(&args.variables_reference)
+                    {
+                        self.build_msg_info_children(msg_info)
+                    } else if let Some(state_init) =
+                        self.state_init_variables.get(&args.variables_reference)
+                    {
+                        self.build_state_init_children(state_init)
                     } else {
                         vec![]
                     }
@@ -631,10 +658,32 @@ impl DebugContext {
                 let action_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
                 self.out_action_variables.insert(action_ref, action.clone());
 
+                let value = match action {
+                    OutAction::SendMsg { mode, out_msg } => {
+                        if let Ok(message) = out_msg.load() {
+                            format!(
+                                "{} and {}",
+                                Self::format_relaxed_msg_info(&message.info),
+                                Self::format_send_msg_flags(*mode)
+                            )
+                        } else {
+                            Self::format_send_msg_flags(*mode)
+                        }
+                    }
+                    OutAction::ReserveCurrency { mode, value } => {
+                        format!(
+                            "{} with {}",
+                            Self::format_currency_collection(value),
+                            Self::format_reserve_currency_flags(*mode)
+                        )
+                    }
+                    _ => format!("{:?}", action),
+                };
+
                 Variable {
                     name: format!("[{}] {}", index, action_type),
                     type_field: Some(action_type.to_string()),
-                    value: format!("{:?}", action),
+                    value,
                     variables_reference: action_ref,
                     ..Default::default()
                 }
@@ -642,22 +691,44 @@ impl DebugContext {
             .collect()
     }
 
-    fn build_out_action_children(&self, out_action: &OutAction) -> Vec<Variable> {
+    fn build_out_action_children(&mut self, out_action: &OutAction) -> Vec<Variable> {
         match out_action {
-            OutAction::SendMsg { mode, out_msg } => vec![
-                Variable {
+            OutAction::SendMsg { mode, out_msg } => {
+                let mut variables = vec![Variable {
                     name: "mode".to_string(),
                     type_field: Some("SendMsgFlags".to_string()),
                     value: Self::format_send_msg_flags(*mode),
                     ..Default::default()
-                },
-                Variable {
-                    name: "out_msg".to_string(),
-                    type_field: Some("Lazy<OwnedRelaxedMessage>".to_string()),
-                    value: format!("{:?}", out_msg),
+                }];
+
+                let message_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+                if let Ok(message) = out_msg.load() {
+                    self.message_variables.insert(message_ref, message);
+                    variables.push(Variable {
+                        name: "out_msg".to_string(),
+                        type_field: Some("OwnedRelaxedMessage".to_string()),
+                        value: "RelaxedMessage".to_string(),
+                        variables_reference: message_ref,
+                        ..Default::default()
+                    });
+                } else {
+                    variables.push(Variable {
+                        name: "out_msg".to_string(),
+                        type_field: Some("Lazy<OwnedRelaxedMessage>".to_string()),
+                        value: format!("{:?}", out_msg),
+                        ..Default::default()
+                    });
+                }
+
+                variables.push(Variable {
+                    name: "out_msg_raw".to_string(),
+                    type_field: Some("cell".to_string()),
+                    value: Boc::encode_hex(out_msg.inner()),
                     ..Default::default()
-                },
-            ],
+                });
+
+                variables
+            }
             OutAction::SetCode { new_code } => vec![Variable {
                 name: "new_code".to_string(),
                 type_field: Some("Cell".to_string()),
@@ -699,26 +770,26 @@ impl DebugContext {
         let mut flag_names = Vec::new();
 
         if flags.contains(SendMsgFlags::PAY_FEE_SEPARATELY) {
-            flag_names.push("PAY_FEE_SEPARATELY");
+            flag_names.push("PAY_FEES_SEPARATELY");
         }
         if flags.contains(SendMsgFlags::IGNORE_ERROR) {
-            flag_names.push("IGNORE_ERROR");
+            flag_names.push("IGNORE_ERRORS");
         }
         if flags.contains(SendMsgFlags::BOUNCE_ON_ERROR) {
-            flag_names.push("BOUNCE_ON_ERROR");
+            flag_names.push("BOUNCE_ON_ACTION_FAIL");
         }
         if flags.contains(SendMsgFlags::DELETE_IF_EMPTY) {
-            flag_names.push("DELETE_IF_EMPTY");
+            flag_names.push("DESTROY");
         }
         if flags.contains(SendMsgFlags::WITH_REMAINING_BALANCE) {
-            flag_names.push("WITH_REMAINING_BALANCE");
+            flag_names.push("CARRY_ALL_REMAINING_MESSAGE_VALUE");
         }
         if flags.contains(SendMsgFlags::ALL_BALANCE) {
-            flag_names.push("ALL_BALANCE");
+            flag_names.push("CARRY_ALL_BALANCE");
         }
 
         if flag_names.is_empty() {
-            "0".to_string()
+            "REGULAR".to_string()
         } else {
             flag_names.join(" | ")
         }
@@ -728,32 +799,64 @@ impl DebugContext {
         let mut flag_names = Vec::new();
 
         if flags.contains(ReserveCurrencyFlags::ALL_BUT) {
-            flag_names.push("ALL_BUT");
+            flag_names.push("ALL_BUT_AMOUNT");
         }
         if flags.contains(ReserveCurrencyFlags::IGNORE_ERROR) {
-            flag_names.push("IGNORE_ERROR");
+            flag_names.push("AT_MOST");
         }
         if flags.contains(ReserveCurrencyFlags::WITH_ORIGINAL_BALANCE) {
-            flag_names.push("WITH_ORIGINAL_BALANCE");
+            flag_names.push("INCREASE_BY_ORIGINAL_BALANCE");
         }
         if flags.contains(ReserveCurrencyFlags::REVERSE) {
-            flag_names.push("REVERSE");
+            flag_names.push("NEGATE_AMOUNT");
         }
         if flags.contains(ReserveCurrencyFlags::BOUNCE_ON_ERROR) {
-            flag_names.push("BOUNCE_ON_ERROR");
+            flag_names.push("BOUNCE_ON_ACTION_FAIL");
         }
 
         if flag_names.is_empty() {
-            "0".to_string()
+            "EXACT_AMOUNT".to_string()
         } else {
             flag_names.join(" | ")
+        }
+    }
+
+    fn format_tokens(tokens: &Tokens) -> String {
+        format!("{:.9} TON", tokens.into_inner() as f64 / 1_000_000_000.0)
+    }
+
+    fn format_int_addr(addr: &IntAddr) -> String {
+        match addr {
+            IntAddr::Std(std_addr) => std_addr.display_base64(true).to_string(),
+            IntAddr::Var(var_addr) => format!("{:?}", var_addr), // fallback for VarAddr
+        }
+    }
+
+    fn format_relaxed_msg_info(info: &RelaxedMsgInfo) -> String {
+        match info {
+            RelaxedMsgInfo::Int(int_info) => {
+                format!(
+                    "to {} with {}",
+                    Self::format_int_addr(&int_info.dst),
+                    Self::format_currency_collection(&int_info.value)
+                )
+            }
+            RelaxedMsgInfo::ExtOut(ext_info) => {
+                format!(
+                    "to {}",
+                    ext_info
+                        .dst
+                        .as_ref()
+                        .map_or("None".to_string(), |addr| addr.to_string())
+                )
+            }
         }
     }
 
     fn format_currency_collection(currency: &CurrencyCollection) -> String {
         let ton_amount = currency.tokens.into_inner() as f64 / 1_000_000_000.0;
 
-        let mut result = format!("{:.9} TON", ton_amount);
+        let mut result = format!("{:.9} TON ", ton_amount);
 
         if !currency.other.is_empty() {
             let mut other_currencies = Vec::new();
@@ -769,6 +872,243 @@ impl DebugContext {
         }
 
         result
+    }
+
+    fn build_message_children(&mut self, message: &OwnedRelaxedMessage) -> Vec<Variable> {
+        let mut variables = Vec::new();
+
+        let info_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+        self.msg_info_variables
+            .insert(info_ref, message.info.clone());
+        variables.push(Variable {
+            name: "info".to_string(),
+            type_field: Some("RelaxedMsgInfo".to_string()),
+            value: "RelaxedMsgInfo".to_string(),
+            variables_reference: info_ref,
+            ..Default::default()
+        });
+
+        if let Some(init) = &message.init {
+            let init_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+            self.state_init_variables.insert(init_ref, init.clone());
+            variables.push(Variable {
+                name: "init".to_string(),
+                type_field: Some("StateInit".to_string()),
+                value: "StateInit".to_string(),
+                variables_reference: init_ref,
+                ..Default::default()
+            });
+        } else {
+            variables.push(Variable {
+                name: "init".to_string(),
+                type_field: Some("Option<StateInit>".to_string()),
+                value: "None".to_string(),
+                ..Default::default()
+            });
+        }
+
+        let msg_cell = message.body.1.clone();
+        let msg_offset = message.body.0.offset();
+        let mut msg_slice = msg_cell.as_slice().unwrap();
+        msg_slice
+            .skip_first(msg_offset.bits, msg_offset.refs)
+            .unwrap();
+        let msg_cell = msg_slice.to_cell();
+
+        variables.push(Variable {
+            name: "body".to_string(),
+            type_field: Some("CellSliceParts".to_string()),
+            value: Boc::encode_hex(msg_cell),
+            ..Default::default()
+        });
+
+        variables
+    }
+
+    fn build_msg_info_children(&self, msg_info: &RelaxedMsgInfo) -> Vec<Variable> {
+        match msg_info {
+            RelaxedMsgInfo::Int(int_info) => vec![
+                Variable {
+                    name: "ihr_disabled".to_string(),
+                    type_field: Some("bool".to_string()),
+                    value: int_info.ihr_disabled.to_string(),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "bounce".to_string(),
+                    type_field: Some("bool".to_string()),
+                    value: int_info.bounce.to_string(),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "bounced".to_string(),
+                    type_field: Some("bool".to_string()),
+                    value: int_info.bounced.to_string(),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "src".to_string(),
+                    type_field: Some("Option<IntAddr>".to_string()),
+                    value: match &int_info.src {
+                        Some(addr) => Self::format_int_addr(addr),
+                        None => "None".to_string(),
+                    },
+                    ..Default::default()
+                },
+                Variable {
+                    name: "dst".to_string(),
+                    type_field: Some("IntAddr".to_string()),
+                    value: Self::format_int_addr(&int_info.dst),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "value".to_string(),
+                    type_field: Some("CurrencyCollection".to_string()),
+                    value: Self::format_currency_collection(&int_info.value),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "ihr_fee".to_string(),
+                    type_field: Some("Tokens".to_string()),
+                    value: Self::format_tokens(&int_info.ihr_fee),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "fwd_fee".to_string(),
+                    type_field: Some("Tokens".to_string()),
+                    value: Self::format_tokens(&int_info.fwd_fee),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "created_lt".to_string(),
+                    type_field: Some("u64".to_string()),
+                    value: int_info.created_lt.to_string(),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "created_at".to_string(),
+                    type_field: Some("u32".to_string()),
+                    value: int_info.created_at.to_string(),
+                    ..Default::default()
+                },
+            ],
+            RelaxedMsgInfo::ExtOut(ext_info) => vec![
+                Variable {
+                    name: "src".to_string(),
+                    type_field: Some("Option<IntAddr>".to_string()),
+                    value: match &ext_info.src {
+                        Some(addr) => Self::format_int_addr(addr),
+                        None => "None".to_string(),
+                    },
+                    ..Default::default()
+                },
+                Variable {
+                    name: "dst".to_string(),
+                    type_field: Some("Option<ExtAddr>".to_string()),
+                    value: match &ext_info.dst {
+                        Some(addr) => addr.to_string(),
+                        None => "None".to_string(),
+                    },
+                    ..Default::default()
+                },
+                Variable {
+                    name: "created_lt".to_string(),
+                    type_field: Some("u64".to_string()),
+                    value: ext_info.created_lt.to_string(),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "created_at".to_string(),
+                    type_field: Some("u32".to_string()),
+                    value: ext_info.created_at.to_string(),
+                    ..Default::default()
+                },
+            ],
+        }
+    }
+
+    fn build_state_init_children(&self, state_init: &StateInit) -> Vec<Variable> {
+        let mut variables = Vec::new();
+
+        if let Some(split_depth) = &state_init.split_depth {
+            variables.push(Variable {
+                name: "split_depth".to_string(),
+                type_field: Some("SplitDepth".to_string()),
+                value: format!("{:?}", split_depth),
+                ..Default::default()
+            });
+        } else {
+            variables.push(Variable {
+                name: "split_depth".to_string(),
+                type_field: Some("Option<SplitDepth>".to_string()),
+                value: "None".to_string(),
+                ..Default::default()
+            });
+        }
+
+        if let Some(special) = &state_init.special {
+            variables.push(Variable {
+                name: "special".to_string(),
+                type_field: Some("SpecialFlags".to_string()),
+                value: format!("tick: {}, tock: {}", special.tick, special.tock),
+                ..Default::default()
+            });
+        } else {
+            variables.push(Variable {
+                name: "special".to_string(),
+                type_field: Some("Option<SpecialFlags>".to_string()),
+                value: "None".to_string(),
+                ..Default::default()
+            });
+        }
+
+        if let Some(code) = &state_init.code {
+            variables.push(Variable {
+                name: "code".to_string(),
+                type_field: Some("Cell".to_string()),
+                value: Boc::encode_hex(code),
+                ..Default::default()
+            });
+        } else {
+            variables.push(Variable {
+                name: "code".to_string(),
+                type_field: Some("Option<Cell>".to_string()),
+                value: "None".to_string(),
+                ..Default::default()
+            });
+        }
+
+        if let Some(data) = &state_init.data {
+            variables.push(Variable {
+                name: "data".to_string(),
+                type_field: Some("Cell".to_string()),
+                value: Boc::encode_hex(data),
+                ..Default::default()
+            });
+        } else {
+            variables.push(Variable {
+                name: "data".to_string(),
+                type_field: Some("Option<Cell>".to_string()),
+                value: "None".to_string(),
+                ..Default::default()
+            });
+        }
+
+        variables.push(Variable {
+            name: "libraries".to_string(),
+            type_field: Some("Dict<HashBytes, SimpleLib>".to_string()),
+            value: if state_init.libraries.is_empty() {
+                "empty".to_string()
+            } else {
+                format!(
+                    "{} libraries",
+                    state_init.libraries.iter().collect::<Vec<_>>().len()
+                )
+            },
+            ..Default::default()
+        });
+
+        variables
     }
 }
 
