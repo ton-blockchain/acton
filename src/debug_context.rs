@@ -231,6 +231,13 @@ impl DebugContext {
                             presentation_hint: Some(ScopePresentationhint::Registers),
                             ..Default::default()
                         },
+                        Scope {
+                            name: "Stack".to_string(),
+                            variables_reference: 3,
+                            expensive: false,
+                            presentation_hint: Some(ScopePresentationhint::Locals),
+                            ..Default::default()
+                        },
                     ],
                 }));
                 self.send_response(rsp)?;
@@ -316,7 +323,23 @@ impl DebugContext {
                     });
 
                     variables
-                } else if args.variables_reference > 2 {
+                } else if args.variables_reference == 3 {
+                    let stack_boc = executor.get_stack();
+                    let stack_cell = ArcCell::from_boc_b64(&stack_boc)?;
+                    let stack_tuple = parse_tuple(&stack_cell)?;
+
+                    stack_tuple
+                        .iter()
+                        .rev()
+                        .enumerate()
+                        .map(|(index, item)| Variable {
+                            name: format!("s{}", index),
+                            type_field: Some("stack_item".to_string()),
+                            value: format!("{}", item),
+                            ..Default::default()
+                        })
+                        .collect::<Vec<_>>()
+                } else if args.variables_reference > 3 {
                     if let Some(tuple_item) = self.tuple_variables.get(&args.variables_reference) {
                         self.build_tuple_children(&tuple_item.clone())
                     } else if let Some(out_actions) =
