@@ -19,7 +19,9 @@ use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::Boc;
-use tycho_types::models::{OutAction, OutActionsRevIter};
+use tycho_types::models::{
+    CurrencyCollection, OutAction, OutActionsRevIter, ReserveCurrencyFlags, SendMsgFlags,
+};
 
 static VARIABLE_REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(1000);
 
@@ -33,6 +35,7 @@ pub struct DebugContext {
     pub req_receiver: Receiver<Request>,
     pub tuple_variables: HashMap<i64, TupleItem>,
     pub out_actions_variables: HashMap<i64, Vec<OutAction>>,
+    pub out_action_variables: HashMap<i64, OutAction>,
 }
 
 impl DebugContext {
@@ -60,6 +63,7 @@ impl DebugContext {
             req_receiver,
             tuple_variables: HashMap::new(),
             out_actions_variables: HashMap::new(),
+            out_action_variables: HashMap::new(),
         }
     }
 
@@ -79,6 +83,7 @@ impl DebugContext {
             req_receiver: req_receiver.clone(),
             tuple_variables: HashMap::new(),
             out_actions_variables: HashMap::new(),
+            out_action_variables: HashMap::new(),
         }
     }
 
@@ -147,6 +152,7 @@ impl DebugContext {
         self.current_executor_id -= 1;
         self.tuple_variables.clear();
         self.out_actions_variables.clear();
+        self.out_action_variables.clear();
         self.send_event(Event::Thread(ThreadEventBody {
             reason: ThreadEventReason::Exited,
             thread_id: id,
@@ -291,7 +297,11 @@ impl DebugContext {
                     } else if let Some(out_actions) =
                         self.out_actions_variables.get(&args.variables_reference)
                     {
-                        self.build_out_actions_children(out_actions)
+                        self.build_out_actions_children(&out_actions.clone())
+                    } else if let Some(out_action) =
+                        self.out_action_variables.get(&args.variables_reference)
+                    {
+                        self.build_out_action_children(out_action)
                     } else {
                         vec![]
                     }
@@ -606,37 +616,159 @@ impl DebugContext {
         }
     }
 
-    fn build_out_actions_children(&self, out_actions: &[OutAction]) -> Vec<Variable> {
+    fn build_out_actions_children(&mut self, out_actions: &[OutAction]) -> Vec<Variable> {
         out_actions
             .iter()
             .enumerate()
             .map(|(index, action)| {
-                let (action_type, value) = match action {
-                    OutAction::SendMsg { mode, out_msg } => (
-                        "SendMsg".to_string(),
-                        format!("mode: {:?}, msg: {:?}", mode, out_msg),
-                    ),
-                    OutAction::SetCode { new_code } => {
-                        ("SetCode".to_string(), format!("code: {:?}", new_code))
-                    }
-                    OutAction::ReserveCurrency { mode, value } => (
-                        "ReserveCurrency".to_string(),
-                        format!("mode: {:?}, value: {:?}", mode, value),
-                    ),
-                    OutAction::ChangeLibrary { mode, lib } => (
-                        "ChangeLibrary".to_string(),
-                        format!("mode: {:?}, lib: {:?}", mode, lib),
-                    ),
+                let action_type = match action {
+                    OutAction::SendMsg { .. } => "SendMsg",
+                    OutAction::SetCode { .. } => "SetCode",
+                    OutAction::ReserveCurrency { .. } => "ReserveCurrency",
+                    OutAction::ChangeLibrary { .. } => "ChangeLibrary",
                 };
+
+                let action_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+                self.out_action_variables.insert(action_ref, action.clone());
 
                 Variable {
                     name: format!("[{}] {}", index, action_type),
-                    type_field: Some(action_type),
-                    value,
+                    type_field: Some(action_type.to_string()),
+                    value: format!("{:?}", action),
+                    variables_reference: action_ref,
                     ..Default::default()
                 }
             })
             .collect()
+    }
+
+    fn build_out_action_children(&self, out_action: &OutAction) -> Vec<Variable> {
+        match out_action {
+            OutAction::SendMsg { mode, out_msg } => vec![
+                Variable {
+                    name: "mode".to_string(),
+                    type_field: Some("SendMsgFlags".to_string()),
+                    value: Self::format_send_msg_flags(*mode),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "out_msg".to_string(),
+                    type_field: Some("Lazy<OwnedRelaxedMessage>".to_string()),
+                    value: format!("{:?}", out_msg),
+                    ..Default::default()
+                },
+            ],
+            OutAction::SetCode { new_code } => vec![Variable {
+                name: "new_code".to_string(),
+                type_field: Some("Cell".to_string()),
+                value: format!("{:?}", new_code),
+                ..Default::default()
+            }],
+            OutAction::ReserveCurrency { mode, value } => vec![
+                Variable {
+                    name: "mode".to_string(),
+                    type_field: Some("ReserveCurrencyFlags".to_string()),
+                    value: Self::format_reserve_currency_flags(*mode),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "value".to_string(),
+                    type_field: Some("CurrencyCollection".to_string()),
+                    value: Self::format_currency_collection(value),
+                    ..Default::default()
+                },
+            ],
+            OutAction::ChangeLibrary { mode, lib } => vec![
+                Variable {
+                    name: "mode".to_string(),
+                    type_field: Some("ChangeLibraryMode".to_string()),
+                    value: format!("{:?}", mode),
+                    ..Default::default()
+                },
+                Variable {
+                    name: "lib".to_string(),
+                    type_field: Some("LibRef".to_string()),
+                    value: format!("{:?}", lib),
+                    ..Default::default()
+                },
+            ],
+        }
+    }
+
+    fn format_send_msg_flags(flags: SendMsgFlags) -> String {
+        let mut flag_names = Vec::new();
+
+        if flags.contains(SendMsgFlags::PAY_FEE_SEPARATELY) {
+            flag_names.push("PAY_FEE_SEPARATELY");
+        }
+        if flags.contains(SendMsgFlags::IGNORE_ERROR) {
+            flag_names.push("IGNORE_ERROR");
+        }
+        if flags.contains(SendMsgFlags::BOUNCE_ON_ERROR) {
+            flag_names.push("BOUNCE_ON_ERROR");
+        }
+        if flags.contains(SendMsgFlags::DELETE_IF_EMPTY) {
+            flag_names.push("DELETE_IF_EMPTY");
+        }
+        if flags.contains(SendMsgFlags::WITH_REMAINING_BALANCE) {
+            flag_names.push("WITH_REMAINING_BALANCE");
+        }
+        if flags.contains(SendMsgFlags::ALL_BALANCE) {
+            flag_names.push("ALL_BALANCE");
+        }
+
+        if flag_names.is_empty() {
+            "0".to_string()
+        } else {
+            flag_names.join(" | ")
+        }
+    }
+
+    fn format_reserve_currency_flags(flags: ReserveCurrencyFlags) -> String {
+        let mut flag_names = Vec::new();
+
+        if flags.contains(ReserveCurrencyFlags::ALL_BUT) {
+            flag_names.push("ALL_BUT");
+        }
+        if flags.contains(ReserveCurrencyFlags::IGNORE_ERROR) {
+            flag_names.push("IGNORE_ERROR");
+        }
+        if flags.contains(ReserveCurrencyFlags::WITH_ORIGINAL_BALANCE) {
+            flag_names.push("WITH_ORIGINAL_BALANCE");
+        }
+        if flags.contains(ReserveCurrencyFlags::REVERSE) {
+            flag_names.push("REVERSE");
+        }
+        if flags.contains(ReserveCurrencyFlags::BOUNCE_ON_ERROR) {
+            flag_names.push("BOUNCE_ON_ERROR");
+        }
+
+        if flag_names.is_empty() {
+            "0".to_string()
+        } else {
+            flag_names.join(" | ")
+        }
+    }
+
+    fn format_currency_collection(currency: &CurrencyCollection) -> String {
+        let ton_amount = currency.tokens.into_inner() as f64 / 1_000_000_000.0;
+
+        let mut result = format!("{:.9} TON", ton_amount);
+
+        if !currency.other.is_empty() {
+            let mut other_currencies = Vec::new();
+            let dict = currency.other.as_dict();
+            for entry in dict.iter() {
+                if let Ok((currency_id, amount)) = entry {
+                    other_currencies.push(format!("{}: {}", currency_id, amount));
+                }
+            }
+            if !other_currencies.is_empty() {
+                result.push_str(&format!(" + [{}]", other_currencies.join(", ")));
+            }
+        }
+
+        result
     }
 }
 
