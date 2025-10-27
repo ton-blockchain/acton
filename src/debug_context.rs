@@ -4,29 +4,28 @@ use anyhow::anyhow;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
 use dap::prelude::{Command, Request, Response, ResponseBody};
-use dap::requests::VariablesArguments;
 use dap::responses::{
     ContinueResponse, ScopesResponse, StackTraceResponse, ThreadsResponse, VariablesResponse,
 };
 use dap::types;
 use dap::types::{
-    Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread,
-    ThreadEventReason, Variable,
+    Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread, ThreadEventReason,
 };
-use emulator::executor::StoreExt;
-use emulator::tuple::stack::{TupleItem, parse_tuple, parse_tuple_item};
+use emulator::tuple::stack::TupleItem;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
 use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
-use tonlib_core::cell::{ArcCell, CellBuilder};
-use tonlib_core::tlb_types::tlb::TLB;
-use tycho_types::boc::Boc;
-use tycho_types::models::{
-    CurrencyCollection, IntAddr, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
-    ReserveCurrencyFlags, SendMsgFlags, StateInit,
-};
+use tycho_types::models::{OutAction, OwnedRelaxedMessage, RelaxedMsgInfo, StateInit};
 
 pub static VARIABLE_REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(1000);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepMode {
+    StepIn,
+    StepOver,
+    StepOut,
+    Continue,
+}
 
 pub struct DebugContext {
     pub executors: Vec<AnyExecutor>,
@@ -187,7 +186,7 @@ impl DebugContext {
             Command::Launch(args) => {
                 println!("Launching {:?}", args);
 
-                self.next(true, true);
+                self.step(StepMode::StepIn, true);
 
                 self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
@@ -290,13 +289,16 @@ impl DebugContext {
                 }));
                 self.send_response(rsp)?;
 
-                self.continue_execution_while(|_| true)?;
+                let is_end = self.step(StepMode::Continue, false);
+                if is_end {
+                    return Ok(true);
+                }
             }
             Command::StepIn(_args) => {
                 let rsp = req.success(ResponseBody::StepIn);
                 self.send_response(rsp)?;
 
-                let is_end = self.next(true, true);
+                let is_end = self.step(StepMode::StepIn, false);
                 if is_end {
                     return Ok(true);
                 }
@@ -315,7 +317,26 @@ impl DebugContext {
                 let rsp = req.success(ResponseBody::Next);
                 self.send_response(rsp)?;
 
-                let is_end = self.next(false, false);
+                let is_end = self.step(StepMode::StepOver, false);
+                if is_end {
+                    return Ok(true);
+                }
+
+                self.send_event(Event::Stopped(StoppedEventBody {
+                    reason: StoppedEventReason::Step,
+                    thread_id: Some(1),
+                    description: None,
+                    preserve_focus_hint: None,
+                    text: None,
+                    all_threads_stopped: None,
+                    hit_breakpoint_ids: None,
+                }))?;
+            }
+            Command::StepOut(_args) => {
+                let rsp = req.success(ResponseBody::StepOut);
+                self.send_response(rsp)?;
+
+                let is_end = self.step(StepMode::StepOut, false);
                 if is_end {
                     return Ok(true);
                 }
@@ -341,84 +362,62 @@ impl DebugContext {
         Ok(false)
     }
 
-    pub(crate) fn next(&mut self, step_in: bool, stop_on_first: bool) -> bool {
-        let executor = &self.executors[self.current_executor_id].clone();
+    pub(crate) fn step(&mut self, mode: StepMode, stop_on_first: bool) -> bool {
+        match mode {
+            StepMode::StepIn => self.step_in_impl(stop_on_first),
+            StepMode::StepOver => self.step_over_impl(),
+            StepMode::StepOut => self.step_out_impl(),
+            StepMode::Continue => self.continue_impl(),
+        }
+    }
 
-        if self.pseudo_step + 1 >= self.locations.len() as i64 {
-            loop {
-                let is_end = executor.step();
-                if is_end {
-                    return true;
-                }
-
-                let source_map = &self.source_maps[self.current_executor_id];
-                let locations = get_locations(executor, &source_map);
-                if let Some(locations) = locations {
-                    // Locations are like pseudo steps
-                    self.locations = locations;
-
-                    if stop_on_first {
-                        self.pseudo_step = 0;
-                        return false;
-                    }
-
-                    self.pseudo_step = -1;
-                    // Step until reach some Tolk code
-                    break;
-                }
-            }
+    fn step_in_impl(&mut self, stop_on_first: bool) -> bool {
+        if stop_on_first && !self.locations.is_empty() {
+            self.pseudo_step = 0;
+            return false;
         }
 
-        if self.pseudo_step + 1 < self.locations.len() as i64 {
-            let step = self.locations[(self.pseudo_step + 1) as usize].clone();
-
-            if step.context.event == Some("EnterInlinedFunction".to_string()) {
-                let is_end = self
-                    .continue_execution_while(|loc| {
-                        step_in || loc.context.event == Some("LeaveInlinedFunction".to_string())
-                    })
-                    .unwrap();
-                if is_end {
-                    return true;
-                }
-            }
-
-            if step.context.containing_function != "foo"
-                && step.context.containing_function != "processMessage"
-                && step.context.event == Some("EnterFunction".to_string())
-            {
-                let is_end = self
-                    .continue_execution_while(|loc| {
-                        step_in
-                            || (loc.context.event == Some("LeaveFunction".to_string())
-                                && step.context.containing_function
-                                    == loc.context.containing_function)
-                    })
-                    .unwrap();
-                if is_end {
-                    return true;
-                }
-            }
-
-            // If there are more pseudo steps, select the next one
+        if self.has_next_synthetic_step() {
             self.pseudo_step += 1;
+            return false;
         }
 
-        if self.pseudo_step >= self.locations.len() as i64 {
-            loop {
-                let is_end = executor.step();
-                if is_end {
-                    return true;
-                }
+        self.perform_real_step_until_mapped()
+    }
 
-                let source_map = &self.source_maps[self.current_executor_id];
-                let locations = get_locations(executor, &source_map);
-                if let Some(locations) = locations {
-                    // Locations are like pseudo steps
-                    self.locations = locations;
-                    self.pseudo_step = 0;
-                    // Step until reach some Tolk code
-                    break;
+    fn step_over_impl(&mut self) -> bool {
+        let current_loc = self.get_current_location();
+        let current_line = current_loc.as_ref().map(|loc| loc.loc.line);
+
+        if !self.has_next_synthetic_step() {
+            let is_end = self.perform_real_step_until_mapped();
+            if is_end {
+                return true;
+            }
+
+            if let Some(line) = current_line {
+                self.skip_same_line_steps(line);
+            }
+            return false;
+        }
+
+        let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
+
+        if next_loc.context.event == Some("EnterInlinedFunction".to_string()) {
+            return self.skip_inlined_function();
+        }
+
+        if next_loc.context.event == Some("EnterFunction".to_string()) {
+            return self.skip_function();
+        }
+
+        self.pseudo_step += 1;
+
+        if let Some(current_line) = current_line {
+            let new_loc = self.get_current_location();
+            if let Some(new_loc) = new_loc {
+                if new_loc.loc.line == current_line {
+                    return self.step_over_impl();
                 }
             }
         }
@@ -426,42 +425,209 @@ impl DebugContext {
         false
     }
 
-    fn continue_execution_while<Cond: Fn(&DebugLocation) -> bool>(
-        &mut self,
-        condition: Cond,
-    ) -> anyhow::Result<bool> {
+    fn step_out_impl(&mut self) -> bool {
+        let current_loc = match self.get_current_location() {
+            Some(loc) => loc.clone(),
+            None => return self.continue_impl(),
+        };
+
+        let current_function = current_loc.context.containing_function.clone();
+        let current_line = current_loc.loc.line;
+
         loop {
-            if self.pseudo_step + 1 < self.locations.len() as i64 {
-                let step = &self.locations[(self.pseudo_step + 1) as usize];
+            if self.has_next_synthetic_step() {
+                let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
 
-                let condition_is_met = condition(step);
+                if next_loc.context.event == Some("LeaveFunction".to_string())
+                    && next_loc.context.containing_function == current_function
+                {
+                    self.pseudo_step += 1;
+                    self.skip_same_line_steps(current_line);
 
-                // If there are more pseudo steps, select the next one
-                self.pseudo_step += 1;
-
-                if condition_is_met {
-                    return Ok(false);
-                }
-            } else {
-                // Otherwise perform a real step
-                loop {
-                    let executor = self.executors[self.current_executor_id].clone();
-                    let is_end = executor.step();
-                    if is_end {
-                        return Ok(true);
+                    if self.has_next_synthetic_step() {
+                        self.pseudo_step += 1;
+                        return false;
+                    } else {
+                        let is_end = self.perform_real_step_until_mapped();
+                        if is_end {
+                            return true;
+                        }
+                        self.skip_same_line_steps(current_line);
+                        return false;
                     }
+                }
 
-                    let source_map = &self.source_maps[self.current_executor_id];
-                    let locations = get_locations(&executor, &source_map);
-                    if let Some(locations) = locations {
-                        // Locations are like pseudo steps
-                        self.locations = locations.clone();
-                        self.pseudo_step = 0;
-                        // Step until reach some Tolk code
-                        break;
+                self.pseudo_step += 1;
+            } else {
+                let is_end = self.perform_real_step_until_mapped();
+                if is_end {
+                    return true;
+                }
+
+                if let Some(new_loc) = self.get_current_location() {
+                    if new_loc.context.containing_function != current_function {
+                        self.skip_same_line_steps(current_line);
+                        return false;
                     }
                 }
             }
+        }
+    }
+
+    fn continue_impl(&mut self) -> bool {
+        loop {
+            let executor = self.executors[self.current_executor_id].clone();
+            let is_end = executor.step();
+            if is_end {
+                return true;
+            }
+        }
+    }
+
+    fn has_next_synthetic_step(&self) -> bool {
+        (self.pseudo_step + 1) < self.locations.len() as i64
+    }
+
+    fn get_current_location(&self) -> Option<&DebugLocation> {
+        if self.pseudo_step >= 0 && (self.pseudo_step as usize) < self.locations.len() {
+            Some(&self.locations[self.pseudo_step as usize])
+        } else {
+            None
+        }
+    }
+
+    fn skip_same_line_steps(&mut self, original_line: i64) {
+        while let Some(loc) = self.get_current_location() {
+            if loc.loc.line != original_line {
+                break;
+            }
+
+            if !self.has_next_synthetic_step() {
+                break;
+            }
+
+            self.pseudo_step += 1;
+        }
+    }
+
+    fn perform_real_step_until_mapped(&mut self) -> bool {
+        loop {
+            let executor = self.executors[self.current_executor_id].clone();
+            let is_end = executor.step();
+            if is_end {
+                return true;
+            }
+
+            let source_map = &self.source_maps[self.current_executor_id];
+            let locations = get_locations(&executor, source_map);
+
+            if let Some(locations) = locations {
+                self.locations = locations;
+                self.pseudo_step = 0;
+                return false;
+            }
+        }
+    }
+
+    fn skip_inlined_function(&mut self) -> bool {
+        let current_line = self.get_current_location().map(|loc| loc.loc.line);
+        let mut depth = 0;
+
+        loop {
+            if !self.has_next_synthetic_step() {
+                let is_end = self.perform_real_step_until_mapped();
+                if is_end {
+                    return true;
+                }
+                if let Some(line) = current_line {
+                    self.skip_same_line_steps(line);
+                }
+                continue;
+            }
+
+            let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
+
+            if next_loc.context.event == Some("EnterInlinedFunction".to_string()) {
+                depth += 1;
+            } else if next_loc.context.event == Some("LeaveInlinedFunction".to_string()) {
+                if depth == 0 {
+                    self.pseudo_step += 1;
+                    if let Some(line) = current_line {
+                        self.skip_same_line_steps(line);
+                    }
+
+                    if self.has_next_synthetic_step() {
+                        self.pseudo_step += 1;
+                    } else {
+                        let is_end = self.perform_real_step_until_mapped();
+                        if is_end {
+                            return true;
+                        }
+                        if let Some(line) = current_line {
+                            self.skip_same_line_steps(line);
+                        }
+                    }
+                    return false;
+                }
+                depth -= 1;
+            }
+
+            self.pseudo_step += 1;
+        }
+    }
+
+    fn skip_function(&mut self) -> bool {
+        let current_line = self.get_current_location().map(|loc| loc.loc.line);
+        let function_name = self.locations[(self.pseudo_step + 1) as usize]
+            .context
+            .containing_function
+            .clone();
+        let mut depth = 0;
+
+        loop {
+            if !self.has_next_synthetic_step() {
+                let is_end = self.perform_real_step_until_mapped();
+                if is_end {
+                    return true;
+                }
+                if let Some(line) = current_line {
+                    self.skip_same_line_steps(line);
+                }
+                continue;
+            }
+
+            let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
+
+            if next_loc.context.event == Some("EnterFunction".to_string())
+                && next_loc.context.containing_function == function_name
+            {
+                depth += 1;
+            } else if next_loc.context.event == Some("LeaveFunction".to_string())
+                && next_loc.context.containing_function == function_name
+            {
+                if depth == 0 {
+                    self.pseudo_step += 1;
+                    if let Some(line) = current_line {
+                        self.skip_same_line_steps(line);
+                    }
+
+                    if self.has_next_synthetic_step() {
+                        self.pseudo_step += 1;
+                    } else {
+                        let is_end = self.perform_real_step_until_mapped();
+                        if is_end {
+                            return true;
+                        }
+                        if let Some(line) = current_line {
+                            self.skip_same_line_steps(line);
+                        }
+                    }
+                    return false;
+                }
+                depth -= 1;
+            }
+
+            self.pseudo_step += 1;
         }
     }
 }

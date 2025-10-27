@@ -1,7 +1,7 @@
 use crate::asserts_exts::process_txs_and_search_params;
 use crate::context::{AnyExecutor, Context, KnownAddress};
+use crate::debug_context::StepMode;
 use crc::{CRC_16_XMODEM, Crc};
-use dap::prelude::Command;
 use emulator::config::DEFAULT_CONFIG;
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use emulator::executor::{EmulationResult, ExecutorVerbosity, RunTransactionArgs, StoreExt};
@@ -175,7 +175,7 @@ fn send_message_from_impl(
         }
 
         // Step to update internal state
-        ctx.dbg_ctx.next(false, true);
+        ctx.dbg_ctx.step(StepMode::StepIn, true);
 
         ctx.dbg_ctx.process_incoming_requests(false).unwrap();
 
@@ -387,7 +387,7 @@ fn run_get_method_impl(
         step_get_executor.run_get_method(method_id, Default::default());
 
         // Step to update internal state
-        ctx.dbg_ctx.next(false, true);
+        ctx.dbg_ctx.step(StepMode::StepIn, true);
 
         ctx.dbg_ctx.process_incoming_requests(false).unwrap();
         ctx.dbg_ctx.finish_thread(2).unwrap();

@@ -32,7 +32,11 @@ impl DebugContext {
                 .iter()
                 .rev()
                 .enumerate()
-                .map(|(index, variable)| {
+                .flat_map(|(index, variable)| {
+                    if index >= stack.len() {
+                        return None;
+                    }
+
                     let value = stack
                         .get(stack.len() - 1 - index)
                         .unwrap_or(&TupleItem::Null);
@@ -45,12 +49,12 @@ impl DebugContext {
                         build_cache: Default::default(),
                         known_addresses: Default::default(),
                     };
-                    Variable {
+                    Some(Variable {
                         name: variable.name.clone(),
                         type_field: Some(variable.var_type.clone()),
                         value: format!("{}", value2),
                         ..Default::default()
-                    }
+                    })
                 })
                 .collect::<Vec<_>>()
         } else if args.variables_reference == 2 {
