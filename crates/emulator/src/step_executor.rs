@@ -2,12 +2,13 @@ use crate::config::DEFAULT_CONFIG;
 use crate::executor::{
     EmulationResult, RunTransactionArgs, StoreExt, create_emulator, em_sbs_c7, em_sbs_code_pos,
     em_sbs_result, em_sbs_stack, em_sbs_step, emulate_sbs, run_common_args_to_internal_params,
-    transaction_emulator_register_extmethod,
+    transaction_emulator_register_extmethod, transaction_emulator_sbs_get_control_register,
 };
 use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use num_bigint::BigInt;
 use serde::Deserialize;
 use std::ffi::{CString, c_void};
+use std::os::raw::c_int;
 use std::ptr::null;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -98,6 +99,17 @@ impl StepExecutor {
         let c7_cstr = unsafe { em_sbs_c7(self.inner) };
         let c7_str = unsafe { CString::from_raw(c7_cstr).to_string_lossy().to_string() };
         c7_str
+    }
+
+    pub fn get_control_register(&self, idx: usize) -> String {
+        let control_cstr =
+            unsafe { transaction_emulator_sbs_get_control_register(self.inner, idx as c_int) };
+        let control_str = unsafe {
+            CString::from_raw(control_cstr)
+                .to_string_lossy()
+                .to_string()
+        };
+        control_str
     }
 
     pub fn finish_transaction(&self) -> EmulationResult {

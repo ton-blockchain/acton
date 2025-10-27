@@ -218,6 +218,13 @@ impl AnyExecutor {
             AnyExecutor::Message(msg) => msg.get_c7(),
         }
     }
+
+    pub fn get_control_register(&self, idx: usize) -> String {
+        match self {
+            AnyExecutor::Get(get) => get.get_control_register(idx),
+            AnyExecutor::Message(msg) => msg.get_control_register(idx),
+        }
+    }
 }
 
 pub struct Context<'a> {

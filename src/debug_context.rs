@@ -18,6 +18,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
+use tycho_types::boc::Boc;
+use tycho_types::models::{OutAction, OutActionsRevIter};
 
 static VARIABLE_REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(1000);
 
@@ -30,6 +32,7 @@ pub struct DebugContext {
     pub dap_sender: Sender<DapMessage>,
     pub req_receiver: Receiver<Request>,
     pub tuple_variables: HashMap<i64, TupleItem>,
+    pub out_actions_variables: HashMap<i64, Vec<OutAction>>,
 }
 
 impl DebugContext {
@@ -56,6 +59,7 @@ impl DebugContext {
             dap_sender,
             req_receiver,
             tuple_variables: HashMap::new(),
+            out_actions_variables: HashMap::new(),
         }
     }
 
@@ -74,6 +78,7 @@ impl DebugContext {
             dap_sender,
             req_receiver: req_receiver.clone(),
             tuple_variables: HashMap::new(),
+            out_actions_variables: HashMap::new(),
         }
     }
 
@@ -141,6 +146,7 @@ impl DebugContext {
         self.pseudo_step = 0;
         self.current_executor_id -= 1;
         self.tuple_variables.clear();
+        self.out_actions_variables.clear();
         self.send_event(Event::Thread(ThreadEventBody {
             reason: ThreadEventReason::Exited,
             thread_id: id,
@@ -244,22 +250,48 @@ impl DebugContext {
                         })
                         .collect::<Vec<_>>()
                 } else if args.variables_reference == 2 {
+                    let mut variables = Vec::new();
+
+                    // c7 register
                     let c7 = executor.get_c7();
                     let c7_cell = &ArcCell::from_boc_b64(&c7)?;
                     let mut c7_slice = c7_cell.parser();
                     let c7_tuple = parse_tuple_item(&mut c7_slice)?;
                     let c7_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
                     self.tuple_variables.insert(c7_ref, c7_tuple.clone());
-                    vec![Variable {
+
+                    variables.push(Variable {
                         name: "c7".to_string(),
                         type_field: Some("tuple".to_string()),
                         value: format!("{}", c7_tuple),
                         variables_reference: c7_ref,
                         ..Default::default()
-                    }]
+                    });
+
+                    // c5 register (out actions)
+                    if let Ok(out_actions) = self.get_out_actions(executor) {
+                        let c5_ref =
+                            VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
+                        self.out_actions_variables
+                            .insert(c5_ref, out_actions.clone());
+
+                        variables.push(Variable {
+                            name: "c5".to_string(),
+                            type_field: Some("out_actions".to_string()),
+                            value: format!("{} out actions", out_actions.len()),
+                            variables_reference: c5_ref,
+                            ..Default::default()
+                        });
+                    }
+
+                    variables
                 } else if args.variables_reference > 2 {
                     if let Some(tuple_item) = self.tuple_variables.get(&args.variables_reference) {
                         self.build_tuple_children(&tuple_item.clone())
+                    } else if let Some(out_actions) =
+                        self.out_actions_variables.get(&args.variables_reference)
+                    {
+                        self.build_out_actions_children(out_actions)
                     } else {
                         vec![]
                     }
@@ -553,6 +585,58 @@ impl DebugContext {
             TupleItem::Tuple(_) => "tuple".to_string(),
             TupleItem::TypedTuple { type_name, .. } => type_name.clone(),
         }
+    }
+
+    fn get_out_actions(&self, executor: &AnyExecutor) -> anyhow::Result<Vec<OutAction>> {
+        let c5 = executor.get_control_register(5);
+        let c5_cell = &ArcCell::from_boc_b64(&c5)?;
+        let mut c5_slice = c5_cell.parser();
+
+        if let TupleItem::Cell(c5_tuple) = parse_tuple_item(&mut c5_slice)? {
+            let c5_cell = &Boc::decode_base64(&c5_tuple.to_boc_b64(false).unwrap())?;
+            let c5_slice = c5_cell.as_slice().unwrap();
+
+            let out_actions = OutActionsRevIter::new(c5_slice)
+                .filter_map(|action| action.ok())
+                .collect::<Vec<_>>();
+
+            Ok(out_actions)
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    fn build_out_actions_children(&self, out_actions: &[OutAction]) -> Vec<Variable> {
+        out_actions
+            .iter()
+            .enumerate()
+            .map(|(index, action)| {
+                let (action_type, value) = match action {
+                    OutAction::SendMsg { mode, out_msg } => (
+                        "SendMsg".to_string(),
+                        format!("mode: {:?}, msg: {:?}", mode, out_msg),
+                    ),
+                    OutAction::SetCode { new_code } => {
+                        ("SetCode".to_string(), format!("code: {:?}", new_code))
+                    }
+                    OutAction::ReserveCurrency { mode, value } => (
+                        "ReserveCurrency".to_string(),
+                        format!("mode: {:?}, value: {:?}", mode, value),
+                    ),
+                    OutAction::ChangeLibrary { mode, lib } => (
+                        "ChangeLibrary".to_string(),
+                        format!("mode: {:?}, lib: {:?}", mode, lib),
+                    ),
+                };
+
+                Variable {
+                    name: format!("[{}] {}", index, action_type),
+                    type_field: Some(action_type),
+                    value,
+                    ..Default::default()
+                }
+            })
+            .collect()
     }
 }
 

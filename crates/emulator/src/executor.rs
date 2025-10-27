@@ -224,6 +224,10 @@ unsafe extern "C" {
     pub fn em_sbs_code_pos(em: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
     pub fn em_sbs_stack(em: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
     pub fn em_sbs_c7(em: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
+    pub fn transaction_emulator_sbs_get_control_register(
+        tvm: *mut std::os::raw::c_void,
+        idx: std::os::raw::c_int,
+    ) -> *mut std::os::raw::c_char;
 }
 unsafe extern "C" {
     pub fn transaction_emulator_register_extmethod(

@@ -7,6 +7,7 @@ use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use crate::tuple::stack::{Tuple, serialize_tuple};
 use serde::Deserialize;
 use std::ffi::{CString, c_void};
+use std::os::raw::c_int;
 use tonlib_core::tlb_types::tlb::TLB;
 
 #[derive(Clone)]
@@ -94,6 +95,17 @@ impl StepGetExecutor {
         c7_str
     }
 
+    pub fn get_control_register(&self, idx: usize) -> String {
+        let control_cstr =
+            unsafe { tvm_emulator_sbs_get_control_register(self.inner, idx as c_int) };
+        let control_str = unsafe {
+            CString::from_raw(control_cstr)
+                .to_string_lossy()
+                .to_string()
+        };
+        control_str
+    }
+
     pub fn finish_get_method(&self) -> GetMethodResult {
         let result_cstr = unsafe { sbs_get_method_result(self.inner) };
 
@@ -123,6 +135,10 @@ unsafe extern "C" {
     pub fn sbs_step(tvm: *mut std::os::raw::c_void) -> bool;
     pub fn sbs_get_stack(tvm: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
     pub fn sbs_get_c7(tvm: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
+    pub fn tvm_emulator_sbs_get_control_register(
+        tvm: *mut std::os::raw::c_void,
+        idx: std::os::raw::c_int,
+    ) -> *mut std::os::raw::c_char;
     pub fn sbs_get_code_pos(tvm: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
     pub fn sbs_get_method_result(tvm: *mut std::os::raw::c_void) -> *mut std::os::raw::c_char;
     pub fn tvm_emulator_register_extmethod(
