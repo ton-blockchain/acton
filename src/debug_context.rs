@@ -12,7 +12,7 @@ use dap::types::{
     Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread, ThreadEventReason,
 };
 use emulator::tuple::stack::TupleItem;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::AtomicU64;
 use tolkc::source_map::{DebugLocation, HighLevelSourceMap, SourceMap};
 use tycho_types::models::{OutAction, OwnedRelaxedMessage, RelaxedMsgInfo, StateInit};
@@ -27,12 +27,158 @@ pub enum StepMode {
     Continue,
 }
 
-pub struct DebugContext {
+#[derive(Debug, Clone)]
+pub enum StepKind {
+    UnmappedAdvance,
+    Mapped,
+    SyntheticEnterFunction(String),
+    SyntheticAfterFunctionCall(String),
+    SyntheticEnterInlined(String),
+    SyntheticLeaveInlined(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct DebugStep {
+    pub kind: StepKind,
+    pub loc: Option<DebugLocation>,
+    pub thread_id: i64,
+}
+
+pub struct Stepper {
     pub executors: Vec<AnyExecutor>,
-    pub current_executor_id: usize,
     pub source_maps: Vec<SourceMap>,
-    pub locations: Vec<DebugLocation>,
-    pub pseudo_step: i64,
+    pub current_executor_id: usize,
+    pub buffers: Vec<VecDeque<DebugStep>>,
+    buffer: VecDeque<DebugStep>,
+    terminated: bool,
+    thread_id: i64,
+}
+
+impl Stepper {
+    pub fn new(executor: AnyExecutor, source_map: SourceMap, thread_id: i64) -> Self {
+        Stepper {
+            executors: vec![executor],
+            source_maps: vec![source_map],
+            current_executor_id: 0,
+            buffers: Vec::new(),
+            buffer: VecDeque::new(),
+            terminated: false,
+            thread_id,
+        }
+    }
+
+    pub fn push_executor(&mut self, executor: AnyExecutor, source_map: SourceMap) {
+        self.executors.push(executor);
+        self.source_maps.push(source_map);
+        self.buffers.push(self.buffer.clone());
+        self.current_executor_id += 1;
+        self.buffer = VecDeque::new();
+    }
+
+    pub fn pop_executor(&mut self) {
+        self.executors.pop();
+        self.source_maps.pop();
+        self.buffer = self.buffers.pop().unwrap_or(VecDeque::new());
+        if self.current_executor_id > 0 {
+            self.current_executor_id -= 1;
+        }
+        self.terminated = false
+    }
+
+    pub fn next(&mut self) -> Option<DebugStep> {
+        if let Some(step) = self.buffer.pop_front() {
+            return Some(step);
+        }
+        self.refill_from_vm()
+    }
+
+    fn refill_from_vm(&mut self) -> Option<DebugStep> {
+        if self.terminated {
+            return None;
+        }
+
+        loop {
+            let executor = self.executors[self.current_executor_id].clone();
+            let is_end = executor.step();
+            if is_end {
+                self.terminated = true;
+                return None;
+            }
+
+            let source_map = &self.source_maps[self.current_executor_id];
+            if let Some(locs) = get_locations(&executor, source_map) {
+                for loc in locs {
+                    let function_name = loc
+                        .clone()
+                        .context
+                        .event_function
+                        .unwrap_or(loc.context.containing_function.to_string())
+                        .clone();
+
+                    if let Some(event) = &loc.context.event
+                        && let Some(name) = loc.clone().context.event_function
+                    {
+                        println!("{}: {}", event, name);
+                    }
+
+                    let step = match loc.context.event.as_deref() {
+                        Some("EnterFunction") => DebugStep {
+                            kind: StepKind::SyntheticEnterFunction(function_name),
+                            loc: Some(loc),
+                            thread_id: self.thread_id,
+                        },
+                        Some("AfterFunctionCall") => DebugStep {
+                            kind: StepKind::SyntheticAfterFunctionCall(
+                                loc.clone()
+                                    .context
+                                    .event_function
+                                    .unwrap_or(loc.context.containing_function.to_string())
+                                    .clone(),
+                            ),
+                            loc: Some(loc),
+                            thread_id: self.thread_id,
+                        },
+                        Some("EnterInlinedFunction") => DebugStep {
+                            kind: StepKind::SyntheticEnterInlined(function_name),
+                            loc: Some(loc),
+                            thread_id: self.thread_id,
+                        },
+                        Some("LeaveInlinedFunction") => DebugStep {
+                            kind: StepKind::SyntheticLeaveInlined(function_name),
+                            loc: Some(loc),
+                            thread_id: self.thread_id,
+                        },
+                        _ => DebugStep {
+                            kind: StepKind::Mapped,
+                            loc: Some(loc),
+                            thread_id: self.thread_id,
+                        },
+                    };
+                    self.buffer.push_back(step);
+                }
+                return self.buffer.pop_front();
+            } else {
+                return Some(DebugStep {
+                    kind: StepKind::UnmappedAdvance,
+                    loc: None,
+                    thread_id: self.thread_id,
+                });
+            }
+        }
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.terminated
+    }
+
+    pub fn get_current_step(&self) -> Option<&DebugStep> {
+        self.buffer.front()
+    }
+}
+
+pub struct DebugContext {
+    pub stepper: Option<Stepper>,
+    pub last_step: Option<DebugStep>,
     pub dap_sender: Sender<DapMessage>,
     pub req_receiver: Receiver<Request>,
     pub tuple_variables: HashMap<i64, TupleItem>,
@@ -41,6 +187,7 @@ pub struct DebugContext {
     pub message_variables: HashMap<i64, OwnedRelaxedMessage>,
     pub msg_info_variables: HashMap<i64, RelaxedMsgInfo>,
     pub state_init_variables: HashMap<i64, StateInit>,
+    pub performing_step: Option<StepMode>,
 }
 
 impl DebugContext {
@@ -49,21 +196,8 @@ impl DebugContext {
         let (dap_sender, _) = unbounded::<DapMessage>();
 
         DebugContext {
-            executors: vec![],
-            current_executor_id: 0,
-            source_maps: vec![SourceMap {
-                debug_marks: HashMap::new(),
-                high_level: HighLevelSourceMap {
-                    version: "".to_string(),
-                    language: None,
-                    compiler_version: None,
-                    files: vec![],
-                    globals: vec![],
-                    locations: vec![],
-                },
-            }],
-            locations: vec![],
-            pseudo_step: 0,
+            stepper: None,
+            last_step: None,
             dap_sender,
             req_receiver,
             tuple_variables: HashMap::new(),
@@ -72,6 +206,7 @@ impl DebugContext {
             message_variables: HashMap::new(),
             msg_info_variables: HashMap::new(),
             state_init_variables: HashMap::new(),
+            performing_step: None,
         }
     }
 
@@ -81,12 +216,10 @@ impl DebugContext {
         req_receiver: &Receiver<Request>,
         dap_sender: Sender<DapMessage>,
     ) -> DebugContext {
+        let stepper = Stepper::new(executor, source_map.clone(), 1);
         DebugContext {
-            executors: vec![executor],
-            current_executor_id: 0,
-            source_maps: vec![(*source_map).clone()],
-            locations: vec![],
-            pseudo_step: 0,
+            stepper: Some(stepper),
+            last_step: None,
             dap_sender,
             req_receiver: req_receiver.clone(),
             tuple_variables: HashMap::new(),
@@ -95,6 +228,7 @@ impl DebugContext {
             message_variables: HashMap::new(),
             msg_info_variables: HashMap::new(),
             state_init_variables: HashMap::new(),
+            performing_step: None,
         }
     }
 
@@ -114,26 +248,32 @@ impl DebugContext {
         executor: AnyExecutor,
         source_map: Option<SourceMap>,
         name: String,
+        stop_on_entry: bool,
     ) -> anyhow::Result<()> {
-        self.executors.push(executor);
+        let sm = source_map.unwrap_or(SourceMap::default());
 
-        self.source_maps
-            .push(source_map.unwrap_or(SourceMap::default()));
+        if let Some(stepper) = &mut self.stepper {
+            stepper.push_executor(executor, sm);
+        } else {
+            self.stepper = Some(Stepper::new(executor, sm, id));
+        }
 
-        self.current_executor_id += 1;
         self.send_event(Event::Thread(ThreadEventBody {
             reason: ThreadEventReason::Started,
             thread_id: id,
         }))?;
-        self.send_event(Event::Stopped(StoppedEventBody {
-            reason: StoppedEventReason::Entry,
-            description: Some(name),
-            thread_id: Some(id),
-            preserve_focus_hint: None,
-            text: None,
-            all_threads_stopped: None,
-            hit_breakpoint_ids: None,
-        }))?;
+
+        if stop_on_entry {
+            self.send_event(Event::Stopped(StoppedEventBody {
+                reason: StoppedEventReason::Entry,
+                description: Some(name),
+                thread_id: Some(id),
+                preserve_focus_hint: None,
+                text: None,
+                all_threads_stopped: None,
+                hit_breakpoint_ids: None,
+            }))?;
+        }
 
         Ok(())
     }
@@ -144,11 +284,14 @@ impl DebugContext {
                 println!("Disconnecting: {:?}", req);
                 break;
             }
-            let is_end = self.on_request(req)?;
+            println!("Processing request: {:?}", req);
+            let is_end = self.on_request(req.clone())?;
             if is_end {
                 if terminate_at_end {
                     self.send_event(Event::Terminated(None))?;
                 }
+                println!("Processing request: {:?}", req);
+                println!("break");
                 break;
             }
         }
@@ -157,10 +300,11 @@ impl DebugContext {
     }
 
     pub fn finish_thread(&mut self, id: i64) -> anyhow::Result<()> {
-        self.executors.pop().unwrap();
-        self.locations = vec![];
-        self.pseudo_step = 0;
-        self.current_executor_id -= 1;
+        if let Some(stepper) = &mut self.stepper {
+            stepper.pop_executor();
+        }
+
+        self.last_step = None;
         self.tuple_variables.clear();
         self.out_actions_variables.clear();
         self.out_action_variables.clear();
@@ -183,10 +327,8 @@ impl DebugContext {
                 self.send_response(rsp)?;
                 self.send_event(Event::Initialized)?;
             }
-            Command::Launch(args) => {
-                println!("Launching {:?}", args);
-
-                self.step(StepMode::StepIn, true);
+            Command::Launch(_args) => {
+                self.step(StepMode::StepIn);
 
                 self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
@@ -247,38 +389,34 @@ impl DebugContext {
                 self.send_response(rsp)?;
             }
             Command::StackTrace(_args) => {
-                if self.locations.is_empty() {
-                    let rsp = req.success(ResponseBody::StackTrace(StackTraceResponse {
-                        stack_frames: vec![StackFrame {
+                let stack_frame = if let Some(step) = &self.last_step {
+                    if let Some(loc) = &step.loc {
+                        StackFrame {
+                            name: "script.tolk".to_string(),
+                            line: loc.loc.line + 1,
+                            column: loc.loc.column + 2,
+                            source: Some(Source {
+                                name: Some("script.tolk".to_string()),
+                                path: Some(
+                                    loc.loc
+                                        .file
+                                        .to_string()
+                                        .replace("_script.tolk", "")
+                                        .replace("_test.tolk_test.tolk", "_test.tolk"),
+                                ),
+                                ..Default::default()
+                            }),
                             ..Default::default()
-                        }],
-                        total_frames: None,
-                    }));
-                    self.send_response(rsp)?;
-                    return Ok(false);
+                        }
+                    } else {
+                        StackFrame::default()
+                    }
+                } else {
+                    StackFrame::default()
                 };
 
-                let current_loc = &self.locations[self.pseudo_step as usize];
-
                 let rsp = req.success(ResponseBody::StackTrace(StackTraceResponse {
-                    stack_frames: vec![StackFrame {
-                        name: "script.tolk".to_string(),
-                        line: current_loc.loc.line + 1,
-                        column: current_loc.loc.column + 2,
-                        source: Some(Source {
-                            name: Some("script.tolk".to_string()),
-                            path: Some(
-                                current_loc
-                                    .loc
-                                    .file
-                                    .to_string()
-                                    .replace("_script.tolk", "")
-                                    .replace("_test.tolk_test.tolk", "_test.tolk"),
-                            ),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    }],
+                    stack_frames: vec![stack_frame],
                     total_frames: None,
                 }));
                 self.send_response(rsp)?;
@@ -289,7 +427,7 @@ impl DebugContext {
                 }));
                 self.send_response(rsp)?;
 
-                let is_end = self.step(StepMode::Continue, false);
+                let is_end = self.step(StepMode::Continue);
                 if is_end {
                     return Ok(true);
                 }
@@ -298,7 +436,7 @@ impl DebugContext {
                 let rsp = req.success(ResponseBody::StepIn);
                 self.send_response(rsp)?;
 
-                let is_end = self.step(StepMode::StepIn, false);
+                let is_end = self.step(StepMode::StepIn);
                 if is_end {
                     return Ok(true);
                 }
@@ -317,7 +455,7 @@ impl DebugContext {
                 let rsp = req.success(ResponseBody::Next);
                 self.send_response(rsp)?;
 
-                let is_end = self.step(StepMode::StepOver, false);
+                let is_end = self.step(StepMode::StepOver);
                 if is_end {
                     return Ok(true);
                 }
@@ -336,7 +474,7 @@ impl DebugContext {
                 let rsp = req.success(ResponseBody::StepOut);
                 self.send_response(rsp)?;
 
-                let is_end = self.step(StepMode::StepOut, false);
+                let is_end = self.step(StepMode::StepOut);
                 if is_end {
                     return Ok(true);
                 }
@@ -362,272 +500,243 @@ impl DebugContext {
         Ok(false)
     }
 
-    pub(crate) fn step(&mut self, mode: StepMode, stop_on_first: bool) -> bool {
+    pub(crate) fn need_to_stop_child_thread_on_start(&self) -> bool {
+        self.performing_step == Some(StepMode::StepIn)
+    }
+
+    pub(crate) fn step(&mut self, mode: StepMode) -> bool {
         match mode {
-            StepMode::StepIn => self.step_in_impl(stop_on_first),
+            StepMode::StepIn => self.step_in_impl(),
             StepMode::StepOver => self.step_over_impl(),
             StepMode::StepOut => self.step_out_impl(),
             StepMode::Continue => self.continue_impl(),
         }
     }
 
-    fn step_in_impl(&mut self, stop_on_first: bool) -> bool {
-        if stop_on_first && !self.locations.is_empty() {
-            self.pseudo_step = 0;
-            return false;
-        }
+    fn step_in_impl(&mut self) -> bool {
+        self.performing_step = Some(StepMode::StepIn);
 
-        if self.has_next_synthetic_step() {
-            self.pseudo_step += 1;
-            return false;
-        }
+        let stepper = match &mut self.stepper {
+            Some(s) => s,
+            None => return true,
+        };
 
-        self.perform_real_step_until_mapped()
+        loop {
+            let step = match stepper.next() {
+                Some(s) => s,
+                None => return true,
+            };
+
+            match step.kind {
+                StepKind::UnmappedAdvance => continue,
+                _ => {
+                    self.last_step = Some(step);
+                    return false;
+                }
+            }
+        }
     }
 
     fn step_over_impl(&mut self) -> bool {
-        let current_loc = self.get_current_location();
-        let current_line = current_loc.as_ref().map(|loc| loc.loc.line);
+        self.performing_step = Some(StepMode::StepOver);
 
-        if !self.has_next_synthetic_step() {
-            let is_end = self.perform_real_step_until_mapped();
-            if is_end {
-                return true;
-            }
+        let current_line = self
+            .last_step
+            .as_ref()
+            .and_then(|s| s.loc.as_ref())
+            .map(|loc| loc.loc.line);
 
-            if let Some(line) = current_line {
-                self.skip_same_line_steps(line);
-            }
-            return false;
-        }
+        let stepper = match &mut self.stepper {
+            Some(s) => s,
+            None => return true,
+        };
 
-        let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
+        loop {
+            let step = match stepper.next() {
+                Some(s) => s,
+                None => return true,
+            };
 
-        if next_loc.context.event == Some("EnterInlinedFunction".to_string()) {
-            return self.skip_inlined_function();
-        }
-
-        if next_loc.context.event == Some("EnterFunction".to_string()) {
-            return self.skip_function();
-        }
-
-        self.pseudo_step += 1;
-
-        if let Some(current_line) = current_line {
-            let new_loc = self.get_current_location();
-            if let Some(new_loc) = new_loc {
-                if new_loc.loc.line == current_line {
-                    return self.step_over_impl();
+            match &step.kind {
+                StepKind::UnmappedAdvance => continue,
+                StepKind::SyntheticEnterInlined(func) => {
+                    match skip_inlined_function_new(stepper, func.clone(), current_line) {
+                        Some(next_step) => {
+                            self.last_step = Some(next_step);
+                            return false;
+                        }
+                        None => return true,
+                    }
                 }
+                StepKind::SyntheticEnterFunction(func) => {
+                    match skip_function_new(stepper, func.clone(), current_line) {
+                        Some(next_step) => {
+                            self.last_step = Some(next_step);
+                            return false;
+                        }
+                        None => return true,
+                    }
+                }
+                StepKind::Mapped => {
+                    if let Some(curr_line) = current_line
+                        && let Some(loc) = &step.loc
+                    {
+                        if loc.loc.line != curr_line {
+                            self.last_step = Some(step);
+                            return false;
+                        }
+                    } else {
+                        self.last_step = Some(step);
+                        return false;
+                    }
+                }
+                _ => {}
             }
         }
-
-        false
     }
 
     fn step_out_impl(&mut self) -> bool {
-        let current_loc = match self.get_current_location() {
-            Some(loc) => loc.clone(),
+        self.performing_step = Some(StepMode::StepIn);
+
+        let (current_function, current_line) = match &self.last_step {
+            Some(step) => match &step.loc {
+                Some(loc) => (loc.context.containing_function.clone(), loc.loc.line),
+                None => return self.continue_impl(),
+            },
             None => return self.continue_impl(),
         };
 
-        let current_function = current_loc.context.containing_function.clone();
-        let current_line = current_loc.loc.line;
+        let stepper = match &mut self.stepper {
+            Some(s) => s,
+            None => return true,
+        };
 
         loop {
-            if self.has_next_synthetic_step() {
-                let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
+            let step = match stepper.next() {
+                Some(s) => s,
+                None => return true,
+            };
 
-                if next_loc.context.event == Some("LeaveFunction".to_string())
-                    && next_loc.context.containing_function == current_function
-                {
-                    self.pseudo_step += 1;
-                    self.skip_same_line_steps(current_line);
+            match &step.kind {
+                StepKind::UnmappedAdvance => continue,
+                StepKind::SyntheticAfterFunctionCall(func) if func == &current_function => loop {
+                    let next_step = match stepper.next() {
+                        Some(s) => s,
+                        None => return true,
+                    };
 
-                    if self.has_next_synthetic_step() {
-                        self.pseudo_step += 1;
-                        return false;
-                    } else {
-                        let is_end = self.perform_real_step_until_mapped();
-                        if is_end {
-                            return true;
+                    match next_step.kind {
+                        StepKind::UnmappedAdvance => continue,
+                        StepKind::Mapped => {
+                            if let Some(loc) = &next_step.loc {
+                                if loc.loc.line != current_line {
+                                    self.last_step = Some(next_step);
+                                    return false;
+                                }
+                            }
                         }
-                        self.skip_same_line_steps(current_line);
-                        return false;
+                        _ => {
+                            self.last_step = Some(next_step);
+                            return false;
+                        }
                     }
-                }
-
-                self.pseudo_step += 1;
-            } else {
-                let is_end = self.perform_real_step_until_mapped();
-                if is_end {
-                    return true;
-                }
-
-                if let Some(new_loc) = self.get_current_location() {
-                    if new_loc.context.containing_function != current_function {
-                        self.skip_same_line_steps(current_line);
-                        return false;
-                    }
-                }
+                },
+                _ => {}
             }
         }
     }
 
     fn continue_impl(&mut self) -> bool {
-        loop {
-            let executor = self.executors[self.current_executor_id].clone();
-            let is_end = executor.step();
-            if is_end {
-                return true;
+        self.performing_step = Some(StepMode::Continue);
+
+        let stepper = match &mut self.stepper {
+            Some(s) => s,
+            None => return true,
+        };
+
+        while let Some(step) = stepper.next() {
+            if let Some(loc) = &step.loc {
+                println!("Continue step: {:?}", loc.idx);
             }
         }
+        true
     }
+}
 
-    fn has_next_synthetic_step(&self) -> bool {
-        (self.pseudo_step + 1) < self.locations.len() as i64
-    }
+fn skip_inlined_function_new(
+    stepper: &mut Stepper,
+    func_name: String,
+    current_line: Option<i64>,
+) -> Option<DebugStep> {
+    let mut depth = 1;
 
-    fn get_current_location(&self) -> Option<&DebugLocation> {
-        if self.pseudo_step >= 0 && (self.pseudo_step as usize) < self.locations.len() {
-            Some(&self.locations[self.pseudo_step as usize])
-        } else {
-            None
-        }
-    }
+    loop {
+        let step = match stepper.next() {
+            Some(s) => s,
+            None => return None,
+        };
 
-    fn skip_same_line_steps(&mut self, original_line: i64) {
-        while let Some(loc) = self.get_current_location() {
-            if loc.loc.line != original_line {
-                break;
-            }
-
-            if !self.has_next_synthetic_step() {
-                break;
-            }
-
-            self.pseudo_step += 1;
-        }
-    }
-
-    fn perform_real_step_until_mapped(&mut self) -> bool {
-        loop {
-            let executor = self.executors[self.current_executor_id].clone();
-            let is_end = executor.step();
-            if is_end {
-                return true;
-            }
-
-            let source_map = &self.source_maps[self.current_executor_id];
-            let locations = get_locations(&executor, source_map);
-
-            if let Some(locations) = locations {
-                self.locations = locations;
-                self.pseudo_step = 0;
-                return false;
-            }
-        }
-    }
-
-    fn skip_inlined_function(&mut self) -> bool {
-        let current_line = self.get_current_location().map(|loc| loc.loc.line);
-        let mut depth = 0;
-
-        loop {
-            if !self.has_next_synthetic_step() {
-                let is_end = self.perform_real_step_until_mapped();
-                if is_end {
-                    return true;
-                }
-                if let Some(line) = current_line {
-                    self.skip_same_line_steps(line);
-                }
-                continue;
-            }
-
-            let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
-
-            if next_loc.context.event == Some("EnterInlinedFunction".to_string()) {
+        match &step.kind {
+            StepKind::SyntheticEnterInlined(f) if f == &func_name => {
                 depth += 1;
-            } else if next_loc.context.event == Some("LeaveInlinedFunction".to_string()) {
-                if depth == 0 {
-                    self.pseudo_step += 1;
-                    if let Some(line) = current_line {
-                        self.skip_same_line_steps(line);
-                    }
-
-                    if self.has_next_synthetic_step() {
-                        self.pseudo_step += 1;
-                    } else {
-                        let is_end = self.perform_real_step_until_mapped();
-                        if is_end {
-                            return true;
-                        }
-                        if let Some(line) = current_line {
-                            self.skip_same_line_steps(line);
-                        }
-                    }
-                    return false;
-                }
-                depth -= 1;
             }
-
-            self.pseudo_step += 1;
+            StepKind::SyntheticLeaveInlined(f) if f == &func_name => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(step);
+                }
+            }
+            _ => {}
         }
     }
+}
 
-    fn skip_function(&mut self) -> bool {
-        let current_line = self.get_current_location().map(|loc| loc.loc.line);
-        let function_name = self.locations[(self.pseudo_step + 1) as usize]
-            .context
-            .containing_function
-            .clone();
-        let mut depth = 0;
+fn skip_function_new(
+    stepper: &mut Stepper,
+    func_name: String,
+    current_line: Option<i64>,
+) -> Option<DebugStep> {
+    let mut depth = 1;
 
-        loop {
-            if !self.has_next_synthetic_step() {
-                let is_end = self.perform_real_step_until_mapped();
-                if is_end {
-                    return true;
-                }
-                if let Some(line) = current_line {
-                    self.skip_same_line_steps(line);
-                }
-                continue;
-            }
+    loop {
+        let step = match stepper.next() {
+            Some(s) => s,
+            None => return None,
+        };
 
-            let next_loc = &self.locations[(self.pseudo_step + 1) as usize];
-
-            if next_loc.context.event == Some("EnterFunction".to_string())
-                && next_loc.context.containing_function == function_name
-            {
+        match &step.kind {
+            StepKind::SyntheticEnterFunction(f) if f == &func_name => {
                 depth += 1;
-            } else if next_loc.context.event == Some("LeaveFunction".to_string())
-                && next_loc.context.containing_function == function_name
-            {
-                if depth == 0 {
-                    self.pseudo_step += 1;
-                    if let Some(line) = current_line {
-                        self.skip_same_line_steps(line);
-                    }
-
-                    if self.has_next_synthetic_step() {
-                        self.pseudo_step += 1;
-                    } else {
-                        let is_end = self.perform_real_step_until_mapped();
-                        if is_end {
-                            return true;
-                        }
-                        if let Some(line) = current_line {
-                            self.skip_same_line_steps(line);
-                        }
-                    }
-                    return false;
-                }
-                depth -= 1;
             }
-
-            self.pseudo_step += 1;
+            StepKind::SyntheticAfterFunctionCall(f) if f == &func_name => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(step);
+                    // loop {
+                    //     let next_step = match stepper.next() {
+                    //         Some(s) => s,
+                    //         None => return None,
+                    //     };
+                    //
+                    //     match next_step.kind {
+                    //         StepKind::UnmappedAdvance => continue,
+                    //         StepKind::Mapped => {
+                    //             if let Some(curr_line) = current_line {
+                    //                 if let Some(loc) = &next_step.loc {
+                    //                     if loc.loc.line != curr_line {
+                    //                         return Some(next_step);
+                    //                     }
+                    //                 }
+                    //             } else {
+                    //                 return Some(next_step);
+                    //             }
+                    //         }
+                    //         _ => return Some(next_step),
+                    //     }
+                    // }
+                }
+            }
+            _ => {}
         }
     }
 }

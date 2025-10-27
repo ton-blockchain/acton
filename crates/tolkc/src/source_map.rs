@@ -80,6 +80,7 @@ pub struct EntryContext {
     pub description: EntryContextDescription,
     pub inlining: InliningInfo,
     pub event: Option<String>,
+    pub event_function: Option<String>,
     pub containing_function: String,
 }
 
@@ -183,15 +184,16 @@ fn get_real_code_hashes(code: &Cell) -> HashMap<String, (String, i32)> {
         builder.store_slice(kv.1);
         let v = builder.build().unwrap();
 
-        let idx_key = slice_to_string(&mut key_slice, 19);
+        let idx_key = slice_to_string(&mut key_slice.clone(), 19);
 
         let final_slice = get_final_slice(&dict_cell, &idx_key);
+        let original_slice = kv.1;
 
         r.insert(
             v.repr_hash().to_string().to_uppercase(),
             (
                 final_slice.repr_hash().to_string().to_uppercase(),
-                final_slice.bit_len() as i32 - key_slice.size_bits() as i32,
+                final_slice.bit_len() as i32 - original_slice.size_bits() as i32,
             ),
         );
     }

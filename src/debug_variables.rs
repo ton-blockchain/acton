@@ -20,8 +20,20 @@ impl DebugContext {
         &mut self,
         args: &&VariablesArguments,
     ) -> anyhow::Result<Vec<Variable>> {
-        let current_loc = &self.locations[self.pseudo_step as usize];
-        let executor = &self.executors[self.current_executor_id];
+        let current_loc = match &self.last_step {
+            Some(step) => match &step.loc {
+                Some(loc) => loc,
+                None => return Ok(vec![]),
+            },
+            None => return Ok(vec![]),
+        };
+
+        let stepper = match &self.stepper {
+            Some(s) => s,
+            None => return Ok(vec![]),
+        };
+
+        let executor = &stepper.executors[stepper.current_executor_id];
 
         let variables = if args.variables_reference == 1 {
             let stack = executor.get_stack();

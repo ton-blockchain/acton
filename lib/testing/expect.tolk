@@ -42,6 +42,7 @@ fun Expectation<T>.create(value: T, value_type: slice, location: slice = "") {
 /// ```tolk
 /// expect(10).toEqual(10);
 /// ```
+@noinline
 fun Expectation<T>.toEqual<U>(self, expected: U) {
     Assert.equal(self.value, expected, "expect(actual).toEqual(expected)", self.location);
 }
