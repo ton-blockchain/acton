@@ -1,5 +1,6 @@
 use crate::context::{BuildCache, KnownAddresses};
 use abi::ContractAbi;
+use num_bigint::BigInt;
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -14,38 +15,30 @@ use tycho_types::models::{
 
 /// Context for formatting TupleItems with rich information
 #[derive(Debug, Clone)]
-pub struct FormatterContext<'a> {
-    pub contract_abi: &'a ContractAbi,
-    pub accounts: &'a HashMap<String, ShardAccount>,
-    pub build_cache: &'a BuildCache,
-    pub known_addresses: &'a KnownAddresses,
+pub struct FormatterContext {
+    pub contract_abi: ContractAbi,
+    pub accounts: HashMap<String, ShardAccount>,
+    pub build_cache: BuildCache,
+    pub known_addresses: KnownAddresses,
 }
 
-impl<'a> FormatterContext<'a> {
-    /// Create formatter context from the main Context
-    pub fn from_context(ctx: &'a crate::context::Context) -> Self {
+impl FormatterContext {
+    pub fn empty() -> Self {
         Self {
-            contract_abi: &ctx.abi,
-            accounts: &ctx.blockchain.get_accounts(),
-            build_cache: &ctx.build_cache,
-            known_addresses: &ctx.known_addresses,
+            contract_abi: ContractAbi::default(),
+            accounts: HashMap::new(),
+            build_cache: BuildCache::new(),
+            known_addresses: KnownAddresses::new(),
         }
     }
 
-    /// Format a tuple item with the given type name
-    pub fn format_item_with_type(&self, item: &TupleItem, type_name: &str) -> String {
-        match item {
-            TupleItem::Int(value) if type_name == "bool" => {
-                if value == &num_bigint::BigInt::from(0) {
-                    "false".to_string()
-                } else if value == &num_bigint::BigInt::from(18446744073709551615u64) {
-                    "true".to_string()
-                } else {
-                    format!("{}", value)
-                }
-            }
-            TupleItem::Slice(slice) if type_name == "address" => self.format_slice(slice),
-            _ => format!("{}", item),
+    /// Create formatter context from the main Context
+    pub fn from_context(ctx: &crate::context::Context) -> Self {
+        Self {
+            contract_abi: ctx.abi.clone(),
+            accounts: ctx.blockchain.get_accounts().clone(),
+            build_cache: ctx.build_cache.clone(),
+            known_addresses: ctx.known_addresses.clone(),
         }
     }
 
@@ -77,7 +70,7 @@ impl<'a> FormatterContext<'a> {
     pub fn format_transaction_list(&self, items: &[TupleItem]) -> String {
         let item = &items[0];
         let TupleItem::Tuple(tx_items) = item else {
-            return format!("{}", items[0]);
+            return self.format(&items[0]);
         };
 
         let txs = tx_items
@@ -288,6 +281,23 @@ impl<'a> FormatterContext<'a> {
         "".to_string()
     }
 
+    pub fn format_tuple(&self, tuple: &Tuple) -> String {
+        if tuple.0.len() == 1 {
+            return self.format(&tuple.0[0]);
+        }
+
+        let mut res = "".to_string();
+        write!(res, "(").ok();
+        for (i, item) in tuple.0.iter().enumerate() {
+            if i > 0 {
+                write!(res, ", ").ok();
+            }
+            write!(res, "{}", self.format(item)).ok();
+        }
+        write!(res, ")").ok();
+        res
+    }
+
     /// Format any TupleItem with rich formatting
     pub fn format(&self, item: &TupleItem) -> String {
         let formatted = match item {
@@ -350,7 +360,7 @@ impl<'a> FormatterContext<'a> {
                     return self.format(&items[0]);
                 }
 
-                format!("{}", item)
+                format!("{}", self.format_tuple(&Tuple((*items).clone())))
             }
             TupleItem::Slice(cell) => {
                 if cell.bit_len() == 0 && cell.references().len() == 0 {
@@ -363,7 +373,31 @@ impl<'a> FormatterContext<'a> {
 
                 self.format_slice(cell)
             }
-            _ => format!("{}", item),
+            TupleItem::Int(value) => {
+                if *value == BigInt::from(18446744073709551615u64) {
+                    return "-1".to_string();
+                }
+                return format!("{}", value);
+            }
+            TupleItem::Null => return "null".to_string(),
+            TupleItem::Nan => return "NaN".to_string(),
+            TupleItem::Cell(cell) => cell.to_boc_hex(false).unwrap(),
+            TupleItem::Builder(cell) => cell.to_boc_hex(false).unwrap(),
+            TupleItem::Tuple(items) => {
+                if items.len() == 1 {
+                    return self.format(&items[0]);
+                }
+                let mut res = "".to_string();
+                write!(res, "(").ok();
+                for (i, item) in items.iter().enumerate() {
+                    if i > 0 {
+                        write!(res, ", ").ok();
+                    }
+                    write!(res, "{}", self.format(item)).ok();
+                }
+                write!(res, ")").ok();
+                return res;
+            }
         };
 
         formatted
@@ -408,7 +442,7 @@ impl<'a> FormatterContext<'a> {
         };
 
         let TupleItem::Tuple(items) = &items[0] else {
-            return format!("{}", items[0]);
+            return self.format(&items[0]);
         };
 
         let txs = items
@@ -465,7 +499,7 @@ impl<'a> FormatterContext<'a> {
     }
 }
 
-impl FormatterContext<'_> {
+impl FormatterContext {
     pub fn format_tuple_diff(
         &self,
         left: &Tuple,
@@ -477,7 +511,11 @@ impl FormatterContext<'_> {
         let right_items = &right.0;
 
         if left_type != right_type {
-            return format!("{} != {}", left, right);
+            return format!(
+                "{} != {}",
+                self.format_tuple(left),
+                self.format_tuple(right)
+            );
         }
 
         let abi = self.contract_abi.find_type(&left_type.to_string());
@@ -515,7 +553,11 @@ impl FormatterContext<'_> {
                 result.push_str("}");
                 result
             } else {
-                format!("{} != {}", left, right)
+                format!(
+                    "{} != {}",
+                    self.format_tuple(left),
+                    self.format_tuple(right)
+                )
             }
         } else {
             let mut result = "(\n".to_string();
@@ -528,17 +570,17 @@ impl FormatterContext<'_> {
                 match (left_val, right_val) {
                     (Some(left_val), Some(right_val)) => {
                         if left_val != right_val {
-                            result.push_str(&format!("    {},\n", left_val.red()));
-                            result.push_str(&format!("    {}\n", right_val.green()));
+                            result.push_str(&format!("    {},\n", self.format(left_val).red()));
+                            result.push_str(&format!("    {}\n", self.format(right_val).green()));
                         } else {
-                            result.push_str(&format!("    {},\n", left_val.dimmed()));
+                            result.push_str(&format!("    {},\n", self.format(left_val).dimmed()));
                         }
                     }
                     (Some(left_val), None) => {
-                        result.push_str(&format!("    {},\n", left_val.red()));
+                        result.push_str(&format!("    {},\n", self.format(left_val).red()));
                     }
                     (None, Some(right_val)) => {
-                        result.push_str(&format!("    {}\n", right_val.green()));
+                        result.push_str(&format!("    {}\n", self.format(right_val).green()));
                     }
                     (None, None) => {}
                 }

@@ -1,5 +1,4 @@
 use num_bigint::BigInt;
-use std::fmt;
 use std::ops::{Deref, DerefMut};
 use tonlib_core::cell::ArcCell;
 
@@ -60,23 +59,6 @@ impl Tuple {
         } else {
             BigInt::from(0)
         }));
-    }
-}
-
-impl fmt::Display for Tuple {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0.len() == 1 {
-            write!(f, "{}", self.0[0])
-        } else {
-            write!(f, "(")?;
-            for (i, item) in self.0.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{}", item)?;
-            }
-            write!(f, ")")
-        }
     }
 }
 

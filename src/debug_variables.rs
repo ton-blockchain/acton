@@ -3,7 +3,6 @@ use crate::debug_context::{DebugContext, VARIABLE_REFERENCE_COUNTER};
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
 use emulator::executor::StoreExt;
-use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
@@ -57,7 +56,7 @@ impl DebugContext {
                     Some(Variable {
                         name: variable.name.clone(),
                         type_field: Some(variable.var_type.clone()),
-                        value: format!("{}", typed_value),
+                        value: self.formatter_context.format(&typed_value),
                         ..Default::default()
                     })
                 })
@@ -101,7 +100,7 @@ impl DebugContext {
             variables.push(Variable {
                 name: "c7 (temporary data)".to_string(),
                 type_field: Some("tuple".to_string()),
-                value: format!("{}", c7_tuple),
+                value: self.formatter_context.format(&c7_tuple),
                 variables_reference: c7_ref,
                 ..Default::default()
             });
@@ -119,7 +118,7 @@ impl DebugContext {
                 .map(|(index, item)| Variable {
                     name: format!("s{}", index),
                     type_field: Some("stack_item".to_string()),
-                    value: format!("{}", item),
+                    value: self.formatter_context.format(item),
                     ..Default::default()
                 })
                 .collect::<Vec<_>>()
@@ -158,9 +157,8 @@ impl DebugContext {
                 .enumerate()
                 .map(|(index, item)| {
                     let item_ref = if Self::has_children(item) {
-                        let ref_id = crate::debug_context::VARIABLE_REFERENCE_COUNTER
-                            .fetch_add(1, Ordering::SeqCst)
-                            as i64;
+                        let ref_id =
+                            VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
                         self.tuple_variables.insert(ref_id, item.clone());
                         ref_id
                     } else {
@@ -169,7 +167,7 @@ impl DebugContext {
                     Variable {
                         name: format!("[{}]", index),
                         type_field: Some(Self::get_item_type(item)),
-                        value: format!("{}", item),
+                        value: self.formatter_context.format(item),
                         variables_reference: item_ref,
                         ..Default::default()
                     }
@@ -180,9 +178,8 @@ impl DebugContext {
                 .enumerate()
                 .map(|(index, item)| {
                     let item_ref = if Self::has_children(item) {
-                        let ref_id = crate::debug_context::VARIABLE_REFERENCE_COUNTER
-                            .fetch_add(1, Ordering::SeqCst)
-                            as i64;
+                        let ref_id =
+                            VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
                         self.tuple_variables.insert(ref_id, item.clone());
                         ref_id
                     } else {
@@ -191,7 +188,7 @@ impl DebugContext {
                     Variable {
                         name: format!("[{}]", index),
                         type_field: Some(Self::get_item_type(item)),
-                        value: format!("{}", item),
+                        value: self.formatter_context.format(item),
                         variables_reference: item_ref,
                         ..Default::default()
                     }

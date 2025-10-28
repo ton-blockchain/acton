@@ -441,10 +441,10 @@ fn run_all_tests(
             failed += 1;
 
             let formatter = FormatterContext {
-                contract_abi: abi,
-                accounts: &accounts,
-                build_cache: &build_cache,
-                known_addresses: &known_addresses,
+                contract_abi: abi.clone(),
+                accounts,
+                build_cache: build_cache.clone(),
+                known_addresses: known_addresses.clone(),
             };
 
             match &result.get_result {

@@ -1,5 +1,6 @@
 use crate::context::AnyExecutor;
 use crate::dap::DapMessage;
+use crate::formatter::FormatterContext;
 use anyhow::anyhow;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
@@ -206,6 +207,7 @@ pub struct DebugContext {
     pub performing_step: Option<StepMode>,
     pub breakpoints: HashMap<PathBuf, Vec<BreakpointInfo>>,
     pub next_breakpoint_id: i64,
+    pub formatter_context: FormatterContext,
 }
 
 impl DebugContext {
@@ -227,6 +229,7 @@ impl DebugContext {
             performing_step: None,
             breakpoints: HashMap::new(),
             next_breakpoint_id: 1,
+            formatter_context: FormatterContext::empty(),
         }
     }
 
@@ -251,6 +254,7 @@ impl DebugContext {
             performing_step: None,
             breakpoints: HashMap::new(),
             next_breakpoint_id: 1,
+            formatter_context: FormatterContext::empty(),
         }
     }
 
