@@ -9,7 +9,6 @@ abi = { path = "crates/abi" }
 tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }
 tolk_parser = { path = "crates/tolk_parser" }
-dap = { path = "crates/dap" }
 
 tonlib-core = "0.26.1"
 num-bigint = "0.4.6"
@@ -29,3 +28,4 @@ num-traits = "0.2.19"
 inquire = "0.7"
 thiserror = "2.0.17"
 crossbeam-channel = "0.5.15"
+dap = "0.4.1-alpha1"
