@@ -16,7 +16,7 @@ use emulator::tuple::stack::TupleItem;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
-use tolkc::source_map::{DebugLocation, SourceMap};
+use tolkc::source_map::{DebugLocation, EntryContextDescription, SourceMap};
 use tycho_types::models::{OutAction, OwnedRelaxedMessage, RelaxedMsgInfo, StateInit};
 
 pub static VARIABLE_REFERENCE_COUNTER: AtomicU64 = AtomicU64::new(1000);
@@ -302,18 +302,17 @@ impl DebugContext {
 
     pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
         for req in self.req_receiver.clone().iter() {
-            if let Command::Disconnect(req) = &req.command {
-                println!("Disconnecting: {:?}", req);
+            if let Command::Disconnect(args) = &req.command {
+                println!("Disconnecting: {:?}", args);
+                let rsp = req.success(ResponseBody::Disconnect);
+                self.send_response(rsp)?;
                 break;
             }
-            println!("Processing request: {:?}", req);
             let is_end = self.on_request(req.clone())?;
             if is_end {
                 if terminate_at_end {
                     self.send_event(Event::Terminated(None))?;
                 }
-                println!("Processing request: {:?}", req);
-                println!("break");
                 break;
             }
         }
@@ -406,9 +405,17 @@ impl DebugContext {
             Command::StackTrace(_args) => {
                 let stack_frame = if let Some(step) = &self.last_step {
                     if let Some(loc) = &step.loc {
+                        let line_offset = if let EntryContextDescription::Basic { ast_kind } =
+                            &loc.context.description
+                            && ast_kind == "ast_function_declaration"
+                        {
+                            1
+                        } else {
+                            0
+                        };
                         StackFrame {
                             name: "script.tolk".to_string(),
-                            line: loc.loc.line + 1,
+                            line: loc.loc.line + 1 + line_offset,
                             column: loc.loc.column + 2,
                             source: Some(Source {
                                 name: Some("script.tolk".to_string()),

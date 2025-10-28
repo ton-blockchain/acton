@@ -2,10 +2,13 @@ use crate::context::{
     AnyExecutor, AssertFailure, BuildCache, Context, KnownAddresses,
     TransactionGenericAssertFailure,
 };
+use crate::dap::DapMessage;
 use crate::debug_context::DebugContext;
 use crate::{asserts_exts, exts, io_exts};
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
+use crossbeam_channel::{Receiver, Sender, unbounded};
+use dap::prelude::Request;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::exit_codes;
@@ -178,6 +181,10 @@ fn find_test_files_recursively(dir_path: &str) -> Result<Vec<String>, anyhow::Er
             let path = entry.path();
 
             if path.is_dir() {
+                if path.file_name() == Some("node_modules".as_ref()) {
+                    return Ok(());
+                }
+
                 visit_dir(&path, test_files)?;
             } else if let Some(file_name) = path.file_name() {
                 if file_name.to_string_lossy().ends_with("_test.tolk") {
@@ -329,6 +336,14 @@ fn run_all_tests(
     let mut build_cache = BuildCache::new();
     let mut known_addresses = KnownAddresses::new();
 
+    let (req_receiver, dap_sender) = if debug {
+        crate::dap::start_dap_server()
+    } else {
+        let (_, req_receiver) = unbounded::<Request>();
+        let (dap_message_sender, _) = unbounded::<DapMessage>();
+        (req_receiver, dap_message_sender)
+    };
+
     for test in filtered_tests.iter() {
         if teamcity {
             TeamcityReporter::on_test_started(&test.name, file_path);
@@ -371,6 +386,8 @@ fn run_all_tests(
             abi,
             source_map,
             debug,
+            req_receiver.clone(),
+            dap_sender.clone(),
         );
         let duration = start_time.elapsed();
         let TestResult {
@@ -720,6 +737,8 @@ fn execute_test(
     abi: &ContractAbi,
     source_map: &SourceMap,
     debug: bool,
+    req_receiver: Receiver<Request>,
+    dap_sender: Sender<DapMessage>,
 ) -> TestResult {
     // thread::sleep(Duration::from_secs(2));
 
@@ -764,8 +783,6 @@ fn execute_test(
         exts::register_extensions(&mut get_executor, &mut ctx);
         io_exts::register_extensions(&mut get_executor, &mut ctx);
         asserts_exts::register_extensions(&mut get_executor, &mut ctx);
-
-        let (req_receiver, dap_sender) = crate::dap::start_dap_server();
 
         let mut dbg_ctx = DebugContext::new(
             AnyExecutor::Get(get_executor.clone()),

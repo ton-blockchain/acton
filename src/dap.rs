@@ -1,4 +1,4 @@
-use crossbeam_channel::{Receiver, Sender, unbounded};
+use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
 use dap::errors::{DeserializationError, ServerError};
 use dap::events::Event;
 use dap::prelude::{Request, Response, Server};
