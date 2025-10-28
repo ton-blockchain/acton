@@ -82,7 +82,23 @@ impl FormatterContext {
             return self.format(&items[0]);
         };
 
-        let send_results = tx_items
+        let send_results = self.parse_send_results(tx_items);
+        let known_contracts = self.collect_known_contracts(&send_results);
+        let contract_letters = self.create_contract_letters(&known_contracts);
+
+        let mut builder = String::new();
+        for send_result in send_results {
+            let tx_formatted = self.format_single_transaction(&send_result, &contract_letters);
+            builder.push_str(&tx_formatted);
+            builder.push_str("\n");
+        }
+
+        builder
+    }
+
+    /// Parse transaction items into SendResult structures
+    fn parse_send_results(&self, tx_items: &[TupleItem]) -> Vec<SendResult> {
+        tx_items
             .iter()
             .filter_map(|el| match el {
                 TupleItem::Tuple(tuple) => match (
@@ -129,13 +145,14 @@ impl FormatterContext {
                 },
                 _ => None,
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    }
 
-        let mut builder = String::new();
-
+    /// Collect all known contract addresses from send results
+    fn collect_known_contracts(&self, send_results: &[SendResult]) -> Vec<IntAddr> {
         let mut known_contracts: Vec<IntAddr> = vec![];
 
-        for send_result in &send_results {
+        for send_result in send_results {
             let in_msg = send_result.tx.load_in_msg().unwrap();
             if let Some(in_msg) = &in_msg
                 && let MsgInfo::Int(info) = &in_msg.info
@@ -150,6 +167,11 @@ impl FormatterContext {
             }
         }
 
+        known_contracts
+    }
+
+    /// Create letter mappings for contract addresses
+    fn create_contract_letters(&self, known_contracts: &[IntAddr]) -> HashMap<IntAddr, String> {
         let mut contract_letters: HashMap<IntAddr, String> = HashMap::new();
 
         for (index, addr) in known_contracts.iter().enumerate() {
@@ -158,130 +180,132 @@ impl FormatterContext {
             contract_letters.insert(addr.clone(), letter.to_string());
         }
 
-        for send_result in send_results {
-            let tx = send_result.tx;
-            let mut tx_builder = "\x1b[0m".to_string();
+        contract_letters
+    }
 
-            tx_builder += "\x1b[0m";
-            let in_msg = tx.load_in_msg().unwrap();
-            if let Some(in_msg) = &in_msg
-                && let MsgInfo::Int(info) = &in_msg.info
-            {
-                if info.bounced {
-                    tx_builder += "(!) ".red().to_string().as_str()
-                }
+    /// Format a single transaction
+    fn format_single_transaction(
+        &self,
+        send_result: &SendResult,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
+        let tx = &send_result.tx;
+        let mut tx_builder = "\x1b[0m".to_string();
 
-                let mut body = in_msg.body.clone();
-                let mut opcode = body.load_u32().unwrap_or(0);
-                if opcode == 0xFFFFFFFF {
-                    // if bounce read another 32 bit to get actual opcode
-                    opcode = body.load_u32().unwrap_or(0);
-                }
-
-                let message_abi = self
-                    .contract_abi
-                    .messages
-                    .iter()
-                    .find(|msg| msg.opcode != Some(0) && msg.opcode == Some(opcode));
-
-                let amount = info.value.tokens.into_inner() as f64 / 1e9;
-
-                let src_contract_type = self.get_contract_type(&info.src);
-                if src_contract_type != "" {
-                    tx_builder += format!("{}", src_contract_type.cyan()).as_str();
-                } else {
-                    tx_builder += Self::format_addr_hash(&info.src)
-                        .dimmed()
-                        .to_string()
-                        .as_str();
-                }
-
-                let letter = contract_letters.get(&info.src);
-                if let Some(letter) = letter {
-                    tx_builder += format!(" {}  ", letter.bold()).as_str();
-                }
-
-                tx_builder += " ";
-                tx_builder += "-> ";
-
-                if let Some(message_abi) = message_abi {
-                    tx_builder += message_abi
-                        .name
-                        .as_str()
-                        .purple()
-                        .bold()
-                        .to_string()
-                        .as_str();
-                } else if opcode == 0 {
-                    tx_builder += "empty".purple().bold().to_string().as_str();
-                } else {
-                    tx_builder += format!("0x{:x}", opcode)
-                        .purple()
-                        .bold()
-                        .to_string()
-                        .as_str();
-                }
-                tx_builder += " ";
-
-                tx_builder += &format!("{} TON", amount.to_string()).green().to_string();
-                tx_builder += " -> ";
-
-                let dst_contract_type = self.get_contract_type(&info.dst);
-                if dst_contract_type != "" {
-                    tx_builder += format!("{}", dst_contract_type.cyan()).as_str();
-                } else {
-                    tx_builder += Self::format_addr_hash(&info.dst)
-                        .dimmed()
-                        .to_string()
-                        .as_str();
-                }
-
-                let letter = contract_letters.get(&info.dst);
-                if let Some(letter) = letter {
-                    tx_builder += format!(" {}  ", letter.bold()).as_str();
-                }
+        tx_builder += "\x1b[0m";
+        let in_msg = tx.load_in_msg().unwrap();
+        if let Some(in_msg) = &in_msg
+            && let MsgInfo::Int(info) = &in_msg.info
+        {
+            if info.bounced {
+                tx_builder += "(!) ".red().to_string().as_str()
             }
 
-            let TxInfo::Ordinary(info) = tx.load_info().unwrap() else {
-                panic!("tick-tock message is unexpected")
-            };
+            let mut body = in_msg.body.clone();
+            let mut opcode = body.load_u32().unwrap_or(0);
+            if opcode == 0xFFFFFFFF {
+                // if bounce read another 32 bit to get actual opcode
+                opcode = body.load_u32().unwrap_or(0);
+            }
 
-            if let ComputePhase::Executed(compute) = info.compute_phase {
-                tx_builder += format!(" gas={}", compute.gas_used.to_string().as_str())
+            let message_abi = self
+                .contract_abi
+                .messages
+                .iter()
+                .find(|msg| msg.opcode != Some(0) && msg.opcode == Some(opcode));
+
+            let amount = info.value.tokens.into_inner() as f64 / 1e9;
+
+            let src_contract_type = self.get_contract_type(&info.src);
+            if src_contract_type != "" {
+                tx_builder += format!("{}", src_contract_type.cyan()).as_str();
+            } else {
+                tx_builder += Self::format_addr_hash(&info.src)
                     .dimmed()
                     .to_string()
                     .as_str();
-
-                if compute.exit_code != 0 {
-                    tx_builder += format!(" exit_code={}", compute.exit_code)
-                        .red()
-                        .to_string()
-                        .as_str();
-                }
-
-                if tx.orig_status == AccountStatus::NotExists
-                    && tx.end_status == AccountStatus::Active
-                {
-                    tx_builder += "\n";
-                    tx_builder += "└─".dimmed().to_string().as_str();
-                    tx_builder += " account created";
-                }
-                if tx.orig_status == AccountStatus::Active
-                    && tx.end_status == AccountStatus::NotExists
-                {
-                    tx_builder += "\n";
-                    tx_builder += "└─".dimmed().to_string().as_str();
-                    tx_builder += " account destroyed"
-                }
-            } else {
-                tx_builder += format!(" {}", "compute phase skipped".dimmed()).as_str();
             }
 
-            builder.push_str(&tx_builder);
-            builder.push_str("\n");
+            let letter = contract_letters.get(&info.src);
+            if let Some(letter) = letter {
+                tx_builder += format!(" {}  ", letter.bold()).as_str();
+            }
+
+            tx_builder += " ";
+            tx_builder += "-> ";
+
+            if let Some(message_abi) = message_abi {
+                tx_builder += message_abi
+                    .name
+                    .as_str()
+                    .purple()
+                    .bold()
+                    .to_string()
+                    .as_str();
+            } else if opcode == 0 {
+                tx_builder += "empty".purple().bold().to_string().as_str();
+            } else {
+                tx_builder += format!("0x{:x}", opcode)
+                    .purple()
+                    .bold()
+                    .to_string()
+                    .as_str();
+            }
+            tx_builder += " ";
+
+            tx_builder += &format!("{} TON", amount.to_string()).green().to_string();
+            tx_builder += " -> ";
+
+            let dst_contract_type = self.get_contract_type(&info.dst);
+            if dst_contract_type != "" {
+                tx_builder += format!("{}", dst_contract_type.cyan()).as_str();
+            } else {
+                tx_builder += Self::format_addr_hash(&info.dst)
+                    .dimmed()
+                    .to_string()
+                    .as_str();
+            }
+
+            let letter = contract_letters.get(&info.dst);
+            if let Some(letter) = letter {
+                tx_builder += format!(" {}  ", letter.bold()).as_str();
+            }
         }
 
-        builder
+        let TxInfo::Ordinary(info) = tx.load_info().unwrap() else {
+            panic!("tick-tock message is unexpected")
+        };
+
+        if let ComputePhase::Executed(compute) = info.compute_phase {
+            tx_builder += format!(" gas={}", compute.gas_used.to_string().as_str())
+                .dimmed()
+                .to_string()
+                .as_str();
+
+            if compute.exit_code != 0 {
+                tx_builder += format!(" exit_code={}", compute.exit_code)
+                    .red()
+                    .to_string()
+                    .as_str();
+            }
+
+            if tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active
+            {
+                tx_builder += "\n";
+                tx_builder += "└─".dimmed().to_string().as_str();
+                tx_builder += " account created";
+            }
+            if tx.orig_status == AccountStatus::Active && tx.end_status == AccountStatus::NotExists
+            {
+                tx_builder += "\n";
+                tx_builder += "└─".dimmed().to_string().as_str();
+                tx_builder += " account destroyed"
+            }
+        } else {
+            tx_builder += format!(" {}", "compute phase skipped".dimmed()).as_str();
+        }
+
+        tx_builder
     }
 
     /// Get contract type for address
