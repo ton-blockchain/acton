@@ -23,7 +23,7 @@ fun JettonWallet.getJettonBalance(self): coins {
     return result.jettonBalance
 }
 
-fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int, recepient: address, responseAddress: address, customPayload: cell?, forwardTonAmount: int, forwardPayload: cell?): TransactionList {
+fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int, recepient: address, responseAddress: address, customPayload: cell?, forwardTonAmount: int, forwardPayload: cell?): SendResultList {
     val msg = createMessage({
         bounce: true,
         value: value,
@@ -41,7 +41,7 @@ fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
-fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, responseAddress: address, customPayload: cell?): TransactionList {
+fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, responseAddress: address, customPayload: cell?): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: value,
@@ -56,7 +56,7 @@ fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, re
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
-fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, includeOwnerAddress: bool): TransactionList {
+fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, includeOwnerAddress: bool): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: ton("0.1"),
@@ -70,7 +70,7 @@ fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, inclu
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
-fun JettonMinter.sendChangeContent(self, from: address, newContent: cell): TransactionList {
+fun JettonMinter.sendChangeContent(self, from: address, newContent: cell): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: ton("0.1"),

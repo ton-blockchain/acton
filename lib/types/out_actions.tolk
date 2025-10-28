@@ -100,9 +100,12 @@ fun OutMessage.outActions(self, mode: int): OutActionList {
 }
 
 fun vm.outActions(): OutActionList {
-    var result = createEmptyTuple();
+    return vm.parseOutActions(vm.getC5())
+}
 
-    val root = vm.getC5() as Cell<OutList>;
+fun vm.parseOutActions(cell: cell): OutActionList {
+    var result = createEmptyTuple();
+    val root = cell as Cell<OutList>;
     var next: Cell<OutList>? = root;
 
     while (next != null) {

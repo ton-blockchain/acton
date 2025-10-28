@@ -1,5 +1,6 @@
 import "expect"
 import "assert"
+import "../emulation/network"
 import "../ffi/ffi"
 import "../types/transaction"
 
@@ -30,7 +31,7 @@ struct SearchParams {
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<TransactionList>.toHaveSuccessfulDeploy(self, params: SearchParams) {
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy(self, params: SearchParams) {
     params.exit_code = 0;
     params.deploy = true;
 
@@ -58,7 +59,7 @@ fun Expectation<TransactionList>.toHaveSuccessfulDeploy(self, params: SearchPara
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<TransactionList>.toHaveSuccessfulTx(self, params: SearchParams) {
+fun Expectation<SendResultList>.toHaveSuccessfulTx(self, params: SearchParams) {
     if (params.exit_code == null) {
         params.exit_code = 0;
     }
@@ -84,7 +85,7 @@ fun Expectation<TransactionList>.toHaveSuccessfulTx(self, params: SearchParams) 
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<TransactionList>.toNotHaveTx(self, params: SearchParams) {
+fun Expectation<SendResultList>.toNotHaveTx(self, params: SearchParams) {
     val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
     if (tx != null) {
         ffi.failToNotFindTransactionByParams(
@@ -106,7 +107,7 @@ fun Expectation<TransactionList>.toNotHaveTx(self, params: SearchParams) {
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<TransactionList>.toHaveBouncedTx(self, params: SearchParams) {
+fun Expectation<SendResultList>.toHaveBouncedTx(self, params: SearchParams) {
     params.bounced = true;
 
     val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
@@ -132,7 +133,7 @@ fun Expectation<TransactionList>.toHaveBouncedTx(self, params: SearchParams) {
 ///     exit_code: 123,
 /// });
 /// ```
-fun Expectation<TransactionList>.toHaveFailedTx(self, params: SearchParams) {
+fun Expectation<SendResultList>.toHaveFailedTx(self, params: SearchParams) {
     if (params.exit_code == null) {
         Assert.fail("expect(<actual>).toHaveFailedTx(params) must have not null exit_code parameter in params");
     }

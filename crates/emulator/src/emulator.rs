@@ -3,9 +3,8 @@ use crate::executor::{
     EmulationResult, Executor, ExecutorVerbosity, ResultError, RunTransactionArgs, StoreExt,
 };
 use num_bigint::BigInt;
-use serde::Deserialize;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, Load};
+use tycho_types::cell::{Cell, Load, Store};
 use tycho_types::models::{
     IntAddr, Message, MsgInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount, Transaction,
 };
@@ -14,19 +13,20 @@ pub struct Emulator {
     pub executor: Executor,
 }
 
-#[derive(Deserialize, Clone)]
-#[serde(untagged)]
+#[derive(Clone)]
 pub enum SendMessageResult {
     Success(SendMessageResultSuccess),
     Error(ResultError),
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Clone)]
 pub struct SendMessageResultSuccess {
     pub raw_transaction: String,
     pub transaction: Transaction,
     pub parent_transaction: Option<Transaction>,
+    pub child_transactions: Vec<u64>,
     pub shard_account: ShardAccount,
+    pub out_messages: Vec<Cell>,
     pub vm_log: String,
     pub actions: Option<String>,
 }
@@ -82,22 +82,54 @@ impl Emulator {
         let mut tx_slice = tx_cell.as_slice().unwrap();
         let transaction = Transaction::load_from(&mut tx_slice).unwrap();
 
+        let out_messages = transaction
+            .iter_out_msgs()
+            .filter_map(|it| it.ok())
+            .map(|it| it.to_cell())
+            .collect::<Vec<_>>();
+
         let send_result = SendMessageResultSuccess {
             raw_transaction: result.transaction,
             transaction: transaction.clone(),
             parent_transaction: None,
+            child_transactions: vec![],
             shard_account,
+            out_messages,
             vm_log: result.vm_log,
             actions: result.actions,
         };
 
-        std::iter::once(SendMessageResult::Success(send_result))
+        let mut all_results = std::iter::once(SendMessageResult::Success(send_result.clone()))
             .chain(transaction.iter_out_msgs().flat_map(|msg| {
                 let Ok(msg) = msg else { return vec![] };
-                let send_results = self.send_message(net, msg.to_cell(), None);
+                let mut send_results = self.send_message(net, msg.to_cell(), None);
+                for result in &mut send_results {
+                    match result {
+                        SendMessageResult::Success(result) => {
+                            result.parent_transaction = Some(transaction.clone());
+                        }
+                        SendMessageResult::Error(_) => {}
+                    }
+                }
+
                 send_results
             }))
-            .collect()
+            .collect::<Vec<_>>();
+
+        let child_txs = all_results
+            .iter()
+            .skip(1)
+            .filter_map(|result| match result {
+                SendMessageResult::Success(result) => Some(result.transaction.lt),
+                SendMessageResult::Error(_) => None,
+            })
+            .collect();
+
+        if let Some(SendMessageResult::Success(result)) = all_results.get_mut(0) {
+            result.child_transactions = child_txs;
+        }
+
+        all_results
     }
 
     /// Set custom `src` address if it is None.

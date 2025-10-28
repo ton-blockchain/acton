@@ -233,7 +233,10 @@ pub fn process_txs_and_search_params(
         .0
         .iter()
         .filter_map(|el| match el {
-            TupleItem::Cell(cell) => Some(cell),
+            TupleItem::Tuple(tuple) => match &tuple[0] {
+                TupleItem::Cell(cell) => Some(cell),
+                _ => None,
+            },
             _ => None,
         })
         .map(|x| {

@@ -1,6 +1,7 @@
 use crate::context::{BuildCache, KnownAddresses};
 use abi::ContractAbi;
 use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -12,6 +13,14 @@ use tycho_types::cell::{Cell, Load};
 use tycho_types::models::{
     AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, ShardAccount, Transaction, TxInfo,
 };
+
+struct SendResult {
+    tx: Transaction,
+    children_ids: Vec<i64>,
+    parent_lt: Option<i64>,
+    actions: ArcCell,
+    out_messages: Vec<ArcCell>,
+}
 
 /// Context for formatting TupleItems with rich information
 #[derive(Debug, Clone)]
@@ -73,17 +82,52 @@ impl FormatterContext {
             return self.format(&items[0]);
         };
 
-        let txs = tx_items
+        let send_results = tx_items
             .iter()
             .filter_map(|el| match el {
-                TupleItem::Cell(cell) => Some(cell),
+                TupleItem::Tuple(tuple) => match (
+                    tuple[0].clone(),
+                    tuple[1].clone(),
+                    tuple[3].clone(),
+                    tuple[4].clone(),
+                ) {
+                    (
+                        TupleItem::Cell(tx),
+                        TupleItem::Tuple(child_ids),
+                        TupleItem::Cell(actions),
+                        TupleItem::Tuple(out_messages),
+                    ) => {
+                        let result = tx.to_boc_b64(false).unwrap();
+                        let tx_cell: Cell = Boc::decode_base64(&result).unwrap();
+                        let mut tx_slice = tx_cell.as_slice().unwrap();
+                        let tx = Transaction::load_from(&mut tx_slice).unwrap();
+                        Some(SendResult {
+                            tx,
+                            children_ids: child_ids
+                                .iter()
+                                .filter_map(|id| match id {
+                                    TupleItem::Int(int) => int.to_i64(),
+                                    _ => None,
+                                })
+                                .collect(),
+                            parent_lt: match tuple[2].clone() {
+                                TupleItem::Null => None,
+                                TupleItem::Int(int) => int.to_i64(),
+                                _ => None,
+                            },
+                            actions,
+                            out_messages: out_messages
+                                .iter()
+                                .filter_map(|msg| match msg {
+                                    TupleItem::Cell(cell) => Some(cell.clone()),
+                                    _ => None,
+                                })
+                                .collect(),
+                        })
+                    }
+                    _ => None,
+                },
                 _ => None,
-            })
-            .map(|x| {
-                let result = x.to_boc_b64(false).unwrap();
-                let tx_cell: Cell = Boc::decode_base64(&result).unwrap();
-                let mut tx_slice = tx_cell.as_slice().unwrap();
-                Transaction::load_from(&mut tx_slice).unwrap()
             })
             .collect::<Vec<_>>();
 
@@ -91,8 +135,8 @@ impl FormatterContext {
 
         let mut known_contracts: Vec<IntAddr> = vec![];
 
-        for tx in &txs {
-            let in_msg = tx.load_in_msg().unwrap();
+        for send_result in &send_results {
+            let in_msg = send_result.tx.load_in_msg().unwrap();
             if let Some(in_msg) = &in_msg
                 && let MsgInfo::Int(info) = &in_msg.info
             {
@@ -114,7 +158,8 @@ impl FormatterContext {
             contract_letters.insert(addr.clone(), letter.to_string());
         }
 
-        for tx in txs {
+        for send_result in send_results {
+            let tx = send_result.tx;
             let mut tx_builder = "\x1b[0m".to_string();
 
             tx_builder += "\x1b[0m";
@@ -309,7 +354,7 @@ impl FormatterContext {
                     return type_name.clone();
                 }
 
-                if type_name == "TransactionList" && items.len() == 1 {
+                if type_name == "SendResultList" && items.len() == 1 {
                     return self.format_transaction_list(items);
                 }
 

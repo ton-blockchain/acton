@@ -216,7 +216,9 @@ fn send_message_from_impl(
             raw_transaction: result.transaction,
             transaction: transaction.clone(),
             parent_transaction: None,
+            child_transactions: vec![],
             shard_account,
+            out_messages: vec![],
             vm_log: result.vm_log,
             actions: result.actions,
         };
@@ -233,8 +235,54 @@ fn send_message_from_impl(
 
     let transaction_cells = successful_emulations
         .iter()
-        .filter_map(|emulation| ArcCell::from_boc_b64(&*emulation.raw_transaction).ok())
-        .map(|tx| TupleItem::Cell(tx))
+        .filter_map(|emulation| {
+            let Ok(tx) = ArcCell::from_boc_b64(&*emulation.raw_transaction) else {
+                return None;
+            };
+            let child_txs = Tuple(
+                emulation
+                    .child_transactions
+                    .iter()
+                    .map(|lt| TupleItem::Int(BigInt::from(*lt)))
+                    .collect::<Vec<_>>(),
+            );
+            let parent_lt = match &emulation.parent_transaction {
+                Some(parent_tx) => TupleItem::Int(BigInt::from(parent_tx.lt)),
+                None => TupleItem::Null,
+            };
+            let actions = match &emulation.actions {
+                Some(actions_b64) => {
+                    ArcCell::from_boc_b64(actions_b64).unwrap_or_else(|_| ArcCell::default())
+                }
+                None => ArcCell::default(),
+            };
+
+            let result = tx.to_boc_b64(false).unwrap();
+            let tx_cell: Cell = Boc::decode_base64(&result).unwrap();
+            let mut tx_slice = tx_cell.as_slice().unwrap();
+            let parsed_tx = Transaction::load_from(&mut tx_slice).unwrap();
+
+            let out_messages = Tuple(
+                parsed_tx
+                    .iter_out_msgs()
+                    .filter_map(|msg| msg.ok())
+                    .filter_map(|msg| {
+                        let cell = msg.to_cell();
+                        let boc = Boc::encode_base64(&cell);
+                        ArcCell::from_boc_b64(&boc).ok()
+                    })
+                    .map(|cell| TupleItem::Cell(cell))
+                    .collect::<Vec<_>>(),
+            );
+
+            Some(TupleItem::Tuple(Tuple(vec![
+                TupleItem::Cell(tx),
+                TupleItem::Tuple(child_txs),
+                parent_lt,
+                TupleItem::Cell(actions),
+                TupleItem::Tuple(out_messages),
+            ])))
+        })
         .collect::<Vec<_>>();
     stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
 }

@@ -1,6 +1,11 @@
+import "../fmt"
 import "../build/build"
 import "../ffi/ffi"
+import "../testing/assert"
+import "../types/message"
+import "../types/out_actions"
 import "../types/transaction"
+import "../vm/vm"
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
@@ -12,6 +17,67 @@ struct net
 struct SendParams {
     /// Value to send with the message.
     value: coins
+}
+
+type ChildTxsIds = tuple
+
+type OutMessages = tuple
+
+fun OutMessages.getAsCell(self, index: int): cell {
+    return self.get<cell>(index);
+}
+
+fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
+    val cell = self.get<cell>(index) as Cell<MessageRelaxed<Msg>>;
+    try {
+        return cell.load()
+    } catch (e) {
+        if (e == 63) {
+            // prefix mismatch
+            val cell_generic = self.get<cell>(index) as Cell<MessageRelaxedGeneric>;
+            val msg = cell_generic.load();
+
+            val opcode = msg.loadOpcode();
+            if (opcode == null) {
+                throw e;
+            }
+
+            val opcode_type_name = ffi.type_name_by_opcode(opcode);
+
+            Assert.fail(
+                format4(
+                    "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
+                    Msg.__typeName2(),
+                    Msg.getDeclaredPackPrefix(),
+                    opcode_type_name == null ? "" : opcode_type_name,
+                    opcode,
+                ),
+            );
+        }
+
+        throw e;
+    }
+}
+
+struct SendResult {
+    tx: Cell<Transaction>
+    child_txs: ChildTxsIds
+    parent_lt: int?
+    out_actions: Cell<OutList> // use SendResult.allOutActions() to load all actions
+    out_messages: OutMessages
+}
+
+fun SendResult.fromTuple(data: tuple): SendResult  asm "5 UNTUPLE"
+
+fun SendResult.allOutActions(self): OutActionList {
+    return vm.parseOutActions(self.out_actions)
+}
+
+type SendResultList = tuple
+
+fun SendResultList.at(self, index: int): SendResult {
+    val tuple = self.get<tuple>(index);
+    return SendResult.fromTuple(tuple)
 }
 
 /// Internal method, don't use it directly.
@@ -33,7 +99,7 @@ fun net.sendFromNull(message: OutMessage, mode: int): TransactionList {
 ///     net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
 /// }
 /// ```
-fun net.send(from: address, message: OutMessage, mode: int): TransactionList {
+fun net.send(from: address, message: OutMessage, mode: int): SendResultList {
     return ffi.sendMessageFrom(message.messageCell, from.toCell(), mode)!
 }
 
@@ -220,7 +286,7 @@ fun __treasuryCode(): cell asm """
 """
 
 fun ffi.sendMessage(msg: cell, mode: int): TransactionList? asm "7 EXTCALL"
-fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): TransactionList? asm "9 EXTCALL"
+fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): SendResultList? asm "9 EXTCALL"
 fun ffi.runGetMethod(addr: cell, code: cell, id: int, return_type: slice, args: tuple): tuple asm "8 EXTCALL"
 fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
