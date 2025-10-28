@@ -7,18 +7,11 @@ use tvmffi::from_stack::FromStack;
 use tvmffi::stack::{Tuple, TupleItem};
 
 extension!(println in (Context) with (s: TupleItem, type_name: String) using println_impl);
-fn println_impl(ctx: &mut Context, _stack: &mut Tuple, s: TupleItem, type_name: String) {
-    let typed_tuple = if let TupleItem::Tuple(tuple) = &s {
-        TupleItem::TypedTuple {
-            inner: tuple.clone(),
-            type_name: type_name.clone(),
-        }
-    } else {
-        s
-    };
+fn println_impl(ctx: &mut Context, _stack: &mut Tuple, arg: TupleItem, type_name: String) {
+    let typed_arg = arg.to_typed(&type_name);
 
     let formatter = crate::formatter::FormatterContext::from_context(ctx);
-    let formatted = strip_quotes(formatter.format(&typed_tuple));
+    let formatted = strip_quotes(formatter.format(&typed_arg));
 
     if ctx.capture_test_output {
         ctx.stdout_buffer.push_str(&formatted);
