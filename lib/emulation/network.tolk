@@ -1,6 +1,6 @@
-import "../fmt"
 import "../build/build"
 import "../ffi/ffi"
+import "../fmt"
 import "../testing/assert"
 import "../types/message"
 import "../types/out_actions"
@@ -40,7 +40,7 @@ fun OutMessages.atCell(self, index: int): cell {
 fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
     val cell = self.get<cell>(index) as Cell<MessageRelaxed<Msg>>;
     try {
-        return cell.load()
+        return cell.load();
     } catch (e) {
         if (e == 63) {
             // prefix mismatch
@@ -54,15 +54,13 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
 
             val opcode_type_name = ffi.type_name_by_opcode(opcode);
 
-            Assert.fail(
-                format4(
-                    "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
-                    Msg.__typeName2(),
-                    Msg.getDeclaredPackPrefix(),
-                    opcode_type_name == null ? "" : opcode_type_name,
-                    opcode,
-                ),
-            );
+            Assert.fail(format4(
+                "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
+                Msg.__typeName2(),
+                Msg.getDeclaredPackPrefix(),
+                opcode_type_name == null ? "" : opcode_type_name,
+                opcode
+            ));
         }
 
         throw e;
@@ -87,7 +85,7 @@ struct SendResult {
 
 /// Returns all out actions produced by this transaction as a list.
 fun SendResult.allOutActions(self): OutActionList {
-    return vm.parseOutActions(self.out_actions)
+    return vm.parseOutActions(self.out_actions);
 }
 
 /// Represents a list of send results obtained from [net.send] method.
@@ -100,12 +98,12 @@ type SendResultList = tuple
 /// Returns the send result at the given index.
 fun SendResultList.at(self, index: int): SendResult {
     val tuple = self.get<tuple>(index);
-    return SendResult.fromTuple(tuple)
+    return SendResult.fromTuple(tuple);
 }
 
 /// Internal method, don't use it directly.
 fun net.sendFromNull(message: OutMessage, mode: int): TransactionList {
-    return ffi.sendMessage(message.messageCell, mode)!
+    return ffi.sendMessage(message.messageCell, mode)!;
 }
 
 /// Send a message from a specified address with specified mode.
@@ -125,7 +123,7 @@ fun net.sendFromNull(message: OutMessage, mode: int): TransactionList {
 /// 
 /// Returns a list of send results representing all transactions produced by this send call.
 fun net.send(from: address, message: OutMessage, mode: int): SendResultList {
-    return ffi.sendMessageFrom(message.messageCell, from.toCell(), mode)!
+    return ffi.sendMessageFrom(message.messageCell, from.toCell(), mode)!;
 }
 
 /// Treasury is a special contract that is used to deploy other contracts.
@@ -159,14 +157,11 @@ fun net.treasury(name: slice): Treasury {
     val msg = createMessage({
         bounce: false,
         value: ton("10000"),
-        dest: {
-            workchain: 0,
-            stateInit: state_init,
-        },
+        dest: { workchain: 0, stateInit: state_init },
     });
     // Deploy treasury
     net.sendFromNull(msg, SEND_MODE_PAY_FEES_SEPARATELY);
-    return Treasury { address }
+    return Treasury { address };
 }
 
 /// Run a get method of a contract by its name.
@@ -205,7 +200,7 @@ fun net.treasury(name: slice): Treasury {
 /// If you need to run a get method by its ID, use [Network.runGetMethodById] instead.
 fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    return net.runGetMethodById(addr, method_id, args)
+    return net.runGetMethodById(addr, method_id, args);
 }
 
 /// Run a get method of a contract by its ID.
@@ -231,19 +226,19 @@ fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? 
 
     val args_to_send = args == null ? createEmptyTuple() : args.__toTuple();
     val res = ffi.runGetMethod(addr.toCell(), code, id, Ret.__typeName2(), args_to_send);
-    return Ret.fromTuple(res)
+    return Ret.fromTuple(res);
 }
 
 /// Check if a contract with a specified address is deployed.
 fun net.isDeployed(addr: address): bool {
-    return ffi.isDeployed(addr.toCell())
+    return ffi.isDeployed(addr.toCell());
 }
 
 /// Get the code of a deployed contract by its address.
 /// 
 /// If the contract is not deployed, returns null.
 fun net.getDeployedCode(addr: address): cell? {
-    return ffi.getDeployedCode(addr.toCell())
+    return ffi.getDeployedCode(addr.toCell());
 }
 
 /// Generate a random address.
