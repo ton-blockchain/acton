@@ -1,0 +1,19 @@
+MessageRelaxedGeneric {
+    info: CommonMsgInfoRelaxed {
+        ihr_disabled: true,
+        bounce: false,
+        bounced: false,
+        src: EQAKIOo5BYX6HLXvPp8Ct55dApFwnI0qWrx55yyF_aI9K5e-,
+        dest: EQCaMdGt9cG70iD0tRb-8Dvt8QqRPDgRrLFHP4wanVjLn2ji,
+        value: CurrencyCollection {
+            grams: 1999900000,
+            other: null
+        },
+        extra_flags: 0,
+        fwd_fee: 0,
+        created_lt: 0,
+        created_at: 0
+    },
+    init: null,
+    body: null
+}

@@ -1,9 +1,9 @@
 use crate::context::{BuildCache, KnownAddresses};
-use abi::ContractAbi;
+use abi::{ContractAbi, TypeAbi};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Write;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
@@ -634,30 +634,12 @@ impl FormatterContext {
                 let abi = self.contract_abi.find_type(type_name);
 
                 // Format structure as Foo { ... }
-                if let Some(struct_desc) = abi
-                    && items.len() == struct_desc.fields.len()
-                {
-                    // TODO: support structures with nested structures
-                    let mut f = "".to_string();
-
-                    write!(f, "{} {{\n", type_name).ok();
-                    for (i, (field, item)) in
-                        struct_desc.fields.iter().zip(items.iter()).enumerate()
-                    {
-                        write!(
-                            f,
-                            "    {}: {}",
-                            field.name,
-                            self.format(&item.to_typed(&field.type_info.human_readable))
-                        )
-                        .ok();
-                        if i < struct_desc.fields.len() - 1 {
-                            write!(f, ",").ok();
-                        }
-                        write!(f, "\n").ok();
-                    }
-                    write!(f, "}}").ok();
-                    return f;
+                if let Some(struct_desc) = abi {
+                    return self.format_structure(
+                        struct_desc,
+                        0,
+                        &mut VecDeque::from(items.0.clone()),
+                    );
                 }
 
                 if let TupleItem::Slice(cell) = &items[0]
@@ -724,6 +706,40 @@ impl FormatterContext {
         formatted
     }
 
+    fn format_structure(
+        &self,
+        struct_desc: TypeAbi,
+        level: usize,
+        items: &mut VecDeque<TupleItem>,
+    ) -> String {
+        let mut f = "".to_string();
+
+        write!(f, "{} {{\n", struct_desc.name).ok();
+
+        for (i, field) in struct_desc.fields.iter().enumerate() {
+            let field_type = field.type_info.human_readable.clone();
+            let field_value = if let Some(abi) = self.contract_abi.find_type(&field_type) {
+                let result = self.format_structure(abi, level, items);
+                Self::add_indent_to_lines_except_first(result.as_str(), (level + 1) * 4)
+            } else {
+                let field_value = items.pop_front().unwrap();
+                self.format(&field_value.to_typed(&field_type))
+            };
+
+            write!(f, "    {}: {}", field.name, field_value).ok();
+            if i < struct_desc.fields.len() - 1 {
+                write!(f, ",").ok();
+            }
+            write!(f, "\n").ok();
+
+            if items.is_empty() {
+                break;
+            }
+        }
+        write!(f, "}}").ok();
+        f
+    }
+
     pub fn format_tuple_value(&self, tuple: &Tuple, type_name: &String, indent: usize) -> String {
         fn add_indent_to_lines(text: &str, indent: usize) -> String {
             let indent_str = " ".repeat(indent);
@@ -745,6 +761,26 @@ impl FormatterContext {
         let mut result = lines[0].to_string() + "\n";
         result += &add_indent_to_lines(&lines[1..].join("\n"), indent);
         result
+    }
+
+    fn add_indent_to_lines_except_first(text: &str, indent: usize) -> String {
+        if !text.contains("\n") {
+            // Fast path for values with single line
+            return text.to_string();
+        }
+
+        let indent_str = " ".repeat(indent);
+        text.lines()
+            .enumerate()
+            .map(|(idx, line)| {
+                if idx == 0 {
+                    line.to_string()
+                } else {
+                    format!("{}{}", indent_str, line)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Show address in short format
