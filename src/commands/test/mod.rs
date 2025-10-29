@@ -25,7 +25,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::{fs, process};
 use teamcity::TeamcityReporter;
-use tolkc::source_map::{SourceLocation, SourceMap};
+use tolkc::source_map::{DebugLocation, SourceLocation, SourceMap};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
@@ -601,12 +601,49 @@ fn run_all_tests(
                             if let Some(info) = &exit_code_info {
                                 if let Some(loc) = &info.loc {
                                     println!(
-                                        "      {} at {}:{}:{}",
+                                        "      {} at {}",
                                         "├─".dimmed(),
-                                        loc.file.replace("_test.tolk_test.tolk", "_test.tolk"),
-                                        loc.line + 1,
-                                        loc.column + 2,
+                                        format!(
+                                            "{}:{}:{}",
+                                            normalize_path(&loc.file),
+                                            loc.line + 1,
+                                            loc.column + 2
+                                        )
+                                        .dimmed(),
                                     );
+                                    if !info.backtrace.is_empty() {
+                                        let max_function_name_len = info
+                                            .backtrace
+                                            .iter()
+                                            .filter_map(|loc| loc.context.event_function.as_ref())
+                                            .map(|name| name.len() + 2)
+                                            .max()
+                                            .unwrap_or(0);
+
+                                        let backtrace_lines =
+                                            info.backtrace.iter().rev().filter_map(|loc| {
+                                                loc.context.event_function.as_ref().map(
+                                                    |func_name| {
+                                                        let location = format!(
+                                                            "{}:{}:{}",
+                                                            normalize_path(&loc.loc.file),
+                                                            loc.loc.line + 1,
+                                                            loc.loc.column + 2
+                                                        );
+                                                        format!(
+                                                            "{:<width$} at {}",
+                                                            func_name.green(),
+                                                            location.dimmed(),
+                                                            width = max_function_name_len
+                                                        )
+                                                    },
+                                                )
+                                            });
+
+                                        for line in backtrace_lines {
+                                            println!("      {}     {}", "│".dimmed(), line);
+                                        }
+                                    }
                                 } else if backtrace.is_none() {
                                     println!(
                                         "      {} Re-run with {} to get more information",
@@ -695,6 +732,25 @@ fn run_all_tests(
     }
 }
 
+fn normalize_path(file: &String) -> String {
+    let normalized = file.replace("_test.tolk_test.tolk", "_test.tolk");
+
+    if let Ok(cwd) = std::env::current_dir() {
+        let file_path = Path::new(&normalized);
+
+        if let Ok(relative) = file_path.strip_prefix(&cwd) {
+            let relative_str = relative.to_string_lossy();
+            if relative_str.len() < normalized.len()
+                || normalized.starts_with(cwd.to_string_lossy().as_ref())
+            {
+                return relative_str.to_string();
+            }
+        }
+    }
+
+    normalized
+}
+
 fn format_search_transaction_parameters(
     assert_failure: &TransactionGenericAssertFailure,
 ) -> Vec<String> {
@@ -735,12 +791,13 @@ fn format_search_transaction_parameters(
 struct ExceptionInfo {
     description: String,
     loc: Option<SourceLocation>,
+    backtrace: Vec<DebugLocation>,
 }
 
 fn find_exception_info(vm_logs: &String, source_map: &SourceMap) -> Option<ExceptionInfo> {
-    let res = vmlogs::parser::parse_lines(vm_logs.as_str());
+    let lines = vmlogs::parser::parse_lines(vm_logs.as_str());
 
-    let exception = res.iter().rfind(|line| match line {
+    let exception = lines.iter().rfind(|line| match line {
         Ok(VmLine::VmException { .. }) => true,
         _ => false,
     });
@@ -749,7 +806,7 @@ fn find_exception_info(vm_logs: &String, source_map: &SourceMap) -> Option<Excep
         _ => "".to_string(),
     };
 
-    let location = res.iter().rfind(|line| match line {
+    let location = lines.iter().rfind(|line| match line {
         Ok(VmLine::VmLoc { .. }) => true,
         _ => false,
     });
@@ -761,7 +818,79 @@ fn find_exception_info(vm_logs: &String, source_map: &SourceMap) -> Option<Excep
 
     let loc = find_source_loc(source_map, &hash, offset);
 
-    Some(ExceptionInfo { description, loc })
+    let backtrace = find_backtrace(source_map, lines);
+
+    Some(ExceptionInfo {
+        description,
+        loc,
+        backtrace,
+    })
+}
+
+fn find_backtrace(
+    source_map: &SourceMap,
+    lines: Vec<Result<VmLine, String>>,
+) -> Vec<DebugLocation> {
+    let execution_path = lines
+        .iter()
+        .filter_map(|line| match line {
+            Ok(VmLine::VmLoc { hash, offset }) => Some((hash, offset.parse().unwrap_or(0))),
+            _ => None,
+        })
+        .flat_map(|(hash, offset)| {
+            let Some(marks) = source_map.debug_marks.get(*hash) else {
+                return vec![];
+            };
+
+            let debug_pairs = marks
+                .iter()
+                .filter(|(mark_offset, _)| return *mark_offset == offset)
+                .collect::<Vec<_>>();
+
+            let exact_locs = source_map
+                .high_level
+                .locations
+                .iter()
+                .filter(|loc| !loc.loc.file.is_empty() && !loc.loc.file.starts_with("@stdlib/"))
+                .filter(|loc| {
+                    debug_pairs
+                        .iter()
+                        .find(|(_, debug_id)| (*debug_id) as i64 == loc.idx)
+                        .is_some()
+                })
+                .collect::<Vec<_>>();
+
+            exact_locs
+        })
+        .collect::<Vec<_>>();
+
+    let mut stack = vec![];
+
+    for step in &execution_path {
+        if step.context.event == Some("EnterFunction".to_string())
+            || step.context.event == Some("EnterInlinedFunction".to_string())
+        {
+            if step.context.event_function.is_none() {
+                continue;
+            }
+
+            stack.push(step);
+        }
+        if step.context.event == Some("AfterFunctionCall".to_string())
+            || step.context.event == Some("LeaveInlinedFunction".to_string())
+        {
+            let event_function = &step.context.event_function;
+
+            let Some(last) = stack.last() else {
+                continue;
+            };
+
+            if last.context.event_function == *event_function {
+                stack.pop();
+            }
+        }
+    }
+    stack.iter().map(|loc| (**loc).clone()).collect::<Vec<_>>()
 }
 
 fn find_source_loc(source_map: &SourceMap, hash: &String, offset: i32) -> Option<SourceLocation> {
