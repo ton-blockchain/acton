@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
@@ -9,6 +10,16 @@ use tycho_types::prelude::DynCell;
 pub struct SourceMap {
     pub high_level: HighLevelSourceMap,
     pub debug_marks: HashMap<String, Vec<(i32, i32)>>,
+}
+
+impl SourceMap {
+    pub fn hash(&self) -> String {
+        let mut hasher = DefaultHasher::new();
+        self.high_level.files.iter().for_each(|file| {
+            file.path.hash(&mut hasher);
+        });
+        format!("{:x}", hasher.finish())
+    }
 }
 
 impl Default for SourceMap {

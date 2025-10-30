@@ -29,6 +29,7 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
         SendMessageResult::Error(_) => None,
     });
 
+    let mut seen_source_maps = HashSet::new();
     let mut whole_executable_locations_per_file: HashMap<String, Vec<DebugLocation>> =
         HashMap::new();
 
@@ -44,6 +45,11 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
 
         let mut trace = build_vm_trace(logs, &source_map);
         whole_trace.append(&mut trace);
+
+        // Optimization: don't process same source map several times
+        if !seen_source_maps.insert(source_map.hash()) {
+            continue;
+        }
 
         let mut executable_locations_per_file: HashMap<String, Vec<DebugLocation>> = HashMap::new();
         let source_maps_locations = source_map.high_level.locations;

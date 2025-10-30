@@ -80,6 +80,6 @@ fn find_locations_by_debug_marks(
                 .is_some()
         })
         .filter(|loc| !loc.loc.file.is_empty() && !loc.loc.file.starts_with("@stdlib/"))
-        .map(|loc| (*loc).clone())
+        .cloned()
         .collect::<Vec<_>>()
 }
