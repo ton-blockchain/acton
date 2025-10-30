@@ -1,6 +1,7 @@
 import "assert"
 import "../fmt"
 import "../ffi/ffi"
+import "../tlb/maybe"
 
 /// Internal struct to represent an expectation for a value.
 /// 
@@ -190,6 +191,17 @@ fun Expectation<T?>.toBeNull(self) {
 /// ```
 fun Expectation<T?>.toBeNotNull(self) {
     Assert.notEqual(self.value, null, "expect(<actual>).toBeNotNull()", self.location);
+}
+
+fun Expectation<Maybe<T>>.toBeDefined(self) {
+    if (self.value is None) {
+        Assert.fail("expect(<actual>).toBeDefined()", self.location);
+    }
+}
+fun Expectation<Maybe<T>>.toBeNone(self) {
+    if (self.value !is None) {
+        Assert.fail("expect(<actual>).toBeNone()", self.location);
+    }
 }
 
 /// Asserts that actual value is not empty.

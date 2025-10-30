@@ -2,6 +2,7 @@ import "../build/build"
 import "../ffi/ffi"
 import "../fmt"
 import "../testing/assert"
+import "../tlb/maybe"
 import "../types/message"
 import "../types/out_actions"
 import "../types/transaction"
@@ -101,6 +102,40 @@ type SendResultList = tuple
 fun SendResultList.at(self, index: int): SendResult {
     val tuple = self.get<tuple>(index);
     return SendResult.fromTuple(tuple);
+}
+
+/// Represents a set of parameters to search for a transaction in the transaction list.
+struct SearchParams {
+    /// Destination address of the transaction.
+    to: address
+    /// Source address of the transaction.
+    from: address? = null
+    /// Exit code of the transaction.
+    exit_code: int32? = null
+    /// Whether the transaction is a deploy transaction.
+    ///
+    /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    deploy: bool? = null
+    /// Whether the transaction is a bounced transaction.
+    bounced: bool? = null
+}
+
+/// Find a transaction in the send result list by specified parameters.
+/// 
+/// Example:
+/// ```
+/// val tx = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val result = tx.findTransaction({ to: counter.address });
+/// expect(result).toBeDefined();
+/// val tx = result.unwrap();
+/// ```
+fun SendResultList.findTransaction(self, params: SearchParams): Maybe<Transaction> {
+    val tx = ffi.findTransactionByParams(self, params.__toTuple());
+    if (tx == null) {
+        return None{};
+    }
+    val tx_cell = tx as Cell<Transaction>;
+    return Value { value: tx_cell.load() };
 }
 
 /// Internal method, don't use it directly.
@@ -354,3 +389,6 @@ fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
 fun ffi.registerAddress(address: cell, name: slice): void asm "15 EXTCALL"
 fun ffi.registerCodeCell(cell: cell, name: slice): void asm "16 EXTCALL"
+fun ffi.findTransactionByParams(txs: tuple, params: tuple): cell? asm "10 EXTCALL"
+fun ffi.failToFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "103 EXTCALL"
+fun ffi.failToNotFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "104 EXTCALL"

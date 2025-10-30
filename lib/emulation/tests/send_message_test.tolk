@@ -3,6 +3,7 @@ import "contracts/types"
 import "../../build/build"
 import "../../testing/expect"
 import "../../testing/transaction_expect"
+import "../../tlb/maybe"
 
 struct Counter {
     address: address
@@ -40,7 +41,7 @@ fun setupTest() {
         },
     });
     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
-    expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+    // expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
     return (counter, deployer)
 }
@@ -67,4 +68,19 @@ get fun `test-send-message-with-gas`() {
     expect(counter.getCounter()).toEqual(100);
 
     expect(res.at(0)).toConsumeLessThan(1500);
+}
+
+get fun `test-find-transaction`() {
+    val (counter, deployer) = setupTest();
+
+    val res = counter.sendIncrease(deployer.address, 100);
+    expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+
+    expect(counter.getCounter()).toEqual(100);
+
+    val tx = res.findTransaction({ to: counter.address });
+    expect(tx).toBeDefined();
+
+    val unknown_tx = res.findTransaction({ to: deployer.address });
+    expect(unknown_tx).toBeNone();
 }

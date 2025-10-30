@@ -4,22 +4,6 @@ import "../emulation/network"
 import "../ffi/ffi"
 import "../types/transaction"
 
-/// Represents a set of parameters to search for a transaction in the transaction list.
-struct SearchParams {
-    /// Destination address of the transaction.
-    to: address
-    /// Source address of the transaction.
-    from: address? = null
-    /// Exit code of the transaction.
-    exit_code: int32? = null
-    /// Whether the transaction is a deploy transaction.
-    /// 
-    /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
-    deploy: bool? = null
-    /// Whether the transaction is a bounced transaction.
-    bounced: bool? = null
-}
-
 /// Expect the transaction list to have a successful deploy transaction.
 /// 
 /// Transaction is considered as "deploy" if previous status was "NonExisting" and end status was "Active".
@@ -169,20 +153,3 @@ fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {
         self.location
     );
 }
-
-// fun Expectation<TransactionList>.findMessage<Message>(self, criteria: SearchParams): Transaction {
-//     // TODO
-// }
-//
-// fun Expectation<TransactionList>.findExternalMessage<Message>(self, criteria: SearchParams): Transaction {
-//     // TODO
-// }
-
-fun ffi.findTransactionByParams(txs: tuple, params: tuple): tuple?
-    asm "10 EXTCALL"
-
-fun ffi.failToFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple?
-    asm "103 EXTCALL"
-
-fun ffi.failToNotFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple?
-    asm "104 EXTCALL"
