@@ -4,6 +4,7 @@ use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, T
 use emulator::emulator::SendMessageResult;
 use owo_colors::OwoColorize;
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::Path;
 use tolkc::source_map::DebugLocation;
 
@@ -17,6 +18,8 @@ pub struct FileCoverage {
     pub file: String,
     pub executable_lines: i64,
     pub covered_lines: i64,
+    pub line_hits: HashMap<i64, u64>, // line number -> hit count
+    pub executable_line_numbers: Vec<i64>, // all executable line numbers
 }
 
 pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Coverage {
@@ -78,10 +81,32 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
 
     let mut coverages: Vec<FileCoverage> = vec![];
 
+    let mut line_hits_per_file: HashMap<String, HashMap<i64, u64>> = HashMap::new();
+    let mut executable_lines_per_file: HashMap<String, Vec<i64>> = HashMap::new();
+
+    for (file, locations) in &whole_executable_locations_per_file {
+        let mut unique_lines = HashSet::new();
+        for loc in locations {
+            unique_lines.insert(loc.loc.line);
+        }
+        let executable_line_numbers: Vec<i64> = unique_lines.into_iter().collect();
+        executable_lines_per_file.insert(file.clone(), executable_line_numbers);
+    }
+
+    for loc in &whole_trace {
+        let file = &loc.loc.file;
+        let line = loc.loc.line;
+        let entry = line_hits_per_file
+            .entry(file.clone())
+            .or_insert_with(HashMap::new);
+        *entry.entry(line).or_insert(0) += 1;
+    }
+
     let executed_lines = whole_trace
         .iter()
         .map(|loc| loc.loc.line)
         .collect::<HashSet<_>>();
+
     for (file, locations) in &whole_executable_locations_per_file {
         let executable_lines = locations.len() as i64;
         let mut covered_lines = 0;
@@ -93,10 +118,18 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
             }
         }
 
+        let line_hits = line_hits_per_file.get(file).cloned().unwrap_or_default();
+        let executable_line_numbers = executable_lines_per_file
+            .get(file)
+            .cloned()
+            .unwrap_or_default();
+
         coverages.push(FileCoverage {
             file: file.clone(),
             executable_lines,
             covered_lines,
+            line_hits,
+            executable_line_numbers,
         })
     }
 
@@ -191,4 +224,42 @@ pub fn print_coverage_summary(coverages: &Vec<Coverage>, teamcity: bool) {
     }
 
     println!("{}", table);
+}
+
+pub fn generate_lcov_file(
+    coverages: &Vec<Coverage>,
+    output_path: &str,
+) -> Result<(), std::io::Error> {
+    let mut lcov_content = String::new();
+
+    for coverage in coverages {
+        for file_coverage in &coverage.files {
+            if file_coverage.line_hits.is_empty() {
+                continue;
+            }
+
+            // SF: source file
+            lcov_content.push_str(&format!("SF:{}\n", file_coverage.file));
+
+            // DA: line data (line number, execution count)
+            for &line_number in &file_coverage.executable_line_numbers {
+                let hit_count = file_coverage
+                    .line_hits
+                    .get(&line_number)
+                    .copied()
+                    .unwrap_or(0);
+                lcov_content.push_str(&format!("DA:{},{}\n", line_number + 1, hit_count));
+            }
+
+            // LF: lines found (total executable lines)
+            lcov_content.push_str(&format!("LF:{}\n", file_coverage.executable_lines));
+
+            // LH: lines hit (covered lines)
+            lcov_content.push_str(&format!("LH:{}\n", file_coverage.covered_lines));
+
+            lcov_content.push_str("end_of_record\n");
+        }
+    }
+
+    fs::write(output_path, lcov_content)
 }

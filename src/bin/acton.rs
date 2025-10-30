@@ -39,6 +39,8 @@ enum Commands {
         backtrace: Option<String>,
         #[arg(long, help = "Enable coverage collection")]
         coverage: bool,
+        #[arg(long, help = "Output coverage in specified format (lcov)")]
+        format: Option<String>,
     },
     #[command(about = "Execute a Tolk script file")]
     Script {
@@ -81,6 +83,7 @@ fn main() {
             debug,
             backtrace,
             coverage,
+            format,
         } => {
             let result = test_cmd(
                 &path,
@@ -89,6 +92,7 @@ fn main() {
                 debug,
                 backtrace,
                 coverage,
+                format.as_deref(),
             );
             if let Err(err) = result {
                 eprintln!("{} {}", "Error:".red(), err);

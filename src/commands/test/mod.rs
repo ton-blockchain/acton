@@ -1,4 +1,6 @@
-use crate::commands::test::coverage::{Coverage, collect_coverage, print_coverage_summary};
+use crate::commands::test::coverage::{
+    Coverage, collect_coverage, generate_lcov_file, print_coverage_summary,
+};
 use crate::context::{
     AnyExecutor, AssertFailure, BuildCache, Context, Emulations, KnownAddresses,
     TransactionGenericAssertFailure,
@@ -47,6 +49,7 @@ pub fn test_cmd(
     debug: bool,
     backtrace: Option<String>,
     coverage: bool,
+    format: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     let metadata = fs::metadata(path)?;
     let test_files = if metadata.is_file() {
@@ -166,6 +169,29 @@ pub fn test_cmd(
 
     if !coverages.is_empty() {
         print_coverage_summary(&coverages, teamcity);
+
+        if let Some(format_type) = format {
+            println!();
+            match format_type {
+                "lcov" => {
+                    let lcov_path = "lcov.info";
+                    if let Err(err) = generate_lcov_file(&coverages, lcov_path) {
+                        eprintln!(
+                            "Warning: Failed to generate LCOV file '{}': {}",
+                            lcov_path, err
+                        );
+                    } else {
+                        println!("LCOV file generated: {}", lcov_path);
+                    }
+                }
+                _ => {
+                    eprintln!(
+                        "Warning: Unknown coverage format '{}'. Supported formats: lcov",
+                        format_type
+                    );
+                }
+            }
+        }
     }
 
     if teamcity {
