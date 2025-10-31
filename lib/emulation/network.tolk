@@ -166,6 +166,10 @@ struct SearchParams {
     bounced: bool? = null
     /// Opcode of the in message.
     opcode: uint32? = null
+    /// Action exit code of the transaction.
+    action_exit_code: int32? = null
+    /// Whether the compute phase was skipped.
+    compute_phase_skipped: bool? = null
 }
 
 /// Find a transaction in the send result list by specified parameters.

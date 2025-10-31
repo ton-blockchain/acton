@@ -165,6 +165,8 @@ pub fn process_txs_and_search_params(
     params: Tuple,
 ) -> Option<(TransactionNotFoundParams, Vec<Transaction>)> {
     let mut params_reader = params.clone().0;
+    let raw_compute_phase_skipped = params_reader.pop();
+    let raw_action_exit_code = params_reader.pop();
     let raw_opcode = params_reader.pop();
     let raw_bounced = params_reader.pop();
     let raw_deploy = params_reader.pop();
@@ -179,6 +181,8 @@ pub fn process_txs_and_search_params(
         deploy: None,
         bounced: None,
         opcode: None,
+        action_exit_code: None,
+        compute_phase_skipped: None,
     };
 
     if let Some(raw_opcode) = raw_opcode {
@@ -245,6 +249,20 @@ pub fn process_txs_and_search_params(
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.to = Some(address);
             }
+        }
+    }
+    if let Some(raw_action_exit_code) = raw_action_exit_code {
+        if let TupleItem::Null = raw_action_exit_code {
+            params.action_exit_code = None
+        } else if let TupleItem::Int(num) = raw_action_exit_code {
+            params.action_exit_code = Some(num.to_i32().unwrap_or(0))
+        }
+    }
+    if let Some(raw_compute_phase_skipped) = raw_compute_phase_skipped {
+        if let TupleItem::Null = raw_compute_phase_skipped {
+            params.compute_phase_skipped = None
+        } else if let TupleItem::Int(num) = raw_compute_phase_skipped {
+            params.compute_phase_skipped = Some(num == BigInt::from(18446744073709551615u64))
         }
     }
 

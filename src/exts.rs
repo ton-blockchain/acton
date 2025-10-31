@@ -375,6 +375,26 @@ fn find_transaction_by_params_impl(
             return None;
         };
 
+        if let Some(expected_compute_skipped) = params.compute_phase_skipped {
+            let is_skipped = matches!(info.compute_phase, ComputePhase::Skipped(_));
+            if expected_compute_skipped != is_skipped {
+                // Compute phase skipped mismatch
+                return None;
+            }
+        }
+
+        if let Some(expected_action_exit_code) = params.action_exit_code {
+            if let Some(action_phase) = &info.action_phase {
+                if action_phase.result_code != expected_action_exit_code {
+                    // Action exit code mismatch
+                    return None;
+                }
+            } else {
+                // Action phase is missing but expected
+                return None;
+            }
+        }
+
         if let ComputePhase::Executed(compute) = info.compute_phase {
             if let Some(expected_exit_code) = params.exit_code {
                 if compute.exit_code != expected_exit_code as i32 {
