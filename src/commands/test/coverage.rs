@@ -161,18 +161,14 @@ pub fn merge_coverages(coverages: &Vec<Coverage>) -> Coverage {
         for file_coverage in &coverage.files {
             let file = &file_coverage.file;
             if let Some(existing) = merged_files.get_mut(file) {
-                existing.executable_lines += file_coverage.executable_lines;
-                existing.covered_lines += file_coverage.covered_lines;
-
+                let mut covered_lines_num = existing.covered_lines;
                 for (&line, &hits) in &file_coverage.line_hits {
                     *existing.line_hits.entry(line).or_insert(0) += hits;
+                    if hits > 0 && !existing.line_hits.contains_key(&line) {
+                        covered_lines_num += 1
+                    }
                 }
-
-                let mut combined_lines = existing.executable_line_numbers.clone();
-                combined_lines.extend_from_slice(&file_coverage.executable_line_numbers);
-                combined_lines.sort_unstable();
-                combined_lines.dedup();
-                existing.executable_line_numbers = combined_lines;
+                existing.covered_lines = covered_lines_num;
             } else {
                 merged_files.insert(file.clone(), file_coverage.clone());
             }
@@ -184,7 +180,7 @@ pub fn merge_coverages(coverages: &Vec<Coverage>) -> Coverage {
     }
 }
 
-pub fn print_coverage_summary(coverage: &Coverage, teamcity: bool) {
+pub fn print_coverage_summary(coverage: &Coverage) {
     if coverage.files.is_empty() {
         // Empty coverage info, likely compilation error
         return;

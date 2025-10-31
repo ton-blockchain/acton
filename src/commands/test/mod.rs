@@ -169,7 +169,7 @@ pub fn test_cmd(
 
     if !coverages.is_empty() {
         let merged_coverage = merge_coverages(&coverages);
-        print_coverage_summary(&merged_coverage, teamcity);
+        print_coverage_summary(&merged_coverage);
 
         if let Some(format_type) = format {
             println!();
