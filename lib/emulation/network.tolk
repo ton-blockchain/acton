@@ -181,10 +181,10 @@ fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {})
     params.opcode = Msg.getDeclaredPackPrefix();
     val tx = ffi.findTransactionByParams(self, params.__toTuple());
     if (tx == null) {
-        return None{};
+        return Maybe<Transaction>.none();
     }
     val tx_cell = tx as Cell<Transaction>;
-    return Value { value: tx_cell.load() };
+    return Maybe<Transaction>.some(tx_cell.load());
 }
 
 /// Internal method, don't use it directly.

@@ -43,6 +43,23 @@ struct (0b0111) Transaction {
     description: Cell<TransactionDescr>
 }
 
+/// Loads the in message of the transaction with given type.
+/// 
+/// Note that if message type mismatch, loading will fail with exit code 63.
+/// 
+/// Example:
+/// ```
+/// val result = net.send(address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val tx = result.findTransaction<IncreaseCounter>({ to: address }).unwrap();
+/// val body = tx.loadBody<IncreaseCounter>();
+/// println(body.increaseBy);
+/// ```
+fun Transaction.loadBody<Msg>(self) {
+    val im_msg_cell = self.messages.load().in_msg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
+    val in_msg = im_msg_cell.load();
+    return in_msg.loadBody()
+}
+
 struct TransactionMessages {
     /// In message.
     in_msg: Maybe<Cell<MessageRelaxedGeneric>>,

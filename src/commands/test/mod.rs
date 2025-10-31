@@ -1018,7 +1018,7 @@ fn execute_test(
         known_code_cells,
         emulations,
         abi: (*abi).clone(),
-        expected_exit_code: &mut Some(BigInt::from(0)),
+        expected_exit_code: &mut None,
         dbg_ctx: &mut DebugContext::empty(),
         debug,
         need_debug_info: debug || coverage,
@@ -1071,8 +1071,7 @@ fn execute_test(
             (*ctx.assert_failure).clone(),
             ctx.expected_exit_code
                 .clone()
-                .map(|value| value.to_i32())
-                .unwrap_or(None),
+                .and_then(|value| value.to_i32()),
         )
     };
 
