@@ -875,6 +875,26 @@ fn format_search_transaction_parameters(
             }
         ))
     }
+    if let Some(action_exit_code) = assert_failure.params.action_exit_code {
+        params.push(format!(
+            "  action_exit_code={}",
+            if action_exit_code == 0 {
+                "0".green().to_string()
+            } else {
+                action_exit_code.to_string().red().to_string()
+            }
+        ))
+    }
+    if let Some(compute_phase_skipped) = assert_failure.params.compute_phase_skipped {
+        params.push(format!(
+            "  compute_phase_skipped={}",
+            if compute_phase_skipped {
+                "true".green().to_string()
+            } else {
+                "false".red().to_string()
+            }
+        ))
+    }
     params
 }
 
