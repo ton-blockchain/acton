@@ -224,3 +224,7 @@ fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {
 fun never.getDeclaredPackPrefix() {
     return null;
 }
+
+fun never.getDeclaredPackPrefixLen() {
+    return null;
+}
