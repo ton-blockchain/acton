@@ -1,7 +1,9 @@
+import "@stdlib/common"
 import "../build/build"
 import "../ffi/ffi"
 import "../fmt"
 import "../testing/assert"
+import "../tlb/either"
 import "../tlb/maybe"
 import "../types/message"
 import "../types/out_actions"
@@ -170,6 +172,78 @@ struct SearchParams {
     action_exit_code: int32? = null
     /// Whether the compute phase was skipped.
     compute_phase_skipped: bool? = null
+}
+
+struct ExternalOutSearchParams {
+    /// Source address of the external-out message.
+    from: address? = null
+    /// Destination address of the external-out message.
+    to: address? = null // TODO: Change to `address_any` after TVM v12 update.
+}
+
+fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>(self, params: ExternalOutSearchParams = {}): bool {
+    if (params.from != null && self.info.src != params.from) {
+        return false;
+    }
+
+    if (params.to != null && self.info.dest != params.to) {
+        return false;
+    }
+
+    if (TBody.getDeclaredPackPrefix() != null) {
+        val body = self.loadBody();
+        if (body.remainingBitsCount() < TBody.getDeclaredPackPrefixLen()) {
+            return false;
+        }
+
+        val prefix = body.preloadUint(TBody.getDeclaredPackPrefixLen());
+        if (prefix != TBody.getDeclaredPackPrefix()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/// Find a external-out message in the send result list by specified parameters.
+///
+/// Example:
+/// ```
+/// val tx = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val result = tx.findExternalOutMessage<IncrementEvent>({ from: counter.address });
+/// expect(result).toBeDefined();
+/// val tx = result.unwrap();
+/// ```
+fun SendResultList.findExternalOutMessage<TBody = never>(self, params: ExternalOutSearchParams = {}): Maybe<Message<TBody, ExternalOutMessageInfo>> {
+    var transactionIndex = 0;
+    while (transactionIndex < self.size()) {
+        val externals = self.at(transactionIndex).externals;
+
+        var externalIndex = 0;
+        while (externalIndex < externals.size()) {
+            val externalOut = externals
+                .get<Cell<Message<RemainingBitsAndRefs, ExternalOutMessageInfo>>>(externalIndex)
+                .load();
+
+            if (externalOut.matches<TBody>(params)) {
+                return Maybe<Message<TBody, ExternalOutMessageInfo>>.some(
+                    Message{
+                        info: externalOut.info,
+                        init: externalOut.init,
+                        body: EitherLeft{
+                            value: TBody.fromSlice(externalOut.loadBody()),
+                        },
+                    },
+                );
+            }
+
+            externalIndex += 1;
+        }
+
+        transactionIndex += 1;
+    }
+
+    return Maybe<Message<TBody, ExternalOutMessageInfo>>.none();
 }
 
 /// Find a transaction in the send result list by specified parameters.
