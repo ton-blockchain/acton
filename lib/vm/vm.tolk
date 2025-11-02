@@ -15,7 +15,7 @@ fun vm.getC5(): cell
 
 /// Write a new value to control register C5.
 fun vm.setC5(cell: cell): void
-    asm "c5 PUSHCTR";
+    asm "c5 POPCTR";
 
 /// Generic helper to get a single config parameter.
 @inline
