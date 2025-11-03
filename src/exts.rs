@@ -22,10 +22,10 @@ use tonlib_core::tlb_types::block::msg_address::MsgAddrIntStd;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, Load};
+use tycho_types::cell::{Cell, CellSlice, Load};
 use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
-    ShardAccount, Transaction, TxInfo,
+    AccountState, AccountStatus, BaseMessage, ComputePhase, IntAddr, MsgInfo, RelaxedMessage,
+    RelaxedMsgInfo, ShardAccount, Transaction, TxInfo,
 };
 
 extension!(read_file in (Context) with (path: String) using read_file_impl);
@@ -125,102 +125,7 @@ fn send_message_from_impl(
     };
 
     let emulations = if ctx.debug {
-        let RelaxedMsgInfo::Int(int_message) = &message_obj.info else {
-            panic!("Emulator only supports internal messages for now");
-        };
-
-        let dest_account = blockchain.get_account(&int_message.dst.to_string());
-        let code = Executor::get_code_cell(&message_obj, &dest_account);
-
-        let step_executor = StepExecutor::new();
-        let source_map = ctx
-            .build_cache
-            .result_for_code(&code)
-            .map(|res| res.1.source_map);
-
-        let need_to_stop_on_entry = ctx.dbg_ctx.need_to_stop_child_thread_on_start();
-
-        ctx.dbg_ctx
-            .begin_thread(
-                2,
-                AnyExecutor::Message(step_executor.clone()),
-                source_map,
-                "Send internal message".to_string(),
-                need_to_stop_on_entry,
-            )
-            .unwrap();
-
-        let msg_cell = Emulator::patch_src_addr(msg_cell, Some(src_addr));
-        let prepare_result = step_executor.prepare_transaction(
-            msg_cell.clone(),
-            BigInt::from(0),
-            RunTransactionArgs {
-                config: DEFAULT_CONFIG.to_string(),
-                libs: None,
-                verbosity: ExecutorVerbosity::FullLocation,
-                shard_account: dest_account.clone(),
-                now: 0,
-                lt: blockchain.get_lt(),
-                random_seed: None,
-                ignore_chksig: false,
-                debug_enabled: true,
-                prev_blocks_info: None,
-            },
-        );
-        if !prepare_result.success {
-            panic!("Failed to prepare Emulator in debug mode");
-        }
-
-        // Step to update internal state
-        if need_to_stop_on_entry {
-            ctx.dbg_ctx.step(StepMode::StepIn);
-        } else {
-            ctx.dbg_ctx.step(StepMode::Continue);
-        }
-
-        if ctx.dbg_ctx.stepper.as_ref().map(|s| s.is_terminated()) == Some(false) {
-            // Process requests only if we have something to execute and generates a requests
-            ctx.dbg_ctx.process_incoming_requests(false).unwrap();
-        }
-
-        let result = step_executor.finish_transaction();
-
-        ctx.dbg_ctx.finish_thread(2).unwrap();
-
-        let result = match result {
-            EmulationResult::Success(result) => result,
-            EmulationResult::Error(err) => {
-                stack.push(TupleItem::Tuple(Tuple::empty()));
-                return;
-            }
-        };
-
-        let shard_account_after = &result.shard_account;
-        let shard_account_cell = Boc::decode_base64(shard_account_after).unwrap();
-        let mut shard_account_slice = shard_account_cell.as_slice().unwrap();
-        let shard_account = ShardAccount::load_from(&mut shard_account_slice).unwrap();
-
-        blockchain.update_account(&int_message.dst.to_string(), &shard_account);
-
-        let tx_cell: Cell = Boc::decode_base64(&result.transaction).unwrap();
-        let mut tx_slice = tx_cell.as_slice().unwrap();
-        let transaction = Transaction::load_from(&mut tx_slice).unwrap();
-
-        let send_result = SendMessageResultSuccess {
-            raw_transaction: result.transaction,
-            transaction: transaction.clone(),
-            parent_transaction: None,
-            child_transactions: vec![],
-            shard_account,
-            out_messages: vec![],
-            vm_log: result.vm_log,
-            logs: "".to_string(),
-            debug_logs: "".to_string(),
-            actions: result.actions,
-            code,
-            externals: vec![],
-        };
-        vec![SendMessageResult::Success(send_result)]
+        send_message_debug(ctx, &msg_cell, &message_obj, &src_addr).unwrap_or_else(|| vec![])
     } else {
         emulator.send_message(blockchain, msg_cell, Some(src_addr))
     };
@@ -305,6 +210,115 @@ fn send_message_from_impl(
         })
         .collect::<Vec<_>>();
     stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
+}
+
+fn send_message_debug(
+    ctx: &mut Context,
+    msg_cell: &Cell,
+    message_obj: &BaseMessage<RelaxedMsgInfo, CellSlice>,
+    src_addr: &IntAddr,
+) -> Option<Vec<SendMessageResult>> {
+    let RelaxedMsgInfo::Int(int_message) = &message_obj.info else {
+        panic!("Emulator only supports internal messages for now");
+    };
+
+    let dest_account = ctx.blockchain.get_account(&int_message.dst.to_string());
+    let code = Executor::get_code_cell(&message_obj, &dest_account);
+
+    let step_executor = StepExecutor::new();
+    let source_map = ctx
+        .build_cache
+        .result_for_code(&code)
+        .map(|res| res.1.source_map);
+
+    let need_to_stop_on_entry = ctx.dbg_ctx.need_to_stop_child_thread_on_start();
+
+    ctx.dbg_ctx
+        .begin_thread(
+            2,
+            AnyExecutor::Message(step_executor.clone()),
+            source_map,
+            "Send internal message".to_string(),
+            need_to_stop_on_entry,
+        )
+        .unwrap();
+
+    let msg_cell = Emulator::patch_src_addr(msg_cell.clone(), Some(src_addr.clone()));
+    let prepare_result = step_executor.prepare_transaction(
+        msg_cell.clone(),
+        BigInt::from(0),
+        RunTransactionArgs {
+            config: DEFAULT_CONFIG.to_string(),
+            libs: None,
+            verbosity: ExecutorVerbosity::FullLocation,
+            shard_account: dest_account.clone(),
+            now: 0,
+            lt: ctx.blockchain.get_lt(),
+            random_seed: None,
+            ignore_chksig: false,
+            debug_enabled: true,
+            prev_blocks_info: None,
+        },
+    );
+    if !prepare_result.success {
+        panic!("Failed to prepare Emulator in debug mode");
+    }
+    if prepare_result.skipped {
+        // Since compute phase is skipped, we don't need to run anything
+        ctx.dbg_ctx.finish_thread(2).unwrap();
+        return None;
+    }
+
+    // Step to update internal state
+    if need_to_stop_on_entry {
+        ctx.dbg_ctx.step(StepMode::StepIn);
+    } else {
+        ctx.dbg_ctx.step(StepMode::Continue);
+    }
+
+    if ctx.dbg_ctx.stepper.as_ref().map(|s| s.is_terminated()) == Some(false) {
+        // Process requests only if we have something to execute and generates a requests
+        ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+    }
+
+    let result = step_executor.finish_transaction();
+
+    ctx.dbg_ctx.finish_thread(2).unwrap();
+
+    let result = match result {
+        EmulationResult::Success(result) => result,
+        EmulationResult::Error(_) => {
+            return None;
+        }
+    };
+
+    let shard_account_after = &result.shard_account;
+    let shard_account_cell = Boc::decode_base64(shard_account_after).unwrap();
+    let mut shard_account_slice = shard_account_cell.as_slice().unwrap();
+    let shard_account = ShardAccount::load_from(&mut shard_account_slice).unwrap();
+
+    ctx.blockchain
+        .update_account(&int_message.dst.to_string(), &shard_account);
+
+    let tx_cell: Cell = Boc::decode_base64(&result.transaction).unwrap();
+    let mut tx_slice = tx_cell.as_slice().unwrap();
+    let transaction = Transaction::load_from(&mut tx_slice).unwrap();
+
+    let send_result = SendMessageResultSuccess {
+        raw_transaction: result.transaction,
+        transaction: transaction.clone(),
+        parent_transaction: None,
+        child_transactions: vec![],
+        shard_account,
+        out_messages: vec![],
+        vm_log: result.vm_log,
+        logs: "".to_string(),
+        debug_logs: "".to_string(),
+        actions: result.actions,
+        code,
+        externals: vec![],
+    };
+    Some(vec![SendMessageResult::Success(send_result)])
 }
 
 extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple) using find_transaction_by_params_impl);

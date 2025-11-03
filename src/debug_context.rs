@@ -74,6 +74,7 @@ pub struct Stepper {
     pub current_executor_id: usize,
     pub buffers: Vec<VecDeque<DebugStep>>,
     buffer: VecDeque<DebugStep>,
+    current_step: Option<DebugStep>,
     terminated: bool,
     thread_id: i64,
     callstacks: Vec<Vec<CallFrame>>,
@@ -95,6 +96,7 @@ impl Stepper {
             current_executor_id: 0,
             buffers: Vec::new(),
             buffer: VecDeque::new(),
+            current_step: None,
             terminated: false,
             thread_id,
             callstacks: Vec::new(),
@@ -128,6 +130,7 @@ impl Stepper {
 
     pub fn next(&mut self) -> Option<DebugStep> {
         let step = self.next_impl();
+        self.current_step = step.clone();
         if let Some(step) = &step {
             self.update_callstack_for_step(step);
         }
@@ -221,7 +224,7 @@ impl Stepper {
     }
 
     pub fn get_current_step(&self) -> Option<&DebugStep> {
-        self.buffer.front()
+        self.current_step.as_ref()
     }
 
     pub fn get_callstack(&self) -> &Vec<CallFrame> {
@@ -517,6 +520,11 @@ impl DebugContext {
                 if is_end {
                     return Ok(true);
                 }
+
+                println!(
+                    "Current step: {:?}",
+                    self.stepper.as_ref().unwrap().get_current_step()
+                );
 
                 self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,

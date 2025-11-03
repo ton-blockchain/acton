@@ -124,6 +124,7 @@ impl StepExecutor {
 #[derive(Deserialize, Debug)]
 pub struct PrepareResult {
     pub success: bool,
+    pub skipped: bool,
 }
 
 #[derive(Deserialize)]
