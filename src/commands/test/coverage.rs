@@ -116,18 +116,18 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
         *entry.entry(line).or_insert(0) += 1;
     }
 
-    let executed_lines = whole_trace
-        .iter()
-        .map(|loc| loc.loc.line)
-        .collect::<HashSet<_>>();
-
     for (file, lines) in whole_executable_lines_per_file {
         let executable_lines = lines.len() as i64;
+        let Some(line_hits) = line_hits_per_file.get(&file) else {
+            continue;
+        };
         let mut covered_lines = 0;
 
         for line in &lines {
-            let covered = executed_lines.contains(&line);
-            if covered {
+            let line_hits = line_hits.get(line);
+            if let Some(line_hits) = line_hits
+                && *line_hits > 0
+            {
                 covered_lines += 1
             }
         }

@@ -28,13 +28,12 @@ use std::sync::Arc;
 use std::time::Instant;
 use std::{fs, process};
 use teamcity::TeamcityReporter;
-use tolkc::source_map::{DebugLocation, SourceLocation, SourceMap};
+use tolkc::source_map::{SourceLocation, SourceMap};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
 use tree_sitter::Node;
 use tycho_types::models::ShardAccount;
-use vmlogs::parser::VmLine;
 
 mod annotations;
 mod coverage;
@@ -97,7 +96,7 @@ pub fn test_cmd(
                     coverages.push(coverage);
                 }
 
-                if index > 0 && test_files.len() != index - 1 {
+                if index + 1 < test_files.len() {
                     println!()
                 }
             }
