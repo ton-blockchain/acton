@@ -482,6 +482,10 @@ fn run_all_tests(
             false
         };
 
+        if exit_code == 0 && assert_failure.is_some() {
+            test_passed = false
+        }
+
         if test_passed {
             println!(
                 "  {} {} {}{}",
