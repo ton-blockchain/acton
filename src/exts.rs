@@ -22,10 +22,10 @@ use tonlib_core::tlb_types::block::msg_address::MsgAddrIntStd;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellSlice, Load};
+use tycho_types::cell::{Cell, Load};
 use tycho_types::models::{
-    AccountState, AccountStatus, BaseMessage, ComputePhase, IntAddr, MsgInfo, RelaxedMessage,
-    RelaxedMsgInfo, ShardAccount, Transaction, TxInfo,
+    AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
+    ShardAccount, Transaction, TxInfo,
 };
 
 extension!(read_file in (Context) with (path: String) using read_file_impl);
@@ -105,9 +105,6 @@ fn send_message_from_impl(
     let msg_b64 = message.to_boc_b64(false).unwrap();
     let msg_cell = Boc::decode_base64(msg_b64).unwrap();
 
-    let mut msg_slice = msg_cell.as_slice().unwrap();
-    let message_obj = RelaxedMessage::load_from(&mut msg_slice).unwrap();
-
     let from_cell = Boc::decode_base64(from.to_boc_b64(false).unwrap()).unwrap();
     let mut from_slice = from_cell.as_slice().unwrap();
     let src_addr = IntAddr::load_from(&mut from_slice);
@@ -125,7 +122,7 @@ fn send_message_from_impl(
     };
 
     let emulations = if ctx.debug {
-        send_message_debug(ctx, &msg_cell, &message_obj, &src_addr).unwrap_or_else(|| vec![])
+        send_message_debug(ctx, &msg_cell, Some(src_addr))
     } else {
         emulator.send_message(blockchain, msg_cell, Some(src_addr))
     };
@@ -215,9 +212,11 @@ fn send_message_from_impl(
 fn send_message_debug(
     ctx: &mut Context,
     msg_cell: &Cell,
-    message_obj: &BaseMessage<RelaxedMsgInfo, CellSlice>,
-    src_addr: &IntAddr,
-) -> Option<Vec<SendMessageResult>> {
+    src_addr: Option<IntAddr>,
+) -> Vec<SendMessageResult> {
+    let mut msg_slice = msg_cell.as_slice().unwrap();
+    let message_obj = RelaxedMessage::load_from(&mut msg_slice).unwrap();
+
     let RelaxedMsgInfo::Int(int_message) = &message_obj.info else {
         panic!("Emulator only supports internal messages for now");
     };
@@ -243,7 +242,7 @@ fn send_message_debug(
         )
         .unwrap();
 
-    let msg_cell = Emulator::patch_src_addr(msg_cell.clone(), Some(src_addr.clone()));
+    let msg_cell = Emulator::patch_src_addr(msg_cell.clone(), src_addr.clone());
     let prepare_result = step_executor.prepare_transaction(
         msg_cell.clone(),
         BigInt::from(0),
@@ -266,7 +265,7 @@ fn send_message_debug(
     if prepare_result.skipped {
         // Since compute phase is skipped, we don't need to run anything
         ctx.dbg_ctx.finish_thread(2).unwrap();
-        return None;
+        return vec![];
     }
 
     // Step to update internal state
@@ -294,7 +293,7 @@ fn send_message_debug(
     let result = match result {
         EmulationResult::Success(result) => result,
         EmulationResult::Error(_) => {
-            return None;
+            return vec![];
         }
     };
 
@@ -310,13 +309,21 @@ fn send_message_debug(
     let mut tx_slice = tx_cell.as_slice().unwrap();
     let transaction = Transaction::load_from(&mut tx_slice).unwrap();
 
+    let out_messages = transaction
+        .iter_out_msgs()
+        .filter_map(|it| it.ok())
+        .map(|it| it.to_cell())
+        .collect::<Vec<_>>();
+
+    let code = Executor::get_code_cell(&message_obj, &dest_account);
+
     let send_result = SendMessageResultSuccess {
         raw_transaction: result.transaction,
         transaction: transaction.clone(),
         parent_transaction: None,
         child_transactions: vec![],
         shard_account,
-        out_messages: vec![],
+        out_messages,
         vm_log: result.vm_log,
         logs: "".to_string(),
         debug_logs: "".to_string(),
@@ -324,7 +331,47 @@ fn send_message_debug(
         code,
         externals: vec![],
     };
-    Some(vec![SendMessageResult::Success(send_result)])
+
+    let mut externals: Vec<Cell> = vec![];
+
+    let mut all_results = std::iter::once(SendMessageResult::Success(send_result.clone()))
+        .chain(transaction.iter_out_msgs().flat_map(|msg| {
+            let Ok(msg) = msg else { return vec![] };
+
+            if let MsgInfo::ExtOut(_) = &msg.info {
+                externals.push(msg.to_cell());
+                return vec![];
+            };
+
+            let mut send_results = send_message_debug(ctx, &msg.to_cell(), None);
+            for result in &mut send_results {
+                match result {
+                    SendMessageResult::Success(result) => {
+                        result.parent_transaction = Some(transaction.clone());
+                    }
+                    SendMessageResult::Error(_) => {}
+                }
+            }
+
+            send_results
+        }))
+        .collect::<Vec<_>>();
+
+    let child_txs = all_results
+        .iter()
+        .skip(1)
+        .filter_map(|result| match result {
+            SendMessageResult::Success(result) => Some(result.transaction.lt),
+            SendMessageResult::Error(_) => None,
+        })
+        .collect();
+
+    if let Some(SendMessageResult::Success(result)) = all_results.get_mut(0) {
+        result.child_transactions = child_txs;
+        result.externals = externals;
+    }
+
+    all_results
 }
 
 extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple) using find_transaction_by_params_impl);
