@@ -1,5 +1,6 @@
 use crate::context::AnyExecutor;
 use crate::debug_context::{DebugContext, VARIABLE_REFERENCE_COUNTER};
+use crate::formatter::FormatterContext;
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
 use emulator::executor::StoreExt;
@@ -11,7 +12,7 @@ use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::models::{
     CurrencyCollection, IntAddr, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
-    ReserveCurrencyFlags, SendMsgFlags, StateInit,
+    StateInit,
 };
 use tycho_types::num::Tokens;
 
@@ -272,17 +273,17 @@ impl DebugContext {
                             format!(
                                 "{} and {}",
                                 Self::format_relaxed_msg_info(&message.info),
-                                Self::format_send_msg_flags(*mode)
+                                FormatterContext::format_send_msg_flags(*mode)
                             )
                         } else {
-                            Self::format_send_msg_flags(*mode)
+                            FormatterContext::format_send_msg_flags(*mode)
                         }
                     }
                     OutAction::ReserveCurrency { mode, value } => {
                         format!(
                             "{} with {}",
                             Self::format_currency_collection(value),
-                            Self::format_reserve_currency_flags(*mode)
+                            FormatterContext::format_reserve_currency_flags(*mode)
                         )
                     }
                     _ => format!("{:?}", action),
@@ -305,7 +306,7 @@ impl DebugContext {
                 let mut variables = vec![Variable {
                     name: "mode".to_string(),
                     type_field: Some("SendMsgFlags".to_string()),
-                    value: Self::format_send_msg_flags(*mode),
+                    value: FormatterContext::format_send_msg_flags(*mode),
                     ..Default::default()
                 }];
 
@@ -348,7 +349,7 @@ impl DebugContext {
                 Variable {
                     name: "mode".to_string(),
                     type_field: Some("ReserveCurrencyFlags".to_string()),
-                    value: Self::format_reserve_currency_flags(*mode),
+                    value: FormatterContext::format_reserve_currency_flags(*mode),
                     ..Default::default()
                 },
                 Variable {
@@ -372,61 +373,6 @@ impl DebugContext {
                     ..Default::default()
                 },
             ],
-        }
-    }
-
-    fn format_send_msg_flags(flags: SendMsgFlags) -> String {
-        let mut flag_names = Vec::new();
-
-        if flags.contains(SendMsgFlags::PAY_FEE_SEPARATELY) {
-            flag_names.push("PAY_FEES_SEPARATELY");
-        }
-        if flags.contains(SendMsgFlags::IGNORE_ERROR) {
-            flag_names.push("IGNORE_ERRORS");
-        }
-        if flags.contains(SendMsgFlags::BOUNCE_ON_ERROR) {
-            flag_names.push("BOUNCE_ON_ACTION_FAIL");
-        }
-        if flags.contains(SendMsgFlags::DELETE_IF_EMPTY) {
-            flag_names.push("DESTROY");
-        }
-        if flags.contains(SendMsgFlags::WITH_REMAINING_BALANCE) {
-            flag_names.push("CARRY_ALL_REMAINING_MESSAGE_VALUE");
-        }
-        if flags.contains(SendMsgFlags::ALL_BALANCE) {
-            flag_names.push("CARRY_ALL_BALANCE");
-        }
-
-        if flag_names.is_empty() {
-            "REGULAR".to_string()
-        } else {
-            flag_names.join(" | ")
-        }
-    }
-
-    fn format_reserve_currency_flags(flags: ReserveCurrencyFlags) -> String {
-        let mut flag_names = Vec::new();
-
-        if flags.contains(ReserveCurrencyFlags::ALL_BUT) {
-            flag_names.push("ALL_BUT_AMOUNT");
-        }
-        if flags.contains(ReserveCurrencyFlags::IGNORE_ERROR) {
-            flag_names.push("AT_MOST");
-        }
-        if flags.contains(ReserveCurrencyFlags::WITH_ORIGINAL_BALANCE) {
-            flag_names.push("INCREASE_BY_ORIGINAL_BALANCE");
-        }
-        if flags.contains(ReserveCurrencyFlags::REVERSE) {
-            flag_names.push("NEGATE_AMOUNT");
-        }
-        if flags.contains(ReserveCurrencyFlags::BOUNCE_ON_ERROR) {
-            flag_names.push("BOUNCE_ON_ACTION_FAIL");
-        }
-
-        if flag_names.is_empty() {
-            "EXACT_AMOUNT".to_string()
-        } else {
-            flag_names.join(" | ")
         }
     }
 

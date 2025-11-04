@@ -1,5 +1,6 @@
 use crate::context::{BuildCache, Emulations, KnownAddresses};
 use crate::retrace;
+use crate::retrace::{ExecutedAction, InstalledActions};
 use abi::{ContractAbi, TypeAbi};
 use emulator::blockchain::account_code;
 use emulator::exit_codes::get_exit_code_info;
@@ -8,16 +9,17 @@ use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Write;
+use tolkc::source_map::SourceLocation;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, Load};
-use tycho_types::error::Error;
 use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, IntAddr, Message, MsgInfo, ShardAccount,
-    Transaction, TxInfo,
+    AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
+    ReserveCurrencyFlags, SendMsgFlags, ShardAccount, Transaction, TxInfo,
 };
+use tycho_types::num::Tokens;
 
 /// Calculate visible length of a string (excluding ANSI escape codes)
 fn visible_len(s: &str) -> usize {
@@ -60,6 +62,7 @@ pub struct FormatterContext {
     pub emulations: Emulations,
     pub known_addresses: KnownAddresses,
     pub known_code_cells: HashMap<String, String>,
+    pub backtrace: Option<String>,
 }
 
 impl FormatterContext {
@@ -71,6 +74,7 @@ impl FormatterContext {
             emulations: Emulations::new(),
             known_addresses: KnownAddresses::new(),
             known_code_cells: HashMap::new(),
+            backtrace: None,
         }
     }
 
@@ -83,6 +87,7 @@ impl FormatterContext {
             emulations: ctx.emulations.clone(),
             known_addresses: ctx.known_addresses.clone(),
             known_code_cells: ctx.known_code_cells.clone(),
+            backtrace: ctx.backtrace.clone(),
         }
     }
 
@@ -404,6 +409,7 @@ impl FormatterContext {
             has_children,
             main_part_visible_len,
             prefix_len,
+            contract_letters,
         );
 
         tx_builder
@@ -416,8 +422,29 @@ impl FormatterContext {
         contract_letters: &HashMap<IntAddr, String>,
         show_full_names: bool,
     ) -> String {
-        let in_msg = tx.load_in_msg().unwrap().unwrap();
-        let MsgInfo::Int(info) = &in_msg.info else {
+        let Some(in_msg) = &tx.in_msg else {
+            return "".to_string();
+        };
+        let Ok(in_msg) = in_msg.parse::<RelaxedMessage>() else {
+            return "".to_string();
+        };
+        self.format_single_message(&in_msg, contract_letters, show_full_names)
+    }
+
+    fn format_single_message(
+        &self,
+        in_msg: &RelaxedMessage,
+        contract_letters: &HashMap<IntAddr, String>,
+        show_full_names: bool,
+    ) -> String {
+        let RelaxedMsgInfo::Int(info) = &in_msg.info else {
+            if let RelaxedMsgInfo::ExtOut(_) = &in_msg.info {
+                let Some(msg_info) = self.format_ext_out_message(&in_msg) else {
+                    return "".to_string();
+                };
+
+                return msg_info;
+            }
             return "".to_string();
         };
 
@@ -427,7 +454,9 @@ impl FormatterContext {
             result += "(!) ".red().to_string().as_str();
         }
 
-        result += &self.format_address_with_letter(&info.src, contract_letters, show_full_names);
+        if let Some(src) = &info.src {
+            result += &self.format_address_with_letter(&src, contract_letters, show_full_names);
+        }
         if show_full_names {
             result += " -> ".dimmed().to_string().as_str();
         }
@@ -437,13 +466,22 @@ impl FormatterContext {
         result += &message_name;
         result += " ";
 
-        let amount = info.value.tokens.into_inner() as f64 / 1e9;
-        result += &format!("{} TON", amount.to_string()).green().to_string();
+        result += self.format_ton_tokens(info.value.tokens).as_str();
         result += " -> ".dimmed().to_string().as_str();
 
         result += &self.format_address_with_letter(&info.dst, contract_letters, true);
 
         result
+    }
+
+    fn format_ton_tokens(&self, tokens: Tokens) -> String {
+        let amount = tokens.into_inner() as f64 / 1e9;
+        format!("{} TON", amount.to_string()).green().to_string()
+    }
+
+    fn format_ton(&self, amount: &BigInt) -> String {
+        let amount = amount.to_f64().unwrap_or(0.0) / 1e9;
+        format!("{} TON", amount.to_string()).green().to_string()
     }
 
     /// Format transaction execution info (gas, exit code, account changes)
@@ -455,6 +493,7 @@ impl FormatterContext {
         has_children: bool,
         main_part_visible_len: usize,
         prefix_len: usize,
+        contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
         let TxInfo::Ordinary(info) = tx.load_info().unwrap() else {
             panic!("tick-tock message is unexpected")
@@ -558,43 +597,49 @@ impl FormatterContext {
                     extra_infos.push("Action phase failed".to_string());
 
                     if let Some(info) = get_exit_code_info(action.result_code as i64) {
-                        extra_infos.push(format!("Description: {}", info.description.to_string()));
+                        extra_infos.push(format!(
+                            "Description: {}",
+                            info.description.to_string().yellow()
+                        ));
+                    }
+
+                    // Trying to collect installed and executed out actions
+                    let vm_logs = self.emulations.find_tx_logs(tx.lt);
+                    let installed_actions = if let Some(vm_logs) = vm_logs {
+                        retrace::find_installed_actions(&vm_logs)
+                    } else {
+                        InstalledActions::empty()
+                    };
+
+                    let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
+                    if let Some(logs) = executor_logs {
+                        if self.backtrace.is_none() {
+                            extra_infos.push(format!(
+                                "Re-run with {} to get actions location",
+                                "--backtrace full".yellow()
+                            ));
+                        }
+
+                        let actions = self.format_actions_retrace(
+                            child_prefix,
+                            tx,
+                            installed_actions,
+                            &logs,
+                            contract_letters,
+                        );
+                        extra_infos.push(actions);
                     }
                 }
             }
         }
 
         for ext_msg in send_result.externals.iter() {
-            let mut slice = ext_msg.as_slice().unwrap();
-            let Ok(msg) = Message::load_from(&mut slice) else {
+            let Ok(msg) = ext_msg.parse::<RelaxedMessage>() else {
                 continue;
             };
 
-            let MsgInfo::ExtOut(info) = &msg.info else {
+            let Some(msg_info) = self.format_ext_out_message(&msg) else {
                 continue;
-            };
-
-            let opcode = self.extract_opcode(&msg);
-            let message_name = self.get_message_name(opcode);
-
-            let msg_info = if let Some(ext_addr) = &info.dst {
-                let hex_data = hex::encode(&ext_addr.data);
-                format!(
-                    "{} {} {} {} {}",
-                    "ext-out".blue(),
-                    message_name,
-                    "->".dimmed(),
-                    format!("0x{}", hex_data).cyan(),
-                    format!("({} bits)", ext_addr.data_bit_len).dimmed(),
-                )
-            } else {
-                format!(
-                    "{} {} {} {}",
-                    "ext-out".blue(),
-                    message_name,
-                    "->".dimmed(),
-                    "none".cyan()
-                )
             };
 
             extra_infos.push(msg_info);
@@ -621,6 +666,173 @@ impl FormatterContext {
         }
 
         result
+    }
+
+    fn format_ext_out_message(&self, msg: &RelaxedMessage) -> Option<String> {
+        let RelaxedMsgInfo::ExtOut(info) = &msg.info else {
+            return None;
+        };
+
+        let opcode = self.extract_opcode(&msg);
+        let message_name = self.get_message_name(opcode);
+
+        let msg_info = if let Some(ext_addr) = &info.dst {
+            let hex_data = hex::encode(&ext_addr.data);
+            format!(
+                "{} {} {} {} {}",
+                "ext-out".blue(),
+                message_name,
+                "->".dimmed(),
+                format!("0x{}", hex_data).cyan(),
+                format!("({} bits)", ext_addr.data_bit_len).dimmed(),
+            )
+        } else {
+            format!(
+                "{} {} {} {}",
+                "ext-out".blue(),
+                message_name,
+                "->".dimmed(),
+                "none".cyan()
+            )
+        };
+        Some(msg_info)
+    }
+
+    fn format_actions_retrace(
+        &self,
+        child_prefix: &str,
+        tx: &Transaction,
+        installed_actions: InstalledActions,
+        logs: &String,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
+        let actions = retrace::extract_actions_from_executor_logs(&logs);
+
+        if actions.is_empty() {
+            return String::new();
+        }
+
+        let mut action_parts = Vec::new();
+
+        for action in &actions {
+            match action {
+                ExecutedAction::SendMessage {
+                    hash,
+                    remaining_balance,
+                } => {
+                    let message = installed_actions.find_message(&hash);
+
+                    let (loc, formated) = if let Some(message) = message {
+                        let msg = message.message().unwrap();
+                        let formated = self.format_single_message(&msg, contract_letters, false);
+
+                        (
+                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset),
+                            formated,
+                        )
+                    } else {
+                        (None, hash.to_string())
+                    };
+
+                    let message_part = formated;
+                    let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
+                    let location_part = loc
+                        .map(|l| format!("at {}", l.format()))
+                        .unwrap_or_default();
+
+                    action_parts.push((message_part, balance_part, location_part));
+                }
+                ExecutedAction::ReserveCurrency {
+                    mode,
+                    reserve,
+                    changed_remaining_balance,
+                    ..
+                } => {
+                    let reserve_action = installed_actions.find_reserve(*mode, &reserve);
+
+                    let loc = if let Some(action) = reserve_action {
+                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
+                    } else {
+                        None
+                    };
+
+                    let mode_flags = ReserveCurrencyFlags::from_bits(*mode as u8)
+                        .unwrap_or(ReserveCurrencyFlags::empty());
+
+                    let message_part = format!(
+                        "{} {} {}",
+                        "reserve".blue(),
+                        self.format_ton(reserve),
+                        Self::format_reserve_currency_flags(mode_flags).dimmed()
+                    );
+                    let balance_part =
+                        format!("balance: {}", self.format_ton(changed_remaining_balance));
+                    let location_part = loc
+                        .map(|l| format!("at {}", l.format()))
+                        .unwrap_or_default();
+
+                    action_parts.push((message_part, balance_part, location_part));
+                }
+            }
+        }
+
+        let mut max_message_width = 0;
+        let mut max_balance_width = 0;
+
+        for (message, balance, _) in &action_parts {
+            max_message_width = max_message_width.max(visible_len(message));
+            max_balance_width = max_balance_width.max(visible_len(balance));
+        }
+
+        let mut result = String::new();
+        result.push_str("Executed actions:\n");
+
+        for (idx, (message, balance, location)) in action_parts.iter().enumerate() {
+            if idx != actions.len() - 1 {
+                result.push_str(format!("{}    {} ", child_prefix, "├──".dimmed()).as_str());
+            } else {
+                result.push_str(format!("{}    {} ", child_prefix, "└──".dimmed()).as_str());
+            }
+
+            let message_padding =
+                " ".repeat(max_message_width.saturating_sub(visible_len(message)));
+            let balance_padding =
+                " ".repeat(max_balance_width.saturating_sub(visible_len(balance)));
+
+            result.push_str(message);
+            result.push_str(&message_padding);
+            result.push_str("  ");
+            result.push_str(balance);
+            result.push_str(&balance_padding);
+
+            if !location.is_empty() {
+                result.push_str("  ");
+                result.push_str(location.dimmed().to_string().as_str());
+            }
+
+            result.push('\n');
+        }
+
+        result.trim_end().to_string()
+    }
+
+    fn find_source_loc(
+        &self,
+        tx: &Transaction,
+        loc_hash: &String,
+        loc_offset: i32,
+    ) -> Option<SourceLocation> {
+        let in_msg = tx.load_in_msg().ok()??;
+        if let MsgInfo::Int(info) = &in_msg.info {
+            let code = account_code(&self.accounts, info.dst.to_string());
+            let result = self.build_cache.result_for_code(&code);
+
+            if let Some(result) = result {
+                return retrace::find_source_loc(&result.1.source_map, loc_hash, loc_offset);
+            }
+        }
+
+        None
     }
 
     /// Format address with contract type and letter
@@ -655,7 +867,7 @@ impl FormatterContext {
     }
 
     /// Extract opcode from message body
-    fn extract_opcode(&self, in_msg: &Message) -> u32 {
+    fn extract_opcode(&self, in_msg: &RelaxedMessage) -> u32 {
         let mut body = in_msg.body.clone();
         let mut opcode = body.load_u32().unwrap_or(0);
         if opcode == 0xFFFFFFFF {
@@ -1062,6 +1274,61 @@ impl FormatterContext {
 
             result.push_str(")");
             result
+        }
+    }
+
+    pub fn format_send_msg_flags(flags: SendMsgFlags) -> String {
+        let mut flag_names = Vec::new();
+
+        if flags.contains(SendMsgFlags::PAY_FEE_SEPARATELY) {
+            flag_names.push("PAY_FEES_SEPARATELY");
+        }
+        if flags.contains(SendMsgFlags::IGNORE_ERROR) {
+            flag_names.push("IGNORE_ERRORS");
+        }
+        if flags.contains(SendMsgFlags::BOUNCE_ON_ERROR) {
+            flag_names.push("BOUNCE_ON_ACTION_FAIL");
+        }
+        if flags.contains(SendMsgFlags::DELETE_IF_EMPTY) {
+            flag_names.push("DESTROY");
+        }
+        if flags.contains(SendMsgFlags::WITH_REMAINING_BALANCE) {
+            flag_names.push("CARRY_ALL_REMAINING_MESSAGE_VALUE");
+        }
+        if flags.contains(SendMsgFlags::ALL_BALANCE) {
+            flag_names.push("CARRY_ALL_BALANCE");
+        }
+
+        if flag_names.is_empty() {
+            "REGULAR".to_string()
+        } else {
+            flag_names.join(" | ")
+        }
+    }
+
+    pub fn format_reserve_currency_flags(flags: ReserveCurrencyFlags) -> String {
+        let mut flag_names = Vec::new();
+
+        if flags.contains(ReserveCurrencyFlags::ALL_BUT) {
+            flag_names.push("ALL_BUT_AMOUNT");
+        }
+        if flags.contains(ReserveCurrencyFlags::IGNORE_ERROR) {
+            flag_names.push("AT_MOST");
+        }
+        if flags.contains(ReserveCurrencyFlags::WITH_ORIGINAL_BALANCE) {
+            flag_names.push("INCREASE_BY_ORIGINAL_BALANCE");
+        }
+        if flags.contains(ReserveCurrencyFlags::REVERSE) {
+            flag_names.push("NEGATE_AMOUNT");
+        }
+        if flags.contains(ReserveCurrencyFlags::BOUNCE_ON_ERROR) {
+            flag_names.push("BOUNCE_ON_ACTION_FAIL");
+        }
+
+        if flag_names.is_empty() {
+            "EXACT_AMOUNT".to_string()
+        } else {
+            flag_names.join(" | ")
         }
     }
 }

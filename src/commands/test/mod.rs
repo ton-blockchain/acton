@@ -438,6 +438,7 @@ fn run_all_tests(
             debug,
             req_receiver.clone(),
             dap_sender.clone(),
+            backtrace.as_ref(),
             coverage,
         );
         let duration = start_time.elapsed();
@@ -512,6 +513,7 @@ fn run_all_tests(
                 emulations: emulations.clone(),
                 known_addresses: known_addresses.clone(),
                 known_code_cells: known_code_cells.clone(),
+                backtrace: backtrace.clone(),
             };
 
             match &get_result {
@@ -923,6 +925,7 @@ fn execute_test(
     debug: bool,
     req_receiver: Receiver<Request>,
     dap_sender: Sender<DapMessage>,
+    backtrace: Option<&String>,
     coverage: bool,
 ) -> TestResult {
     let params = GetMethodParams {
@@ -960,7 +963,8 @@ fn execute_test(
         expected_exit_code: &mut None,
         dbg_ctx: &mut DebugContext::empty(),
         debug,
-        need_debug_info: debug || coverage,
+        backtrace: backtrace.cloned(),
+        need_debug_info: debug || coverage || backtrace == Some(&"full".to_string()),
     };
 
     let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) = if debug {

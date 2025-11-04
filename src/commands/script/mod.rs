@@ -115,6 +115,7 @@ fn execute_script(
         expected_exit_code: &mut None,
         dbg_ctx: &mut DebugContext::empty(),
         debug,
+        backtrace: None,
         need_debug_info: false,
     };
 

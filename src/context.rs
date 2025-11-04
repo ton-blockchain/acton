@@ -227,6 +227,11 @@ impl Emulations {
         self.find_tx_by_lt(lt)
             .and_then(|res| Some(res.debug_logs()))
     }
+
+    pub fn find_tx_executor_logs(&self, lt: u64) -> Option<String> {
+        self.find_tx_by_lt(lt)
+            .and_then(|res| Some(res.executor_logs()))
+    }
 }
 
 pub struct Context<'a> {
@@ -243,6 +248,7 @@ pub struct Context<'a> {
     pub abi: ContractAbi,
     pub debug: bool,
     pub need_debug_info: bool,
+    pub backtrace: Option<String>,
     pub emulations: &'a mut Emulations,
     pub dbg_ctx: &'a mut DebugContext,
 }

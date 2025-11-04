@@ -33,6 +33,13 @@ impl SendMessageResult {
             SendMessageResult::Error(res) => "".to_string(),
         }
     }
+
+    pub fn executor_logs(&self) -> String {
+        match self {
+            SendMessageResult::Success(res) => res.logs.clone(),
+            SendMessageResult::Error(res) => "".to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
