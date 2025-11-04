@@ -1,5 +1,6 @@
 use crate::spec::*;
 use crate::types::{ArgValue, Code, CodeDictionary, Control, Instruction, Method, StackRegister};
+use anyhow::anyhow;
 use num_bigint::{BigInt, BigUint};
 use num_traits::ToPrimitive;
 use smallvec::smallvec;
@@ -16,7 +17,8 @@ pub struct Disassembler {
 
 impl Disassembler {
     pub fn new() -> Disassembler {
-        let spec: Specification = serde_json::from_str(SPEC).unwrap();
+        let spec: Specification =
+            serde_json::from_str(SPEC).expect("Failed to parse built-in TVM specification JSON");
         Self::from_instructions(&spec.instructions)
     }
 
@@ -35,22 +37,26 @@ impl Disassembler {
 
         instruction_ranges.sort_by_key(|r| r.min);
 
+        // fill gaps between instruction ranges with empty ranges (no instruction)
+        // This ensures binary search works correctly for all opcode values
         let mut upto = 0i64;
         for instr in instruction_ranges {
             if instr.min >= instr.max || instr.min < upto || instr.max > top_opcode {
                 panic!("instruction list is invalid");
             }
+            // add gap range if there's space between current position and next instruction
             if upto < instr.min {
                 list.push(InstructionWithRange {
                     min: upto,
                     max: instr.min,
-                    instr: None,
+                    instr: None, // no instruction for this range
                 });
             }
             upto = instr.max;
             list.push(instr);
         }
 
+        // add final gap range to cover remaining opcodes up to maximum
         if upto < top_opcode {
             list.push(InstructionWithRange {
                 min: upto,
@@ -72,15 +78,21 @@ impl Disassembler {
             .saturating_sub(1);
 
         let instr = &self.list[instr_idx];
-        let instruction = instr.instr.as_ref().unwrap();
+        let Some(instruction) = instr.instr.as_ref() else {
+            return Err(anyhow!(
+                "found instruction is dummy one, max: {}, min: {}",
+                instr.max,
+                instr.min
+            ));
+        };
         let layout = &instruction.layout;
 
-        // Skip opcode, we already know the instruction
-        let _ = slice.load_uint(layout.check_len as u16);
+        // skip opcode, we already know the instruction
+        slice.load_uint(layout.check_len as u16)?;
 
         let mut args = smallvec::SmallVec::with_capacity(3);
 
-        // Process DICTPUSHCONST-like instructions with separate logic
+        // process DICTPUSHCONST-like instructions with separate logic
         if layout.args.0.len() == 2 && matches!(&layout.args.0[0], Arg::InlineDictArg(_)) {
             let key_length = slice.load_uint(10)?;
             let mut dict_slice = slice.load_reference()?.as_slice()?;
@@ -251,7 +263,7 @@ impl Disassembler {
                 args.push(ArgValue::Code(Box::new(code)));
             }
             Arg::SliceArg(slice_arg) => {
-                let slice_val = Self::load_slice(slice, slice_arg);
+                let slice_val = Self::load_slice(slice, slice_arg)?;
                 args.push(ArgValue::Cell(slice_val));
             }
             Arg::DebugstrArg(_) => {
@@ -268,11 +280,11 @@ impl Disassembler {
         Ok(())
     }
 
-    fn load_slice(slice: &mut CellSlice, arg: &SliceArg) -> Cell {
+    fn load_slice(slice: &mut CellSlice, arg: &SliceArg) -> anyhow::Result<Cell> {
         let count_refs: u64 = if let Arg::UintArg(arg) = &*arg.refs
             && arg.len > 0
         {
-            slice.load_uint(arg.len as u16).unwrap()
+            slice.load_uint(arg.len as u16)?
         } else {
             0
         };
@@ -281,14 +293,15 @@ impl Disassembler {
             panic!("expected uint for bits")
         };
 
-        let y = slice.load_uint(bits.len as u16).unwrap().to_i64().unwrap();
+        let y = slice.load_uint(bits.len as u16)?.to_i64().unwrap();
         let real_length = (y * 8 + arg.pad) as u16;
-        let mut r = slice.load_prefix(real_length, 0).unwrap();
+        let mut r = slice.load_prefix(real_length, 0)?;
 
+        // Find the position of the last set bit (MSB) to determine actual data length
         let mut length = 0usize;
         for i in (0..real_length).rev() {
             let byte_idx = i / 8;
-            let data_byte = r.get_u8(byte_idx).unwrap();
+            let data_byte = r.get_u8(byte_idx)?;
             let bit_shift = (i % 8) as u32;
             let bit = data_byte & (1 << (7 - bit_shift));
             if bit == 0 {
@@ -298,16 +311,14 @@ impl Disassembler {
             break;
         }
 
-        let r = r.load_prefix(length as u16, 0).unwrap();
+        let r = r.load_prefix(length as u16, 0)?;
 
         let mut builder = CellBuilder::new();
-        builder.store_slice(r).expect("should be stored");
+        builder.store_slice(&r)?;
         for _ in 0..count_refs {
-            builder
-                .store_reference(dyn_cell_to_cell(slice.load_reference().unwrap()))
-                .unwrap();
+            builder.store_reference(dyn_cell_to_cell(slice.load_reference()?))?;
         }
-        builder.build().unwrap()
+        Ok(builder.build()?)
     }
 }
 
@@ -321,7 +332,7 @@ struct InstructionWithRange {
 }
 
 fn dyn_cell_to_cell(cell: &DynCell) -> Cell {
-    Boc::decode_base64(Boc::encode_base64(cell)).unwrap()
+    Boc::decode_base64(Boc::encode_base64(cell)).expect("Cell after encoding must be correct")
 }
 
 #[cfg(test)]
