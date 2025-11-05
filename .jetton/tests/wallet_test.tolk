@@ -476,7 +476,7 @@ get fun `test-correctly-sends-forward-payload`() {
 
     expect(send_result).toHaveSuccessfulTx({
         from: not_deployer_jetton_wallet.address,
-        to: not_deployer_jetton_wallet.address
+        to: deployer.address
     }); // excesses
 
     expect(send_result).toHaveSuccessfulTx({

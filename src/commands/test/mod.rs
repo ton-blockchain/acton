@@ -19,12 +19,12 @@ use emulator::emulator::Emulator;
 use emulator::exit_codes;
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
-use num_bigint::BigInt;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use regex::Regex;
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use std::{fs, process};
@@ -34,6 +34,7 @@ use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::models::ShardAccount;
+use walkdir::WalkDir;
 
 mod annotations;
 mod coverage;
@@ -51,6 +52,7 @@ pub struct TestConfig {
     pub coverage: bool,
     pub filter: Option<String>,
     pub coverage_format: Option<String>,
+    pub exclude_patterns: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -222,7 +224,10 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         }
         vec![path.clone()]
     } else if metadata.is_dir() {
-        find_test_files_recursively(&path)?
+        find_test_files_recursively(&path, &config.exclude_patterns)?
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect()
     } else {
         anyhow::bail!("Path '{}' is neither a file nor a directory", path);
     };
@@ -368,32 +373,67 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     Ok(())
 }
 
-fn find_test_files_recursively(dir_path: &str) -> Result<Vec<String>, anyhow::Error> {
-    let mut test_files = Vec::new();
+pub fn find_test_files_recursively(
+    dir_path: &str,
+    exclude_patterns: &[String],
+) -> anyhow::Result<Vec<PathBuf>> {
+    let mut builder = GlobSetBuilder::new();
+    for p in exclude_patterns {
+        builder.add(Glob::new(p)?);
+    }
+    for p in ["**/node_modules/**", "**/.git/**", "**/target/**"] {
+        builder.add(Glob::new(p)?);
+    }
+    let excludes: GlobSet = builder.build()?;
 
-    fn visit_dir(dir: &Path, test_files: &mut Vec<String>) -> anyhow::Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
+    let root = Path::new(dir_path);
+
+    let it = WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|entry| {
+            if !entry.file_type().is_dir() {
+                return true;
+            }
+            let p = entry.path();
+            let rel = p.strip_prefix(root).unwrap_or(p);
+            !excludes.is_match(rel)
+        });
+
+    let mut out: Vec<PathBuf> = Vec::new();
+
+    for entry in it {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(err) => {
+                log::warn!("walk dir error: {err}");
+                continue;
+            }
+        };
+
+        if entry.file_type().is_file() {
             let path = entry.path();
 
-            if path.is_dir() {
-                if path.file_name() == Some("node_modules".as_ref()) {
-                    return Ok(());
-                }
+            let rel = path.strip_prefix(root).unwrap_or(path);
 
-                visit_dir(&path, test_files)?;
-            } else if let Some(file_name) = path.file_name() {
-                if file_name.to_string_lossy().ends_with("_test.tolk") {
-                    test_files.push(path.to_string_lossy().to_string());
+            if let Some(name) = rel.file_name().and_then(|s| s.to_str()) {
+                if !name.ends_with("_test.tolk") {
+                    continue;
                 }
+            } else {
+                continue;
             }
+
+            if excludes.is_match(rel) {
+                continue;
+            }
+
+            out.push(path.to_path_buf());
         }
-        Ok(())
     }
 
-    visit_dir(Path::new(dir_path), &mut test_files)?;
-    test_files.sort();
-    Ok(test_files)
+    out.sort_unstable();
+    Ok(out)
 }
 
 #[derive(Debug)]

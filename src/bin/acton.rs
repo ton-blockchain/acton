@@ -46,6 +46,8 @@ enum Commands {
         coverage: bool,
         #[arg(long, help = "Output coverage in specified format (lcov)")]
         format: Option<String>,
+        #[arg(long, help = "Exclude test files matching glob patterns")]
+        exclude: Vec<String>,
     },
     #[command(about = "Execute a Tolk script file")]
     Script {
@@ -104,6 +106,7 @@ fn main() {
             backtrace,
             coverage,
             format,
+            exclude,
         } => {
             let config = TestConfig {
                 teamcity,
@@ -113,6 +116,7 @@ fn main() {
                 coverage,
                 filter: filter.map(|s| s.to_string()),
                 coverage_format: format,
+                exclude_patterns: exclude,
             };
             let result = test_cmd(path, &config);
             if let Err(err) = result {
