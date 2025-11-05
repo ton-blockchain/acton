@@ -69,6 +69,15 @@ impl Executor {
         let shard_account_b64_cst = CString::new(shard_account_b64)
             .expect("Failed to create C string from shard account BOC");
 
+        let has_libs = params.libs.is_some();
+        let libs = params
+            .libs
+            .clone()
+            .map(|lib| Boc::encode_base64(lib))
+            .unwrap_or("".to_string());
+        let libs_cstr = CString::new(libs).unwrap();
+        let libs_ptr = libs_cstr.as_ptr();
+
         let params = run_common_args_to_internal_params(&params);
         let params_str =
             serde_json::to_string(&params).expect("Failed to serialize emulation params to JSON");
@@ -78,7 +87,7 @@ impl Executor {
         let result_cstr = unsafe {
             emulate_with_emulator(
                 self.inner,
-                null(),
+                if has_libs { libs_ptr } else { null() },
                 shard_account_b64_cst.as_ptr(),
                 message.as_ptr(),
                 params_cstr.as_ptr(),

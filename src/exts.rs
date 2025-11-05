@@ -370,7 +370,7 @@ fn send_message_debug(
         BigInt::from(0),
         RunTransactionArgs {
             config: DEFAULT_CONFIG.to_string(),
-            libs: Some(libs.to_cell()),
+            libs: libs.clone().into_root(),
             verbosity: ExecutorVerbosity::FullLocation,
             shard_account: dest_account.clone(),
             now: 0,
