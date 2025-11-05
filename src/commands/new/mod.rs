@@ -6,7 +6,7 @@ use std::path::Path;
 
 static LIB_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/lib");
 
-pub fn new_cmd(path: &str) -> Result<(), anyhow::Error> {
+pub fn new_cmd(path: &str) -> anyhow::Result<()> {
     let project_path = if path == "." {
         std::env::current_dir()?
     } else {

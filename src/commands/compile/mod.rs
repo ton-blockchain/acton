@@ -10,7 +10,7 @@ pub fn compile_cmd(
     json: bool,
     base64_only: bool,
     boc: Option<String>,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() {
         return Err(anyhow!("Path '{}' is not a file", path));

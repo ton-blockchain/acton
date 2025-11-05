@@ -4,7 +4,7 @@ use owo_colors::OwoColorize;
 
 static LIB_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/lib");
 
-pub fn init_cmd() -> Result<(), anyhow::Error> {
+pub fn init_cmd() -> anyhow::Result<()> {
     if std::path::Path::new("Acton.toml").exists() {
         println!("{}", "Acton.toml already exists!".yellow());
         return Ok(());

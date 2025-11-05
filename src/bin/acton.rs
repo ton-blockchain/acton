@@ -5,7 +5,7 @@ use emulator_rs::commands::disasm::disasm_cmd;
 use emulator_rs::commands::init::init_cmd;
 use emulator_rs::commands::new::new_cmd;
 use emulator_rs::commands::script::script_cmd;
-use emulator_rs::commands::test::test_cmd;
+use emulator_rs::commands::test::{TestConfig, test_cmd};
 use owo_colors::OwoColorize;
 use std::fs::OpenOptions;
 
@@ -105,16 +105,16 @@ fn main() {
             coverage,
             format,
         } => {
-            let result = test_cmd(
-                &path.unwrap_or_else(|| ".".to_string()),
-                filter.as_deref(),
+            let config = TestConfig {
                 teamcity,
                 debug,
                 debug_port,
                 backtrace,
                 coverage,
-                format.as_deref(),
-            );
+                filter: filter.map(|s| s.to_string()),
+                coverage_format: format,
+            };
+            let result = test_cmd(path, &config);
             if let Err(err) = result {
                 eprintln!("{} {}", "Error:".red(), err);
             }

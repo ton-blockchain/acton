@@ -16,7 +16,7 @@ use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
 
-pub fn script_cmd(path: &String, debug: bool, debug_port: u16) -> Result<(), anyhow::Error> {
+pub fn script_cmd(path: &String, debug: bool, debug_port: u16) -> anyhow::Result<()> {
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() {
         return Err(anyhow!("Path '{}' is not a file", path));
@@ -35,7 +35,7 @@ fn run_script_file(
     content: &str,
     debug: bool,
     debug_port: u16,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<()> {
     let abi = contract_abi(content, file_path);
 
     let executable_code = content.to_string();

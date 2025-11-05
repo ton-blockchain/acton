@@ -16,10 +16,7 @@ impl Tuple {
 }
 
 /// Serialize a tuple item to a cell builder
-pub fn serialize_tuple_item(
-    builder: &mut CellBuilder,
-    src: &TupleItem,
-) -> Result<(), anyhow::Error> {
+pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyhow::Result<()> {
     match src {
         TupleItem::Null => {
             builder.store_u8(8, 0x00)?;
@@ -200,7 +197,7 @@ pub fn serialize_tuple(src: &Tuple) -> Result<ArcCell, anyhow::Error> {
     Ok(ArcCell::new(builder.build()?))
 }
 
-fn serialize_tuple_tail(src: &[TupleItem], builder: &mut CellBuilder) -> Result<(), anyhow::Error> {
+fn serialize_tuple_tail(src: &[TupleItem], builder: &mut CellBuilder) -> anyhow::Result<()> {
     if !src.is_empty() {
         // rest:^(VmStackList n)
         let mut tail_builder = CellBuilder::new();

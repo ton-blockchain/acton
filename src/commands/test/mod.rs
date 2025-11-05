@@ -1,6 +1,7 @@
 use crate::commands::test::coverage::{
     Coverage, collect_coverage, generate_lcov_file, merge_coverages, print_coverage_summary,
 };
+use crate::commands::test::instrumentation::inject_locations_into_expect_calls;
 use crate::context::{
     AnyExecutor, AssertFailure, BuildCache, Context, Emulations, KnownAddresses,
     TransactionGenericAssertFailure,
@@ -32,11 +33,11 @@ use tolkc::source_map::{SourceLocation, SourceMap};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
-use tree_sitter::Node;
 use tycho_types::models::ShardAccount;
 
 mod annotations;
 mod coverage;
+mod instrumentation;
 mod teamcity;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
@@ -49,6 +50,7 @@ pub struct TestConfig {
     pub backtrace: Option<String>,
     pub coverage: bool,
     pub filter: Option<String>,
+    pub coverage_format: Option<String>,
 }
 
 #[derive(Debug)]
@@ -97,14 +99,13 @@ impl TestRunner {
         &mut self,
         test: &TestDescriptor,
         code_cell: &Arc<Cell>,
-        data_cell: &Arc<Cell>,
         dest_address: &TonAddress,
         abi: &ContractAbi,
         source_map: &SourceMap,
     ) -> TestResult {
         let params = GetMethodParams {
             code: code_cell.to_boc_b64(false).unwrap().to_string(),
-            data: data_cell.to_boc_b64(false).unwrap().to_string(),
+            data: ArcCell::default().to_boc_b64(false).unwrap().to_string(),
             verbosity: 5,
             libs: "".to_string(),
             address: dest_address.to_string(),
@@ -210,34 +211,20 @@ impl TestRunner {
     }
 }
 
-pub fn test_cmd(
-    path: &String,
-    filter: Option<&str>,
-    teamcity: bool,
-    debug: bool,
-    debug_port: u16,
-    backtrace: Option<String>,
-    coverage: bool,
-    format: Option<&str>,
-) -> Result<(), anyhow::Error> {
-    let config = TestConfig {
-        teamcity,
-        debug,
-        debug_port,
-        backtrace,
-        coverage,
-        filter: filter.map(|s| s.to_string()),
-    };
-    let metadata = fs::metadata(path)?;
+pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()> {
+    // If path is omitted, default to current directory
+    let path = path.unwrap_or_else(|| ".".to_string());
+
+    let metadata = fs::metadata(&path)?;
     let test_files = if metadata.is_file() {
         if !path.ends_with("_test.tolk") {
-            return Err(anyhow!("File must end with _test.tolk"));
+            anyhow::bail!("Test file must end with _test.tolk");
         }
         vec![path.clone()]
     } else if metadata.is_dir() {
-        find_test_files_recursively(path)?
+        find_test_files_recursively(&path)?
     } else {
-        return Err(anyhow!("Path '{}' is neither a file nor a directory", path));
+        anyhow::bail!("Path '{}' is neither a file nor a directory", path);
     };
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
@@ -347,9 +334,9 @@ pub fn test_cmd(
         let merged_coverage = merge_coverages(&coverages);
         print_coverage_summary(&merged_coverage);
 
-        if let Some(format_type) = format {
+        if let Some(format_type) = &config.coverage_format {
             println!();
-            match format_type {
+            match format_type.as_str() {
                 "lcov" => {
                     let lcov_path = "lcov.info";
                     if let Err(err) = generate_lcov_file(&merged_coverage, lcov_path) {
@@ -384,7 +371,7 @@ pub fn test_cmd(
 fn find_test_files_recursively(dir_path: &str) -> Result<Vec<String>, anyhow::Error> {
     let mut test_files = Vec::new();
 
-    fn visit_dir(dir: &Path, test_files: &mut Vec<String>) -> Result<(), anyhow::Error> {
+    fn visit_dir(dir: &Path, test_files: &mut Vec<String>) -> anyhow::Result<()> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -409,21 +396,6 @@ fn find_test_files_recursively(dir_path: &str) -> Result<Vec<String>, anyhow::Er
     Ok(test_files)
 }
 
-fn has_entry_function(root_node: &Node, content: &str) -> bool {
-    let mut cursor = root_node.walk();
-    for child in root_node.children(&mut cursor) {
-        if child.kind() == "function_declaration" {
-            if let Some(name_node) = child.child_by_field_name("name") {
-                let name = name_node.utf8_text(content.as_bytes()).unwrap_or("");
-                if name == "main" || name == "onInternalMessage" {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
 #[derive(Debug)]
 struct TestStats {
     passed: usize,
@@ -441,7 +413,7 @@ fn run_tests_for_file(file: &str, config: &TestConfig) -> Result<TestStats, anyh
         }
     };
 
-    let tests = find_all_test(file.to_string(), &content);
+    let tests = find_all_test(&content);
 
     let abi = contract_abi(content.as_str(), file);
 
@@ -458,15 +430,13 @@ fn run_tests_for_file(file: &str, config: &TestConfig) -> Result<TestStats, anyh
             let _ = fs::remove_file(&tmp_test_filename);
 
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64)?;
-            let data_cell = ArcCell::default();
 
             let mut runner = TestRunner::new(config.clone());
-            let stats = run_all_tests(
+            let stats = run_file_tests(
                 &mut runner,
                 file,
                 tests,
                 &code_cell,
-                &data_cell,
                 &abi,
                 &result.source_map.unwrap_or(Default::default()),
             );
@@ -483,12 +453,11 @@ fn run_tests_for_file(file: &str, config: &TestConfig) -> Result<TestStats, anyh
     result
 }
 
-fn run_all_tests(
+fn run_file_tests(
     runner: &mut TestRunner,
     file_path: &str,
     tests: Vec<TestDescriptor>,
     code_cell: &Arc<Cell>,
-    data_cell: &Arc<Cell>,
     abi: &ContractAbi,
     source_map: &SourceMap,
 ) -> TestStats {
@@ -575,8 +544,7 @@ fn run_all_tests(
         }
 
         let start_time = Instant::now();
-        let result =
-            runner.execute_test(test, &code_cell, &data_cell, &dest_address, abi, source_map);
+        let result = runner.execute_test(test, &code_cell, &dest_address, abi, source_map);
         let duration = start_time.elapsed();
         let TestResult {
             captured_stdout,
@@ -668,7 +636,8 @@ fn run_all_tests(
                     } else if let Some(ref assert_failure) = assert_failure {
                         if let Some(message) = &assert_failure.message() {
                             if !message.is_empty() {
-                                let highlighted_message = highlight_actual_expected(message);
+                                let highlighted_message =
+                                    FormatterContext::highlight_actual_expected(message);
                                 println!(
                                     "    {} {} {}",
                                     "└─".dimmed(),
@@ -733,7 +702,8 @@ fn run_all_tests(
 
                         if let AssertFailure::TransactionNotFound(assert_failure) = &assert_failure
                         {
-                            let params = format_search_transaction_parameters(assert_failure, abi);
+                            let params =
+                                formatter.format_search_transaction_parameters(assert_failure, abi);
 
                             let diff_output = format!(
                                 "{}\nCannot find transaction from {} to {}\nwith:\n{}",
@@ -753,7 +723,8 @@ fn run_all_tests(
                         }
 
                         if let AssertFailure::TransactionIsFound(assert_failure) = &assert_failure {
-                            let params = format_search_transaction_parameters(assert_failure, abi);
+                            let params =
+                                formatter.format_search_transaction_parameters(assert_failure, abi);
 
                             let diff_output = format!(
                                 "{}\nUnexpected transaction from {} to {}\n{}{}",
@@ -964,80 +935,6 @@ fn beatify_test_name(name: &String) -> String {
         .to_string()
 }
 
-fn format_search_transaction_parameters(
-    assert_failure: &TransactionGenericAssertFailure,
-    abi: &ContractAbi,
-) -> Vec<String> {
-    let mut params = vec![];
-    if let Some(opcode) = assert_failure.params.opcode {
-        let opcode_type = abi.find_type_by_opcode(BigInt::from(opcode));
-        params.push(format!(
-            "  opcode={} {}",
-            format!("0x{:x}", opcode).green(),
-            opcode_type
-                .and_then(|typ| Some(typ.name.clone()))
-                .unwrap_or(if opcode == 0 {
-                    "empty".to_string()
-                } else {
-                    "unknown".to_string()
-                })
-                .purple()
-                .bold()
-        ))
-    }
-    if let Some(bounced) = assert_failure.params.bounced {
-        params.push(format!(
-            "  bounced={}",
-            if bounced {
-                "true".green().to_string()
-            } else {
-                "false".red().to_string()
-            }
-        ))
-    }
-    if let Some(deploy) = assert_failure.params.deploy {
-        params.push(format!(
-            "  deploy={}",
-            if deploy {
-                "true".green().to_string()
-            } else {
-                "false".red().to_string()
-            }
-        ))
-    }
-    if let Some(exit_code) = assert_failure.params.exit_code {
-        params.push(format!(
-            "  exit_code={}",
-            if exit_code == 0 {
-                "0".green().to_string()
-            } else {
-                exit_code.to_string().red().to_string()
-            }
-        ))
-    }
-    if let Some(action_exit_code) = assert_failure.params.action_exit_code {
-        params.push(format!(
-            "  action_exit_code={}",
-            if action_exit_code == 0 {
-                "0".green().to_string()
-            } else {
-                action_exit_code.to_string().red().to_string()
-            }
-        ))
-    }
-    if let Some(compute_phase_skipped) = assert_failure.params.compute_phase_skipped {
-        params.push(format!(
-            "  compute_phase_skipped={}",
-            if compute_phase_skipped {
-                "true".green().to_string()
-            } else {
-                "false".red().to_string()
-            }
-        ))
-    }
-    params
-}
-
 fn contract_address(code: &Arc<Cell>) -> TonAddress {
     let state_init = CellBuilder::new()
         .store_bit(false)
@@ -1059,7 +956,6 @@ fn contract_address(code: &Arc<Cell>) -> TonAddress {
 
 #[derive(Debug)]
 struct TestDescriptor {
-    pub file: String,
     pub id: i32,
     pub name: String,
     pub annotations: Vec<String>,
@@ -1068,7 +964,7 @@ struct TestDescriptor {
     pub todo_description: Option<String>,
 }
 
-fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
+fn find_all_test(content: &String) -> Vec<TestDescriptor> {
     let Ok(tree) = tolk_parser::parser::parse(&content) else {
         return vec![];
     };
@@ -1097,7 +993,6 @@ fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
                     let test_annotations = annotations::find_test_annotations(content, child);
 
                     return vec![TestDescriptor {
-                        file: file.clone(),
                         id,
                         name: name.to_string(),
                         annotations: test_annotations.annotations,
@@ -1111,84 +1006,4 @@ fn find_all_test(file: String, content: &String) -> Vec<TestDescriptor> {
             vec![]
         })
         .collect()
-}
-
-fn inject_locations_into_expect_calls(content: &str, file_path: &str) -> String {
-    let Ok(tree) = tolk_parser::parser::parse(&content) else {
-        return "".to_string();
-    };
-    let root_node = tree.root_node();
-
-    let mut replacements = Vec::new();
-    find_expect_calls(&root_node, content, file_path, &mut replacements);
-
-    let mut result = content.to_string();
-
-    if !has_entry_function(&root_node, &result) {
-        result += "\n\nfun main() {}"
-    }
-
-    for (start, end, replacement) in replacements.into_iter().rev() {
-        result.replace_range(start..end, &replacement);
-    }
-
-    result
-}
-
-fn find_expect_calls(
-    node: &Node,
-    content: &str,
-    file_path: &str,
-    replacements: &mut Vec<(usize, usize, String)>,
-) {
-    for i in 0..node.child_count() {
-        let child = node.child(i).unwrap();
-        find_expect_calls(&child, content, file_path, replacements);
-    }
-
-    if node.kind() != "function_call" {
-        // fast path
-        return;
-    }
-
-    let Some(callee_node) = node.child_by_field_name("callee") else {
-        return;
-    };
-
-    if callee_node.kind() == "identifier"
-        && callee_node.utf8_text(content.as_bytes()).unwrap_or("") == "expect"
-    {
-        let Some(args_node) = node.child_by_field_name("arguments") else {
-            return;
-        };
-
-        let mut arg_count = 0;
-        let mut cursor = args_node.walk();
-        for child in args_node.children(&mut cursor) {
-            if child.kind() == "call_argument" {
-                arg_count += 1;
-            }
-        }
-
-        // Don't add location if it already passed by the user
-        if arg_count == 1 {
-            let column = callee_node.start_position().column + 1;
-            let start = args_node.end_byte() - 1;
-            let end = args_node.end_byte() - 1;
-
-            let lines: Vec<&str> = content[..start].lines().collect();
-            let line_number = lines.len();
-
-            let location = format!(", \"{file_path}:{line_number}:{column}\"",);
-            replacements.push((start, end, location));
-        }
-    }
-}
-
-fn highlight_actual_expected(message: &str) -> String {
-    let result = message
-        .replace("<actual>", &"actual".red().to_string())
-        .replace("<expected>", &"expected".green().to_string());
-
-    result.to_string()
 }

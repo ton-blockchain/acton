@@ -1,4 +1,4 @@
-use crate::context::{BuildCache, Emulations, KnownAddresses};
+use crate::context::{BuildCache, Emulations, KnownAddresses, TransactionGenericAssertFailure};
 use crate::retrace;
 use crate::retrace::{ExecutedAction, InstalledActions};
 use abi::{ContractAbi, TypeAbi};
@@ -1369,5 +1369,88 @@ impl FormatterContext {
         } else {
             flag_names.join(" | ")
         }
+    }
+
+    pub fn format_search_transaction_parameters(
+        &self,
+        assert_failure: &TransactionGenericAssertFailure,
+        abi: &ContractAbi,
+    ) -> Vec<String> {
+        let mut params = vec![];
+        if let Some(opcode) = assert_failure.params.opcode {
+            let opcode_type = abi.find_type_by_opcode(BigInt::from(opcode));
+            params.push(format!(
+                "  opcode={} {}",
+                format!("0x{:x}", opcode).green(),
+                opcode_type
+                    .and_then(|typ| Some(typ.name.clone()))
+                    .unwrap_or(if opcode == 0 {
+                        "empty".to_string()
+                    } else {
+                        "unknown".to_string()
+                    })
+                    .purple()
+                    .bold()
+            ))
+        }
+        if let Some(bounced) = assert_failure.params.bounced {
+            params.push(format!(
+                "  bounced={}",
+                if bounced {
+                    "true".green().to_string()
+                } else {
+                    "false".red().to_string()
+                }
+            ))
+        }
+        if let Some(deploy) = assert_failure.params.deploy {
+            params.push(format!(
+                "  deploy={}",
+                if deploy {
+                    "true".green().to_string()
+                } else {
+                    "false".red().to_string()
+                }
+            ))
+        }
+        if let Some(exit_code) = assert_failure.params.exit_code {
+            params.push(format!(
+                "  exit_code={}",
+                if exit_code == 0 {
+                    "0".green().to_string()
+                } else {
+                    exit_code.to_string().red().to_string()
+                }
+            ))
+        }
+        if let Some(action_exit_code) = assert_failure.params.action_exit_code {
+            params.push(format!(
+                "  action_exit_code={}",
+                if action_exit_code == 0 {
+                    "0".green().to_string()
+                } else {
+                    action_exit_code.to_string().red().to_string()
+                }
+            ))
+        }
+        if let Some(compute_phase_skipped) = assert_failure.params.compute_phase_skipped {
+            params.push(format!(
+                "  compute_phase_skipped={}",
+                if compute_phase_skipped {
+                    "true".green().to_string()
+                } else {
+                    "false".red().to_string()
+                }
+            ))
+        }
+        params
+    }
+
+    pub fn highlight_actual_expected(message: &str) -> String {
+        let result = message
+            .replace("<actual>", &"actual".red().to_string())
+            .replace("<expected>", &"expected".green().to_string());
+
+        result.to_string()
     }
 }
