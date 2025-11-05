@@ -7,7 +7,7 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 use tycho_types::dict::Dict;
 use tycho_types::models::{
-    IntAddr, Message, MsgInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount, Transaction,
+    IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount, Transaction,
 };
 use tycho_types::prelude::HashBytes;
 
@@ -70,7 +70,7 @@ impl Emulator {
         &self,
         net: &mut Blockchain,
         message: Cell,
-        libs: &Dict<HashBytes, Cell>,
+        libs: &Dict<HashBytes, LibDescr>,
         src_addr: Option<IntAddr>,
     ) -> Vec<SendMessageResult> {
         let message = Emulator::patch_src_addr(message, src_addr);

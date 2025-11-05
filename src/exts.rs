@@ -25,8 +25,8 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Load, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
-    ShardAccount, Transaction, TxInfo,
+    AccountState, AccountStatus, ComputePhase, IntAddr, LibDescr, MsgInfo, RelaxedMessage,
+    RelaxedMsgInfo, ShardAccount, Transaction, TxInfo,
 };
 
 extension!(read_file in (Context) with (path: String) using read_file_impl);
@@ -161,9 +161,16 @@ fn send_message_from_impl(
         }
     };
 
-    let mut libs = Dict::<HashBytes, Cell>::new();
+    let mut libs = Dict::<HashBytes, LibDescr>::new();
     for lib in ctx.libraries.clone() {
-        libs.add(lib.repr_hash(), lib.clone()).ok();
+        libs.add(
+            lib.repr_hash(),
+            LibDescr {
+                lib: lib.clone(),
+                publishers: Default::default(),
+            },
+        )
+        .ok();
     }
 
     let emulations = if ctx.debug {
@@ -257,7 +264,7 @@ fn send_message_from_impl(
 fn send_message_debug(
     ctx: &mut Context,
     msg_cell: &Cell,
-    libs: &Dict<HashBytes, Cell>,
+    libs: &Dict<HashBytes, LibDescr>,
     src_addr: Option<IntAddr>,
 ) -> Vec<SendMessageResult> {
     let mut msg_slice = try_ctx!(
