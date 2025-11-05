@@ -1,0 +1,119 @@
+---
+title: "Test Configuration"
+---
+
+Test runner provides flexible configuration options that allow you to set default test behavior in your project configuration file and override it as needed via command line flags. This approach helps maintain consistent testing practices across your project while still allowing per-run customization.
+
+**What you'll learn:**
+- How to configure tests in `Acton.toml`
+- How to override configuration via command line flags
+- Understanding configuration precedence
+- Available test configuration options
+
+## Configuration Methods
+
+Acton supports two methods for configuring test behavior:
+
+1. **Project Configuration** — Set defaults in `Acton.toml` for consistent behavior
+2. **Command Line Flags** — Override configuration for specific test runs
+
+### Configuration Precedence
+
+When both methods are used, the precedence order is:
+
+1. **Command line flags** (highest priority) — override everything
+2. **Acton.toml settings** (medium priority) — project defaults
+3. **Built-in defaults** (lowest priority) — fallback values
+
+## Project Configuration in Acton.toml
+
+### Basic Configuration
+
+Add a `[test]` section to your `Acton.toml` file to configure default test behavior:
+
+```toml title="Acton.toml"
+[package]
+name = "my-ton-project"
+version = "0.1.0"
+
+[test]
+# Enable code coverage by default
+coverage = true
+coverage-format = "lcov"
+
+# Enable detailed backtraces
+backtrace = "full"
+```
+
+## Command Line Override
+
+Any configuration option can be overridden via command line flags:
+
+```bash
+# Override coverage setting from config
+acton test --coverage
+
+# Override filter setting from config
+acton test --filter "test-mint.*"
+
+# Multiple overrides
+acton test --coverage --filter "test-deploy" --debug
+```
+
+## Configuration Options Reference
+
+### Filter Options
+
+| Configuration | CLI Flag    | Type   | Description                         |
+|---------------|-------------|--------|-------------------------------------|
+| `filter`      | `--filter`  | String | Regex pattern to filter test names  |
+| `exclude`     | `--exclude` | Array  | Glob patterns to exclude test files |
+
+**Examples:**
+```toml
+[test]
+filter = "test-wallet.*"           # Only wallet tests
+exclude = ["**/integration/**"]    # Skip integration directory
+```
+
+### Output Options
+
+| Configuration | CLI Flag     | Type    | Description                   |
+|---------------|--------------|---------|-------------------------------|
+| `teamcity`    | `--teamcity` | Boolean | Enable TeamCity output format |
+
+**Examples:**
+```toml
+[test]
+teamcity = true    # Always use TeamCity format
+```
+
+### Debug Options
+
+| Configuration | CLI Flag       | Type    | Description                  |
+|---------------|----------------|---------|------------------------------|
+| `debug`       | `--debug`      | Boolean | Enable debug mode            |
+| `debug-port`  | `--debug-port` | Integer | Debug server port            |
+| `backtrace`   | `--backtrace`  | String  | Enable stack traces ("full") |
+
+**Examples:**
+```toml
+[test]
+debug = false
+debug-port = 12345
+backtrace = "full"
+```
+
+### Coverage Options
+
+| Configuration     | CLI Flag     | Type    | Description                     |
+|-------------------|--------------|---------|---------------------------------|
+| `coverage`        | `--coverage` | Boolean | Enable code coverage            |
+| `coverage-format` | `--format`   | String  | Coverage output format ("lcov") |
+
+**Examples:**
+```toml
+[test]
+coverage = true
+coverage-format = "lcov"
+```
