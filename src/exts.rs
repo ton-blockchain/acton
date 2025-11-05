@@ -794,10 +794,22 @@ fn type_name_by_opcode_impl(ctx: &mut Context, stack: &mut Tuple, id: BigInt) {
 
 extension!(register_address in (Context) with (name: String, address: ArcCell) using register_address_impl);
 fn register_address_impl(ctx: &mut Context, _stack: &mut Tuple, name: String, address: ArcCell) {
-    let address_cell = Boc::decode_base64(address.to_boc_b64(false).unwrap()).unwrap();
-    let mut address_slice = address_cell.parse().unwrap();
+    let address_boc = try_ctx!(
+        ctx,
+        address.to_boc_b64(false),
+        "Failed to encode address to BoC: {}"
+    );
+    let address_cell = try_ctx!(
+        ctx,
+        Boc::decode_base64(address_boc),
+        "Failed to decode address from BoC: {}"
+    );
 
-    let addr = IntAddr::load_from(&mut address_slice).unwrap();
+    let addr = try_ctx!(
+        ctx,
+        address_cell.parse::<IntAddr>(),
+        "Failed to load address from slice: {}"
+    );
 
     ctx.known_addresses
         .addresses
@@ -806,15 +818,27 @@ fn register_address_impl(ctx: &mut Context, _stack: &mut Tuple, name: String, ad
 
 extension!(register_code in (Context) with (name: String, address: ArcCell) using register_code_impl);
 fn register_code_impl(ctx: &mut Context, _stack: &mut Tuple, name: String, code: ArcCell) {
-    ctx.known_code_cells
-        .insert(code.cell_hash().unwrap().to_hex(), name);
+    let hash = try_ctx!(ctx, code.cell_hash(), "Failed to get cell hash: {}");
+    ctx.known_code_cells.insert(hash.to_hex(), name);
 }
 
 extension!(account_state in (Context) with (address: ArcCell) using account_state_impl);
 fn account_state_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
-    let address_cell = Boc::decode_base64(address.to_boc_b64(false).unwrap()).unwrap();
-    let mut address_slice = address_cell.parse().unwrap();
-    let addr = IntAddr::load_from(&mut address_slice).unwrap();
+    let address_boc = try_ctx!(
+        ctx,
+        address.to_boc_b64(false),
+        "Failed to encode address to BoC: {}"
+    );
+    let address_cell = try_ctx!(
+        ctx,
+        Boc::decode_base64(address_boc),
+        "Failed to decode address from BoC: {}"
+    );
+    let addr = try_ctx!(
+        ctx,
+        address_cell.parse::<IntAddr>(),
+        "Failed to load address from slice: {}"
+    );
 
     let Ok(account) = ctx.blockchain.get_account(&addr.to_string()).account.load() else {
         stack.push(TupleItem::Null);
@@ -827,11 +851,21 @@ fn account_state_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
     };
 
     let mut builder = CellBuilder::new();
-    builder.store_bit(true).unwrap();
-    account
-        .store_into(&mut builder, Cell::empty_context())
-        .unwrap();
-    let cell = builder.build().unwrap();
+    try_ctx!(
+        ctx,
+        builder.store_bit(true),
+        "Failed to store bit in cell builder: {}"
+    );
+    try_ctx!(
+        ctx,
+        account.store_into(&mut builder, Cell::empty_context()),
+        "Failed to store account into cell builder: {}"
+    );
+    let cell = try_ctx!(
+        ctx,
+        builder.build(),
+        "Failed to build cell from builder: {}"
+    );
 
     let Ok(cell) = ArcCell::from_boc_b64(&Boc::encode_base64(cell)) else {
         stack.push(TupleItem::Null);
@@ -843,7 +877,16 @@ fn account_state_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
 
 extension!(register_lib in (Context) with (lib: ArcCell) using register_lib_impl);
 fn register_lib_impl(ctx: &mut Context, _stack: &mut Tuple, lib: ArcCell) {
-    let cell = Boc::decode_base64(lib.to_boc_b64(false).unwrap()).unwrap();
+    let lib_boc = try_ctx!(
+        ctx,
+        lib.to_boc_b64(false),
+        "Failed to encode lib to BoC: {}"
+    );
+    let cell = try_ctx!(
+        ctx,
+        Boc::decode_base64(lib_boc),
+        "Failed to decode lib from BoC: {}"
+    );
     ctx.libraries.push(cell)
 }
 
