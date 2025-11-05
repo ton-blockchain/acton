@@ -1211,9 +1211,6 @@ impl FormatterContext {
         let letter = contract_letters.get(&addr);
         if let Some(contract_type) = contract_type {
             builder += format!("{} ", contract_type.cyan()).as_str();
-        } else {
-            builder += Self::format_addr_hash(&addr).as_str();
-            builder += " ";
         }
 
         if let Some(letter) = letter {
