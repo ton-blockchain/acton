@@ -14,6 +14,7 @@ use dap::types::{
     Breakpoint, Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread,
     ThreadEventReason,
 };
+use log::debug;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
@@ -172,12 +173,6 @@ impl Stepper {
                         .event_function
                         .unwrap_or(loc.context.containing_function.to_string())
                         .clone();
-
-                    if let Some(event) = &loc.context.event
-                        && let Some(name) = loc.clone().context.event_function
-                    {
-                        println!("{}: {}", event, name);
-                    }
 
                     let step = match loc.context.event.as_deref() {
                         Some("EnterFunction") => DebugStep {
@@ -351,11 +346,16 @@ impl DebugContext {
     }
 
     pub fn send_response(&self, response: Response) -> anyhow::Result<()> {
+        debug!(
+            "Sending DAP response: request_seq={}, success={}",
+            response.request_seq, response.success
+        );
         self.dap_sender.send(DapMessage::Response(response))?;
         Ok(())
     }
 
     pub fn send_event(&self, event: Event) -> anyhow::Result<()> {
+        debug!("Sending DAP event: {:?}", event);
         self.dap_sender.send(DapMessage::Event(event))?;
         Ok(())
     }
@@ -439,8 +439,10 @@ impl DebugContext {
     }
 
     pub(crate) fn on_request(&mut self, req: Request) -> anyhow::Result<bool> {
+        debug!("DAP on_request: {:?}", req.command);
         match &req.command {
-            Command::Initialize(_args) => {
+            Command::Initialize(args) => {
+                let client_name = args.client_name.clone();
                 let rsp = req.success(ResponseBody::Initialize(types::Capabilities {
                     supports_configuration_done_request: Some(true),
                     supports_breakpoint_locations_request: Some(false),
@@ -448,6 +450,8 @@ impl DebugContext {
                 }));
                 self.send_response(rsp)?;
                 self.send_event(Event::Initialized)?;
+
+                println!("Client: {}", client_name.unwrap_or("Unknown".to_string()));
             }
             Command::Launch(_args) => {
                 let rsp = req.success(ResponseBody::Launch);

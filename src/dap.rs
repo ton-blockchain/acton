@@ -2,6 +2,7 @@ use crossbeam_channel::{Receiver, SendError, Sender, unbounded};
 use dap::errors::{DeserializationError, ServerError};
 use dap::events::Event;
 use dap::prelude::{Request, Response, Server};
+use log::{debug, info, warn};
 use std::io::{BufRead, BufReader, BufWriter, Cursor, Read};
 use std::net::{TcpListener, TcpStream};
 use std::thread;
@@ -75,6 +76,7 @@ pub fn poll_request(
                         let request: Request = serde_json::from_str(content).map_err(|e| {
                             ServerError::ParseError(DeserializationError::SerdeError(e))
                         })?;
+                        debug!("Received DAP request: {:?}", request);
                         return Ok(Some(request));
                     }
                 }
@@ -105,24 +107,24 @@ pub fn start_dap_server(port: u16) -> (Receiver<Request>, Sender<DapMessage>) {
         let reader_thread = thread::spawn(move || {
             loop {
                 let req = poll_request(&mut input);
-                println!("{:?}", req);
                 match req {
                     Ok(Some(req)) => {
+                        debug!("Processing DAP request: {:?}", req.command);
                         req_sender_for_reader.send(req.clone()).unwrap();
                     }
                     Ok(None) => {
                         // No more requests, connection might be closed
-                        println!("Request is closed");
+                        info!("DAP connection closed - no more requests");
                         break;
                     }
                     Err(e) => {
-                        eprintln!("Error handling request: {}", e);
+                        warn!("Error handling DAP request: {}", e);
                     }
                 }
             }
         });
 
-        // Server require an input, pass dummy one, that's safe since we never call `pull_request`
+        // Server require an input, pass dummy one, that's safe since we never call `poll_request`
         // on server, since we use thread above.
         let dummy_input = BufReader::new(Cursor::new("".as_bytes()));
         let output_stream = stream;

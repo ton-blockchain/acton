@@ -4,6 +4,7 @@ use crate::formatter::FormatterContext;
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
 use emulator::executor::StoreExt;
+use log::debug;
 use std::sync::atomic::Ordering;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
@@ -21,6 +22,10 @@ impl DebugContext {
         &mut self,
         args: &&VariablesArguments,
     ) -> anyhow::Result<Vec<Variable>> {
+        debug!(
+            "Processing variables request: variables_reference={}, count={:?}",
+            args.variables_reference, args.count
+        );
         let stepper = match &self.stepper {
             Some(s) => s,
             None => return Ok(vec![]),
@@ -148,6 +153,7 @@ impl DebugContext {
         } else {
             vec![]
         };
+        debug!("Returning {} variables", variables.len());
         Ok(variables)
     }
 

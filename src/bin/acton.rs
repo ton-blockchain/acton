@@ -7,6 +7,7 @@ use emulator_rs::commands::new::new_cmd;
 use emulator_rs::commands::script::script_cmd;
 use emulator_rs::commands::test::test_cmd;
 use owo_colors::OwoColorize;
+use std::fs::OpenOptions;
 
 #[derive(Parser)]
 #[command(name = "acton")]
@@ -78,6 +79,7 @@ enum Commands {
 }
 
 fn main() {
+    setup_logging().expect("Failed to set up logging");
     let cli = Cli::parse();
 
     match cli.command {
@@ -160,4 +162,27 @@ fn main() {
             }
         }
     }
+}
+
+fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
+    let log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("debug.log")?;
+
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{} {}] {}",
+                chrono::Utc::now().format("%Y-%m-%d %H:%M:%S%.3f"),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Debug)
+        .chain(log_file)
+        // .chain(std::io::stdout())
+        .apply()?;
+
+    Ok(())
 }
