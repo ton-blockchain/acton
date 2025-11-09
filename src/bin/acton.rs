@@ -1,4 +1,6 @@
-use clap::{Parser, Subcommand};
+use clap::builder::styling::Style;
+use clap::builder::{StyledStr, Styles};
+use clap::{Parser, Subcommand, arg};
 use emulator_rs::commands::compile::compile_cmd;
 use emulator_rs::commands::disasm::disasm_cmd;
 use emulator_rs::commands::init::init_cmd;
@@ -30,30 +32,7 @@ enum Commands {
     },
     #[command(
         about = "Execute tests in file or directory",
-        after_help = "\x1b[1;4mExamples:\x1b[0m
-    \x1b[2m# Run all tests in current directory\x1b[0m
-    \x1b[1macton test\x1b[0m
-
-    \x1b[2m# Run tests in specific file\x1b[0m
-    \x1b[1macton test my_test.tolk\x1b[0m
-
-    \x1b[2m# Run tests in directory with regex filter\x1b[0m
-    \x1b[1macton test . --filter \"wallet.*\"\x1b[0m
-
-    \x1b[2m# Exclude tests\x1b[0m
-    \x1b[1macton test . --exclude \"**/integration/**\"\x1b[0m
-
-    \x1b[2m# Exclude multiple patterns\x1b[0m
-    \x1b[1macton test . --exclude \"**/e2e/**\" --exclude \"**/gas/**\"\x1b[0m
-
-    \x1b[2m# Include only specific directories\x1b[0m
-    \x1b[1macton test . --include \"**/unit/**\" --include \"**/wallet/**\"\x1b[0m
-
-    \x1b[2m# Enable coverage collection\x1b[0m
-    \x1b[1macton test . --coverage --format lcov\x1b[0m
-
-    \x1b[2m# Run in debug mode\x1b[0m
-    \x1b[1macton test my_test.tolk --debug\x1b[0m"
+        after_help = example_test_usage()
     )]
     Test {
         #[arg(help = "Test file or directory containing test files (default: current directory)")]
@@ -123,6 +102,53 @@ enum Commands {
         #[arg(short, long, help = "Output file (if not specified, output to stdout)")]
         output: Option<String>,
     },
+}
+
+fn example_test_usage() -> StyledStr {
+    use std::fmt::Write as _;
+
+    let mut writer = StyledStr::new();
+    let styled = Styles::styled();
+
+    let exampled_command = Vec::from([
+        ("Run all tests in current directory", "acton test"),
+        ("Run tests in specific file", "acton test my_test.tolk"),
+        (
+            "Run tests in directory with regex filter",
+            "acton test . --filtedr \"wallet.*\"",
+        ),
+        (
+            "Exclude tests",
+            "acton test . --exclude \"**/integration/**\"",
+        ),
+        (
+            "Exclude multiple patterns",
+            "acton test . --exclude \"**/e2e/**\" --exclude \"**/gas/**\"",
+        ),
+        (
+            "Include only specific directories",
+            "acton test . --include \"**/unit/**\" --include \"**/wallet/**\"",
+        ),
+        (
+            "Enable coverage collection",
+            "acton test . --coverage --format lcov",
+        ),
+        ("Run in debug mode", "acton test my_test.tolk --debug"),
+    ]);
+
+    let header = styled.get_header();
+    let named = Style::new().dimmed();
+    let example = styled.get_literal();
+
+    let _ = write!(writer, "{header}Examples:{header:#}",);
+
+    const USAGE_SEP: &str = "\n     ";
+    for (name, value) in exampled_command.iter() {
+        let _ = write!(writer, "{USAGE_SEP}{named}# {}{named:#}", name);
+        let _ = write!(writer, "{USAGE_SEP}{example}{}{example:#}\n", value);
+    }
+
+    writer
 }
 
 fn main() {
