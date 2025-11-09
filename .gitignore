@@ -1,5 +1,7 @@
 # Acton project directories
 .acton/
+/objs/
+/debug.log
 
 # Rust build artifacts
 target/
