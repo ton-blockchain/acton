@@ -1,3 +1,4 @@
+use crate::config::ActonConfig;
 use abi;
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
@@ -30,6 +31,7 @@ pub struct CacheEntry {
 #[derive(Debug)]
 pub struct FileBuildCache {
     cache_dir: PathBuf,
+    config: ActonConfig,
     entries: HashMap<String, CacheEntry>,
     _lock_file: File,
 }
@@ -64,9 +66,12 @@ impl FileBuildCache {
 
         let entries = Self::load_cache(&cache_dir)?;
 
+        let config = ActonConfig::load().unwrap_or_default();
+
         Ok(Self {
             cache_dir,
             entries,
+            config,
             _lock_file: lock_file,
         })
     }
@@ -203,8 +208,43 @@ impl FileBuildCache {
     }
 
     fn get_dependencies(&self, file_path: &str) -> Result<Vec<String>> {
-        abi::get_file_dependencies(file_path, true)
-            .map_err(|e| anyhow!("Failed to get file dependencies: {}", e))
+        let file_deps = abi::get_file_dependencies(file_path, true)
+            .map_err(|e| anyhow!("Failed to get file dependencies: {}", e))?;
+
+        let file_path = fs::canonicalize(&file_path).unwrap_or(PathBuf::from(&file_path));
+        let contracts = self.config.contracts.clone().unwrap_or_default().contracts;
+        let Some((_, contract_info)) = contracts.iter().find(|(_, config)| {
+            fs::canonicalize(&config.root).unwrap_or(PathBuf::from(&config.root)) == file_path
+        }) else {
+            return Ok(file_deps);
+        };
+
+        let has_deps = contract_info
+            .depends
+            .as_ref()
+            .map_or(false, |deps| !deps.is_empty());
+        if !has_deps {
+            debug!(
+                "Skipping deps processing for `{}` in `get_dependencies`",
+                file_path.display()
+            );
+            // fast path, no deps, no extra logic to find all dependencies of each dependency
+            return Ok(file_deps);
+        }
+
+        let mut result = file_deps;
+
+        if let Some(deps) = &contract_info.depends {
+            for dep in deps {
+                let contract_config = contracts
+                    .get(dep)
+                    .ok_or_else(|| anyhow!("Contract '{}' not found in Acton.toml", dep))?;
+
+                result.append(&mut self.get_dependencies(contract_config.root.as_str())?);
+            }
+        }
+
+        Ok(result)
     }
 
     fn compute_dependencies_hash(&self, dependencies: &[String]) -> Result<String> {

@@ -34,7 +34,7 @@ pub struct TestSettings {
     pub include: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ContractsConfig {
     #[serde(flatten)]
     pub contracts: HashMap<String, ContractConfig>,
