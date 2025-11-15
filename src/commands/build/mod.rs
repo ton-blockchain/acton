@@ -84,41 +84,12 @@ pub fn build_cmd(
 
         generate_dependency_files(&contract_key, &contract_config, &compiled_contracts)?;
 
-        let cached_result = file_cache.get(contract_path, false, 2, "1.2".to_string());
-
-        let code_boc64 = if let Some(cached_result) = cached_result {
-            debug!("Cache hit, use cached result for '{}'", contract_path);
-            Some(cached_result.code_boc64)
-        } else {
-            debug!("Cache miss, recompile '{}'", contract_path);
-            let compile_start = Instant::now();
-            println!("   {} {}", "Compiling".green().bold(), contract_config.name);
-
-            let compilation_result = tolkc::compile(Path::new(contract_path), false);
-            let compile_time = compile_start.elapsed();
-
-            match compilation_result {
-                tolkc::CompilerResult::Success(result) => {
-                    if let Err(e) =
-                        file_cache.put(contract_path, &result, false, 2, "1.2".to_string())
-                    {
-                        eprintln!(
-                            "Warning: Failed to cache compilation result for {}: {}",
-                            contract_config.name, e
-                        );
-                    }
-
-                    println!("    {} in {:?}", "Finished".green(), compile_time);
-
-                    Some(result.code_boc64)
-                }
-                tolkc::CompilerResult::Error(error) => {
-                    eprintln!("{}", error.message);
-                    failure_count += 1;
-                    None
-                }
-            }
-        };
+        let code_boc64 = process_contract(
+            &mut file_cache,
+            &mut failure_count,
+            contract_config,
+            contract_path,
+        );
 
         let Some(code_boc64) = &code_boc64 else {
             continue;
@@ -146,6 +117,73 @@ pub fn build_cmd(
             if failure_count == 1 { "" } else { "s" }
         ))
     }
+}
+
+fn process_contract(
+    file_cache: &mut FileBuildCache,
+    failure_count: &mut i32,
+    contract_config: &ContractConfig,
+    contract_path: &String,
+) -> Option<String> {
+    let code_boc64 = if contract_path.ends_with(".boc") {
+        debug!("Loading BoC file: {}", contract_path);
+        match fs::read(contract_path) {
+            Ok(boc_data) => match Boc::decode(&boc_data) {
+                Ok(boc) => {
+                    let boc_base64 = Boc::encode_base64(&boc);
+                    Some(boc_base64)
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Failed to decode BoC file {}: {}",
+                        contract_path, e
+                    );
+                    None
+                }
+            },
+            Err(e) => {
+                eprintln!("Warning: Failed to read BoC file {}: {}", contract_path, e);
+                None
+            }
+        }
+    } else {
+        let cached_result = file_cache.get(contract_path, false, 2, "1.2".to_string());
+
+        if let Some(cached_result) = cached_result {
+            debug!("Cache hit, use cached result for '{}'", contract_path);
+            Some(cached_result.code_boc64)
+        } else {
+            debug!("Cache miss, recompile '{}'", contract_path);
+            let compile_start = Instant::now();
+            println!("   {} {}", "Compiling".green().bold(), contract_config.name);
+
+            let compilation_result = tolkc::compile(Path::new(contract_path), false);
+            let compile_time = compile_start.elapsed();
+
+            match compilation_result {
+                tolkc::CompilerResult::Success(result) => {
+                    if let Err(e) =
+                        file_cache.put(contract_path, &result, false, 2, "1.2".to_string())
+                    {
+                        eprintln!(
+                            "Warning: Failed to cache compilation result for {}: {}",
+                            contract_config.name, e
+                        );
+                    }
+
+                    println!("    {} in {:?}", "Finished".green(), compile_time);
+
+                    Some(result.code_boc64)
+                }
+                tolkc::CompilerResult::Error(error) => {
+                    eprintln!("{}", error.message);
+                    *failure_count += 1;
+                    None
+                }
+            }
+        }
+    };
+    code_boc64
 }
 
 fn save_boc_file(contract_config: &ContractConfig, code_boc64: &str) -> anyhow::Result<()> {
