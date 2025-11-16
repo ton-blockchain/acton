@@ -20,9 +20,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command(about = "Initialize a new project")]
+    #[command(
+        about = "Initialize a new project in the current directory",
+        long_about = "Initialize a new project in the current directory. Suitable if you want to use Acton in an existing project."
+    )]
     Init,
-    #[command(about = "Create a new project in the specified directory")]
+    #[command(
+        about = "Create a new project in the specified directory",
+        long_about = "Create a new project in the specified directory. Suitable if you want to create a new project with Acton."
+    )]
     New {
         #[arg(
             help = "Directory to create the project in (use '.' to create a project in the current directory)"
