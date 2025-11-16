@@ -21,5 +21,3 @@ struct Pair {
     x: int
     y: int
 }
-
-fun Pair.fromTuple(tuple: tuple): Pair asm "2 UNTUPLE"

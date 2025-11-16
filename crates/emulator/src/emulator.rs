@@ -61,8 +61,8 @@ pub struct SendMessageResultSuccess {
 }
 
 impl Emulator {
-    pub fn new() -> Self {
-        let executor = Executor::new();
+    pub fn new(verbosity: ExecutorVerbosity) -> Self {
+        let executor = Executor::new(verbosity);
         Self { executor }
     }
 
@@ -72,6 +72,7 @@ impl Emulator {
         message: Cell,
         libs: &Dict<HashBytes, LibDescr>,
         src_addr: Option<IntAddr>,
+        verbosity: Option<ExecutorVerbosity>,
     ) -> Vec<SendMessageResult> {
         let message = Emulator::patch_src_addr(message, src_addr);
         let Ok(message_obj) = message.parse::<Message>() else {
@@ -88,7 +89,7 @@ impl Emulator {
             RunTransactionArgs {
                 config: crate::config::DEFAULT_CONFIG.to_string(),
                 libs: libs.clone().into_root(),
-                verbosity: ExecutorVerbosity::FullLocation,
+                verbosity: verbosity.unwrap_or(ExecutorVerbosity::Short),
                 shard_account: dest_account.clone(),
                 now: 0,
                 lt: net.get_lt(),
@@ -152,7 +153,7 @@ impl Emulator {
                     return vec![];
                 };
 
-                let mut send_results = self.send_message(net, msg.to_cell(), libs, None);
+                let mut send_results = self.send_message(net, msg.to_cell(), libs, None, verbosity);
                 for result in &mut send_results {
                     match result {
                         SendMessageResult::Success(result) => {

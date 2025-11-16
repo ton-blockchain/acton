@@ -1,3 +1,4 @@
+use crate::config::ActonConfig;
 use crate::context::{AnyExecutor, BuildCache, Context, Emulations, KnownAddresses};
 use crate::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
@@ -6,6 +7,7 @@ use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
+use emulator::executor::ExecutorVerbosity;
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use owo_colors::OwoColorize;
@@ -68,6 +70,7 @@ fn run_script_file(
                 &result.source_map.unwrap_or(Default::default()),
                 debug,
                 debug_port,
+                Some(ExecutorVerbosity::FullLocationStackVerbose),
             );
             print_script_result(script_result?);
             Ok(())
@@ -93,13 +96,15 @@ fn execute_script(
     source_map: &SourceMap,
     debug: bool,
     debug_port: u16,
+    verbosity: Option<ExecutorVerbosity>,
 ) -> anyhow::Result<ScriptResult> {
     let dest_address = contract_address(code_cell)?;
+    let verbosity = verbosity.unwrap_or(ExecutorVerbosity::Short);
 
     let params = GetMethodParams {
         code: code_cell.to_boc_b64(false)?.to_string(),
         data: data_cell.to_boc_b64(false)?.to_string(),
-        verbosity: 5,
+        verbosity,
         libs: "".to_string(),
         address: dest_address.to_string(),
         unixtime: 0,
@@ -112,7 +117,7 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let mut emulator = Emulator::new();
+    let mut emulator = Emulator::new(verbosity);
     let mut blockchain = Blockchain::new();
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =
@@ -123,6 +128,7 @@ fn execute_script(
     let mut libraries = vec![];
 
     let mut ctx = Context {
+        config: &ActonConfig::load()?,
         stdout_buffer: "".to_string(),
         stderr_buffer: "".to_string(),
         capture_test_output: false,
@@ -141,6 +147,7 @@ fn execute_script(
         backtrace: None,
         need_debug_info: false,
         libraries: &mut libraries,
+        default_log_level: verbosity,
     };
 
     if debug {

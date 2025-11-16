@@ -8,7 +8,7 @@ import "ffi/ffi"
 /// println(msg);  // prints "Hello world"
 /// ```
 fun format1<T1>(fmt: slice, arg1: T1): slice {
-    return ffi.format1(fmt, __typeName(arg1), arg1.__toTuple());
+    return ffi.format1(fmt, arg1.typeNameOfObject(), arg1.toTuple());
 }
 
 /// Formats a string with 2 arguments.
@@ -19,7 +19,7 @@ fun format1<T1>(fmt: slice, arg1: T1): slice {
 /// println(msg);  // prints "name: John"
 /// ```
 fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice {
-    return ffi.format2(fmt, __typeName(arg1), arg1.__toTuple(), __typeName(arg2), arg2.__toTuple());
+    return ffi.format2(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple());
 }
 
 /// Formats a string with 3 arguments.
@@ -30,7 +30,7 @@ fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice {
 /// println(msg);  // prints "2 + 3 = 5"
 /// ```
 fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice {
-    return ffi.format3(fmt, __typeName(arg1), arg1.__toTuple(), __typeName(arg2), arg2.__toTuple(), __typeName(arg3), arg3.__toTuple());
+    return ffi.format3(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple());
 }
 
 /// Formats a string with 4 arguments.
@@ -41,7 +41,7 @@ fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice {
 /// println(msg);  // prints "a b c d"
 /// ```
 fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4): slice {
-    return ffi.format4(fmt, __typeName(arg1), arg1.__toTuple(), __typeName(arg2), arg2.__toTuple(), __typeName(arg3), arg3.__toTuple(), __typeName(arg4), arg4.__toTuple());
+    return ffi.format4(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple(), arg4.typeNameOfObject(), arg4.toTuple());
 }
 
 /// Formats a string with 5 arguments.
@@ -52,7 +52,7 @@ fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4):
 /// println(msg);  // prints "1 2 3 4 5"
 /// ```
 fun format5<T1, T2, T3, T4, T5>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): slice {
-    return ffi.format5(fmt, __typeName(arg1), arg1.__toTuple(), __typeName(arg2), arg2.__toTuple(), __typeName(arg3), arg3.__toTuple(), __typeName(arg4), arg4.__toTuple(), __typeName(arg5), arg5.__toTuple());
+    return ffi.format5(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple(), arg4.typeNameOfObject(), arg4.toTuple(), arg5.typeNameOfObject(), arg5.toTuple());
 }
 
 fun ffi.format1(fmt: slice, type1: slice, arg1: tuple): slice

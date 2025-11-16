@@ -2,7 +2,7 @@ use crate::config::DEFAULT_CONFIG;
 use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use hex;
 use num_bigint::BigInt;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use std::ffi::{CString, c_void};
 use std::ptr::null;
 use tycho_types::boc::Boc;
@@ -48,10 +48,10 @@ impl BaseExecutor for Executor {
 }
 
 impl Executor {
-    pub fn new() -> Self {
+    pub fn new(verbosity: ExecutorVerbosity) -> Self {
         let config_cstr = CString::new(DEFAULT_CONFIG).expect("DEFAULT_CONFIG contains null bytes");
         Executor {
-            inner: unsafe { create_emulator(config_cstr.as_ptr(), 5) },
+            inner: unsafe { create_emulator(config_cstr.as_ptr(), verbosity as i32) },
         }
     }
 
@@ -164,7 +164,7 @@ pub fn run_common_args_to_internal_params(args: &RunTransactionArgs) -> Emulatio
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExecutorVerbosity {
     Short = 0,
     Full = 1,
@@ -172,6 +172,15 @@ pub enum ExecutorVerbosity {
     FullLocationGas = 3,
     FullLocationStack = 4,
     FullLocationStackVerbose = 5,
+}
+
+impl Serialize for ExecutorVerbosity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_i8(*self as i8)
+    }
 }
 
 #[derive(Debug, Clone)]

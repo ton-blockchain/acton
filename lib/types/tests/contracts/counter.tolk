@@ -23,7 +23,7 @@ fun onInternalMessage(in: InMessage) {
 
             {
                 val msg = createExternalLogMessage({
-                    dest: address.fromValidBuilder(beginCell().storeUint(0b01, 2).storeUint(16, 9).storeUint(0xDEAD, 16)),
+                    dest: any_address.fromCell(beginCell().storeUint(0b01, 2).storeUint(16, 9).storeUint(0xDEAD, 16).endCell()),
                     body: ResetCounter{},
                 });
                 msg.send(SEND_MODE_REGULAR);

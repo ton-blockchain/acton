@@ -36,7 +36,7 @@ pub fn compile_cmd(
 
     let mut file_cache = FileBuildCache::new(None)?;
 
-    if let Some(cached_entry) = file_cache.get(path, false, 2, "1.1".to_string()) {
+    if let Some(cached_entry) = file_cache.get(path, false, 2, "1.2".to_string()) {
         let elapsed = start_time.elapsed();
         info!(
             "Compile {} from file cache (.acton/cache) in {:?}",
@@ -101,7 +101,7 @@ pub fn compile_cmd(
                 path, compile_time, total_elapsed
             );
 
-            if let Err(e) = file_cache.put(path, &result, false, 2, "1.1".to_string()) {
+            if let Err(e) = file_cache.put(path, &result, false, 2, "1.2".to_string()) {
                 if !json {
                     eprintln!("Warning: Failed to cache compilation result: {}", e);
                 }

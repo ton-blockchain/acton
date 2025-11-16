@@ -1,5 +1,5 @@
 use crate::config::DEFAULT_CONFIG;
-use crate::executor::ExtFunc;
+use crate::executor::{ExecutorVerbosity, ExtFunc};
 use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -85,7 +85,7 @@ impl GetExecutor {
 pub struct GetMethodParams {
     pub code: String,
     pub data: String,
-    pub verbosity: i32,
+    pub verbosity: ExecutorVerbosity,
     pub libs: String,
     pub address: String,
     pub unixtime: i64,

@@ -124,7 +124,7 @@ struct (0b0) IntMsgInfoRelaxed {
     ihr_disabled: bool
     bounce: bool
     bounced: bool
-    src: address
+    src: any_address
     dest: address
     value: CurrencyCollection
     extra_flags: varuint16
@@ -136,7 +136,7 @@ struct (0b0) IntMsgInfoRelaxed {
 /// Represents common message info for external relaxed message.
 struct (0b11) ExtMsgInfoRelaxed {
     src: address
-    dest: address
+    dest: any_address
     created_lt: uint64
     created_at: uint32
 }
@@ -173,7 +173,7 @@ struct (0b0) InternalMessage {
 ///                    import_fee:Grams = CommonMsgInfo;
 /// ```
 struct (0b10) ExternalInMessageInfo {
-    src: address // TODO: Change to `address_any` after TVM v12 update.
+    src: any_address
     dest: address
     importFee: coins
 }
@@ -184,7 +184,7 @@ struct (0b10) ExternalInMessageInfo {
 /// ```
 struct (0b11) ExternalOutMessageInfo {
     src: address
-    dest: address // TODO: Change to `address_any` after TVM v12 update.
+    dest: any_address
     createdLt: uint64
     createdAt: uint32
 }

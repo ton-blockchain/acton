@@ -1,4 +1,3 @@
-import "@stdlib/gas-payments"
 import "errors"
 import "jetton-utils"
 import "messages"
@@ -18,17 +17,17 @@ fun onInternalMessage(in: InMessage) {
     match (msg) {
         BurnNotificationForMinter => {
             var storage = lazy MinterStorage.load();
-            assert (in.senderAddress.isAddressOfJettonWallet(msg.burnInitiator, contract.getAddress(), storage.jettonWalletCode)) throw ERR_UNAUTHORIZED_BURN;
+            assert (in.senderAddress == calcAddressOfJettonWallet(msg.burnInitiator, contract.getAddress(), storage.jettonWalletCode)) throw ERR_UNAUTHORIZED_BURN;
 
             storage.totalSupply -= msg.jettonAmount;
             storage.save();
 
-            if (!msg.sendExcessesTo.isInternal()) {
+            if (msg.sendExcessesTo == null) {
                 return;
             }
 
             val excessesMsg = createMessage({
-                bounce: false,
+                bounce: BounceMode.NoBounce,
                 dest: msg.sendExcessesTo,
                 value: 0,
                 body: ReturnExcessesBack {
@@ -45,21 +44,14 @@ fun onInternalMessage(in: InMessage) {
                 ? msg.ownerAddress.toCell()
                 : null;
 
-            var walletAddrBuilt: builder;
+            var walletAddress: address? = null;
             if (msg.ownerAddress.getWorkchain() == BASECHAIN) {
                 var storage = lazy MinterStorage.load();
-                walletAddrBuilt = buildAddressOfJettonWallet(msg.ownerAddress, contract.getAddress(), storage.jettonWalletCode);
-            } else {
-                walletAddrBuilt = beginCell().storeAddressNone();
+                walletAddress = calcAddressOfJettonWallet(msg.ownerAddress, contract.getAddress(), storage.jettonWalletCode);
             }
-            // we could respond `builder` (and it would be much more effective),
-            // but we want to leave the type as `address` in a "Response" struct
-            // (for clarity and future TypeScript wrappers, which can't be auto-generated for "builder");
-            // in TVM 12, there will be a cheap instruction to avoid an intermediate cell creation
-            val walletAddress = address.fromValidBuilder(walletAddrBuilt);
 
             val respondMsg = createMessage({
-                bounce: true,
+                bounce: BounceMode.Only256BitsOfBody,
                 dest: in.senderAddress,
                 value: 0,
                 body: ResponseWalletAddress {
@@ -80,7 +72,7 @@ fun onInternalMessage(in: InMessage) {
             storage.save();
 
             val deployMsg = createMessage({
-                bounce: true,
+                bounce: BounceMode.Only256BitsOfBody,
                 dest: calcDeployedJettonWallet(msg.mintRecipient, contract.getAddress(), storage.jettonWalletCode),
                 value: msg.tonAmount,
                 body: msg.internalTransferMsg,  // a newly-deployed wallet contract will immediately handle it
@@ -123,6 +115,5 @@ get fun get_jetton_data(): JettonDataReply {
 
 get fun get_wallet_address(ownerAddress: address): address {
     val storage = lazy MinterStorage.load();
-    val addrBuilt = buildAddressOfJettonWallet(ownerAddress, contract.getAddress(), storage.jettonWalletCode);
-    return address.fromValidBuilder(addrBuilt);
+    return calcAddressOfJettonWallet(ownerAddress, contract.getAddress(), storage.jettonWalletCode);
 }

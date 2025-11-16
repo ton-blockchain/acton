@@ -21,13 +21,13 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params
     params.exit_code = 0;
     params.deploy = true;
 
-    val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
             "expect(<actual>).toHaveSuccessfulDeploy(<expected>)",
             self.value,
-            params.__toTuple()
+            params.toTuple()
         );
         throw 567;
     }
@@ -51,13 +51,13 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: Se
         params.exit_code = 0;
     }
 
-    val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
             "expect(<actual>).toHaveSuccessfulTx(<expected>)",
             self.value,
-            params.__toTuple()
+            params.toTuple()
         );
         throw 567;
     }
@@ -75,13 +75,13 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: Se
 fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams = {}) {
     params.opcode = Msg.getDeclaredPackPrefix();
 
-    val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
             "expect(<actual>).toHaveTx(<expected>)",
             self.value,
-            params.__toTuple()
+            params.toTuple()
         );
         throw 567;
     }
@@ -99,13 +99,13 @@ fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams
 fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchParams = {}) {
     params.opcode = Msg.getDeclaredPackPrefix();
 
-    val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx != null) {
         ffi.failToNotFindTransactionByParams(
             self.location,
             "expect(<actual>).toNotHaveTx(<expected>)",
             self.value,
-            params.__toTuple()
+            params.toTuple()
         );
         throw 567;
     }
@@ -124,13 +124,13 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: Searc
     params.opcode = Msg.getDeclaredPackPrefix();
     params.bounced = true;
 
-    val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
             "expect(<actual>).toHaveBouncedTx(<expected>)",
             self.value,
-            params.__toTuple()
+            params.toTuple()
         );
         throw 567;
     }
@@ -157,13 +157,13 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: Search
         Assert.fail("expect(<actual>).toHaveFailedTx(params) must have non zero exit_code parameter in params");
     }
 
-    val tx = ffi.findTransactionByParams(self.value, params.__toTuple());
+    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx == null) {
         ffi.failToFindTransactionByParams(
             self.location,
             "expect(<actual>).toHaveFailedTx(<expected>)",
             self.value,
-            params.__toTuple()
+            params.toTuple()
         );
         throw 567;
     }
@@ -196,8 +196,8 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
     Assert.fail(
         format3(
             "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
-            Msg.__typeName2(),
-            Msg.__typeName2(),
+            Msg.typeName(),
+            Msg.typeName(),
             Msg.getDeclaredPackPrefix()
         ),
         self.location

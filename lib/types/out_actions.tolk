@@ -138,8 +138,6 @@ fun OutAction.kind(self): slice {
             return "change-library";
         }
     }
-
-    return "unknown-action";
 }
 
 /// Represents a list of out actions.
@@ -250,7 +248,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
         val loaded = next.load();
         match (loaded.action) {
             OutActionSendMessage => {
-                result.push(loaded.action.__toTuple());
+                result.push(loaded.action.toTuple());
                 if (loaded.action.prev.beginParse().remainingBitsCount() == 0) {
                     next = null;
                 } else {
@@ -258,7 +256,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
                 }
             }
             OutActionSetCode => {
-                result.push(loaded.action.__toTuple());
+                result.push(loaded.action.toTuple());
                 if (loaded.action.prev.beginParse().remainingBitsCount() == 0) {
                     next = null;
                 } else {
@@ -266,7 +264,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
                 }
             }
             OutActionReserveCurrency => {
-                result.push(loaded.action.__toTuple());
+                result.push(loaded.action.toTuple());
                 if (loaded.action.prev.beginParse().remainingBitsCount() == 0) {
                     next = null;
                 } else {
@@ -289,12 +287,6 @@ fun vm.parseOutActions(cell: cell): OutActionList {
 
 // Implementation details
 
-fun OutActionSendMessage.fromTuple(data: tuple): OutActionSendMessage asm "3 UNTUPLE"
-fun OutActionSetCode.fromTuple(data: tuple): OutActionSetCode asm "2 UNTUPLE"
-fun OutActionReserveCurrency.fromTuple(data: tuple): OutActionReserveCurrency asm "4 UNTUPLE"
-fun OutActionChangeLibrary.fromTuple(data: tuple): OutActionChangeLibrary asm "4 UNTUPLE"
-fun LibRefHash.fromTuple(data: tuple): LibRefHash asm "1 UNTUPLE"
-fun LibRefRef.fromTuple(data: tuple): LibRefRef asm "1 UNTUPLE"
 fun LibRef.fromTuple(data: tuple): LibRef {
     val tag = data.get<int>(0);
     if (tag == 0) {

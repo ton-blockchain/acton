@@ -81,7 +81,6 @@ fun Transaction.getUsedGas(self) {
     } else {
         Assert.fail("Cannot get used gas for non TransOrd")
     }
-    throw ASSERTION_FAILED;
 }
 
 /// Return address of account of this transaction.

@@ -17,7 +17,7 @@ fun Counter.fromStorage(storage: Storage) {
         code: build("Counter", "lib/types/tests/contracts/counter.tolk"),
         data: storage.toCell(),
     };
-    val address = address.fromValidBuilder(AutoDeployAddress { stateInit: init }.buildAddress());
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
     return Counter { address, init }
 }
 

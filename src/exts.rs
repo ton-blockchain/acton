@@ -12,7 +12,7 @@ use emulator::step_executor::StepExecutor;
 use emulator::step_get_executor::StepGetExecutor;
 use emulator::traits::BaseExecutor;
 use emulator::{extension, pop_args, register_ext_methods, try_ctx};
-use log::{info, warn};
+use log::{debug, info, warn};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::collections::HashMap;
@@ -40,8 +40,25 @@ fn read_file_impl(_ctx: &mut Context, stack: &mut Tuple, path: String) {
 }
 
 extension!(build in (Context) with (path: String, name: String) using build_impl);
-fn build_impl(ctx: &mut Context, stack: &mut Tuple, path: String, name: String) {
+fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, name: String) {
+    debug!("Building {name}");
     let start_time = Instant::now();
+
+    if path.is_empty() {
+        debug!("No path provided, search in contracts");
+        let contracts = ctx.config.contracts.clone().unwrap_or_default().contracts;
+        let found_contract = contracts.iter().find(|(_, config)| config.name == name);
+
+        if let Some((_, found_contract)) = found_contract {
+            debug!("Found contract with info: {:?}", found_contract);
+            path = found_contract.src.clone()
+        } else {
+            ctx.fail(format!(
+                "Cannot find contract {name} in Acton.toml, please add it or provide an explicit path to the entry point"
+            ));
+            return;
+        }
+    }
 
     if let Some(cached) = ctx.build_cache.built.get(&path) {
         let elapsed = start_time.elapsed();
@@ -59,7 +76,7 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, path: String, name: String) 
 
     if let Some(cached_entry) =
         ctx.file_build_cache
-            .get(&path, ctx.need_debug_info, 2, "1.1".to_string())
+            .get(&path, ctx.need_debug_info, 2, "1.2".to_string())
     {
         let elapsed = start_time.elapsed();
         info!(
@@ -99,7 +116,7 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, path: String, name: String) 
 
             if let Err(err) =
                 ctx.file_build_cache
-                    .put(&path, &success, ctx.need_debug_info, 2, "1.1".to_string())
+                    .put(&path, &success, ctx.need_debug_info, 2, "1.2".to_string())
             {
                 warn!("Failed to build cached code BoC for {}: {}", path, err);
             }
@@ -153,7 +170,13 @@ fn send_message_impl(ctx: &mut Context, stack: &mut Tuple, _mode: BigInt, messag
 
     // Send from null address for now
     let src_addr = IntAddr::default();
-    let emulations = emulator.send_message(blockchain, msg_cell, &Dict::default(), Some(src_addr));
+    let emulations = emulator.send_message(
+        blockchain,
+        msg_cell,
+        &Dict::default(),
+        Some(src_addr),
+        Some(ctx.default_log_level),
+    );
 
     let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
         SendMessageResult::Success(res) => Some(res),
@@ -221,9 +244,21 @@ fn send_message_from_impl(
     let blockchain = &mut ctx.blockchain;
 
     let emulations = if ctx.debug {
-        send_message_debug(ctx, &msg_cell, &libs, Some(src_addr))
+        send_message_debug(
+            ctx,
+            &msg_cell,
+            &libs,
+            Some(src_addr),
+            Some(ctx.default_log_level),
+        )
     } else {
-        emulator.send_message(blockchain, msg_cell, &libs, Some(src_addr))
+        emulator.send_message(
+            blockchain,
+            msg_cell,
+            &libs,
+            Some(src_addr),
+            Some(ctx.default_log_level),
+        )
     };
 
     ctx.emulations.results.push(emulations.clone());
@@ -313,6 +348,7 @@ fn send_message_debug(
     msg_cell: &Cell,
     libs: &Dict<HashBytes, LibDescr>,
     src_addr: Option<IntAddr>,
+    verbosity: Option<ExecutorVerbosity>,
 ) -> Vec<SendMessageResult> {
     let mut msg_slice = try_ctx!(
         ctx,
@@ -358,7 +394,7 @@ fn send_message_debug(
         RunTransactionArgs {
             config: DEFAULT_CONFIG.to_string(),
             libs: libs.clone().into_root(),
-            verbosity: ExecutorVerbosity::FullLocation,
+            verbosity: verbosity.unwrap_or(ExecutorVerbosity::FullLocation),
             shard_account: dest_account.clone(),
             now: 0,
             lt: ctx.blockchain.get_lt(),
@@ -476,7 +512,7 @@ fn send_message_debug(
                 return vec![];
             };
 
-            let mut send_results = send_message_debug(ctx, &msg.to_cell(), libs, None);
+            let mut send_results = send_message_debug(ctx, &msg.to_cell(), libs, None, verbosity);
             for result in &mut send_results {
                 match result {
                     SendMessageResult::Success(result) => {
@@ -679,7 +715,7 @@ fn run_get_method_impl(
     let params = GetMethodParams {
         code: code.to_boc_b64(false).unwrap().to_string(),
         data: Boc::encode_base64(data),
-        verbosity: 5,
+        verbosity: ExecutorVerbosity::FullLocationStackVerbose,
         libs: libs_root
             .map(|root| Boc::encode_base64(root))
             .unwrap_or("".to_string()),

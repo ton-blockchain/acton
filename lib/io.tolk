@@ -13,7 +13,7 @@ import "ffi/ffi"
 /// });
 /// ```
 fun println<T>(value: T): void {
-    ffi.println(__typeName(value), value.__toTuple());
+    ffi.println(value.typeNameOfObject(), value.toTuple());
 }
 
 /// Prints the given slice string to the standard error output.

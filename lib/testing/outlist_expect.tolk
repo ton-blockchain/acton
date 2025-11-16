@@ -58,7 +58,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 Assert.fail(
                     format4(
                         "Out action is a send message, but it cannot be load as a `{}` (opcode: 0x{:x}) since body has opcode 0x{:x}{}",
-                        Msg.__typeName2(),
+                        Msg.typeName(),
                         Msg.getDeclaredPackPrefix(),
                         opcode,
                         opcode_type_name == null ? "" : format1(" ({})", opcode_type_name),
@@ -84,7 +84,7 @@ fun impl.fail_to_find_out_msg<Msg>(exit_code: int, location: slice) {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
-            Msg.__typeName2(),
+            Msg.typeName(),
             exit_code
         ),
         location

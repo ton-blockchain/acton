@@ -33,7 +33,7 @@ fun onInternalMessage(in: InMessage) {
         InternalTransferStep => {
             var storage = lazy WalletStorage.load();
             if (in.senderAddress != storage.minterAddress) {
-                assert (in.senderAddress.isAddressOfJettonWallet(msg.transferInitiator, storage.minterAddress, contract.getCode())) throw ERR_INVALID_WALLET;
+                assert (in.senderAddress == calcAddressOfJettonWallet(msg.transferInitiator!, storage.minterAddress, contract.getCode())) throw ERR_INVALID_WALLET;
             }
             storage.jettonBalance += msg.jettonAmount;
             storage.save();
@@ -47,7 +47,7 @@ fun onInternalMessage(in: InMessage) {
                 msgValue -= (msg.forwardTonAmount + in.originalForwardFee);
 
                 val notifyOwnerMsg = createMessage({
-                    bounce: false,      // we should not bounce here cause receiver can have uninitialized contract
+                    bounce: BounceMode.NoBounce,      // cause receiver can have uninitialized contract
                     dest: storage.ownerAddress,
                     value: msg.forwardTonAmount,
                     body: TransferNotificationForRecipient {
@@ -60,10 +60,10 @@ fun onInternalMessage(in: InMessage) {
                 notifyOwnerMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
             }
 
-            if (msg.sendExcessesTo.isInternal() & (msgValue > 0)) {
+            if (msg.sendExcessesTo != null & (msgValue > 0)) {
                 val excessesMsg = createMessage({
-                    bounce: false,
-                    dest: msg.sendExcessesTo,
+                    bounce: BounceMode.NoBounce,
+                    dest: msg.sendExcessesTo!,
                     value: msgValue,
                     body: ReturnExcessesBack {
                         queryId: msg.queryId
@@ -93,7 +93,7 @@ fun onInternalMessage(in: InMessage) {
             ) throw ERR_NOT_ENOUGH_TON;
 
             val deployMsg = createMessage({
-                bounce: true,
+                bounce: BounceMode.Only256BitsOfBody,
                 dest: calcDeployedJettonWallet(msg.transferRecipient, storage.minterAddress, contract.getCode()),
                 value: 0,
                 body: InternalTransferStep {
@@ -116,7 +116,7 @@ fun onInternalMessage(in: InMessage) {
             storage.save();
 
             val notifyMinterMsg = createMessage({
-                bounce: true,
+                bounce: BounceMode.Only256BitsOfBody,
                 dest: storage.minterAddress,
                 value: 0,
                 body: BurnNotificationForMinter {
@@ -148,11 +148,3 @@ get fun get_wallet_data(): JettonWalletDataReply {
         jettonWalletCode: contract.getCode(),
     }
 }
-
-get fun get_balance(): coins {
-    val storage = lazy WalletStorage.load();
-    return storage.jettonBalance
-}
-
-// te6cckECCwEAAoQAART/APSkE/S88sgLAQIBYgIIA6jQ+JGONNMfMdcsILxqKMyW0z8x+gAwjhHXLCPe7L70kvI/4dM/MfoAMOLtRND6AAKgyAH6As7J7VTgINcsILxqKMzjAtcsIHxT9SzjAtcsIsr4PeQDBQcB/DHtRNAB0z/6APpA+kD6AAb6ACD6QPpAMPiSIccFkTCOOPiS+CooyM+EIM4TzskSXPkAAfkAWtdlAddlyM+MCATSyw/LD8v/y/9x+QQAAfpEWLoBwACw8uLD4lEmoMgB+gLOye1U+Jf4J28QIaGCCJiWgCAStgihggjk4cCgoQQAviKUN1tsIY4w+JNw+DojoKHIz5HNi0JyJ88LP1AG+gIUzhbOycjPhQgTzlAF+gJxzwtqzMlx+wAC4iDXLAUxI8IAsJJfA44XyM+FCM5Y+gKCENUydtvPC4rLP8ly+wDiAfwx0z/6APpA+kD0AfoAINdJ8uLEI/pEMMAA8uFN7UTQ+gAg+kD6QDD4kiLHBfLiwVM4vvLiwlE4ocgB+gISzsntVHJSQHHjBPiX+JNw+DoSqCWgggpiWgCgvPLixfgqyM+EIBfOEs7JyM+QXjUUZhjLP1AG+gIVzhLOAfoCEs4GAHLJyM+JiAFTI1z5AAH5AFrXZQHXZcjPjAgE0ssPyw/L/8v/cfkEAM8L/4EAjc8LdBLMEszMyYBA+wAAsI5NMe1E0PoAIPpA+kAw+JIixwXy4sEE0z/6APpAMFNRvvLiwlFRocgB+gIUzsntVMjPke92X3rLP1j6As7OycjPhYgSznHPC27MyYBQ+wDgMIQPAccA8vQCASAJCgAdv9gXaiaH0AfSB9IBh8FUABG/6T9qJofQAYTrRrQq
-// te6cckECDAEAAoYAART/APSkE/S88sgLAQIBYgIJA7zQ+JGONNMfMdcsILxqKMyW0z8x+gAwjhHXLCPe7L70kvI/4dM/MfoAMOLtRND6AAKgyAH6As7J7VTgINcsILxqKMzjAtcsIHxT9SzjAtcsIsr4PeTjAjCEDwHHAPL0AwUIAfwx7UTQAdM/+gD6QPpA+gAG+gAg+kD6QDD4kiHHBZEwjjj4kvgqKMjPhCDOE87JElz5AAH5AFrXZQHXZcjPjAgE0ssPyw/L/8v/cfkEAAH6RFi6AcAAsPLiw+JRJqDIAfoCzsntVPiX+CdvECGhggiYloBmtgihggjk4cCgoSIEALyOMPiTcPg6I6ChyM+RzYtCcifPCz9QBvoCFM4WzsnIz4UIE85QBfoCcc8LaszJcfsAApQ3W2wh4iDXLAUxI8IAsI4XyM+FCM5Y+gKCENUydtvPC4rLP8ly+wCSXwPiAf4x0z/6APpA+kD0AfoAINdJ8uLEI/pEMMAA8uFN7UTQ+gAg+kD6QDD4kiLHBfLiwVM4vvLiwlE4ocgB+gISzsntVCNyceME+Jf4k3D4OhKoJaCCCmJaAKC88uLF+CrIz4QgF84SzsnIz5BeNRRmGMs/UAb6AhXOEs4B+gISzsnIBgFsic8WUyNc+QAB+QBa12UB12XIz4wIBNLLD8sPy//L/3H5BADPC/+BAI3PC3QSzBLMzMmAQPsABwAFYgBAAJox7UTQ+gAg+kD6QDD4kiLHBfLiwQTTP/oA+kAwU1G+8uLCUVGhyAH6AhTOye1UyM+R73Zfess/WPoCzs7JyM+FiBLOcc8LbszJgFD7AAIBIAoLAB2/2BdqJofQB9IH0gGHwVQAEb/pP2omh9ABhAGParE=

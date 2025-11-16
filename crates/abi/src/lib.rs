@@ -114,6 +114,14 @@ struct FileInfo {
 }
 
 pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> Result<Vec<String>, String> {
+    if file_path.ends_with(".boc") {
+        if include_itself {
+            return Ok(vec![file_path.to_owned()]);
+        }
+
+        return Ok(vec![]);
+    }
+
     let content = match fs::read_to_string(file_path) {
         Ok(content) => content,
         Err(e) => return Err(format!("Failed to read file '{}': {}", file_path, e)),

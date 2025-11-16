@@ -33,10 +33,10 @@ fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: sli
     if (
     !ffi.assert_bin(
         "==",
-        __typeName(left),
-        left.__toTuple(),
-        __typeName(right),
-        right.__toTuple(),
+        left.typeNameOfObject(),
+        left.toTuple(),
+        right.typeNameOfObject(),
+        right.toTuple(),
         message,
         location
     )
@@ -57,10 +57,10 @@ fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: 
     if (
     !ffi.assert_bin(
         "!=",
-        __typeName(left),
-        left.__toTuple(),
-        __typeName(right),
-        right.__toTuple(),
+        left.typeNameOfObject(),
+        left.toTuple(),
+        right.typeNameOfObject(),
+        right.toTuple(),
         message,
         location
     )
@@ -100,7 +100,8 @@ fun Assert.fail(message: slice = "", location: slice = ""): never {
 fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn();
-    ffi.assert_consumed_less(start, expected);
+    val end = getGasConsumedAtTheMoment();
+    ffi.assert_consumed_less(start, end, expected);
     return result;
 }
 
@@ -123,7 +124,8 @@ fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
 fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1);
-    ffi.assert_consumed_less(start, expected);
+    val end = getGasConsumedAtTheMoment();
+    ffi.assert_consumed_less(start, end, expected);
     return result;
 }
 
@@ -144,7 +146,8 @@ fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected:
 fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(fn: (Arg1, Arg2) -> Ret, arg1: Arg1, arg2: Arg2, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2);
-    ffi.assert_consumed_less(start, expected);
+    val end = getGasConsumedAtTheMoment();
+    ffi.assert_consumed_less(start, end, expected);
     return result;
 }
 
@@ -165,15 +168,16 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(fn: (Arg1, Arg2) -> Ret, arg1: Arg
 fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(fn: (Arg1, Arg2, Arg3) -> Ret, arg1: Arg1, arg2: Arg2, arg3: Arg3, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2, arg3);
-    ffi. assert_consumed_less(start, expected);
+    val end = getGasConsumedAtTheMoment();
+    ffi.assert_consumed_less(start, end, expected);
     return result;
 }
 
 /// Internal function to assert that the function consumed less than the expected amount of gas.
 /// 
 /// NOT FOR PUBLIC USE.
-fun ffi.assert_consumed_less(start: int, expected: int) {
-    val consumed = getGasConsumedAtTheMoment() - start;
+fun ffi.assert_consumed_less(start: int, end: int, expected: int) {
+    val consumed = end - start - 26; // 26 gas cost of GASCONSUMED
     if (consumed > expected) {
         Assert.fail(format2("Gas consumption was expected to be less than or equal to {}, but {} was consumed", expected, consumed))
     }

@@ -1,8 +1,10 @@
+use crate::config::ActonConfig;
 use crate::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
 use abi::ContractAbi;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::{Emulator, SendMessageResult};
+use emulator::executor::ExecutorVerbosity;
 use emulator::get_executor::GetMethodResultSuccess;
 use emulator::step_executor::StepExecutor;
 use emulator::step_get_executor::StepGetExecutor;
@@ -237,6 +239,7 @@ impl Emulations {
 }
 
 pub struct Context<'a> {
+    pub config: &'a ActonConfig,
     pub stdout_buffer: String,
     pub stderr_buffer: String,
     pub capture_test_output: bool,
@@ -255,6 +258,7 @@ pub struct Context<'a> {
     pub emulations: &'a mut Emulations,
     pub dbg_ctx: &'a mut DebugContext,
     pub libraries: &'a mut Vec<Cell>,
+    pub default_log_level: ExecutorVerbosity,
 }
 
 impl<'a> Context<'a> {

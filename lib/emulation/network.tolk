@@ -103,7 +103,7 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
 
             Assert.fail(format4(
                 "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
-                Msg.__typeName2(),
+                Msg.typeName(),
                 Msg.getDeclaredPackPrefix(),
                 opcode_type_name == null ? "" : opcode_type_name,
                 opcode
@@ -257,7 +257,7 @@ fun SendResultList.findExternalOutMessage<TBody = never>(self, params: ExternalO
 /// ```
 fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {}): Maybe<Transaction> {
     params.opcode = Msg.getDeclaredPackPrefix();
-    val tx = ffi.findTransactionByParams(self, params.__toTuple());
+    val tx = ffi.findTransactionByParams(self, params.toTuple());
     if (tx == null) {
         return Maybe<Transaction>.none();
     }
@@ -315,7 +315,7 @@ fun net.treasury(name: slice): Treasury {
         data: beginCell().storeSlice(name).endCell(),
     };
 
-    val address = address.fromValidBuilder(AutoDeployAddress { stateInit: state_init }.buildAddress());
+    val address = AutoDeployAddress { stateInit: state_init }.calculateAddress();
     net.registerAddress(address, name);
 
     val msg = createMessage({
@@ -404,8 +404,8 @@ fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? 
         throw CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE;
     }
 
-    val args_to_send = args == null ? createEmptyTuple() : args.__toTuple();
-    val res = ffi.runGetMethod(addr.toCell(), code, id, Ret.__typeName2(), args_to_send);
+    val args_to_send = args == null ? createEmptyTuple() : args.toTuple();
+    val res = ffi.runGetMethod(addr.toCell(), code, id, Ret.typeName(), args_to_send);
     return Ret.fromTuple(res);
 }
 
@@ -496,20 +496,6 @@ fun net.getAccountState(addr: address): AccountInfo? {
 /// val crc = crc16("hello");
 /// ```
 fun crc16(data: slice): int asm "13 EXTCALL"
-
-fun address.fromTuple(data: tuple): address  asm "1 UNTUPLE"
-fun address?.fromTuple(data: tuple): address  asm "1 UNTUPLE"
-fun int.fromTuple(data: tuple): int  asm "1 UNTUPLE"
-fun int?.fromTuple(data: tuple): int  asm "1 UNTUPLE"
-fun coins.fromTuple(data: tuple): coins  asm "1 UNTUPLE"
-fun coins?.fromTuple(data: tuple): coins  asm "1 UNTUPLE"
-fun bool.fromTuple(data: tuple): bool  asm "1 UNTUPLE"
-fun bool?.fromTuple(data: tuple): bool  asm "1 UNTUPLE"
-fun slice.fromTuple(data: tuple): slice  asm "1 UNTUPLE"
-fun slice?.fromTuple(data: tuple): slice  asm "1 UNTUPLE"
-fun cell.fromTuple(data: tuple): cell  asm "1 UNTUPLE"
-fun cell?.fromTuple(data: tuple): cell  asm "1 UNTUPLE"
-fun SendResult.fromTuple(data: tuple): SendResult  asm "7 UNTUPLE"
 
 fun tuple.fromTuple(data: tuple): tuple {
     return data;

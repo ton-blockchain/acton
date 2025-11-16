@@ -94,7 +94,7 @@ fun JettonMinter.fromStorage(storage: MinterStorage) {
         code: build("Minter", "./.jetton/contracts/jetton-minter-contract.tolk"),
         data: storage.toCell(),
     };
-    val addr = address.fromValidBuilder(AutoDeployAddress { stateInit: init }.buildAddress());
+    val addr = AutoDeployAddress { stateInit: init }.calculateAddress();
     return JettonMinter {
         address: addr, init
     }
@@ -124,7 +124,7 @@ fun JettonMinter.sendMint(self, from: address, recipient: address, jetton_amount
             internalTransferMsg: InternalTransferStep {
                 queryId: 0,
                 jettonAmount: jetton_amount,
-                transferInitiator: createAddressNone(),
+                transferInitiator: null,
                 sendExcessesTo: self.address,
                 forwardTonAmount: forward_ton_amount,
                 forwardPayload: createEmptySlice(),
@@ -771,7 +771,7 @@ get fun `test-minter-should-only-accept-burn-messages-from-jetton-wallets`() {
         body: BurnNotificationForMinter {
             queryId: 0,
             jettonAmount: burn_amount,
-            burnInitiator: createAddressNone(), // wrong address
+            burnInitiator: net.randomAddress("random-address"), // wrong address
             sendExcessesTo: deployer.address,
         }
     });
@@ -1020,13 +1020,3 @@ get fun `test-can-not-send-to-masterchain`() {
         exit_code: ERR_WRONG_WORKCHAIN
     });
 }
-
-fun JettonWalletDataReply.fromTuple(data: tuple): JettonWalletDataReply asm "4 UNTUPLE"
-fun JettonDataReply.fromTuple(data: tuple): JettonDataReply asm "5 UNTUPLE"
-
-// TODO: single method
-// fun T.fromTuple(self): T {
-//     return untuple_any(sizeof(self)) as T
-// }
-//
-// fun untuple_any<T>(count: int): T asm "UNTUPLEVAR"

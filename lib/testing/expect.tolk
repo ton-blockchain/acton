@@ -270,7 +270,7 @@ fun Expectation<bool>.toBeFalse(self) {
 /// ```tolk
 /// expect(addr).toBeInternalAddress();
 /// ```
-fun Expectation<address>.toBeInternalAddress(self) {
+fun Expectation<any_address>.toBeInternalAddress(self) {
     if (!self.value.isInternal()) {
         Assert.fail("expect(<actual>).toBeInternalAddress(): Expected address to be internal", self.location);
     }
@@ -282,7 +282,7 @@ fun Expectation<address>.toBeInternalAddress(self) {
 /// ```tolk
 /// expect(addr).toBeNoneAddress();
 /// ```
-fun Expectation<address>.toBeNoneAddress(self) {
+fun Expectation<any_address>.toBeNoneAddress(self) {
     if (!self.value.isNone()) {
         Assert.fail("expect(<actual>).toBeNoneAddress(): Expected address to be none", self.location);
     }
@@ -294,7 +294,7 @@ fun Expectation<address>.toBeNoneAddress(self) {
 /// ```tolk
 /// expect(addr).toBeExternalAddress();
 /// ```
-fun Expectation<address>.toBeExternalAddress(self) {
+fun Expectation<any_address>.toBeExternalAddress(self) {
     if (!self.value.isExternal()) {
         Assert.fail("expect(<actual>).toBeExternalAddress(): Expected address to be external", self.location);
     }
@@ -493,7 +493,7 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
 /// as the location will be automatically set by the test framework.
 @noinline
 fun expect<T>(value: T, location: slice = "") {
-    return Expectation<T>.create(value, __typeName(value), location);
+    return Expectation<T>.create(value, value.typeNameOfObject(), location);
 }
 
 /// Sets the expected exit code for the test.
@@ -534,10 +534,10 @@ fun ffi.assert_comparison<V1, V2>(left: V1, right: V2, op: slice, message: slice
     if (
         !ffi.assert_bin(
             op,
-            __typeName(left),
-            left.__toTuple(),
-            __typeName(right),
-            right.__toTuple(),
+            left.typeNameOfObject(),
+            left.toTuple(),
+            right.typeNameOfObject(),
+            right.toTuple(),
             message,
             location
         )
