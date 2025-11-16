@@ -77,6 +77,9 @@ pub fn new_cmd(path: &str) -> anyhow::Result<()> {
     LIB_DIR.extract(".acton")?;
     TOLK_STDLIB_DIR.extract(".acton/tolk-stdlib")?;
 
+    fs::create_dir_all("contracts/")?;
+    fs::create_dir_all("tests/")?;
+
     println!("{}", "✓ Created new Acton project".green().bold());
     println!(
         "  {} {}",
