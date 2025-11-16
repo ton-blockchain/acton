@@ -43,18 +43,7 @@
     "singleQuote": false,
     "tabWidth": 2,
     "trailingComma": "all",
-    "useTabs": false,
-    "overrides": [
-      {
-        "files": [
-          "*.yaml",
-          "*.yml"
-        ],
-        "options": {
-          "tabWidth": 2
-        }
-      }
-    ]
+    "useTabs": false
   },
   "dependencies": {
     "react": "^19.2.0",
