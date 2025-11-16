@@ -80,7 +80,7 @@ pub fn build_cmd(
 
     for contract_key in filtered_compilation_order {
         let contract_config = contracts.get(&contract_key).unwrap();
-        let contract_path = &contract_config.root;
+        let contract_path = &contract_config.src;
 
         generate_dependency_files(
             &contract_key,
@@ -294,10 +294,10 @@ fn generate_tolk_dependency_content(
     acton_config: &ActonConfig,
 ) -> String {
     let asm_code = match kind {
-        DependencyKind::Simple => {
+        DependencyKind::EmbedCode => {
             format!("    \"{}\" base64>B B>boc PUSHREF", boc_base64)
         }
-        DependencyKind::Library => {
+        DependencyKind::LibraryRef => {
             format!(
                 "    \"{}\" base64>B B>boc hashu <b 2 8 u, swap 256 u, b>spec PUSHREF",
                 boc_base64

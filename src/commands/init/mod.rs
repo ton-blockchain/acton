@@ -111,7 +111,7 @@ fn discover_contracts() -> HashMap<String, ContractConfig> {
 
         let contract_config = ContractConfig {
             name: contract_name,
-            root: relative_path,
+            src: relative_path,
             depends: Some(vec![]),
             output: None,
         };

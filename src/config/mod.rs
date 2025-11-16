@@ -7,11 +7,11 @@ use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Default)]
 pub enum DependencyKind {
-    #[serde(rename = "simple")]
+    #[serde(rename = "embed_code")]
     #[default]
-    Simple,
-    #[serde(rename = "library")]
-    Library,
+    EmbedCode,
+    #[serde(rename = "library_ref")]
+    LibraryRef,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq)]
@@ -22,10 +22,8 @@ pub enum ContractDependency {
         name: String,
         #[serde(default)]
         kind: DependencyKind,
-        #[serde(rename = "out-function")]
-        out_function: Option<String>,
-        #[serde(rename = "out-path")]
-        out_path: Option<String>,
+        function: Option<String>,
+        path: Option<String>,
     },
 }
 
@@ -67,7 +65,7 @@ pub struct ContractsConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractConfig {
     pub name: String,
-    pub root: String,
+    pub src: String,
     pub depends: Option<Vec<ContractDependency>>,
     pub output: Option<String>,
 }
@@ -106,7 +104,7 @@ impl ContractDependency {
 
     pub fn kind(&self) -> DependencyKind {
         match self {
-            ContractDependency::Simple(_) => DependencyKind::Simple,
+            ContractDependency::Simple(_) => DependencyKind::EmbedCode,
             ContractDependency::Detailed { kind, .. } => kind.clone(),
         }
     }
@@ -114,14 +112,14 @@ impl ContractDependency {
     pub fn compiled_code_function(&self) -> Option<&str> {
         match self {
             ContractDependency::Simple(_) => None,
-            ContractDependency::Detailed { out_function, .. } => out_function.as_deref(),
+            ContractDependency::Detailed { function, .. } => function.as_deref(),
         }
     }
 
     pub fn compiled_code_out_path(&self) -> Option<&str> {
         match self {
             ContractDependency::Simple(_) => None,
-            ContractDependency::Detailed { out_path, .. } => out_path.as_deref(),
+            ContractDependency::Detailed { path, .. } => path.as_deref(),
         }
     }
 }
@@ -199,12 +197,12 @@ depends = []
 
         let counter = config.get_contract("counter").unwrap();
         assert_eq!(counter.name, "Counter Contract");
-        assert_eq!(counter.root, "counter.tolk");
+        assert_eq!(counter.src, "counter.tolk");
         assert_eq!(counter.depends, Some(vec![]));
 
         let wallet = config.get_contract("wallet-v5").unwrap();
         assert_eq!(wallet.name, "Wallet V5");
-        assert_eq!(wallet.root, "wallet-v5.tolk");
+        assert_eq!(wallet.src, "wallet-v5.tolk");
         assert_eq!(wallet.depends, Some(vec![]));
     }
 }

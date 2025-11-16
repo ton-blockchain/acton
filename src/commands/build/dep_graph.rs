@@ -156,8 +156,8 @@ pub(crate) fn generate_dependency_graph_svg(
                 let dep_kind = dep.kind();
 
                 let label = match dep_kind {
-                    DependencyKind::Simple => " simple ",
-                    DependencyKind::Library => " library ",
+                    DependencyKind::EmbedCode => " embed code ",
+                    DependencyKind::LibraryRef => " library ref ",
                 };
 
                 dot_content.push_str(&format!(

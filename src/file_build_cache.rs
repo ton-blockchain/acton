@@ -214,7 +214,7 @@ impl FileBuildCache {
         let file_path = fs::canonicalize(&file_path).unwrap_or(PathBuf::from(&file_path));
         let contracts = self.config.contracts.clone().unwrap_or_default().contracts;
         let Some((_, contract_info)) = contracts.iter().find(|(_, config)| {
-            fs::canonicalize(&config.root).unwrap_or(PathBuf::from(&config.root)) == file_path
+            fs::canonicalize(&config.src).unwrap_or(PathBuf::from(&config.src)) == file_path
         }) else {
             return Ok(file_deps);
         };
@@ -241,7 +241,7 @@ impl FileBuildCache {
                     .get(dep_name)
                     .ok_or_else(|| anyhow!("Contract '{}' not found in Acton.toml", dep_name))?;
 
-                result.append(&mut self.get_dependencies(contract_config.root.as_str())?);
+                result.append(&mut self.get_dependencies(contract_config.src.as_str())?);
             }
         }
 
