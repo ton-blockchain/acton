@@ -1,0 +1,18 @@
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > ./tests/test_test.tolk (1 tests)
+  ✗ with error [TIME]
+    └─ exit_code=42
+      ├─ at tests/test_test[LINE]
+      │     __throw   at tests/test_test[LINE]
+      └─ Phase: Action phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

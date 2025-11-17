@@ -5,4 +5,4 @@ pub mod snapshots;
 
 pub use assertions::TestOutputExt;
 pub use fixtures::FixtureProject;
-pub use project::ProjectBuilder;
+pub use project::{ProjectBuilder, TestConfig};

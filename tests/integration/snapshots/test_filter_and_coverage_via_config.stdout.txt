@@ -1,0 +1,28 @@
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > ./tests/test_test.tolk (1 tests)
+  ✗ unit div [TIME]
+    └─ exit_code=4
+      ├─ at code/utils[LINE]
+      │     _/_   at code/utils[LINE]
+      │     div   at tests/test_test[LINE]
+      ├─ integer overflow
+      └─ Phase: Compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.
+
+ COVERAGE  
+
+─────────────────────────────────────────────────────────
+ File              Covered Lines   Total Lines   % Lines 
+─────────────────────────────────────────────────────────
+ All files                     1             2     50.0% 
+ code/utils.tolk               1             2     50.0% 

@@ -11,6 +11,14 @@ pub struct ProjectBuilder {
     contracts: Vec<(String, String)>,
     tests: Vec<(String, String)>,
     files: Vec<(String, String)>,
+    test_config: Option<TestConfig>,
+}
+
+#[derive(Clone)]
+pub struct TestConfig {
+    pub filter: Option<String>,
+    pub coverage: Option<bool>,
+    pub backtrace: Option<String>,
 }
 
 impl ProjectBuilder {
@@ -22,6 +30,7 @@ impl ProjectBuilder {
             contracts: Vec::new(),
             tests: Vec::new(),
             files: Vec::new(),
+            test_config: None,
         }
     }
 
@@ -43,6 +52,21 @@ impl ProjectBuilder {
     /// ```
     pub fn file(mut self, path: &str, code: &str) -> Self {
         self.files.push((path.to_string(), code.to_string()));
+        self
+    }
+
+    /// Configure test settings in Acton.toml
+    ///
+    /// # Examples
+    /// ```
+    /// .with_test_config(TestConfig {
+    ///     filter: Some("test-unit-.*".to_string()),
+    ///     coverage: Some(true),
+    ///     backtrace: Some("full".to_string()),
+    /// })
+    /// ```
+    pub fn with_test_config(mut self, config: TestConfig) -> Self {
+        self.test_config = Some(config);
         self
     }
 
@@ -77,7 +101,12 @@ impl ProjectBuilder {
             fs::write(file_path, code).expect("Failed to write custom file");
         }
 
-        Self::create_acton_toml(&project_path, &self.name, &self.contracts);
+        Self::create_acton_toml(
+            &project_path,
+            &self.name,
+            &self.contracts,
+            &self.test_config,
+        );
 
         Project {
             path: project_path,
@@ -100,7 +129,12 @@ impl ProjectBuilder {
         code.replace("import \"../../../../lib/", "import \"../../lib/")
     }
 
-    fn create_acton_toml(project_path: &Path, name: &str, contracts: &[(String, String)]) {
+    fn create_acton_toml(
+        project_path: &Path,
+        name: &str,
+        contracts: &[(String, String)],
+        test_config: &Option<TestConfig>,
+    ) {
         let mut toml_content = format!(
             r#"[package]
 name = "{}"
@@ -124,6 +158,25 @@ depends = []
                 contract_name,
                 contract_name
             ));
+        }
+
+        // Add [test] section if test_config is provided
+        if let Some(config) = test_config {
+            toml_content.push_str("[test]\n");
+
+            if let Some(filter) = &config.filter {
+                toml_content.push_str(&format!("filter = \"{}\"\n", filter));
+            }
+
+            if let Some(coverage) = config.coverage {
+                toml_content.push_str(&format!("coverage = {}\n", coverage));
+            }
+
+            if let Some(backtrace) = &config.backtrace {
+                toml_content.push_str(&format!("backtrace = \"{}\"\n", backtrace));
+            }
+
+            toml_content.push_str("\n");
         }
 
         let config_path = project_path.join("Acton.toml");
