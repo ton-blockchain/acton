@@ -277,15 +277,31 @@ impl Stepper {
     }
 }
 
+#[derive(Default)]
+pub struct DebugVariables {
+    pub state_init: HashMap<i64, StateInit>,
+    pub msg_info: HashMap<i64, RelaxedMsgInfo>,
+    pub message: HashMap<i64, OwnedRelaxedMessage>,
+    pub out_action: HashMap<i64, OutAction>,
+    pub out_actions: HashMap<i64, Vec<OutAction>>,
+    pub tuple: HashMap<i64, TupleItem>,
+}
+
+impl DebugVariables {
+    pub fn clear(&mut self) {
+        self.state_init.clear();
+        self.msg_info.clear();
+        self.message.clear();
+        self.out_action.clear();
+        self.out_actions.clear();
+        self.tuple.clear();
+    }
+}
+
 pub struct DebugContext {
     pub stepper: Stepper,
     pub transport: DapTransport,
-    pub tuple_variables: HashMap<i64, TupleItem>,
-    pub out_actions_variables: HashMap<i64, Vec<OutAction>>,
-    pub out_action_variables: HashMap<i64, OutAction>,
-    pub message_variables: HashMap<i64, OwnedRelaxedMessage>,
-    pub msg_info_variables: HashMap<i64, RelaxedMsgInfo>,
-    pub state_init_variables: HashMap<i64, StateInit>,
+    pub variables: DebugVariables,
     pub performing_step: Option<StepMode>,
     pub breakpoints: HashMap<PathBuf, Vec<BreakpointInfo>>,
     pub next_breakpoint_id: i64,
@@ -304,12 +320,7 @@ impl DebugContext {
         DebugContext {
             stepper,
             transport,
-            tuple_variables: HashMap::new(),
-            out_actions_variables: HashMap::new(),
-            out_action_variables: HashMap::new(),
-            message_variables: HashMap::new(),
-            msg_info_variables: HashMap::new(),
-            state_init_variables: HashMap::new(),
+            variables: DebugVariables::default(),
             performing_step: None,
             breakpoints: HashMap::new(),
             next_breakpoint_id: 1,
@@ -394,12 +405,7 @@ impl DebugContext {
         self.stepper.pop_executor();
         self.stepper.thread_id = 1;
 
-        self.tuple_variables.clear();
-        self.out_actions_variables.clear();
-        self.out_action_variables.clear();
-        self.message_variables.clear();
-        self.msg_info_variables.clear();
-        self.state_init_variables.clear();
+        self.variables.clear();
         self.send_event(Event::Thread(ThreadEventBody {
             reason: ThreadEventReason::Exited,
             thread_id: id,
@@ -646,7 +652,6 @@ impl DebugContext {
 
     fn normalize_path(file: &String) -> String {
         file.to_string()
-            .replace("_script.tolk", "")
             .replace("_test.tolk_test.tolk", "_test.tolk")
     }
 
@@ -659,15 +664,6 @@ impl DebugContext {
     }
 
     fn create_stack_frame(&self, loc: &DebugLocation, function_name: String) -> StackFrame {
-        let line_offset = if let EntryContextDescription::Basic { ast_kind } =
-            &loc.context.description
-            && ast_kind == "ast_function_declaration"
-        {
-            1
-        } else {
-            0
-        };
-
         let file_path = Self::normalize_path(&loc.loc.file.to_string());
         let file_name = std::path::Path::new(&file_path)
             .file_name()
@@ -677,7 +673,7 @@ impl DebugContext {
 
         StackFrame {
             name: function_name,
-            line: loc.loc.line + 1 + line_offset,
+            line: loc.loc.line + 1,
             column: loc.loc.column + 2,
             source: Some(Source {
                 name: Some(file_name),

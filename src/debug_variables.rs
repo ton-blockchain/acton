@@ -81,7 +81,8 @@ impl DebugContext {
             // c5 register (out actions)
             if let Ok(out_actions) = self.get_out_actions(executor) {
                 let c5_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
-                self.out_actions_variables
+                self.variables
+                    .out_actions
                     .insert(c5_ref, out_actions.clone());
 
                 variables.push(Variable {
@@ -99,7 +100,7 @@ impl DebugContext {
             let mut c7_slice = c7_cell.parser();
             let c7_tuple = parse_tuple_item(&mut c7_slice)?;
             let c7_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
-            self.tuple_variables.insert(c7_ref, c7_tuple.clone());
+            self.variables.tuple.insert(c7_ref, c7_tuple.clone());
 
             variables.push(Variable {
                 name: "c7 (temporary data)".to_string(),
@@ -127,22 +128,22 @@ impl DebugContext {
                 })
                 .collect::<Vec<_>>()
         } else if args.variables_reference > 3 {
-            if let Some(tuple_item) = self.tuple_variables.get(&args.variables_reference) {
+            if let Some(tuple_item) = self.variables.tuple.get(&args.variables_reference) {
                 self.build_tuple_children(&tuple_item.clone())
             } else if let Some(out_actions) =
-                self.out_actions_variables.get(&args.variables_reference)
+                self.variables.out_actions.get(&args.variables_reference)
             {
                 self.build_out_actions_children(&out_actions.clone())
             } else if let Some(out_action) =
-                self.out_action_variables.get(&args.variables_reference)
+                self.variables.out_action.get(&args.variables_reference)
             {
                 self.build_out_action_children(&out_action.clone())
-            } else if let Some(message) = self.message_variables.get(&args.variables_reference) {
+            } else if let Some(message) = self.variables.message.get(&args.variables_reference) {
                 self.build_message_children(&message.clone())
-            } else if let Some(msg_info) = self.msg_info_variables.get(&args.variables_reference) {
+            } else if let Some(msg_info) = self.variables.msg_info.get(&args.variables_reference) {
                 self.build_msg_info_children(msg_info)
             } else if let Some(state_init) =
-                self.state_init_variables.get(&args.variables_reference)
+                self.variables.state_init.get(&args.variables_reference)
             {
                 self.build_state_init_children(state_init)
             } else {
@@ -164,7 +165,7 @@ impl DebugContext {
                     let item_ref = if Self::has_children(item) {
                         let ref_id =
                             VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
-                        self.tuple_variables.insert(ref_id, item.clone());
+                        self.variables.tuple.insert(ref_id, item.clone());
                         ref_id
                     } else {
                         0
@@ -185,7 +186,7 @@ impl DebugContext {
                     let item_ref = if Self::has_children(item) {
                         let ref_id =
                             VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
-                        self.tuple_variables.insert(ref_id, item.clone());
+                        self.variables.tuple.insert(ref_id, item.clone());
                         ref_id
                     } else {
                         0
@@ -273,7 +274,7 @@ impl DebugContext {
 
                 let action_ref = crate::debug_context::VARIABLE_REFERENCE_COUNTER
                     .fetch_add(1, Ordering::SeqCst) as i64;
-                self.out_action_variables.insert(action_ref, action.clone());
+                self.variables.out_action.insert(action_ref, action.clone());
 
                 let value = match action {
                     OutAction::SendMsg { mode, out_msg } => {
@@ -321,7 +322,7 @@ impl DebugContext {
                 let message_ref = crate::debug_context::VARIABLE_REFERENCE_COUNTER
                     .fetch_add(1, Ordering::SeqCst) as i64;
                 if let Ok(message) = out_msg.load() {
-                    self.message_variables.insert(message_ref, message);
+                    self.variables.message.insert(message_ref, message);
                     variables.push(Variable {
                         name: "out_msg".to_string(),
                         type_field: Some("OwnedRelaxedMessage".to_string()),
@@ -441,7 +442,8 @@ impl DebugContext {
         let mut variables = Vec::new();
 
         let info_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
-        self.msg_info_variables
+        self.variables
+            .msg_info
             .insert(info_ref, message.info.clone());
         variables.push(Variable {
             name: "info".to_string(),
@@ -453,7 +455,7 @@ impl DebugContext {
 
         if let Some(init) = &message.init {
             let init_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
-            self.state_init_variables.insert(init_ref, init.clone());
+            self.variables.state_init.insert(init_ref, init.clone());
             variables.push(Variable {
                 name: "init".to_string(),
                 type_field: Some("StateInit".to_string()),
