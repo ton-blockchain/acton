@@ -8,7 +8,7 @@ use emulator_rs::commands::disasm::disasm_cmd;
 use emulator_rs::commands::init::init_cmd;
 use emulator_rs::commands::new::new_cmd;
 use emulator_rs::commands::script::script_cmd;
-use emulator_rs::commands::test::{TestConfig, test_cmd};
+use emulator_rs::commands::test::{ReportFormat, TestConfig, test_cmd};
 use emulator_rs::config::ActonConfig;
 use owo_colors::OwoColorize;
 use std::fs::OpenOptions;
@@ -51,6 +51,8 @@ enum Commands {
         filter: Option<String>,
         #[arg(long, help = "Output in TeamCity format for IDE integration")]
         teamcity: bool,
+        #[arg(long, help = "Report formats to use", value_delimiter = ',')]
+        reporter: Vec<String>,
         #[arg(long, help = "Enable debug mode")]
         debug: bool,
         #[arg(long, help = "Debug server port", default_value = "12345")]
@@ -252,6 +254,7 @@ fn main() {
             path,
             filter,
             teamcity,
+            reporter,
             debug,
             debug_port,
             backtrace,
@@ -261,6 +264,29 @@ fn main() {
             include,
             clear_cache,
         } => {
+            let mut report_formats = Vec::new();
+
+            if teamcity {
+                report_formats.push(ReportFormat::TeamCity);
+            }
+
+            for format_str in reporter {
+                match format_str.to_lowercase().as_str() {
+                    "console" => report_formats.push(ReportFormat::Console),
+                    "teamcity" => report_formats.push(ReportFormat::TeamCity),
+                    _ => {
+                        eprintln!(
+                            "Warning: Unknown report format '{}'. Supported formats: console, teamcity",
+                            format_str
+                        );
+                    }
+                }
+            }
+
+            if report_formats.is_empty() {
+                report_formats.push(ReportFormat::Console);
+            }
+
             let config = create_test_config(
                 filter,
                 teamcity,
@@ -272,6 +298,7 @@ fn main() {
                 exclude,
                 include,
                 clear_cache,
+                report_formats,
             );
             let result = test_cmd(path, &config);
             if let Err(err) = result {
@@ -376,6 +403,7 @@ fn create_test_config(
     exclude: Vec<String>,
     include: Vec<String>,
     clear_cache: bool,
+    report_formats: Vec<ReportFormat>,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -415,5 +443,6 @@ fn create_test_config(
         exclude_patterns: exclude,
         include_patterns: include,
         clear_cache,
+        report_formats,
     }
 }

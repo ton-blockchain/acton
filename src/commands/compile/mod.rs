@@ -16,7 +16,6 @@ pub fn compile_cmd(
     fift: Option<String>,
     clear_cache: bool,
 ) -> anyhow::Result<()> {
-    // Clear cache if clear_cache flag is set
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
         file_cache.clear()?;

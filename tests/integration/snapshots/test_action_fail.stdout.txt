@@ -8,7 +8,7 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 tests)
+ > ./tests/test_test.tolk (1 test)
   ✓ action fail [TIME]
     └─ Test output:
        N/A -> deployer A

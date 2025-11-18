@@ -3,13 +3,18 @@ use crate::commands::test::coverage::{
     Coverage, collect_coverage, generate_lcov_file, merge_coverages, print_coverage_summary,
 };
 use crate::commands::test::instrumentation::inject_locations_into_expect_calls;
+use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
+use crate::commands::test::reporting::teamcity::TeamCityReporter;
+use crate::commands::test::reporting::{
+    ReporterManager, TestExecutionContext, TestReport, TestStatus, TestSuiteStats,
+    extract_suite_name,
+};
 use crate::config::ActonConfig;
 use crate::context::{AnyExecutor, AssertFailure, BuildCache, Context, Emulations, KnownAddresses};
 use crate::dap::DapMessage;
 use crate::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
-use crate::formatter::FormatterContext;
-use crate::{asserts_exts, exts, io_exts, retrace};
+use crate::{asserts_exts, exts, io_exts};
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -17,7 +22,6 @@ use dap::prelude::Request;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::executor::ExecutorVerbosity;
-use emulator::exit_codes;
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -28,10 +32,9 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::{fs, process};
-use teamcity::TeamcityReporter;
-use tolkc::source_map::{SourceLocation, SourceMap};
+use tolkc::source_map::SourceMap;
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
@@ -41,13 +44,20 @@ use walkdir::WalkDir;
 mod annotations;
 mod coverage;
 mod instrumentation;
-mod teamcity;
+mod reporting;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ReportFormat {
+    Console,
+    TeamCity,
+}
 
 #[derive(Debug, Clone)]
 pub struct TestConfig {
     pub teamcity: bool,
+    pub report_formats: Vec<ReportFormat>,
     pub debug: bool,
     pub debug_port: u16,
     pub backtrace: Option<String>,
@@ -79,10 +89,15 @@ pub struct TestRunner<'a> {
     emulations: Emulations,
     req_receiver: Receiver<Request>,
     dap_sender: Sender<DapMessage>,
+    reporter_manager: &'a mut ReporterManager,
 }
 
 impl<'a> TestRunner<'a> {
-    pub fn new(config: TestConfig, cache: &'a mut FileBuildCache) -> TestRunner<'a> {
+    pub fn new(
+        config: TestConfig,
+        cache: &'a mut FileBuildCache,
+        reporter_manager: &'a mut ReporterManager,
+    ) -> TestRunner<'a> {
         let (req_receiver, dap_sender) = if config.debug {
             crate::dap::start_dap_server(config.debug_port)
         } else {
@@ -100,6 +115,20 @@ impl<'a> TestRunner<'a> {
             emulations: Emulations::new(),
             req_receiver,
             dap_sender,
+            reporter_manager,
+        }
+    }
+
+    fn setup_reporters(reporter_manager: &mut ReporterManager, config: &TestConfig) {
+        if config.report_formats.is_empty()
+            || config.report_formats.contains(&ReportFormat::Console)
+        {
+            let console_config = ConsoleConfig { show_output: true };
+            reporter_manager.add_reporter(Box::new(ConsoleReporter::new(console_config)));
+        }
+
+        if config.report_formats.contains(&ReportFormat::TeamCity) {
+            reporter_manager.add_reporter(Box::new(TeamCityReporter::new()));
         }
     }
 
@@ -266,20 +295,13 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         anyhow::bail!("Path '{}' is neither a file nor a directory", path);
     };
 
-    let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-
-    if config.teamcity {
-        TeamcityReporter::on_testing_started();
-    }
-
-    if !config.teamcity {
-        println!("\n{} {}", " TEST ".bold().on_blue(), cwd.display().dimmed());
-    }
+    let mut global_reporter = ReporterManager::new();
+    TestRunner::setup_reporters(&mut global_reporter, &config);
+    global_reporter.init()?;
+    global_reporter.on_testing_started()?;
 
     // hacky init VM with debug enabled due to global variables :/
     tolkc::compile("./testdata/simple.tolk".as_ref(), true);
-
-    println!();
 
     let mut file_cache = FileBuildCache::new(None)?;
 
@@ -290,7 +312,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let mut coverages = vec![];
 
     for (index, file) in test_files.iter().enumerate() {
-        let result = run_tests_for_file(&file, &config, &mut file_cache);
+        let result = run_tests_for_file(&file, &config, &mut file_cache, &mut global_reporter);
         match result {
             Ok(stats) => {
                 total_passed += stats.passed;
@@ -313,65 +335,16 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         }
     }
 
-    let mut parts = Vec::new();
-
-    // Show 0 passed only if no tests at all
-    if total_passed > 0 || (total_failed == 0 && total_skipped == 0 && total_todo == 0) {
-        parts.push(format!(
-            "{} {} {}",
-            "✓".green().bold(),
-            total_passed.to_string().green().bold(),
-            "passed".green().bold()
-        ));
-    }
-
-    if total_failed > 0 {
-        parts.push(format!(
-            "{} {} {}",
-            "✗".red().bold(),
-            total_failed.to_string().red().bold(),
-            "failed".red().bold()
-        ));
-    }
-
-    if total_skipped > 0 {
-        parts.push(format!(
-            "{} {} {}",
-            "○".yellow().bold(),
-            total_skipped.to_string().yellow().bold(),
-            "skipped".yellow().bold()
-        ));
-    }
-
-    if total_todo > 0 {
-        parts.push(format!(
-            "{} {} {}",
-            "□".purple().bold(),
-            total_todo.to_string().purple().bold(),
-            "todo".purple().bold()
-        ));
-    }
-
-    let file_str = if test_files.len() == 1 {
-        "file"
-    } else {
-        "files"
+    let global_stats = TestSuiteStats {
+        total: total_passed + total_failed + total_skipped + total_todo,
+        passed: total_passed,
+        failed: total_failed,
+        skipped: total_skipped,
+        ignored: 0,
+        todo: total_todo,
+        duration: Duration::default(),
     };
-
-    if !parts.is_empty() {
-        let summary = parts.join(", ");
-        println!(
-            "\n {} {} {} {}",
-            summary,
-            "in".dimmed(),
-            test_files.len().to_string().green(),
-            file_str.green().dimmed()
-        );
-    }
-
-    if total_failed > 0 {
-        println!("\n{}", "Some tests failed.".red());
-    }
+    global_reporter.on_testing_finished(&global_stats)?;
 
     if !coverages.is_empty() {
         let merged_coverage = merge_coverages(&coverages);
@@ -401,9 +374,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         }
     }
 
-    if config.teamcity {
-        TeamcityReporter::on_testing_finished();
-    }
+    global_reporter.finalize()?;
 
     if total_failed > 0 {
         process::exit(1)
@@ -540,6 +511,7 @@ fn run_tests_for_file(
     file: &str,
     config: &TestConfig,
     file_cache: &mut FileBuildCache,
+    reporter_manager: &mut ReporterManager,
 ) -> Result<TestStats, anyhow::Error> {
     let content = match fs::read_to_string(file) {
         Ok(content) => content,
@@ -569,7 +541,7 @@ fn run_tests_for_file(
 
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64)?;
 
-            let mut runner = TestRunner::new(config.clone(), file_cache);
+            let mut runner = TestRunner::new(config.clone(), file_cache, reporter_manager);
             let stats = run_file_tests(
                 &mut runner,
                 file,
@@ -586,7 +558,7 @@ fn run_tests_for_file(
             let trimmed_message = normalized_filepath.trim();
             Err(anyhow!(trimmed_message.to_string()))
         }
-    };
+    }?;
 
     result
 }
@@ -598,19 +570,19 @@ fn run_file_tests(
     code_cell: &Arc<Cell>,
     abi: &ContractAbi,
     source_map: &SourceMap,
-) -> TestStats {
+) -> anyhow::Result<TestStats> {
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
         let regex = match Regex::new(pattern) {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("Invalid regex pattern '{}': {}", pattern, e);
-                return TestStats {
+                return Ok(TestStats {
                     passed: 0,
                     failed: 0,
                     skipped: 0,
                     todo: 0,
                     coverage: None,
-                };
+                });
             }
         };
         tests
@@ -622,20 +594,9 @@ fn run_file_tests(
     };
 
     if !filtered_tests.is_empty() {
-        if runner.config.teamcity {
-            TeamcityReporter::on_test_suite_started(file_path);
-        }
-
-        let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-        let relative_path = Path::new(file_path)
-            .strip_prefix(&cwd)
-            .unwrap_or_else(|_| Path::new(file_path));
-        println!(
-            " {} {} {}",
-            ">".dimmed(),
-            relative_path.display().to_string(),
-            format!("({} tests)", filtered_tests.len()).dimmed()
-        );
+        runner
+            .reporter_manager
+            .on_suite_started(file_path, &filtered_tests)?;
     }
 
     let dest_address = contract_address(&code_cell);
@@ -646,37 +607,35 @@ fn run_file_tests(
     let mut todo = 0;
 
     for test in filtered_tests.iter() {
-        if runner.config.teamcity {
-            TeamcityReporter::on_test_started(&beatify_test_name(&test.name), file_path);
-        }
+        let suite_name = extract_suite_name(file_path);
+        let mut test_report = TestReport {
+            name: test.name.clone(),
+            suite_name: suite_name.clone(),
+            file_path: file_path.to_string(),
+            duration: Duration::default(),
+            gas_limit: test.gas_limit,
+            status: TestStatus::Passed,
+            message: None,
+            details: None,
+            abi: abi.clone(),
+            source_map: source_map.clone(),
+            backtrace: runner.config.backtrace.clone(),
+            execution: None,
+        };
+
+        runner.reporter_manager.on_test_started(&test_report)?;
 
         if test.annotations.contains(&"todo".to_string()) {
-            if runner.config.teamcity {
-                TeamcityReporter::on_test_ignored(&beatify_test_name(&test.name), 0);
-            }
-            let description = test.todo_description.as_deref().unwrap_or("TODO");
-            println!(
-                "  {} {} {}{}{}",
-                "□".purple().bold(),
-                beatify_test_name(&test.name),
-                "[".dimmed(),
-                description.dimmed(),
-                "]".dimmed()
-            );
+            test_report.status = TestStatus::Todo;
+            test_report.details = test.todo_description.clone();
+            runner.reporter_manager.on_test_finished(&test_report)?;
             todo += 1;
             continue;
         }
 
         if test.annotations.contains(&"skip".to_string()) {
-            if runner.config.teamcity {
-                TeamcityReporter::on_test_ignored(&beatify_test_name(&test.name), 0);
-            }
-            println!(
-                "  {} {} {}",
-                "○".dimmed(),
-                beatify_test_name(&test.name),
-                "skipped".dimmed()
-            );
+            test_report.status = TestStatus::Skipped;
+            runner.reporter_manager.on_test_finished(&test_report)?;
             skipped += 1;
             continue;
         }
@@ -714,334 +673,58 @@ fn run_file_tests(
             GetMethodResult::Error(_) => (999, 0),
         };
 
-        let duration_ms = duration.as_millis();
-        let (time_value, time_unit) = if duration_ms > 0 {
-            (duration_ms.to_string(), "ms")
-        } else {
-            (duration.as_micros().to_string(), "μs")
-        };
-
         let expected_exit_code = dyn_expected_exit_code
             .or_else(|| test.expected_exit_code)
             .unwrap_or(0);
         let mut test_passed = exit_code == expected_exit_code;
 
-        let gas_limit_exceeded = if let Some(limit) = test.gas_limit {
+        if let Some(limit) = test.gas_limit {
             if gas_used > limit {
                 test_passed = false;
-                true
-            } else {
-                false
             }
-        } else {
-            false
-        };
+        }
 
         if exit_code == 0 && assert_failure.is_some() {
             test_passed = false
         }
 
+        test_report.duration = duration;
+        test_report.execution = Some(TestExecutionContext {
+            get_result: get_result.clone(),
+            gas_used,
+            stdout: captured_stdout.clone(),
+            stderr: captured_stderr.clone(),
+            assert_failure: assert_failure.clone(),
+            accounts: accounts.clone(),
+            expected_exit_code,
+            build_cache: runner.build_cache.clone(),
+            emulations: runner.emulations.clone(),
+            known_addresses: runner.known_addresses.clone(),
+            known_code_cells: runner.known_code_cells.clone(),
+        });
+
         if test_passed {
-            println!(
-                "  {} {} {}{}",
-                "✓".green(),
-                beatify_test_name(&test.name),
-                time_value.green(),
-                time_unit.green().dimmed()
-            );
+            test_report.status = TestStatus::Passed;
             passed += 1;
         } else {
-            println!(
-                "  {} {} {}{}",
-                "✗".red(),
-                beatify_test_name(&test.name),
-                time_value.red(),
-                time_unit.red().dimmed()
-            );
+            test_report.status = TestStatus::Failed;
+
+            if let Some(failure) = &assert_failure {
+                test_report.message = failure.message();
+                test_report.details = failure.location();
+            } else if expected_exit_code != 0 {
+                test_report.message = Some(format!(
+                    "Expected exit_code={}, got={}",
+                    expected_exit_code, exit_code
+                ));
+            } else {
+                test_report.message = Some(format!("exit_code={}", exit_code));
+            }
+
             failed += 1;
-
-            let formatter = FormatterContext {
-                contract_abi: abi.clone(),
-                accounts,
-                build_cache: runner.build_cache.clone(),
-                emulations: runner.emulations.clone(),
-                known_addresses: runner.known_addresses.clone(),
-                known_code_cells: runner.known_code_cells.clone(),
-                backtrace: runner.config.backtrace.clone(),
-            };
-
-            match &get_result {
-                GetMethodResult::Success(result) => {
-                    let exit_code = result.vm_exit_code as i64;
-
-                    let exit_code_info = retrace::find_exception_info(&result.vm_log, source_map);
-
-                    if gas_limit_exceeded {
-                        println!(
-                            "    {} Gas limit exceeded: used {}, limit {}",
-                            "└─".dimmed(),
-                            gas_used.to_string().red(),
-                            test.gas_limit.unwrap_or(0).to_string().green()
-                        );
-                    } else if let Some(ref assert_failure) = assert_failure {
-                        if let Some(message) = &assert_failure.message() {
-                            if !message.is_empty() {
-                                let highlighted_message =
-                                    FormatterContext::highlight_actual_expected(message);
-                                println!(
-                                    "    {} {} {}",
-                                    "└─".dimmed(),
-                                    "Error:".bright_red(),
-                                    highlighted_message
-                                );
-                            } else {
-                                println!("    {}", "└─".dimmed());
-                            }
-                        } else {
-                            println!("    {}", "└─".dimmed());
-                        }
-
-                        if let AssertFailure::Bin(assert_failure) = &assert_failure
-                            && assert_failure.operator == "=="
-                        {
-                            let diff_output = formatter.format_tuple_diff(
-                                &assert_failure.left,
-                                &assert_failure.right,
-                                &assert_failure.left_type,
-                                &assert_failure.right_type,
-                            );
-
-                            for line in diff_output.lines() {
-                                println!("        {}", line);
-                            }
-                        }
-
-                        if let AssertFailure::Bin(assert_failure) = &assert_failure
-                            && assert_failure.operator == "!="
-                        {
-                            println!(
-                                "       {}",
-                                "Values are equal but expected to be different:"
-                            );
-                            let value = formatter.format_tuple_value(
-                                &assert_failure.left,
-                                &assert_failure.left_type,
-                                8,
-                            );
-                            println!("         {}", value.dimmed());
-                        }
-
-                        if let AssertFailure::Bin(assert_failure) = &assert_failure
-                            && assert_failure.is_ord()
-                        {
-                            let left = formatter.format_tuple_value(
-                                &assert_failure.left,
-                                &assert_failure.left_type,
-                                8,
-                            );
-
-                            let right = formatter.format_tuple_value(
-                                &assert_failure.right,
-                                &assert_failure.right_type,
-                                8,
-                            );
-
-                            println!("        Actual:   {}", left.red());
-                            println!("        Expected: {}", right.green());
-                        }
-
-                        if let AssertFailure::TransactionNotFound(assert_failure) = &assert_failure
-                        {
-                            let params =
-                                formatter.format_search_transaction_parameters(assert_failure, abi);
-
-                            let diff_output = format!(
-                                "{}\nCannot find transaction from {} to {}\nwith:\n{}",
-                                formatter.format(&assert_failure.txs),
-                                formatter.format_address(
-                                    &assert_failure.txs,
-                                    &assert_failure.params.from
-                                ),
-                                formatter
-                                    .format_address(&assert_failure.txs, &assert_failure.params.to),
-                                params.join("\n"),
-                            );
-
-                            for line in diff_output.lines() {
-                                println!("        {}", line);
-                            }
-                        }
-
-                        if let AssertFailure::TransactionIsFound(assert_failure) = &assert_failure {
-                            let params =
-                                formatter.format_search_transaction_parameters(assert_failure, abi);
-
-                            let diff_output = format!(
-                                "{}\nUnexpected transaction from {} to {}\n{}{}",
-                                formatter.format(&assert_failure.txs),
-                                formatter.format_address(
-                                    &assert_failure.txs,
-                                    &assert_failure.params.from
-                                ),
-                                formatter.format_address(
-                                    &assert_failure.txs,
-                                    &assert_failure.params.to,
-                                ),
-                                if params.len() != 0 { "with:\n" } else { "" },
-                                params.join("\n"),
-                            );
-
-                            for line in diff_output.lines() {
-                                println!("        {}", line);
-                            }
-                        }
-
-                        if let Some(location) = &assert_failure.location() {
-                            if !location.is_empty() {
-                                println!("      {} at {}", "└─".dimmed(), location.dimmed());
-                            }
-                        }
-                    } else {
-                        if expected_exit_code != 0 {
-                            println!(
-                                "    {} Expected exit_code={}, got={}",
-                                "└─".dimmed(),
-                                expected_exit_code.to_string().green(),
-                                exit_code.to_string().bright_red()
-                            );
-                        } else {
-                            println!(
-                                "    {} exit_code={}",
-                                "└─".dimmed(),
-                                exit_code.to_string().yellow()
-                            );
-
-                            if let Some(info) = &exit_code_info {
-                                if let Some(loc) = &info.loc {
-                                    println!(
-                                        "      {} at {}",
-                                        "├─".dimmed(),
-                                        format!(
-                                            "{}:{}:{}",
-                                            SourceLocation::normalize_path(&loc.file),
-                                            loc.line + 1,
-                                            loc.column + 2
-                                        )
-                                        .dimmed(),
-                                    );
-                                    if !info.backtrace.is_empty() {
-                                        let max_function_name_len = info
-                                            .backtrace
-                                            .iter()
-                                            .filter_map(|loc| loc.context.event_function.as_ref())
-                                            .map(|name| name.len() + 2)
-                                            .max()
-                                            .unwrap_or(0);
-
-                                        let backtrace_lines =
-                                            info.backtrace.iter().rev().filter_map(|loc| {
-                                                loc.context.event_function.as_ref().map(
-                                                    |func_name| {
-                                                        let location = format!(
-                                                            "{}:{}:{}",
-                                                            SourceLocation::normalize_path(
-                                                                &loc.loc.file
-                                                            ),
-                                                            loc.loc.line + 1,
-                                                            loc.loc.column + 2
-                                                        );
-                                                        format!(
-                                                            "{:<width$} at {}",
-                                                            func_name.green(),
-                                                            location.dimmed(),
-                                                            width = max_function_name_len
-                                                        )
-                                                    },
-                                                )
-                                            });
-
-                                        for line in backtrace_lines {
-                                            println!("      {}     {}", "│".dimmed(), line);
-                                        }
-                                    }
-                                } else if runner.config.backtrace.is_none() {
-                                    println!(
-                                        "      {} Re-run with {} to get more information",
-                                        "├─".dimmed(),
-                                        "--backtrace full".yellow()
-                                    );
-                                }
-                                if !info.description.is_empty() {
-                                    println!(
-                                        "      {} {}",
-                                        "├─".dimmed(),
-                                        info.description.dimmed()
-                                    );
-                                }
-                            }
-
-                            if let Some(info) = exit_codes::get_exit_code_info(exit_code) {
-                                if exit_code_info.is_none() {
-                                    // Don't show duplicate info
-                                    println!(
-                                        "      {} {}",
-                                        "├─".dimmed(),
-                                        info.description.dimmed()
-                                    );
-                                }
-                                println!("      {} Phase: {}", "└─".dimmed(), info.phase.dimmed());
-                            } else if exit_code == 678 {
-                                println!(
-                                    "      {} {}",
-                                    "└─".dimmed(),
-                                    "Cannot run method of not deployed contract"
-                                );
-                            } else if exit_code == 679 {
-                                println!(
-                                    "      {} {}",
-                                    "└─".dimmed(),
-                                    "Cannot run method of contract without code"
-                                );
-                            }
-                        }
-                    }
-                }
-                GetMethodResult::Error(error) => {
-                    println!("    {} {}", "└─".dimmed(), error.error.yellow());
-                }
-            }
-
-            if runner.config.teamcity {
-                TeamcityReporter::on_test_failed(
-                    &beatify_test_name(&test.name),
-                    duration_ms,
-                    assert_failure.as_ref(),
-                    &formatter,
-                );
-            }
         }
 
-        if !captured_stdout.trim().is_empty() {
-            println!("    {} Test output:", "└─".dimmed());
-            for line in captured_stdout.trim().lines() {
-                println!("       {}", line);
-            }
-        }
-
-        if !captured_stderr.trim().is_empty() {
-            println!("    {} Test stderr:", "└─".dimmed());
-            for line in captured_stderr.trim().lines() {
-                println!("       {}", line.bright_red());
-            }
-        }
-
-        if runner.config.teamcity {
-            TeamcityReporter::on_test_finished(
-                &beatify_test_name(&test.name),
-                file_path,
-                duration_ms,
-            );
-        }
+        runner.reporter_manager.on_test_finished(&test_report)?;
 
         if runner.config.coverage {
             // For coverage, we need to process test logs as well, so register it here
@@ -1064,8 +747,19 @@ fn run_file_tests(
         }
     }
 
-    if !filtered_tests.is_empty() && runner.config.teamcity {
-        TeamcityReporter::on_test_suite_finished(file_path);
+    if !filtered_tests.is_empty() {
+        let suite_stats = TestSuiteStats {
+            total: passed + failed + skipped + todo,
+            passed,
+            failed,
+            skipped,
+            ignored: 0,
+            todo,
+            duration: Duration::default(), // TODO: track suite duration
+        };
+        runner
+            .reporter_manager
+            .on_suite_finished(file_path, &suite_stats)?;
     }
 
     let coverage = if runner.config.coverage {
@@ -1074,21 +768,13 @@ fn run_file_tests(
         None
     };
 
-    TestStats {
+    Ok(TestStats {
         passed,
         failed,
         skipped,
         todo,
         coverage,
-    }
-}
-
-fn beatify_test_name(name: &String) -> String {
-    name.replace("-", " ")
-        .replace("_", " ")
-        .to_string()
-        .trim_start_matches("test ")
-        .to_string()
+    })
 }
 
 fn contract_address(code: &Arc<Cell>) -> TonAddress {
@@ -1111,7 +797,7 @@ fn contract_address(code: &Arc<Cell>) -> TonAddress {
 }
 
 #[derive(Debug)]
-struct TestDescriptor {
+pub struct TestDescriptor {
     pub id: i32,
     pub name: String,
     pub annotations: Vec<String>,

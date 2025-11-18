@@ -224,6 +224,7 @@ impl TestSettings {
         TestConfig {
             filter: filter_override.or_else(|| self.filter.clone()),
             teamcity: teamcity_override.unwrap_or_else(|| self.teamcity.unwrap_or(false)),
+            report_formats: vec![],
             debug: debug_override.unwrap_or_else(|| self.debug.unwrap_or(false)),
             debug_port: debug_port_override.unwrap_or_else(|| self.debug_port.unwrap_or(12345)),
             backtrace: backtrace_override.or_else(|| self.backtrace.clone()),

@@ -123,7 +123,7 @@ pub struct GetMethodRawResultSuccess {
     pub missing_library: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GetMethodResult {
     Success(GetMethodResultSuccess),
     Error(GetMethodResultError),
@@ -140,7 +140,7 @@ pub struct GetMethodResultSuccess {
     pub code: Option<Cell>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct GetMethodResultError {
     pub success: bool,
     pub error: String,
