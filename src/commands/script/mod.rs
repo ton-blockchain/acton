@@ -52,12 +52,7 @@ fn run_script_file(
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content, file_path);
 
-    let executable_code = content.to_string();
-    let tmp_script_filename = format!("{}_script.tolk", file_path);
-
-    fs::write(&tmp_script_filename, executable_code)?;
-
-    let compilation_result = tolkc::compile(Path::new(&tmp_script_filename), debug);
+    let compilation_result = tolkc::compile(Path::new(&file_path), debug);
     let result = match compilation_result {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64)?;
@@ -79,8 +74,6 @@ fn run_script_file(
             Err(anyhow!("Cannot compile script file {}", error.message))
         }
     };
-
-    let _ = fs::remove_file(&tmp_script_filename);
 
     result
 }

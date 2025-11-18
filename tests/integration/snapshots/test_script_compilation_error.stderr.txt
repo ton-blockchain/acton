@@ -1,0 +1,6 @@
+Error: Cannot compile script file [ROOT]/scripts/broken[LINE]: error: undefined symbol `nonexistent_function`
+
+    // in function `main`
+   3 |                 val x = nonexistent_function();
+     |                         ^^^^^^^^^^^^^^^^^^^^
+

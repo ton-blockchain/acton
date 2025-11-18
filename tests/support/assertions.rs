@@ -25,6 +25,15 @@ impl TestOutput {
             project_path: self.project_path,
         }
     }
+
+    /// Assert specific exit code
+    pub fn code(self, expected_code: i32) -> TestSuccess {
+        let output = self.output.code(expected_code);
+        TestSuccess {
+            output,
+            project_path: self.project_path,
+        }
+    }
 }
 
 pub struct TestSuccess {
@@ -46,6 +55,7 @@ pub trait TestOutputExt {
     fn assert_test_failed(&self, name: &str) -> &Self;
     fn assert_contains(&self, text: &str) -> &Self;
     fn assert_not_contains(&self, text: &str) -> &Self;
+    fn assert_stderr_contains(&self, text: &str) -> &Self;
     fn get_stdout(&self) -> String;
     fn get_stderr(&self) -> String;
     fn get_normalized_stdout(&self) -> String;
@@ -145,6 +155,17 @@ impl TestOutputExt for TestSuccess {
             "Did not expect '{}' in stdout, but got:\n{}",
             text,
             stdout
+        );
+        self
+    }
+
+    fn assert_stderr_contains(&self, text: &str) -> &Self {
+        let stderr = strip_ansi(&self.get_stderr());
+        assert!(
+            stderr.contains(text),
+            "Expected '{}' in stderr, but got:\n{}",
+            text,
+            stderr
         );
         self
     }
@@ -287,6 +308,17 @@ impl TestOutputExt for TestFailure {
             "Did not expect '{}' in stdout, but got:\n{}",
             text,
             stdout
+        );
+        self
+    }
+
+    fn assert_stderr_contains(&self, text: &str) -> &Self {
+        let stderr = strip_ansi(&self.get_stderr());
+        assert!(
+            stderr.contains(text),
+            "Expected '{}' in stderr, but got:\n{}",
+            text,
+            stderr
         );
         self
     }

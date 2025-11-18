@@ -207,6 +207,18 @@ impl ProjectBuilder {
         self
     }
 
+    /// Add a script file
+    ///
+    /// # Examples
+    /// ```
+    /// .script_file("hello", r#"print("Hello");"#)
+    /// ```
+    pub fn script_file(mut self, name: &str, code: &str) -> Self {
+        self.files
+            .push((format!("scripts/{}", name), code.to_string()));
+        self
+    }
+
     /// Add a custom file to the project (e.g., library files)
     ///
     /// # Examples
@@ -483,6 +495,21 @@ impl ActonCommand {
         self
     }
 
+    /// Start script command
+    ///
+    /// # Examples
+    /// ```
+    /// .script("scripts/hello.tolk")
+    /// ```
+    pub fn script(mut self, script_path: &str) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("script")
+            .arg(script_path)
+            .current_dir(&self.project.path);
+        self
+    }
+
     /// Specify path to test file or directory
     ///
     /// # Examples
@@ -542,11 +569,12 @@ impl ActonCommand {
         self
     }
 
-    /// Clear compilation cache before building (only for build command)
+    /// Clear compilation cache (for build and script commands)
     ///
     /// # Examples
     /// ```
     /// .build().clear_cache()              // Clear cache before building
+    /// .script("test.tolk").clear_cache()  // Clear cache before running script
     /// ```
     pub fn clear_cache(mut self) -> Self {
         self.build_clear_cache = true;

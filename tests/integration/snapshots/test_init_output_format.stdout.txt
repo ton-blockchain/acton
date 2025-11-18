@@ -1,6 +1,6 @@
 Discovered 2 contracts:
-  Contract1 (contract1)
   Contract2 (contract2)
+  Contract1 (contract1)
 
 ✓ Initialized new Acton project
 Created Acton.toml with project configuration
