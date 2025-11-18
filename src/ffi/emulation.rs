@@ -31,14 +31,6 @@ use tycho_types::models::{
     RelaxedMsgInfo, ShardAccount, Transaction, TxInfo,
 };
 
-extension!(read_file in (Context) with (path: String) using read_file_impl);
-fn read_file_impl(_ctx: &mut Context, stack: &mut Tuple, path: String) {
-    match std::fs::read_to_string(&path) {
-        Ok(content) => stack.push_string(&content),
-        Err(_) => stack.push(TupleItem::Null),
-    }
-}
-
 extension!(build in (Context) with (path: String, name: String) using build_impl);
 fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, name: String) {
     debug!("Building {name}");
@@ -46,10 +38,9 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, name: Stri
 
     if path.is_empty() {
         debug!("No path provided, search in contracts");
-        let contracts = ctx.config.contracts.clone().unwrap_or_default().contracts;
-        let found_contract = contracts.iter().find(|(_, config)| config.name == name);
+        let found_contract = ctx.env.find_contract(name.as_str());
 
-        if let Some((_, found_contract)) = found_contract {
+        if let Some(found_contract) = found_contract {
             debug!("Found contract with info: {:?}", found_contract);
             path = found_contract.src.clone()
         } else {
@@ -77,7 +68,7 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, name: Stri
     if let Some(cached_entry) =
         ctx.build
             .file_build_cache
-            .get(&path, ctx.debug.need_debug_info, 2, "1.2".to_string())
+            .get(&path, ctx.build.need_debug_info, 2, "1.2".to_string())
     {
         let elapsed = start_time.elapsed();
         info!(
@@ -104,7 +95,7 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, name: Stri
     }
 
     let compile_start = Instant::now();
-    let result = tolkc::compile(Path::new(&path), ctx.debug.need_debug_info);
+    let result = tolkc::compile(Path::new(&path), ctx.build.need_debug_info);
     let compile_time = compile_start.elapsed();
 
     match result {
@@ -118,7 +109,7 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, name: Stri
             if let Err(err) = ctx.build.file_build_cache.put(
                 &path,
                 &success,
-                ctx.debug.need_debug_info,
+                ctx.build.need_debug_info,
                 2,
                 "1.2".to_string(),
             ) {
@@ -179,7 +170,7 @@ fn send_message_impl(ctx: &mut Context, stack: &mut Tuple, _mode: BigInt, messag
         msg_cell,
         &Dict::default(),
         Some(src_addr),
-        Some(ctx.default_log_level),
+        Some(ctx.env.default_log_level),
     );
 
     let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
@@ -247,13 +238,13 @@ fn send_message_from_impl(
     let libs = ctx.chain.build_libs(&src_addr);
     let blockchain = &mut ctx.chain.blockchain;
 
-    let emulations = if ctx.debug.enabled {
+    let emulations = if ctx.debug.is_enabled() {
         send_message_debug(
             ctx,
             &msg_cell,
             &libs,
             Some(src_addr),
-            Some(ctx.default_log_level),
+            Some(ctx.env.default_log_level),
         )
     } else {
         emulator.send_message(
@@ -261,7 +252,7 @@ fn send_message_from_impl(
             msg_cell,
             &libs,
             Some(src_addr),
-            Some(ctx.default_log_level),
+            Some(ctx.env.default_log_level),
         )
     };
 
@@ -742,7 +733,7 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
-    let result = if ctx.debug.enabled {
+    let result = if ctx.debug.is_enabled() {
         let step_get_executor = StepGetExecutor::new(Default::default(), params.clone());
 
         let source_map = ctx
@@ -888,7 +879,7 @@ fn crc16_impl(_ctx: &mut Context, stack: &mut Tuple, data: String) {
 
 extension!(type_name_by_opcode in (Context) with (id: BigInt) using type_name_by_opcode_impl);
 fn type_name_by_opcode_impl(ctx: &mut Context, stack: &mut Tuple, id: BigInt) {
-    let type_abi = ctx.abi.find_type_by_opcode(id);
+    let type_abi = ctx.env.abi.find_type_by_opcode(id);
     match type_abi {
         None => {
             stack.push(TupleItem::Null);
@@ -1006,7 +997,6 @@ fn register_lib_impl(ctx: &mut Context, _stack: &mut Tuple, lib: ArcCell) {
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        3 => read_file,
         6 => build,
         7 => send_message,
         8 => run_get_method,

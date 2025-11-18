@@ -14,7 +14,7 @@ use crate::commands::test::reporting::{
 use crate::config::ActonConfig;
 use crate::context::{
     AnyExecutor, AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context,
-    DebugCtx, Emulations, IoContext, KnownAddresses,
+    DebugCtx, Emulations, Env, IoContext, KnownAddresses,
 };
 use crate::dap::DapTransport;
 use crate::debug_context::DebugContext;
@@ -201,9 +201,11 @@ impl<'a> TestRunner<'a> {
         let mut expected_exit_code = None;
 
         let mut ctx = Context {
-            config: &ActonConfig::load()?,
-            abi,
-            default_log_level: verbosity,
+            env: Env {
+                config: &ActonConfig::load()?,
+                abi,
+                default_log_level: verbosity,
+            },
             io: IoContext {
                 stdout_buffer: "".to_string(),
                 stderr_buffer: "".to_string(),
@@ -224,15 +226,12 @@ impl<'a> TestRunner<'a> {
                 file_build_cache: &mut self.file_build_cache,
                 known_addresses: &mut self.known_addresses,
                 known_code_cells: &mut self.known_code_cells,
-            },
-            debug: DebugCtx {
-                enabled: self.config.debug,
                 need_debug_info: self.config.debug
                     || self.config.backtrace == Some("full".to_string())
                     || self.config.coverage,
                 backtrace: self.config.backtrace.clone(),
-                ctx: None,
             },
+            debug: DebugCtx::Disabled,
         };
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
@@ -248,11 +247,11 @@ impl<'a> TestRunner<'a> {
                     test.name.clone(),
                 );
 
-                ctx.debug.with_ctx(&mut dbg_ctx);
+                ctx.debug = DebugCtx::new(&mut dbg_ctx);
 
                 get_executor.prepare_get_method(test.id, Default::default());
 
-                ctx.debug.ctx.unwrap().process_incoming_requests(true)?;
+                ctx.debug.ctx().process_incoming_requests(true)?;
 
                 let get_result = get_executor.finish_get_method(&params.code);
 
@@ -261,11 +260,7 @@ impl<'a> TestRunner<'a> {
                     ctx.io.stdout_buffer,
                     ctx.io.stderr_buffer,
                     (*ctx.asserts.assert_failure).clone(),
-                    ctx.asserts
-                        .expected_exit_code
-                        .clone()
-                        .map(|value| value.to_i32())
-                        .unwrap_or(None),
+                    ctx.asserts.expected_exit_code.clone(),
                 )
             } else {
                 let mut get_executor = GetExecutor::new(params.clone());
@@ -279,10 +274,7 @@ impl<'a> TestRunner<'a> {
                     ctx.io.stdout_buffer,
                     ctx.io.stderr_buffer,
                     (*ctx.asserts.assert_failure).clone(),
-                    ctx.asserts
-                        .expected_exit_code
-                        .clone()
-                        .and_then(|value| value.to_i32()),
+                    ctx.asserts.expected_exit_code.clone(),
                 )
             };
 
@@ -291,7 +283,7 @@ impl<'a> TestRunner<'a> {
             captured_stdout,
             captured_stderr,
             assert_failure,
-            expected_exit_code,
+            expected_exit_code: expected_exit_code.and_then(|value| value.to_i32()),
             accounts: blockchain.get_accounts().clone(),
         })
     }

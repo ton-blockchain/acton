@@ -83,13 +83,13 @@ impl FormatterContext {
     /// Create formatter context from the main Context
     pub fn from_context(ctx: &crate::context::Context) -> Self {
         Self {
-            contract_abi: ctx.abi.clone(),
+            contract_abi: ctx.env.abi.clone(),
             accounts: ctx.chain.blockchain.get_accounts().clone(),
             build_cache: ctx.build.build_cache.clone(),
             emulations: ctx.chain.emulations.clone(),
             known_addresses: ctx.build.known_addresses.clone(),
             known_code_cells: ctx.build.known_code_cells.clone(),
-            backtrace: ctx.debug.backtrace.clone(),
+            backtrace: ctx.build.backtrace.clone(),
         }
     }
 

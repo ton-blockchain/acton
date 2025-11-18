@@ -1,7 +1,7 @@
 use crate::config::ActonConfig;
 use crate::context::{
     AnyExecutor, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
-    Emulations, IoContext, KnownAddresses,
+    Emulations, Env, IoContext, KnownAddresses,
 };
 use crate::debug_context::DebugContext;
 use crate::ffi;
@@ -129,9 +129,11 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let mut ctx = Context {
-        config: &ActonConfig::load()?,
-        abi,
-        default_log_level: verbosity,
+        env: Env {
+            config: &ActonConfig::load()?,
+            abi,
+            default_log_level: verbosity,
+        },
         io: IoContext {
             stdout_buffer: "".to_string(),
             stderr_buffer: "".to_string(),
@@ -152,13 +154,10 @@ fn execute_script(
             file_build_cache: &mut file_build_cache,
             known_addresses: &mut known_addresses,
             known_code_cells: &mut known_code_cell,
-        },
-        debug: DebugCtx {
-            enabled: debug,
             need_debug_info: false,
             backtrace: None,
-            ctx: None,
         },
+        debug: DebugCtx::Disabled,
     };
 
     if debug {
@@ -174,7 +173,7 @@ fn execute_script(
             "main".to_string(),
         );
 
-        ctx.debug.with_ctx(&mut dbg_ctx);
+        ctx.debug = DebugCtx::new(&mut dbg_ctx);
 
         executor.prepare_get_method(0, Tuple::empty());
 

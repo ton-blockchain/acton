@@ -46,11 +46,6 @@ impl CompilationOrder {
         }
     }
 
-    /// Get list of all compiled contracts
-    pub fn compiled_contracts(&self) -> Vec<String> {
-        self.positions.keys().cloned().collect()
-    }
-
     /// Get number of compiled contracts
     pub fn count(&self) -> usize {
         self.positions.len()

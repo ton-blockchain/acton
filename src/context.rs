@@ -1,4 +1,4 @@
-use crate::config::ActonConfig;
+use crate::config::{ActonConfig, ContractConfig};
 use crate::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
 use abi::ContractAbi;
@@ -224,24 +224,26 @@ impl Emulations {
     }
 
     pub fn find_tx_logs(&self, lt: u64) -> Option<String> {
-        self.find_tx_by_lt(lt).and_then(|res| Some(res.vm_logs()))
+        self.find_tx_by_lt(lt).map(|res| res.vm_logs())
     }
 
     pub fn find_tx_debug_logs(&self, lt: u64) -> Option<String> {
-        self.find_tx_by_lt(lt)
-            .and_then(|res| Some(res.debug_logs()))
+        self.find_tx_by_lt(lt).map(|res| res.debug_logs())
     }
 
     pub fn find_tx_executor_logs(&self, lt: u64) -> Option<String> {
-        self.find_tx_by_lt(lt)
-            .and_then(|res| Some(res.executor_logs()))
+        self.find_tx_by_lt(lt).map(|res| res.executor_logs())
     }
 }
 
-pub struct Context<'a> {
+pub struct Env<'a> {
     pub config: &'a ActonConfig,
     pub abi: &'a ContractAbi,
     pub default_log_level: ExecutorVerbosity,
+}
+
+pub struct Context<'a> {
+    pub env: Env<'a>,
 
     pub io: IoContext,
     pub asserts: AssertsContext<'a>,
@@ -274,13 +276,24 @@ pub struct BuildContext<'a> {
     pub file_build_cache: &'a mut FileBuildCache,
     pub known_addresses: &'a mut KnownAddresses,
     pub known_code_cells: &'a mut HashMap<String, String>,
-}
-
-pub struct DebugCtx<'a> {
-    pub enabled: bool,
     pub need_debug_info: bool,
     pub backtrace: Option<String>,
-    pub ctx: Option<&'a mut DebugContext>,
+}
+
+pub enum DebugCtx<'a> {
+    Disabled,
+    Enabled { inner: &'a mut DebugContext },
+}
+
+impl<'a> Env<'a> {
+    pub fn find_contract(&self, name: &str) -> Option<ContractConfig> {
+        let contracts = self.config.contracts.clone().unwrap_or_default().contracts;
+        let Some((_, config)) = contracts.iter().find(|(_, config)| config.name == name) else {
+            return None;
+        };
+
+        Some(config.clone())
+    }
 }
 
 impl<'a> AssertsContext<'a> {
@@ -317,13 +330,20 @@ impl<'a> ChainContext<'a> {
 }
 
 impl<'a> DebugCtx<'a> {
-    pub fn with_ctx(&mut self, dbg: &'a mut DebugContext) {
-        self.ctx = Some(dbg)
+    pub fn new(inner: &'a mut DebugContext) -> DebugCtx<'a> {
+        DebugCtx::Enabled { inner }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        matches!(self, DebugCtx::Enabled { .. })
     }
 
     pub fn ctx(&mut self) -> &mut DebugContext {
-        self.ctx
-            .as_mut()
-            .expect("Debug context accessed from non debug context")
+        match self {
+            DebugCtx::Enabled { inner: ctx, .. } => ctx,
+            DebugCtx::Disabled => {
+                panic!("Debug context accessed from non debug context");
+            }
+        }
     }
 }
