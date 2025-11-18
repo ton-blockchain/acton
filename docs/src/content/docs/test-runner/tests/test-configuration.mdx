@@ -8,7 +8,8 @@ Test runner provides flexible configuration options that allow you to set defaul
 - How to configure tests in `Acton.toml`
 - How to override configuration via command line flags
 - Understanding configuration precedence
-- Available test configuration options
+- Available test reporters and output formats
+- JUnit XML report configuration
 
 ## Configuration Methods
 
@@ -50,14 +51,26 @@ backtrace = "full"
 Any configuration option can be overridden via command line flags:
 
 ```bash
+# Use specific reporter
+acton test --reporter console
+
+# Use multiple reporters
+acton test --reporter console,junit
+
+# TeamCity with console output
+acton test --reporter console,teamcity
+
 # Override coverage setting from config
 acton test --coverage
 
 # Override filter setting from config
 acton test --filter "test-mint.*"
 
+# Override reporter setting
+acton test --reporter teamcity
+
 # Multiple overrides
-acton test --coverage --filter "test-deploy" --debug
+acton test --coverage --filter "test-deploy" --debug --reporter junit
 ```
 
 ## Configuration Options Reference
@@ -78,16 +91,36 @@ exclude = ["**/integration/**"]    # Skip integration directory
 include = ["**/unit/**"]           # Only include unit test files
 ```
 
-### Output Options
+### Reporter Options
 
-| Configuration | CLI Flag     | Type    | Description                   |
-|---------------|--------------|---------|-------------------------------|
-| `teamcity`    | `--teamcity` | Boolean | Enable TeamCity output format |
+| Configuration | CLI Flag      | Type  | Description                          |
+|---------------|---------------|-------|--------------------------------------|
+| `reporter`    | `--reporter`  | Array | Test output format(s)                |
+
+**Supported reporters:**
+- `console` — Detailed console output with code context (default)
+- `teamcity` — TeamCity CI integration (minimal output, best combined with console)
+- `junit` — JUnit XML reports for external tools
+- `dot` — Minimal dot-style output for quick feedback
+
+:::tip[TeamCity Integration]
+When using TeamCity CI, combine `teamcity` with `console` reporter to see detailed test output alongside CI integration data.
+```bash
+acton test --reporter console,teamcity
+```
+:::
 
 **Examples:**
 ```toml
 [test]
-teamcity = true    # Always use TeamCity format
+# Use multiple reporters
+reporter = ["console", "junit"]
+
+# Single reporter
+reporter = ["teamcity"]
+
+# For TeamCity CI, combine with console for detailed output
+reporter = ["console", "teamcity"]
 ```
 
 ### Debug Options
@@ -118,4 +151,19 @@ backtrace = "full"
 [test]
 coverage = true
 coverage-format = "lcov"
+```
+
+### JUnit Options
+
+| Configuration     | CLI Flag        | Type    | Description                      |
+|-------------------|-----------------|---------|----------------------------------|
+| `junit-path`      | `--junit-path`  | String  | JUnit XML output directory       |
+| `junit-merge`     | `--junit-merge` | Boolean | Merge all suites into one file   |
+
+**Examples:**
+```toml
+[test]
+# Custom JUnit output directory
+junit-path = "custom-reports"
+junit-merge = true
 ```

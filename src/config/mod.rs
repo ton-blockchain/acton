@@ -1,4 +1,4 @@
-use crate::commands::test::TestConfig;
+use crate::commands::test::{ReportFormat, TestConfig};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -46,7 +46,7 @@ pub struct PackageConfig {
 #[serde(rename_all = "kebab-case")]
 pub struct TestSettings {
     pub filter: Option<String>,
-    pub teamcity: Option<bool>,
+    pub reporter: Option<Vec<String>>,
     pub debug: Option<bool>,
     pub debug_port: Option<u16>,
     pub backtrace: Option<String>,
@@ -54,6 +54,8 @@ pub struct TestSettings {
     pub coverage_format: Option<String>,
     pub exclude: Option<Vec<String>>,
     pub include: Option<Vec<String>>,
+    pub junit_path: Option<String>,
+    pub junit_merge: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -205,6 +207,50 @@ depends = []
         assert_eq!(wallet.src, "wallet-v5.tolk");
         assert_eq!(wallet.depends, Some(vec![]));
     }
+
+    #[test]
+    fn test_test_config_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[test]
+filter = "test-unit.*"
+reporter = ["console", "junit"]
+debug = true
+debug-port = 9999
+backtrace = "full"
+coverage = true
+coverage-format = "lcov"
+exclude = ["**/integration/**"]
+include = ["**/unit/**"]
+junit-path = "custom-reports"
+junit-merge = true
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+
+        let test_settings = config.test.as_ref().unwrap();
+        assert_eq!(test_settings.filter, Some("test-unit.*".to_string()));
+        assert_eq!(
+            test_settings.reporter,
+            Some(vec!["console".to_string(), "junit".to_string()])
+        );
+        assert_eq!(test_settings.debug, Some(true));
+        assert_eq!(test_settings.debug_port, Some(9999));
+        assert_eq!(test_settings.backtrace, Some("full".to_string()));
+        assert_eq!(test_settings.coverage, Some(true));
+        assert_eq!(test_settings.coverage_format, Some("lcov".to_string()));
+        assert_eq!(
+            test_settings.exclude,
+            Some(vec!["**/integration/**".to_string()])
+        );
+        assert_eq!(test_settings.include, Some(vec!["**/unit/**".to_string()]));
+        assert_eq!(test_settings.junit_path, Some("custom-reports".to_string()));
+        assert_eq!(test_settings.junit_merge, Some(true));
+    }
 }
 
 impl TestSettings {
@@ -222,9 +268,22 @@ impl TestSettings {
         junit_path_override: Option<String>,
         junit_merge_override: bool,
     ) -> TestConfig {
+        let mut report_formats = Vec::new();
+        if let Some(reporters) = &self.reporter {
+            for reporter in reporters {
+                match reporter.to_lowercase().as_str() {
+                    "console" => report_formats.push(ReportFormat::Console),
+                    "teamcity" => report_formats.push(ReportFormat::TeamCity),
+                    "junit" => report_formats.push(ReportFormat::JUnit),
+                    "dot" => report_formats.push(ReportFormat::Dot),
+                    _ => {} // skip unknown reporters
+                }
+            }
+        }
+
         TestConfig {
             filter: filter_override.or_else(|| self.filter.clone()),
-            report_formats: vec![],
+            report_formats,
             debug: debug_override.unwrap_or_else(|| self.debug.unwrap_or(false)),
             debug_port: debug_port_override.unwrap_or_else(|| self.debug_port.unwrap_or(12345)),
             backtrace: backtrace_override.or_else(|| self.backtrace.clone()),
@@ -235,8 +294,16 @@ impl TestSettings {
             include_patterns: include_override
                 .unwrap_or_else(|| self.include.clone().unwrap_or_default()),
             clear_cache: clear_cache_override.unwrap_or(false),
-            junit_path: junit_path_override,
-            junit_merge: junit_merge_override,
+            junit_path: if self.junit_path != Some("test-results".to_owned()) {
+                Some(
+                    self.junit_path
+                        .clone()
+                        .unwrap_or(junit_path_override.unwrap_or("".to_owned())),
+                )
+            } else {
+                junit_path_override
+            },
+            junit_merge: junit_merge_override || self.junit_merge.unwrap_or(false),
         }
     }
 }

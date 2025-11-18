@@ -29,8 +29,16 @@ fn test_filter_via_config() {
         )
         .with_test_config(TestConfig {
             filter: Some("test-unit-.*".to_string()),
-            coverage: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
             backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
         })
         .build()
         .acton()
@@ -69,8 +77,16 @@ fn test_coverage_via_config() {
         )
         .with_test_config(TestConfig {
             filter: None,
-            coverage: Some(true),
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
             backtrace: None,
+            coverage: Some(true),
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
         })
         .build()
         .acton()
@@ -98,8 +114,16 @@ fn test_backtrace_via_config() {
         )
         .with_test_config(TestConfig {
             filter: None,
-            coverage: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
             backtrace: Some("full".to_string()),
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
         })
         .build()
         .acton()
@@ -147,8 +171,16 @@ fn test_filter_and_coverage_via_config() {
         )
         .with_test_config(TestConfig {
             filter: Some("test-unit-.*".to_string()),
-            coverage: Some(true),
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
             backtrace: None,
+            coverage: Some(true),
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
         })
         .build()
         .acton()
@@ -189,8 +221,16 @@ fn test_cli_overrides_config_filter() {
         )
         .with_test_config(TestConfig {
             filter: Some("test-alpha".to_string()), // Config says alpha
-            coverage: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
             backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
         })
         .build();
 
@@ -233,8 +273,16 @@ fn test_config_with_specific_path() {
         )
         .with_test_config(TestConfig {
             filter: None,
-            coverage: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
             backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
         })
         .build();
 
@@ -266,8 +314,16 @@ fn test_empty_config() {
         )
         .with_test_config(TestConfig {
             filter: None,
-            coverage: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
             backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
         })
         .build()
         .acton()
@@ -275,4 +331,180 @@ fn test_empty_config() {
         .run()
         .success()
         .assert_passed(1);
+}
+
+#[test]
+fn test_exclude_patterns_via_config() {
+    ProjectBuilder::new("exclude-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "unit_test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-unit`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .test_file(
+            "integration_test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-integration`() {
+                expect(2).toEqual(2);
+            }
+        "#,
+        )
+        .with_test_config(TestConfig {
+            filter: None,
+            exclude_patterns: Some(vec!["**/integration*".to_string()]),
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
+            backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
+        })
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("unit")
+        .assert_not_contains("integration");
+}
+
+#[test]
+fn test_include_patterns_via_config() {
+    ProjectBuilder::new("include-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "unit_test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-unit`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .test_file(
+            "integration_test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-integration`() {
+                expect(2).toEqual(2);
+            }
+        "#,
+        )
+        .with_test_config(TestConfig {
+            filter: None,
+            exclude_patterns: None,
+            include_patterns: Some(vec!["**/unit*".to_string()]),
+            reporters: None,
+            debug: None,
+            debug_port: None,
+            backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
+        })
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("unit")
+        .assert_not_contains("integration");
+}
+
+#[test]
+fn test_reporters_via_config() {
+    ProjectBuilder::new("reporters-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-simple`() {
+                expect(1).toEqual(1);
+            }
+            get fun `test-simple1`() {
+                expect(1).toEqual(2);
+            }
+            get fun `test-simple2`() {
+                expect(1).toEqual(1);
+            }
+            get fun `test-simple3`() {
+                expect(1).toEqual(1);
+            }
+            get fun `test-simple4`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .with_test_config(TestConfig {
+            filter: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: Some(vec!["dot".to_owned()]),
+            debug: None,
+            debug_port: None,
+            backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: None,
+            junit_merge: None,
+        })
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_contains("·x···");
+}
+
+#[test]
+fn test_junit_config_via_config() {
+    ProjectBuilder::new("junit-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-simple`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .with_test_config(TestConfig {
+            filter: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: Some(vec!["junit".to_owned()]),
+            debug: None,
+            debug_port: None,
+            backtrace: None,
+            coverage: None,
+            coverage_format: None,
+            junit_path: Some("custom-reports".to_owned()),
+            junit_merge: Some(true),
+        })
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_file_exists("custom-reports/junit-results.xml");
 }

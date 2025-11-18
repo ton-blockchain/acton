@@ -40,8 +40,16 @@ struct DependencyDef {
 #[derive(Clone)]
 pub struct TestConfig {
     pub filter: Option<String>,
-    pub coverage: Option<bool>,
+    pub exclude_patterns: Option<Vec<String>>,
+    pub include_patterns: Option<Vec<String>>,
+    pub reporters: Option<Vec<String>>,
+    pub debug: Option<bool>,
+    pub debug_port: Option<u16>,
     pub backtrace: Option<String>,
+    pub coverage: Option<bool>,
+    pub coverage_format: Option<String>,
+    pub junit_path: Option<String>,
+    pub junit_merge: Option<bool>,
 }
 
 impl ProjectBuilder {
@@ -421,12 +429,65 @@ version = "0.1.0"
                 toml_content.push_str(&format!("filter = \"{}\"\n", filter));
             }
 
-            if let Some(coverage) = config.coverage {
-                toml_content.push_str(&format!("coverage = {}\n", coverage));
+            if let Some(exclude_patterns) = &config.exclude_patterns {
+                toml_content.push_str(&format!(
+                    "exclude = [{}]\n",
+                    exclude_patterns
+                        .iter()
+                        .map(|p| format!("\"{}\"", p))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+
+            if let Some(include_patterns) = &config.include_patterns {
+                toml_content.push_str(&format!(
+                    "include = [{}]\n",
+                    include_patterns
+                        .iter()
+                        .map(|p| format!("\"{}\"", p))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+
+            if let Some(reporters) = &config.reporters {
+                toml_content.push_str(&format!(
+                    "reporter = [{}]\n",
+                    reporters
+                        .iter()
+                        .map(|r| format!("\"{}\"", r))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+
+            if let Some(debug) = config.debug {
+                toml_content.push_str(&format!("debug = {}\n", debug));
+            }
+
+            if let Some(debug_port) = config.debug_port {
+                toml_content.push_str(&format!("debug-port = {}\n", debug_port));
             }
 
             if let Some(backtrace) = &config.backtrace {
                 toml_content.push_str(&format!("backtrace = \"{}\"\n", backtrace));
+            }
+
+            if let Some(coverage) = config.coverage {
+                toml_content.push_str(&format!("coverage = {}\n", coverage));
+            }
+
+            if let Some(coverage_format) = &config.coverage_format {
+                toml_content.push_str(&format!("coverage-format = \"{}\"\n", coverage_format));
+            }
+
+            if let Some(junit_path) = &config.junit_path {
+                toml_content.push_str(&format!("junit-path = \"{}\"\n", junit_path));
+            }
+
+            if let Some(junit_merge) = config.junit_merge {
+                toml_content.push_str(&format!("junit-merge = {}\n", junit_merge));
             }
 
             toml_content.push_str("\n");
