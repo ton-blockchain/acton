@@ -86,10 +86,27 @@ pub fn poll_request(
     }
 }
 
-pub fn start_dap_server(port: u16) -> (Receiver<Request>, Sender<DapMessage>) {
+#[derive(Debug, Clone)]
+pub struct DapTransport {
+    pub req_receiver: Receiver<Request>,
+    pub dap_sender: Sender<DapMessage>,
+}
+
+impl DapTransport {
+    pub fn dummy() -> DapTransport {
+        let (_, req_receiver) = unbounded::<Request>();
+        let (dap_sender, _) = unbounded::<DapMessage>();
+        DapTransport {
+            req_receiver,
+            dap_sender,
+        }
+    }
+}
+
+pub fn start_dap_server(port: u16) -> DapTransport {
     let address = format!("127.0.0.1:{}", port);
     let (req_sender, req_receiver) = unbounded::<Request>();
-    let (dap_message_sender, dap_message_receiver) = unbounded::<DapMessage>();
+    let (dap_sender, dap_receiver) = unbounded::<DapMessage>();
 
     thread::spawn(move || {
         let listener = TcpListener::bind(&address).unwrap();
@@ -133,7 +150,7 @@ pub fn start_dap_server(port: u16) -> (Receiver<Request>, Sender<DapMessage>) {
 
         loop {
             crossbeam_channel::select! {
-                recv(dap_message_receiver) -> msg => {
+                recv(dap_receiver) -> msg => {
                     let Ok(dap_msg) = msg else { break };
                     match dap_msg {
                         DapMessage::Response(rsp) => {
@@ -155,5 +172,8 @@ pub fn start_dap_server(port: u16) -> (Receiver<Request>, Sender<DapMessage>) {
 
         println!("Connection closed");
     });
-    (req_receiver, dap_message_sender)
+    DapTransport {
+        req_receiver,
+        dap_sender,
+    }
 }

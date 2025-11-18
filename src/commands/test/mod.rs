@@ -13,14 +13,12 @@ use crate::commands::test::reporting::{
 };
 use crate::config::ActonConfig;
 use crate::context::{AnyExecutor, AssertFailure, BuildCache, Context, Emulations, KnownAddresses};
-use crate::dap::DapMessage;
+use crate::dap::DapTransport;
 use crate::debug_context::DebugContext;
-use crate::exts;
+use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
-use crossbeam_channel::{Receiver, Sender, unbounded};
-use dap::prelude::Request;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::executor::ExecutorVerbosity;
@@ -92,8 +90,7 @@ pub struct TestRunner<'a> {
     known_addresses: KnownAddresses,
     known_code_cells: HashMap<String, String>,
     emulations: Emulations,
-    req_receiver: Receiver<Request>,
-    dap_sender: Sender<DapMessage>,
+    transport: DapTransport,
     reporter_manager: &'a mut ReporterManager,
 }
 
@@ -103,12 +100,10 @@ impl<'a> TestRunner<'a> {
         cache: &'a mut FileBuildCache,
         reporter_manager: &'a mut ReporterManager,
     ) -> TestRunner<'a> {
-        let (req_receiver, dap_sender) = if config.debug {
+        let transport = if config.debug {
             crate::dap::start_dap_server(config.debug_port)
         } else {
-            let (_, req_receiver) = unbounded::<Request>();
-            let (dap_message_sender, _) = unbounded::<DapMessage>();
-            (req_receiver, dap_message_sender)
+            DapTransport::dummy()
         };
 
         Self {
@@ -118,8 +113,7 @@ impl<'a> TestRunner<'a> {
             known_addresses: KnownAddresses::new(),
             known_code_cells: HashMap::new(),
             emulations: Emulations::new(),
-            req_receiver,
-            dap_sender,
+            transport,
             reporter_manager,
         }
     }
@@ -215,7 +209,7 @@ impl<'a> TestRunner<'a> {
             emulations: &mut self.emulations,
             abi,
             expected_exit_code: &mut None,
-            dbg_ctx: &mut DebugContext::empty(),
+            dbg_ctx: None,
             debug: self.config.debug,
             backtrace: self.config.backtrace.clone(),
             need_debug_info: self.config.debug
@@ -229,21 +223,20 @@ impl<'a> TestRunner<'a> {
             if self.config.debug {
                 let mut get_executor = StepGetExecutor::new(Default::default(), params.clone());
 
-                exts::register(&mut get_executor, &mut ctx);
+                ffi::register(&mut get_executor, &mut ctx);
 
                 let mut dbg_ctx = DebugContext::new(
+                    self.transport.clone(),
                     AnyExecutor::Get(get_executor.clone()),
                     source_map,
-                    &self.req_receiver,
-                    self.dap_sender.clone(),
                     test.name.clone(),
                 );
 
-                ctx.dbg_ctx = &mut dbg_ctx;
+                ctx.with_dbg(&mut dbg_ctx);
 
-                get_executor.run_get_method(test.id, Default::default());
+                get_executor.prepare_get_method(test.id, Default::default());
 
-                ctx.dbg_ctx.process_incoming_requests(true)?;
+                ctx.dbg_ctx.unwrap().process_incoming_requests(true)?;
 
                 let get_result = get_executor.finish_get_method(&params.code);
 
@@ -260,7 +253,7 @@ impl<'a> TestRunner<'a> {
             } else {
                 let mut get_executor = GetExecutor::new(params.clone());
 
-                exts::register(&mut get_executor, &mut ctx);
+                ffi::register(&mut get_executor, &mut ctx);
 
                 let get_result = get_executor.run_get_method(Default::default(), params);
 

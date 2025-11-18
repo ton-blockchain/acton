@@ -1,8 +1,7 @@
 use crate::context::AnyExecutor;
-use crate::dap::DapMessage;
+use crate::dap::{DapMessage, DapTransport};
 use crate::formatter::FormatterContext;
 use anyhow::anyhow;
-use crossbeam_channel::{Receiver, Sender, unbounded};
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
 use dap::prelude::{Command, Request, Response, ResponseBody};
 use dap::responses::{
@@ -279,9 +278,8 @@ impl Stepper {
 }
 
 pub struct DebugContext {
-    pub stepper: Option<Stepper>,
-    pub dap_sender: Sender<DapMessage>,
-    pub req_receiver: Receiver<Request>,
+    pub stepper: Stepper,
+    pub transport: DapTransport,
     pub tuple_variables: HashMap<i64, TupleItem>,
     pub out_actions_variables: HashMap<i64, Vec<OutAction>>,
     pub out_action_variables: HashMap<i64, OutAction>,
@@ -296,40 +294,16 @@ pub struct DebugContext {
 }
 
 impl DebugContext {
-    pub fn empty() -> DebugContext {
-        let (_, req_receiver) = unbounded::<Request>();
-        let (dap_sender, _) = unbounded::<DapMessage>();
-
-        DebugContext {
-            stepper: None,
-            dap_sender,
-            req_receiver,
-            tuple_variables: HashMap::new(),
-            out_actions_variables: HashMap::new(),
-            out_action_variables: HashMap::new(),
-            message_variables: HashMap::new(),
-            msg_info_variables: HashMap::new(),
-            state_init_variables: HashMap::new(),
-            performing_step: None,
-            breakpoints: HashMap::new(),
-            next_breakpoint_id: 1,
-            formatter_context: FormatterContext::empty(),
-            test_name: "".to_owned(),
-        }
-    }
-
     pub fn new(
+        transport: DapTransport,
         executor: AnyExecutor,
         source_map: &SourceMap,
-        req_receiver: &Receiver<Request>,
-        dap_sender: Sender<DapMessage>,
         test_name: String,
     ) -> DebugContext {
         let stepper = Stepper::new(executor, source_map.clone(), 1, test_name.clone());
         DebugContext {
-            stepper: Some(stepper),
-            dap_sender,
-            req_receiver: req_receiver.clone(),
+            stepper,
+            transport,
             tuple_variables: HashMap::new(),
             out_actions_variables: HashMap::new(),
             out_action_variables: HashMap::new(),
@@ -349,13 +323,15 @@ impl DebugContext {
             "Sending DAP response: request_seq={}, success={}",
             response.request_seq, response.success
         );
-        self.dap_sender.send(DapMessage::Response(response))?;
+        self.transport
+            .dap_sender
+            .send(DapMessage::Response(response))?;
         Ok(())
     }
 
     pub fn send_event(&self, event: Event) -> anyhow::Result<()> {
         debug!("Sending DAP event: {:?}", event);
-        self.dap_sender.send(DapMessage::Event(event))?;
+        self.transport.dap_sender.send(DapMessage::Event(event))?;
         Ok(())
     }
 
@@ -370,13 +346,9 @@ impl DebugContext {
         let sm = source_map.unwrap_or(SourceMap::default());
         let root_name = self.get_root_function_name(id);
 
-        if let Some(stepper) = &mut self.stepper {
-            stepper.push_executor(executor, sm);
-            stepper.thread_id = id;
-            stepper.root_function_name = root_name;
-        } else {
-            self.stepper = Some(Stepper::new(executor, sm, id, root_name));
-        }
+        self.stepper.push_executor(executor, sm);
+        self.stepper.thread_id = id;
+        self.stepper.root_function_name = root_name;
 
         self.send_event(Event::Thread(ThreadEventBody {
             reason: ThreadEventReason::Started,
@@ -399,7 +371,7 @@ impl DebugContext {
     }
 
     pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
-        for req in self.req_receiver.clone().iter() {
+        for req in self.transport.req_receiver.clone().iter() {
             if let Command::Disconnect(args) = &req.command {
                 println!("Disconnecting: {:?}", args);
                 let rsp = req.success(ResponseBody::Disconnect);
@@ -419,10 +391,8 @@ impl DebugContext {
     }
 
     pub fn finish_thread(&mut self, id: i64) -> anyhow::Result<()> {
-        if let Some(stepper) = &mut self.stepper {
-            stepper.pop_executor();
-            stepper.thread_id = 1
-        }
+        self.stepper.pop_executor();
+        self.stepper.thread_id = 1;
 
         self.tuple_variables.clear();
         self.out_actions_variables.clear();
@@ -535,7 +505,7 @@ impl DebugContext {
 
                 self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
-                    thread_id: self.current_thread_id(),
+                    thread_id: Some(self.current_thread_id()),
                     description: None,
                     preserve_focus_hint: None,
                     text: None,
@@ -554,7 +524,7 @@ impl DebugContext {
 
                 self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
-                    thread_id: self.current_thread_id(),
+                    thread_id: Some(self.current_thread_id()),
                     description: None,
                     preserve_focus_hint: None,
                     text: None,
@@ -573,7 +543,7 @@ impl DebugContext {
 
                 self.send_event(Event::Stopped(StoppedEventBody {
                     reason: StoppedEventReason::Step,
-                    thread_id: self.current_thread_id(),
+                    thread_id: Some(self.current_thread_id()),
                     description: None,
                     preserve_focus_hint: None,
                     text: None,
@@ -670,12 +640,8 @@ impl DebugContext {
         Ok(false)
     }
 
-    fn current_thread_id(&self) -> Option<i64> {
-        let Some(stepper) = &self.stepper else {
-            return None;
-        };
-
-        Some(stepper.thread_id)
+    fn current_thread_id(&self) -> i64 {
+        self.stepper.thread_id
     }
 
     fn normalize_path(file: &String) -> String {
@@ -723,9 +689,7 @@ impl DebugContext {
     }
 
     fn build_stack_frames(&self, thread_id: i64) -> Vec<StackFrame> {
-        let Some(stepper) = &self.stepper else {
-            return Vec::new();
-        };
+        let stepper = &self.stepper;
 
         let callstack = if thread_id == 1 {
             stepper
@@ -786,11 +750,6 @@ impl DebugContext {
     }
 
     fn check_breakpoint(&mut self, step: &DebugStep) -> Option<i64> {
-        let stepper = match &mut self.stepper {
-            Some(s) => s,
-            None => return None,
-        };
-
         let loc = step.loc.as_ref()?;
         let normalized_path = PathBuf::from(Self::normalize_path(&loc.loc.file));
 
@@ -798,9 +757,9 @@ impl DebugContext {
 
         for bp_info in file_breakpoints {
             if bp_info.breakpoint.line == loc.loc.line + 1
-                && bp_info.breakpoint.line != stepper.last_breakpoint_line
+                && bp_info.breakpoint.line != self.stepper.last_breakpoint_line
             {
-                stepper.last_breakpoint_line = bp_info.breakpoint.line;
+                self.stepper.last_breakpoint_line = bp_info.breakpoint.line;
                 return Some(bp_info.id);
             }
         }
@@ -820,13 +779,8 @@ impl DebugContext {
     fn step_in_impl(&mut self) -> bool {
         self.performing_step = Some(StepMode::StepIn);
 
-        let stepper = match &mut self.stepper {
-            Some(s) => s,
-            None => return true,
-        };
-
         loop {
-            let step = match stepper.next() {
+            let step = match self.stepper.next() {
                 Some(s) => s,
                 None => return true,
             };
@@ -843,10 +797,7 @@ impl DebugContext {
     fn step_over_impl(&mut self) -> bool {
         self.performing_step = Some(StepMode::StepOver);
 
-        let stepper = match &mut self.stepper {
-            Some(s) => s,
-            None => return true,
-        };
+        let stepper = &mut self.stepper;
 
         let current_line = stepper.get_current_step_line();
 
@@ -897,10 +848,7 @@ impl DebugContext {
     fn step_out_impl(&mut self) -> bool {
         self.performing_step = Some(StepMode::StepIn);
 
-        let stepper = match &mut self.stepper {
-            Some(s) => s,
-            None => return true,
-        };
+        let stepper = &mut self.stepper;
 
         let current_function = match &stepper.get_current_step() {
             Some(step) => match &step.loc {
@@ -935,16 +883,9 @@ impl DebugContext {
         self.performing_step = Some(StepMode::Continue);
 
         loop {
-            let step = {
-                let stepper = match &mut self.stepper {
-                    Some(s) => s,
-                    None => return true,
-                };
-
-                match stepper.next() {
-                    Some(s) => s,
-                    None => return true,
-                }
+            let step = match self.stepper.next() {
+                Some(s) => s,
+                None => return true,
             };
 
             if let Some(bp_id) = self.check_breakpoint(&step) {

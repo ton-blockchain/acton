@@ -4,7 +4,7 @@ pub mod context;
 pub mod dap;
 pub mod debug_context;
 pub mod debug_variables;
-pub mod exts;
+pub mod ffi;
 pub mod file_build_cache;
 pub mod formatter;
 pub mod retrace;

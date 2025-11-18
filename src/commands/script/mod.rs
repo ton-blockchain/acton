@@ -1,7 +1,7 @@
 use crate::config::ActonConfig;
 use crate::context::{AnyExecutor, BuildCache, Context, Emulations, KnownAddresses};
 use crate::debug_context::DebugContext;
-use crate::exts;
+use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
@@ -45,6 +45,11 @@ pub fn script_cmd(
     run_script_file(path, &content, debug, debug_port)
 }
 
+/// A script is essentially a regular smart contract with a `main` function,
+/// which serves as an alias for the `onInternalMessage` function with ID=0.
+///
+/// Executing the script means calling the get-method with ID=0 and an empty stack,
+/// so the `main` function takes no arguments.
 fn run_script_file(
     file_path: &str,
     content: &str,
@@ -53,8 +58,7 @@ fn run_script_file(
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content, file_path);
 
-    let compilation_result = tolkc::compile(Path::new(&file_path), debug);
-    let result = match compilation_result {
+    match tolkc::compile(Path::new(file_path), debug) {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = ArcCell::from_boc_b64(&*result.code_boc64)?;
             let data_cell = ArcCell::default();
@@ -66,17 +70,15 @@ fn run_script_file(
                 &result.source_map.unwrap_or(Default::default()),
                 debug,
                 debug_port,
-                Some(ExecutorVerbosity::FullLocationStackVerbose),
+                ExecutorVerbosity::FullLocationStackVerbose,
             );
             print_script_result(script_result?);
             Ok(())
         }
         tolkc::CompilerResult::Error(error) => {
-            Err(anyhow!("Cannot compile script file {}", error.message))
+            anyhow::bail!("Cannot compile script file {}", error.message)
         }
-    };
-
-    result
+    }
 }
 
 struct ScriptResult {
@@ -90,10 +92,9 @@ fn execute_script(
     source_map: &SourceMap,
     debug: bool,
     debug_port: u16,
-    verbosity: Option<ExecutorVerbosity>,
+    verbosity: ExecutorVerbosity,
 ) -> anyhow::Result<ScriptResult> {
     let dest_address = contract_address(code_cell)?;
-    let verbosity = verbosity.unwrap_or(ExecutorVerbosity::Short);
 
     let params = GetMethodParams {
         code: code_cell.to_boc_b64(false)?.to_string(),
@@ -136,7 +137,7 @@ fn execute_script(
         emulations: &mut emulations,
         abi,
         expected_exit_code: &mut None,
-        dbg_ctx: &mut DebugContext::empty(),
+        dbg_ctx: None,
         debug,
         backtrace: None,
         need_debug_info: false,
@@ -146,30 +147,29 @@ fn execute_script(
 
     if debug {
         let mut executor = StepGetExecutor::new(Tuple::empty(), params.clone());
-        exts::register(&mut executor, &mut ctx);
+        ffi::register(&mut executor, &mut ctx);
 
-        let (req_receiver, dap_sender) = crate::dap::start_dap_server(debug_port);
+        let transport = crate::dap::start_dap_server(debug_port);
 
         let mut dbg_ctx = DebugContext::new(
+            transport,
             AnyExecutor::Get(executor.clone()),
             source_map,
-            &req_receiver,
-            dap_sender,
             "main".to_string(),
         );
 
-        ctx.dbg_ctx = &mut dbg_ctx;
+        ctx.with_dbg(&mut dbg_ctx);
 
-        executor.run_get_method(0, Tuple::empty());
+        executor.prepare_get_method(0, Tuple::empty());
 
-        ctx.dbg_ctx.process_incoming_requests(true)?;
+        ctx.dbg().process_incoming_requests(true)?;
 
         let result = executor.finish_get_method(&params.code);
         return Ok(ScriptResult { result });
     }
 
     let mut executor = GetExecutor::new(params.clone());
-    exts::register(&mut executor, &mut ctx);
+    ffi::register(&mut executor, &mut ctx);
 
     let result = executor.run_get_method(Tuple::empty(), params);
     Ok(ScriptResult { result })

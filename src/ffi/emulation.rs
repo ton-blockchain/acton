@@ -1,6 +1,6 @@
 use crate::context::{AnyExecutor, AssertFailure, Context, FailAssertFailure, KnownAddress};
 use crate::debug_context::StepMode;
-use crate::exts::assert::process_txs_and_search_params;
+use crate::ffi::assert::process_txs_and_search_params;
 use crc::{CRC_16_XMODEM, Crc};
 use emulator::config::DEFAULT_CONFIG;
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -375,9 +375,9 @@ fn send_message_debug(
         .result_for_code(&code)
         .map(|res| res.1.source_map);
 
-    let need_to_stop_on_entry = ctx.dbg_ctx.need_to_stop_child_thread_on_start();
+    let need_to_stop_on_entry = ctx.dbg().need_to_stop_child_thread_on_start();
 
-    ctx.dbg_ctx
+    ctx.dbg()
         .begin_thread(
             2,
             AnyExecutor::Message(step_executor.clone()),
@@ -409,30 +409,30 @@ fn send_message_debug(
     }
     if prepare_result.skipped {
         // Since compute phase is skipped, we don't need to run anything
-        ctx.dbg_ctx.finish_thread(2).unwrap();
+        ctx.dbg().finish_thread(2).unwrap();
         return vec![];
     }
 
     // Step to update internal state
     if need_to_stop_on_entry {
-        ctx.dbg_ctx.step(StepMode::StepIn);
+        ctx.dbg().step(StepMode::StepIn);
     } else {
-        ctx.dbg_ctx.step(StepMode::Continue);
+        ctx.dbg().step(StepMode::Continue);
     }
 
-    if ctx.dbg_ctx.stepper.as_ref().map(|s| s.is_terminated()) == Some(false) {
+    if !ctx.dbg().stepper.is_terminated() {
         // Process requests only if we have something to execute and generates a requests
-        ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+        ctx.dbg().process_incoming_requests(false).unwrap();
     }
 
     let result = step_executor.finish_transaction();
 
-    ctx.dbg_ctx.finish_thread(2).unwrap();
+    ctx.dbg().finish_thread(2).unwrap();
 
-    if ctx.dbg_ctx.performing_step != Some(StepMode::Continue) {
+    if ctx.dbg().performing_step != Some(StepMode::Continue) {
         // When we step out from nested message/get method, send stop message to client to
         // stop on a line after send/call get method
-        ctx.dbg_ctx.step(StepMode::StepIn);
+        ctx.dbg().step(StepMode::StepIn);
     }
 
     let result = match result {
@@ -740,35 +740,36 @@ fn run_get_method_impl(
             ))
             .map(|res| res.1.source_map);
 
-        ctx.dbg_ctx
+        let dbg_ctx = ctx.dbg();
+        dbg_ctx
             .begin_thread(
                 2,
                 AnyExecutor::Get(step_get_executor.clone()),
                 source_map,
                 "Send internal message".to_string(),
-                ctx.dbg_ctx.need_to_stop_child_thread_on_start(),
+                dbg_ctx.need_to_stop_child_thread_on_start(),
             )
             .unwrap();
 
-        step_get_executor.run_get_method(method_id, Default::default());
+        step_get_executor.prepare_get_method(method_id, Default::default());
 
         // Step to update internal state
-        if ctx.dbg_ctx.need_to_stop_child_thread_on_start() {
-            ctx.dbg_ctx.step(StepMode::StepIn);
+        if dbg_ctx.need_to_stop_child_thread_on_start() {
+            dbg_ctx.step(StepMode::StepIn);
         } else {
-            ctx.dbg_ctx.step(StepMode::Continue);
+            dbg_ctx.step(StepMode::Continue);
         }
 
-        if ctx.dbg_ctx.stepper.as_ref().map(|s| s.is_terminated()) == Some(false) {
-            ctx.dbg_ctx.process_incoming_requests(false).unwrap();
+        if !dbg_ctx.stepper.is_terminated() {
+            dbg_ctx.process_incoming_requests(false).unwrap();
         }
 
-        ctx.dbg_ctx.finish_thread(2).unwrap();
+        dbg_ctx.finish_thread(2).unwrap();
 
-        if ctx.dbg_ctx.performing_step != Some(StepMode::Continue) {
+        if dbg_ctx.performing_step != Some(StepMode::Continue) {
             // When we step out from nested message/get method, send stop message to client to
             // stop on a line after send/call get method
-            ctx.dbg_ctx.step(StepMode::StepIn);
+            dbg_ctx.step(StepMode::StepIn);
         }
 
         step_get_executor.finish_get_method(&params.code)

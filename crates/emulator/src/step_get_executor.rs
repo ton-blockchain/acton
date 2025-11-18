@@ -61,7 +61,7 @@ impl StepGetExecutor {
         }
     }
 
-    pub fn run_get_method(&self, method_id: i32, stack: Tuple) {
+    pub fn prepare_get_method(&self, method_id: i32, stack: Tuple) {
         let stack = stack.serialize().unwrap();
         let stack_b64 = stack.to_boc_b64(false).unwrap();
         let stack_b64_cstr = CString::new(stack_b64).unwrap();

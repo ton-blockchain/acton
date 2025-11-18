@@ -256,7 +256,7 @@ pub struct Context<'a> {
     pub need_debug_info: bool,
     pub backtrace: Option<String>,
     pub emulations: &'a mut Emulations,
-    pub dbg_ctx: &'a mut DebugContext,
+    pub dbg_ctx: Option<&'a mut DebugContext>,
     pub libraries: &'a mut Vec<Cell>,
     pub default_log_level: ExecutorVerbosity,
 }
@@ -289,5 +289,15 @@ impl<'a> Context<'a> {
             .ok();
         }
         libs
+    }
+
+    pub fn with_dbg(&mut self, dbg: &'a mut DebugContext) {
+        self.dbg_ctx = Some(dbg)
+    }
+
+    pub fn dbg(&mut self) -> &mut DebugContext {
+        self.dbg_ctx
+            .as_mut()
+            .expect("Debug context accessed from non debug context")
     }
 }

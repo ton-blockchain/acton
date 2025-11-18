@@ -27,10 +27,7 @@ impl DebugContext {
             "Processing variables request: variables_reference={}, count={:?}",
             args.variables_reference, args.count
         );
-        let stepper = match &self.stepper {
-            Some(s) => s,
-            None => return Ok(vec![]),
-        };
+        let stepper = &self.stepper;
 
         let current_loc = match &stepper.get_current_step() {
             Some(step) => match &step.loc {
