@@ -34,7 +34,7 @@ pub fn disasm_cmd(
     let disassembler = Disassembler::new();
     let code = disassembler.decompile_cell(&cell)?;
 
-    let output = code.print(opts);
+    let output = code.print(&opts);
 
     if let Some(output_path) = output_file {
         fs::write(&output_path, &output)?;

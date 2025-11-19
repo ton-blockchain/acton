@@ -1,4 +1,5 @@
 use crate::types::{ArgValue, Instruction};
+use std::fs;
 use tolkc::source_map::SourceMap;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -46,8 +47,20 @@ impl Instruction {
                 get_source_locations(&source_map, self.source_cell.as_ref(), off as i32)
                 && !locations.is_empty()
             {
-                let loc_strings = locations.iter().map(|loc| loc.format()).collect::<Vec<_>>();
-                return format!("{}{:>padding$} // {}", result, "", loc_strings.join(", "));
+                let source_contexts: Vec<String> = locations
+                    .iter()
+                    .filter_map(|location| format_source_context(location))
+                    .collect();
+
+                if !source_contexts.is_empty() {
+                    let before = format!("    └{}┐\n", "─".repeat(56));
+                    let after = format!("    ┌{}┘", "─".repeat(56));
+                    let source_output = source_contexts.join("");
+                    return format!(
+                        "{}{:>padding$}\n{before}{}{after}",
+                        result, "", source_output
+                    );
+                }
             }
         }
 
@@ -94,6 +107,52 @@ fn get_source_locations<'a>(
         }
     }
     None
+}
+
+fn format_source_context(location: &tolkc::source_map::SourceLocation) -> Option<String> {
+    let content = fs::read_to_string(&location.file).ok()?;
+    let lines: Vec<&str> = content.lines().collect();
+
+    let line_idx = (location.line as usize).saturating_sub(1); // Convert to 0-based index
+    if line_idx >= lines.len() {
+        return None;
+    }
+
+    let start_line = line_idx.saturating_sub(1);
+    let end_line = (line_idx + 2).min(lines.len());
+
+    let mut result = String::new();
+    result.push_str(&format!(
+        "{:<60} │  {}:{}:{}",
+        " ",
+        tolkc::source_map::SourceLocation::normalize_path(&location.file),
+        location.line + 1,
+        location.column + 2
+    ));
+
+    for i in start_line..end_line {
+        let line_num = i + 1;
+        let line_content = lines[i];
+        result.push_str(&format!(
+            "\n{:>60}{}│  {:>3}: {}",
+            "", " ", line_num, line_content
+        ));
+
+        if i == line_idx + 1 {
+            let cursor_pos = location.column as usize + 1;
+            result.push_str(&format!(
+                "\n{:>60} │  {:>3}  {}{}",
+                "",
+                "",
+                " ".repeat(cursor_pos),
+                "^"
+            ));
+        }
+    }
+
+    result.push('\n');
+
+    Some(result)
 }
 
 impl ArgValue {

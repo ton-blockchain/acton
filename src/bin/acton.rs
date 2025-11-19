@@ -14,6 +14,7 @@ use owo_colors::OwoColorize;
 use std::fs::OpenOptions;
 use std::{fs, process};
 use tasm::printer::FormatOptions;
+use tolkc::source_map::SourceMap;
 
 #[derive(Parser)]
 #[command(name = "acton")]
@@ -139,6 +140,8 @@ enum Commands {
         show_hashes: bool,
         #[arg(long, help = "Show instruction offsets in left column")]
         show_offsets: bool,
+        #[arg(long, help = "Source map file for showing Tolk source locations")]
+        source_map: Option<String>,
     },
 }
 
@@ -378,7 +381,18 @@ fn main() {
             output,
             show_hashes,
             show_offsets,
+            source_map,
         } => {
+            let source_map_data = if let Some(source_map_path) = source_map {
+                let content =
+                    fs::read_to_string(source_map_path).expect("Failed to read source map file");
+                let result: SourceMap = serde_json::from_str(content.as_str())
+                    .expect("Failed to parse source map JSON");
+                Some(Box::new(result))
+            } else {
+                None
+            };
+
             let result = disasm_cmd(
                 boc_file,
                 string,
@@ -386,6 +400,7 @@ fn main() {
                 FormatOptions {
                     show_hashes,
                     show_offsets,
+                    source_map: source_map_data,
                 },
             );
             if let Err(err) = result {
