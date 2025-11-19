@@ -13,8 +13,8 @@ use crate::commands::test::reporting::{
 };
 use crate::config::ActonConfig;
 use crate::context::{
-    AnyExecutor, AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context,
-    DebugCtx, Emulations, Env, IoContext, KnownAddresses,
+    AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
+    Emulations, Env, IoContext, KnownAddresses,
 };
 use crate::debugger::dap::DapTransport;
 use crate::debugger::debug_context::DebugContext;
@@ -22,6 +22,7 @@ use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
+use emulator::AnyExecutor;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
 use emulator::executor::ExecutorVerbosity;
@@ -236,24 +237,23 @@ impl<'a> TestRunner<'a> {
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
             if self.config.debug {
-                let mut get_executor = StepGetExecutor::new(Default::default(), params.clone());
-
-                ffi::register(&mut get_executor, &mut ctx);
+                let mut executor = StepGetExecutor::new(Default::default(), params.clone());
+                ffi::register(&mut executor, &mut ctx);
 
                 let mut dbg_ctx = DebugContext::new(
                     self.transport.clone(),
-                    AnyExecutor::Get(get_executor.clone()),
+                    AnyExecutor::Get(executor.clone()),
                     source_map,
                     test.name.clone(),
                 );
 
                 ctx.debug = DebugCtx::new(&mut dbg_ctx);
 
-                get_executor.prepare_get_method(test.id, Default::default());
+                executor.prepare_get_method(test.id, Default::default());
 
                 ctx.debug.ctx().process_incoming_requests(true)?;
 
-                let get_result = get_executor.finish_get_method(&params.code);
+                let get_result = executor.finish_get_method(&params.code);
 
                 (
                     get_result,
@@ -263,11 +263,10 @@ impl<'a> TestRunner<'a> {
                     ctx.asserts.expected_exit_code.clone(),
                 )
             } else {
-                let mut get_executor = GetExecutor::new(params.clone());
+                let mut executor = GetExecutor::new(params.clone());
+                ffi::register(&mut executor, &mut ctx);
 
-                ffi::register(&mut get_executor, &mut ctx);
-
-                let get_result = get_executor.run_get_method(Default::default(), params);
+                let get_result = executor.run_get_method(Default::default(), params);
 
                 (
                     get_result,
@@ -822,37 +821,36 @@ fn find_all_test(content: &String) -> Vec<TestDescriptor> {
 
     root_node
         .children(&mut cursor)
-        .flat_map(|child| {
+        .filter_map(|child| {
             if child.kind() == "get_method_declaration" {
-                let Some(name_node) = child.child_by_field_name("name") else {
-                    return vec![];
-                };
+                let name_node = child.child_by_field_name("name")?;
                 let raw_name = name_node
                     .utf8_text(content.as_bytes())
-                    .map(|text| text.to_string());
+                    .map(|text| text.to_string())
+                    .ok()?;
 
-                let Ok(raw_name) = raw_name else {
-                    return vec![];
-                };
                 let name = raw_name.trim_matches('`').to_string();
 
-                // get fun `test-foo`() or get fun test_foo()
-                if name.starts_with("test-") || name.starts_with("test_") {
+                // get fun `test-foo`() or get fun test_foo() or get fun `test foo`()
+                if name.starts_with("test-")
+                    || name.starts_with("test_")
+                    || name.starts_with("test ")
+                {
                     let id = CRC16.checksum(name.as_bytes()) as i32 | 0x1_00_00;
                     let test_annotations = annotations::find_test_annotations(content, child);
 
-                    return vec![TestDescriptor {
+                    return Some(TestDescriptor {
                         id,
                         name: name.to_string(),
                         annotations: test_annotations.annotations,
                         expected_exit_code: test_annotations.expected_exit_code,
                         gas_limit: test_annotations.gas_limit,
                         todo_description: test_annotations.todo_description,
-                    }];
+                    });
                 }
             };
 
-            vec![]
+            None
         })
         .collect()
 }

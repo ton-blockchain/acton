@@ -342,9 +342,10 @@ mod tests {
     #[test]
     fn test_file_cache_operations() {
         let temp_dir = tempdir().unwrap();
-        let (mut cache, lib_path, main_path) = prepare_cache(&temp_dir);
+        let (mut cache, lib_path, main_path) =
+            prepare_cache(&temp_dir).expect("Failed to prepare cache");
 
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(10));
         File::create(&lib_path)
             .unwrap()
             .write_all(b"fun helper() { return 1; }")
@@ -360,7 +361,7 @@ mod tests {
     #[test]
     fn test_should_return_none_for_different_debug_info() {
         let temp_dir = tempdir().unwrap();
-        let (mut cache, _, main_path) = prepare_cache(&temp_dir);
+        let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
 
         let cached = cache.get(main_path.to_str().unwrap(), true, 2, "1.1".to_string());
         assert!(
@@ -372,7 +373,7 @@ mod tests {
     #[test]
     fn test_should_return_none_for_different_optimization_level() {
         let temp_dir = tempdir().unwrap();
-        let (mut cache, _, main_path) = prepare_cache(&temp_dir);
+        let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
 
         let cached = cache.get(main_path.to_str().unwrap(), false, 0, "1.1".to_string());
         assert!(
@@ -384,7 +385,7 @@ mod tests {
     #[test]
     fn test_should_return_none_for_different_tolk_version() {
         let temp_dir = tempdir().unwrap();
-        let (mut cache, _, main_path) = prepare_cache(&temp_dir);
+        let (mut cache, _, main_path) = prepare_cache(&temp_dir).expect("Failed to prepare cache");
 
         let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.2".to_string());
         assert!(
@@ -393,22 +394,16 @@ mod tests {
         );
     }
 
-    fn prepare_cache(temp_dir: &TempDir) -> (FileBuildCache, PathBuf, PathBuf) {
+    fn prepare_cache(temp_dir: &TempDir) -> Result<(FileBuildCache, PathBuf, PathBuf)> {
         let cache_dir = temp_dir.path().join("cache");
 
         let mut cache = FileBuildCache::new(Some(cache_dir.clone())).unwrap();
 
         let lib_path = temp_dir.path().join("lib.tolk");
-        File::create(&lib_path)
-            .unwrap()
-            .write_all(b"fun helper() { }")
-            .unwrap();
+        File::create(&lib_path)?.write_all(b"fun helper() { }")?;
 
         let main_path = temp_dir.path().join("main.tolk");
-        File::create(&main_path)
-            .unwrap()
-            .write_all(b"import \"lib\";\nfun main() { }")
-            .unwrap();
+        File::create(&main_path)?.write_all(b"import \"lib\";\nfun main() { }")?;
 
         let result = CompilerResultSuccess {
             fift_code: "test_fift_code".to_string(),
@@ -417,19 +412,17 @@ mod tests {
             source_map: None,
         };
 
-        cache
-            .put(
-                main_path.to_str().unwrap(),
-                &result,
-                false,
-                2,
-                "1.1".to_string(),
-            )
-            .unwrap();
+        cache.put(
+            main_path.to_str().unwrap(),
+            &result,
+            false,
+            2,
+            "1.1".to_string(),
+        )?;
 
         let cached = cache.get(main_path.to_str().unwrap(), false, 2, "1.1".to_string());
         assert!(cached.is_some());
         assert_eq!(cached.unwrap().code_boc64, "test_boc");
-        (cache, lib_path, main_path)
+        Ok((cache, lib_path, main_path))
     }
 }

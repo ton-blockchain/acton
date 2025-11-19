@@ -1,4 +1,3 @@
-use crate::context::AnyExecutor;
 use crate::debugger::dap::{DapMessage, DapTransport};
 use crate::formatter::FormatterContext;
 use anyhow::anyhow;
@@ -13,6 +12,7 @@ use dap::types::{
     Breakpoint, Scope, ScopePresentationhint, Source, StackFrame, StoppedEventReason, Thread,
     ThreadEventReason,
 };
+use emulator::AnyExecutor;
 use log::debug;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;

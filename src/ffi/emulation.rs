@@ -1,4 +1,4 @@
-use crate::context::{AnyExecutor, AssertFailure, Context, FailAssertFailure, KnownAddress};
+use crate::context::{AssertFailure, Context, FailAssertFailure, KnownAddress};
 use crate::debugger::debug_context::StepMode;
 use crate::ffi::assert::process_txs_and_search_params;
 use crc::{CRC_16_XMODEM, Crc};
@@ -11,7 +11,7 @@ use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_executor::StepExecutor;
 use emulator::step_get_executor::StepGetExecutor;
 use emulator::traits::BaseExecutor;
-use emulator::{extension, pop_args, register_ext_methods, try_ctx};
+use emulator::{AnyExecutor, extension, pop_args, register_ext_methods, try_ctx};
 use log::{debug, info, warn};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;

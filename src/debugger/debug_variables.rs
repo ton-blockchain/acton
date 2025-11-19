@@ -1,9 +1,9 @@
-use crate::context::AnyExecutor;
 use crate::debugger::debug_context::{DebugContext, VARIABLE_REFERENCE_COUNTER};
 use crate::formatter::FormatterContext;
 use anyhow::anyhow;
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
+use emulator::AnyExecutor;
 use emulator::executor::StoreExt;
 use log::debug;
 use std::sync::atomic::Ordering;
