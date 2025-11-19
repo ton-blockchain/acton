@@ -322,7 +322,8 @@ impl<'a> AssertsContext<'a> {
 
 impl<'a> ChainContext<'a> {
     pub fn build_libs(&self, owner: &IntAddr) -> Dict<HashBytes, LibDescr> {
-        self.build_libs_with_hash_owner(&owner.as_std().unwrap().address)
+        let std_address = owner.as_std().expect("VarAddr is unexpected");
+        self.build_libs_with_hash_owner(&std_address.address)
     }
 
     pub fn build_libs_with_hash_owner(&self, owner: &HashBytes) -> Dict<HashBytes, LibDescr> {

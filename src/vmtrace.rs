@@ -55,10 +55,12 @@ pub fn low_level_loc_to_debug_locations(
             .copied()
             .collect::<Vec<_>>();
 
-        if debug_pairs.is_empty() {
+        if debug_pairs.is_empty()
+            && let Some(first_mark) = marks.first()
+        {
             // If we don't find approx info but have marks info,
             // use first one to show at least some location to user
-            debug_pairs = vec![marks.first().unwrap()]
+            debug_pairs = vec![first_mark]
         }
     }
 

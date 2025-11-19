@@ -3,6 +3,7 @@ use crate::vmtrace::build_vm_trace;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use emulator::emulator::SendMessageResult;
 use owo_colors::OwoColorize;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -241,7 +242,7 @@ pub fn print_coverage_summary(coverage: &Coverage) {
         })
         .collect();
 
-    files_with_percentage.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    files_with_percentage.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
 
     for (percentage, file_coverage) in files_with_percentage {
         let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());

@@ -79,7 +79,9 @@ pub fn build_cmd(
     let mut compiled_contracts: HashMap<String, String> = HashMap::new();
 
     for contract_key in filtered_compilation_order {
-        let contract_config = contracts.get(&contract_key).unwrap();
+        let Some(contract_config) = contracts.get(&contract_key) else {
+            continue;
+        };
         let contract_path = &contract_config.src;
 
         generate_dependency_files(&contract_key, contract_config, &compiled_contracts, &config)?;
@@ -237,7 +239,7 @@ fn generate_single_dependency_file(
             gen_dir
                 .join(format!("{dependency_key}_code.tolk"))
                 .to_str()
-                .unwrap(),
+                .ok_or_else(|| anyhow!("Path.to_str() failed"))?,
         )
         .to_string();
 

@@ -108,26 +108,29 @@ pub fn start_dap_server(port: u16) -> DapTransport {
     let (req_sender, req_receiver) = unbounded::<Request>();
     let (dap_sender, dap_receiver) = unbounded::<DapMessage>();
 
-    thread::spawn(move || {
-        let listener = TcpListener::bind(&address).unwrap();
+    thread::spawn(move || -> anyhow::Result<()> {
+        let listener = TcpListener::bind(&address)?;
         println!("Debugger server listening on {address}");
 
-        let stream = listener.incoming().next().unwrap().unwrap();
+        let stream = listener
+            .incoming()
+            .next()
+            .expect("listener.incoming().next() cannot fail by design")?;
         println!("New connection established");
 
-        let input_stream = stream.try_clone().unwrap();
+        let input_stream = stream.try_clone()?;
         let mut input = BufReader::new(input_stream);
 
         let req_sender_for_reader = req_sender.clone();
 
         // Since `poll_request` is blocking, run it in the separate thread
-        let reader_thread = thread::spawn(move || {
+        let reader_thread = thread::spawn(move || -> anyhow::Result<()> {
             loop {
                 let req = poll_request(&mut input);
                 match req {
                     Ok(Some(req)) => {
                         debug!("Processing DAP request: {:?}", req.command);
-                        req_sender_for_reader.send(req.clone()).unwrap();
+                        req_sender_for_reader.send(req.clone())?;
                     }
                     Ok(None) => {
                         // No more requests, connection might be closed
@@ -139,6 +142,8 @@ pub fn start_dap_server(port: u16) -> DapTransport {
                     }
                 }
             }
+
+            Ok(())
         });
 
         // Server require an input, pass dummy one, that's safe since we never call `poll_request`
@@ -154,10 +159,10 @@ pub fn start_dap_server(port: u16) -> DapTransport {
                     let Ok(dap_msg) = msg else { break };
                     match dap_msg {
                         DapMessage::Response(rsp) => {
-                            server.respond(rsp).unwrap();
+                            server.respond(rsp)?;
                         }
                         DapMessage::Event(event) => {
-                            server.send_event(event).unwrap();
+                            server.send_event(event)?;
                         }
                     }
                 }
@@ -168,9 +173,13 @@ pub fn start_dap_server(port: u16) -> DapTransport {
             }
         }
 
-        reader_thread.join().unwrap();
+        reader_thread
+            .join()
+            .expect("[INTERNAL ERROR] DAP thread panicked")
+            .expect("[INTERNAL ERROR] Cannot send DAP message");
 
         println!("Connection closed");
+        Ok(())
     });
     DapTransport {
         req_receiver,

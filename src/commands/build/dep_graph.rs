@@ -29,8 +29,11 @@ pub(crate) fn build_dependency_graph(
                 ));
             }
 
-            graph.get_mut(dep_name).unwrap().push((*key).clone());
-            *in_degree.get_mut(*key).unwrap() += 1;
+            graph
+                .get_mut(dep_name)
+                .expect("cannot fail")
+                .push((*key).clone());
+            *in_degree.get_mut(*key).expect("cannot fail") += 1;
         }
     }
 
@@ -47,7 +50,9 @@ pub(crate) fn build_dependency_graph(
         result.push(current.clone());
 
         for neighbor in &graph[&current] {
-            let degree = in_degree.get_mut(neighbor).unwrap();
+            let Some(degree) = in_degree.get_mut(neighbor) else {
+                break;
+            };
             *degree -= 1;
             if *degree == 0 {
                 queue.push_back(neighbor.clone());

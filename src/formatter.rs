@@ -242,9 +242,16 @@ impl FormatterContext {
         let mut contract_letters: HashMap<IntAddr, String> = HashMap::new();
 
         for (index, addr) in known_contracts.iter().enumerate() {
-            let letter = char::from_u32('A' as u32 + index as u32)
-                .unwrap_or_else(|| char::from_digit(index as u32, 10).unwrap());
-            contract_letters.insert(addr.clone(), letter.to_string());
+            let letter = ((index % 26) as u8 + b'A') as char;
+
+            let letter_str = if index < 26 {
+                letter.to_string()
+            } else {
+                let cycle = index / 26 + 1;
+                format!("{letter}{cycle}")
+            };
+
+            contract_letters.insert(addr.clone(), letter_str);
         }
 
         contract_letters

@@ -339,7 +339,7 @@ fn main() {
             let result = build_cmd(contract, clear_cache, graph);
             if let Err(err) = result {
                 eprintln!("{} {}", "Error:".red(), err);
-                std::process::exit(1);
+                process::exit(1);
             }
         }
         Commands::Compile {
@@ -359,7 +359,7 @@ fn main() {
                             "success": false,
                             "error": err.to_string()
                         }))
-                        .unwrap()
+                        .expect("JSON serialization should not fail")
                     );
                 } else {
                     eprintln!("{} {}", "Error:".red(), err);

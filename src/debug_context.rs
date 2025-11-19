@@ -247,8 +247,7 @@ impl Stepper {
                 }
             }
             StepKind::SyntheticAfterFunctionCall(func_name) => {
-                if !self.callstack.is_empty() {
-                    let last = self.callstack.last().unwrap();
+                if let Some(last) = self.callstack.last() {
                     if last.function_name == *func_name {
                         self.callstack.pop();
                     }
@@ -263,8 +262,7 @@ impl Stepper {
                 }
             }
             StepKind::SyntheticLeaveInlined(func_name) => {
-                if !self.callstack.is_empty() {
-                    let last = self.callstack.last().unwrap();
+                if let Some(last) = self.callstack.last() {
                     if last.function_name == *func_name {
                         self.callstack.pop();
                     }
@@ -705,10 +703,10 @@ impl DebugContext {
             return Vec::new();
         };
 
-        let top_frame_name = if callstack.is_empty() {
-            self.get_root_function_name(thread_id)
+        let top_frame_name = if let Some(last) = callstack.last() {
+            last.function_name.clone()
         } else {
-            callstack.last().unwrap().function_name.clone()
+            self.get_root_function_name(thread_id)
         };
         let top_frame = self.create_stack_frame(loc, top_frame_name);
 
@@ -723,10 +721,10 @@ impl DebugContext {
             .enumerate()
             .rev()
             .map(|(idx, frame)| {
-                let function_name = if idx == 0 {
-                    self.get_root_function_name(thread_id)
+                let function_name = if let Some(prev) = callstack.get(idx - 1) {
+                    prev.function_name.clone()
                 } else {
-                    callstack.get(idx - 1).unwrap().function_name.clone()
+                    self.get_root_function_name(thread_id)
                 };
 
                 self.create_stack_frame(&frame.loc, function_name)
@@ -953,7 +951,7 @@ fn skip_function(stepper: &mut Stepper, func_name: String) -> bool {
 
 fn get_locations(executor: &AnyExecutor, source_map: &SourceMap) -> Option<Vec<DebugLocation>> {
     let pos = executor.get_code_pos();
-    let (hash, offset) = pos.split_once(":").unwrap();
-    let offset = offset.parse::<i32>().unwrap();
+    let (hash, offset) = pos.split_once(":")?;
+    let offset = offset.parse::<i32>().ok()?;
     crate::vmtrace::low_level_loc_to_debug_locations(source_map, hash, offset, false, false)
 }

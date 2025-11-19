@@ -276,11 +276,11 @@ pub fn process_txs_and_search_params(
             },
             _ => None,
         })
-        .map(|x| {
-            let result = x.to_boc_b64(false).unwrap();
-            let tx_cell: tycho_types::cell::Cell = Boc::decode_base64(&result).unwrap();
-            let mut tx_slice = tx_cell.as_slice().unwrap();
-            Transaction::load_from(&mut tx_slice).unwrap()
+        .filter_map(|x| {
+            let result = x.to_boc_b64(false).ok()?;
+            let tx_cell: tycho_types::cell::Cell = Boc::decode_base64(&result).ok()?;
+            let mut tx_slice = tx_cell.as_slice().ok()?;
+            Transaction::load_from(&mut tx_slice).ok()
         })
         .collect::<Vec<_>>();
 

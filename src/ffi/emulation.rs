@@ -382,7 +382,7 @@ fn send_message_debug(
             "Send internal message".to_string(),
             need_to_stop_on_entry,
         )
-        .unwrap();
+        .expect("Cannot send response");
 
     let msg_cell = Emulator::patch_src_addr(msg_cell.clone(), src_addr.clone());
     let prepare_result = step_executor.prepare_transaction(
@@ -406,7 +406,10 @@ fn send_message_debug(
     }
     if prepare_result.skipped {
         // Since compute phase is skipped, we don't need to run anything
-        ctx.debug.ctx().finish_thread(2).unwrap();
+        ctx.debug
+            .ctx()
+            .finish_thread(2)
+            .expect("Cannot send response");
         return vec![];
     }
 
@@ -419,12 +422,18 @@ fn send_message_debug(
 
     if !ctx.debug.ctx().stepper.is_terminated() {
         // Process requests only if we have something to execute and generates a requests
-        ctx.debug.ctx().process_incoming_requests(false).unwrap();
+        ctx.debug
+            .ctx()
+            .process_incoming_requests(false)
+            .expect("Cannot send response");
     }
 
     let result = step_executor.finish_transaction();
 
-    ctx.debug.ctx().finish_thread(2).unwrap();
+    ctx.debug
+        .ctx()
+        .finish_thread(2)
+        .expect("Cannot send response");
 
     if ctx.debug.ctx().performing_step != Some(StepMode::Continue) {
         // When we step out from nested message/get method, send stop message to client to
@@ -572,8 +581,8 @@ fn find_transaction_by_params_impl(
             }
         }
 
-        let in_msg = tx.load_in_msg().unwrap();
-        if let Some(in_msg) = &in_msg
+        let in_msg = tx.load_in_msg();
+        if let Ok(Some(in_msg)) = &in_msg
             && let MsgInfo::Int(info) = &in_msg.info
         {
             if let Some(expected_opcode) = &params.opcode {
@@ -622,7 +631,7 @@ fn find_transaction_by_params_impl(
             }
         };
 
-        let TxInfo::Ordinary(info) = tx.load_info().unwrap() else {
+        let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
             return false;
         };
 
@@ -659,12 +668,12 @@ fn find_transaction_by_params_impl(
     });
 
     let txs = found.collect::<Vec<_>>();
-    if txs.is_empty() {
+    let Some(first) = txs.first() else {
+        // No transaction found
         stack.push(TupleItem::Null);
         return;
-    }
+    };
 
-    let first = txs.first().unwrap();
     let tx_base64 = Boc::encode_base64(first.to_cell());
     let tx_cell = try_ctx!(
         ctx,
@@ -711,7 +720,7 @@ fn run_get_method_impl(
 
     let method_id = id.to_i32().unwrap_or(0);
     let params = GetMethodParams {
-        code: code.to_boc_b64(false).unwrap().to_string(),
+        code: code.to_boc_b64(false).unwrap(),
         data: Boc::encode_base64(data),
         verbosity: ExecutorVerbosity::FullLocationStackVerbose,
         libs: libs_root.map(Boc::encode_base64).unwrap_or("".to_string()),
@@ -746,7 +755,7 @@ fn run_get_method_impl(
                 "Send internal message".to_string(),
                 dbg_ctx.need_to_stop_child_thread_on_start(),
             )
-            .unwrap();
+            .expect("Cannot send response");
 
         step_get_executor.prepare_get_method(method_id, Default::default());
 
@@ -758,10 +767,12 @@ fn run_get_method_impl(
         }
 
         if !dbg_ctx.stepper.is_terminated() {
-            dbg_ctx.process_incoming_requests(false).unwrap();
+            dbg_ctx
+                .process_incoming_requests(false)
+                .expect("Cannot send response");
         }
 
-        dbg_ctx.finish_thread(2).unwrap();
+        dbg_ctx.finish_thread(2).expect("Cannot send response");
 
         if dbg_ctx.performing_step != Some(StepMode::Continue) {
             // When we step out from nested message/get method, send stop message to client to
@@ -803,13 +814,10 @@ fn run_get_method_impl(
 
 extension!(is_deployed in (Context) with (address: ArcCell) using is_deployed_impl);
 fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
-    let address_boc = address.to_boc_hex(false).unwrap();
-
-    let address_std = MsgAddrIntStd::from_boc_hex(address_boc.as_str()).unwrap();
-    let dst_addr_str = format!(
-        "{}:{}",
-        &address_std.workchain,
-        hex::encode(&address_std.address)
+    let dst_addr_str = try_ctx!(
+        ctx,
+        cell_address_to_raw(address),
+        "Failed to decode address: {}"
     );
 
     let is_deployed = ctx.chain.blockchain.is_deployed(&dst_addr_str);
@@ -818,13 +826,10 @@ fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
 
 extension!(get_deployed_code in (Context) with (address: ArcCell) using get_deployed_code_impl);
 fn get_deployed_code_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
-    let address_boc = address.to_boc_hex(false).unwrap();
-
-    let address_std = MsgAddrIntStd::from_boc_hex(address_boc.as_str()).unwrap();
-    let dst_addr_str = format!(
-        "{}:{}",
-        &address_std.workchain,
-        hex::encode(&address_std.address)
+    let dst_addr_str = try_ctx!(
+        ctx,
+        cell_address_to_raw(address),
+        "Failed to decode address: {}"
     );
 
     let is_deployed = ctx.chain.blockchain.is_deployed(&dst_addr_str);
@@ -845,8 +850,19 @@ fn get_deployed_code_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell
     stack.push(TupleItem::Cell(cell));
 }
 
+fn cell_address_to_raw(address: ArcCell) -> anyhow::Result<String> {
+    let address_boc = address.to_boc_hex(false)?;
+    let address_std = MsgAddrIntStd::from_boc_hex(address_boc.as_str())?;
+    let dst_addr_str = format!(
+        "{}:{}",
+        &address_std.workchain,
+        hex::encode(&address_std.address)
+    );
+    Ok(dst_addr_str)
+}
+
 fn get_address_code(account: &ShardAccount) -> Option<ArcCell> {
-    let state = account.account.load().unwrap().0.map(|s| s.state);
+    let state = account.account.load().ok()?.0.map(|s| s.state);
 
     let Some(AccountState::Active(state)) = state else {
         return None;

@@ -21,18 +21,18 @@ pub fn init_cmd() -> anyhow::Result<()> {
     let contract_count = discovered_contracts.len();
 
     if !discovered_contracts.is_empty() {
-        config.contracts = Some(ContractsConfig {
-            contracts: discovered_contracts,
-        });
         println!(
             "Discovered {} contract{}:",
             contract_count,
             if contract_count == 1 { "" } else { "s" }
         );
-        for (key, contract) in &config.contracts.as_ref().unwrap().contracts {
+        for (key, contract) in &discovered_contracts {
             println!("  {} ({})", contract.name.cyan(), key);
         }
-        println!()
+        println!();
+        config.contracts = Some(ContractsConfig {
+            contracts: discovered_contracts,
+        });
     } else {
         println!("No contracts found in the current directory.");
     }

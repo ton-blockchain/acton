@@ -27,27 +27,23 @@ fn find_expect_calls(
     content: &str,
     file_path: &str,
     replacements: &mut Vec<(usize, usize, String)>,
-) {
+) -> Option<()> {
     for i in 0..node.child_count() {
-        let child = node.child(i).unwrap();
+        let Some(child) = node.child(i) else { break };
         find_expect_calls(&child, content, file_path, replacements);
     }
 
     if node.kind() != "function_call" {
         // fast path
-        return;
+        return None;
     }
 
-    let Some(callee_node) = node.child_by_field_name("callee") else {
-        return;
-    };
+    let callee_node = node.child_by_field_name("callee")?;
 
     if callee_node.kind() == "identifier"
         && callee_node.utf8_text(content.as_bytes()).unwrap_or("") == "expect"
     {
-        let Some(args_node) = node.child_by_field_name("arguments") else {
-            return;
-        };
+        let args_node = node.child_by_field_name("arguments")?;
 
         let mut arg_count = 0;
         let mut cursor = args_node.walk();
@@ -70,6 +66,8 @@ fn find_expect_calls(
             replacements.push((start, end, location));
         }
     }
+
+    Some(())
 }
 
 fn has_entry_function(root_node: &Node, content: &str) -> bool {
