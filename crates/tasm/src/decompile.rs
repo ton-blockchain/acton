@@ -109,7 +109,7 @@ impl Disassembler {
                 .filter_map(|(key, mut value)| {
                     let mut key_slice = key.as_data_slice();
                     let id = key_slice.load_uint(key_length as u16).ok()?;
-                    let code = self.decompile_slice(&mut value).ok()?;
+                    let code = self.decompile_slice(&mut value, None).ok()?;
                     Some(Method {
                         id,
                         source: dyn_cell_to_cell(value.cell()),
@@ -136,20 +136,24 @@ impl Disassembler {
 
     pub fn decompile_cell(&self, cell: &Cell) -> anyhow::Result<Code> {
         let mut slice = cell.as_slice()?;
-        self.decompile_slice(&mut slice)
+        self.decompile_slice(&mut slice, None)
     }
 
     pub fn decompile_dyn_cell(&self, cell: &DynCell) -> anyhow::Result<Code> {
         let mut slice = cell.as_slice()?;
-        self.decompile_slice(&mut slice)
+        self.decompile_slice(&mut slice, None)
     }
 
-    pub fn decompile_slice(&self, slice: &mut CellSlice) -> anyhow::Result<Code> {
+    pub fn decompile_slice(
+        &self,
+        slice: &mut CellSlice,
+        start_offset: Option<u16>,
+    ) -> anyhow::Result<Code> {
         let mut result = Vec::with_capacity(32);
         let mut offsets = Vec::with_capacity(32);
 
         while slice.size_bits() > 0 {
-            let offset = slice.offset_bits();
+            let offset = start_offset.unwrap_or(0) + slice.offset_bits();
             let instruction = self.load_instruction(slice).with_context(|| {
                 format!(
                     "cannot load instruction at offset {offset} in x{{{}}}",
@@ -260,7 +264,7 @@ impl Disassembler {
                 let y = slice.load_uint(bits.len as u16)?;
                 let real_length = y * 8;
                 let mut r = slice.load_prefix(real_length as u16, 0)?;
-                let code = self.decompile_slice(&mut r)?;
+                let code = self.decompile_slice(&mut r, None)?;
                 args.push(ArgValue::Code {
                     code: Box::new(code),
                     source: dyn_cell_to_cell(slice.cell()),
@@ -283,24 +287,27 @@ impl Disassembler {
 
                 if count_refs == 0 {
                     // optimization to not build a cell
-                    let code = self.decompile_slice(&mut r)?;
+                    let code = self.decompile_slice(&mut r, None)?;
                     args.push(ArgValue::Code {
                         code: Box::new(code),
-                        source: slice_to_cell(&r),
+                        source: dyn_cell_to_cell(slice.cell()),
                         offset,
                     });
                     return Ok(());
                 }
 
                 let mut builder = CellBuilder::new();
-                builder.store_slice(&r)?;
+                builder.store_slice(r)?;
                 for _ in 0..count_refs {
                     builder.store_reference(dyn_cell_to_cell(slice.load_reference()?))?;
                 }
-                let code = self.decompile_cell(&builder.build()?)?;
+                let code_cell = builder.build()?;
+                let mut code_slice = code_cell.as_slice()?;
+
+                let code = self.decompile_slice(&mut code_slice, Some(r.offset_bits()))?;
                 args.push(ArgValue::Code {
                     code: Box::new(code),
-                    source: slice_to_cell(&r),
+                    source: dyn_cell_to_cell(slice.cell()),
                     offset,
                 });
             }
@@ -382,14 +389,6 @@ fn dyn_cell_to_cell(cell: &DynCell) -> Cell {
         .store_into(&mut builder, Cell::empty_context())
         .expect("Cell after encoding must be correct");
     builder.build().unwrap()
-}
-
-fn slice_to_cell(slice: &CellSlice) -> Cell {
-    let mut builder = CellBuilder::new();
-    slice
-        .store_into(&mut builder, Cell::empty_context())
-        .expect("Failed to store data into cell builder");
-    builder.build().expect("Failed to build cell from builder")
 }
 
 #[cfg(test)]
