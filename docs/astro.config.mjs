@@ -143,6 +143,7 @@ export default defineConfig({
         {
           label: "Commands",
           items: [
+            {slug: "compile", label: "compile"},
             {slug: "disasm", label: "disasm"},
           ],
         },
