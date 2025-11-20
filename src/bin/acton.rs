@@ -49,53 +49,110 @@ enum Commands {
     Test {
         #[arg(help = "Test file or directory containing test files (default: current directory)")]
         path: Option<String>,
-        #[arg(short, long, help = "Filter tests by regex pattern")]
-        filter: Option<String>,
-        #[arg(long, help = "Report formats to use", value_delimiter = ',')]
-        reporter: Vec<String>,
-        #[arg(long, help = "Enable debug mode")]
-        debug: bool,
-        #[arg(long, help = "Debug server port", default_value = "12345")]
-        debug_port: u16,
+        // Filtering
         #[arg(
+            short,
             long,
-            help = "Enable backtraces (currently only \"full\" mode is available)"
+            help = "Filter tests by regex pattern",
+            help_heading = "Filtering"
         )]
-        backtrace: Option<String>,
-        #[arg(long, help = "Generate a coverage profile")]
-        coverage: bool,
-        #[arg(long, help = "Output coverage profile in specified format (lcov)")]
-        format: Option<String>,
+        filter: Option<String>,
         #[arg(
             long,
-            help = "Exclude test files and directories matching glob patterns"
+            help = "Exclude test files and directories matching glob patterns",
+            help_heading = "Filtering"
         )]
         exclude: Vec<String>,
         #[arg(
             long,
-            help = "Include only test files and directories matching glob patterns"
+            help = "Include only test files and directories matching glob patterns",
+            help_heading = "Filtering"
         )]
         include: Vec<String>,
-        #[arg(long, help = "Clear compilation cache before running")]
-        clear_cache: bool,
+
+        // Debugging
+        #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
+        debug: bool,
+        #[arg(
+            long,
+            help = "Debug server port",
+            default_value = "12345",
+            help_heading = "Debugging"
+        )]
+        debug_port: u16,
+        #[arg(
+            long,
+            help = "Enable backtraces (currently only \"full\" mode is available)",
+            help_heading = "Debugging"
+        )]
+        backtrace: Option<String>,
+
+        // Coverage
+        #[arg(long, help = "Generate a coverage profile", help_heading = "Coverage")]
+        coverage: bool,
+        #[arg(
+            long,
+            help = "Output coverage profile in specified format (lcov)",
+            help_heading = "Coverage"
+        )]
+        format: Option<String>,
+
+        // Profiling
+        #[arg(
+            long,
+            help = "Create JSON snapshot of gas usage statistics",
+            help_heading = "Profiling"
+        )]
+        snapshot: Option<String>,
+        #[arg(
+            long,
+            help = "Compare gas usage with baseline snapshot file",
+            help_heading = "Profiling"
+        )]
+        baseline_snapshot: Option<String>,
+
+        // Reporting
+        #[arg(
+            long,
+            help = "Report formats to use",
+            value_delimiter = ',',
+            help_heading = "Reporting"
+        )]
+        reporter: Vec<String>,
         #[arg(
             long,
             default_value = "test-results",
-            help = "JUnit XML output directory"
+            help = "JUnit XML output directory",
+            help_heading = "Reporting"
         )]
         junit_path: Option<String>,
-        #[arg(long, help = "Merge all test suites into a single JUnit XML file")]
-        junit_merge: bool,
-        #[arg(long, help = "Create JSON snapshot of gas usage statistics")]
-        snapshot: Option<String>,
-        #[arg(long, help = "Compare gas usage with baseline snapshot file")]
-        baseline_snapshot: Option<String>,
         #[arg(
             long,
-            help = "Fork from network (testnet or mainnet) for remote account resolution"
+            help = "Merge all test suites into a single JUnit XML file",
+            help_heading = "Reporting"
+        )]
+        junit_merge: bool,
+
+        // Cache
+        #[arg(
+            long,
+            help = "Clear compilation cache before running",
+            help_heading = "Cache"
+        )]
+        clear_cache: bool,
+
+        // Remote
+        #[arg(
+            long,
+            help = "Fork from network (testnet or mainnet) for remote account resolution",
+            help_heading = "Remote"
         )]
         fork_net: Option<String>,
-        #[arg(long, help = "TonCenter API key for blockchain queries")]
+        #[arg(
+            long,
+            help = "TonCenter API key for blockchain queries",
+            help_heading = "Remote"
+        )]
         api_key: Option<String>,
     },
     #[command(about = "Execute a Tolk script file")]
