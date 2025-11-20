@@ -56,6 +56,8 @@ pub struct TestSettings {
     pub include: Option<Vec<String>>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fork_net: Option<String>,
+    pub api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -186,6 +188,8 @@ impl TestSettings {
         junit_merge_override: bool,
         snapshot_override: Option<String>,
         baseline_gas_override: Option<String>,
+        fork_net_override: Option<String>,
+        api_key_override: Option<String>,
     ) -> TestConfig {
         let mut final_report_formats = Vec::new();
 
@@ -231,6 +235,8 @@ impl TestSettings {
             junit_merge: junit_merge_override || self.junit_merge.unwrap_or(false),
             snapshot: snapshot_override,
             baseline_snapshot: baseline_gas_override,
+            fork_net: fork_net_override.or_else(|| self.fork_net.clone()),
+            api_key: api_key_override.or_else(|| self.api_key.clone()),
         }
     }
 }

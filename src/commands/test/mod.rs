@@ -77,6 +77,8 @@ pub struct TestConfig {
     pub junit_merge: bool,
     pub snapshot: Option<String>,
     pub baseline_snapshot: Option<String>,
+    pub fork_net: Option<String>,
+    pub api_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -198,7 +200,8 @@ impl<'a> TestRunner<'a> {
         };
 
         let mut emulator = Emulator::new(verbosity);
-        let mut blockchain = Blockchain::new();
+        let mut blockchain =
+            Blockchain::new(self.config.fork_net.clone(), self.config.api_key.clone());
 
         let mut assert_failure = None;
         let mut expected_exit_code = None;
@@ -770,16 +773,18 @@ fn run_file_tests(
         .reporter_manager
         .on_suite_finished(file_path, &suite_stats)?;
 
-    match profiling::collect_profile(runner, abi) {
-        Ok(_) => {}
-        Err(err) => {
-            eprintln!(
-                "{}: Cannot collect profiling result: {}",
-                "Error".red(),
-                err
-            );
-        }
-    };
+    if runner.config.snapshot.is_some() {
+        match profiling::collect_profile(runner, abi) {
+            Ok(_) => {}
+            Err(err) => {
+                eprintln!(
+                    "{}: Cannot collect profiling result: {}",
+                    "Error".red(),
+                    err
+                );
+            }
+        };
+    }
 
     let coverage = if runner.config.coverage {
         Some(collect_coverage(&runner.emulations, &runner.build_cache))

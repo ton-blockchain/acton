@@ -90,6 +90,13 @@ enum Commands {
         snapshot: Option<String>,
         #[arg(long, help = "Compare gas usage with baseline snapshot file")]
         baseline_snapshot: Option<String>,
+        #[arg(
+            long,
+            help = "Fork from network (testnet or mainnet) for remote account resolution"
+        )]
+        fork_net: Option<String>,
+        #[arg(long, help = "TonCenter API key for blockchain queries")]
+        api_key: Option<String>,
     },
     #[command(about = "Execute a Tolk script file")]
     Script {
@@ -305,6 +312,8 @@ fn main() {
             junit_merge,
             snapshot,
             baseline_snapshot,
+            fork_net,
+            api_key,
         } => {
             let mut report_formats = Vec::new();
 
@@ -337,6 +346,8 @@ fn main() {
                 junit_merge,
                 snapshot,
                 baseline_snapshot,
+                fork_net,
+                api_key,
             );
             let result = test_cmd(path, &config);
             if let Err(err) = result {
@@ -473,6 +484,8 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    fork_net: Option<String>,
+    api_key: Option<String>,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -502,6 +515,8 @@ fn create_test_config(
             junit_merge,
             snapshot,
             baseline_snapshot,
+            fork_net,
+            api_key,
         );
     }
 
@@ -520,5 +535,7 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
+        fork_net,
+        api_key,
     }
 }
