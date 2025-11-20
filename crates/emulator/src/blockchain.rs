@@ -43,8 +43,18 @@ impl Blockchain {
         &self.accounts
     }
 
-    pub fn is_deployed(&self, raw_addr: &String) -> bool {
-        self.accounts.contains_key(raw_addr)
+    pub fn check_deployed(&mut self, raw_addr: &String) -> bool {
+        let deployed = self.accounts.contains_key(raw_addr);
+        if !deployed && self.fork_net.is_some() {
+            // we need to populate address for the first time
+            let account = self.get_account(raw_addr);
+            return account
+                .account
+                .load()
+                .and_then(|acc| Ok(acc.0 != None))
+                .unwrap_or(false);
+        }
+        deployed
     }
 
     pub fn get_account(&mut self, raw_addr: &String) -> ShardAccount {

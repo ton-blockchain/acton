@@ -820,7 +820,7 @@ fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
         "Failed to decode address: {}"
     );
 
-    let is_deployed = ctx.chain.blockchain.is_deployed(&dst_addr_str);
+    let is_deployed = ctx.chain.blockchain.check_deployed(&dst_addr_str);
     stack.push_bool(is_deployed);
 }
 
@@ -832,7 +832,7 @@ fn get_deployed_code_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell
         "Failed to decode address: {}"
     );
 
-    let is_deployed = ctx.chain.blockchain.is_deployed(&dst_addr_str);
+    let is_deployed = ctx.chain.blockchain.check_deployed(&dst_addr_str);
     if !is_deployed {
         stack.push(TupleItem::Null);
         return;
