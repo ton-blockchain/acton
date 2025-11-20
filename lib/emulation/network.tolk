@@ -489,6 +489,17 @@ fun net.getAccountState(addr: address): AccountInfo? {
     return typed_cell.load()
 }
 
+/// Convert a slice with string representation of address to an address type.
+/// 
+/// Example:
+/// ```
+/// val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
+/// ```
+fun net.convertAddress(addr: slice): address {
+    val cell = ffi.convertAddress(addr);
+    return cell.beginParse() as address
+}
+
 /// Calculate the CRC16 checksum of a slice.
 /// 
 /// Example:
@@ -516,3 +527,4 @@ fun ffi.findTransactionByParams(txs: tuple, params: tuple): cell? asm "10 EXTCAL
 fun ffi.failToFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "103 EXTCALL"
 fun ffi.failToNotFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "104 EXTCALL"
 fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
+fun ffi.convertAddress(addr: slice): cell asm "19 EXTCALL"

@@ -17,6 +17,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::collections::HashMap;
 use std::path::Path;
+use std::str::FromStr;
 use std::time::Instant;
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
@@ -999,6 +1000,23 @@ fn register_lib_impl(ctx: &mut Context, _stack: &mut Tuple, lib: ArcCell) {
     ctx.chain.blockchain.register_lib(cell)
 }
 
+extension!(convert_address in (Context) with (address: String) using convert_address_impl);
+fn convert_address_impl(ctx: &mut Context, stack: &mut Tuple, address: String) {
+    let addr = try_ctx!(
+        ctx,
+        tonlib_core::TonAddress::from_str(address.as_str()),
+        "Failed to convert address from {address}: {}"
+    );
+
+    let cell = try_ctx!(
+        ctx,
+        addr.to_msg_address().to_cell(),
+        "Failed to convert address to cell: {}"
+    );
+
+    stack.push(TupleItem::Cell(cell.to_arc()))
+}
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         6 => build,
@@ -1014,5 +1032,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         16 => register_code,
         17 => account_state,
         18 => register_lib,
+        19 => convert_address,
     });
 }
