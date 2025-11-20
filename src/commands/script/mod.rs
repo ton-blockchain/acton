@@ -29,6 +29,8 @@ pub fn script_cmd(
     debug: bool,
     debug_port: u16,
     clear_cache: bool,
+    fork_net: Option<String>,
+    api_key: Option<String>,
 ) -> anyhow::Result<()> {
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -46,7 +48,7 @@ pub fn script_cmd(
     }
 
     let content = fs::read_to_string(path)?;
-    run_script_file(path, &content, debug, debug_port)
+    run_script_file(path, &content, debug, debug_port, fork_net, api_key)
 }
 
 /// A script is essentially a regular smart contract with a `main` function,
@@ -59,6 +61,8 @@ fn run_script_file(
     content: &str,
     debug: bool,
     debug_port: u16,
+    fork_net: Option<String>,
+    api_key: Option<String>,
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content, file_path);
 
@@ -75,6 +79,8 @@ fn run_script_file(
                 debug,
                 debug_port,
                 ExecutorVerbosity::FullLocationStackVerbose,
+                fork_net,
+                api_key,
             );
             print_script_result(script_result?);
             Ok(())
@@ -97,6 +103,8 @@ fn execute_script(
     debug: bool,
     debug_port: u16,
     verbosity: ExecutorVerbosity,
+    fork_net: Option<String>,
+    api_key: Option<String>,
 ) -> anyhow::Result<ScriptResult> {
     let dest_address = contract_address(code_cell)?;
 
@@ -117,7 +125,7 @@ fn execute_script(
     };
 
     let mut emulator = Emulator::new(verbosity);
-    let mut blockchain = Blockchain::new(None, None);
+    let mut blockchain = Blockchain::new(fork_net.clone(), api_key.clone());
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =
         FileBuildCache::new(None).expect("Failed to create file cache for script execution");

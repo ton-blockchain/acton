@@ -159,12 +159,39 @@ enum Commands {
     Script {
         #[arg(help = "Script file to execute")]
         path: String,
-        #[arg(long, help = "Enable debug mode")]
+
+        // Debugging
+        #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
         debug: bool,
-        #[arg(long, help = "Debug server port", default_value = "12345")]
+        #[arg(
+            long,
+            help = "Debug server port",
+            default_value = "12345",
+            help_heading = "Debugging"
+        )]
         debug_port: u16,
-        #[arg(long, help = "Clear compilation cache before running")]
+
+        // Cache
+        #[arg(
+            long,
+            help = "Clear compilation cache before running",
+            help_heading = "Cache"
+        )]
         clear_cache: bool,
+
+        // Remote
+        #[arg(
+            long,
+            help = "Fork from network (testnet or mainnet) for remote account resolution",
+            help_heading = "Remote"
+        )]
+        fork_net: Option<String>,
+        #[arg(
+            long,
+            help = "TonCenter API key for blockchain queries",
+            help_heading = "Remote"
+        )]
+        api_key: Option<String>,
     },
     #[command(
         about = "Build all contracts",
@@ -417,8 +444,10 @@ fn main() {
             debug,
             debug_port,
             clear_cache,
+            fork_net,
+            api_key,
         } => {
-            let result = script_cmd(&path, debug, debug_port, clear_cache);
+            let result = script_cmd(&path, debug, debug_port, clear_cache, fork_net, api_key);
             if let Err(err) = result {
                 eprintln!("{} {}", "Error:".red(), err);
                 process::exit(1)
