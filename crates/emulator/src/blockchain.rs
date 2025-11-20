@@ -94,8 +94,7 @@ impl Blockchain {
             .clone()
             .or_else(|| env::var("TONCENTER_API_KEY").ok());
 
-        let seqno = remote::get_last_block_seqno(network, api_key.clone())?;
-        let info = remote::get_account_info(seqno, address, network, api_key)?;
+        let info = remote::get_account_info(None, address, network, api_key)?;
 
         let balance = info
             .balance

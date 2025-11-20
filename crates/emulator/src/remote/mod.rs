@@ -30,16 +30,19 @@ pub fn get_last_block_seqno(network: &str, api_key: Option<String>) -> anyhow::R
 }
 
 pub fn get_account_info(
-    seqno: u64,
+    seqno: Option<u64>,
     address: &String,
     network: &str,
     api_key: Option<String>,
 ) -> anyhow::Result<TonCenterAccountInfoResult> {
     let base_url = toncenter_url(network)?;
     let url = format!(
-        "{}/api/v2/getAddressInformation?address={}&seqno={seqno}",
+        "{}/api/v2/getAddressInformation?address={}{}",
         base_url,
-        urlencoding::encode(address)
+        urlencoding::encode(address),
+        seqno
+            .map(|seqno| format!("&seqno={seqno}"))
+            .unwrap_or("".to_owned()),
     );
     let client = reqwest::blocking::Client::new();
     let mut request = client.get(url).header("User-Agent", "acton-cli");
