@@ -502,7 +502,7 @@ fun net.loadLibrary(hash: slice): cell? {
 /// Load library from the real blockchain by hash and register it in current blockchain.
 ///
 /// Returns false if library is not found.
-fun net.registerLibrary(hash: slice): bool {
+fun net.fetchAndRegisterLibrary(hash: slice): bool {
     val cell = net.loadLibrary(hash);
     if (cell == null) {
         return false
