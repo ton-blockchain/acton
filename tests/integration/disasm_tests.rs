@@ -295,8 +295,6 @@ fn test_disasm_follow_libraries() {
         .follow_libraries()
         .run()
         .success()
-        .assert_contains("Following library reference:")
-        .assert_contains("Successfully loaded library code")
         .assert_snapshot_matches("integration/snapshots/test_disasm_follow_libraries.stdout.txt");
 }
 

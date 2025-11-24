@@ -283,7 +283,7 @@ fn test_incremental_diamond_branch_change() {
 fn test_incremental_library_file_change() {
     let project = ProjectBuilder::new("incr-lib-change")
         .file(
-            "lib/utils",
+            "common/utils",
             r#"
             fun helper(): int {
                 return 42;
@@ -293,7 +293,7 @@ fn test_incremental_library_file_change() {
         .contract(
             "main",
             r#"
-            import "../lib/utils"
+            import "../common/utils"
             
             fun onInternalMessage(in: InMessage) {
                 val x = helper();
@@ -307,7 +307,7 @@ fn test_incremental_library_file_change() {
 
     // Modify library file
     fs::write(
-        project.path().join("lib/utils.tolk"),
+        project.path().join("common/utils.tolk"),
         r#"
             fun helper(): int {
                 return 43; // Changed
@@ -328,13 +328,13 @@ fn test_incremental_library_file_change() {
 fn test_incremental_nested_import_change() {
     let project = ProjectBuilder::new("incr-nested-import")
         .file(
-            "lib/base",
+            "common/base",
             r#"
             fun baseFunc(): int { return 1; }
         "#,
         )
         .file(
-            "lib/wrapper",
+            "common/wrapper",
             r#"
             import "./base"
             fun wrapperFunc(): int { return baseFunc(); }
@@ -343,7 +343,7 @@ fn test_incremental_nested_import_change() {
         .contract(
             "main",
             r#"
-            import "../lib/wrapper"
+            import "../common/wrapper"
             
             fun onInternalMessage(in: InMessage) {
                 val x = wrapperFunc();
@@ -355,9 +355,9 @@ fn test_incremental_nested_import_change() {
 
     project.acton().build().run().success();
 
-    // Modify base lib nested import
+    // Modify base common nested import
     fs::write(
-        project.path().join("lib/base.tolk"),
+        project.path().join("common/base.tolk"),
         r#"
             fun baseFunc(): int { return 2; } // Changed
         "#,

@@ -1,0 +1,6 @@
+[alias]
+lint = "clippy --all-targets --all-features -- -D warnings"
+test-cli = "test --test cli_test"
+
+# Since the Tolk compiler and emulator are not thread-safe, we will run the test in a single thread for now.
+test-debugger = "test --test debug_test -- --test-threads 1"

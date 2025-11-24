@@ -1,7 +1,7 @@
 use crate::commands::test::{ReportFormat, TestConfig};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -63,7 +63,7 @@ pub struct TestSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ContractsConfig {
     #[serde(flatten)]
-    pub contracts: HashMap<String, ContractConfig>,
+    pub contracts: BTreeMap<String, ContractConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,7 +161,7 @@ impl ActonConfig {
         Ok(())
     }
 
-    pub fn contracts(&self) -> Option<&HashMap<String, ContractConfig>> {
+    pub fn contracts(&self) -> Option<&BTreeMap<String, ContractConfig>> {
         self.contracts.as_ref().map(|c| &c.contracts)
     }
 

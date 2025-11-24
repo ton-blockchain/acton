@@ -78,7 +78,7 @@ pub(crate) fn build_dependency_graph(
 
 pub(crate) fn collect_dependencies_for_contract(
     target_contract: &str,
-    contracts: &HashMap<String, ContractConfig>,
+    contracts: &BTreeMap<String, ContractConfig>,
 ) -> anyhow::Result<HashSet<String>> {
     let mut dependencies = HashSet::new();
     let mut to_visit = VecDeque::new();
@@ -111,7 +111,7 @@ pub(crate) fn collect_dependencies_for_contract(
 pub(crate) fn filter_compilation_order_for_contract(
     target_contract: &str,
     compilation_order: &[String],
-    contracts: &HashMap<String, ContractConfig>,
+    contracts: &BTreeMap<String, ContractConfig>,
 ) -> anyhow::Result<Vec<String>> {
     let dependencies = collect_dependencies_for_contract(target_contract, contracts)?;
 
@@ -129,7 +129,7 @@ pub(crate) fn filter_compilation_order_for_contract(
 
 pub(crate) fn generate_dependency_graph_svg(
     compilation_order: &Vec<String>,
-    contracts: &HashMap<String, ContractConfig>,
+    contracts: &BTreeMap<String, ContractConfig>,
     output_path: &str,
 ) -> anyhow::Result<()> {
     let mut dot_content = String::new();

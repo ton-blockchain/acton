@@ -1,7 +1,7 @@
 use crate::config::{ActonConfig, ContractConfig, ContractsConfig};
 use include_dir::{Dir, include_dir};
 use owo_colors::OwoColorize;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use tree_sitter::Node;
 use walkdir::WalkDir;
@@ -57,8 +57,8 @@ pub fn init_cmd() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn discover_contracts() -> HashMap<String, ContractConfig> {
-    let mut contracts = HashMap::new();
+fn discover_contracts() -> BTreeMap<String, ContractConfig> {
+    let mut contracts = BTreeMap::new();
 
     for entry in WalkDir::new(".")
         .follow_links(false)

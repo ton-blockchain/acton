@@ -4,7 +4,7 @@ use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, T
 use emulator::emulator::SendMessageResult;
 use owo_colors::OwoColorize;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use tolkc::source_map::{EntryContextDescription, SourceMap};
@@ -19,8 +19,8 @@ pub struct FileCoverage {
     pub file: String,
     pub executable_lines: i64,
     pub covered_lines: i64,
-    pub line_hits: HashMap<i64, u64>, // line number -> hit count
-    pub executable_line_numbers: HashSet<i64>, // all executable line numbers
+    pub line_hits: BTreeMap<i64, u64>, // line number -> hit count
+    pub executable_line_numbers: BTreeSet<i64>, // all executable line numbers
 }
 
 pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Coverage {
@@ -31,7 +31,7 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
     });
 
     let mut seen_source_maps = HashSet::new();
-    let mut whole_executable_lines_per_file: HashMap<String, HashSet<i64>> = HashMap::new();
+    let mut whole_executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
 
     let mut whole_trace = vec![];
 
@@ -75,7 +75,7 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
 
     let mut coverages: Vec<FileCoverage> = vec![];
 
-    let mut line_hits_per_file: HashMap<String, HashMap<i64, u64>> = HashMap::new();
+    let mut line_hits_per_file: HashMap<String, BTreeMap<i64, u64>> = HashMap::new();
 
     for loc in &whole_trace {
         let file = &loc.loc.file;
@@ -115,10 +115,10 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
 }
 
 fn build_executable_lines_per_file(
-    whole_executable_lines_per_file: &mut HashMap<String, HashSet<i64>>,
+    whole_executable_lines_per_file: &mut HashMap<String, BTreeSet<i64>>,
     source_map: SourceMap,
 ) {
-    let mut executable_lines_per_file: HashMap<String, HashSet<i64>> = HashMap::new();
+    let mut executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
     let source_maps_locations = source_map.high_level.locations;
     let executable_locations = source_maps_locations;
     for loc in executable_locations {

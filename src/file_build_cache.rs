@@ -235,6 +235,7 @@ impl FileBuildCache {
                 "Skipping deps processing for `{}` in `get_dependencies`",
                 file_path.display()
             );
+            debug!("Using file dependencies: {file_deps:?}",);
             // fast path, no deps, no extra logic to find all dependencies of each dependency
             return Ok(file_deps);
         }
