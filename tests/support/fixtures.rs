@@ -181,16 +181,14 @@ impl FixtureProject {
             .into_iter()
             .filter_map(|e| e.ok())
         {
-            if entry.file_type().is_file() {
-                if let Some(ext) = entry.path().extension() {
-                    if ext == "tolk" || ext == "toml" {
-                        let content =
-                            fs::read_to_string(entry.path()).expect("Failed to read file");
-                        if content.contains(from) {
-                            let new_content = content.replace(from, to);
-                            fs::write(entry.path(), new_content).expect("Failed to write file");
-                        }
-                    }
+            if entry.file_type().is_file()
+                && let Some(ext) = entry.path().extension()
+                && (ext == "tolk" || ext == "toml")
+            {
+                let content = fs::read_to_string(entry.path()).expect("Failed to read file");
+                if content.contains(from) {
+                    let new_content = content.replace(from, to);
+                    fs::write(entry.path(), new_content).expect("Failed to write file");
                 }
             }
         }

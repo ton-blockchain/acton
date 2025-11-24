@@ -31,52 +31,52 @@ impl TeamCityReporter {
         let mut expected: Option<String> = None;
         let mut actual: Option<String> = None;
 
-        if let Some(exec) = &test.execution {
-            if let Some(ref assert_failure) = exec.assert_failure {
-                if let Some(location) = assert_failure.location() {
-                    details = location;
-                }
+        if let Some(exec) = &test.execution
+            && let Some(ref assert_failure) = exec.assert_failure
+        {
+            if let Some(location) = assert_failure.location() {
+                details = location;
+            }
 
-                match assert_failure {
-                    AssertFailure::Bin(bin_failure) => match bin_failure.operator.as_str() {
-                        "==" => {
-                            message = "Values are not equal".to_string();
-                            if let Some(formatter) = &self.formatter {
-                                expected = Some(formatter.format_tuple_value(
-                                    &bin_failure.right,
-                                    &bin_failure.right_type,
-                                    0,
-                                ));
-                                actual = Some(formatter.format_tuple_value(
-                                    &bin_failure.left,
-                                    &bin_failure.left_type,
-                                    0,
-                                ));
-                            }
+            match assert_failure {
+                AssertFailure::Bin(bin_failure) => match bin_failure.operator.as_str() {
+                    "==" => {
+                        message = "Values are not equal".to_string();
+                        if let Some(formatter) = &self.formatter {
+                            expected = Some(formatter.format_tuple_value(
+                                &bin_failure.right,
+                                &bin_failure.right_type,
+                                0,
+                            ));
+                            actual = Some(formatter.format_tuple_value(
+                                &bin_failure.left,
+                                &bin_failure.left_type,
+                                0,
+                            ));
                         }
-                        "!=" => {
-                            message = "Values are equal but expected to be different".to_string();
-                        }
-                        _ => {
-                            message = "Assertion failed".to_string();
-                        }
-                    },
-                    AssertFailure::Fail(_) => {
-                        message = "Test assertion failed".to_string();
                     }
-                    AssertFailure::TransactionNotFound(_) => {
-                        message = "Transaction not found".to_string();
+                    "!=" => {
+                        message = "Values are equal but expected to be different".to_string();
                     }
-                    AssertFailure::TransactionIsFound(_) => {
-                        message = "Unexpected transaction found".to_string();
+                    _ => {
+                        message = "Assertion failed".to_string();
                     }
+                },
+                AssertFailure::Fail(_) => {
+                    message = "Test assertion failed".to_string();
                 }
+                AssertFailure::TransactionNotFound(_) => {
+                    message = "Transaction not found".to_string();
+                }
+                AssertFailure::TransactionIsFound(_) => {
+                    message = "Unexpected transaction found".to_string();
+                }
+            }
 
-                if let Some(failure_message) = assert_failure.message() {
-                    if !failure_message.is_empty() {
-                        message = failure_message;
-                    }
-                }
+            if let Some(failure_message) = assert_failure.message()
+                && !failure_message.is_empty()
+            {
+                message = failure_message;
             }
         }
 

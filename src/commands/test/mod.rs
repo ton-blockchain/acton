@@ -470,10 +470,10 @@ pub fn find_test_files_recursively(
                 continue;
             }
 
-            if let Some(includes) = &includes {
-                if !includes.is_match(rel) {
-                    continue;
-                }
+            if let Some(includes) = &includes
+                && !includes.is_match(rel)
+            {
+                continue;
             }
 
             out.push(path.to_path_buf());
@@ -692,10 +692,10 @@ fn run_file_tests(
             .unwrap_or(0);
         let mut test_passed = exit_code == expected_exit_code;
 
-        if let Some(limit) = test.gas_limit {
-            if gas_used > limit {
-                test_passed = false;
-            }
+        if let Some(limit) = test.gas_limit
+            && gas_used > limit
+        {
+            test_passed = false;
         }
 
         if exit_code == 0 && assert_failure.is_some() {

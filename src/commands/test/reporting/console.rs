@@ -318,10 +318,10 @@ impl TestReporter for ConsoleReporter {
                             }
                         }
 
-                        if let Some(location) = &assert_failure.location() {
-                            if !location.is_empty() {
-                                println!("      {} at {}", "└─".dimmed(), location.dimmed());
-                            }
+                        if let Some(location) = &assert_failure.location()
+                            && !location.is_empty()
+                        {
+                            println!("      {} at {}", "└─".dimmed(), location.dimmed());
                         }
                     } else if exec.expected_exit_code != 0 {
                         println!(
@@ -449,20 +449,20 @@ impl TestReporter for ConsoleReporter {
             }
         }
 
-        if self.config.show_output {
-            if let Some(exec) = &test.execution {
-                if !exec.stdout.trim().is_empty() {
-                    println!("    {} Test output:", "└─".dimmed());
-                    for line in exec.stdout.trim().lines() {
-                        println!("       {line}");
-                    }
+        if self.config.show_output
+            && let Some(exec) = &test.execution
+        {
+            if !exec.stdout.trim().is_empty() {
+                println!("    {} Test output:", "└─".dimmed());
+                for line in exec.stdout.trim().lines() {
+                    println!("       {line}");
                 }
+            }
 
-                if !exec.stderr.trim().is_empty() {
-                    println!("    {} Test stderr:", "└─".dimmed());
-                    for line in exec.stderr.trim().lines() {
-                        println!("       {}", line.bright_red());
-                    }
+            if !exec.stderr.trim().is_empty() {
+                println!("    {} Test stderr:", "└─".dimmed());
+                for line in exec.stderr.trim().lines() {
+                    println!("       {}", line.bright_red());
                 }
             }
         }

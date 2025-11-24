@@ -66,10 +66,10 @@ pub fn compile_cmd(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
             );
 
-            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.2".to_string()) {
-                if !json {
-                    eprintln!("Warning: Failed to cache compilation result: {e}");
-                }
+            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.2".to_string())
+                && !json
+            {
+                eprintln!("Warning: Failed to cache compilation result: {e}");
             }
 
             if let Some(source_map_path) = &source_map {

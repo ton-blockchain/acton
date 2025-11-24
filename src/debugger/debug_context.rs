@@ -247,10 +247,10 @@ impl Stepper {
                 }
             }
             StepKind::SyntheticAfterFunctionCall(func_name) => {
-                if let Some(last) = self.callstack.last() {
-                    if last.function_name == *func_name {
-                        self.callstack.pop();
-                    }
+                if let Some(last) = self.callstack.last()
+                    && last.function_name == *func_name
+                {
+                    self.callstack.pop();
                 }
             }
             StepKind::SyntheticEnterInlined(func_name) => {
@@ -262,10 +262,10 @@ impl Stepper {
                 }
             }
             StepKind::SyntheticLeaveInlined(func_name) => {
-                if let Some(last) = self.callstack.last() {
-                    if last.function_name == *func_name {
-                        self.callstack.pop();
-                    }
+                if let Some(last) = self.callstack.last()
+                    && last.function_name == *func_name
+                {
+                    self.callstack.pop();
                 }
             }
             _ => {}

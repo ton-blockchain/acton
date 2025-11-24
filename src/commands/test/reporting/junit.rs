@@ -185,10 +185,10 @@ impl TestReporter for JUnitReporter {
                 suite.stats = stats.clone();
             }
 
-            if !self.config.merge_suites {
-                if let Some(suite) = self.suites.get(suite_name) {
-                    self.write_suite_file(suite)?;
-                }
+            if !self.config.merge_suites
+                && let Some(suite) = self.suites.get(suite_name)
+            {
+                self.write_suite_file(suite)?;
             }
         }
         self.current_suite = None;
@@ -196,10 +196,10 @@ impl TestReporter for JUnitReporter {
     }
 
     fn on_test_finished(&mut self, test: &TestReport) -> anyhow::Result<()> {
-        if let Some(ref suite_name) = self.current_suite {
-            if let Some(suite) = self.suites.get_mut(suite_name) {
-                suite.tests.push(test.clone());
-            }
+        if let Some(ref suite_name) = self.current_suite
+            && let Some(suite) = self.suites.get_mut(suite_name)
+        {
+            suite.tests.push(test.clone());
         }
         Ok(())
     }

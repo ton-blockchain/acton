@@ -73,12 +73,12 @@ fn find_expect_calls(
 fn has_entry_function(root_node: &Node, content: &str) -> bool {
     let mut cursor = root_node.walk();
     for child in root_node.children(&mut cursor) {
-        if child.kind() == "function_declaration" {
-            if let Some(name_node) = child.child_by_field_name("name") {
-                let name = name_node.utf8_text(content.as_bytes()).unwrap_or("");
-                if name == "main" || name == "onInternalMessage" {
-                    return true;
-                }
+        if child.kind() == "function_declaration"
+            && let Some(name_node) = child.child_by_field_name("name")
+        {
+            let name = name_node.utf8_text(content.as_bytes()).unwrap_or("");
+            if name == "main" || name == "onInternalMessage" {
+                return true;
             }
         }
     }

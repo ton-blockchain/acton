@@ -144,10 +144,10 @@ impl FileBuildCache {
 
         if let Ok(dependencies) = self.get_dependencies(file_path) {
             debug!("Check hash `{file_path}` with dependencies: {dependencies:?}");
-            if let Ok(current_hash) = self.compute_dependencies_hash(&dependencies) {
-                if current_hash == entry.dependencies_hash {
-                    return Some(entry.clone());
-                }
+            if let Ok(current_hash) = self.compute_dependencies_hash(&dependencies)
+                && current_hash == entry.dependencies_hash
+            {
+                return Some(entry.clone());
             }
         }
 

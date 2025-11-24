@@ -572,14 +572,13 @@ fn find_transaction_by_params_impl(
     };
 
     let found = parsed_txs.iter().filter(|tx| {
-        if let Some(expected_deploy) = params.deploy {
-            if expected_deploy
-                && (tx.orig_status != AccountStatus::NotExists
-                    || tx.end_status != AccountStatus::Active)
-            {
-                // We expect to deploy contract but we don't
-                return false;
-            }
+        if let Some(expected_deploy) = params.deploy
+            && expected_deploy
+            && (tx.orig_status != AccountStatus::NotExists
+                || tx.end_status != AccountStatus::Active)
+        {
+            // We expect to deploy contract but we don't
+            return false;
         }
 
         let in_msg = tx.load_in_msg();
@@ -610,25 +609,25 @@ fn find_transaction_by_params_impl(
                 }
             }
 
-            if let Some(expected_bounced) = &params.bounced {
-                if *expected_bounced != info.bounced {
-                    // Bounced value mismatch
-                    return false;
-                }
+            if let Some(expected_bounced) = &params.bounced
+                && *expected_bounced != info.bounced
+            {
+                // Bounced value mismatch
+                return false;
             }
 
-            if let Some(expected_from_addr) = &params.from {
-                if (*expected_from_addr).to_string() != info.src.to_string() {
-                    // Source address mismatch
-                    return false;
-                }
+            if let Some(expected_from_addr) = &params.from
+                && (*expected_from_addr).to_string() != info.src.to_string()
+            {
+                // Source address mismatch
+                return false;
             }
 
-            if let Some(expected_to_addr) = &params.to {
-                if (*expected_to_addr).to_string() != info.dst.to_string() {
-                    // Destination address mismatch
-                    return false;
-                }
+            if let Some(expected_to_addr) = &params.to
+                && (*expected_to_addr).to_string() != info.dst.to_string()
+            {
+                // Destination address mismatch
+                return false;
             }
         };
 
@@ -656,13 +655,12 @@ fn find_transaction_by_params_impl(
             }
         }
 
-        if let ComputePhase::Executed(compute) = info.compute_phase {
-            if let Some(expected_exit_code) = params.exit_code {
-                if compute.exit_code != expected_exit_code as i32 {
-                    // Exit code mismatch
-                    return false;
-                }
-            }
+        if let ComputePhase::Executed(compute) = info.compute_phase
+            && let Some(expected_exit_code) = params.exit_code
+            && compute.exit_code != expected_exit_code as i32
+        {
+            // Exit code mismatch
+            return false;
         }
 
         true

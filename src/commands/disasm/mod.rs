@@ -52,16 +52,16 @@ pub fn disasm_cmd(
         let code = disassembler.decompile_cell(&final_cell)?;
         let instructions = code.instructions;
 
-        if instructions.len() == 1 {
-            if let Some(lib_hash) = extract_library_hash_from_instruction(&instructions[0]) {
-                match remote::get_library_by_hash(&net, &lib_hash.to_string(), api_key.clone()) {
-                    Ok(lib_cell) => {
-                        final_cell = lib_cell;
-                    }
-                    Err(err) => {
-                        eprintln!("Warning: Failed to load library {lib_hash}: {err}");
-                        eprintln!("Showing original code instead");
-                    }
+        if instructions.len() == 1
+            && let Some(lib_hash) = extract_library_hash_from_instruction(&instructions[0])
+        {
+            match remote::get_library_by_hash(&net, &lib_hash.to_string(), api_key.clone()) {
+                Ok(lib_cell) => {
+                    final_cell = lib_cell;
+                }
+                Err(err) => {
+                    eprintln!("Warning: Failed to load library {lib_hash}: {err}");
+                    eprintln!("Showing original code instead");
                 }
             }
         }

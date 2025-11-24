@@ -45,10 +45,10 @@ pub fn build_cmd(
     let failure_count = 0;
     let total_start = Instant::now();
 
-    if let Some(filter) = &contract_filter {
-        if !contracts.iter().any(|(key, _)| key == filter) {
-            return Err(anyhow!("Contract '{filter}' not found in Acton.toml"));
-        }
+    if let Some(filter) = &contract_filter
+        && !contracts.iter().any(|(key, _)| key == filter)
+    {
+        return Err(anyhow!("Contract '{filter}' not found in Acton.toml"));
     }
 
     let flatten_contracts = contracts.iter().collect::<Vec<_>>();

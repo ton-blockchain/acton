@@ -138,17 +138,17 @@ fn parse_annotation_object(content: &String, object_node: Node) -> TestAnnotatio
             if let Some(value_node) = field.child_by_field_name("value") {
                 match field_name {
                     "fail_with" => {
-                        if let Some(number) = parse_number_literal(content, value_node) {
-                            if let Ok(code) = number.parse::<i32>() {
-                                expected_exit_code = Some(code);
-                            }
+                        if let Some(number) = parse_number_literal(content, value_node)
+                            && let Ok(code) = number.parse::<i32>()
+                        {
+                            expected_exit_code = Some(code);
                         }
                     }
                     "gas_limit" => {
-                        if let Some(number) = parse_number_literal(content, value_node) {
-                            if let Ok(limit) = number.parse::<u64>() {
-                                gas_limit = Some(limit);
-                            }
+                        if let Some(number) = parse_number_literal(content, value_node)
+                            && let Ok(limit) = number.parse::<u64>()
+                        {
+                            gas_limit = Some(limit);
                         }
                     }
                     _ => {}
