@@ -51,6 +51,7 @@ fn test_coverage_basic_output() {
     project
         .acton()
         .test()
+        .with_coverage()
         .with_coverage_format("text")
         .run()
         .success()
@@ -105,6 +106,7 @@ fn test_coverage_multiple_tests() {
     project
         .acton()
         .test()
+        .with_coverage()
         .with_coverage_format("text")
         .run()
         .success()
@@ -155,6 +157,7 @@ fn test_coverage_with_failing_tests() {
     project
         .acton()
         .test()
+        .with_coverage()
         .with_coverage_format("text")
         .run()
         .failure()
@@ -209,6 +212,7 @@ fn test_coverage_with_filter() {
     project
         .acton()
         .test()
+        .with_coverage()
         .with_coverage_format("text")
         .run()
         .success()
@@ -225,6 +229,7 @@ fn test_coverage_with_filter() {
         .acton()
         .test()
         .filter("test-unit-.*")
+        .with_coverage()
         .with_coverage_format("text")
         .run()
         .success()
@@ -276,6 +281,7 @@ fn test_coverage_lcov_snapshot() {
     let output = project
         .acton()
         .test()
+        .with_coverage()
         .with_coverage_format("lcov")
         .run()
         .success();
@@ -350,6 +356,7 @@ fn test_coverage_text_custom_filename() {
     let output = project
         .acton()
         .test()
+        .with_coverage()
         .with_coverage_format("text")
         .with_coverage_file("my-custom-coverage.txt")
         .run()

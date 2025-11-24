@@ -767,7 +767,7 @@ impl ActonCommand {
 
     /// Enable coverage with specific format (e.g., "lcov")
     pub fn with_coverage_format(mut self, format: &str) -> Self {
-        self.cmd = self.cmd.arg("--coverage").arg("--format").arg(format);
+        self.cmd = self.cmd.arg("--coverage-format").arg(format);
         self
     }
 
