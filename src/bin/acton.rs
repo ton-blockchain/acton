@@ -293,7 +293,7 @@ fn example_test_usage() -> StyledStr {
         ),
         (
             "Enable coverage collection",
-            "acton test . --coverage --format lcov",
+            "acton test . --coverage --coverage-format lcov",
         ),
         (
             "Run with teamcity service messages",
