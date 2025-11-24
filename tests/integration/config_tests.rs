@@ -37,6 +37,7 @@ fn test_filter_via_config() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -85,6 +86,7 @@ fn test_coverage_via_config() {
             backtrace: None,
             coverage: Some(true),
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -122,6 +124,7 @@ fn test_backtrace_via_config() {
             backtrace: Some("full".to_string()),
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -179,6 +182,7 @@ fn test_filter_and_coverage_via_config() {
             backtrace: None,
             coverage: Some(true),
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -229,6 +233,7 @@ fn test_cli_overrides_config_filter() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -281,6 +286,7 @@ fn test_config_with_specific_path() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -322,6 +328,7 @@ fn test_empty_config() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -367,6 +374,7 @@ fn test_exclude_patterns_via_config() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -414,6 +422,7 @@ fn test_include_patterns_via_config() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -463,6 +472,7 @@ fn test_reporters_via_config() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: None,
             junit_merge: None,
         })
@@ -498,6 +508,7 @@ fn test_junit_config_via_config() {
             backtrace: None,
             coverage: None,
             coverage_format: None,
+            coverage_file: None,
             junit_path: Some("custom-reports".to_owned()),
             junit_merge: Some(true),
         })

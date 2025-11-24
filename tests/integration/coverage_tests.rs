@@ -1,6 +1,6 @@
 use crate::common::assertion;
 use crate::support::snapshots::normalize_output;
-use crate::support::{ProjectBuilder, TestOutputExt};
+use crate::support::{ProjectBuilder, TestConfig, TestOutputExt};
 use std::fs;
 
 const SIMPLE_CONTRACT: &str = r#"
@@ -271,9 +271,7 @@ fn test_coverage_lcov_snapshot() {
         )
         .build();
 
-    // Clean up any existing lcov.info
     let lcov_path = project.path().join("lcov.info");
-    let _ = fs::remove_file(&lcov_path);
 
     let output = project
         .acton()
@@ -314,4 +312,126 @@ fn test_coverage_empty_no_tests() {
         .run()
         .success()
         .assert_passed(0);
+}
+
+#[test]
+fn test_coverage_text_custom_filename() {
+    let project = ProjectBuilder::new("coverage-text-custom")
+        .contract("simple", SIMPLE_CONTRACT)
+        .file(
+            "code/logic",
+            r#"
+            fun and(a: bool, b: bool): bool {
+                return a && b;
+            }
+
+            fun or(a: bool, b: bool): bool {
+                return a || b;
+            }
+        "#,
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../code/logic"
+
+            get fun `test-custom-filename`() {
+                val result1 = and(true, true);
+                expect(result1).toEqual(true);
+
+                val result2 = or(false, true);
+                expect(result2).toEqual(true);
+            }
+        "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_coverage_format("text")
+        .with_coverage_file("my-custom-coverage.txt")
+        .run()
+        .success();
+
+    output
+        .assert_passed(1)
+        .assert_contains("Text coverage file saved in my-custom-coverage.txt")
+        .assert_file_exists("my-custom-coverage.txt")
+        .assert_file_snapshot_matches(
+            "my-custom-coverage.txt",
+            "integration/snapshots/test_coverage_text_custom_filename.txt",
+        );
+
+    let default_path = project.path().join("coverage.txt");
+    assert!(
+        !default_path.exists(),
+        "Default coverage.txt should not exist when custom filename is specified"
+    );
+}
+
+#[test]
+fn test_coverage_text_custom_filename_from_config() {
+    let project = ProjectBuilder::new("coverage-text-custom")
+        .contract("simple", SIMPLE_CONTRACT)
+        .file(
+            "code/logic",
+            r#"
+            fun and(a: bool, b: bool): bool {
+                return a && b;
+            }
+
+            fun or(a: bool, b: bool): bool {
+                return a || b;
+            }
+        "#,
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../code/logic"
+
+            get fun `test-custom-filename`() {
+                val result1 = and(true, true);
+                expect(result1).toEqual(true);
+
+                val result2 = or(false, true);
+                expect(result2).toEqual(true);
+            }
+        "#,
+        )
+        .with_test_config(TestConfig {
+            filter: None,
+            exclude_patterns: None,
+            include_patterns: None,
+            reporters: None,
+            debug: None,
+            debug_port: None,
+            backtrace: None,
+            coverage: Some(true),
+            coverage_format: Some("text".to_owned()),
+            coverage_file: Some("my-custom-coverage.txt".to_owned()),
+            junit_path: None,
+            junit_merge: None,
+        })
+        .build();
+
+    let output = project.acton().test().run().success();
+
+    output
+        .assert_passed(1)
+        .assert_contains("Text coverage file saved in my-custom-coverage.txt")
+        .assert_file_exists("my-custom-coverage.txt")
+        .assert_file_snapshot_matches(
+            "my-custom-coverage.txt",
+            "integration/snapshots/test_coverage_text_custom_filename.txt",
+        );
+
+    let default_path = project.path().join("coverage.txt");
+    assert!(
+        !default_path.exists(),
+        "Default coverage.txt should not exist when custom filename is specified"
+    );
 }

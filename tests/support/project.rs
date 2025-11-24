@@ -48,6 +48,7 @@ pub struct TestConfig {
     pub backtrace: Option<String>,
     pub coverage: Option<bool>,
     pub coverage_format: Option<String>,
+    pub coverage_file: Option<String>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
 }
@@ -482,6 +483,10 @@ version = "0.1.0"
                 toml_content.push_str(&format!("coverage-format = \"{coverage_format}\"\n"));
             }
 
+            if let Some(coverage_file) = &config.coverage_file {
+                toml_content.push_str(&format!("coverage-file = \"{coverage_file}\"\n"));
+            }
+
             if let Some(junit_path) = &config.junit_path {
                 toml_content.push_str(&format!("junit-path = \"{junit_path}\"\n"));
             }
@@ -763,6 +768,12 @@ impl ActonCommand {
     /// Enable coverage with specific format (e.g., "lcov")
     pub fn with_coverage_format(mut self, format: &str) -> Self {
         self.cmd = self.cmd.arg("--coverage").arg("--format").arg(format);
+        self
+    }
+
+    /// Enable coverage with custom output file
+    pub fn with_coverage_file(mut self, file: &str) -> Self {
+        self.cmd = self.cmd.arg("--coverage-file").arg(file);
         self
     }
 

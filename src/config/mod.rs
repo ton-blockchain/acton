@@ -52,6 +52,7 @@ pub struct TestSettings {
     pub backtrace: Option<String>,
     pub coverage: Option<bool>,
     pub coverage_format: Option<String>,
+    pub coverage_file: Option<String>,
     pub exclude: Option<Vec<String>>,
     pub include: Option<Vec<String>>,
     pub junit_path: Option<String>,
@@ -181,6 +182,7 @@ impl TestSettings {
         backtrace_override: Option<String>,
         coverage_override: Option<bool>,
         coverage_format_override: Option<String>,
+        coverage_file_override: Option<String>,
         exclude_override: Option<Vec<String>>,
         include_override: Option<Vec<String>>,
         clear_cache_override: Option<bool>,
@@ -218,6 +220,7 @@ impl TestSettings {
             backtrace: backtrace_override.or_else(|| self.backtrace.clone()),
             coverage: coverage_override.unwrap_or_else(|| self.coverage.unwrap_or(false)),
             coverage_format: coverage_format_override.or_else(|| self.coverage_format.clone()),
+            coverage_file: coverage_file_override.or_else(|| self.coverage_file.clone()),
             exclude_patterns: exclude_override
                 .unwrap_or_else(|| self.exclude.clone().unwrap_or_default()),
             include_patterns: include_override

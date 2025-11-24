@@ -96,6 +96,12 @@ enum Commands {
             help_heading = "Coverage"
         )]
         format: Option<String>,
+        #[arg(
+            long,
+            help = "Output coverage profile to specified file (default: lcov.info for lcov, coverage.txt for text)",
+            help_heading = "Coverage"
+        )]
+        coverage_file: Option<String>,
 
         // Profiling
         #[arg(
@@ -400,6 +406,7 @@ fn main() {
             backtrace,
             coverage,
             format,
+            coverage_file,
             exclude,
             include,
             clear_cache,
@@ -433,6 +440,7 @@ fn main() {
                 backtrace,
                 coverage,
                 format,
+                coverage_file,
                 exclude,
                 include,
                 clear_cache,
@@ -577,6 +585,7 @@ fn create_test_config(
     backtrace: Option<String>,
     coverage: bool,
     format: Option<String>,
+    coverage_file: Option<String>,
     exclude: Vec<String>,
     include: Vec<String>,
     clear_cache: bool,
@@ -601,6 +610,7 @@ fn create_test_config(
             backtrace,
             if coverage { Some(true) } else { None },
             format,
+            coverage_file,
             if !exclude.is_empty() {
                 Some(exclude)
             } else {
@@ -628,6 +638,7 @@ fn create_test_config(
         coverage,
         filter,
         coverage_format: format,
+        coverage_file,
         exclude_patterns: exclude,
         include_patterns: include,
         clear_cache,

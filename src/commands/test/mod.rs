@@ -71,6 +71,7 @@ pub struct TestConfig {
     pub coverage: bool,
     pub filter: Option<String>,
     pub coverage_format: Option<String>,
+    pub coverage_file: Option<String>,
     pub exclude_patterns: Vec<String>,
     pub include_patterns: Vec<String>,
     pub clear_cache: bool,
@@ -377,7 +378,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
             println!();
             match format_type.as_str() {
                 "lcov" => {
-                    let lcov_path = "lcov.info";
+                    let lcov_path = config.coverage_file.as_deref().unwrap_or("lcov.info");
                     if let Err(err) = generate_lcov_file(&merged_coverage, lcov_path) {
                         eprintln!("Warning: Failed to generate LCOV file '{lcov_path}': {err}");
                     } else {
@@ -385,7 +386,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                     }
                 }
                 "text" => {
-                    let text_path = "coverage.txt";
+                    let text_path = config.coverage_file.as_deref().unwrap_or("coverage.txt");
                     if let Err(err) = generate_text_file(&merged_coverage, text_path) {
                         eprintln!(
                             "Warning: Failed to generate text coverage file '{text_path}': {err}"

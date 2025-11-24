@@ -1,0 +1,16 @@
+Coverage Summary:
+Lines: 2/2 (100.00%)
+Total Hits: 14
+
+File: [ROOT]/code/logic.tolk
+Annotated Code:
+1   |                                                        |
+2   |             fun and(a: bool, b: bool): bool {          |
+3 ✓ |                 return a && b;                         | hits:6
+4   |             }                                          |
+5   |                                                        |
+6   |             fun or(a: bool, b: bool): bool {           |
+7 ✓ |                 return a || b;                         | hits:6
+8   |             }                                          |
+9   |                                                        |
+

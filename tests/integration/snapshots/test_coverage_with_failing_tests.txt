@@ -2,7 +2,7 @@ Coverage Summary:
 Lines: 2/3 (66.67%)
 Total Hits: 14
 
-File: /private/var/folders/z4/7mh2czxx4ng1pqxtsdj423bm0000gn/T/.tmpJWlwEB/coverage-with-failures/code/validator.tolk
+File: [ROOT]/code/validator.tolk
 Annotated Code:
 1   |                                                       |
 2   |             fun validate(value: int): bool {          |
