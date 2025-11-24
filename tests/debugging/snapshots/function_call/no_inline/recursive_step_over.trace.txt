@@ -1,0 +1,31 @@
+Step 1 (before):
+  Code:
+     10| }
+     11| 
+     12| fun main() {
+     13|     foo = 5;
+             ^
+     14|     val res = fib(foo);
+     15|     return res + foo;
+     16| }
+
+Step 2 (step_over):
+  Code:
+     11| 
+     12| fun main() {
+     13|     foo = 5;
+     14|     val res = fib(foo);
+                 ^
+     15|     return res + foo;
+     16| }
+
+Step 3 (step_over):
+  Code:
+     12| fun main() {
+     13|     foo = 5;
+     14|     val res = fib(foo);
+     15|     return res + foo;
+                    ^
+     16| }
+  Variables:
+    '6 = 10
