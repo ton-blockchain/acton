@@ -27,7 +27,7 @@ fun main() {
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_steps(5);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_simple_step_by_step_execution.trace.txt",
+        "debugging/snapshots/test_simple_step_by_step_execution.trace.txt",
     );
 
     Ok(())
@@ -58,7 +58,7 @@ fun main() {
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_steps(3);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_simple_step_by_step_execution_with_step_over.trace.txt",
+        "debugging/snapshots/test_simple_step_by_step_execution_with_step_over.trace.txt",
     );
 
     Ok(())
@@ -125,7 +125,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_match_over_numbers_with_first_matching.trace.txt",
+        "debugging/snapshots/test_match_over_numbers_with_first_matching.trace.txt",
     );
 
     Ok(())
@@ -167,7 +167,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_match_over_numbers_with_second_matching.trace.txt",
+        "debugging/snapshots/test_match_over_numbers_with_second_matching.trace.txt",
     );
 
     Ok(())
@@ -213,7 +213,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_match_over_numbers_with_else_matching.trace.txt",
+        "debugging/snapshots/test_match_over_numbers_with_else_matching.trace.txt",
     );
 
     Ok(())
@@ -246,7 +246,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_if_over_numbers_with_first_matching.trace.txt",
+        "debugging/snapshots/test_if_over_numbers_with_first_matching.trace.txt",
     );
 
     Ok(())
@@ -283,7 +283,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_if_over_numbers_with_second_matching.trace.txt",
+        "debugging/snapshots/test_if_over_numbers_with_second_matching.trace.txt",
     );
 
     Ok(())
@@ -323,7 +323,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_if_over_numbers_with_else_matching.trace.txt",
+        "debugging/snapshots/test_if_over_numbers_with_else_matching.trace.txt",
     );
 
     Ok(())
@@ -361,7 +361,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_inline_function_call_step_in.trace.txt",
+        "debugging/snapshots/test_inline_function_call_step_in.trace.txt",
     );
 
     Ok(())
@@ -395,7 +395,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_inline_function_call_step_over.trace.txt",
+        "debugging/snapshots/test_inline_function_call_step_over.trace.txt",
     );
 
     Ok(())
@@ -433,7 +433,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_inline_function_call_step_out.trace.txt",
+        "debugging/snapshots/test_inline_function_call_step_out.trace.txt",
     );
 
     Ok(())
@@ -474,7 +474,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_ref_inline_function_call_step_in.trace.txt",
+        "debugging/snapshots/test_ref_inline_function_call_step_in.trace.txt",
     );
 
     Ok(())
@@ -509,7 +509,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_ref_inline_function_call_step_over.trace.txt",
+        "debugging/snapshots/test_ref_inline_function_call_step_over.trace.txt",
     );
 
     Ok(())
@@ -548,7 +548,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_ref_inline_function_call_step_out.trace.txt",
+        "debugging/snapshots/test_ref_inline_function_call_step_out.trace.txt",
     );
 
     Ok(())
@@ -589,7 +589,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_noinline_function_call_step_in.trace.txt",
+        "debugging/snapshots/test_noinline_function_call_step_in.trace.txt",
     );
 
     Ok(())
@@ -624,7 +624,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_noinline_function_call_step_over.trace.txt",
+        "debugging/snapshots/test_noinline_function_call_step_over.trace.txt",
     );
 
     Ok(())
@@ -663,7 +663,7 @@ fun main() {
 
     let debug_output = DebugTestOutput::new(result);
     debug_output.assert_trace_snapshot_matches(
-        "integration/snapshots/debug/test_noinline_function_call_step_out.trace.txt",
+        "debugging/snapshots/test_noinline_function_call_step_out.trace.txt",
     );
 
     Ok(())
