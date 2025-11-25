@@ -1,4 +1,5 @@
 Step 1 (before):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:8
   Code:
       1| 
       2| fun main() {
@@ -9,6 +10,7 @@ Step 1 (before):
       6|     }
 
 Step 2 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:8
   Code:
       1| 
       2| fun main() {
@@ -19,6 +21,7 @@ Step 2 (step_in):
       6|     }
 
 Step 3 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:8
   Code:
       1| 
       2| fun main() {
@@ -29,6 +32,7 @@ Step 3 (step_in):
       6|     }
 
 Step 4 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:16
   Code:
       1| 
       2| fun main() {
@@ -42,6 +46,7 @@ Step 4 (step_in):
     a = 0
 
 Step 5 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:16
   Code:
       1| 
       2| fun main() {
@@ -55,6 +60,7 @@ Step 5 (step_in):
     a = 0
 
 Step 6 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
@@ -68,12 +74,13 @@ Step 6 (step_in):
     a = 0
 
 Step 7 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
       4|     repeat(2) {
       5|         a += 1;
-                 ^
+                 ^^^^^^
       6|     }
       7|     return a + 1;
       8| }
@@ -81,6 +88,7 @@ Step 7 (step_in):
     a = 0
 
 Step 8 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
@@ -94,12 +102,13 @@ Step 8 (step_in):
     a = 0
 
 Step 9 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
       4|     repeat(2) {
       5|         a += 1;
-                 ^
+                 ^^^^^^
       6|     }
       7|     return a + 1;
       8| }
@@ -107,6 +116,7 @@ Step 9 (step_in):
     a = 0
 
 Step 10 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
@@ -120,12 +130,13 @@ Step 10 (step_in):
     a = 1
 
 Step 11 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
       4|     repeat(2) {
       5|         a += 1;
-                 ^
+                 ^^^^^^
       6|     }
       7|     return a + 1;
       8| }
@@ -133,6 +144,7 @@ Step 11 (step_in):
     a = 1
 
 Step 12 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
@@ -146,12 +158,13 @@ Step 12 (step_in):
     a = 1
 
 Step 13 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:32
   Code:
       2| fun main() {
       3|     var a = 0;
       4|     repeat(2) {
       5|         a += 1;
-                 ^
+                 ^^^^^^
       6|     }
       7|     return a + 1;
       8| }
@@ -159,6 +172,7 @@ Step 13 (step_in):
     a = 1
 
 Step 14 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:48
   Code:
       4|     repeat(2) {
       5|         a += 1;
@@ -170,34 +184,37 @@ Step 14 (step_in):
     a = 2
 
 Step 15 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:48
   Code:
       4|     repeat(2) {
       5|         a += 1;
       6|     }
       7|     return a + 1;
-                    ^
+                    ^^^^^
       8| }
   Variables:
     a = 2
 
 Step 16 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:56
   Code:
       4|     repeat(2) {
       5|         a += 1;
       6|     }
       7|     return a + 1;
-                    ^
+                    ^^^^^
       8| }
   Variables:
     '6 = 3
 
 Step 17 (step_in):
+  Bytecode position: B5D7175AA997394FE0292F4C494C78AB77917CB1609EAF163A5AE3DC4B04A660:56
   Code:
       4|     repeat(2) {
       5|         a += 1;
       6|     }
       7|     return a + 1;
-             ^
+             ^^^^^^^^^^^^
       8| }
   Variables:
     '6 = 3

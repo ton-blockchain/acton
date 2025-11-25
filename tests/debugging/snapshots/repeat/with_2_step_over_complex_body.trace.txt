@@ -1,4 +1,5 @@
 Step 1 (before):
+  Bytecode position: D14DAEA46F9B829FEC8F71853E93D22992C9AE923946CD0ECD94922724A016A2:8
   Code:
       1| 
       2| fun main() {
@@ -9,6 +10,7 @@ Step 1 (before):
       6|             a += 10;
 
 Step 2 (step_over):
+  Bytecode position: D14DAEA46F9B829FEC8F71853E93D22992C9AE923946CD0ECD94922724A016A2:16
   Code:
       1| 
       2| fun main() {
@@ -22,6 +24,7 @@ Step 2 (step_over):
     a = 0
 
 Step 3 (step_over):
+  Bytecode position: D14DAEA46F9B829FEC8F71853E93D22992C9AE923946CD0ECD94922724A016A2:32
   Code:
       2| fun main() {
       3|     var a = 0;
@@ -35,6 +38,7 @@ Step 3 (step_over):
     a = 0
 
 Step 4 (step_over):
+  Bytecode position: D14DAEA46F9B829FEC8F71853E93D22992C9AE923946CD0ECD94922724A016A2:64
   Code:
       3|     var a = 0;
       4|     repeat(2) {
@@ -48,12 +52,13 @@ Step 4 (step_over):
     a = 0
 
 Step 5 (step_in):
+  Bytecode position: D14DAEA46F9B829FEC8F71853E93D22992C9AE923946CD0ECD94922724A016A2:64
   Code:
       3|     var a = 0;
       4|     repeat(2) {
       5|         if (a == 0) {
       6|             a += 10;
-                     ^
+                     ^^^^^^^
       7|         } else {
       8|             a += 20;
       9|         }
@@ -61,12 +66,13 @@ Step 5 (step_in):
     a = 0
 
 Step 6 (step_in):
+  Bytecode position: D14DAEA46F9B829FEC8F71853E93D22992C9AE923946CD0ECD94922724A016A2:64
   Code:
       3|     var a = 0;
       4|     repeat(2) {
       5|         if (a == 0) {
       6|             a += 10;
-                          ^
+                          ^^
       7|         } else {
       8|             a += 20;
       9|         }
@@ -74,12 +80,13 @@ Step 6 (step_in):
     a = 0
 
 Step 7 (step_in):
+  Bytecode position: D14DAEA46F9B829FEC8F71853E93D22992C9AE923946CD0ECD94922724A016A2:64
   Code:
       3|     var a = 0;
       4|     repeat(2) {
       5|         if (a == 0) {
       6|             a += 10;
-                     ^
+                     ^^^^^^^
       7|         } else {
       8|             a += 20;
       9|         }

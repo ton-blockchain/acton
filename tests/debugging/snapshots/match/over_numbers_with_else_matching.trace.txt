@@ -1,15 +1,17 @@
 Step 1 (before):
+  Bytecode position: 783CE5E8FCCFCE19B355BA4714717D03945A14621BB047B0D23D86AC118C460B:8
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 300;
-             ^
+             ^^^
       6|     match (foo) {
       7|         100 => {
       8|             return 10
 
 Step 2 (step_over):
+  Bytecode position: 783CE5E8FCCFCE19B355BA4714717D03945A14621BB047B0D23D86AC118C460B:48
   Code:
       3| 
       4| fun main() {
@@ -21,12 +23,13 @@ Step 2 (step_over):
       9|         }
 
 Step 3 (step_over):
+  Bytecode position: 783CE5E8FCCFCE19B355BA4714717D03945A14621BB047B0D23D86AC118C460B:64
   Code:
       4| fun main() {
       5|     foo = 300;
       6|     match (foo) {
       7|         100 => {
-                 ^
+                 ^^^
       8|             return 10
       9|         }
      10|         200 => {
@@ -34,12 +37,13 @@ Step 3 (step_over):
     g_foo = 300
 
 Step 4 (step_over):
+  Bytecode position: 783CE5E8FCCFCE19B355BA4714717D03945A14621BB047B0D23D86AC118C460B:112
   Code:
       5|     foo = 300;
       6|     match (foo) {
       7|         100 => {
       8|             return 10
-                     ^
+                     ^^^^^^^^^
       9|         }
      10|         200 => {
      11|             return 20
@@ -47,12 +51,13 @@ Step 4 (step_over):
     '5 = null
 
 Step 5 (step_over):
+  Bytecode position: 783CE5E8FCCFCE19B355BA4714717D03945A14621BB047B0D23D86AC118C460B:120
   Code:
       7|         100 => {
       8|             return 10
       9|         }
      10|         200 => {
-                 ^
+                 ^^^
      11|             return 20
      12|         }
      13|         else => {
@@ -60,12 +65,13 @@ Step 5 (step_over):
     g_foo = 300
 
 Step 6 (step_over):
+  Bytecode position: 783CE5E8FCCFCE19B355BA4714717D03945A14621BB047B0D23D86AC118C460B:176
   Code:
       8|             return 10
       9|         }
      10|         200 => {
      11|             return 20
-                     ^
+                     ^^^^^^^^^
      12|         }
      13|         else => {
      14|             return 30
@@ -73,12 +79,13 @@ Step 6 (step_over):
     '8 = null
 
 Step 7 (step_over):
+  Bytecode position: 783CE5E8FCCFCE19B355BA4714717D03945A14621BB047B0D23D86AC118C460B:184
   Code:
      11|             return 20
      12|         }
      13|         else => {
      14|             return 30
-                            ^
+                            ^^
      15|         }
      16|     }
      17|

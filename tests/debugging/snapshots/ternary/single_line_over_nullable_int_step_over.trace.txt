@@ -1,4 +1,5 @@
 Step 1 (before):
+  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:8
   Code:
       1| 
       2| fun main(foo: int?) {
@@ -10,6 +11,7 @@ Step 1 (before):
     foo = 200
 
 Step 2 (step_over):
+  Bytecode position: 3A6291BB1798B49FE423EFC63051F0F382A75054C7ED2BB314F85D6657758201:72
   Code:
       1| 
       2| fun main(foo: int?) {

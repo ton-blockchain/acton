@@ -1,4 +1,5 @@
 Step 1 (before):
+  Bytecode position: 6C6DADE68BFB6945C87D97B35A0CC7C415A053B656DC3791AE6F1607DF0A042E:8
   Code:
       1| 
       2| fun main() {
@@ -9,6 +10,7 @@ Step 1 (before):
       6|     }
 
 Step 2 (step_over):
+  Bytecode position: 6C6DADE68BFB6945C87D97B35A0CC7C415A053B656DC3791AE6F1607DF0A042E:16
   Code:
       1| 
       2| fun main() {
@@ -22,6 +24,7 @@ Step 2 (step_over):
     a = 0
 
 Step 3 (step_over):
+  Bytecode position: 6C6DADE68BFB6945C87D97B35A0CC7C415A053B656DC3791AE6F1607DF0A042E:32
   Code:
       2| fun main() {
       3|     var a = 0;
