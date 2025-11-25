@@ -11,6 +11,7 @@ use acton::{debugger, ffi};
 use anyhow::anyhow;
 use dap::events::Event;
 use dap::responses::ContinueResponse;
+use dap::types::StackFrame;
 use dap_client::DapClient;
 use emulator::AnyExecutor;
 use emulator::blockchain::Blockchain;
@@ -33,6 +34,7 @@ use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
 
 mod debug_test;
+mod real_test;
 mod support;
 mod tests;
 
@@ -92,19 +94,9 @@ impl DebuggerClient {
         self.client.step_out(thread_id)
     }
 
-    pub fn stack_trace(&mut self, thread_id: i64) -> anyhow::Result<Vec<SourcePosition>> {
+    pub fn stack_trace(&mut self, thread_id: i64) -> anyhow::Result<Vec<StackFrame>> {
         let trace = self.client.stack_trace(thread_id)?;
-        let positions = trace
-            .stack_frames
-            .iter()
-            .filter_map(|frame| {
-                frame.source.as_ref().and_then(|source| {
-                    source.path.as_ref().map(|path| {
-                        SourcePosition::new(path.clone(), frame.line as u32, frame.column as u32)
-                    })
-                })
-            })
-            .collect();
+        let positions = trace.stack_frames;
         Ok(positions)
     }
 
@@ -123,9 +115,17 @@ impl DebuggerClient {
             .first()
             .ok_or_else(|| anyhow!("No stack frames available"))?;
 
+        let Some(source) = &actual.source else {
+            anyhow::bail!("No source for frame available");
+        };
+        let Some(path) = &source.path else {
+            anyhow::bail!("No source for frame available");
+        };
+
+        let actual = SourcePosition::new(path.clone(), actual.line as u32, actual.column as u32);
         println!("Position: {}", actual);
 
-        if actual == expected {
+        if &actual == expected {
             Ok(())
         } else {
             Err(anyhow!(

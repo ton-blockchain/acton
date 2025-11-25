@@ -17,7 +17,7 @@ use log::debug;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
-use tolkc::source_map::{DebugLocation, SourceMap};
+use tolkc::source_map::{BytecodeLocation, DebugLocation, SourceMap};
 use tvmffi::stack::TupleItem;
 use tycho_types::models::{OutAction, OwnedRelaxedMessage, RelaxedMsgInfo, StateInit};
 
@@ -59,6 +59,7 @@ pub enum StepKind {
 pub struct DebugStep {
     pub kind: StepKind,
     pub loc: Option<DebugLocation>,
+    pub pos: BytecodeLocation,
     pub thread_id: i64,
 }
 
@@ -66,6 +67,7 @@ pub struct DebugStep {
 pub struct CallFrame {
     pub function_name: String,
     pub loc: DebugLocation,
+    pub pos: BytecodeLocation,
 }
 
 pub struct Stepper {
@@ -159,10 +161,12 @@ impl Stepper {
         let is_end = executor.step();
         if is_end {
             self.terminated = true;
-            return None;
         }
 
         let source_map = &self.source_maps[self.current_executor_id];
+        let (hash, offset) = get_code_pos(&executor)?;
+        let pos = BytecodeLocation { offset, hash };
+
         if let Some(locs) = get_locations(&executor, source_map) {
             for loc in locs {
                 let function_name = loc
@@ -177,6 +181,7 @@ impl Stepper {
                         kind: StepKind::SyntheticEnterFunction(function_name),
                         loc: Some(loc),
                         thread_id: self.thread_id,
+                        pos: pos.clone(),
                     },
                     Some("AfterFunctionCall") => DebugStep {
                         kind: StepKind::SyntheticAfterFunctionCall(
@@ -188,21 +193,25 @@ impl Stepper {
                         ),
                         loc: Some(loc),
                         thread_id: self.thread_id,
+                        pos: pos.clone(),
                     },
                     Some("EnterInlinedFunction") => DebugStep {
                         kind: StepKind::SyntheticEnterInlined(function_name),
                         loc: Some(loc),
                         thread_id: self.thread_id,
+                        pos: pos.clone(),
                     },
                     Some("LeaveInlinedFunction") => DebugStep {
                         kind: StepKind::SyntheticLeaveInlined(function_name),
                         loc: Some(loc),
                         thread_id: self.thread_id,
+                        pos: pos.clone(),
                     },
                     _ => DebugStep {
                         kind: StepKind::Mapped,
                         loc: Some(loc),
                         thread_id: self.thread_id,
+                        pos: pos.clone(),
                     },
                 };
                 self.buffer.push_back(step);
@@ -213,6 +222,7 @@ impl Stepper {
                 kind: StepKind::UnmappedAdvance,
                 loc: None,
                 thread_id: self.thread_id,
+                pos: pos.clone(),
             })
         }
     }
@@ -243,6 +253,7 @@ impl Stepper {
                     self.callstack.push(CallFrame {
                         function_name: func_name.clone(),
                         loc: loc.clone(),
+                        pos: step.pos.clone(),
                     });
                 }
             }
@@ -258,6 +269,7 @@ impl Stepper {
                     self.callstack.push(CallFrame {
                         function_name: func_name.clone(),
                         loc: loc.clone(),
+                        pos: step.pos.clone(),
                     });
                 }
             }
@@ -667,7 +679,12 @@ impl DebugContext {
         }
     }
 
-    fn create_stack_frame(&self, loc: &DebugLocation, function_name: String) -> StackFrame {
+    fn create_stack_frame(
+        &self,
+        loc: &DebugLocation,
+        function_name: String,
+        pos: &BytecodeLocation,
+    ) -> StackFrame {
         let file_path = Self::normalize_path(&loc.loc.file.to_string());
         let file_name = std::path::Path::new(&file_path)
             .file_name()
@@ -679,11 +696,14 @@ impl DebugContext {
             name: function_name,
             line: loc.loc.line + 1,
             column: loc.loc.column + 2,
+            end_line: Some(loc.loc.end_line + 1),
+            end_column: Some(loc.loc.end_column + 1),
             source: Some(Source {
                 name: Some(file_name),
                 path: Some(file_path),
                 ..Default::default()
             }),
+            instruction_pointer_reference: Some(format!("{}:{}", pos.hash, pos.offset)),
             ..Default::default()
         }
     }
@@ -716,7 +736,7 @@ impl DebugContext {
         } else {
             self.get_root_function_name(thread_id)
         };
-        let top_frame = self.create_stack_frame(loc, top_frame_name);
+        let top_frame = self.create_stack_frame(loc, top_frame_name, &step.pos);
 
         let final_callstack = if thread_id == stepper.thread_id {
             vec![top_frame]
@@ -737,7 +757,7 @@ impl DebugContext {
                     self.get_root_function_name(thread_id)
                 };
 
-                self.create_stack_frame(&frame.loc, function_name)
+                self.create_stack_frame(&frame.loc, function_name, &frame.pos)
             })
             .collect::<Vec<_>>();
 
@@ -960,8 +980,13 @@ fn skip_function(stepper: &mut Stepper, func_name: String) -> bool {
 }
 
 fn get_locations(executor: &AnyExecutor, source_map: &SourceMap) -> Option<Vec<DebugLocation>> {
+    let (hash, offset) = get_code_pos(executor)?;
+    crate::vmtrace::low_level_loc_to_debug_locations(source_map, hash.as_str(), offset, true, false)
+}
+
+fn get_code_pos(executor: &AnyExecutor) -> Option<(String, i32)> {
     let pos = executor.get_code_pos();
     let (hash, offset) = pos.split_once(":")?;
     let offset = offset.parse::<i32>().ok()?;
-    crate::vmtrace::low_level_loc_to_debug_locations(source_map, hash, offset, true, false)
+    Some((hash.to_string(), offset))
 }

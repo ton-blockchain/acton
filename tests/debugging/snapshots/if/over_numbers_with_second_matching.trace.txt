@@ -1,15 +1,17 @@
 Step 1 (before):
+  Bytecode position: 408689A0B8522C33A63DBEDC1911FC1321F6A47825964A5FF0816EBE70D75DB2:8
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 200;
-             ^
+             ^^^
       6|     if (foo == 100) {
       7|         return 10;
       8|     } else if (foo == 200) {
 
 Step 2 (step_over):
+  Bytecode position: 408689A0B8522C33A63DBEDC1911FC1321F6A47825964A5FF0816EBE70D75DB2:48
   Code:
       3| 
       4| fun main() {
@@ -21,12 +23,13 @@ Step 2 (step_over):
       9|         return 20
 
 Step 3 (step_over):
+  Bytecode position: 408689A0B8522C33A63DBEDC1911FC1321F6A47825964A5FF0816EBE70D75DB2:96
   Code:
       4| fun main() {
       5|     foo = 200;
       6|     if (foo == 100) {
       7|         return 10;
-                 ^
+                 ^^^^^^^^^
       8|     } else if (foo == 200) {
       9|         return 20
      10|     }
@@ -34,6 +37,7 @@ Step 3 (step_over):
     '5 = null
 
 Step 4 (step_over):
+  Bytecode position: 408689A0B8522C33A63DBEDC1911FC1321F6A47825964A5FF0816EBE70D75DB2:104
   Code:
       5|     foo = 200;
       6|     if (foo == 100) {
@@ -45,12 +49,13 @@ Step 4 (step_over):
      11| 
 
 Step 5 (step_over):
+  Bytecode position: 408689A0B8522C33A63DBEDC1911FC1321F6A47825964A5FF0816EBE70D75DB2:176
   Code:
       6|     if (foo == 100) {
       7|         return 10;
       8|     } else if (foo == 200) {
       9|         return 20
-                 ^
+                 ^^^^^^^^^
      10|     }
      11| 
      12|     return 0;

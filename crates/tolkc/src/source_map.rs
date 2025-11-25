@@ -16,9 +16,14 @@ pub struct SourceMap {
 impl SourceMap {
     pub fn hash(&self) -> String {
         let mut hasher = DefaultHasher::new();
-        self.high_level.files.iter().for_each(|file| {
-            file.path.hash(&mut hasher);
-        });
+        self.high_level.version.hash(&mut hasher);
+        self.high_level.language.hash(&mut hasher);
+        self.high_level.compiler_version.hash(&mut hasher);
+        for loc in &self.high_level.locations {
+            loc.loc.file.hash(&mut hasher);
+            loc.loc.line.hash(&mut hasher);
+            loc.loc.column.hash(&mut hasher);
+        }
         format!("{:x}", hasher.finish())
     }
 }
@@ -38,7 +43,6 @@ pub struct HighLevelSourceMap {
     pub version: String,
     pub language: Option<String>,
     pub compiler_version: Option<String>,
-    pub files: Vec<SourceFile>,
     pub globals: Vec<GlobalVariable>,
     pub locations: Vec<DebugLocation>,
 }
@@ -99,11 +103,18 @@ impl SourceLocation {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BytecodeLocation {
+    pub hash: String,
+    pub offset: i32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct DebugLocation {
     pub idx: i64,
     pub loc: SourceLocation,
     pub variables: Vec<Variable>,
     pub context: EntryContext,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub debug: Option<DebugInfo>,
 }
 
@@ -112,8 +123,11 @@ pub struct Variable {
     pub name: String,
     #[serde(rename = "type")]
     pub var_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_temporary: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub constant_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub possible_qualifier_types: Option<Vec<String>>,
 }
 
@@ -121,7 +135,9 @@ pub struct Variable {
 pub struct EntryContext {
     pub description: EntryContextDescription,
     pub inlining: InliningInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub event: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub event_function: Option<String>,
     pub containing_function: String,
 }

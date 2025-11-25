@@ -1,15 +1,17 @@
 Step 1 (before):
+  Bytecode position: 01ECAEBCD39763B66039146D66EE7BFE22CC223F5836118F365B49D70BB92CE6:8
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 100;
-             ^
+             ^^^
       6|     if (foo == 100) {
       7|         return 10;
       8|     }
 
 Step 2 (step_over):
+  Bytecode position: 01ECAEBCD39763B66039146D66EE7BFE22CC223F5836118F365B49D70BB92CE6:40
   Code:
       3| 
       4| fun main() {
@@ -21,12 +23,13 @@ Step 2 (step_over):
       9| 
 
 Step 3 (step_over):
+  Bytecode position: 01ECAEBCD39763B66039146D66EE7BFE22CC223F5836118F365B49D70BB92CE6:88
   Code:
       4| fun main() {
       5|     foo = 100;
       6|     if (foo == 100) {
       7|         return 10;
-                 ^
+                 ^^^^^^^^^
       8|     }
       9| 
      10|     return 0;

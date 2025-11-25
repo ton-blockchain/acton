@@ -54,10 +54,17 @@ impl DebugTestOutputExt for DebugTestOutput {
             .expect(&format!("Step {} not found in trace", step_index));
 
         if let Some(pos) = step.positions.first() {
-            let filename = std::path::Path::new(&pos.file)
+            let Some(source) = &pos.source else {
+                return self;
+            };
+            let Some(path) = &source.path else {
+                return self;
+            };
+
+            let filename = std::path::Path::new(&path)
                 .file_name()
                 .and_then(|n| n.to_str())
-                .unwrap_or(&pos.file);
+                .unwrap_or(&path);
 
             assert_eq!(
                 filename, expected_file,
@@ -65,12 +72,12 @@ impl DebugTestOutputExt for DebugTestOutput {
                 step_index
             );
             assert_eq!(
-                pos.line, expected_line,
+                pos.line, expected_line as i64,
                 "Line mismatch at step {}: expected {}, got {}",
                 step_index, expected_line, pos.line
             );
             assert_eq!(
-                pos.column, expected_column,
+                pos.column, expected_column as i64,
                 "Column mismatch at step {}: expected {}, got {}",
                 step_index, expected_column, pos.column
             );
@@ -91,16 +98,13 @@ impl DebugTestOutputExt for DebugTestOutput {
             .trace()
             .steps
             .get(step_index)
-            .expect(&format!("Step {} not found in trace", step_index));
+            .unwrap_or_else(|| panic!("Step {} not found in trace", step_index));
 
         let var = step
             .variables
             .iter()
             .find(|v| v.name == var_name)
-            .expect(&format!(
-                "Variable '{}' not found at step {}",
-                var_name, step_index
-            ));
+            .unwrap_or_else(|| panic!("Variable '{}' not found at step {}", var_name, step_index));
 
         assert_eq!(
             &var.value, expected_value,

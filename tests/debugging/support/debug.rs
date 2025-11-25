@@ -1,7 +1,8 @@
 use crate::debugging::{DebuggerClient, SourcePosition, run_script_file};
 use crate::support::snapshots::normalize_output;
+use dap::types::StackFrame;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
@@ -17,6 +18,8 @@ pub struct DebugBuilder {
     name: String,
     temp_dir: TempDir,
     code: String,
+    project_path: Option<PathBuf>,
+    script_file: Option<String>,
     debug_port: Option<u16>,
     stack: Option<Tuple>,
 }
@@ -29,6 +32,8 @@ impl DebugBuilder {
             name: name.to_string(),
             temp_dir,
             code: String::new(),
+            project_path: None,
+            script_file: None,
             debug_port: None,
             stack: None,
         }
@@ -36,6 +41,16 @@ impl DebugBuilder {
 
     pub fn code(mut self, code: &str) -> Self {
         self.code = code.to_string();
+        self
+    }
+
+    pub fn project<P: AsRef<Path>>(mut self, path: P) -> Self {
+        self.project_path = Some(path.as_ref().to_path_buf());
+        self
+    }
+
+    pub fn script_file(mut self, file_name: &str) -> Self {
+        self.script_file = Some(file_name.to_string());
         self
     }
 
@@ -52,11 +67,28 @@ impl DebugBuilder {
     }
 
     pub fn build(self) -> DebugSession {
-        let project_path = self.temp_dir.path().join(&self.name);
-        fs::create_dir_all(&project_path).expect("Failed to create project dir");
+        let project_path = if let Some(path) = &self.project_path {
+            path.clone()
+        } else {
+            let path = self.temp_dir.path().join(&self.name);
+            fs::create_dir_all(&path).expect("Failed to create project dir");
 
-        let code_path = project_path.join("debug_script.tolk");
-        fs::write(&code_path, &self.code).expect("Failed to write debug script");
+            let code_path = path.join("debug_script.tolk");
+            fs::write(&code_path, &self.code).expect("Failed to write debug script");
+            path
+        };
+
+        let code_path = if let Some(script_file) = self.script_file {
+            if let Some(project_path) = self.project_path {
+                project_path.join(script_file)
+            } else {
+                project_path.join(script_file)
+            }
+        } else if self.project_path.is_some() {
+            project_path.join("main.tolk")
+        } else {
+            project_path.join("debug_script.tolk")
+        };
 
         let debug_port = self.debug_port.unwrap_or_else(find_available_port);
 
@@ -171,7 +203,7 @@ pub struct DebugActionExecutor<'a> {
 
 impl<'a> DebugActionExecutor<'a> {
     fn record_state_with_action(&mut self, action: String) -> anyhow::Result<()> {
-        let thread_id = 1; // Default thread
+        let thread_id = 1;
         let positions = self.client.stack_trace(thread_id)?;
         let variables = self.client.variables(thread_id)?;
 
@@ -239,7 +271,7 @@ pub struct ExecutionTrace {
 #[derive(Debug, Clone)]
 pub struct ExecutionStep {
     pub step_number: usize,
-    pub positions: Vec<SourcePosition>,
+    pub positions: Vec<StackFrame>,
     pub variables: Vec<dap::types::Variable>,
     pub action: String,
     pub code_context: Vec<String>,
@@ -255,7 +287,7 @@ impl ExecutionTrace {
 
     fn add_step(
         &mut self,
-        positions: Vec<SourcePosition>,
+        positions: Vec<StackFrame>,
         variables: Vec<dap::types::Variable>,
         action: String,
     ) {
@@ -270,30 +302,57 @@ impl ExecutionTrace {
         });
     }
 
-    fn get_code_context(&self, positions: &[SourcePosition]) -> Vec<String> {
+    fn get_code_context(&self, positions: &[StackFrame]) -> Vec<String> {
         if let Some(pos) = positions.first() {
+            let Some(source) = &pos.source else {
+                return vec![];
+            };
+            let Some(path) = &source.path else {
+                return vec![];
+            };
+
             let line_idx = (pos.line - 1) as usize;
-            if line_idx < self.source_code.len() {
+            let content = fs::read_to_string(path.clone())
+                .unwrap_or_else(|_| panic!("cannot read file {path}"));
+            let content = content.lines().collect::<Vec<_>>();
+
+            if line_idx < content.len() {
                 let start_line = line_idx.saturating_sub(3);
-                let end_line = (line_idx + 4).min(self.source_code.len());
+                let end_line = (line_idx + 4).min(content.len());
                 let mut context = Vec::new();
 
                 for i in start_line..end_line {
                     let line_num = i + 1;
-                    context.push(format!("{:3}| {}", line_num, self.source_code[i]));
+                    context.push(format!("{:3}| {}", line_num, content[i]));
                 }
 
                 if line_idx >= start_line && line_idx < end_line {
                     let line_relative_idx = line_idx - start_line;
                     let col = (pos.column - 1) as usize;
-                    let code_line = &self.source_code[line_idx];
+                    let end_col = if let Some(end_column) = pos.end_column
+                        && pos.end_line == Some(pos.line)
+                    {
+                        end_column as usize
+                    } else {
+                        col + 1
+                    };
+                    let code_line = &content[line_idx];
 
                     let mut pointer_line = String::new();
                     pointer_line.push_str(&" ".repeat(5));
 
                     if col < code_line.len() {
                         pointer_line.push_str(&" ".repeat(col));
-                        pointer_line.push('^');
+
+                        if pos.end_line == Some(pos.line)
+                            && end_col > col
+                            && end_col <= code_line.len()
+                        {
+                            let underline_len = end_col - col;
+                            pointer_line.push_str(&"^".repeat(underline_len));
+                        } else {
+                            pointer_line.push('^');
+                        }
                     }
 
                     context.insert(line_relative_idx + 1, pointer_line);
@@ -313,6 +372,16 @@ impl ExecutionTrace {
 
         for step in &self.steps {
             result.push_str(&format!("Step {} ({}):\n", step.step_number, step.action));
+
+            result.push_str(&format!(
+                "  Bytecode position: {}\n",
+                step.positions
+                    .first()
+                    .cloned()
+                    .unwrap_or_default()
+                    .instruction_pointer_reference
+                    .unwrap_or("<unknown-position>".to_owned())
+            ));
 
             if !step.code_context.is_empty() {
                 result.push_str("  Code:\n");
