@@ -7,6 +7,10 @@ import "ffi/ffi"
 /// let msg = format1("Hello {}", "world");
 /// println(msg);  // prints "Hello world"
 /// ```
+///
+/// Format supports following format soecifiers:
+/// - `{:x}` — formats a number as hexadecimal without `0x` prefix
+/// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 fun format1<T1>(fmt: slice, arg1: T1): slice {
     return ffi.format1(fmt, arg1.typeNameOfObject(), arg1.toTuple());
 }
@@ -18,6 +22,10 @@ fun format1<T1>(fmt: slice, arg1: T1): slice {
 /// let msg = format2("{}: {}", "name", "John");
 /// println(msg);  // prints "name: John"
 /// ```
+///
+/// Format supports following format soecifiers:
+/// - `{:x}` — formats a number as hexadecimal without `0x` prefix
+/// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice {
     return ffi.format2(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple());
 }
@@ -29,6 +37,10 @@ fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice {
 /// let msg = format3("{} + {} = {}", 2, 3, 5);
 /// println(msg);  // prints "2 + 3 = 5"
 /// ```
+///
+/// Format supports following format soecifiers:
+/// - `{:x}` — formats a number as hexadecimal without `0x` prefix
+/// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice {
     return ffi.format3(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple());
 }
@@ -40,6 +52,10 @@ fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice {
 /// let msg = format4("{} {} {} {}", "a", "b", "c", "d");
 /// println(msg);  // prints "a b c d"
 /// ```
+///
+/// Format supports following format soecifiers:
+/// - `{:x}` — formats a number as hexadecimal without `0x` prefix
+/// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4): slice {
     return ffi.format4(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple(), arg4.typeNameOfObject(), arg4.toTuple());
 }
@@ -51,6 +67,10 @@ fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4):
 /// let msg = format5("{} {} {} {} {}", 1, 2, 3, 4, 5);
 /// println(msg);  // prints "1 2 3 4 5"
 /// ```
+///
+/// Format supports following format soecifiers:
+/// - `{:x}` — formats a number as hexadecimal without `0x` prefix
+/// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 fun format5<T1, T2, T3, T4, T5>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): slice {
     return ffi.format5(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple(), arg4.typeNameOfObject(), arg4.toTuple(), arg5.typeNameOfObject(), arg5.toTuple());
 }
