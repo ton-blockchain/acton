@@ -233,6 +233,7 @@ impl TestSettings {
         baseline_gas_override: Option<String>,
         fork_net_override: Option<String>,
         api_key_override: Option<String>,
+        save_test_trace_override: Option<String>,
     ) -> TestConfig {
         let mut final_report_formats = Vec::new();
 
@@ -281,6 +282,7 @@ impl TestSettings {
             baseline_snapshot: baseline_gas_override,
             fork_net: fork_net_override.or_else(|| self.fork_net.clone()),
             api_key: api_key_override.or_else(|| self.api_key.clone()),
+            save_test_trace: save_test_trace_override,
         }
     }
 }

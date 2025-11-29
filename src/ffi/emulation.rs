@@ -531,6 +531,7 @@ fn send_message_debug(
         transaction: transaction.clone(),
         parent_transaction: None,
         child_transactions: vec![],
+        shard_account_before: dest_account.clone(),
         shard_account,
         out_messages,
         vm_log: result.vm_log,

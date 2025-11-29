@@ -34,6 +34,7 @@ use log::{debug, error};
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -51,6 +52,7 @@ mod coverage;
 mod instrumentation;
 mod profiling;
 mod reporting;
+mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -81,6 +83,7 @@ pub struct TestConfig {
     pub baseline_snapshot: Option<String>,
     pub fork_net: Option<String>,
     pub api_key: Option<String>,
+    pub save_test_trace: Option<String>,
 }
 
 #[derive(Debug)]
@@ -268,6 +271,15 @@ impl<'a> TestRunner<'a> {
 
                 let get_result = executor.finish(&params.code);
 
+                if let Some(trace_dir) = &self.config.save_test_trace {
+                    trace::cave_test_transactions(
+                        test,
+                        ctx.build.build_cache,
+                        &ctx.chain.emulations.results,
+                        trace_dir,
+                    )?;
+                }
+
                 (
                     get_result,
                     ctx.io.stdout_buffer,
@@ -280,6 +292,15 @@ impl<'a> TestRunner<'a> {
                 ffi::register(&mut executor, &mut ctx);
 
                 let get_result = executor.run_get_method(Default::default(), params);
+
+                if let Some(trace_dir) = &self.config.save_test_trace {
+                    trace::cave_test_transactions(
+                        test,
+                        ctx.build.build_cache,
+                        &ctx.chain.emulations.results,
+                        trace_dir,
+                    )?;
+                }
 
                 (
                     get_result,
@@ -314,7 +335,12 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         if !path.ends_with("_test.tolk") {
             anyhow::bail!("Test file must end with _test.tolk");
         }
-        vec![path.clone()]
+        vec![
+            fs::canonicalize(&path)
+                .unwrap_or_else(|_| PathBuf::from(&path))
+                .to_string_lossy()
+                .to_string(),
+        ]
     } else if metadata.is_dir() {
         find_test_files_recursively(&path, &config.exclude_patterns, &config.include_patterns)?
             .into_iter()
@@ -557,7 +583,7 @@ fn run_tests_for_file(
         }
     };
 
-    let tests = find_all_test(&content);
+    let tests = find_all_test(file, &content);
 
     let abi = contract_abi(content.as_str(), file);
 
@@ -838,6 +864,13 @@ fn contract_address(code: &Arc<Cell>) -> TonAddress {
     TonAddress::new(0, state_init.cell_hash())
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Pos {
+    pub row: usize,
+    pub column: usize,
+    pub uri: String,
+}
+
 #[derive(Debug)]
 pub struct TestDescriptor {
     pub id: i32,
@@ -846,9 +879,10 @@ pub struct TestDescriptor {
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
     pub todo_description: Option<String>,
+    pub pos: Pos,
 }
 
-fn find_all_test(content: &String) -> Vec<TestDescriptor> {
+fn find_all_test(file_path: &str, content: &str) -> Vec<TestDescriptor> {
     let Ok(tree) = tolk_parser::parser::parse(content) else {
         return vec![];
     };
@@ -882,6 +916,11 @@ fn find_all_test(content: &String) -> Vec<TestDescriptor> {
                         expected_exit_code: test_annotations.expected_exit_code,
                         gas_limit: test_annotations.gas_limit,
                         todo_description: test_annotations.todo_description,
+                        pos: Pos {
+                            row: name_node.start_position().row,
+                            column: name_node.start_position().column,
+                            uri: file_path.to_owned(),
+                        },
                     });
                 }
             };

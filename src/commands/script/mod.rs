@@ -63,6 +63,7 @@ pub fn script_cmd(
 ///
 /// Executing the script means calling the get-method with ID=0 and an empty stack,
 /// so the `main` function takes no arguments.
+#[allow(clippy::too_many_arguments)]
 fn run_script_file(
     file_path: &str,
     content: &str,

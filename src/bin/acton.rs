@@ -162,6 +162,17 @@ enum Commands {
             help_heading = "Remote"
         )]
         api_key: Option<String>,
+
+        // Tracing
+        #[arg(
+            long,
+            help = "Save transaction traces to directory",
+            help_heading = "Tracing",
+            value_name = "DIR",
+            default_missing_value = ".acton/traces",
+            num_args = 0..=1,
+        )]
+        save_test_trace: Option<String>,
     },
     #[command(about = "Generate test wrapper and test file for a contract")]
     TestGen {
@@ -440,6 +451,7 @@ fn main() {
             baseline_snapshot,
             fork_net,
             api_key,
+            save_test_trace,
         } => {
             let mut report_formats = Vec::new();
 
@@ -475,6 +487,7 @@ fn main() {
                 baseline_snapshot,
                 fork_net,
                 api_key,
+                save_test_trace,
             );
             let result = test_cmd(path, &config);
             if let Err(err) = result {
@@ -642,6 +655,7 @@ fn create_test_config(
     baseline_snapshot: Option<String>,
     fork_net: Option<String>,
     api_key: Option<String>,
+    save_test_trace: Option<String>,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -674,6 +688,7 @@ fn create_test_config(
             baseline_snapshot,
             fork_net,
             api_key,
+            save_test_trace,
         );
     }
 
@@ -695,5 +710,6 @@ fn create_test_config(
         baseline_snapshot,
         fork_net,
         api_key,
+        save_test_trace,
     }
 }
