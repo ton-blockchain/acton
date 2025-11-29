@@ -3,6 +3,7 @@ use crate::context::BuildCache;
 use emulator::emulator::SendMessageResult;
 use emulator::executor::StoreExt;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use tolkc::source_map::SourceMap;
@@ -13,6 +14,7 @@ pub struct TestTrace {
     pub name: String,
     pub pos: Pos,
     pub txs: TransactionList,
+    pub contracts: Vec<ContractInfo>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -34,12 +36,11 @@ pub struct TransactionInfo {
     pub child_transactions: Vec<u64>,
     pub shard_account_before: String,
     pub shard_account: String,
-    pub vm_log: String,
+    pub vm_log_diff: String,
     pub logs: String,
     pub debug_logs: String,
     pub actions: Option<String>,
-    pub code: Option<String>,
-    pub dest_contract_info: Option<ContractInfo>,
+    pub dest_contract_info: Option<String>,
 }
 
 pub fn cave_test_transactions(
@@ -48,6 +49,8 @@ pub fn cave_test_transactions(
     txs: &[Vec<SendMessageResult>],
     output_dir: &str,
 ) -> anyhow::Result<()> {
+    let mut known_contracts = BTreeMap::new();
+
     let txs = txs
         .iter()
         .flatten()
@@ -64,18 +67,21 @@ pub fn cave_test_transactions(
                 source_map: info.source_map.clone(),
             });
 
+            if let Some(contract_info) = &contract_info {
+                known_contracts.insert(contract_info.name.clone(), contract_info.clone());
+            }
+
             Some(TransactionInfo {
                 raw_transaction: tx.raw_transaction.clone(),
                 parent_transaction: tx.parent_transaction.as_ref().map(|tx| tx.lt),
-                dest_contract_info: contract_info,
+                dest_contract_info: contract_info.as_ref().map(|info| info.name.clone()),
                 child_transactions: tx.child_transactions.clone(),
                 shard_account_before: Boc::encode_hex(tx.shard_account_before.to_cell()),
                 shard_account: Boc::encode_hex(tx.shard_account.to_cell()),
-                vm_log: tx.vm_log.clone(),
+                vm_log_diff: vmlogs::convert_to_diff_logs(&tx.vm_log),
                 logs: tx.logs.clone(),
                 debug_logs: tx.debug_logs.clone(),
                 actions: tx.actions.clone(),
-                code: tx.code.as_ref().map(Boc::encode_hex),
             })
         })
         .collect::<Vec<_>>();
@@ -85,6 +91,7 @@ pub fn cave_test_transactions(
         name: test.name.clone(),
         pos: test.pos.clone(),
         txs: list,
+        contracts: known_contracts.values().cloned().collect(),
     };
 
     let str = serde_json::to_string(&test_info)?;

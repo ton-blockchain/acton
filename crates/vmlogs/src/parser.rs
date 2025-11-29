@@ -34,6 +34,17 @@ impl<'a> VmStack<'a> {
     pub fn parsed(&self) -> Vec<VmStackValue<'a>> {
         parse_stack_content(self.raw_content)
     }
+
+    pub fn to_string(&self) -> String {
+        format!(
+            "[ {} ]",
+            self.parsed()
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
 }
 
 fn parse_stack_content(input: &str) -> Vec<VmStackValue<'_>> {
@@ -85,10 +96,44 @@ pub enum VmStackValue<'a> {
     Unknown,
 }
 
+impl<'a> VmStackValue<'a> {
+    pub fn to_string(&self) -> String {
+        match self {
+            VmStackValue::Null => "()".to_string(),
+            VmStackValue::NaN => "NaN".to_string(),
+            VmStackValue::Integer(s) => s.to_string(),
+            VmStackValue::Tuple(items) => {
+                format!(
+                    "[ {} ]",
+                    items
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
+            VmStackValue::Cell(cell) => cell.to_string(),
+            VmStackValue::Continuation(s) => format!("Cont{{{}}}", s),
+            VmStackValue::Builder(s) => format!("BC{{{}}}", s),
+            VmStackValue::CellSlice(cs) => cs.to_string(),
+            VmStackValue::Unknown => "???".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum CellLike<'a> {
     Cell(&'a str),    // C{hex}
     Builder(&'a str), // BC{hex}
+}
+
+impl<'a> CellLike<'a> {
+    pub fn to_string(&self) -> String {
+        match self {
+            CellLike::Cell(s) => format!("C{{{}}}", s),
+            CellLike::Builder(s) => format!("BC{{{}}}", s),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -96,6 +141,20 @@ pub struct CellSlice<'a> {
     pub value: &'a str,
     pub bits: Option<(&'a str, &'a str)>,
     pub refs: Option<(&'a str, &'a str)>,
+}
+
+impl<'a> CellSlice<'a> {
+    pub fn to_string(&self) -> String {
+        match (&self.bits, &self.refs) {
+            (Some((bits_start, bits_end)), Some((refs_start, refs_end))) => {
+                format!(
+                    "CS{{Cell{{{}}} bits:{}..{} ; refs:{}..{}}}",
+                    self.value, bits_start, bits_end, refs_start, refs_end
+                )
+            }
+            _ => format!("CS{{{}}}", self.value),
+        }
+    }
 }
 
 fn ws0(i: &mut I) -> PResult<()> {
