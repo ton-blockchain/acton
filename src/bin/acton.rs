@@ -256,7 +256,7 @@ enum Commands {
     },
     #[command(about = "Disassemble TVM bitcode to human-readable TASM")]
     Disasm {
-        #[arg(help = "Binary BoC file to disassemble (use -s flag to pass a string)")]
+        #[arg(help = "Binary/Hex/Base64 BoC file to disassemble (use -s flag to pass a string)")]
         boc_file: Option<String>,
         #[arg(short, long, help = "BoC string in hex or base64 format")]
         string: Option<String>,

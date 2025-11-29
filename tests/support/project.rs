@@ -11,6 +11,7 @@ pub struct ProjectBuilder {
     contracts: Vec<ContractDef>,
     tests: Vec<(String, String)>,
     files: Vec<(String, String)>,
+    raw_files: Vec<(String, String)>,
     test_config: Option<TestConfig>,
     license: Option<String>,
     create_acton_toml: bool,
@@ -63,6 +64,7 @@ impl ProjectBuilder {
             contracts: Vec::new(),
             tests: Vec::new(),
             files: Vec::new(),
+            raw_files: Vec::new(),
             test_config: None,
             license: Some("MIT".to_string()),
             create_acton_toml: true,
@@ -240,6 +242,17 @@ impl ProjectBuilder {
         self
     }
 
+    /// Add a custom raw file to the project (e.g., library files)
+    ///
+    /// # Examples
+    /// ```
+    /// .raw_file("foo.hex", "...")
+    /// ```
+    pub fn raw_file(mut self, path: &str, code: &str) -> Self {
+        self.raw_files.push((path.to_string(), code.to_string()));
+        self
+    }
+
     /// Configure test settings in Acton.toml
     ///
     /// # Examples
@@ -299,6 +312,14 @@ impl ProjectBuilder {
                 fs::create_dir_all(parent).expect("Failed to create parent directories");
             }
             fs::write(file_path, code).expect("Failed to write custom file");
+        }
+
+        for (path, code) in &self.raw_files {
+            let file_path = project_path.join(path);
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent).expect("Failed to create parent directories");
+            }
+            fs::write(file_path, code).expect("Failed to write raw file");
         }
 
         if self.create_acton_toml {

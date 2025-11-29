@@ -46,6 +46,78 @@ fn test_disasm_from_boc_file_with_output() {
 }
 
 #[test]
+fn test_disasm_from_boc_file_with_base64() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.base64", "te6ccgEBBAEAbwABFP8A9KQT9LzyyAsBAgFiAgMAmtD4kZEw4CDXLCP0Oyd8jhgx7UTQAdcLHwHWH9cLH1igAcjOyx/J7VTg1ywh06l4NDGOEjDtRNDWHzDIzs+QAAAAAsntVOCEDwHHAPL0ABehlaHaiaGmPmOuFj8=")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.base64")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_base64.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_from_boc_file_with_hex() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.hex", "b5ee9c7201010401006f000114ff00f4a413f4bcf2c80b0102016203020017a195a1da89a1a63e63ae163f009ad0f8919130e020d72c23f43b277c8e1831ed44d001d70b1f01d61fd70b1f58a001c8cecb1fc9ed54e0d72c21d3a97834318e1230ed44d0d61f30c8cecf9000000002c9ed54e0840f01c700f2f4")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.hex")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_hex.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_from_boc_file_with_hex_with_newlines() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.hex", "\n\nb5ee9c7201010401006f000114ff00f4a413f4bcf2c80b0102016203020017a195a1da89a1a63e63ae163f009ad0f8919130e020d72c23f43b277c8e1831ed44d001d70b1f01d61fd70b1f58a001c8cecb1fc9ed54e0d72c21d3a97834318e1230ed44d0d61f30c8cecf9000000002c9ed54e0840f01c700f2f4\n\n")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.hex")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_hex_with_newlines.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_from_boc_file_with_invalid_hex() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.hex", "123\n\nb5ee9c7201010401006f000114ff00f4a413f4bcf2c80b0102016203020017a195a1da89a1a63e63ae163f009ad0f8919130e020d72c23f43b277c8e1831ed44d001d70b1f01d61fd70b1f58a001c8cecb1fc9ed54e0d72c21d3a97834318e1230ed44d0d61f30c8cecf9000000002c9ed54e0840f01c700f2f4\n\n")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.hex")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_invalid_hex.stderr.txt",
+        );
+}
+
+#[test]
 fn test_disasm_from_hex_string() {
     let project = ProjectBuilder::new("disasm-hex")
         .contract_with_output("simple", SIMPLE_CONTRACT, "simple.boc")

@@ -22,8 +22,15 @@ pub fn disasm_cmd(
     let boc_data = if let Some(string) = boc_string {
         string
     } else if let Some(file_path) = boc_file {
+        // BoC file can be binary file or file with hex/base64 encoded data
         let binary_data = fs::read(&file_path)?;
-        hex::encode(binary_data)
+        if let Ok(cell) = Boc::decode_base64(binary_data.trim_ascii()) {
+            Boc::encode_hex(cell)
+        } else if let Ok(cell) = Boc::decode_hex(binary_data.trim_ascii()) {
+            Boc::encode_hex(cell)
+        } else {
+            hex::encode(binary_data)
+        }
     } else if let Some(addr) = address {
         remote::fetch_contract_boc(&addr, api_key.as_deref())?
     } else {

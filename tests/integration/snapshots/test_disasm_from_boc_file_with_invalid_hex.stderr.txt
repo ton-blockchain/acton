@@ -1,0 +1,1 @@
+Error: Failed to decode BOC data as hex or base64
