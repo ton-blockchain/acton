@@ -56,7 +56,10 @@ fun main() {
         id: 8,
         counter: 0,
     });
-    counter.deploy(deployer.address, ton("0.05"));
+
+    val result = counter.deploy(deployer.address, ton("0.05"));
+    result.wait(); // optional wait for deployment when broadcasting
+
     println1("Deployed counter to {}", counter.address);
 }
 ```
@@ -164,6 +167,64 @@ Be extremely careful with message values when using `--broadcast`. While local t
 
 **Recommendation:** Use small values like `ton("0.05")` or `ton("0.1")` for most operations.
 :::
+
+## Waiting for Transactions
+
+When broadcasting transactions to the real network, you may want to wait for them to be processed. The `SendResultList.wait()` method polls the network until the transaction is confirmed:
+
+```tolk
+fun main() {
+    val deployer = net.wallet("deployer");
+
+    // Deploy counter
+    val counter = Counter.fromStorage(Storage { id: 8, counter: 0 });
+    val deployResult = counter.deploy(deployer.address, ton("0.05"));
+    deployResult.wait(); // Wait for deployment
+
+    println1("Counter deployed at {}", counter.address);
+
+    // Send increase message
+    val increaseResult = counter.sendIncrease(deployer.address, 5);
+    increaseResult.wait(); // Wait for transaction
+
+    println("Counter increased!");
+}
+```
+
+You can also check the result of waiting:
+
+```tolk
+fun main() {
+    // ...
+    val result = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+
+    val success = result.wait();
+    if (success) {
+        println("Transaction confirmed!");
+    } else {
+        println("Transaction not found after max attempts");
+    }
+}
+```
+
+### Behavior in Different Modes
+
+The `wait()` method automatically adapts to the execution mode:
+
+| Mode            | Behavior                                       |
+|-----------------|------------------------------------------------|
+| Local (default) | Returns `true` immediately (no waiting needed) |
+| `--broadcast`   | Polls the network until transaction is found   |
+
+You can check the current mode using `net.isBroadcasting()`:
+
+```tolk
+if (net.isBroadcasting()) {
+    println("Running on real network");
+} else {
+    println("Running in emulation mode");
+}
+```
 
 ## Querying Blockchain State
 
