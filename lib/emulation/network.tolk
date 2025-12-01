@@ -427,6 +427,39 @@ fun net.isBroadcasting(): bool {
     return ffi.isBroadcasting()
 }
 
+/// Enable broadcasting mode.
+///
+/// This function allows scripts to manually enable broadcasting behavior.
+/// Useful for testing broadcasting logic in emulation mode.
+///
+/// Example:
+/// ```
+/// // Force broadcasting behavior even in emulation mode
+/// net.enableBroadcast();
+/// if (net.isBroadcasting()) {
+///     println("Broadcasting mode enabled");
+/// }
+/// ```
+fun net.enableBroadcast(): void {
+    ffi.enableBroadcast();
+}
+
+/// Disable broadcasting mode.
+///
+/// This function allows scripts to manually disable broadcasting behavior.
+///
+/// Example:
+/// ```
+/// // Disable broadcasting behavior
+/// net.disableBroadcast();
+/// if (!net.isBroadcasting()) {
+///     println("Broadcasting mode disabled");
+/// }
+/// ```
+fun net.disableBroadcast(): void {
+    ffi.disableBroadcast();
+}
+
 /// Run a get method of a contract by its name.
 ///
 /// Imagine you have the following get method in the contract:
@@ -698,3 +731,5 @@ fun ffi.loadLibrary(hash: slice): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
 fun ffi.getWalletByName(name: slice): cell? asm "24 EXTCALL"
 fun ffi.waitForTransaction(addr: cell, messageBodyHash: cell, quiet: bool, attempts: int, sleepDuration: int): bool asm "25 EXTCALL"
+fun ffi.enableBroadcast(): void asm "26 EXTCALL"
+fun ffi.disableBroadcast(): void asm "27 EXTCALL"

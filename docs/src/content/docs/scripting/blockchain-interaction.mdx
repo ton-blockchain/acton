@@ -38,6 +38,24 @@ acton script deploy.tolk --broadcast --net mainnet
 Always test your scripts without `--broadcast` first. The local emulator allows you to verify logic before spending real TON on testnet or mainnet.
 :::
 
+### Manually Controlling Broadcasting Mode
+
+For advanced use cases, you can additionally manually control the broadcasting flag using `net.enableBroadcast()` and `net.disableBroadcast()`:
+
+```tolk
+fun main() {
+    net.disableBroadcast();
+    // ...
+    // This send will be emulated and not sent to the real blockchain
+    val result = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    result.wait();
+
+    // Enable broadcasting mode again
+    net.enableBroadcast();
+    // ...
+}
+```
+
 ## Deploying a Contract
 
 Here's a complete example of deploying a counter contract to the blockchain:

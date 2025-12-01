@@ -1303,6 +1303,16 @@ fn wait_for_transaction_impl(
     stack.push_bool(false);
 }
 
+extension!(enable_broadcast in (Context) using enable_broadcast_impl);
+fn enable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) {
+    ctx.is_broadcasting = true;
+}
+
+extension!(disable_broadcast in (Context) using disable_broadcast_impl);
+fn disable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) {
+    ctx.is_broadcasting = false;
+}
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         6 => build,
@@ -1324,5 +1334,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         23 => is_broadcasting,
         24 => get_wallet_by_name,
         25 => wait_for_transaction,
+        26 => enable_broadcast,
+        27 => disable_broadcast,
     });
 }
