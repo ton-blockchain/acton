@@ -333,6 +333,51 @@ impl TonApiClient {
         }
         Ok(Some(Boc::decode_base64(cell_data)?))
     }
+
+    pub fn get_transactions(
+        &self,
+        address: &str,
+        limit: Option<u32>,
+        lt: Option<String>,
+        hash: Option<String>,
+    ) -> anyhow::Result<Vec<TonCenterTransaction>> {
+        let url = format!("{}/api/v2/getTransactions", self.network.toncenter_url());
+
+        let mut params = vec![("address", address.to_string())];
+        if let Some(limit) = limit {
+            params.push(("limit", limit.to_string()));
+        }
+        if let Some(lt) = lt {
+            params.push(("lt", lt));
+        }
+        if let Some(hash) = hash {
+            params.push(("hash", hash));
+        }
+
+        let response = self
+            .build_request(&url)
+            .query(&params)
+            .send()
+            .context("Failed to send getTransactions request")?;
+
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "TonCenter API returned status: {}",
+                response.status()
+            ));
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterTransactionsResponse {
+            result: Vec<TonCenterTransaction>,
+        }
+
+        let data: TonCenterTransactionsResponse = response
+            .json()
+            .context("Failed to parse getTransactions response")?;
+
+        Ok(data.result)
+    }
 }
 
 #[derive(Deserialize, Clone)]
@@ -385,4 +430,38 @@ impl StringOrNumber {
                 .ok_or_else(|| anyhow!("cannot convert {num} to bigint")),
         }
     }
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct TonCenterTransaction {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub utime: u64,
+    pub data: String,
+    pub transaction_id: TonCenterTransactionId,
+    pub fee: String,
+    pub storage_fee: String,
+    pub other_fee: String,
+    pub in_msg: Option<TonCenterMessage>,
+    pub out_msgs: Vec<TonCenterMessage>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct TonCenterTransactionId {
+    pub lt: String,
+    pub hash: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct TonCenterMessage {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub value: String,
+    pub fwd_fee: Option<String>,
+    pub ihr_fee: Option<String>,
+    pub created_lt: Option<String>,
+    pub body_hash: Option<String>,
+    pub message: Option<String>,
 }

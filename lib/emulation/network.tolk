@@ -45,7 +45,7 @@ type OutMessages = tuple
 type ExtOutList = tuple
 
 /// Returns the external outgoing message at the given index with given type.
-/// 
+///
 /// Note that if message is not a given type, loading will fail with exit code 63.
 /// If you want to handle this case, use [ExtOutList.atOrNull] instead.
 fun ExtOutList.at<Msg>(self, index: int): ExtMessageRelaxed<Msg> {
@@ -53,10 +53,10 @@ fun ExtOutList.at<Msg>(self, index: int): ExtMessageRelaxed<Msg> {
     return cell.load();
 }
 
-/// Returns the external outgoing message at the given index with given type or 
+/// Returns the external outgoing message at the given index with given type or
 /// null if message is not a given type.
-/// 
-/// Note that if message is not a given type, this method will return null instead 
+///
+/// Note that if message is not a given type, this method will return null instead
 /// of throwing an exception. Use [ExtOutList.at] if you don't want to handle null case.
 fun ExtOutList.atOrNull<Msg>(self, index: int): ExtMessageRelaxed<Msg>? {
     val cell = self.get<cell>(index) as Cell<ExtMessageRelaxed<Msg>>;
@@ -74,16 +74,16 @@ fun ExtOutList.atOrNull<Msg>(self, index: int): ExtMessageRelaxed<Msg>? {
 }
 
 /// Returns the out message at the given index as a raw cell.
-/// 
+///
 /// To get parsed message, use [OutMessages.at] method.
 fun OutMessages.atCell(self, index: int): cell {
     return self.get<cell>(index);
 }
 
 /// Returns the out message at the given index as a parsed message of given type.
-/// 
+///
 /// To get raw cell, use [OutMessages.atCell] method.
-/// 
+///
 /// If actual message body has a different type, loading will fail.
 fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
     val cell = self.get<cell>(index) as Cell<MessageRelaxed<Msg>>;
@@ -141,9 +141,9 @@ fun SendResult.allOutActions(self): OutActionList {
 }
 
 /// Represents a list of send results obtained from [net.send] method.
-/// 
+///
 /// This list represent all transactions produced by a [net.send] call.
-/// 
+///
 /// To get a single send result, use [SendResultList.at] method.
 type SendResultList = tuple
 
@@ -250,7 +250,7 @@ fun SendResultList.findExternalOutMessage<TBody = never>(self, params: ExternalO
 }
 
 /// Find a transaction in the send result list by specified parameters.
-/// 
+///
 /// Example:
 /// ```
 /// val tx = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
@@ -274,7 +274,7 @@ fun net.sendFromNull(message: OutMessage, mode: int): TransactionList {
 }
 
 /// Send a message from a specified address with specified mode.
-/// 
+///
 /// Example:
 /// ```
 /// get fun `test-send-message`() {
@@ -287,23 +287,23 @@ fun net.sendFromNull(message: OutMessage, mode: int): TransactionList {
 ///     net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
 /// }
 /// ```
-/// 
+///
 /// Returns a list of send results representing all transactions produced by this send call.
 fun net.send(from: address, message: OutMessage, mode: int): SendResultList {
     return ffi.sendMessageFrom(message.messageCell, from.toCell(), mode)!;
 }
 
 /// Treasury is a special contract that is used to deploy other contracts.
-/// 
+///
 /// To create a treasury, use the `Network.treasury()` method.
 struct Treasury {
     address: address
 }
 
 /// Create a treasury with a specified name.
-/// 
+///
 /// Calling this method with same name will return the same treasury.
-/// 
+///
 /// Example:
 /// ```
 /// get fun `test-mint`() {
@@ -360,12 +360,12 @@ fun net.wallet(name: slice): Wallet {
 }
 
 /// Run a get method of a contract by its name.
-/// 
+///
 /// Imagine you have the following get method in the contract:
 /// ```
 /// get fun get_balance(): coins { ... }
 /// ```
-/// 
+///
 /// To call it, you can use the following code:
 /// ```
 /// val balance = net.runGetMethod<coins>(wallet.address, "get_balance");
@@ -383,7 +383,7 @@ fun net.wallet(name: slice): Wallet {
 /// ```
 ///
 /// ## With struct return type
-/// 
+///
 /// If get method returns a struct, specify the type of the struct as a first type argument:
 /// ```
 /// get fun get_jetton_data(): JettonDataReply { ... }
@@ -407,7 +407,7 @@ fun net.wallet(name: slice): Wallet {
 /// val first = data.get<int>(0);
 /// val second = data.get<int>(1);
 /// ```
-/// 
+///
 /// If you need to run a get method by its ID, use [Network.runGetMethodById] instead.
 fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
     val method_id = (crc16(name) & 0xffff) | 0x10000;
@@ -415,14 +415,14 @@ fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? 
 }
 
 /// Run a get method of a contract by its ID.
-/// 
+///
 /// If you need to run a get method by its name, use [Network.runGetMethod] instead.
-/// 
+///
 /// Example:
 /// ```
 /// val data = net.runGetMethodById<JettonDataReply>(wallet.address, 0x17b02);
 /// ```
-/// 
+///
 /// See [Network.runGetMethod] for more information.
 @noinline
 fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? = null): Ret {
@@ -435,17 +435,45 @@ fun net.isDeployed(addr: address): bool {
 }
 
 /// Get the code of a deployed contract by its address.
-/// 
+///
 /// If the contract is not deployed, returns null.
 fun net.getDeployedCode(addr: address): cell? {
     return ffi.getDeployedCode(addr.toCell());
 }
 
+/// Wait for a transaction with the specified message hash.
+///
+/// This method polls the network until the transaction is applied or the
+/// maximum number of attempts is reached.
+///
+/// Returns true if transaction is found and false otherwise.
+///
+/// Example:
+/// ```
+/// val messageHash = "abc123...";
+/// net.waitForTransaction(wallet.address, messageHash, 20, 2000);
+/// ```
+fun net.waitForTransaction(
+    addr: address,
+    messageHash: slice,
+    quiet: bool = false,
+    attempts: int = 20,
+    sleepDuration: int = 2000,
+): bool {
+    return ffi.waitForTransaction(
+        addr.toCell(),
+        messageHash.toCell(),
+        quiet,
+        attempts,
+        sleepDuration
+    );
+}
+
 /// Generate a random address.
-/// 
+///
 /// If a name is provided, the address will be registered with the given name.
 /// This allows test runner to show the name instead of the address in the test output.
-/// 
+///
 /// Example:
 /// ```
 /// val address = net.randomAddress("random_user");
@@ -471,13 +499,13 @@ fun net.randomAddress(name: slice? = null): address {
 }
 
 /// Register an address with a name.
-/// 
+///
 /// This allows test runner to show the name instead of the address in the test output.
-/// 
-/// For example, if your contract is not deployed yet, without calling this method, 
-/// the test runner will show raw address in the test output. In this case, you 
+///
+/// For example, if your contract is not deployed yet, without calling this method,
+/// the test runner will show raw address in the test output. In this case, you
 /// likely want to call this method to register the address with a name.
-/// 
+///
 /// Example:
 /// ```
 /// net.registerAddress(address, "my_address");
@@ -487,10 +515,10 @@ fun net.registerAddress(addr: address, name: slice) {
 }
 
 /// Register a code cell with a name.
-/// 
+///
 /// This allows test runner to show the name instead of the address in the test output
 /// if the actual code of the contract is match to previously registered code.
-/// 
+///
 /// Example:
 /// ```
 /// net.registerCodeCell(code, "my_code");
@@ -541,7 +569,7 @@ fun net.fetchAndRegisterLibrary(hash: slice): bool {
 }
 
 /// Calculate the CRC16 checksum of a slice.
-/// 
+///
 /// Example:
 /// ```
 /// val crc = crc16("hello");
@@ -599,3 +627,4 @@ fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
 fun ffi.loadLibrary(hash: slice): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
 fun ffi.getWalletByName(name: slice): cell? asm "24 EXTCALL"
+fun ffi.waitForTransaction(addr: cell, messageHash: cell, quiet: bool, attempts: int, sleepDuration: int): bool asm "25 EXTCALL"

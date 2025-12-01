@@ -2,6 +2,8 @@ use crate::context::{AssertFailure, Context, FailAssertFailure, KnownAddress, Wa
 use crate::debugger::debug_context::StepMode;
 use crate::ffi::assert::process_txs_and_search_params;
 use crate::formatter::FormatterContext;
+use anyhow::anyhow;
+use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use emulator::config::DEFAULT_CONFIG;
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -15,7 +17,8 @@ use emulator::traits::BaseExecutor;
 use emulator::{AnyExecutor, extension, pop_args, register_ext_methods, remote, try_ctx};
 use log::{debug, info, warn};
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
+use num_traits::{ToPrimitive, Zero};
+use owo_colors::OwoColorize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::str::FromStr;
@@ -1160,6 +1163,97 @@ fn get_wallet_by_name_impl(ctx: &mut Context, stack: &mut Tuple, name: String) {
     stack.push(TupleItem::Null);
 }
 
+extension!(wait_for_transaction in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: BigInt, ext_message_hash: ArcCell, address: ArcCell) using wait_for_transaction_impl);
+#[allow(clippy::too_many_arguments)]
+fn wait_for_transaction_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    sleep_duration: BigInt,
+    attempts: BigInt,
+    quiet: BigInt,
+    ext_message_hash: ArcCell,
+    address: ArcCell,
+) {
+    if !ctx.is_broadcasting {
+        return;
+    }
+
+    let quiet = !quiet.is_zero();
+    let attempts = attempts.to_u32().unwrap_or(20);
+    let sleep_duration_ms = sleep_duration.to_u64().unwrap_or(2000);
+
+    if attempts == 0 {
+        ctx.asserts
+            .fail("Attempt number must be positive".to_owned());
+        return;
+    }
+
+    let address_str = try_ctx!(
+        ctx,
+        cell_address_to_raw(address.clone()),
+        "Failed to decode address: {}"
+    );
+
+    let network = try_ctx!(
+        ctx,
+        Network::from_str(&ctx.network),
+        "Failed to parse network: {}"
+    );
+
+    let api_client = TonApiClient::new(network, ctx.chain.blockchain.get_api_key().clone());
+
+    let ext_message_hash_bytes = ext_message_hash.data();
+
+    for attempt in 1..=attempts {
+        if !quiet {
+            println!("Awaiting transaction... [Attempt {}/{}]", attempt, attempts);
+        }
+
+        let txs = match api_client.get_transactions(&address_str, Some(100), None, None) {
+            Ok(txs) => txs,
+            Err(_) => {
+                std::thread::sleep(Duration::from_millis(sleep_duration_ms));
+                continue;
+            }
+        };
+
+        for tx in txs.iter().rev() {
+            if let Some(in_msg) = &tx.in_msg
+                && let Some(body_hash) = &in_msg.body_hash
+            {
+                let msg_hash_bytes = try_ctx!(
+                    ctx,
+                    base64::engine::general_purpose::STANDARD.decode(body_hash),
+                    "Failed to decode message body hash: {}"
+                );
+
+                if msg_hash_bytes == ext_message_hash_bytes {
+                    if !quiet {
+                        println!(
+                            "Transaction {} successfully applied!",
+                            HashBytes::from_slice(ext_message_hash_bytes)
+                                .to_string()
+                                .dimmed()
+                        );
+                    }
+                    stack.push_bool(true);
+                    return;
+                }
+            }
+        }
+
+        if attempt < attempts {
+            std::thread::sleep(Duration::from_millis(sleep_duration_ms));
+        }
+    }
+
+    ctx.asserts.fail(
+        "Transaction was not applied after {} attempts. Check your wallet's transactions"
+            .to_owned(),
+    );
+    stack.push_bool(false);
+}
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         6 => build,
@@ -1180,5 +1274,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         21 => load_library_by_hash,
         23 => is_broadcasting,
         24 => get_wallet_by_name,
+        25 => wait_for_transaction,
     });
 }

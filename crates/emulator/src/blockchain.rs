@@ -157,4 +157,8 @@ impl Blockchain {
         self.libraries.push(lib_cell);
         Ok(())
     }
+
+    pub fn get_api_key(&self) -> &Option<String> {
+        &self.api_key
+    }
 }
