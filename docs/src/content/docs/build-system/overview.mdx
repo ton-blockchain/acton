@@ -1,0 +1,115 @@
+---
+title: "Build system overview"
+description: "Learn how Acton's build system manages smart contract compilation, dependencies, and code generation"
+---
+
+Acton provides a flexible smart contract build system with support for code generation and dependency management between contracts. The build system automatically handles contract compilation, dependency resolution, and generates helper functions for embedding child contracts.
+
+**What you'll learn:**
+- How to configure contracts in Acton.toml
+- Different ways to handle contract dependencies
+- Code embedding and library reference techniques
+- Build caching and performance optimization
+
+For a complete reference of all configuration options and CLI flags, see the [Configuration Reference](/acton/build-system/configuration-reference/).
+
+## Basic Configuration
+
+Contracts are described in the Acton.toml project configuration file. A simple contract might look like this:
+
+```toml title=Acton.toml
+[package]
+name = "my-counter"
+description = "The Best Counter Ever"
+version = "0.1.0"
+license = "MIT"
+
+[contracts.counter]
+name = "Counter"
+src = "contracts/counter.tolk"
+depends = []
+```
+
+Now when calling `acton build`, the contract will be compiled and added to the cache.
+
+## Contract Dependencies
+
+Very often, one contract's code needs to be included in another contract. There are three main ways to implement this:
+
+1. **Storage approach**: Store the code in `Storage` during deployment
+2. **Code embedding**: Compile the child contract code and embed it through an assembly function directly into the parent contract's code
+3. **Library reference**: Deploy a library with the child contract code and reference this library through an assembly function
+
+Acton supports all three approaches and provides convenient file generation for the second and third methods.
+
+### Code Embedding
+
+Let's imagine we have a Jetton Minter and Jetton Wallet, and we need the Wallet code inside the Minter. All you need to do to embed the Wallet code into the Minter is to specify the dependency in Acton.toml:
+
+```toml
+[contracts.jetton-minter]
+name = "Minter"
+src = "contracts/jetton-minter-contract.tolk"
+depends = ["jetton-wallet"]
+
+[contracts.jetton-wallet]
+name = "Wallet"
+src = "contracts/jetton-wallet-contract.tolk"
+depends = []
+```
+
+Now after calling `acton build`, a file `gen/jetton-wallet_code.tolk` will appear in the `gen/` folder with the function `jetton_walletCompiledCode` which returns a Cell with the Wallet code.
+
+
+### Library References
+
+If you want to reference code through a library reference, specify the dependency kind in the `depends` array:
+
+```toml
+[contracts.jetton-minter]
+name = "Minter"
+src = "contracts/jetton-minter-contract.tolk"
+depends = [
+  { name = "jetton-wallet", kind = "library_ref" }
+]
+
+[contracts.jetton-wallet]
+name = "Wallet"
+src = "contracts/jetton-wallet-contract.tolk"
+depends = []
+```
+
+The generated file `gen/jetton-wallet_code.tolk` will contain the function `jetton_walletCompiledCode` which references the library by its hash instead of embedding the full code.
+
+:::note
+Acton currently does not provide the ability to deploy a library. You need to deploy the library contract separately and ensure it matches the generated hash reference.
+:::
+
+### Dependency Resolution
+
+Acton automatically resolves contract dependencies and ensures they are compiled in the correct order. If a circular dependency is detected between contracts, the build will fail with a detailed error message showing the cycle path:
+
+```bash
+Error: Circular dependency detected in contracts: A → B → A → C
+```
+
+## Build Caching
+
+Acton supports incremental builds which significantly improves build and testing startup speed by recompiling only changed files. The incremental build system is aware of dependencies both within contracts and between contracts.
+
+### Cache Management
+
+| Command                     | Description                        |
+|-----------------------------|------------------------------------|
+| `acton build`               | Build with incremental caching     |
+| `acton build --clear-cache` | Clear cache and rebuild everything |
+
+### How Caching Works
+
+The build system tracks:
+- File modification times
+- Contract dependencies
+- Generated code changes
+- Compiler version changes
+
+When you modify a contract, only that contract and its dependents are recompiled, significantly speeding up development workflows.

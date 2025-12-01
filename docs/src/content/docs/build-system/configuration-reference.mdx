@@ -1,0 +1,187 @@
+---
+title: "Build Reference"
+description: "Complete reference for all build system configuration options, CLI flags, and contract settings"
+---
+
+This page provides a complete reference for all configuration options available in Acton's build system.
+
+## `acton build`
+
+Compile all contracts defined in `Acton.toml` or a specific contract with its dependencies.
+
+```bash
+acton build [OPTIONS] [CONTRACT]
+```
+
+### Arguments
+
+| Argument     | Description                                                                                              |
+|--------------|----------------------------------------------------------------------------------------------------------|
+| `[CONTRACT]` | Optional contract name to build. If specified, only this contract and its dependencies will be compiled. |
+
+### Options
+
+| Flag             | Description                                                                                                  |
+|------------------|--------------------------------------------------------------------------------------------------------------|
+| `--clear-cache`  | Clear the compilation cache before building. Forces recompilation of all contracts regardless of cache state |
+| `--graph [PATH]` | Generate a visual dependency graph as an SVG file. Requires Graphviz to be installed. Defaults to `deps.svg` |
+
+### Examples
+
+```bash
+# Build all contracts
+acton build
+
+# Build only the counter contract and its dependencies
+acton build counter
+
+# Clear cache and rebuild everything
+acton build --clear-cache
+
+# Build and generate dependency graph
+acton build --graph
+
+# Build with custom graph path
+acton build --graph diagrams/dependencies.svg
+```
+
+## Acton.toml Configuration
+
+### Contracts Section
+
+Contracts are defined using `[contracts.*]` sections where `*` is the contract key.
+
+```toml
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+output = "build/my-contract.boc"
+depends = []
+```
+
+#### Contract Fields
+
+| Field     | Type   | Required | Description                                                                                                        |
+|-----------|--------|----------|--------------------------------------------------------------------------------------------------------------------|
+| `name`    | string | Yes      | Human-readable contract name displayed during compilation                                                          |
+| `src`     | string | Yes      | Path to the contract source file. Can be a `.tolk` file for compilation or a `.boc` file for precompiled contracts |
+| `output`  | string | No       | Path where the compiled `.boc` file should be saved. If omitted, the compiled contract is only cached              |
+| `depends` | array  | No       | Array of contract dependencies. Can be simple strings or detailed dependency objects                               |
+
+#### Contract Keys
+
+The contract key (the part after `contracts.` in the section name) is used:
+- As the dependency name when referencing this contract
+- To generate the output file name in `gen/` folder (e.g., `counter` → `gen/counter_code.tolk`)
+- To generate the function name (e.g., `counter` → `counterCompiledCode()`)
+
+Keys should use lowercase with hyphens (e.g., `jetton-wallet`, `nft-collection`).
+
+### Dependencies Configuration
+
+Dependencies can be specified in two formats:
+
+#### Simple Format
+
+```toml
+depends = ["child-contract", "another-contract"]
+```
+
+Uses default settings:
+- `kind = "embed_code"`
+- Generated file: `gen/{contract-key}_code.tolk`
+- Generated function: `{contract_key}CompiledCode()`
+
+#### Detailed Format
+
+```toml
+depends = [
+  { name = "child-contract", kind = "library_ref", function = "getChildCode", path = "contracts/gen/child.tolk" }
+]
+```
+
+| Field      | Type   | Required | Default                | Description                                                                                  |
+|------------|--------|----------|------------------------|----------------------------------------------------------------------------------------------|
+| `name`     | string | Yes      | -                      | Contract key to depend on. Must match a `[contracts.*]` key                                  |
+| `kind`     | string | No       | `"embed_code"`         | Dependency type: `"embed_code"` or `"library_ref"`                                           |
+| `function` | string | No       | Auto-generated         | Custom name for the generated function. If omitted, uses `{contract_key}CompiledCode` format |
+| `path`     | string | No       | `gen/{name}_code.tolk` | Custom output path for the generated file                                                    |
+
+#### Dependency Kinds
+
+**`embed_code`** (default)
+
+Embeds the full compiled contract code directly into the parent contract.
+
+```toml
+depends = ["wallet"]
+# or
+depends = [{ name = "wallet", kind = "embed_code" }]
+```
+
+Generated assembly:
+```tolk
+@pure
+fun walletCompiledCode(): cell asm """
+    "<base64_boc_data>" base64>B B>boc PUSHREF
+"""
+```
+
+**`library_ref`**
+
+Generates a library reference instead of embedding full code. The library must be deployed separately.
+
+```toml
+depends = [{ name = "wallet", kind = "library_ref" }]
+```
+
+Generated assembly:
+```tolk
+@pure
+fun walletCompiledCode(): cell asm """
+    "<base64_boc_data>" base64>B B>boc hashu <b 2 8 u, swap 256 u, b>spec PUSHREF
+"""
+```
+
+### Using Precompiled Contracts
+
+You can use precompiled `.boc` files instead of `.tolk` sources:
+
+```toml
+[contracts.precompiled]
+name = "PrecompiledContract"
+src = "contracts/precompiled.boc"
+depends = []
+```
+
+When using `.boc` files:
+- No compilation is performed
+- The BoC is loaded and cached directly
+- Dependencies can still reference this contract
+- Useful for third-party contracts or cross-platform builds
+
+## Dependency Graph Visualization
+
+Generate a visual representation of contract dependencies:
+
+```bash
+acton build --graph deps.svg
+```
+
+Requires [Graphviz](https://graphviz.org/) to be installed:
+
+```bash
+# macOS
+brew install graphviz
+
+# Ubuntu/Debian
+sudo apt-get install graphviz
+
+# Windows
+# Download from https://graphviz.org/download/
+```
+
+The generated SVG shows:
+- Contract boxes with names and keys
+- Arrows indicating dependencies
+- Edge labels showing dependency kind (`embed code` or `library ref`)

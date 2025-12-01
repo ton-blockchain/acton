@@ -165,6 +165,13 @@ export default defineConfig({
             },
           ],
         },
+        {
+          label: "Build System",
+          items: [
+            {slug: "build-system/overview", label: "Overview"},
+            {slug: "build-system/configuration-reference", label: "Reference"},
+          ],
+        },
       ],
     }),
     react(),
