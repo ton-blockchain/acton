@@ -171,7 +171,7 @@ impl Compiler {
                             match read_to_string(file_path) {
                                 Ok(content) => content,
                                 Err(error) => {
-                                    let raw_str = CString::new(error.to_string() + "aaa")
+                                    let raw_str = CString::new(error.to_string())
                                         .expect("Failed to create C string from error");
                                     unsafe {
                                         *dest_error = raw_str.into_raw();

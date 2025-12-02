@@ -552,6 +552,7 @@ impl Project {
             compile_base64_only: false,
             compile_boc: None,
             compile_fift: None,
+            compile_source_map: None,
             test_reporters: Vec::new(),
             junit_merge: false,
         }
@@ -584,6 +585,7 @@ pub struct ActonCommand {
     pub(crate) compile_base64_only: bool,
     pub(crate) compile_boc: Option<String>,
     pub(crate) compile_fift: Option<String>,
+    pub(crate) compile_source_map: Option<String>,
     pub(crate) test_reporters: Vec<String>,
     pub(crate) junit_merge: bool,
 }
@@ -741,6 +743,11 @@ impl ActonCommand {
 
     pub fn with_fift_output(mut self, fift_path: &str) -> Self {
         self.compile_fift = Some(fift_path.to_string());
+        self
+    }
+
+    pub fn with_source_map(mut self, source_map_path: &str) -> Self {
+        self.compile_source_map = Some(source_map_path.to_string());
         self
     }
 
@@ -932,6 +939,10 @@ impl ActonCommand {
 
         if let Some(fift_path) = self.compile_fift {
             self.cmd = self.cmd.arg("--fift").arg(fift_path);
+        }
+
+        if let Some(source_map_path) = self.compile_source_map {
+            self.cmd = self.cmd.arg("--source-map").arg(source_map_path);
         }
 
         self.cmd = self.cmd.env("NO_COLOR", "1");

@@ -47,6 +47,9 @@ pub mod error_fmt {
     }
 
     pub fn file_not_found(path: &str) -> String {
+        if path.is_empty() {
+            return "Empty file path is not allowed".to_string();
+        }
         let cwd = std::env::current_dir().unwrap_or(".".into());
         format!(
             "Cannot find file or directory {}",

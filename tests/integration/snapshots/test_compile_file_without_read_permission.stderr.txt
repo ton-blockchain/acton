@@ -1,0 +1,2 @@
+Error: fatal: Failed to read [ROOT]/contracts/secret.tolk: Permission denied (os error 13)
+
