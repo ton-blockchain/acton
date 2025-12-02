@@ -7,10 +7,12 @@
     "init-project.mdx",
     "deploy-contract.mdx",
     "verify-contract.mdx",
-    "--- Documentation ---",
+    "--- Digging deeper ---",
     "commands",
     "build-system",
     "test-runner",
-    "scripting"
+    "scripting",
+    "--- Advanced ---",
+    "advanced/libraries"
   ]
 }
