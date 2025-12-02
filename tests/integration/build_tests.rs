@@ -935,3 +935,416 @@ depends = []
             "integration/snapshots/test_build_missing_boc_file.stderr.txt",
         );
 }
+
+#[test]
+fn test_build_missing_acton_toml() {
+    let project = ProjectBuilder::new("build-missing-toml")
+        .without_acton_toml()
+        .build();
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_missing_acton_toml.stderr.txt",
+        )
+        .assert_contains("Acton.toml not found");
+}
+
+#[test]
+fn test_build_invalid_acton_toml() {
+    let project = ProjectBuilder::new("build-invalid-toml").build();
+
+    fs::write(
+        project.path().join("Acton.toml"),
+        r#"
+[package
+name = "invalid-toml"
+description = ""
+version = "0.1.0"
+
+[contracts]
+missing_closing_bracket = { name = "test", src = "contracts/test.tolk" }
+"#,
+    )
+    .expect("Failed to write invalid TOML");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_invalid_acton_toml.stderr.txt",
+        )
+        .assert_contains("TOML parse error");
+}
+
+#[test]
+fn test_build_contract_source_file_not_found() {
+    let project = ProjectBuilder::new("contract-file-missing").build();
+
+    let toml_content = r#"[package]
+name = "contract-file-missing"
+description = ""
+version = "0.1.0"
+
+[contracts.missing]
+name = "missing"
+src = "contracts/missing_file.tolk"
+depends = []
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_contract_source_file_not_found.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_contract_invalid_file_extension() {
+    let project = ProjectBuilder::new("invalid-extension")
+        .raw_file("contracts/simple.txt", SIMPLE_CONTRACT)
+        .build();
+
+    let toml_content = r#"[package]
+name = "invalid-extension"
+description = ""
+version = "0.1.0"
+
+[contracts.simple]
+name = "simple"
+src = "contracts/simple.txt"
+depends = []
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_contract_invalid_file_extension.stdout.txt",
+        );
+}
+
+#[test]
+fn test_build_output_boc_write_error() {
+    let project = ProjectBuilder::new("boc-write-error")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "readonly/output.boc")
+        .build();
+
+    // Create a readonly directory to simulate write error
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444); // readonly
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_output_boc_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_empty_contracts_section() {
+    let project = ProjectBuilder::new("empty-contracts").build();
+
+    let toml_content = r#"[package]
+name = "empty-contracts"
+description = ""
+version = "0.1.0"
+
+[contracts]
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_contains("No contracts to build.");
+}
+
+#[test]
+fn test_build_dependency_custom_path_write_error() {
+    let project = ProjectBuilder::new("dep-path-error")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_detailed_deps(
+            "parent",
+            SIMPLE_CONTRACT,
+            vec![("child", None, None, Some("readonly/child_code.tolk"))],
+        )
+        .build();
+
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444); // readonly
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_dependency_custom_path_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_contract_with_special_characters_in_path() {
+    let project = ProjectBuilder::new("special-chars-path")
+        .contract("simple file", SIMPLE_CONTRACT)
+        .build();
+
+    let toml_content = r#"[package]
+name = "special-chars-path"
+description = ""
+version = "0.1.0"
+
+[contracts.simple]
+name = "simple"
+src = "contracts/simple file.tolk"
+depends = []
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_build_contract_with_special_characters_in_path.stdout.txt",
+        );
+}
+
+#[test]
+fn test_build_corrupted_cache_file() {
+    let project = ProjectBuilder::new("corrupted-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // First build to create cache
+    project.acton().build().run().success();
+
+    // Manually corrupt the cache file by writing invalid base64
+    let cache_dir = project.path().join(".acton/cache");
+    if cache_dir.exists() {
+        for entry in fs::read_dir(&cache_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.extension().unwrap_or_default() == "cache" {
+                fs::write(&path, "invalid base64 data!!!").unwrap();
+                break;
+            }
+        }
+    }
+
+    // Second build should fail due to corrupted cache
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_build_corrupted_cache_file.stdout.txt",
+        );
+}
+
+#[test]
+fn test_build_contract_with_invalid_output_path() {
+    let project = ProjectBuilder::new("invalid-output-path")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "")
+        .build();
+
+    project.acton().build().run().success(); // Empty output path should be ignored
+}
+
+#[test]
+fn test_build_contract_with_numeric_name_dependency() {
+    let project = ProjectBuilder::new("numeric-name-dep")
+        .contract("123contract", SIMPLE_CONTRACT)
+        .contract_with_detailed_deps(
+            "main",
+            SIMPLE_CONTRACT,
+            vec![("123contract", None, None, None)],
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    let gen_file = project.path().join("gen/123contract_code.tolk");
+    assert!(
+        gen_file.exists(),
+        "Should create file for numeric contract name"
+    );
+
+    let content = fs::read_to_string(&gen_file).expect("Should read gen file");
+
+    assertion().eq(
+        normalize_output(content.as_str(), project.path()),
+        snapbox::file!("snapshots/test_build_contract_with_numeric_name_dependency.tolk.gen"),
+    );
+}
+
+#[test]
+fn test_build_contract_syntax_error() {
+    let project = ProjectBuilder::new("syntax-error")
+        .contract(
+            "broken",
+            r#"
+            fun onInternalMessage(in: InMessage) {
+                val x = ;
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_contract_syntax_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_several_contracts_with_syntax_error() {
+    let project = ProjectBuilder::new("syntax-error")
+        .contract(
+            "broken1",
+            r#"
+            fun onInternalMessage(in: InMessage) {
+                val x = ;
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        )
+        .contract(
+            "broken2",
+            r#"
+            fun onInternalMessage(in: InMessage) {
+                val x;
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_several_contracts_with_syntax_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_good_and_bad_contracts_with_syntax_error() {
+    let project = ProjectBuilder::new("syntax-error")
+        .contract(
+            "broken1",
+            r#"
+            fun onInternalMessage(in: InMessage) {
+                val x = 10;
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        )
+        .contract(
+            "ok2",
+            r#"
+            fun onInternalMessage(in: InMessage) {
+                val x =;
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_good_and_bad_contracts_with_syntax_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_corrupted_boc_file() {
+    let project = ProjectBuilder::new("corrupted-boc")
+        .raw_file("contracts/corrupted.boc", "not a valid boc file!!!")
+        .build();
+
+    let toml_content = r#"[package]
+name = "corrupted-boc"
+description = ""
+version = "0.1.0"
+
+[contracts.corrupted]
+name = "corrupted"
+src = "contracts/corrupted.boc"
+depends = []
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_corrupted_boc_file.stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_contract_filter_nonexistent() {
+    let project = ProjectBuilder::new("filter-nonexistent")
+        .contract("existing", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .build()
+        .contract("nonexistent")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_contract_filter_nonexistent.stderr.txt",
+        );
+}

@@ -1,1 +1,4 @@
-Error: Failed to read BoC file contracts/missing.boc: [NOT_FOUND]
+Error: In broken:
+
+Failed to read BoC file contracts/missing.boc: [NOT_FOUND]
+Build failed with 1 error

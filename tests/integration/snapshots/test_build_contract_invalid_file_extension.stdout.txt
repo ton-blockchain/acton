@@ -1,0 +1,5 @@
+Error: In simple:
+
+fatal: Failed to locate contracts/simple.txt: [NOT_FOUND]
+
+Build failed with 1 error

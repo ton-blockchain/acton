@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_char};
 use std::fs::{canonicalize, read_to_string};
+use std::io::Error;
 use std::path::{Path, PathBuf};
 
 /// Compiles passed file with Tolk compiler.
@@ -74,7 +75,7 @@ impl Compiler {
                 dest_contents: *mut *mut c_char,
                 dest_error: *mut *mut c_char,
             ) {
-                fn realpath(path: PathBuf) -> Result<String, std::io::Error> {
+                fn realpath(path: PathBuf) -> Result<String, Error> {
                     if path.is_absolute() {
                         let abs_path = canonicalize(path)?;
                         return Ok(abs_path.to_string_lossy().into_owned());
@@ -103,17 +104,22 @@ impl Compiler {
                             relative_path.push_str(relative_path_raw);
                         }
 
-                        let Ok(abs_path) = realpath(
+                        let result = realpath(
                             relative_path
                                 .parse()
                                 .expect("Failed to parse relative path"),
-                        ) else {
-                            let raw_str = CString::new("cannot realpath a path".to_string())
-                                .expect("Failed to create C string");
-                            unsafe {
-                                *dest_error = raw_str.into_raw();
+                        );
+
+                        let abs_path = match result {
+                            Ok(abs_path) => abs_path,
+                            Err(err) => {
+                                let raw_str = CString::new(err.to_string())
+                                    .expect("Failed to create C string");
+                                unsafe {
+                                    *dest_error = raw_str.into_raw();
+                                }
+                                return;
                             }
-                            return;
                         };
 
                         let raw_str = CString::new(abs_path)

@@ -4,7 +4,7 @@ use crate::file_build_cache::FileBuildCache;
 use anyhow::anyhow;
 use log::debug;
 use owo_colors::OwoColorize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
@@ -49,7 +49,7 @@ pub fn build_cmd(
     }
 
     let mut file_cache = FileBuildCache::new(None)?;
-    let failure_count = 0;
+    let mut failure_count = 0;
     let total_start = Instant::now();
 
     let flatten_contracts = contracts.iter().collect::<Vec<_>>();
@@ -78,6 +78,7 @@ pub fn build_cmd(
     }
 
     let mut compiled_contracts: HashMap<String, String> = HashMap::new();
+    let mut compile_errors = BTreeMap::new();
 
     for contract_key in filtered_compilation_order {
         let Some(contract_config) = contracts.get(&contract_key) else {
@@ -87,7 +88,15 @@ pub fn build_cmd(
 
         generate_dependency_files(&contract_key, contract_config, &compiled_contracts, &config)?;
 
-        let code_boc64 = process_contract(&mut file_cache, contract_config, contract_path)?;
+        let code_boc64 = process_contract(&mut file_cache, contract_config, contract_path);
+        let code_boc64 = match code_boc64 {
+            Ok(code_boc64) => code_boc64,
+            Err(err) => {
+                failure_count += 1;
+                compile_errors.insert(contract_key.clone(), err);
+                continue;
+            }
+        };
 
         compiled_contracts.insert(contract_key.clone(), code_boc64.clone());
 
@@ -105,11 +114,22 @@ pub fn build_cmd(
         println!("    {} in {:?}", "Finished".green().bold(), total_elapsed);
         Ok(())
     } else {
-        Err(anyhow!(
-            "Build failed with {} error{}",
-            failure_count,
-            if failure_count == 1 { "" } else { "s" }
-        ))
+        let mut whole_error = "".to_owned();
+
+        for (contract, err) in compile_errors {
+            whole_error += color_print::cformat!("In <yellow>{contract}</>:\n\n{err}\n").as_str()
+        }
+
+        whole_error.push_str(
+            color_print::cformat!(
+                "<red>Build failed</> with {} error{}",
+                failure_count,
+                if failure_count == 1 { "" } else { "s" }
+            )
+            .as_str(),
+        );
+
+        Err(anyhow!(whole_error))
     }
 }
 
@@ -161,7 +181,7 @@ fn process_contract(
                     result.code_boc64
                 }
                 tolkc::CompilerResult::Error(error) => {
-                    return Err(anyhow!("Cannot compile script file {}", error.message));
+                    anyhow::bail!(error.message);
                 }
             }
         }

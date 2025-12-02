@@ -1,0 +1,7 @@
+Error: In ok2:
+
+[ROOT]/contracts/ok2[LINE]: error: expected <expression>, got `;`
+   3 |                 val x =;
+     |                        ^
+
+Build failed with 1 error

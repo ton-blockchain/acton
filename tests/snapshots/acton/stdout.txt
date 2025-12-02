@@ -3,16 +3,17 @@ TON blockchain development tool
 Usage: acton <COMMAND>
 
 Commands:
-  init      Initialize a new project in the current directory
-  new       Create a new project in the specified directory
-  test      Execute tests in file or directory
-  test-gen  Generate test wrapper and test file for a contract
-  script    Execute a Tolk script file
-  build     Build all contracts
-  compile   Compile a Tolk file
-  disasm    Disassemble TVM bitcode to human-readable TASM
-  verify    Verify contract source code on verifier.ton.org
-  help      Print this message or the help of the given subcommand(s)
+  init         Initialize a new project in the current directory
+  new          Create a new project in the specified directory
+  test         Execute tests in file or directory
+  test-gen     Generate test wrapper and test file for a contract
+  script       Execute a Tolk script file
+  build        Build all contracts
+  compile      Compile a Tolk file
+  disasm       Disassemble TVM bitcode to human-readable TASM
+  verify       Verify contract source code on verifier.ton.org
+  completions  Generate shell completions for selected shell
+  help         Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help

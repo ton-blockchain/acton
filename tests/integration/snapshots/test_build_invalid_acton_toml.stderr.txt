@@ -1,0 +1,6 @@
+Error: TOML parse error at line 2, column 9
+  |
+2 | [package
+  |         ^
+unclosed table, expected `]`
+

@@ -2530,6 +2530,7 @@ dependencies = [
 name = "tolkc"
 version = "0.1.0"
 dependencies = [
+ "color-print",
  "include_dir",
  "serde",
  "serde_json",

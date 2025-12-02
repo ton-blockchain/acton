@@ -1,0 +1,4 @@
+Error: In corrupted:
+
+Failed to decode BoC file contracts/corrupted.boc: unknown BOC tag
+Build failed with 1 error

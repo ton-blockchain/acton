@@ -1,6 +1,9 @@
-Error: Cannot compile script file [ROOT]/contracts/broken[LINE]: error: undefined symbol `nonexistent`
+Error: In broken:
+
+[ROOT]/contracts/broken[LINE]: error: undefined symbol `nonexistent`
 
     // in function `onInternalMessage`
    3 |                 val x = nonexistent; // This will cause compilation error
      |                         ^^^^^^^^^^^
 
+Build failed with 1 error

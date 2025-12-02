@@ -180,7 +180,7 @@ impl ActonConfig {
         let config_path = Path::new("Acton.toml");
         if !config_path.exists() {
             return Err(anyhow!(
-                "Acton.toml not found. Run 'acton init' to create a new project."
+                "Acton.toml not found. Run 'acton init' to initialize Acton in the project."
             ));
         }
 
