@@ -1,3 +1,4 @@
+use crate::commands::common::error_fmt;
 use crate::config::{ActonConfig, ContractConfig, ContractDependency, DependencyKind};
 use crate::file_build_cache::FileBuildCache;
 use anyhow::anyhow;
@@ -12,7 +13,7 @@ use tycho_types::boc::Boc;
 mod dep_graph;
 
 pub fn build_cmd(
-    contract_filter: Option<String>,
+    contract_id: Option<String>,
     clear_cache: bool,
     graph_output: Option<String>,
 ) -> anyhow::Result<()> {
@@ -30,7 +31,7 @@ pub fn build_cmd(
         Some(contracts) => contracts,
         None => {
             println!(
-                "No contracts found in Acton.toml. Run 'acton init' first or add contracts manually."
+                "No contracts section found in Acton.toml. Run 'acton init' first or add contracts manually."
             );
             return Ok(());
         }
@@ -41,21 +42,21 @@ pub fn build_cmd(
         return Ok(());
     }
 
+    if let Some(filter) = &contract_id
+        && !contracts.iter().any(|(key, _)| key == filter)
+    {
+        anyhow::bail!(error_fmt::contract_not_found(&config, filter))
+    }
+
     let mut file_cache = FileBuildCache::new(None)?;
     let failure_count = 0;
     let total_start = Instant::now();
-
-    if let Some(filter) = &contract_filter
-        && !contracts.iter().any(|(key, _)| key == filter)
-    {
-        return Err(anyhow!("Contract '{filter}' not found in Acton.toml"));
-    }
 
     let flatten_contracts = contracts.iter().collect::<Vec<_>>();
     let compilation_order = dep_graph::build_dependency_graph(&flatten_contracts)?;
     debug!("Compilation order: {compilation_order:?}");
 
-    let filtered_compilation_order = if let Some(filter) = &contract_filter {
+    let filtered_compilation_order = if let Some(filter) = &contract_id {
         dep_graph::filter_compilation_order_for_contract(filter, &compilation_order, contracts)?
     } else {
         compilation_order

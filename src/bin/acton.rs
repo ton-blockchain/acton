@@ -244,7 +244,7 @@ enum Commands {
     )]
     Build {
         #[arg(help = "Contract name to build (builds all if not specified)")]
-        contract: Option<String>,
+        contract_id: Option<String>,
         #[arg(long, help = "Clear compilation cache before building")]
         clear_cache: bool,
         #[arg(
@@ -452,21 +452,9 @@ fn main() {
     setup_logging().expect("Failed to set up logging");
     let cli = Cli::parse();
 
-    match cli.command {
-        Commands::Init => {
-            let result = init_cmd();
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1)
-            }
-        }
-        Commands::New { path } => {
-            let result = new_cmd(&path);
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1)
-            }
-        }
+    let result = match cli.command {
+        Commands::Init => init_cmd(),
+        Commands::New { path } => new_cmd(&path),
         Commands::Test {
             path,
             filter,
@@ -524,23 +512,13 @@ fn main() {
                 api_key,
                 save_test_trace,
             );
-            let result = test_cmd(path, &config);
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1)
-            }
+            test_cmd(path, &config)
         }
         Commands::TestGen {
             contract_id,
             wrapper_output,
             test_output,
-        } => {
-            let result = test_gen_cmd(&contract_id, wrapper_output, test_output);
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1)
-            }
-        }
+        } => test_gen_cmd(&contract_id, wrapper_output, test_output),
         Commands::Script {
             path,
             debug,
@@ -550,33 +528,21 @@ fn main() {
             api_key,
             broadcast,
             net,
-        } => {
-            let result = script_cmd(
-                &path,
-                debug,
-                debug_port,
-                clear_cache,
-                fork_net,
-                api_key,
-                broadcast,
-                net,
-            );
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1)
-            }
-        }
+        } => script_cmd(
+            &path,
+            debug,
+            debug_port,
+            clear_cache,
+            fork_net,
+            api_key,
+            broadcast,
+            net,
+        ),
         Commands::Build {
-            contract,
+            contract_id,
             clear_cache,
             graph,
-        } => {
-            let result = build_cmd(contract, clear_cache, graph);
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1);
-            }
-        }
+        } => build_cmd(contract_id, clear_cache, graph),
         Commands::Compile {
             path,
             json,
@@ -587,8 +553,8 @@ fn main() {
             clear_cache,
         } => {
             let result = compile_cmd(&path, json, base64_only, boc, fift, source_map, clear_cache);
-            if let Err(err) = result {
-                if json {
+            if json {
+                if let Err(err) = result {
                     println!(
                         "{}",
                         serde_json::to_string_pretty(&serde_json::json!({
@@ -597,11 +563,10 @@ fn main() {
                         }))
                         .expect("JSON serialization should not fail")
                     );
-                } else {
-                    eprintln!("{} {}", "Error:".red(), err);
-                    process::exit(1)
                 }
+                return;
             }
+            result
         }
         Commands::Disasm {
             boc_file,
@@ -625,7 +590,7 @@ fn main() {
                 None
             };
 
-            let result = disasm_cmd(
+            disasm_cmd(
                 boc_file,
                 string,
                 output,
@@ -638,11 +603,7 @@ fn main() {
                 api_key,
                 net,
                 follow_libraries,
-            );
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1)
-            }
+            )
         }
         Commands::Verify {
             contract,
@@ -652,21 +613,20 @@ fn main() {
             compiler_version,
             dry_run,
             api_key,
-        } => {
-            let result = verify_cmd(
-                contract,
-                address,
-                net,
-                wallet,
-                compiler_version,
-                dry_run,
-                api_key,
-            );
-            if let Err(err) = result {
-                eprintln!("{} {}", "Error:".red(), err);
-                process::exit(1)
-            }
-        }
+        } => verify_cmd(
+            contract,
+            address,
+            net,
+            wallet,
+            compiler_version,
+            dry_run,
+            api_key,
+        ),
+    };
+
+    if let Err(err) = result {
+        eprintln!("{} {}", "Error:".red(), err);
+        process::exit(1)
     }
 }
 

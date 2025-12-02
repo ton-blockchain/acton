@@ -1,4 +1,5 @@
 pub mod build;
+pub(crate) mod common;
 pub mod compile;
 pub mod disasm;
 pub mod init;

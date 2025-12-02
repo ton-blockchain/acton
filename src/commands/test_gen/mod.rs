@@ -1,3 +1,4 @@
+use crate::commands::common::error_fmt;
 use crate::config::ActonConfig;
 use abi::{ContractAbi, TypeAbi};
 use anyhow::anyhow;
@@ -18,23 +19,9 @@ pub fn test_gen_cmd(
 
     let config = ActonConfig::load().map_err(|e| anyhow!("Failed to load Acton.toml: {}", e))?;
 
-    let contract_config = config.get_contract(contract_id).ok_or_else(|| {
-        let available = config
-            .contracts()
-            .map(|contracts| {
-                contracts
-                    .keys()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            })
-            .unwrap_or_else(|| "none".to_string());
-        anyhow!(
-            "Contract '{}' not found in Acton.toml. Available contracts: {}",
-            contract_id,
-            available
-        )
-    })?;
+    let contract_config = config
+        .get_contract(contract_id)
+        .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, contract_id)))?;
 
     let contract_path = project_root.join(&contract_config.src);
 
