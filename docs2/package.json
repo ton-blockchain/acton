@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy": "rm -rf out .next && next build && echo '' > out/.nojekyll && bun x gh-pages -d out --dotfiles"
   },
   "dependencies": {
     "@types/mdx": "^2.0.13",

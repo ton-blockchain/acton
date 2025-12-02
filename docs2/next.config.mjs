@@ -1,22 +1,20 @@
-import { createMDX } from 'fumadocs-mdx/next';
+import { createMDX } from "fumadocs-mdx/next";
+const withMDX = createMDX();
+
+const isProd = process.env.NODE_ENV === "production";
+const repoName = "acton";  // Change to your repo name
 
 /** @type {import('next').NextConfig} */
 const config = {
     reactStrictMode: true,
-    // output: 'export',
-    async rewrites() {
-        return [
-            {
-                source: '/docs/:path*.mdx',
-                destination: '/llms.mdx/:path*',
-            },
-        ];
-    },
-};
+    output: "export",              // Replaces `next export`
+    trailingSlash: true,           // /docs → /docs/
+    images: { unoptimized: true }, // Required for static export
 
-const withMDX = createMDX({
-    // customise the config file path
-    // configPath: "source.config.ts"
-});
+    basePath: isProd ? `/${repoName}` : "",
+    assetPrefix: isProd
+        ? `https://i582.github.io/${repoName}/`  // Full URL = no 404
+        : "",
+};
 
 export default withMDX(config);
