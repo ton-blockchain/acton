@@ -130,6 +130,7 @@ fn test_disasm_from_hex_string() {
 
     project
         .acton()
+        .disasm()
         .disasm_string(&hex_string)
         .run()
         .success()
@@ -150,6 +151,7 @@ fn test_disasm_from_base64_string() {
 
     project
         .acton()
+        .disasm()
         .disasm_string(&base64_string)
         .run()
         .success()
@@ -189,6 +191,7 @@ fn test_disasm_invalid_hex_string() {
 
     project
         .acton()
+        .disasm()
         .disasm_string("not_valid_hex_or_base64")
         .run()
         .failure()
@@ -398,4 +401,104 @@ fn test_disasm_from_blockchain_with_wrong_api_key() {
         .run()
         .failure()
         .assert_contains("Contract with address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM not found on both mainnet and testnet");
+}
+
+#[test]
+fn test_disasm_directory_as_file() {
+    let project = ProjectBuilder::new("disasm-directory")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .disasm_file("contracts") // contracts is a directory
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_directory_as_file.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_invalid_network() {
+    let project = ProjectBuilder::new("disasm-invalid-net")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "simple.boc")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.boc")
+        .with_net("invalid-network")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_invalid_network.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_multiple_input_sources_file_and_string() {
+    let project = ProjectBuilder::new("disasm-multiple-inputs")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "simple.boc")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.boc")
+        .disasm_string("some_hex_data")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_multiple_input_sources_file_and_string.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_address_with_invalid_network() {
+    let project = ProjectBuilder::new("disasm-addr-invalid-net").build();
+
+    project
+        .acton()
+        .disasm()
+        .with_address("UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM")
+        .with_net("invalid-network")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_address_with_invalid_network.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_empty_address() {
+    let project = ProjectBuilder::new("disasm-empty-addr").build();
+
+    project
+        .acton()
+        .disasm()
+        .with_address("")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_empty_address.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_empty_string() {
+    let project = ProjectBuilder::new("disasm-empty-string").build();
+
+    project
+        .acton()
+        .disasm()
+        .disasm_string("")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_empty_string.stderr.txt",
+        );
 }

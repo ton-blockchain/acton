@@ -657,7 +657,7 @@ impl ActonCommand {
     /// .disasm_string("base64_encoded_boc")
     /// ```
     pub fn disasm_string(mut self, boc_string: &str) -> Self {
-        self.cmd = self.cmd.arg("disasm").current_dir(&self.project.path);
+        self.cmd = self.cmd.current_dir(&self.project.path);
         self.disasm_string = Some(boc_string.to_string());
         self
     }

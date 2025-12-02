@@ -22,6 +22,12 @@ pub fn disasm_cmd(
     net: String,
     follow_libraries: bool,
 ) -> anyhow::Result<()> {
+    if boc_file.is_some() && boc_string.is_some() {
+        anyhow::bail!(color_print::cformat!(
+            "Cannot provide both <yellow>--string</>/<yellow>-s</> and <yellow>BOC_FILE</> argument"
+        ));
+    }
+
     let boc_data = if let Some(string) = boc_string {
         string
     } else if let Some(path) = boc_file {
