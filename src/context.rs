@@ -7,6 +7,7 @@ use emulator::emulator::{Emulator, SendMessageResult};
 use emulator::executor::ExecutorVerbosity;
 use emulator::get_executor::GetMethodResultSuccess;
 use num_bigint::BigInt;
+use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use tolkc::source_map::SourceMap;
 use ton_api::{Network, TonApiClient};
@@ -65,11 +66,18 @@ pub struct TransactionGenericAssertFailure {
 }
 
 #[derive(Debug, Clone)]
+pub struct WalletNotFoundFailure {
+    pub wallet_name: String,
+    pub location: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub enum AssertFailure {
     Bin(AssertBinFailure),
     Fail(FailAssertFailure),
     TransactionNotFound(TransactionGenericAssertFailure),
     TransactionIsFound(TransactionGenericAssertFailure),
+    WalletNotFound(WalletNotFoundFailure),
 }
 
 impl AssertFailure {
@@ -79,6 +87,7 @@ impl AssertFailure {
             AssertFailure::Fail(arg) => arg.message.clone(),
             AssertFailure::TransactionNotFound(arg) => arg.message.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.message.clone(),
+            AssertFailure::WalletNotFound(_) => None, // Will be formatted in print_script_result
         }
     }
 
@@ -88,6 +97,50 @@ impl AssertFailure {
             AssertFailure::Fail(arg) => arg.location.clone(),
             AssertFailure::TransactionNotFound(arg) => arg.location.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.location.clone(),
+            AssertFailure::WalletNotFound(arg) => arg.location.clone(),
+        }
+    }
+
+    pub fn format_wallet_not_found_message(failure: &WalletNotFoundFailure, env: &Env) -> String {
+        let has_wallets_config = env.wallets.is_some();
+        let available_wallets = env.open_wallets.keys().cloned().collect::<Vec<_>>();
+
+        if !has_wallets_config || available_wallets.is_empty() {
+            color_print::cformat!(
+                "Wallet {} not found in Acton.toml. Wallets are not configured yet.
+
+To add wallets, add the following section to your Acton.toml:
+
+<dim># Example wallet configuration</>
+[wallets.{}]
+type = \"v4r2\"
+workchain = 0
+keys = {{ mnemonic-env = \"WALLET_MNEMONIC\" }}
+
+[wallets.deployer.expected]
+address-testnet = \"<<ADDRESS>>\"
+
+See https://i582.github.io/acton/docs/scripting/setup-wallets/ for more information
+",
+                failure.wallet_name.yellow(),
+                failure.wallet_name
+            )
+        } else {
+            let available = if available_wallets.is_empty() {
+                "no wallets defined yet".to_string()
+            } else {
+                available_wallets
+                    .iter()
+                    .map(|s| format!("  {}", s.yellow()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+
+            format!(
+                "Wallet {} not found in Acton.toml\nAvailable wallets:\n{}",
+                failure.wallet_name.yellow(),
+                available
+            )
         }
     }
 }

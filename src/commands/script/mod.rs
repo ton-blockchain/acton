@@ -1,8 +1,8 @@
 use crate::commands::common::error_fmt;
 use crate::config::ActonConfig;
 use crate::context::{
-    AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, Emulations, Env,
-    IoContext, KnownAddresses,
+    AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
+    Emulations, Env, IoContext, KnownAddresses,
 };
 use crate::debugger::debug_context::DebugContext;
 use crate::ffi;
@@ -240,22 +240,39 @@ fn print_script_result(ctx: &mut Context, result: ScriptResult) {
             if exit_code != 0
                 && let Some(assert_failure) = ctx.asserts.assert_failure
             {
-                if let Some(message) = &assert_failure.message() {
-                    if !message.is_empty() {
+                match assert_failure {
+                    AssertFailure::WalletNotFound(failure) => {
+                        let message =
+                            AssertFailure::format_wallet_not_found_message(failure, &ctx.env);
                         let highlighted_message =
-                            FormatterContext::highlight_actual_expected(message);
-                        println!("{} {}", "Error:".bright_red(), highlighted_message);
-                    } else {
-                        println!("{}", "└─".dimmed());
-                    }
-                } else {
-                    println!("{}", "└─".dimmed());
-                }
+                            FormatterContext::highlight_actual_expected(&message);
+                        eprintln!("{} {}", "Error:".bright_red(), highlighted_message);
 
-                if let Some(location) = &assert_failure.location()
-                    && !location.is_empty()
-                {
-                    println!("{} at {}", "└─".dimmed(), location.dimmed());
+                        if let Some(location) = &failure.location
+                            && !location.is_empty()
+                        {
+                            println!("{} at {}", "└─".dimmed(), location.dimmed());
+                        }
+                    }
+                    _ => {
+                        if let Some(message) = &assert_failure.message() {
+                            if !message.is_empty() {
+                                let highlighted_message =
+                                    FormatterContext::highlight_actual_expected(message);
+                                println!("{} {}", "Error:".bright_red(), highlighted_message);
+                            } else {
+                                println!("{}", "└─".dimmed());
+                            }
+                        } else {
+                            println!("{}", "└─".dimmed());
+                        }
+
+                        if let Some(location) = &assert_failure.location()
+                            && !location.is_empty()
+                        {
+                            println!("{} at {}", "└─".dimmed(), location.dimmed());
+                        }
+                    }
                 }
             }
 

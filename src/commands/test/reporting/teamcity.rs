@@ -71,6 +71,9 @@ impl TeamCityReporter {
                 AssertFailure::TransactionIsFound(_) => {
                     message = "Unexpected transaction found".to_string();
                 }
+                AssertFailure::WalletNotFound(failure) => {
+                    message = format!("Wallet '{}' not found", failure.wallet_name);
+                }
             }
 
             if let Some(failure_message) = assert_failure.message()

@@ -160,7 +160,7 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(fn: (Arg1, Arg2) -> Ret, arg1: Arg
 /// fun to_track_gas(a: int, b: int, c: int) {
 ///     // do something that consumes gas
 /// }
-/// 
+///
 /// get fun test_gas_consumption() {
 ///     Assert.consumesLessThan3(to_track_gas, 100, 100, 100, 100);
 /// }
@@ -171,6 +171,17 @@ fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(fn: (Arg1, Arg2, Arg3) -> Re
     val end = getGasConsumedAtTheMoment();
     ffi.assert_consumed_less(start, end, expected);
     return result;
+}
+
+/// Fails the test with wallet not found error.
+/// 
+/// This function is used internally by the framework when a wallet is not found.
+/// It provides detailed information about available wallets and instructions on how to add them.
+/// 
+/// NOT FOR PUBLIC USE.
+fun Assert.failWalletNotFound(wallet_name: slice, location: slice = ""): never {
+    ffi.fail_wallet_not_found(wallet_name, location);
+    throw ASSERTION_FAILED;
 }
 
 /// Internal function to assert that the function consumed less than the expected amount of gas.
@@ -202,6 +213,12 @@ fun ffi.assert_bin<V1, V2>(
 /// NOT FOR PUBLIC USE.
 fun ffi.assert_fail(message: slice = "", location: slice = ""): bool
     asm "100 EXTCALL"
+
+/// Internal function to fail when wallet is not found.
+/// 
+/// NOT FOR PUBLIC USE.
+fun ffi.fail_wallet_not_found(wallet_name: slice, location: slice = ""): bool
+    asm "105 EXTCALL"
 
 fun ffi.type_name_by_opcode(id: int): slice?
     asm "14 EXTCALL"

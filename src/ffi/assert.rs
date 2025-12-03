@@ -1,6 +1,6 @@
 use crate::context::{
     AssertBinFailure, AssertFailure, Context, FailAssertFailure, TransactionGenericAssertFailure,
-    TransactionNotFoundParams,
+    TransactionNotFoundParams, WalletNotFoundFailure,
 };
 use emulator::traits::BaseExecutor;
 use emulator::{extension, pop_args, register_ext_methods};
@@ -170,6 +170,23 @@ fn fail_to_not_find_transaction_by_params_impl(
     ));
 }
 
+extension!(fail_wallet_not_found in (Context) with (location: String, wallet_name: String) using fail_wallet_not_found_impl);
+fn fail_wallet_not_found_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    location: String,
+    wallet_name: String,
+) {
+    *ctx.asserts.assert_failure = Some(AssertFailure::WalletNotFound(WalletNotFoundFailure {
+        wallet_name,
+        location: if location.is_empty() {
+            None
+        } else {
+            Some(location)
+        },
+    }));
+}
+
 pub fn process_txs_and_search_params(
     txs: &Tuple,
     params: Tuple,
@@ -315,5 +332,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         102 => expect_to_end_with_exit_code,
         103 => fail_to_find_transaction_by_params,
         104 => fail_to_not_find_transaction_by_params,
+        105 => fail_wallet_not_found,
     });
 }

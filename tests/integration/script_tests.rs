@@ -393,8 +393,8 @@ fn test_script_file_without_read_permission() {
 }
 
 #[test]
-fn test_script_broadcast_with_nonexistent_wallet() {
-    let project = ProjectBuilder::new("script-broadcast-wallet")
+fn test_script_broadcast_with_nonexistent_wallet_with_wallets() {
+    let project = ProjectBuilder::new("script-broadcast-wallet-no-config")
         .script_file(
             "deploy",
             r#"
@@ -411,6 +411,22 @@ fn test_script_broadcast_with_nonexistent_wallet() {
         )
         .build();
 
+    let mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+    fs::write(project.path().join("mnemonic.txt"), mnemonic).unwrap();
+
+    let toml_content = r#"
+[package]
+name = "script-broadcast-wallet-no-config"
+description = ""
+version = "0.1.0"
+
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic-file = "mnemonic.txt" }
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).unwrap();
+
     project
         .acton()
         .script("scripts/deploy.tolk")
@@ -418,7 +434,88 @@ fn test_script_broadcast_with_nonexistent_wallet() {
         .network("testnet")
         .run()
         .failure()
-        .assert_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet.stdout.txt",
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet_with_wallets.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_broadcast_with_nonexistent_wallet_no_config() {
+    let project = ProjectBuilder::new("script-broadcast-wallet-no-config")
+        .script_file(
+            "deploy",
+            r#"
+            import "../../lib/io"
+            import "../../lib/emulation/network"
+
+            fun main() {
+                println("Attempting to deploy with nonexistent wallet");
+                // This should fail because wallet "nonexistent" is not defined
+                val wallet = net.wallet("nonexistent");
+                println1("Wallet found: {}", wallet.address);
+            }
+        "#,
+        )
+        .build();
+
+    let toml_content = r#"
+[package]
+name = "script-broadcast-wallet-no-config"
+description = ""
+version = "0.1.0"
+
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).unwrap();
+
+    project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .network("testnet")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet.stderr.txt",
+        );
+}
+
+#[test]
+fn test_script_broadcast_with_nonexistent_wallet_empty_config() {
+    let project = ProjectBuilder::new("script-broadcast-wallet-empty-config")
+        .script_file(
+            "deploy",
+            r#"
+            import "../../lib/io"
+            import "../../lib/emulation/network"
+
+            fun main() {
+                println("Attempting to deploy with nonexistent wallet");
+                // This should fail because wallet "nonexistent" is not defined
+                val wallet = net.wallet("nonexistent");
+                println1("Wallet found: {}", wallet.address);
+            }
+        "#,
+        )
+        .build();
+
+    let toml_content = r#"
+[package]
+name = "script-broadcast-wallet-empty-config"
+description = ""
+version = "0.1.0"
+
+[wallets]
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).unwrap();
+
+    project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .network("testnet")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet_empty_config.stderr.txt",
         );
 }

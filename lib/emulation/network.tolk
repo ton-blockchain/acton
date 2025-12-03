@@ -397,7 +397,7 @@ fun net.wallet(name: slice): Wallet {
     if (ffi.isBroadcasting()) {
         val address_cell = ffi.getWalletByName(name);
         if (address_cell == null) {
-            Assert.fail(format1("Cannot find wallet with name '{}', check Acton.toml for available wallets", name));
+            Assert.failWalletNotFound(name);
             throw 1;
         }
         val address = address_cell.beginParse().loadAddress();
