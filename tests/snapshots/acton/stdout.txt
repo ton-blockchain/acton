@@ -8,7 +8,7 @@ Commands:
   test         Execute tests in file or directory
   test-gen     Generate test wrapper and test file for a contract
   script       Execute a Tolk script file
-  build        Build all contracts
+  build        Build the specified contract or all contracts
   compile      Compile a Tolk file
   disasm       Disassemble TVM bitcode to human-readable TASM
   verify       Verify contract source code on verifier.ton.org

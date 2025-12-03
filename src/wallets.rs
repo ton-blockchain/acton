@@ -1,6 +1,7 @@
 use crate::config::ActonConfig;
 use crate::context::Wallet;
 use anyhow::anyhow;
+use owo_colors::OwoColorize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::str::FromStr;
@@ -30,9 +31,24 @@ pub fn open_wallets(
 
     for (name, wallet) in wallets {
         let mnemonic = if let Some(env) = wallet.keys.mnemonic_env {
-            std::env::var(env).ok()
+            Some(std::env::var(&env).map_err(|err| {
+                anyhow!(
+                    "Cannot access env variable {} for wallet mnemonic: {err}",
+                    env.yellow()
+                )
+            })?)
         } else if let Some(file) = wallet.keys.mnemonic_file {
-            Some(fs::read_to_string(file)?.trim().to_string())
+            Some(
+                fs::read_to_string(&file)
+                    .map_err(|err| {
+                        anyhow!(
+                            "Cannot access file {} for wallet mnemonic: {err}",
+                            file.yellow()
+                        )
+                    })?
+                    .trim()
+                    .to_string(),
+            )
         } else {
             None
         };

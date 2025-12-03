@@ -391,3 +391,34 @@ fn test_script_file_without_read_permission() {
             "integration/snapshots/test_script_file_without_read_permission.stderr.txt",
         );
 }
+
+#[test]
+fn test_script_broadcast_with_nonexistent_wallet() {
+    let project = ProjectBuilder::new("script-broadcast-wallet")
+        .script_file(
+            "deploy",
+            r#"
+            import "../../lib/io"
+            import "../../lib/emulation/network"
+
+            fun main() {
+                println("Attempting to deploy with nonexistent wallet");
+                // This should fail because wallet "nonexistent" is not defined
+                val wallet = net.wallet("nonexistent");
+                println1("Wallet found: {}", wallet.address);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .network("testnet")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet.stdout.txt",
+        );
+}

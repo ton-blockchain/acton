@@ -16,7 +16,14 @@ pub fn build_cmd(
     contract_id: Option<String>,
     clear_cache: bool,
     graph_output: Option<String>,
+    out_dir: Option<String>,
 ) -> anyhow::Result<()> {
+    let out_dir = out_dir.unwrap_or_else(|| "build".to_string());
+
+    if !Path::new(&out_dir).exists() {
+        fs::create_dir_all(&out_dir)?;
+    }
+
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
         file_cache.clear()?;
@@ -31,7 +38,15 @@ pub fn build_cmd(
         Some(contracts) => contracts,
         None => {
             println!(
-                "No contracts section found in Acton.toml. Run 'acton init' first or add contracts manually."
+                "No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = \"MyContract\"
+src = \"contracts/my-contract.tolk\"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
             );
             return Ok(());
         }
@@ -88,17 +103,24 @@ pub fn build_cmd(
 
         generate_dependency_files(&contract_key, contract_config, &compiled_contracts, &config)?;
 
-        let code_boc64 = process_contract(&mut file_cache, contract_config, contract_path);
-        let code_boc64 = match code_boc64 {
-            Ok(code_boc64) => code_boc64,
-            Err(err) => {
-                failure_count += 1;
-                compile_errors.insert(contract_key.clone(), err);
-                continue;
-            }
-        };
+        let (code_boc64, code_hash) =
+            match process_contract(&mut file_cache, contract_config, contract_path) {
+                Ok((code, hash)) => (code, hash),
+                Err(err) => {
+                    failure_count += 1;
+                    compile_errors.insert(contract_key.clone(), err);
+                    continue;
+                }
+            };
 
         compiled_contracts.insert(contract_key.clone(), code_boc64.clone());
+
+        if let Err(e) = save_build_artifact(&out_dir, &contract_key, &code_boc64, &code_hash) {
+            eprintln!(
+                "Warning: Failed to save build artifact file for {}: {}",
+                contract_config.name, e
+            );
+        }
 
         if let Err(e) = save_boc_file(contract_config, &code_boc64) {
             eprintln!(
@@ -137,12 +159,15 @@ fn process_contract(
     file_cache: &mut FileBuildCache,
     contract_config: &ContractConfig,
     contract_path: &String,
-) -> anyhow::Result<String> {
-    let code_boc64 = if contract_path.ends_with(".boc") {
+) -> anyhow::Result<(String, String)> {
+    let (code_boc64, code_hash) = if contract_path.ends_with(".boc") {
         debug!("Loading BoC file: {contract_path}");
         match fs::read(contract_path) {
             Ok(boc_data) => match Boc::decode(&boc_data) {
-                Ok(boc) => Boc::encode_base64(&boc),
+                Ok(boc) => {
+                    let code_boc64 = Boc::encode_base64(&boc);
+                    (code_boc64, boc.repr_hash().to_string())
+                }
                 Err(e) => {
                     anyhow::bail!("Failed to decode BoC file {contract_path}: {e}");
                 }
@@ -156,7 +181,7 @@ fn process_contract(
 
         if let Some(cached_result) = cached_result {
             debug!("Cache hit, use cached result for '{contract_path}'");
-            cached_result.code_boc64
+            (cached_result.code_boc64, cached_result.code_hash_hex)
         } else {
             debug!("Cache miss, recompile '{contract_path}'");
             let compile_start = Instant::now();
@@ -178,7 +203,7 @@ fn process_contract(
 
                     println!("    {} in {:?}", "Finished".green(), compile_time);
 
-                    result.code_boc64
+                    (result.code_boc64, result.code_hash_hex)
                 }
                 tolkc::CompilerResult::Error(error) => {
                     anyhow::bail!(error.message);
@@ -186,7 +211,7 @@ fn process_contract(
             }
         }
     };
-    Ok(code_boc64)
+    Ok((code_boc64, code_hash))
 }
 
 fn save_boc_file(contract_config: &ContractConfig, code_boc64: &str) -> anyhow::Result<()> {
@@ -194,6 +219,26 @@ fn save_boc_file(contract_config: &ContractConfig, code_boc64: &str) -> anyhow::
         let code = Boc::decode_base64(code_boc64)?;
         fs::write(output_path, Boc::encode(code))?;
     }
+    Ok(())
+}
+
+fn save_build_artifact(
+    out_dir: &str,
+    contract_key: &str,
+    code_boc64: &str,
+    code_hash: &str,
+) -> anyhow::Result<()> {
+    use serde_json::json;
+
+    let json_data = json!({
+        "code_boc64": code_boc64,
+        "hash": code_hash
+    });
+
+    let filename = format!("{}.json", contract_key);
+    let path = Path::new(out_dir).join(filename);
+    fs::write(path, serde_json::to_string_pretty(&json_data)?)?;
+
     Ok(())
 }
 

@@ -11,6 +11,9 @@ const BASE_GITIGNORE: &str = "
 # Acton main directory
 .acton/
 
+# Build directory
+build/
+
 .DS_Store
 node_modules/
 

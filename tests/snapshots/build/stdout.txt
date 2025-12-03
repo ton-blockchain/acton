@@ -1,4 +1,4 @@
-Build all contracts
+Build the specified contract or all contracts
 
 Usage: acton build [OPTIONS] [CONTRACT_ID]
 
@@ -6,9 +6,10 @@ Arguments:
   [CONTRACT_ID]  Contract name to build (builds all if not specified)
 
 Options:
-      --clear-cache    Clear compilation cache before building
-      --graph <GRAPH>  Generate dependency graph as SVG file (requires graphviz)
-  -h, --help           Print help
+      --clear-cache        Clear compilation cache before building
+      --graph <GRAPH>      Generate dependency graph as SVG file (requires graphviz)
+      --out-dir <OUT_DIR>  Output directory for build artifacts [default: build]
+  -h, --help               Print help
 
 Configuration:
      # Configure contracts in Acton.toml

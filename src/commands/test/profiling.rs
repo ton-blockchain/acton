@@ -179,7 +179,7 @@ pub fn collect_profile(runner: &TestRunner, abi: &ContractAbi) -> anyhow::Result
         }
     }
 
-    println!("{table}");
+    println!("{table}\n");
 
     // we don't want to override previous snapshot in compare mode
     if let Some(snapshot_filename) = &runner.config.snapshot

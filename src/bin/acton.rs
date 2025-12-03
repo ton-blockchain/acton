@@ -241,7 +241,7 @@ enum Commands {
         net: String,
     },
     #[command(
-        about = "Build all contracts",
+        about = "Build the specified contract or all contracts",
         after_help = example_build_usage()
     )]
     Build {
@@ -254,6 +254,12 @@ enum Commands {
             help = "Generate dependency graph as SVG file (requires graphviz)"
         )]
         graph: Option<String>,
+        #[arg(
+            long,
+            default_value = "build",
+            help = "Output directory for build artifacts"
+        )]
+        out_dir: Option<String>,
     },
     #[command(about = "Compile a Tolk file")]
     Compile {
@@ -600,7 +606,8 @@ fn main() {
             contract_id,
             clear_cache,
             graph,
-        } => build_cmd(contract_id, clear_cache, graph),
+            out_dir,
+        } => build_cmd(contract_id, clear_cache, graph, out_dir),
         Commands::Compile {
             path,
             json,

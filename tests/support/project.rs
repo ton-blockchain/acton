@@ -542,6 +542,7 @@ impl Project {
             build_contract: None,
             build_clear_cache: false,
             build_graph: None,
+            build_out_dir: None,
             disasm_string: None,
             disasm_output: None,
             disasm_address: None,
@@ -561,6 +562,7 @@ impl Project {
             verify_address: None,
             verify_wallet: None,
             verify_network: None,
+            script_broadcast: false,
         }
     }
 
@@ -581,6 +583,7 @@ pub struct ActonCommand {
     pub(crate) build_contract: Option<String>,
     pub(crate) build_clear_cache: bool,
     pub(crate) build_graph: Option<Option<String>>,
+    pub(crate) build_out_dir: Option<String>,
     pub(crate) disasm_string: Option<String>,
     pub(crate) disasm_output: Option<String>,
     pub(crate) disasm_address: Option<String>,
@@ -600,6 +603,7 @@ pub struct ActonCommand {
     pub(crate) verify_address: Option<String>,
     pub(crate) verify_wallet: Option<String>,
     pub(crate) verify_network: Option<String>,
+    pub(crate) script_broadcast: bool,
 }
 
 impl ActonCommand {
@@ -911,6 +915,29 @@ impl ActonCommand {
         self
     }
 
+    /// Set output directory for build artifacts (only for build command)
+    ///
+    /// # Examples
+    /// ```
+    /// .build().with_out_dir("artifacts")     // Use artifacts/ directory
+    /// .build().with_out_dir("dist/build")    // Use dist/build/ directory
+    /// ```
+    pub fn with_out_dir(mut self, path: &str) -> Self {
+        self.build_out_dir = Some(path.to_string());
+        self
+    }
+
+    /// Enable broadcast mode for script execution (only for script command)
+    ///
+    /// # Examples
+    /// ```
+    /// .script("deploy.tolk").broadcast()     // Send transactions to blockchain
+    /// ```
+    pub fn broadcast(mut self) -> Self {
+        self.script_broadcast = true;
+        self
+    }
+
     /// Run the command and return output
     pub fn run(mut self) -> TestOutput {
         if let Some(path) = self.test_path {
@@ -963,6 +990,10 @@ impl ActonCommand {
             self.cmd = self.cmd.arg("--clear-cache");
         }
 
+        if self.script_broadcast {
+            self.cmd = self.cmd.arg("--broadcast");
+        }
+
         if let Some(graph_path) = self.build_graph {
             self.cmd = self.cmd.arg("--graph");
             if let Some(path) = graph_path {
@@ -970,6 +1001,10 @@ impl ActonCommand {
             } else {
                 self.cmd = self.cmd.arg("");
             }
+        }
+
+        if let Some(out_dir) = self.build_out_dir {
+            self.cmd = self.cmd.arg("--out-dir").arg(out_dir);
         }
 
         if let Some(boc_string) = self.disasm_string {

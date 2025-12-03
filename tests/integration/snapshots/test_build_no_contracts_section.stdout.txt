@@ -1,0 +1,10 @@
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information

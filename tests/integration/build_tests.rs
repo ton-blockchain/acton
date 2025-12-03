@@ -1065,6 +1065,28 @@ fn test_build_output_boc_write_error() {
 }
 
 #[test]
+fn test_build_no_contracts_section() {
+    let project = ProjectBuilder::new("contracts-missing").build();
+
+    let toml_content = r#"[package]
+name = "contract-file-missing"
+description = ""
+version = "0.1.0"
+
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_build_no_contracts_section.stdout.txt",
+        );
+}
+
+#[test]
 fn test_build_empty_contracts_section() {
     let project = ProjectBuilder::new("empty-contracts").build();
 
@@ -1347,4 +1369,235 @@ fn test_build_contract_filter_nonexistent() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_build_contract_filter_nonexistent.stderr.txt",
         );
+}
+
+#[test]
+fn test_build_with_default_out_dir() {
+    let project = ProjectBuilder::new("build-default-out-dir")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+
+    let json_file = project.path().join("build/simple.json");
+    assert!(json_file.exists(), "build/simple.json should be created");
+
+    let content = fs::read_to_string(&json_file).expect("Should read JSON file");
+    let json: serde_json::Value = serde_json::from_str(&content).expect("Should parse JSON");
+
+    assert!(
+        json.get("code_boc64").is_some(),
+        "Should contain code_boc64 field"
+    );
+    assert!(json.get("hash").is_some(), "Should contain hash field");
+
+    let _ = json["code_boc64"]
+        .as_str()
+        .expect("code_boc64 should be string");
+    let hash = json["hash"].as_str().expect("hash should be string");
+
+    // Verify hash is a valid hex string (64 characters for SHA-256)
+    assert_eq!(hash.len(), 64, "Hash should be 64 hex characters");
+    assert!(
+        hash.chars().all(|c| c.is_ascii_hexdigit()),
+        "Hash should contain only hex digits"
+    );
+}
+
+#[test]
+fn test_build_with_custom_out_dir() {
+    let project = ProjectBuilder::new("build-custom-out-dir")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_out_dir("artifacts")
+        .run()
+        .success();
+
+    let json_file = project.path().join("artifacts/simple.json");
+    assert!(
+        json_file.exists(),
+        "artifacts/simple.json should be created"
+    );
+
+    // Default build directory should not be created
+    let default_json = project.path().join("build/simple.json");
+    assert!(!default_json.exists(), "build/simple.json should not exist");
+
+    let content = fs::read_to_string(&json_file).expect("Should read JSON file");
+    let json: serde_json::Value = serde_json::from_str(&content).expect("Should parse JSON");
+
+    assert!(
+        json.get("code_boc64").is_some(),
+        "Should contain code_boc64 field"
+    );
+    assert!(json.get("hash").is_some(), "Should contain hash field");
+}
+
+#[test]
+fn test_build_multiple_contracts_artifacts() {
+    let project = ProjectBuilder::new("build-multi-artifacts")
+        .contract("contract1", SIMPLE_CONTRACT)
+        .contract("contract2", SIMPLE_CONTRACT)
+        .contract("contract3", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+
+    // Check that all JSON files are created
+    let json1 = project.path().join("build/contract1.json");
+    let json2 = project.path().join("build/contract2.json");
+    let json3 = project.path().join("build/contract3.json");
+
+    assert!(json1.exists(), "build/contract1.json should be created");
+    assert!(json2.exists(), "build/contract2.json should be created");
+    assert!(json3.exists(), "build/contract3.json should be created");
+
+    // Verify all files contain valid JSON with required fields
+    for (path, name) in [
+        (json1, "contract1"),
+        (json2, "contract2"),
+        (json3, "contract3"),
+    ] {
+        let content = fs::read_to_string(&path).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        assert!(
+            json.get("code_boc64").is_some(),
+            "Should contain code_boc64 field for {}",
+            name
+        );
+        assert!(
+            json.get("hash").is_some(),
+            "Should contain hash field for {}",
+            name
+        );
+    }
+}
+
+#[test]
+fn test_build_artifacts_with_dependencies() {
+    let project = ProjectBuilder::new("build-artifacts-deps")
+        .contract("base", SIMPLE_CONTRACT)
+        .contract_with_deps("dependent", SIMPLE_CONTRACT, vec!["base"])
+        .build();
+
+    project.acton().build().run().success();
+
+    // Check both artifacts are created
+    let base_json = project.path().join("build/base.json");
+    let dependent_json = project.path().join("build/dependent.json");
+
+    assert!(base_json.exists(), "build/base.json should be created");
+    assert!(
+        dependent_json.exists(),
+        "build/dependent.json should be created"
+    );
+
+    // Verify JSON structure
+    for path in [base_json, dependent_json] {
+        let content = fs::read_to_string(&path).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        assert!(
+            json.get("code_boc64").is_some(),
+            "Should contain code_boc64 field"
+        );
+        assert!(json.get("hash").is_some(), "Should contain hash field");
+
+        let _ = json["code_boc64"].as_str().unwrap();
+        let hash = json["hash"].as_str().unwrap();
+
+        // Verify hash is a valid hex string (64 characters for SHA-256)
+        assert_eq!(hash.len(), 64, "Hash should be 64 hex characters");
+        assert!(
+            hash.chars().all(|c| c.is_ascii_hexdigit()),
+            "Hash should contain only hex digits"
+        );
+    }
+}
+
+#[test]
+fn test_build_artifacts_nested_directory() {
+    let project = ProjectBuilder::new("build-nested-dir")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_out_dir("dist/artifacts/build")
+        .run()
+        .success();
+
+    let json_file = project.path().join("dist/artifacts/build/simple.json");
+    assert!(
+        json_file.exists(),
+        "Nested directory structure should be created"
+    );
+
+    let content = fs::read_to_string(&json_file).expect("Should read JSON file");
+    let json: serde_json::Value = serde_json::from_str(&content).expect("Should parse JSON");
+
+    assert!(
+        json.get("code_boc64").is_some(),
+        "Should contain code_boc64 field"
+    );
+    assert!(json.get("hash").is_some(), "Should contain hash field");
+}
+
+#[test]
+fn test_build_artifacts_created_with_cache() {
+    let project = ProjectBuilder::new("build-artifacts-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // First build, create cache and artifacts
+    project.acton().build().run().success();
+
+    let json_file = project.path().join("build/simple.json");
+    assert!(
+        json_file.exists(),
+        "build/simple.json should be created on first build"
+    );
+
+    // Verify JSON content is valid
+    let content = fs::read_to_string(&json_file).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert!(
+        json.get("code_boc64").is_some(),
+        "Should contain code_boc64 field"
+    );
+    assert!(json.get("hash").is_some(), "Should contain hash field");
+
+    // Delete the JSON artifact
+    fs::remove_file(&json_file).expect("Should delete JSON file");
+    assert!(!json_file.exists(), "JSON file should be deleted");
+
+    // Second build, should use cache but still create artifacts
+    let output = project.acton().build().run().success();
+    let stdout = output.get_normalized_stdout();
+    let compiled = extract_compiled_contracts(&stdout);
+
+    // Should not compile (cache hit)
+    assert_eq!(compiled.len(), 0, "Should not recompile (cache hit)");
+
+    // But JSON artifact should be recreated
+    assert!(
+        json_file.exists(),
+        "build/simple.json should be recreated even with cache hit"
+    );
+
+    // Verify JSON content is the same
+    let new_content = fs::read_to_string(&json_file).unwrap();
+    let new_json: serde_json::Value = serde_json::from_str(&new_content).unwrap();
+
+    assert_eq!(json, new_json, "JSON content should be identical");
+    assert_eq!(
+        content, new_content,
+        "File content should be byte-for-byte identical"
+    );
 }

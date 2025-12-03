@@ -111,6 +111,7 @@ impl FixtureProject {
             build_clear_cache: false,
             build_contract: None,
             build_graph: None,
+            build_out_dir: None,
             disasm_string: None,
             disasm_output: None,
             disasm_address: None,
@@ -130,6 +131,7 @@ impl FixtureProject {
             verify_address: None,
             verify_wallet: None,
             verify_network: None,
+            script_broadcast: false,
         }
     }
 
