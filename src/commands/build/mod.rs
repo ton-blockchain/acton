@@ -6,8 +6,11 @@ use log::debug;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
+use tempfile::TempDir;
 use tycho_types::boc::Boc;
 
 mod dep_graph;
@@ -18,6 +21,10 @@ pub fn build_cmd(
     graph_output: Option<String>,
     out_dir: Option<String>,
 ) -> anyhow::Result<()> {
+    // Due to global variables, we need to enable debug mode for emulator as early as possible
+    // since first compilation WITHOUT debug mode will set debug=false forever
+    enable_emulator_debug_mode()?;
+
     let out_dir = out_dir.unwrap_or_else(|| "build".to_string());
 
     if !Path::new(&out_dir).exists() {
@@ -371,4 +378,15 @@ fun {func_name}(): cell asm \"\"\"
 \"\"\"
 "
     )
+}
+
+fn enable_emulator_debug_mode() -> anyhow::Result<()> {
+    // hacky init VM with debug enabled due to global variables :/
+    let dummy_contract: &'static str = "fun onInternalMessage(in: InMessage) {}";
+    let tmp_dir = TempDir::new()?;
+    let tmp_file_path = tmp_dir.path().join("enable_debug.tolk");
+    let mut tmp_file = File::create(&tmp_file_path)?;
+    tmp_file.write_all(dummy_contract.as_bytes())?;
+    let _ = tolkc::compile(tmp_file_path.as_ref(), true);
+    Ok(())
 }

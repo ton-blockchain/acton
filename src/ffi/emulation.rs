@@ -550,7 +550,6 @@ fn send_message_debug(
         out_messages,
         vm_log: result.vm_log,
         logs: "".to_string(),
-        debug_logs: "".to_string(),
         actions: result.actions,
         code,
         externals: vec![],

@@ -173,7 +173,7 @@ impl<'a> TestRunner<'a> {
             return ExecutorVerbosity::FullLocation;
         }
 
-        ExecutorVerbosity::Short
+        ExecutorVerbosity::Full
     }
 
     fn execute_test(
@@ -363,10 +363,6 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     TestRunner::setup_reporters(&mut global_reporter, config);
     global_reporter.init()?;
     global_reporter.on_testing_started()?;
-
-    // hacky init VM with debug enabled due to global variables :/
-    let dummy_contract: &'static str = include_str!("./testdata/simple.tolk");
-    tolkc::compile(dummy_contract.as_ref(), true);
 
     let mut file_cache = FileBuildCache::new(None)?;
 

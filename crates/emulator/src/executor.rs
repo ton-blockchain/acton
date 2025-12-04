@@ -60,7 +60,7 @@ impl Executor {
         message: Cell,
         _mode: BigInt,
         params: RunTransactionArgs,
-    ) -> (EmulationResult, String, String) {
+    ) -> (EmulationResult, String) {
         let message = CString::new(Boc::encode_base64(message))
             .expect("Failed to create C string from message BOC");
 
@@ -97,7 +97,7 @@ impl Executor {
         let output_str = unsafe { CString::from_raw(result_cstr).to_string_lossy().to_string() };
         let result = serde_json::from_str::<EmulationInternalResult>(&output_str)
             .expect("Failed to parse emulator output JSON");
-        (result.output, result.logs, result.debug_logs)
+        (result.output, result.logs)
     }
 
     pub fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
@@ -221,7 +221,6 @@ pub struct EmulationInternalParams {
 struct EmulationInternalResult {
     pub output: EmulationResult,
     pub logs: String,
-    pub debug_logs: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
