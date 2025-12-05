@@ -41,6 +41,7 @@ use tycho_types::models::{
 extension!(build in (Context) with (path: String, name: String) using build_impl);
 fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: String) {
     debug!("Building {name}");
+    let id = name.clone();
     let start_time = Instant::now();
 
     if path.is_empty() {
@@ -56,6 +57,12 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: 
                 .fail(error_fmt::contract_not_found(ctx.env.config, &name));
             return;
         }
+    }
+
+    if let Some(override_code) = ctx.env.build_override.get(id.as_str()) {
+        debug!("Overriding code for {name}");
+        stack.push(TupleItem::Cell(override_code.clone()));
+        return;
     }
 
     if let Some(cached) = ctx.build.build_cache.built.get(&path) {

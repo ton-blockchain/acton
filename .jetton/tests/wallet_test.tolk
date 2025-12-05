@@ -90,8 +90,7 @@ struct JettonMinter {
 
 fun JettonMinter.fromStorage(storage: MinterStorage) {
     val init = ContractState {
-        // TODO: in the future version there will be no path at all
-        code: build("Minter", "./.jetton/contracts/jetton-minter-contract.tolk"),
+        code: build("jetton-minter"),
         data: storage.toCell(),
     };
     val addr = AutoDeployAddress { stateInit: init }.calculateAddress();
@@ -179,7 +178,7 @@ fun setup_test(): (JettonMinter, Treasury, Treasury) {
         totalSupply: 1000000,
         adminAddress: deployer.address,
         content: createEmptyCell(),
-        jettonWalletCode: build("Wallet", "./.jetton/contracts/jetton-wallet-contract.tolk"),
+        jettonWalletCode: build("jetton-wallet"),
     });
 
     val transactions = minter.sendDeploy({ value: ton("10") });

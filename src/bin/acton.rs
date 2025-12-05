@@ -5,7 +5,7 @@ use acton::commands::disasm::disasm_cmd;
 use acton::commands::init::init_cmd;
 use acton::commands::new::new_cmd;
 use acton::commands::script::script_cmd;
-use acton::commands::test::{ReportFormat, TestConfig, test_cmd};
+use acton::commands::test::{ReportFormat, TestConfig, mutation, test_cmd};
 use acton::commands::test_gen::test_gen_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::config::ActonConfig;
@@ -31,6 +31,7 @@ struct Cli {
     command: Commands,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand)]
 enum Commands {
     #[command(
@@ -177,6 +178,28 @@ enum Commands {
             num_args = 0..=1,
         )]
         save_test_trace: Option<String>,
+
+        // Mutation testing
+        #[arg(
+            long,
+            help = "Run tests in mutation testing mode",
+            help_heading = "Mutation Testing"
+        )]
+        mutate: bool,
+        #[arg(
+            long,
+            help = "Internal flag for overrides",
+            help_heading = "Mutation Testing",
+            hide = true
+        )]
+        mutate_overrides: Option<String>,
+        #[arg(
+            long,
+            help = "Contract ID to mutate during mutation testing",
+            help_heading = "Mutation Testing",
+            value_name = "ID"
+        )]
+        mutate_contract: Option<String>,
     },
     #[command(about = "Generate test wrapper and test file for a contract")]
     TestGen {
@@ -545,44 +568,54 @@ fn main() {
             fork_net,
             api_key,
             save_test_trace,
+            mutate,
+            mutate_overrides,
+            mutate_contract,
         } => {
-            let mut report_formats = Vec::new();
+            if mutate {
+                mutation::test_mutate_cmd(&path, mutate_contract)
+            } else {
+                let mut report_formats = Vec::new();
 
-            for format_str in reporter {
-                match format_str.to_lowercase().as_str() {
-                    "console" => report_formats.push(ReportFormat::Console),
-                    "teamcity" => report_formats.push(ReportFormat::TeamCity),
-                    "junit" => report_formats.push(ReportFormat::JUnit),
-                    "dot" => report_formats.push(ReportFormat::Dot),
-                    _ => {
-                        eprintln!(
-                            "Warning: Unknown report format '{format_str}'. Supported formats: console, teamcity, junit, dot"
-                        );
+                for format_str in reporter {
+                    match format_str.to_lowercase().as_str() {
+                        "console" => report_formats.push(ReportFormat::Console),
+                        "teamcity" => report_formats.push(ReportFormat::TeamCity),
+                        "junit" => report_formats.push(ReportFormat::JUnit),
+                        "dot" => report_formats.push(ReportFormat::Dot),
+                        _ => {
+                            eprintln!(
+                                "Warning: Unknown report format '{format_str}'. Supported formats: console, teamcity, junit, dot"
+                            );
+                        }
                     }
                 }
-            }
 
-            let config = create_test_config(
-                filter,
-                debug,
-                debug_port,
-                backtrace,
-                coverage,
-                coverage_format,
-                coverage_file,
-                exclude,
-                include,
-                clear_cache,
-                report_formats,
-                junit_path,
-                junit_merge,
-                snapshot,
-                baseline_snapshot,
-                fork_net,
-                api_key,
-                save_test_trace,
-            );
-            test_cmd(path, &config)
+                let config = create_test_config(
+                    filter,
+                    debug,
+                    debug_port,
+                    backtrace,
+                    coverage,
+                    coverage_format,
+                    coverage_file,
+                    exclude,
+                    include,
+                    clear_cache,
+                    report_formats,
+                    junit_path,
+                    junit_merge,
+                    snapshot,
+                    baseline_snapshot,
+                    fork_net,
+                    api_key,
+                    save_test_trace,
+                    mutate,
+                    mutate_overrides,
+                    mutate_contract,
+                );
+                test_cmd(path, &config)
+            }
         }
         Commands::TestGen {
             contract_id,
@@ -761,6 +794,9 @@ fn create_test_config(
     fork_net: Option<String>,
     api_key: Option<String>,
     save_test_trace: Option<String>,
+    mutate: bool,
+    mutate_overrides: Option<String>,
+    mutate_contract: Option<String>,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -794,6 +830,9 @@ fn create_test_config(
             fork_net,
             api_key,
             save_test_trace,
+            mutate,
+            mutate_overrides,
+            mutate_contract,
         );
     }
 
@@ -816,5 +855,8 @@ fn create_test_config(
         fork_net,
         api_key,
         save_test_trace,
+        mutate,
+        mutate_overrides,
+        mutate_contract,
     }
 }

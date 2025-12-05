@@ -11,6 +11,7 @@ use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use tolkc::source_map::SourceMap;
 use ton_api::{Network, TonApiClient};
+use tonlib_core::cell::ArcCell;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, HashBytes};
@@ -285,6 +286,7 @@ pub struct Env<'a> {
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
+    pub build_override: BTreeMap<String, ArcCell>, // contract ID -> code
 }
 
 pub struct Context<'a> {

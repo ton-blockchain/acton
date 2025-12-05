@@ -38,7 +38,9 @@ fun onInternalMessage(in: InMessage) {
         }
 
         RequestWalletAddress => {
-            assert (in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND) throw ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND;
+            assert (
+                in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND
+            ) throw ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND;
 
             var respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
                 ? msg.ownerAddress.toCell()

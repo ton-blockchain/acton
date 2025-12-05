@@ -18,7 +18,7 @@ use emulator::executor::ExecutorVerbosity;
 use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use owo_colors::OwoColorize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use tolkc::source_map::SourceMap;
@@ -172,6 +172,7 @@ fn execute_script(
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets,
+            build_override: BTreeMap::new(),
         },
         io: IoContext {
             stdout_buffer: "".to_string(),

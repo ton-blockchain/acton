@@ -36,7 +36,7 @@ use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -51,6 +51,7 @@ use walkdir::WalkDir;
 mod annotations;
 mod coverage;
 mod instrumentation;
+pub mod mutation;
 mod profiling;
 mod reporting;
 mod trace;
@@ -85,6 +86,9 @@ pub struct TestConfig {
     pub fork_net: Option<String>,
     pub api_key: Option<String>,
     pub save_test_trace: Option<String>,
+    pub mutate: bool,
+    pub mutate_overrides: Option<String>,
+    pub mutate_contract: Option<String>,
 }
 
 #[derive(Debug)]
@@ -108,6 +112,7 @@ pub struct TestRunner<'a> {
     emulations: Emulations,
     transport: DapTransport,
     reporter_manager: &'a mut ReporterManager,
+    mutation_overrides: BTreeMap<String, ArcCell>,
 }
 
 impl<'a> TestRunner<'a> {
@@ -116,6 +121,7 @@ impl<'a> TestRunner<'a> {
         config: TestConfig,
         cache: &'a mut FileBuildCache,
         reporter_manager: &'a mut ReporterManager,
+        mutation_overrides: BTreeMap<String, ArcCell>,
     ) -> TestRunner<'a> {
         let transport = if config.debug {
             crate::debugger::start_dap_server(config.debug_port)
@@ -133,6 +139,7 @@ impl<'a> TestRunner<'a> {
             emulations: Emulations::new(),
             transport,
             reporter_manager,
+            mutation_overrides,
         }
     }
 
@@ -219,6 +226,7 @@ impl<'a> TestRunner<'a> {
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
                 open_wallets: Default::default(), // in tests, we never use real wallets
+                build_override: self.mutation_overrides.clone(),
             },
             io: IoContext {
                 stdout_buffer: "".to_owned(),
@@ -622,11 +630,24 @@ fn run_tests_for_file(
 
             let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
 
+            let mut mutation_overrides = BTreeMap::new();
+
+            if let Some((first, second)) = config
+                .mutate_overrides
+                .as_ref()
+                .unwrap_or(&"".to_owned())
+                .split_once(":")
+            {
+                let code_cell = ArcCell::from_boc_b64(second)?;
+                mutation_overrides.insert(first.to_owned(), code_cell);
+            }
+
             let mut runner = TestRunner::new(
                 acton_config.clone(),
                 config.clone(),
                 file_cache,
                 reporter_manager,
+                mutation_overrides,
             );
             let stats = run_file_tests(
                 &mut runner,
