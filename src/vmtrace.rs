@@ -158,8 +158,8 @@ pub struct TraceStepUnmapped {
     pub gas: usize,
 }
 
-pub fn build_extended_vm_trace(vm_logs: &String, source_map: &SourceMap) -> Vec<TraceStep> {
-    let lines = vmlogs::parser::parse_lines(vm_logs.as_str());
+pub fn build_extended_vm_trace(vm_logs: &str, source_map: &SourceMap) -> Vec<TraceStep> {
+    let lines = vmlogs::parser::parse_lines(vm_logs);
     build_extended_vm_trace_from_lines(lines, source_map)
 }
 

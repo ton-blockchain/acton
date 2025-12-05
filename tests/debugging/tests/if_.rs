@@ -137,7 +137,7 @@ fun main(foo: int?) {
 
     let mut client = session.start();
 
-    let result = client.execute(|executor| {
+    let result = client.execute(|_executor| {
         // TODO: doesn't stop on return
         // executor.step_over()?;
         Ok(())
@@ -170,7 +170,7 @@ fun main(foo: int?) {
 
     let mut client = session.start();
 
-    let result = client.execute(|executor| {
+    let result = client.execute(|_executor| {
         // TODO: doesn't stop on debug.print()
         // executor.step_over()?;
         Ok(())

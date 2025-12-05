@@ -54,6 +54,7 @@ pub struct TestConfig {
     pub junit_merge: Option<bool>,
 }
 
+#[allow(dead_code)]
 impl ProjectBuilder {
     pub fn new(name: &str) -> Self {
         let mut temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -530,6 +531,7 @@ pub struct Project {
 }
 
 impl Project {
+    #[allow(dead_code)]
     pub fn acton(&self) -> ActonCommand {
         let cmd = snapbox::cmd::Command::new(acton_exe()).with_assert(assert_ui());
         ActonCommand {
@@ -606,6 +608,7 @@ pub struct ActonCommand {
     pub(crate) script_broadcast: bool,
 }
 
+#[allow(dead_code)]
 impl ActonCommand {
     pub fn build(mut self) -> Self {
         self.cmd = self.cmd.arg("build").current_dir(&self.project.path);

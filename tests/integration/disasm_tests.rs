@@ -1,6 +1,8 @@
 use crate::common::assertion;
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
-use crate::support::{ProjectBuilder, TestOutputExt};
+
 use std::time::Duration;
 use std::{fs, thread};
 

@@ -1,3 +1,5 @@
+all: precommit
+
 build:
     cargo build
 
@@ -16,3 +18,17 @@ test:
     cargo test -p abi -p dap-client -p emulator -p tolk_parser -p ton-api -p tvmffi -p vmlogs\
     && just i-test \
     && just d-test
+
+fmt:
+    cargo fmt --all
+
+clippy:
+    cargo clippy --workspace --all-features --all-targets -- -D warnings
+
+check: fmt clippy test
+
+clean:
+    cargo clean
+
+precommit:
+    just build && just check

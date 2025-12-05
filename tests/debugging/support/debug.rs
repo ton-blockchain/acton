@@ -1,4 +1,4 @@
-use crate::debugging::{DebuggerClient, SourcePosition, run_script_file};
+use crate::debugging::{DebuggerClient, run_script_file};
 use crate::support::snapshots::normalize_output;
 use dap::types::StackFrame;
 use std::cmp::max;
@@ -133,7 +133,6 @@ impl DebugSession {
         let port = self.debug_port;
 
         let source_content = fs::read_to_string(&code).expect("Failed to read code file");
-        let source_lines: Vec<String> = source_content.lines().map(|s| s.to_string()).collect();
 
         let stack = self.stack.clone();
         let handle = thread::spawn(move || {
@@ -151,15 +150,8 @@ impl DebugSession {
         DebugClient {
             client: Some(client),
             session: self,
-            trace: ExecutionTrace::new(source_lines),
+            trace: ExecutionTrace::new(),
         }
-    }
-
-    pub fn join(mut self) -> anyhow::Result<()> {
-        if let Some(handle) = self.client_handle.take() {
-            handle.join().map_err(|_| anyhow::anyhow!("Join error"))?;
-        }
-        Ok(())
     }
 }
 
@@ -188,6 +180,7 @@ impl DebugClient {
         })
     }
 
+    #[allow(dead_code)]
     pub fn terminate(mut self) -> anyhow::Result<()> {
         if let Some(mut client) = self.client.take() {
             client.terminate()
@@ -262,7 +255,6 @@ impl DebugResult {
 #[derive(Debug, Clone)]
 pub struct ExecutionTrace {
     pub steps: Vec<ExecutionStep>,
-    pub source_code: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -275,11 +267,8 @@ pub struct ExecutionStep {
 }
 
 impl ExecutionTrace {
-    fn new(source_code: Vec<String>) -> Self {
-        Self {
-            steps: Vec::new(),
-            source_code,
-        }
+    fn new() -> Self {
+        Self { steps: Vec::new() }
     }
 
     fn add_step(
@@ -318,9 +307,9 @@ impl ExecutionTrace {
                 let end_line = (line_idx + 4).min(content.len());
                 let mut context = Vec::new();
 
-                for i in start_line..end_line {
+                for (i, line) in content.iter().enumerate().take(end_line).skip(start_line) {
                     let line_num = i + 1;
-                    context.push(format!("{:3}| {}", line_num, content[i]));
+                    context.push(format!("{:3}| {}", line_num, line));
                 }
 
                 if line_idx >= start_line && line_idx < end_line {

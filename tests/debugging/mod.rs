@@ -20,9 +20,9 @@ use emulator::get_executor::{GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Duration;
-use std::{env, fs, thread};
+use std::{fs, thread};
 use tasm::printer::FormatOptions;
 use tolkc::CompilerResult;
 use tolkc::source_map::SourceMap;
@@ -104,42 +104,10 @@ impl DebuggerClient {
         Ok(variables.variables)
     }
 
+    #[allow(dead_code)]
     pub fn terminate(&mut self) -> anyhow::Result<()> {
         self.client.terminate()
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SourcePosition {
-    pub file: String,
-    pub line: u32,
-    pub column: u32,
-}
-
-impl SourcePosition {
-    pub fn new(file: String, line: u32, column: u32) -> Self {
-        Self {
-            file: normalize_path(&file),
-            line,
-            column,
-        }
-    }
-}
-
-impl std::fmt::Display for SourcePosition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.file, self.line, self.column)
-    }
-}
-
-fn normalize_path(path: &str) -> String {
-    let path_buf = PathBuf::from(path);
-    if let Ok(current_dir) = env::current_dir()
-        && let Ok(relative) = path_buf.strip_prefix(&current_dir)
-    {
-        return relative.to_string_lossy().to_string();
-    }
-    path.to_string()
 }
 
 fn wait_for_initialized(client: &mut DapClient) -> anyhow::Result<()> {

@@ -1,4 +1,6 @@
-use crate::support::{CompilationOrder, ProjectBuilder, TestOutputExt};
+use crate::support::TestOutputExt;
+use crate::support::compilation::CompilationOrder;
+use crate::support::project::ProjectBuilder;
 use std::fs;
 
 const SIMPLE_CONTRACT: &str = r#"

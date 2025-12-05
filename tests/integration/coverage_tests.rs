@@ -1,6 +1,7 @@
 use crate::common::assertion;
+use crate::support::TestOutputExt;
+use crate::support::project::{ProjectBuilder, TestConfig};
 use crate::support::snapshots::normalize_output;
-use crate::support::{ProjectBuilder, TestConfig, TestOutputExt};
 use std::fs;
 
 const SIMPLE_CONTRACT: &str = r#"

@@ -1,4 +1,5 @@
-use crate::support::{FixtureProject, TestOutputExt};
+use crate::support::TestOutputExt;
+use crate::support::fixtures::FixtureProject;
 
 #[test]
 fn test_basic_fixture_passing() {

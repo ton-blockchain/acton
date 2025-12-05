@@ -44,10 +44,12 @@ fn add_regex_redactions(subs: &mut snapbox::Redactions) {
     subs.insert("[LINE]", regex!(r"(\.tolk):\d+:\d+")).unwrap();
 }
 
+#[allow(dead_code)]
 pub fn acton_exe() -> PathBuf {
     snapbox::cmd::cargo_bin!("acton").to_path_buf()
 }
 
+#[allow(dead_code)]
 pub trait ActonCommandExt {
     fn acton_ui() -> Self;
 }

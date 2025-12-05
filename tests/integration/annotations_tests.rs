@@ -1,4 +1,5 @@
-use crate::support::{ProjectBuilder, TestOutputExt};
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 
 const SIMPLE_CONTRACT: &str = r#"
 fun onInternalMessage(in: InMessage) {}

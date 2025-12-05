@@ -1,6 +1,8 @@
 use crate::common::assertion;
+use crate::support::TestOutputExt;
+use crate::support::compilation::{CompilationOrder, extract_compiled_contracts};
+use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
-use crate::support::{CompilationOrder, ProjectBuilder, TestOutputExt, extract_compiled_contracts};
 use std::fs;
 use tycho_types::boc::Boc;
 

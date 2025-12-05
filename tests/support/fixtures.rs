@@ -14,6 +14,7 @@ pub struct FixtureProject {
     enabled_slots: HashMap<String, Vec<usize>>,
 }
 
+#[allow(dead_code)]
 impl FixtureProject {
     /// Load a fixture project from tests/projects/{name}
     pub fn load(name: &str) -> Self {

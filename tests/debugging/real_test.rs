@@ -1,7 +1,6 @@
 use crate::debugging::support::assertions::{DebugTestOutput, DebugTestOutputExt};
 use crate::debugging::support::debug::{DebugBuilder, DebugSession};
 use crate::support::project::ProjectBuilder;
-use std::env;
 
 const COUNTER: &str = r#"import "counter_messages"
 
