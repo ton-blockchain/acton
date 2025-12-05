@@ -16,7 +16,7 @@ git clone https://github.com/i582/ton/tree/pmakhnev/acton
 Build and copy artifacts to `./objs`:
 
 ```
-sh assembly/native/build-macos-static.sh -a && cp ./artifacts/libemulator.a ./artifacts/libtolk.a ../acton/objs
+sh assembly/native/build-macos-static.sh -a && ../acton/objs && cp ./artifacts/libemulator.a ./artifacts/libtolk.a ../acton/objs
 ```
 
 Run Rust compilation:

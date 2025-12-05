@@ -1,6 +1,5 @@
 import "../../../../lib/build/build"
 import "../../../../lib/emulation/network"
-import "../../../../lib/net/fetch"
 import "../../../../lib/testing/expect"
 import "../../../../lib/testing/transaction_expect"
 import "../../../../lib/types/message"

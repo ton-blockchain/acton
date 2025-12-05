@@ -1,38 +1,38 @@
 Step 1 (before):
   Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
-     68| }
-     69| 
-     70| fun main() {
-     71|     val (counter, deployer) = setupTest();
+     67| }
+     68| 
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
                  ^^^^^^^^^^^^^^^^^^^
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
 
 Step 2 (step_over):
   Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
-     68| }
-     69| 
-     70| fun main() {
-     71|     val (counter, deployer) = setupTest();
+     67| }
+     68| 
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
                                        ^^^^^^^^^^^
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
 
 Step 3 (step_over):
   Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:864
   Code:
-     68| }
-     69| 
-     70| fun main() {
-     71|     val (counter, deployer) = setupTest();
+     67| }
+     68| 
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
                                        ^^^^^^^^^^^
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
   Variables:
     '4 = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     '7 = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
@@ -40,14 +40,14 @@ Step 3 (step_over):
 Step 4 (step_over):
   Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:864
   Code:
-     70| fun main() {
-     71|     val (counter, deployer) = setupTest();
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
                  ^^^^^^^^^^
-     74|     println(format1("Counter: {}", counterRes));
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
+     73|     println(format1("Counter: {}", counterRes));
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
   Variables:
     counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
@@ -88,14 +88,14 @@ Step 6 (step_over):
 Step 7 (step_over):
   Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:1000
   Code:
-     70| fun main() {
-     71|     val (counter, deployer) = setupTest();
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     74|     println(format1("Counter: {}", counterRes));
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
+     73|     println(format1("Counter: {}", counterRes));
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
   Variables:
     '304 = null
     '303 = "currentCounter"
@@ -105,14 +105,14 @@ Step 7 (step_over):
 Step 8 (step_over):
   Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:160
   Code:
-     70| fun main() {
-     71|     val (counter, deployer) = setupTest();
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     74|     println(format1("Counter: {}", counterRes));
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
+     73|     println(format1("Counter: {}", counterRes));
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
   Variables:
     '305 = 0
     counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
@@ -121,14 +121,14 @@ Step 8 (step_over):
 Step 9 (step_over):
   Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:264
   Code:
-     71|     val (counter, deployer) = setupTest();
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
+     76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
   Variables:
     '313 = "Counter: {}"
     counterRes = 0
