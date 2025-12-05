@@ -12,7 +12,7 @@ i-test:
 
 d-test:
     # run debugger tests and auto update snapshots
-    RUSTFLAGS="-Awarnings" cargo test --test debug_test -- --test-threads 1
+    cargo test --test debug_test -- --test-threads 1
 
 test:
     cargo test -p abi -p dap-client -p emulator -p tolk_parser -p ton-api -p tvmffi -p vmlogs\
