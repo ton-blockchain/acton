@@ -72,4 +72,4 @@ cargo test --test debug_test -- --test-threads 1
 
 To update snapshots set `SNAPSHOTS=overwrite`.
 
-See also: [justfile](justfile) for commands.
+See also: [justfile](justfile) for all commands.
