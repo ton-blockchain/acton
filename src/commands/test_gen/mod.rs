@@ -60,11 +60,7 @@ pub fn test_gen_cmd(
             .map_err(|e| anyhow!("Failed to create directory {}: {}", parent.display(), e))?;
     }
 
-    let storage_file_path = abi
-        .storage
-        .as_ref()
-        .and_then(|s| s.pos.as_ref())
-        .map(|pos| PathBuf::from(&pos.uri));
+    let storage_file_path = abi.storage.as_ref().map(|typ| PathBuf::from(&typ.pos.uri));
 
     let types_in_same_file = check_types_in_same_file(&contract_path, &storage_file_path, &abi);
 
@@ -144,12 +140,10 @@ fn check_types_in_same_file(
         false
     };
 
-    let messages_in_same_file = abi.messages.iter().any(|msg| {
-        msg.pos
-            .as_ref()
-            .map(|pos| pos.uri == contract_path_str)
-            .unwrap_or(false)
-    });
+    let messages_in_same_file = abi
+        .messages
+        .iter()
+        .any(|msg| msg.pos.uri == contract_path_str);
 
     storage_in_same_file || messages_in_same_file
 }
@@ -188,16 +182,13 @@ fn print_types_warning(contract_path: &Path, types_file_path: &Path, abi: &Contr
     println!();
 
     if let Some(storage) = &abi.storage
-        && let Some(pos) = &storage.pos
-        && pos.uri == contract_path.to_string_lossy()
+        && storage.pos.uri == contract_path.to_string_lossy()
     {
         println!("  • {} struct", "Storage".cyan().bold());
     }
 
     for message in &abi.messages {
-        if let Some(pos) = &message.pos
-            && pos.uri == contract_path.to_string_lossy()
-        {
+        if message.pos.uri == contract_path.to_string_lossy() {
             println!("  • {} struct", message.name.cyan().bold());
         }
     }

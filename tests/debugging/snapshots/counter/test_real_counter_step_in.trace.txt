@@ -1,5 +1,5 @@
 Step 1 (before):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:2
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
      68| }
      69| 
@@ -11,7 +11,7 @@ Step 1 (before):
      74|     println(format1("Counter: {}", counterRes));
 
 Step 2 (step_in):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:2
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
      68| }
      69| 
@@ -23,7 +23,7 @@ Step 2 (step_in):
      74|     println(format1("Counter: {}", counterRes));
 
 Step 3 (step_in):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:2
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
      68| }
      69| 
@@ -35,7 +35,7 @@ Step 3 (step_in):
      74|     println(format1("Counter: {}", counterRes));
 
 Step 4 (step_in):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:2
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
      68| }
      69| 
@@ -47,7 +47,7 @@ Step 4 (step_in):
      74|     println(format1("Counter: {}", counterRes));
 
 Step 5 (step_in):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:2
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
      51| }
      52| 
@@ -59,7 +59,7 @@ Step 5 (step_in):
      57|     val msg = createMessage({
 
 Step 6 (step_over):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:2
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:2
   Code:
      51| }
      52| 
@@ -71,7 +71,7 @@ Step 6 (step_over):
      57|     val msg = createMessage({
 
 Step 7 (step_over):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:330
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:330
   Code:
      51| }
      52| 
@@ -82,12 +82,12 @@ Step 7 (step_over):
      56|     val deployer = net.treasury("deployer");
      57|     val msg = createMessage({
   Variables:
-    '13 = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '13 = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     '15 = [BOC_HEX]
     '14 = [BOC_HEX]
 
 Step 8 (step_over):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:330
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:330
   Code:
      53| fun setupTest() {
      54|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
@@ -98,12 +98,12 @@ Step 8 (step_over):
      58|         bounce: false,
      59|         value: ton("1.0"),
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 9 (step_over):
-  Bytecode position: 6BDBBD7715600D7A36F168E72EA1006A855CAE8E095C1010F1475C691F18AFC2:410
+  Bytecode position: 778EFD392DE820766916FDF8F303AA019EBBCD63B2BFA25F85D0BF42E77026AD:410
   Code:
      53| fun setupTest() {
      54|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
@@ -115,12 +115,12 @@ Step 9 (step_over):
      59|         value: ton("1.0"),
   Variables:
     '59 = "deployer"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 10 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:120
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:472
   Code:
      53| fun setupTest() {
      54|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
@@ -132,12 +132,12 @@ Step 10 (step_over):
      59|         value: ton("1.0"),
   Variables:
     '60 = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 11 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:120
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:472
   Code:
      54|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
      55| 
@@ -149,12 +149,12 @@ Step 11 (step_over):
      60|         dest: {
   Variables:
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 12 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:120
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:472
   Code:
      55| 
      56|     val deployer = net.treasury("deployer");
@@ -166,12 +166,12 @@ Step 12 (step_over):
      61|             stateInit: counter.init,
   Variables:
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 13 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:120
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:472
   Code:
      55| 
      56|     val deployer = net.treasury("deployer");
@@ -183,12 +183,12 @@ Step 13 (step_over):
      61|             stateInit: counter.init,
   Variables:
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 14 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:168
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:520
   Code:
      57|     val msg = createMessage({
      58|         bounce: false,
@@ -199,14 +199,14 @@ Step 14 (step_over):
      62|         },
      63|     });
   Variables:
-    '184 = 1000000000
+    '189 = 1000000000
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 15 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:168
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:520
   Code:
      54|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
      55| 
@@ -217,14 +217,14 @@ Step 15 (step_over):
      59|         value: ton("1.0"),
      60|         dest: {
   Variables:
-    '184 = 1000000000
+    '189 = 1000000000
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 16 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:168
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:520
   Code:
      54|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
      55| 
@@ -235,14 +235,14 @@ Step 16 (step_over):
      59|         value: ton("1.0"),
      60|         dest: {
   Variables:
-    '184 = 1000000000
+    '189 = 1000000000
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     counter.init.data = [BOC_HEX]
     counter.init.code = [BOC_HEX]
 
 Step 17 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:464
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:816
   Code:
      54|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
      55| 
@@ -253,12 +253,12 @@ Step 17 (step_over):
      59|         value: ton("1.0"),
      60|         dest: {
   Variables:
-    '256 = [BOC_HEX]
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '261 = [BOC_HEX]
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 18 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:464
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:816
   Code:
      61|             stateInit: counter.init,
      62|         },
@@ -270,11 +270,11 @@ Step 18 (step_over):
      67|     return (counter, deployer)
   Variables:
     msg = [BOC_HEX]
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 19 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:472
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:824
   Code:
      61|             stateInit: counter.init,
      62|         },
@@ -285,13 +285,13 @@ Step 19 (step_over):
      66| 
      67|     return (counter, deployer)
   Variables:
-    '258 = 1
+    '263 = 1
     msg = [BOC_HEX]
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 20 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:568
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:920
   Code:
      61|             stateInit: counter.init,
      62|         },
@@ -302,12 +302,12 @@ Step 20 (step_over):
      66| 
      67|     return (counter, deployer)
   Variables:
-    '259 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '264 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 21 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:584
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:936
   Code:
      62|         },
      63|     });
@@ -318,13 +318,13 @@ Step 21 (step_over):
      67|     return (counter, deployer)
      68| }
   Variables:
-    '264 = empty slice
-    res = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '269 = empty slice
+    res = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 22 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:600
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:952
   Code:
      62|         },
      63|     });
@@ -335,297 +335,319 @@ Step 22 (step_over):
      67|     return (counter, deployer)
      68| }
   Variables:
-    '267 = empty slice
-    '266 = "SendResultList"
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '272 = empty slice
+    '271 = "SendResultList"
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 23 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:608
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:960
   Code:
-    157|     /// Destination address of the transaction.
-    158|     to: address? = null
-    159|     /// Source address of the transaction.
-    160|     from: address? = null
+    208|     /// Destination address of the transaction.
+    209|     to: address? = null
+    210|     /// Source address of the transaction.
+    211|     from: address? = null
                               ^^^^
-    161|     /// Exit code of the transaction.
-    162|     exit_code: int32? = null
-    163|     /// Whether the transaction is a deploy transaction.
+    212|     /// Exit code of the transaction.
+    213|     exit_code: int32? = null
+    214|     /// Whether the transaction is a deploy transaction.
   Variables:
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 24 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:616
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:968
   Code:
-    157|     /// Destination address of the transaction.
-    158|     to: address? = null
-    159|     /// Source address of the transaction.
-    160|     from: address? = null
+    208|     /// Destination address of the transaction.
+    209|     to: address? = null
+    210|     /// Source address of the transaction.
+    211|     from: address? = null
                               ^^^^
-    161|     /// Exit code of the transaction.
-    162|     exit_code: int32? = null
-    163|     /// Whether the transaction is a deploy transaction.
+    212|     /// Exit code of the transaction.
+    213|     exit_code: int32? = null
+    214|     /// Whether the transaction is a deploy transaction.
   Variables:
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 25 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:616
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:968
   Code:
-    159|     /// Source address of the transaction.
-    160|     from: address? = null
-    161|     /// Exit code of the transaction.
-    162|     exit_code: int32? = null
+    210|     /// Source address of the transaction.
+    211|     from: address? = null
+    212|     /// Exit code of the transaction.
+    213|     exit_code: int32? = null
                                  ^^^^
-    163|     /// Whether the transaction is a deploy transaction.
-    164|     ///
-    165|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    214|     /// Whether the transaction is a deploy transaction.
+    215|     ///
+    216|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
   Variables:
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 26 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:616
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:968
   Code:
-    159|     /// Source address of the transaction.
-    160|     from: address? = null
-    161|     /// Exit code of the transaction.
-    162|     exit_code: int32? = null
+    210|     /// Source address of the transaction.
+    211|     from: address? = null
+    212|     /// Exit code of the transaction.
+    213|     exit_code: int32? = null
                                  ^^^^
-    163|     /// Whether the transaction is a deploy transaction.
-    164|     ///
-    165|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    214|     /// Whether the transaction is a deploy transaction.
+    215|     ///
+    216|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
   Variables:
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 27 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:616
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:968
   Code:
-    163|     /// Whether the transaction is a deploy transaction.
-    164|     ///
-    165|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
-    166|     deploy: bool? = null
+    214|     /// Whether the transaction is a deploy transaction.
+    215|     ///
+    216|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    217|     deploy: bool? = null
                              ^^^^
-    167|     /// Whether the transaction is a bounced transaction.
-    168|     bounced: bool? = null
-    169|     /// Opcode of the in message.
+    218|     /// Whether the transaction is a bounced transaction.
+    219|     bounced: bool? = null
+    220|     /// Opcode of the in message.
   Variables:
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 28 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:616
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:968
   Code:
-    163|     /// Whether the transaction is a deploy transaction.
-    164|     ///
-    165|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
-    166|     deploy: bool? = null
+    214|     /// Whether the transaction is a deploy transaction.
+    215|     ///
+    216|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    217|     deploy: bool? = null
                              ^^^^
-    167|     /// Whether the transaction is a bounced transaction.
-    168|     bounced: bool? = null
-    169|     /// Opcode of the in message.
+    218|     /// Whether the transaction is a bounced transaction.
+    219|     bounced: bool? = null
+    220|     /// Opcode of the in message.
   Variables:
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 29 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:616
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:968
   Code:
-    165|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
-    166|     deploy: bool? = null
-    167|     /// Whether the transaction is a bounced transaction.
-    168|     bounced: bool? = null
+    216|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    217|     deploy: bool? = null
+    218|     /// Whether the transaction is a bounced transaction.
+    219|     bounced: bool? = null
                               ^^^^
-    169|     /// Opcode of the in message.
-    170|     opcode: uint32? = null
-    171|     /// Action [EXIT_STATUS] of the transaction.
+    220|     /// Opcode of the in message.
+    221|     opcode: uint32? = null
+    222|     /// Action [EXIT_STATUS] of the transaction.
   Variables:
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 30 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:624
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:976
   Code:
-    165|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
-    166|     deploy: bool? = null
-    167|     /// Whether the transaction is a bounced transaction.
-    168|     bounced: bool? = null
+    216|     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
+    217|     deploy: bool? = null
+    218|     /// Whether the transaction is a bounced transaction.
+    219|     bounced: bool? = null
                               ^^^^
-    169|     /// Opcode of the in message.
-    170|     opcode: uint32? = null
-    171|     /// Action [EXIT_STATUS] of the transaction.
+    220|     /// Opcode of the in message.
+    221|     opcode: uint32? = null
+    222|     /// Action [EXIT_STATUS] of the transaction.
   Variables:
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '276 = null
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 31 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:624
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:976
   Code:
-    167|     /// Whether the transaction is a bounced transaction.
-    168|     bounced: bool? = null
-    169|     /// Opcode of the in message.
-    170|     opcode: uint32? = null
+    218|     /// Whether the transaction is a bounced transaction.
+    219|     bounced: bool? = null
+    220|     /// Opcode of the in message.
+    221|     opcode: uint32? = null
                                ^^^^
-    171|     /// Action [EXIT_STATUS] of the transaction.
-    172|     action_exit_code: int32? = null
-    173|     /// Whether the compute phase was skipped.
+    222|     /// Action [EXIT_STATUS] of the transaction.
+    223|     action_exit_code: int32? = null
+    224|     /// Whether the compute phase was skipped.
   Variables:
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '276 = null
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 32 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:624
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:976
   Code:
-    167|     /// Whether the transaction is a bounced transaction.
-    168|     bounced: bool? = null
-    169|     /// Opcode of the in message.
-    170|     opcode: uint32? = null
+    218|     /// Whether the transaction is a bounced transaction.
+    219|     bounced: bool? = null
+    220|     /// Opcode of the in message.
+    221|     opcode: uint32? = null
                                ^^^^
-    171|     /// Action [EXIT_STATUS] of the transaction.
-    172|     action_exit_code: int32? = null
-    173|     /// Whether the compute phase was skipped.
+    222|     /// Action [EXIT_STATUS] of the transaction.
+    223|     action_exit_code: int32? = null
+    224|     /// Whether the compute phase was skipped.
   Variables:
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '276 = null
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 33 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:624
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:976
   Code:
-    169|     /// Opcode of the in message.
-    170|     opcode: uint32? = null
-    171|     /// Action [EXIT_STATUS] of the transaction.
-    172|     action_exit_code: int32? = null
+    220|     /// Opcode of the in message.
+    221|     opcode: uint32? = null
+    222|     /// Action [EXIT_STATUS] of the transaction.
+    223|     action_exit_code: int32? = null
                                         ^^^^
-    173|     /// Whether the compute phase was skipped.
-    174|     compute_phase_skipped: bool? = null
-    175| }
+    224|     /// Whether the compute phase was skipped.
+    225|     compute_phase_skipped: bool? = null
+    226|     /// Body of the in message (compared by hash).
   Variables:
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '276 = null
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 34 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:632
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:984
   Code:
-    169|     /// Opcode of the in message.
-    170|     opcode: uint32? = null
-    171|     /// Action [EXIT_STATUS] of the transaction.
-    172|     action_exit_code: int32? = null
+    220|     /// Opcode of the in message.
+    221|     opcode: uint32? = null
+    222|     /// Action [EXIT_STATUS] of the transaction.
+    223|     action_exit_code: int32? = null
                                         ^^^^
-    173|     /// Whether the compute phase was skipped.
-    174|     compute_phase_skipped: bool? = null
-    175| }
+    224|     /// Whether the compute phase was skipped.
+    225|     compute_phase_skipped: bool? = null
+    226|     /// Body of the in message (compared by hash).
   Variables:
+    '278 = null
+    '276 = null
     '273 = null
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 35 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:632
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:984
   Code:
-    171|     /// Action [EXIT_STATUS] of the transaction.
-    172|     action_exit_code: int32? = null
-    173|     /// Whether the compute phase was skipped.
-    174|     compute_phase_skipped: bool? = null
+    222|     /// Action [EXIT_STATUS] of the transaction.
+    223|     action_exit_code: int32? = null
+    224|     /// Whether the compute phase was skipped.
+    225|     compute_phase_skipped: bool? = null
                                             ^^^^
-    175| }
-    176| 
-    177| struct ExternalOutSearchParams {
+    226|     /// Body of the in message (compared by hash).
+    227|     body: cell? = null
+    228| }
   Variables:
+    '278 = null
+    '276 = null
     '273 = null
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 36 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:640
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:992
   Code:
-    171|     /// Action [EXIT_STATUS] of the transaction.
-    172|     action_exit_code: int32? = null
-    173|     /// Whether the compute phase was skipped.
-    174|     compute_phase_skipped: bool? = null
+    222|     /// Action [EXIT_STATUS] of the transaction.
+    223|     action_exit_code: int32? = null
+    224|     /// Whether the compute phase was skipped.
+    225|     compute_phase_skipped: bool? = null
                                             ^^^^
-    175| }
-    176| 
-    177| struct ExternalOutSearchParams {
+    226|     /// Body of the in message (compared by hash).
+    227|     body: cell? = null
+    228| }
   Variables:
-    '274 = null
+    '279 = null
+    '278 = null
+    '276 = null
     '273 = null
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 37 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:640
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:992
   Code:
-     62|         },
-     63|     });
-     64|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
-     65|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     66| 
-     67|     return (counter, deployer)
-     68| }
+    224|     /// Whether the compute phase was skipped.
+    225|     compute_phase_skipped: bool? = null
+    226|     /// Body of the in message (compared by hash).
+    227|     body: cell? = null
+                           ^^^^
+    228| }
+    229| 
+    230| struct ExternalOutSearchParams {
   Variables:
-    '274 = null
+    '279 = null
+    '278 = null
+    '276 = null
     '273 = null
-    '271 = null
-    '268 = null
-    '267 = empty slice
-    '265 = ([BOC_HEX], (), null, [BOC_HEX], (), 958, ())
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 38 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:856
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:1000
+  Code:
+    224|     /// Whether the compute phase was skipped.
+    225|     compute_phase_skipped: bool? = null
+    226|     /// Body of the in message (compared by hash).
+    227|     body: cell? = null
+                           ^^^^
+    228| }
+    229| 
+    230| struct ExternalOutSearchParams {
+  Variables:
+    '280 = null
+    '279 = null
+    '278 = null
+    '276 = null
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 39 (step_over):
+  Bytecode position: DC45F0812EF153B3726F62D255D352971B38206ABBFD1A2FC01369A968871FED:1000
   Code:
      62|         },
      63|     });
@@ -636,11 +658,33 @@ Step 38 (step_over):
      67|     return (counter, deployer)
      68| }
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '280 = null
+    '279 = null
+    '278 = null
+    '276 = null
+    '273 = null
+    '272 = empty slice
+    '270 = ([BOC_HEX], (), null, [BOC_HEX], (), 1040, ())
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
-Step 39 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:856
+Step 40 (step_over):
+  Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:864
+  Code:
+     62|         },
+     63|     });
+     64|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     65|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     66| 
+     67|     return (counter, deployer)
+     68| }
+  Variables:
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 41 (step_over):
+  Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:864
   Code:
      64|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
      65|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
@@ -651,11 +695,11 @@ Step 39 (step_over):
      69| 
      70| fun main() {
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
-Step 40 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:856
+Step 42 (step_over):
+  Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:864
   Code:
      65|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
      66| 
@@ -666,11 +710,11 @@ Step 40 (step_over):
      70| fun main() {
      71|     val (counter, deployer) = setupTest();
   Variables:
-    '4 = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '4 = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     '7 = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
-Step 41 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:856
+Step 43 (step_over):
+  Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:864
   Code:
      70| fun main() {
      71|     val (counter, deployer) = setupTest();
@@ -681,61 +725,44 @@ Step 41 (step_over):
      75| 
      76|     val info = net.getAccountState(counter.address)!;
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 42 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:984
-  Code:
-    378| /// ```
-    379| /// 
-    380| /// If you need to run a get method by its ID, use [Network.runGetMethodById] instead.
-    381| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
-                                                                                           ^^^^
-    382|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    383|     return net.runGetMethodById(addr, method_id, args);
-    384| }
-  Variables:
-    '296 = "currentCounter"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 43 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:992
-  Code:
-    378| /// ```
-    379| /// 
-    380| /// If you need to run a get method by its ID, use [Network.runGetMethodById] instead.
-    381| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
-                                                                                           ^^^^
-    382|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    383|     return net.runGetMethodById(addr, method_id, args);
-    384| }
-  Variables:
-    '297 = null
-    '296 = "currentCounter"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 44 (step_over):
-  Bytecode position: B888D3958F895DCC109A8ABC9CFDD782CE9830B96EB78949E432A846227D8797:992
+  Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:992
   Code:
-     70| fun main() {
-     71|     val (counter, deployer) = setupTest();
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     74|     println(format1("Counter: {}", counterRes));
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
+    506| /// ```
+    507| ///
+    508| /// If you need to run a get method by its ID, use [Network.runGetMethodById] instead.
+    509| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+                                                                                           ^^^^
+    510|     val method_id = (crc16(name) & 0xffff) | 0x10000;
+    511|     return impl.runGetMethodById(addr, method_id, name, args)
+    512| }
   Variables:
-    '297 = null
-    '296 = "currentCounter"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '303 = "currentCounter"
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 45 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:128
+  Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:1000
+  Code:
+    506| /// ```
+    507| ///
+    508| /// If you need to run a get method by its ID, use [Network.runGetMethodById] instead.
+    509| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+                                                                                           ^^^^
+    510|     val method_id = (crc16(name) & 0xffff) | 0x10000;
+    511|     return impl.runGetMethodById(addr, method_id, name, args)
+    512| }
+  Variables:
+    '304 = null
+    '303 = "currentCounter"
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 46 (step_over):
+  Bytecode position: 202467D6F0BBF0AFD21A40EC9E492A061ABCD136D3B3BD5418132254D4A6B075:1000
   Code:
      70| fun main() {
      71|     val (counter, deployer) = setupTest();
@@ -746,29 +773,29 @@ Step 45 (step_over):
      75| 
      76|     val info = net.getAccountState(counter.address)!;
   Variables:
-    '298 = 0
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 46 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:232
-  Code:
-     71|     val (counter, deployer) = setupTest();
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-  Variables:
-    '306 = "Counter: {}"
-    counterRes = 0
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '304 = null
+    '303 = "currentCounter"
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 47 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:352
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:160
+  Code:
+     70| fun main() {
+     71|     val (counter, deployer) = setupTest();
+     72| 
+     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     74|     println(format1("Counter: {}", counterRes));
+     75| 
+     76|     val info = net.getAccountState(counter.address)!;
+  Variables:
+    '305 = 0
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 48 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:264
   Code:
      71|     val (counter, deployer) = setupTest();
      72| 
@@ -779,28 +806,29 @@ Step 47 (step_over):
      76|     val info = net.getAccountState(counter.address)!;
      77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
   Variables:
-    '307 = "Counter: 0"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 48 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:352
-  Code:
-     71|     val (counter, deployer) = setupTest();
-     72| 
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-  Variables:
-    '307 = "Counter: 0"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '313 = "Counter: {}"
+    counterRes = 0
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 49 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:480
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:384
+  Code:
+     71|     val (counter, deployer) = setupTest();
+     72| 
+     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     74|     println(format1("Counter: {}", counterRes));
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     75| 
+     76|     val info = net.getAccountState(counter.address)!;
+     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+  Variables:
+    '314 = "Counter: 0"
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 50 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:384
   Code:
      71|     val (counter, deployer) = setupTest();
      72| 
@@ -811,11 +839,27 @@ Step 49 (step_over):
      76|     val info = net.getAccountState(counter.address)!;
      77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '314 = "Counter: 0"
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
-Step 50 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:480
+Step 51 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:512
+  Code:
+     71|     val (counter, deployer) = setupTest();
+     72| 
+     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     74|     println(format1("Counter: {}", counterRes));
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     75| 
+     76|     val info = net.getAccountState(counter.address)!;
+     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+  Variables:
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 52 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:512
   Code:
      73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
      74|     println(format1("Counter: {}", counterRes));
@@ -826,71 +870,54 @@ Step 50 (step_over):
      78| 
      79|     val res = counter.sendIncrease(deployer.address, 100);
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 51 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:480
-  Code:
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-     78| 
-     79|     val res = counter.sendIncrease(deployer.address, 100);
-  Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 52 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:504
-  Code:
-     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
-     74|     println(format1("Counter: {}", counterRes));
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
-                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-     78| 
-     79|     val res = counter.sendIncrease(deployer.address, 100);
-  Variables:
-    'UTag = 172
-    '336 = 170
-    '335 = null
-    '334 = 999616800
-    '333 = 2000001
-    'UTag = 133
-    'USlot1 = null
-    '330[MAYBE_UNIX_TIME_VALUE]
-    'UTag = 166
-    'USlot1 = null
-    '327 = 2865
-    '326 = 19
-    '325 = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 53 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:672
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:512
   Code:
+     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
      74|     println(format1("Counter: {}", counterRes));
      75| 
      76|     val info = net.getAccountState(counter.address)!;
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      78| 
      79|     val res = counter.sendIncrease(deployer.address, 100);
-     80|     println(res);
   Variables:
-    '338 = "Balance: {:ton}"
-    info.storage.balance.grams = 999616800
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 54 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:808
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:536
+  Code:
+     73|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     74|     println(format1("Counter: {}", counterRes));
+     75| 
+     76|     val info = net.getAccountState(counter.address)!;
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     78| 
+     79|     val res = counter.sendIncrease(deployer.address, 100);
+  Variables:
+    'UTag = 176
+    '343 = 168
+    '342 = null
+    '341 = 999584000
+    '340 = 2000001
+    'UTag = 133
+    'USlot1 = null
+    '337[MAYBE_UNIX_TIME_VALUE]
+    'UTag = 174
+    'USlot1 = null
+    '334 = 3586
+    '333 = 22
+    '332 = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 55 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:704
   Code:
      74|     println(format1("Counter: {}", counterRes));
      75| 
@@ -901,28 +928,29 @@ Step 54 (step_over):
      79|     val res = counter.sendIncrease(deployer.address, 100);
      80|     println(res);
   Variables:
-    '339 = "Balance: 0.9996168 TON"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 55 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:808
-  Code:
-     74|     println(format1("Counter: {}", counterRes));
-     75| 
-     76|     val info = net.getAccountState(counter.address)!;
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     78| 
-     79|     val res = counter.sendIncrease(deployer.address, 100);
-     80|     println(res);
-  Variables:
-    '339 = "Balance: 0.9996168 TON"
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '345 = "Balance: {:ton}"
+    info.storage.balance.grams = 999584000
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
 Step 56 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:936
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:840
+  Code:
+     74|     println(format1("Counter: {}", counterRes));
+     75| 
+     76|     val info = net.getAccountState(counter.address)!;
+     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     78| 
+     79|     val res = counter.sendIncrease(deployer.address, 100);
+     80|     println(res);
+  Variables:
+    '346 = "Balance: 0.999584 TON"
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 57 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:840
   Code:
      74|     println(format1("Counter: {}", counterRes));
      75| 
@@ -933,11 +961,27 @@ Step 56 (step_over):
      79|     val res = counter.sendIncrease(deployer.address, 100);
      80|     println(res);
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    '346 = "Balance: 0.999584 TON"
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
-Step 57 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:936
+Step 58 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:968
+  Code:
+     74|     println(format1("Counter: {}", counterRes));
+     75| 
+     76|     val info = net.getAccountState(counter.address)!;
+     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     78| 
+     79|     val res = counter.sendIncrease(deployer.address, 100);
+     80|     println(res);
+  Variables:
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 59 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:968
   Code:
      76|     val info = net.getAccountState(counter.address)!;
      77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
@@ -948,40 +992,40 @@ Step 57 (step_over):
      81| }
      82| 
   Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
     deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 58 (step_over):
-  Bytecode position: A41486FB709B786ADBF8791ED6B18A47ED5D264E8330A11BB19A5CF372CA8CA8:936
-  Code:
-     76|     val info = net.getAccountState(counter.address)!;
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-     78| 
-     79|     val res = counter.sendIncrease(deployer.address, 100);
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     80|     println(res);
-     81| }
-     82| 
-  Variables:
-    counter.address = EQCh22v4yTUa_zpjd13fluhNS1LeI6imUsTLjairRED01OWd
-    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
-
-Step 59 (step_over):
-  Bytecode position: C1CCACC97D2872479CF601DC9BCD19C7E72F5A73FABEE945F637B7713401E32F:432
-  Code:
-     76|     val info = net.getAccountState(counter.address)!;
-     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
-     78| 
-     79|     val res = counter.sendIncrease(deployer.address, 100);
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     80|     println(res);
-     81| }
-     82| 
-  Variables:
-    '347 = ([BOC_HEX], (), null, [BOC_HEX], (), 2452, ())
 
 Step 60 (step_over):
-  Bytecode position: C1CCACC97D2872479CF601DC9BCD19C7E72F5A73FABEE945F637B7713401E32F:432
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:968
+  Code:
+     76|     val info = net.getAccountState(counter.address)!;
+     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     78| 
+     79|     val res = counter.sendIncrease(deployer.address, 100);
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     80|     println(res);
+     81| }
+     82| 
+  Variables:
+    counter.address = EQAz9PDC4qZwDAlWNuneOwXd0Wov9GnzyPtQcVCokS49yxvs
+    deployer = EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
+
+Step 61 (step_over):
+  Bytecode position: 6CAA5DB50957F554B3DD4069867DE7986ED05A86FF6920612C010E1A2ADBCB81:464
+  Code:
+     76|     val info = net.getAccountState(counter.address)!;
+     77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+     78| 
+     79|     val res = counter.sendIncrease(deployer.address, 100);
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     80|     println(res);
+     81| }
+     82| 
+  Variables:
+    '354 = ([BOC_HEX], (), null, [BOC_HEX], (), 3386, ())
+
+Step 62 (step_over):
+  Bytecode position: 6CAA5DB50957F554B3DD4069867DE7986ED05A86FF6920612C010E1A2ADBCB81:464
   Code:
      77|     println(format1("Balance: {:ton}", info.storage.balance.grams));
      78| 
@@ -992,4 +1036,4 @@ Step 60 (step_over):
      82| 
      83| get fun `test-should-reset-counter`() {
   Variables:
-    res = ([BOC_HEX], (), null, [BOC_HEX], (), 2452, ())
+    res = ([BOC_HEX], (), null, [BOC_HEX], (), 3386, ())

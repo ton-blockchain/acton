@@ -125,7 +125,7 @@ struct Counter {
 
 fun Counter.fromStorage(storage: Storage) {
     val init = ContractState {
-        code: build("Counter"),
+        code: build("counter"),
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
@@ -200,10 +200,6 @@ get fun `test-should-reset-counter`() {
 "#;
 
 fn setup_counter_project() -> DebugSession {
-    unsafe {
-        env::set_var("SNAPSHOTS", "overwrite");
-    }
-
     let main_code = MAIN_CODE;
 
     let project = ProjectBuilder::new("counter-test")
@@ -254,7 +250,7 @@ fn test_real_counter_contract_step_in() -> anyhow::Result<()> {
         executor.step_in()?;
         executor.step_in()?;
 
-        for _ in 0..55 {
+        for _ in 0..57 {
             executor.step_over()?;
         }
         Ok(())

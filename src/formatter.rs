@@ -932,7 +932,6 @@ impl FormatterContext {
         }
     }
 
-    /// Extract opcode from message body
     fn extract_opcode(&self, in_msg: &RelaxedMessage) -> u32 {
         let mut body = in_msg.body;
         let bounced = match &in_msg.info {
@@ -947,15 +946,9 @@ impl FormatterContext {
         opcode
     }
 
-    /// Get message name from opcode
     fn get_message_name(&self, opcode: u32) -> String {
-        let message_abi = self
-            .contract_abi
-            .messages
-            .iter()
-            .find(|msg| msg.opcode != Some(0) && msg.opcode == Some(opcode));
-
-        let name = if let Some(message_abi) = message_abi {
+        let message_abi = self.contract_abi.find_type_by_opcode(&BigInt::from(opcode));
+        let name = if let Some(message_abi) = &message_abi {
             message_abi.name.as_str()
         } else if opcode == 0 {
             "empty"
@@ -966,13 +959,12 @@ impl FormatterContext {
         name.purple().bold().to_string()
     }
 
-    /// Get contract type for address
     fn get_contract_type(&self, addr: &IntAddr) -> Option<String> {
         let known_address = self
             .known_addresses
             .addresses
             .iter()
-            .find(|(address, _info)| address.to_string() == addr.to_string());
+            .find(|(address, _)| address.to_string() == addr.to_string());
 
         if let Some((_, known_address)) = known_address {
             return Some(known_address.name.clone());
@@ -1056,7 +1048,7 @@ impl FormatterContext {
                     return self.format_transaction_list(items);
                 }
 
-                let abi = self.contract_abi.find_type(type_name);
+                let abi = self.contract_abi.find_any_type(type_name);
 
                 // Format structure as Foo { ... }
                 if let Some(struct_desc) = abi {
@@ -1145,7 +1137,7 @@ impl FormatterContext {
 
         for (i, field) in struct_desc.fields.iter().enumerate() {
             let field_type = field.type_info.human_readable.clone();
-            let field_value = if let Some(abi) = self.contract_abi.find_type(&field_type) {
+            let field_value = if let Some(abi) = self.contract_abi.find_any_type(&field_type) {
                 let result = self.format_structure(abi, level, items);
                 Self::add_indent_to_lines_except_first(result.as_str(), (level + 1) * 4)
             } else if let Some(field_value) = items.pop_front() {
@@ -1271,7 +1263,7 @@ impl FormatterContext {
             );
         }
 
-        let abi = self.contract_abi.find_type(&left_type.to_string());
+        let abi = self.contract_abi.find_any_type(&left_type.to_string());
         if let Some(struct_desc) = abi {
             if left_items.len() == struct_desc.fields.len() {
                 let mut result = format!("{left_type} {{\n");

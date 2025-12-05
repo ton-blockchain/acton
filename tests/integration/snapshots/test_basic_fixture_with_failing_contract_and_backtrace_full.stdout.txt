@@ -13,7 +13,8 @@
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
             ├── Compute phase failed: Dictionary error
             └── at contracts/counter[LINE]
-                   __throw   at contracts/counter[LINE]
+                   __throw             at contracts/counter[LINE]
+                   onInternalMessage   at contracts/counter[LINE]
         
         
         Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
@@ -26,7 +27,8 @@
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
             ├── Compute phase failed: Dictionary error
             └── at contracts/counter[LINE]
-                   __throw   at contracts/counter[LINE]
+                   __throw             at contracts/counter[LINE]
+                   onInternalMessage   at contracts/counter[LINE]
         
         
         Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV

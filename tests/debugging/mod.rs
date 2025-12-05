@@ -8,7 +8,6 @@ use acton::debugger::debug_context::DebugContext;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
 use acton::{debugger, ffi};
-use anyhow::anyhow;
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
@@ -103,37 +102,6 @@ impl DebuggerClient {
     pub fn variables(&mut self, thread_id: i64) -> anyhow::Result<Vec<dap::types::Variable>> {
         let variables = self.client.variables(thread_id)?;
         Ok(variables.variables)
-    }
-
-    pub fn assert_position(
-        &mut self,
-        thread_id: i64,
-        expected: &SourcePosition,
-    ) -> anyhow::Result<()> {
-        let positions = self.stack_trace(thread_id)?;
-        let actual = positions
-            .first()
-            .ok_or_else(|| anyhow!("No stack frames available"))?;
-
-        let Some(source) = &actual.source else {
-            anyhow::bail!("No source for frame available");
-        };
-        let Some(path) = &source.path else {
-            anyhow::bail!("No source for frame available");
-        };
-
-        let actual = SourcePosition::new(path.clone(), actual.line as u32, actual.column as u32);
-        println!("Position: {}", actual);
-
-        if &actual == expected {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Position mismatch: expected {}, got {}",
-                expected,
-                actual
-            ))
-        }
     }
 
     pub fn terminate(&mut self) -> anyhow::Result<()> {
@@ -350,6 +318,10 @@ fn get_script_result(
 ) -> anyhow::Result<String> {
     match &result {
         GetMethodResult::Success(result) => {
+            if result.vm_exit_code != 0 {
+                anyhow::bail!("VM exit code {}", result.vm_exit_code)
+            }
+
             let cell = ArcCell::from_boc_b64(&result.stack)?;
 
             let tuple = Tuple::deserialize(&cell)?;
@@ -357,28 +329,20 @@ fn get_script_result(
 
             Ok(tuple_str + io.stdout_buffer.as_str() + io.stderr_buffer.as_str())
         }
-        GetMethodResult::Error(error) => Ok(format!(
-            "{} {}",
-            "Execution error:".red(),
-            error.error.red()
-        )),
+        GetMethodResult::Error(error) => {
+            anyhow::bail!("{} {}", "Execution error:".red(), error.error.red())
+        }
     }
 }
 
 fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
     let state_init = CellBuilder::new()
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store bounce flag: {}", e))?
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store maybe libraries: {}", e))?
-        .store_ref_cell_optional(Some(code))
-        .map_err(|e| anyhow!("Failed to store code cell: {}", e))?
-        .store_ref_cell_optional(Some(&ArcCell::default()))
-        .map_err(|e| anyhow!("Failed to store data cell: {}", e))?
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store maybe tick/tock: {}", e))?
-        .build()
-        .map_err(|e| anyhow!("Failed to build state init cell: {}", e))?;
+        .store_bit(false)?
+        .store_bit(false)?
+        .store_ref_cell_optional(Some(code))?
+        .store_ref_cell_optional(Some(&ArcCell::default()))?
+        .store_bit(false)?
+        .build()?;
 
     let dest_address = TonAddress::new(0, state_init.cell_hash());
     Ok(dest_address)

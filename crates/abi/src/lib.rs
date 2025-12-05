@@ -49,16 +49,30 @@ pub struct TypeAbi {
     pub opcode: Option<u32>,
     pub opcode_width: Option<usize>,
     pub fields: Vec<Field>,
-    pub pos: Option<Pos>,
+    pub pos: Pos,
+}
+
+impl TypeAbi {
+    pub fn is_from_acton_lib(&self) -> bool {
+        // TODO: remove lib/
+        self.pos.uri.contains(".acton/") || self.pos.uri.contains("lib/")
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct GetMethod {
     pub name: String,
     pub id: u32,
-    pub pos: Option<Pos>,
+    pub pos: Pos,
     pub return_type: TypeInfo,
     pub parameters: Vec<Field>,
+}
+
+impl GetMethod {
+    pub fn is_from_acton_lib(&self) -> bool {
+        // TODO: remove lib/
+        self.pos.uri.contains(".acton/") || self.pos.uri.contains("lib/")
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -85,13 +99,14 @@ pub struct ContractAbi {
 }
 
 impl ContractAbi {
-    pub fn find_type(&self, name: &String) -> Option<TypeAbi> {
+    pub fn find_any_type(&self, name: &String) -> Option<TypeAbi> {
         self.types.iter().find(|typ| typ.name == *name).cloned()
     }
 
     pub fn find_type_by_opcode(&self, id: &BigInt) -> Option<TypeAbi> {
         self.types
             .iter()
+            .filter(|typ| !typ.is_from_acton_lib())
             .find(|typ| typ.opcode.is_some() && &BigInt::from(typ.opcode.unwrap() as u64) == id)
             .cloned()
     }
@@ -99,6 +114,7 @@ impl ContractAbi {
     pub fn find_get_method_by_id(&self, id: &BigInt) -> Option<GetMethod> {
         self.get_methods
             .iter()
+            .filter(|typ| !typ.is_from_acton_lib())
             .find(|typ| &BigInt::from(typ.id) == id)
             .cloned()
     }
@@ -320,11 +336,6 @@ fn collect_imported_files_recursive(
             continue;
         };
 
-        if resolved.contains(".acton/") || resolved.contains("lib/") {
-            // skip Acton files
-            continue;
-        }
-
         if processed.contains(&resolved) {
             // recursive dependency, already processed
             continue;
@@ -527,7 +538,7 @@ fn extract_get_method(
     Some(GetMethod {
         name: func_name,
         id: method_id,
-        pos: Some(pos),
+        pos,
         return_type,
         parameters,
     })
@@ -599,7 +610,7 @@ fn extract_struct_abi(
         opcode,
         opcode_width,
         fields,
-        pos: Some(pos),
+        pos,
     })
 }
 

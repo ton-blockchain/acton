@@ -49,7 +49,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 val msg = action.loadGenericMessage();
                 val opcode = msg.loadOpcode();
                 if (opcode == null) {
-                    impl.fail_to_find_out_msg<Msg>(e, self.location);
+                    expect_impl.fail_to_find_out_msg<Msg>(e, self.location);
                     return;
                 }
 
@@ -67,7 +67,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 );
                 return;
             }
-            impl.fail_to_find_out_msg<Msg>(e, self.location);
+            expect_impl.fail_to_find_out_msg<Msg>(e, self.location);
         }
         return;
     }
@@ -78,9 +78,9 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
     );
 }
 
-struct impl
+struct expect_impl
 
-fun impl.fail_to_find_out_msg<Msg>(exit_code: int, location: slice) {
+fun expect_impl.fail_to_find_out_msg<Msg>(exit_code: int, location: slice) {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",

@@ -232,10 +232,6 @@ impl<'a> DebugActionExecutor<'a> {
         Ok(())
         // self.record_state_with_action("continue".to_string())
     }
-
-    pub fn assert_position(&mut self, expected: &SourcePosition) -> anyhow::Result<()> {
-        self.client.assert_position(1, expected)
-    }
 }
 
 pub struct DebugResult {
