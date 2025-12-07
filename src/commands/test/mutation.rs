@@ -8,28 +8,72 @@ use std::{fs, process};
 use tempfile::TempDir;
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
 
-fn find_asserts<'a>(root: Node<'a>, source: &str) -> anyhow::Result<Vec<Node<'a>>> {
-    let mut asserts = Vec::new();
-    let query_str = "(assert_statement) @assert";
-    let query = Query::new(&tolk_parser::parser::language(), query_str)
-        .map_err(|e| anyhow::anyhow!("Failed to create query: {:?}", e))?;
+#[derive(Clone)]
+enum MutationEdit {
+    Remove,
+    Replace { replacement: &'static str },
+}
 
-    let mut query_cursor = QueryCursor::new();
-    let matches = query_cursor.matches(&query, root, source.as_bytes());
+#[derive(Clone)]
+struct MutationRule {
+    name: &'static str,
+    description: &'static str,
+    query: &'static str,
+    capture: &'static str,
+    edit: MutationEdit,
+    predicate: Option<fn(&str) -> bool>,
+}
 
-    matches.for_each(|m| {
-        for c in m.captures {
-            asserts.push(c.node);
+impl MutationRule {
+    fn remove(
+        name: &'static str,
+        description: &'static str,
+        query: &'static str,
+        capture: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            description,
+            query,
+            capture,
+            edit: MutationEdit::Remove,
+            predicate: None,
         }
-    });
+    }
 
-    Ok(asserts)
+    fn replace(
+        name: &'static str,
+        description: &'static str,
+        query: &'static str,
+        capture: &'static str,
+        replacement: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            description,
+            query,
+            capture,
+            edit: MutationEdit::Replace { replacement },
+            predicate: None,
+        }
+    }
+
+    fn with_predicate(mut self, predicate: fn(&str) -> bool) -> Self {
+        self.predicate = Some(predicate);
+        self
+    }
+}
+
+#[derive(Clone)]
+struct MutationCandidate<'a> {
+    rule: MutationRule,
+    node: Node<'a>,
 }
 
 struct MutationResult<'a> {
     index: usize,
+    rule: MutationRule,
     node: Node<'a>,
-    code: String,
     line: usize,
     column: usize,
     survived: bool,
@@ -57,6 +101,17 @@ fn remove_node_from_source(source: &str, node_to_remove: &Node) -> String {
     new_content.push_str(&source[..line_start_byte]);
     new_content.push_str(&source[line_end_byte..]);
 
+    new_content
+}
+
+fn replace_node_in_source(source: &str, target: &Node, replacement: &str) -> String {
+    let start = target.start_byte();
+    let end = target.end_byte();
+
+    let mut new_content = String::with_capacity(source.len() + replacement.len());
+    new_content.push_str(&source[..start]);
+    new_content.push_str(replacement);
+    new_content.push_str(&source[end..]);
     new_content
 }
 
@@ -90,6 +145,95 @@ fn get_code_context(source: &str, node: &Node, context_lines: usize) -> String {
         }
     }
     result
+}
+
+fn rules() -> Vec<MutationRule> {
+    vec![
+        MutationRule::remove(
+            "remove_assert",
+            "Remove assert statements",
+            "(assert_statement) @assert",
+            "assert",
+        ),
+        MutationRule::remove(
+            "remove_throw",
+            "Remove throw keyword",
+            "(\"throw\") @throw_kw",
+            "throw_kw",
+        ),
+        MutationRule::replace(
+            "flip_plus_assign",
+            "Replace += with -=",
+            "(\"+=\") @plus_assign",
+            "plus_assign",
+            "-=",
+        ),
+        MutationRule::replace(
+            "flip_minus_assign",
+            "Replace -= with +=",
+            "(\"-=\") @minus_assign",
+            "minus_assign",
+            "+=",
+        ),
+    ]
+}
+
+fn collect_mutations<'a>(
+    root: Node<'a>,
+    source: &str,
+    rules: &[MutationRule],
+) -> anyhow::Result<Vec<MutationCandidate<'a>>> {
+    let mut candidates = Vec::new();
+
+    for rule in rules {
+        let query = Query::new(&tolk_parser::parser::language(), rule.query)
+            .map_err(|e| anyhow!("Failed to create query for rule {}: {:?}", rule.name, e))?;
+
+        let mut cursor = QueryCursor::new();
+        let matches = cursor.matches(&query, root, source.as_bytes());
+
+        matches.for_each(|m| {
+            for capture in m.captures {
+                let capture_name = query
+                    .capture_names()
+                    .get(capture.index as usize)
+                    .map(|s| s.as_ref())
+                    .unwrap_or("");
+
+                if capture_name != rule.capture {
+                    continue;
+                }
+
+                let text = capture
+                    .node
+                    .utf8_text(source.as_bytes())
+                    .unwrap_or("")
+                    .to_string();
+
+                if let Some(predicate) = rule.predicate
+                    && !predicate(&text)
+                {
+                    continue;
+                }
+
+                candidates.push(MutationCandidate {
+                    rule: rule.clone(),
+                    node: capture.node,
+                });
+            }
+        });
+    }
+
+    Ok(candidates)
+}
+
+fn apply_mutation(source: &str, candidate: &MutationCandidate) -> String {
+    match candidate.rule.edit {
+        MutationEdit::Remove => remove_node_from_source(source, &candidate.node),
+        MutationEdit::Replace { replacement } => {
+            replace_node_in_source(source, &candidate.node, replacement)
+        }
+    }
 }
 
 pub fn test_mutate_cmd(
@@ -143,29 +287,25 @@ pub fn test_mutate_cmd(
         })?;
     }
 
-    let asserts = find_asserts(root_node, &content)?;
+    let mutation_rules = rules();
+    let mutations = collect_mutations(root_node, &content, &mutation_rules)?;
 
     println!("{}", "Mutation Testing".bold());
     println!("{}", "─".repeat(60).dimmed());
     println!("Contract: {}", contract.name.bright_white());
     println!("Source:   {}", contract.src.dimmed());
-    println!("Mutants:  {}\n", asserts.len().to_string().bright_cyan());
+    println!("Mutants:  {}\n", mutations.len().to_string().bright_cyan());
 
     let mut results = Vec::new();
 
-    for (index, assert) in asserts.iter().enumerate() {
-        let pos = assert.start_position();
-        let code = assert
-            .utf8_text(content.as_bytes())
-            .unwrap_or("")
-            .trim()
-            .to_string();
+    for (index, mutation) in mutations.iter().enumerate() {
+        let pos = mutation.node.start_position();
 
         print!(
             "  {} Mutation {}/{} ",
             "◉".cyan(),
             (index + 1).to_string().bright_white(),
-            asserts.len()
+            mutations.len()
         );
         print!(
             "{}:{}:{} ",
@@ -173,8 +313,13 @@ pub fn test_mutate_cmd(
             pos.row + 1,
             pos.column + 1
         );
+        print!(
+            "[{}] {} ",
+            mutation.rule.name.bright_white(),
+            mutation.rule.description.dimmed()
+        );
 
-        let new_content = remove_node_from_source(&content, assert);
+        let new_content = apply_mutation(&content, mutation);
         let contract_src_path = PathBuf::from(&contract.src);
         let relative_contract_path = if contract_src_path.is_absolute() {
             contract_src_path
@@ -188,6 +333,19 @@ pub fn test_mutate_cmd(
         fs::write(&dest_contract_path, new_content)?;
 
         let code_b64 = compile_file(&dest_contract_path.to_string_lossy())?;
+        if code_b64.is_empty() {
+            println!("{}", "KILLED".green());
+
+            results.push(MutationResult {
+                index,
+                rule: mutation.rule.clone(),
+                node: mutation.node,
+                line: pos.row + 1,
+                column: pos.column + 1,
+                survived: false, // TODO: separate flag for compilation error
+            });
+            continue;
+        }
 
         let exe = std::env::current_exe().unwrap_or(PathBuf::from("acton"));
         let mut cmd = process::Command::new(exe);
@@ -208,8 +366,8 @@ pub fn test_mutate_cmd(
 
         results.push(MutationResult {
             index,
-            node: *assert,
-            code,
+            rule: mutation.rule.clone(),
+            node: mutation.node,
             line: pos.row + 1,
             column: pos.column + 1,
             survived,
@@ -293,6 +451,12 @@ pub fn test_mutate_cmd(
                 result.line.to_string().bright_white(),
                 result.column
             );
+            println!(
+                "  {} {} - {}",
+                "rule".dimmed(),
+                result.rule.name.bright_white(),
+                result.rule.description.dimmed()
+            );
             println!("{}", get_code_context(&content, &result.node, 2));
         }
 
@@ -318,6 +482,13 @@ fn compile_file(path: &str) -> anyhow::Result<String> {
     let compilation_result = cmd.output()?;
     let compilation_result = String::from_utf8_lossy(&compilation_result.stdout);
     let compilation_result: Value = serde_json::from_str(compilation_result.as_ref())?;
+    let Some(success) = compilation_result.get("success") else {
+        anyhow::bail!("Compilation returned invalid result without `success` flag");
+    };
+    let success = success.as_bool().unwrap_or(false);
+    if !success {
+        return Ok("".to_owned());
+    }
     let Some(code_b64) = compilation_result.get("code_boc64") else {
         anyhow::bail!("No code boc64 found in compilation result")
     };
