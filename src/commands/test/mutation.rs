@@ -3,6 +3,7 @@ use crate::config::ActonConfig;
 use anyhow::anyhow;
 use owo_colors::OwoColorize;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{fs, process};
 use tempfile::TempDir;
@@ -14,53 +15,83 @@ enum MutationEdit {
     Replace { replacement: &'static str },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+enum MutationLevel {
+    Critical,
+    Major,
+    Minor,
+}
+
+impl MutationLevel {
+    fn label(&self) -> &'static str {
+        match self {
+            MutationLevel::Critical => "critical",
+            MutationLevel::Major => "major",
+            MutationLevel::Minor => "minor",
+        }
+    }
+
+    fn colorize(&self, text: &str) -> String {
+        match self {
+            MutationLevel::Critical => text.red().bold().to_string(),
+            MutationLevel::Major => text.yellow().bold().to_string(),
+            MutationLevel::Minor => text.dimmed().to_string(),
+        }
+    }
+}
+
+type NodePredicate = for<'a> fn(Node<'a>, &str) -> anyhow::Result<bool>;
+
+#[derive(Clone)]
+enum MutationMatcher {
+    Query {
+        query: &'static str,
+        capture: &'static str,
+    },
+    Callback {
+        predicate: NodePredicate,
+    },
+}
+
 #[derive(Clone)]
 struct MutationRule {
     name: &'static str,
     description: &'static str,
-    query: &'static str,
-    capture: &'static str,
+    level: MutationLevel,
     edit: MutationEdit,
-    predicate: Option<fn(&str) -> bool>,
+    matcher: MutationMatcher,
 }
 
 impl MutationRule {
     fn remove(
         name: &'static str,
         description: &'static str,
-        query: &'static str,
-        capture: &'static str,
+        level: MutationLevel,
+        matcher: MutationMatcher,
     ) -> Self {
         Self {
             name,
             description,
-            query,
-            capture,
+            level,
             edit: MutationEdit::Remove,
-            predicate: None,
+            matcher,
         }
     }
 
     fn replace(
         name: &'static str,
         description: &'static str,
-        query: &'static str,
-        capture: &'static str,
+        level: MutationLevel,
+        matcher: MutationMatcher,
         replacement: &'static str,
     ) -> Self {
         Self {
             name,
             description,
-            query,
-            capture,
+            level,
             edit: MutationEdit::Replace { replacement },
-            predicate: None,
+            matcher,
         }
-    }
-
-    fn with_predicate(mut self, predicate: fn(&str) -> bool) -> Self {
-        self.predicate = Some(predicate);
-        self
     }
 }
 
@@ -77,6 +108,7 @@ struct MutationResult<'a> {
     line: usize,
     column: usize,
     survived: bool,
+    compile_failed: bool,
 }
 
 fn remove_node_from_source(source: &str, node_to_remove: &Node) -> String {
@@ -152,27 +184,44 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::remove(
             "remove_assert",
             "Remove assert statements",
-            "(assert_statement) @assert",
-            "assert",
+            MutationLevel::Critical,
+            MutationMatcher::Query {
+                query: r#"(assert_statement) @assert"#,
+                capture: "assert",
+            },
         ),
         MutationRule::remove(
             "remove_throw",
             "Remove throw keyword",
-            "(\"throw\") @throw_kw",
-            "throw_kw",
+            MutationLevel::Critical,
+            MutationMatcher::Callback {
+                predicate: |node, _| -> anyhow::Result<bool> {
+                    if node.kind() != "throw" {
+                        return Ok(false);
+                    }
+                    let parent_kind = node.parent().map(|p| p.kind()).unwrap_or("");
+                    Ok(parent_kind != "assert_statement")
+                },
+            },
         ),
         MutationRule::replace(
             "flip_plus_assign",
             "Replace += with -=",
-            "(\"+=\") @plus_assign",
-            "plus_assign",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"("+=") @plus_assign"#,
+                capture: "plus_assign",
+            },
             "-=",
         ),
         MutationRule::replace(
             "flip_minus_assign",
             "Replace -= with +=",
-            "(\"-=\") @minus_assign",
-            "minus_assign",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"("-=") @minus_assign"#,
+                capture: "minus_assign",
+            },
             "+=",
         ),
     ]
@@ -186,42 +235,52 @@ fn collect_mutations<'a>(
     let mut candidates = Vec::new();
 
     for rule in rules {
-        let query = Query::new(&tolk_parser::parser::language(), rule.query)
-            .map_err(|e| anyhow!("Failed to create query for rule {}: {:?}", rule.name, e))?;
+        match &rule.matcher {
+            MutationMatcher::Query { query, capture } => {
+                let query = Query::new(&tolk_parser::parser::language(), query).map_err(|e| {
+                    anyhow!("Failed to create query for rule {}: {:?}", rule.name, e)
+                })?;
 
-        let mut cursor = QueryCursor::new();
-        let matches = cursor.matches(&query, root, source.as_bytes());
+                let mut cursor = QueryCursor::new();
+                let matches = cursor.matches(&query, root, source.as_bytes());
 
-        matches.for_each(|m| {
-            for capture in m.captures {
-                let capture_name = query
-                    .capture_names()
-                    .get(capture.index as usize)
-                    .map(|s| s.as_ref())
-                    .unwrap_or("");
+                matches.for_each(|m| {
+                    for capture_match in m.captures {
+                        let capture_name = query
+                            .capture_names()
+                            .get(capture_match.index as usize)
+                            .map(|s| s.as_ref())
+                            .unwrap_or("");
 
-                if capture_name != rule.capture {
-                    continue;
-                }
+                        if capture_name != *capture {
+                            continue;
+                        }
 
-                let text = capture
-                    .node
-                    .utf8_text(source.as_bytes())
-                    .unwrap_or("")
-                    .to_string();
-
-                if let Some(predicate) = rule.predicate
-                    && !predicate(&text)
-                {
-                    continue;
-                }
-
-                candidates.push(MutationCandidate {
-                    rule: rule.clone(),
-                    node: capture.node,
+                        candidates.push(MutationCandidate {
+                            rule: rule.clone(),
+                            node: capture_match.node,
+                        });
+                    }
                 });
             }
-        });
+            MutationMatcher::Callback { predicate } => {
+                let mut stack = vec![root];
+                while let Some(node) = stack.pop() {
+                    if predicate(node, source)? {
+                        candidates.push(MutationCandidate {
+                            rule: rule.clone(),
+                            node,
+                        });
+                    }
+
+                    for idx in 0..node.child_count() {
+                        if let Some(child) = node.child(idx) {
+                            stack.push(child);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Ok(candidates)
@@ -334,7 +393,7 @@ pub fn test_mutate_cmd(
 
         let code_b64 = compile_file(&dest_contract_path.to_string_lossy())?;
         if code_b64.is_empty() {
-            println!("{}", "KILLED".green());
+            println!("{}", "COMPILE ERROR".yellow().bold());
 
             results.push(MutationResult {
                 index,
@@ -342,7 +401,8 @@ pub fn test_mutate_cmd(
                 node: mutation.node,
                 line: pos.row + 1,
                 column: pos.column + 1,
-                survived: false, // TODO: separate flag for compilation error
+                survived: false,
+                compile_failed: true,
             });
             continue;
         }
@@ -371,13 +431,19 @@ pub fn test_mutate_cmd(
             line: pos.row + 1,
             column: pos.column + 1,
             survived,
+            compile_failed: false,
         });
     }
 
+    let compile_failed_count = results.iter().filter(|r| r.compile_failed).count();
+    let killed_count = results
+        .iter()
+        .filter(|r| !r.survived && !r.compile_failed)
+        .count();
     let survived_count = results.iter().filter(|r| r.survived).count();
-    let killed_count = results.len() - survived_count;
-    let mutation_score = if !results.is_empty() {
-        (killed_count as f64 / results.len() as f64) * 100.0
+    let executed_total = results.len().saturating_sub(compile_failed_count);
+    let mutation_score = if executed_total > 0 {
+        (killed_count as f64 / executed_total as f64) * 100.0
     } else {
         0.0
     };
@@ -403,6 +469,13 @@ pub fn test_mutate_cmd(
         "✗".red(),
         "Survived".red(),
         survived_count.to_string().red()
+    );
+
+    println!(
+        "  {} {:<20} {}",
+        "!".yellow(),
+        "Compile errors".yellow(),
+        compile_failed_count.to_string().yellow()
     );
 
     let score_str = format!("{:.1}%", mutation_score);
@@ -439,10 +512,17 @@ pub fn test_mutate_cmd(
         println!("{}", "─".repeat(60).dimmed());
 
         for result in results.iter().filter(|r| r.survived) {
+            println!("\n  {} Mutation #{}", "✗".red().bold(), (result.index + 1));
             println!(
-                "\n  {} Mutation #{}",
-                "✗".red().bold(),
-                (result.index + 1).to_string()
+                "  {} {} — {}",
+                "Rule".dimmed(),
+                result.rule.name.bright_white(),
+                result.rule.description.dimmed()
+            );
+            println!(
+                "  {} {}",
+                "Level".dimmed(),
+                result.rule.level.colorize(result.rule.level.label())
             );
             println!(
                 "  {} {}:{}:{}",
@@ -450,12 +530,6 @@ pub fn test_mutate_cmd(
                 contract.src.bright_white(),
                 result.line.to_string().bright_white(),
                 result.column
-            );
-            println!(
-                "  {} {} - {}",
-                "rule".dimmed(),
-                result.rule.name.bright_white(),
-                result.rule.description.dimmed()
             );
             println!("{}", get_code_context(&content, &result.node, 2));
         }
