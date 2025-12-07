@@ -54,22 +54,7 @@ acton test --mutate --mutate-contract wallet
 ## Mutation Rules
 
 Acton includes several built-in mutation rules categorized by their impact level.
-
-### Critical Rules
-These mutations often involve removing security guards or changing control flow.
-
-- `remove_assert`: Removes `assert` statements.
-- `remove_throw`: Removes `throw` statements.
-- `if_condition_true` / `if_condition_false`: Forces `if` conditions to always be true or false.
-
-### Arithmetic & Logic
-These mutations invert operations to check if calculations are verified.
-
-- `flip_plus` / `flip_minus`: Swaps `+` and `-`.
-- `flip_mul_div`: Swaps `*` and `/`.
-- `flip_eq_ne`: Swaps `==` and `!=`.
-- `flip_lt_le` / `flip_gt_ge`: Changes boundaries (e.g., `<` becomes `<=`).
-- `invert_bool`: Swaps `true` and `false`.
+See [Mutation Rules](/docs/test-runner/mutation-testing/rules) for complete list.
 
 ## Interpreting Results
 
@@ -83,15 +68,16 @@ Main Source: .jetton/contracts/jetton-wallet-contract.tolk
 Files:    6
 Mutants:  51
 
-  ◉ Mutation 1/51 .jetton/contracts/jetton-wallet-contract.tolk:36:17 Remove assert statements KILLED
-  ◉ Mutation 2/51 .jetton/contracts/jetton-wallet-contract.tolk:77:13 Remove assert statements SURVIVED
-  ◉ Mutation 3/51 .jetton/contracts/jetton-wallet-contract.tolk:78:13 Remove assert statements KILLED
-  ◉ Mutation 4/51 .jetton/contracts/jetton-wallet-contract.tolk:81:13 Remove assert statements KILLED
-  ◉ Mutation 5/51 .jetton/contracts/jetton-wallet-contract.tolk:82:13 Remove assert statements KILLED
-  ◉ Mutation 6/51 .jetton/contracts/jetton-wallet-contract.tolk:87:13 Remove assert statements KILLED
-  ◉ Mutation 7/51 .jetton/contracts/jetton-wallet-contract.tolk:113:13 Remove assert statements KILLED
-  ◉ Mutation 8/51 .jetton/contracts/jetton-wallet-contract.tolk:114:13 Remove assert statements KILLED
-  ◉ Mutation 9/51 .jetton/contracts/jetton-wallet-contract.tolk:134:13 Remove assert statements SURVIVED
+  ◉ Mutation 1/51 contracts/jetton-wallet.tolk:36:17 Remove assert statements KILLED
+  ◉ Mutation 2/51 contracts/jetton-wallet.tolk:77:13 Remove assert statements SURVIVED
+  ◉ Mutation 3/51 contracts/jetton-wallet.tolk:78:13 Remove assert statements KILLED
+  ◉ Mutation 4/51 contracts/jetton-wallet.tolk:81:13 Remove assert statements KILLED
+  ◉ Mutation 5/51 contracts/jetton-wallet.tolk:82:13 Remove assert statements KILLED
+  ◉ Mutation 6/51 contracts/jetton-wallet.tolk:87:13 Remove assert statements KILLED
+  ◉ Mutation 7/51 contracts/jetton-wallet.tolk:113:13 Remove assert statements KILLED
+  ◉ Mutation 8/51 contracts/jetton-wallet.tolk:114:13 Remove assert statements KILLED
+  ◉ Mutation 9/51 contracts/jetton-wallet.tolk:134:13 Remove assert statements SURVIVED
+  ...
 ```
 
 - **KILLED**: Your tests successfully detected the bug.
@@ -100,17 +86,18 @@ Mutants:  51
 For survived mutants, Acton provides a diff showing exactly what was changed and explains why it's an issue:
 
 ```text
-  ✗ Mutation #51
-  Rule: Replace if condition with false [if_condition_false]
-  Level critical
-  at .jetton/contracts/jetton-utils.tolk:10:9
-     8 │     };
-     9 │
+  ✗ Mutation #2
+  Rule:  Remove assert statements [remove_assert]
+  Level: critical
+  Group: assertion
+  at contracts/jetton-minter.tolk:46:13
+    44 │ 
+    45 │         RequestWalletAddress => {
+    46 │             assert (
+    47 │                 in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND
+    48 │             ) throw ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND;
+    49 │ 
+    50 │             var respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
 
-    10 │     if (emptyWalletStorage.jettonBalance != 0) {
-       │         false
-    11 │         throw 10;
-    12 │     }
-
-  Why it's bad: The conditional logic is not fully covered. Forcing the condition to false did not affect test results.
+  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.
 ```
