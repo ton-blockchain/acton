@@ -8,6 +8,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Remove assert statements",
             "This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.",
             MutationLevel::Critical,
+            "assertion",
             MutationMatcher::Query {
                 query: r#"(assert_statement) @assert"#,
                 capture: "assert",
@@ -18,6 +19,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Remove throw keyword",
             "This exception path is not covered by tests. Missing error handling might leave the contract in an inconsistent state.",
             MutationLevel::Critical,
+            "assertion",
             MutationMatcher::Callback {
                 predicate: |node, _| -> anyhow::Result<bool> {
                     if node.kind() != "throw" {
@@ -33,6 +35,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace + with -",
             "This arithmetic operation is not fully covered by tests. Changing + to - did not cause any tests to fail.",
             MutationLevel::Major,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "+" @op)"#,
                 capture: "op",
@@ -44,6 +47,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace - with +",
             "This arithmetic operation is not fully covered by tests. Changing - to + did not cause any tests to fail.",
             MutationLevel::Major,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "-" @op)"#,
                 capture: "op",
@@ -55,6 +59,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace * with /",
             "This arithmetic operation is not fully covered by tests. Changing * to / did not cause any tests to fail.",
             MutationLevel::Minor,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "*" @op)"#,
                 capture: "op",
@@ -66,6 +71,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace / with *",
             "This arithmetic operation is not fully covered by tests. Changing / to * did not cause any tests to fail.",
             MutationLevel::Minor,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "/" @op)"#,
                 capture: "op",
@@ -77,6 +83,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace == with !=",
             "This comparison is not fully covered by tests. Inverting the equality check did not cause any tests to fail.",
             MutationLevel::Major,
+            "comparison",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "==" @op)"#,
                 capture: "op",
@@ -88,6 +95,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace != with ==",
             "This comparison is not fully covered by tests. Inverting the inequality check did not cause any tests to fail.",
             MutationLevel::Major,
+            "comparison",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "!=" @op)"#,
                 capture: "op",
@@ -99,6 +107,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace < with <=",
             "This comparison boundary is not strictly checked. Changing < to <= did not affect test results.",
             MutationLevel::Major,
+            "comparison",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "<" @op)"#,
                 capture: "op",
@@ -110,6 +119,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace > with >=",
             "This comparison boundary is not strictly checked. Changing > to >= did not affect test results.",
             MutationLevel::Major,
+            "comparison",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: ">" @op)"#,
                 capture: "op",
@@ -121,6 +131,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace <= with <",
             "This comparison boundary is not strictly checked. Changing <= to < did not affect test results.",
             MutationLevel::Major,
+            "comparison",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "<=" @op)"#,
                 capture: "op",
@@ -132,6 +143,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace >= with >",
             "This comparison boundary is not strictly checked. Changing >= to > did not affect test results.",
             MutationLevel::Major,
+            "comparison",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: ">=" @op)"#,
                 capture: "op",
@@ -143,6 +155,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace true with false",
             "This boolean logic is not fully covered. Replacing 'true' with 'false' did not fail any tests.",
             MutationLevel::Major,
+            "boolean",
             MutationMatcher::Query {
                 query: r#"((boolean_literal) @true (#eq? @true "true"))"#,
                 capture: "true",
@@ -154,6 +167,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace false with true",
             "This boolean logic is not fully covered. Replacing 'false' with 'true' did not fail any tests.",
             MutationLevel::Major,
+            "boolean",
             MutationMatcher::Query {
                 query: r#"((boolean_literal) @false (#eq? @false "false"))"#,
                 capture: "false",
@@ -165,6 +179,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace += with -=",
             "This compound assignment is not fully covered. Changing += to -= did not affect test results.",
             MutationLevel::Minor,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(set_assignment operator_name: "+=" @op)"#,
                 capture: "op",
@@ -176,6 +191,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace -= with +=",
             "This compound assignment is not fully covered. Changing -= to += did not affect test results.",
             MutationLevel::Minor,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(set_assignment operator_name: "-=" @op)"#,
                 capture: "op",
@@ -187,6 +203,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace && with ||",
             "This logical operation is not fully covered. Changing && to || did not affect test results.",
             MutationLevel::Major,
+            "logical",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "&&" @op)"#,
                 capture: "op",
@@ -198,6 +215,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace || with &&",
             "This logical operation is not fully covered. Changing || to && did not affect test results.",
             MutationLevel::Major,
+            "logical",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "||" @op)"#,
                 capture: "op",
@@ -209,6 +227,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace & with |",
             "This bitwise operation is not fully covered. Changing & to | did not affect test results.",
             MutationLevel::Minor,
+            "bitwise",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "&" @op)"#,
                 capture: "op",
@@ -220,6 +239,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace | with &",
             "This bitwise operation is not fully covered. Changing | to & did not affect test results.",
             MutationLevel::Minor,
+            "bitwise",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "|" @op)"#,
                 capture: "op",
@@ -231,6 +251,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace ^ with &",
             "This bitwise operation is not fully covered. Changing ^ to & did not affect test results.",
             MutationLevel::Minor,
+            "bitwise",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "^" @op)"#,
                 capture: "op",
@@ -242,6 +263,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace << with >>",
             "This bitwise shift is not fully covered. Changing << to >> did not affect test results.",
             MutationLevel::Minor,
+            "bitwise",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "<<" @op)"#,
                 capture: "op",
@@ -253,6 +275,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace >> with <<",
             "This bitwise shift is not fully covered. Changing >> to << did not affect test results.",
             MutationLevel::Minor,
+            "bitwise",
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: ">>" @op)"#,
                 capture: "op",
@@ -264,6 +287,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Remove logical NOT (!)",
             "The logical negation is not fully covered. Removing '!' did not affect test results.",
             MutationLevel::Critical,
+            "critical",
             MutationMatcher::Query {
                 query: r#"(unary_operator operator_name: "!" @op)"#,
                 capture: "op",
@@ -275,6 +299,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Remove bitwise NOT (~)",
             "The bitwise negation is not fully covered. Removing '~' did not affect test results.",
             MutationLevel::Minor,
+            "bitwise",
             MutationMatcher::Query {
                 query: r#"(unary_operator operator_name: "~" @op)"#,
                 capture: "op",
@@ -286,6 +311,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace *= with /=",
             "This compound assignment is not fully covered. Changing *= to /= did not affect test results.",
             MutationLevel::Minor,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(set_assignment operator_name: "*=" @op)"#,
                 capture: "op",
@@ -297,6 +323,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace /= with *=",
             "This compound assignment is not fully covered. Changing /= to *= did not affect test results.",
             MutationLevel::Minor,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(set_assignment operator_name: "/=" @op)"#,
                 capture: "op",
@@ -308,6 +335,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace %= with *=",
             "This compound assignment is not fully covered. Changing %= to *= did not affect test results.",
             MutationLevel::Minor,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(set_assignment operator_name: "%=" @op)"#,
                 capture: "op",
@@ -319,6 +347,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Remove unary minus (-)",
             "The unary negation is not fully covered. Removing '-' did not affect test results.",
             MutationLevel::Major,
+            "arithmetic",
             MutationMatcher::Query {
                 query: r#"(unary_operator operator_name: "-" @op)"#,
                 capture: "op",
@@ -330,6 +359,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace if condition with true",
             "The conditional logic is not fully covered. Forcing the condition to true did not affect test results.",
             MutationLevel::Critical,
+            "control-flow",
             MutationMatcher::Query {
                 query: r#"(if_statement condition: (_) @cond)"#,
                 capture: "cond",
@@ -341,6 +371,7 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "Replace if condition with false",
             "The conditional logic is not fully covered. Forcing the condition to false did not affect test results.",
             MutationLevel::Critical,
+            "control-flow",
             MutationMatcher::Query {
                 query: r#"(if_statement condition: (_) @cond)"#,
                 capture: "cond",
@@ -396,10 +427,11 @@ pub(crate) enum MutationMatcher {
 
 #[derive(Clone)]
 pub(crate) struct MutationRule {
-    pub(crate) name: &'static str,
+    pub name: &'static str,
     pub description: &'static str,
     pub explanation: &'static str,
     pub level: MutationLevel,
+    pub group: &'static str,
     pub edit: MutationEdit,
     pub matcher: MutationMatcher,
 }
@@ -410,6 +442,7 @@ impl MutationRule {
         description: &'static str,
         explanation: &'static str,
         level: MutationLevel,
+        group: &'static str,
         matcher: MutationMatcher,
     ) -> Self {
         Self {
@@ -417,6 +450,7 @@ impl MutationRule {
             description,
             explanation,
             level,
+            group,
             edit: MutationEdit::Remove,
             matcher,
         }
@@ -427,6 +461,7 @@ impl MutationRule {
         description: &'static str,
         explanation: &'static str,
         level: MutationLevel,
+        group: &'static str,
         matcher: MutationMatcher,
         replacement: &'static str,
     ) -> Self {
@@ -435,6 +470,7 @@ impl MutationRule {
             description,
             explanation,
             level,
+            group,
             edit: MutationEdit::Replace { replacement },
             matcher,
         }

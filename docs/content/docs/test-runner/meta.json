@@ -6,8 +6,8 @@
     "test-configuration",
     "fork-testing",
     "code-coverage",
+    "mutation-testing",
     "writing-your-own-matchers",
     "cookbook"
   ]
 }
-

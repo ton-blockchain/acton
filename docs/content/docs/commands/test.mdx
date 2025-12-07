@@ -9,6 +9,7 @@ The `test` command runs your Tolk smart contract tests. It discovers and execute
 - Basic usage of the test command
 - Command options and configuration
 - Available reporters and output formats
+- Mutation testing
 
 ## Basic Usage
 
@@ -61,6 +62,14 @@ This command will discover and run all test files in the current directory and s
 | `--coverage`            | Boolean   | Enable code coverage                                      |
 | `--format <FORMAT>`     | String    | Coverage output format ("lcov")                           |
 
+### Mutation Testing Options
+
+| Option                    | Type    | Description                                       |
+|---------------------------|---------|---------------------------------------------------|
+| `--mutate`                | Flag    | Run tests in mutation testing mode                |
+| `--mutate-contract <ID>`  | String  | Contract ID from `Acton.toml` to mutate           |
+| `--disable-rule <RULE>`   | Array   | Disable specific mutation rules                   |
+
 ### JUnit Options
 
 | Option                  | Type      | Description                                               |
@@ -112,6 +121,16 @@ acton test --reporter junit --junit-path ./reports
 acton test --coverage --format lcov
 ```
 
+### Mutation testing
+
+```bash
+# Run mutation tests for the 'wallet' contract
+acton test --mutate --mutate-contract wallet
+
+# Disable specific rules
+acton test --mutate --mutate-contract wallet --disable-rule remove_assert
+```
+
 ### Debug mode
 
 ```bash
@@ -157,3 +176,4 @@ For detailed guides on writing tests, see the "Test Runner" section:
 - [Test attributes and configuration](/docs/test-runner/test-attributes/)
 - [Test configuration options](/docs/test-runner/test-configuration/)
 - [Code coverage](/docs/test-runner/code-coverage/)
+- [Mutation testing](/docs/test-runner/mutation-testing/)
