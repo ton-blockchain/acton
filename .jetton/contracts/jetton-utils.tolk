@@ -7,10 +7,6 @@ fun calcDeployedJettonWallet(ownerAddress: address, minterAddress: address, jett
         minterAddress,
     };
 
-    if (emptyWalletStorage.jettonBalance != 0) {
-        throw 10;
-    }
-
     return {
         stateInit: {
             code: jettonWalletCode,

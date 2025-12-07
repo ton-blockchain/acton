@@ -51,6 +51,20 @@ acton test --mutate --mutate-contract wallet
 | `--mutate-contract <CONTRACT_ID>` | Specifies which contract from `Acton.toml` to mutate.          |
 | `--disable-rule <RULE>`           | Disables specific mutation rules (can be used multiple times). |
 
+### Requirements
+
+For mutation testing to work correctly, your tests must build contracts using their ID from `Acton.toml`, not direct file paths:
+
+```tolk
+// ✅ Correct — uses contract ID
+val wallet = build("jetton-wallet");
+
+// ❌ Incorrect — uses direct file path
+val wallet = build("wallet", "./contracts/jetton-wallet-contract.tolk");
+```
+
+Mutation testing analyzes the contract specified by `--mutate-contract` and its dependencies. When tests use direct file paths, the mutated code won't be used, making mutation testing inefficient.
+
 ## Mutation Rules
 
 Acton includes several built-in mutation rules categorized by their impact level.
