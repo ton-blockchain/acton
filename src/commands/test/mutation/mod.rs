@@ -326,7 +326,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     println!("{}", "Mutation Testing".bold());
     println!("{}", "─".repeat(60).dimmed());
     println!("Contract: {}", contract.name.bright_white());
-    println!("Main Source: {}", contract.src.dimmed());
+    println!("Source:   {}", contract.src.dimmed());
     println!("Files:    {}", sources.len().to_string().bright_cyan());
     println!(
         "Mutants:  {}\n",
@@ -389,12 +389,24 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
 
         let exe = std::env::current_exe().unwrap_or(PathBuf::from("acton"));
         let mut cmd = process::Command::new(exe);
-        let cmd = cmd
-            .arg("test")
+        cmd.arg("test")
             .arg(path.as_ref().unwrap_or(&".".to_owned()))
             .arg("--fail-fast")
             .arg("--mutate-overrides")
             .arg(format!("{mutate_contract}:{code_b64}"));
+
+        if let Some(filter) = &config.filter {
+            cmd.arg("--filter").arg(filter);
+        }
+
+        for exclude in &config.exclude_patterns {
+            cmd.arg("--exclude").arg(exclude);
+        }
+
+        for include in &config.include_patterns {
+            cmd.arg("--include").arg(include);
+        }
+
         let output = cmd.output()?;
 
         let survived = output.status.success();
@@ -498,17 +510,17 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         for result in results.iter().filter(|r| r.survived) {
             println!("\n  {} Mutation #{}", "✗".red().bold(), (result.index + 1));
             println!(
-                "  {} {}{}{}",
+                "  {}  {} {}",
                 "Rule:".dimmed(),
                 result.rule.description,
-                " ",
                 format!("[{}]", result.rule.name).dimmed()
             );
             println!(
                 "  {} {}",
-                "Level".dimmed(),
+                "Level:".dimmed(),
                 result.rule.level.colorize(result.rule.level.label())
             );
+            println!("  {} {}", "Group:".dimmed(), result.rule.group);
             println!(
                 "  {} {}:{}:{}",
                 "at".dimmed(),

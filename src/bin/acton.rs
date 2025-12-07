@@ -203,9 +203,9 @@ enum Commands {
         mutate_overrides: Option<String>,
         #[arg(
             long,
-            help = "Contract ID to mutate during mutation testing",
+            help = "Contract to mutate during mutation testing",
             help_heading = "Mutation Testing",
-            value_name = "ID"
+            value_name = "CONTRACT_ID"
         )]
         mutate_contract: Option<String>,
         #[arg(
