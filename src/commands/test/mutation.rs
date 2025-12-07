@@ -1,4 +1,5 @@
 use crate::commands::common::error_fmt;
+use crate::commands::test::TestConfig;
 use crate::config::ActonConfig;
 use anyhow::anyhow;
 use owo_colors::OwoColorize;
@@ -487,17 +488,19 @@ fn apply_mutation(source: &str, candidate: &MutationCandidate) -> String {
     }
 }
 
-pub fn test_mutate_cmd(
-    path: &Option<String>,
-    mutate_contract: Option<String>,
-) -> anyhow::Result<()> {
-    let Some(mutate_contract) = mutate_contract else {
+pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Result<()> {
+    let Some(mutate_contract) = &config.mutate_contract else {
         anyhow::bail!("Provide --mutate-contract flag to specify a contract to mutate")
     };
-    let config = ActonConfig::load()?;
-    let contract = config
-        .get_contract(&mutate_contract)
-        .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &mutate_contract)))?;
+    let acton_config = ActonConfig::load()?;
+    let contract = acton_config.get_contract(mutate_contract).ok_or_else(|| {
+        anyhow!(error_fmt::contract_not_found(
+            &acton_config,
+            mutate_contract
+        ))
+    })?;
+
+    let all_disable_rules = &config.disable_rules;
 
     let content = match fs::read_to_string(&contract.src) {
         Ok(content) => content,
@@ -539,7 +542,11 @@ pub fn test_mutate_cmd(
     }
 
     let mutation_rules = rules();
-    let mutations = collect_mutations(root_node, &content, &mutation_rules)?;
+    let filtered_rules: Vec<MutationRule> = mutation_rules
+        .into_iter()
+        .filter(|rule| !all_disable_rules.contains(&rule.name.to_string()))
+        .collect();
+    let mutations = collect_mutations(root_node, &content, &filtered_rules)?;
 
     println!("{}", "Mutation Testing".bold());
     println!("{}", "─".repeat(60).dimmed());

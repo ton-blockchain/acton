@@ -200,6 +200,13 @@ enum Commands {
             value_name = "ID"
         )]
         mutate_contract: Option<String>,
+        #[arg(
+            long,
+            help = "Disable specific mutation rules",
+            help_heading = "Mutation Testing",
+            value_name = "RULE"
+        )]
+        disable_rule: Vec<String>,
     },
     #[command(about = "Generate test wrapper and test file for a contract")]
     TestGen {
@@ -571,49 +578,52 @@ fn main() {
             mutate,
             mutate_overrides,
             mutate_contract,
+            disable_rule,
         } => {
-            if mutate {
-                mutation::test_mutate_cmd(&path, mutate_contract)
-            } else {
-                let mut report_formats = Vec::new();
+            let mut report_formats = Vec::new();
 
-                for format_str in reporter {
-                    match format_str.to_lowercase().as_str() {
-                        "console" => report_formats.push(ReportFormat::Console),
-                        "teamcity" => report_formats.push(ReportFormat::TeamCity),
-                        "junit" => report_formats.push(ReportFormat::JUnit),
-                        "dot" => report_formats.push(ReportFormat::Dot),
-                        _ => {
-                            eprintln!(
-                                "Warning: Unknown report format '{format_str}'. Supported formats: console, teamcity, junit, dot"
-                            );
-                        }
+            for format_str in reporter {
+                match format_str.to_lowercase().as_str() {
+                    "console" => report_formats.push(ReportFormat::Console),
+                    "teamcity" => report_formats.push(ReportFormat::TeamCity),
+                    "junit" => report_formats.push(ReportFormat::JUnit),
+                    "dot" => report_formats.push(ReportFormat::Dot),
+                    _ => {
+                        eprintln!(
+                            "Warning: Unknown report format '{format_str}'. Supported formats: console, teamcity, junit, dot"
+                        );
                     }
                 }
+            }
 
-                let config = create_test_config(
-                    filter,
-                    debug,
-                    debug_port,
-                    backtrace,
-                    coverage,
-                    coverage_format,
-                    coverage_file,
-                    exclude,
-                    include,
-                    clear_cache,
-                    report_formats,
-                    junit_path,
-                    junit_merge,
-                    snapshot,
-                    baseline_snapshot,
-                    fork_net,
-                    api_key,
-                    save_test_trace,
-                    mutate,
-                    mutate_overrides,
-                    mutate_contract,
-                );
+            let config = create_test_config(
+                filter,
+                debug,
+                debug_port,
+                backtrace,
+                coverage,
+                coverage_format,
+                coverage_file,
+                exclude,
+                include,
+                clear_cache,
+                report_formats,
+                junit_path,
+                junit_merge,
+                snapshot,
+                baseline_snapshot,
+                fork_net,
+                api_key,
+                save_test_trace,
+                mutate,
+                mutate_overrides,
+                mutate_contract,
+                disable_rule,
+            );
+
+            if mutate {
+                mutation::test_mutate_cmd(&path, &config)
+            } else {
                 test_cmd(path, &config)
             }
         }
@@ -797,6 +807,7 @@ fn create_test_config(
     mutate: bool,
     mutate_overrides: Option<String>,
     mutate_contract: Option<String>,
+    disable_rules: Vec<String>,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -833,6 +844,7 @@ fn create_test_config(
             mutate,
             mutate_overrides,
             mutate_contract,
+            disable_rules,
         );
     }
 
@@ -858,5 +870,6 @@ fn create_test_config(
         mutate,
         mutate_overrides,
         mutate_contract,
+        disable_rules,
     }
 }

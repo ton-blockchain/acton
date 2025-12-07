@@ -89,6 +89,7 @@ pub struct TestConfig {
     pub mutate: bool,
     pub mutate_overrides: Option<String>,
     pub mutate_contract: Option<String>,
+    pub disable_rules: Vec<String>,
 }
 
 #[derive(Debug)]

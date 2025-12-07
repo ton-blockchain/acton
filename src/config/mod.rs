@@ -60,6 +60,13 @@ pub struct TestSettings {
     pub junit_merge: Option<bool>,
     pub fork_net: Option<String>,
     pub api_key: Option<String>,
+    pub mutation: Option<MutationConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct MutationConfig {
+    pub disable_rules: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -237,6 +244,7 @@ impl TestSettings {
         mutate_override: bool,
         mutate_overrides_override: Option<String>,
         mutate_contract_override: Option<String>,
+        disable_rules_override: Vec<String>,
     ) -> TestConfig {
         let mut final_report_formats = Vec::new();
 
@@ -289,6 +297,14 @@ impl TestSettings {
             mutate: mutate_override,
             mutate_overrides: mutate_overrides_override,
             mutate_contract: mutate_contract_override,
+            disable_rules: if !disable_rules_override.is_empty() {
+                disable_rules_override
+            } else {
+                self.mutation
+                    .as_ref()
+                    .and_then(|m| m.disable_rules.clone())
+                    .unwrap_or_default()
+            },
         }
     }
 }
