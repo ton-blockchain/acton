@@ -182,6 +182,182 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             },
             "+=",
         ),
+        MutationRule::replace(
+            "flip_logical_and",
+            "Replace && with ||",
+            "This logical operation is not fully covered. Changing && to || did not affect test results.",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "&&" @op)"#,
+                capture: "op",
+            },
+            "||",
+        ),
+        MutationRule::replace(
+            "flip_logical_or",
+            "Replace || with &&",
+            "This logical operation is not fully covered. Changing || to && did not affect test results.",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "||" @op)"#,
+                capture: "op",
+            },
+            "&&",
+        ),
+        MutationRule::replace(
+            "flip_bitwise_and",
+            "Replace & with |",
+            "This bitwise operation is not fully covered. Changing & to | did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "&" @op)"#,
+                capture: "op",
+            },
+            "|",
+        ),
+        MutationRule::replace(
+            "flip_bitwise_or",
+            "Replace | with &",
+            "This bitwise operation is not fully covered. Changing | to & did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "|" @op)"#,
+                capture: "op",
+            },
+            "&",
+        ),
+        MutationRule::replace(
+            "flip_bitwise_xor",
+            "Replace ^ with &",
+            "This bitwise operation is not fully covered. Changing ^ to & did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "^" @op)"#,
+                capture: "op",
+            },
+            "&",
+        ),
+        MutationRule::replace(
+            "flip_lshift",
+            "Replace << with >>",
+            "This bitwise shift is not fully covered. Changing << to >> did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "<<" @op)"#,
+                capture: "op",
+            },
+            ">>",
+        ),
+        MutationRule::replace(
+            "flip_rshift",
+            "Replace >> with <<",
+            "This bitwise shift is not fully covered. Changing >> to << did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: ">>" @op)"#,
+                capture: "op",
+            },
+            "<<",
+        ),
+        MutationRule::replace(
+            "replace_zero",
+            "Replace 0 with 1",
+            "The constant 0 is not fully covered. Replacing it with 1 did not affect test results.",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"((number_literal) @num (#eq? @num "0"))"#,
+                capture: "num",
+            },
+            "1",
+        ),
+        MutationRule::replace(
+            "remove_logical_not",
+            "Remove logical NOT (!)",
+            "The logical negation is not fully covered. Removing '!' did not affect test results.",
+            MutationLevel::Critical,
+            MutationMatcher::Query {
+                query: r#"(unary_operator operator_name: "!" @op)"#,
+                capture: "op",
+            },
+            "",
+        ),
+        MutationRule::replace(
+            "remove_bitwise_not",
+            "Remove bitwise NOT (~)",
+            "The bitwise negation is not fully covered. Removing '~' did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(unary_operator operator_name: "~" @op)"#,
+                capture: "op",
+            },
+            "",
+        ),
+        MutationRule::replace(
+            "flip_mul_assign",
+            "Replace *= with /=",
+            "This compound assignment is not fully covered. Changing *= to /= did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(set_assignment operator_name: "*=" @op)"#,
+                capture: "op",
+            },
+            "/=",
+        ),
+        MutationRule::replace(
+            "flip_div_assign",
+            "Replace /= with *=",
+            "This compound assignment is not fully covered. Changing /= to *= did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(set_assignment operator_name: "/=" @op)"#,
+                capture: "op",
+            },
+            "*=",
+        ),
+        MutationRule::replace(
+            "flip_mod_assign",
+            "Replace %= with *=",
+            "This compound assignment is not fully covered. Changing %= to *= did not affect test results.",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(set_assignment operator_name: "%=" @op)"#,
+                capture: "op",
+            },
+            "*=",
+        ),
+        MutationRule::replace(
+            "remove_unary_minus",
+            "Remove unary minus (-)",
+            "The unary negation is not fully covered. Removing '-' did not affect test results.",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(unary_operator operator_name: "-" @op)"#,
+                capture: "op",
+            },
+            "",
+        ),
+        MutationRule::replace(
+            "if_condition_true",
+            "Replace if condition with true",
+            "The conditional logic is not fully covered. Forcing the condition to true did not affect test results.",
+            MutationLevel::Critical,
+            MutationMatcher::Query {
+                query: r#"(if_statement condition: (_) @cond)"#,
+                capture: "cond",
+            },
+            "true",
+        ),
+        MutationRule::replace(
+            "if_condition_false",
+            "Replace if condition with false",
+            "The conditional logic is not fully covered. Forcing the condition to false did not affect test results.",
+            MutationLevel::Critical,
+            MutationMatcher::Query {
+                query: r#"(if_statement condition: (_) @cond)"#,
+                capture: "cond",
+            },
+            "false",
+        ),
     ]
 }
 
