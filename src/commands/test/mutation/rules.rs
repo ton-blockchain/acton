@@ -30,6 +30,17 @@ pub(crate) fn rules() -> Vec<MutationRule> {
                 },
             },
         ),
+        MutationRule::remove(
+            "remove_storage_save_call",
+            "Remove storage save() method calls",
+            "This storage save operation is not covered by tests. Without this call, data changes won't be persisted to storage.",
+            MutationLevel::Critical,
+            "storage",
+            MutationMatcher::Query {
+                query: r#"(function_call callee: (dot_access obj: (identifier) field: (identifier) @method) (#eq? @method "save")) @call"#,
+                capture: "call",
+            },
+        ),
         MutationRule::replace(
             "flip_plus",
             "Replace + with -",

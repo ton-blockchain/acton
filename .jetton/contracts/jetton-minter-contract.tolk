@@ -22,10 +22,6 @@ fun onInternalMessage(in: InMessage) {
             storage.totalSupply -= msg.jettonAmount;
             storage.save();
 
-            if (msg.sendExcessesTo == null && msg.jettonAmount == 111) {
-                throw 10;
-            }
-
             if (msg.sendExcessesTo == null) {
                 return;
             }

@@ -24,6 +24,8 @@ Mutation testing will try to **remove** the `assert (a > 0) throw 5` statement. 
 
 This is especially critical for smart contracts where assertions guard security invariants. If an assertion can be removed without any test failing, that security check might be effectively untested.
 
+Beyond testing gaps, mutation testing can also reveal implementation issues. For example, if you have two `storage.save()` calls and removing the second one doesn't cause tests to fail, it might indicate that the second call is redundant and could be removed to optimize gas usage.
+
 ## How It Works
 
 1.  **Mutant Generation**: Acton scans your contract code and identifies places where it can introduce bugs (mutants).
@@ -103,7 +105,8 @@ For survived mutants, Acton provides a diff showing exactly what was changed and
   Level critical
   at .jetton/contracts/jetton-utils.tolk:10:9
      8 │     };
-     9 │ 
+     9 │
+
     10 │     if (emptyWalletStorage.jettonBalance != 0) {
        │         false
     11 │         throw 10;
