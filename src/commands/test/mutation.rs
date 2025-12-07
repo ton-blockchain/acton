@@ -379,8 +379,8 @@ fn rules() -> Vec<MutationRule> {
             "This boolean logic is not fully covered. Replacing 'true' with 'false' did not fail any tests.",
             MutationLevel::Major,
             MutationMatcher::Query {
-                query: r#"(boolean_literal) @bool"#,
-                capture: "bool",
+                query: r#"((boolean_literal) @true (#eq? @true "true"))"#,
+                capture: "true",
             },
             "false",
         ),
@@ -390,8 +390,8 @@ fn rules() -> Vec<MutationRule> {
             "This boolean logic is not fully covered. Replacing 'false' with 'true' did not fail any tests.",
             MutationLevel::Major,
             MutationMatcher::Query {
-                query: r#"(boolean_literal) @bool"#,
-                capture: "bool",
+                query: r#"((boolean_literal) @false (#eq? @false "false"))"#,
+                capture: "false",
             },
             "true",
         ),
@@ -605,6 +605,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         let cmd = cmd
             .arg("test")
             .arg(path.as_ref().unwrap_or(&".".to_owned()))
+            .arg("--fail-fast")
             .arg("--mutate-overrides")
             .arg(format!("{mutate_contract}:{code_b64}"));
         let output = cmd.output()?;
