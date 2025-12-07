@@ -26,6 +26,19 @@ struct MutationResult<'a> {
     column: usize,
     survived: bool,
     compile_failed: bool,
+    source_path: String,
+}
+
+struct MutationSource {
+    path: PathBuf,
+    relative_path: PathBuf,
+    content: String,
+    tree: tree_sitter::Tree,
+}
+
+struct GlobalMutation<'a> {
+    candidate: MutationCandidate<'a>,
+    source_index: usize,
 }
 
 fn remove_node_from_source(source: &str, node_to_remove: &Node) -> String {
@@ -229,44 +242,67 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     })?;
 
     let all_disable_rules = &config.disable_rules;
+    let project_root = std::env::current_dir()?;
 
-    let content = match fs::read_to_string(&contract.src) {
+    let mut sources = Vec::new();
+
+    let main_content = match fs::read_to_string(&contract.src) {
         Ok(content) => content,
         Err(err) => {
             anyhow::bail!("Error reading file '{}': {err}", contract.src)
         }
     };
-    let tree = tolk_parser::parser::parse(&content)?;
-    let root_node = tree.root_node();
+    let main_tree = tolk_parser::parser::parse(&main_content)?;
+    let main_path = PathBuf::from(&contract.src);
+    let main_path = fs::canonicalize(&main_path).unwrap_or(main_path);
+
+    let main_relative_path = if main_path.starts_with(&project_root) {
+        main_path.strip_prefix(&project_root)?.to_path_buf()
+    } else {
+        main_path.clone()
+    };
+
+    sources.push(MutationSource {
+        path: main_path,
+        relative_path: main_relative_path,
+        content: main_content,
+        tree: main_tree,
+    });
 
     let dependencies = abi::get_file_dependencies(&contract.src, true)?;
-    let project_root = PathBuf::from(".");
+    for dep_path_str in &dependencies {
+        let dep_path = PathBuf::from(dep_path_str);
+        let dep_path = fs::canonicalize(&dep_path).unwrap_or(dep_path);
+
+        if !dep_path.starts_with(&project_root) {
+            continue;
+        }
+
+        if sources.iter().any(|s| s.path == dep_path) {
+            continue;
+        }
+
+        let relative_path = dep_path.strip_prefix(&project_root)?.to_path_buf();
+        let content = fs::read_to_string(&dep_path)
+            .map_err(|e| anyhow!("Error reading dependency {}: {}", dep_path.display(), e))?;
+        let tree = tolk_parser::parser::parse(&content)?;
+
+        sources.push(MutationSource {
+            path: dep_path,
+            relative_path,
+            content,
+            tree,
+        });
+    }
 
     let mutation_dir = TempDir::new()?;
 
-    for dep_path_str in &dependencies {
-        let dep_path = PathBuf::from(dep_path_str);
-        let relative_path = if dep_path.is_absolute() {
-            dep_path
-                .strip_prefix(&project_root)
-                .map(|p| p.to_path_buf())
-                .unwrap_or(dep_path.clone())
-        } else {
-            dep_path.clone()
-        };
-        let dest_path = mutation_dir.path().join(relative_path);
-
+    for source in &sources {
+        let dest_path = mutation_dir.path().join(&source.relative_path);
         if let Some(parent) = dest_path.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(&dep_path, &dest_path).map_err(|e| {
-            anyhow!(
-                "Failed to copy {} to {}: {}",
-                dep_path.display(),
-                dest_path.display(),
-                e
-            )
-        })?;
+        fs::write(&dest_path, &source.content)?;
     }
 
     let mutation_rules = rules();
@@ -274,45 +310,65 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         .into_iter()
         .filter(|rule| !all_disable_rules.contains(&rule.name.to_string()))
         .collect();
-    let mutations = collect_mutations(root_node, &content, &filtered_rules)?;
+
+    let mut global_mutations = Vec::new();
+    for (idx, source) in sources.iter().enumerate() {
+        let candidates =
+            collect_mutations(source.tree.root_node(), &source.content, &filtered_rules)?;
+        for candidate in candidates {
+            global_mutations.push(GlobalMutation {
+                candidate,
+                source_index: idx,
+            });
+        }
+    }
 
     println!("{}", "Mutation Testing".bold());
     println!("{}", "─".repeat(60).dimmed());
     println!("Contract: {}", contract.name.bright_white());
-    println!("Source:   {}", contract.src.dimmed());
-    println!("Mutants:  {}\n", mutations.len().to_string().bright_cyan());
+    println!("Main Source: {}", contract.src.dimmed());
+    println!("Files:    {}", sources.len().to_string().bright_cyan());
+    println!(
+        "Mutants:  {}\n",
+        global_mutations.len().to_string().bright_cyan()
+    );
 
     let mut results = Vec::new();
 
-    for (index, mutation) in mutations.iter().enumerate() {
+    for (index, global_mutation) in global_mutations.iter().enumerate() {
+        let mutation = &global_mutation.candidate;
+        let source_idx = global_mutation.source_index;
+        let source = &sources[source_idx];
         let pos = mutation.node.start_position();
 
         print!(
             "  {} Mutation {}/{} ",
             "◉".cyan(),
             (index + 1).to_string().bright_white(),
-            mutations.len()
+            global_mutations.len()
         );
         print!(
             "{} ",
-            format!("{}:{}:{}", contract.src, pos.row + 1, pos.column + 1).dimmed(),
+            format!(
+                "{}:{}:{}",
+                source.relative_path.display(),
+                pos.row + 1,
+                pos.column + 1
+            )
+            .dimmed(),
         );
         print!("{} ", mutation.rule.description.dimmed());
 
-        let new_content = apply_mutation(&content, mutation);
-        let contract_src_path = PathBuf::from(&contract.src);
-        let relative_contract_path = if contract_src_path.is_absolute() {
-            contract_src_path
-                .strip_prefix(&project_root)
-                .map(|p| p.to_path_buf())
-                .unwrap_or(contract_src_path.clone())
-        } else {
-            contract_src_path.clone()
-        };
-        let dest_contract_path = mutation_dir.path().join(relative_contract_path);
-        fs::write(&dest_contract_path, new_content)?;
+        let new_content = apply_mutation(&source.content, mutation);
+        let dest_path = mutation_dir.path().join(&source.relative_path);
 
-        let code_b64 = compile_file(&dest_contract_path.to_string_lossy())?;
+        fs::write(&dest_path, &new_content)?;
+
+        // main contract file is always at sources[0]
+        let main_contract_relative_path = &sources[0].relative_path;
+        let main_contract_dest_path = mutation_dir.path().join(main_contract_relative_path);
+
+        let code_b64 = compile_file(&main_contract_dest_path.to_string_lossy())?;
         if code_b64.is_empty() {
             println!("{}", "COMPILE ERROR".yellow().bold());
 
@@ -324,7 +380,10 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
                 column: pos.column + 1,
                 survived: false,
                 compile_failed: true,
+                source_path: source.relative_path.to_string_lossy().to_string(),
             });
+
+            fs::write(&dest_path, &source.content)?;
             continue;
         }
 
@@ -354,7 +413,10 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             column: pos.column + 1,
             survived,
             compile_failed: false,
+            source_path: source.relative_path.to_string_lossy().to_string(),
         });
+
+        fs::write(&dest_path, &source.content)?;
     }
 
     let compile_failed_count = results.iter().filter(|r| r.compile_failed).count();
@@ -450,11 +512,18 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             println!(
                 "  {} {}:{}:{}",
                 "at".dimmed(),
-                contract.src.bright_white(),
+                result.source_path.bright_white(),
                 result.line.to_string().bright_white(),
                 result.column
             );
-            println!("{}", get_code_context(&content, result, 2));
+
+            let content = sources
+                .iter()
+                .find(|s| s.relative_path.to_string_lossy() == result.source_path)
+                .map(|s| s.content.as_str())
+                .unwrap_or("");
+
+            println!("{}", get_code_context(content, result, 2));
             println!(
                 "  {} {}",
                 "Why it's bad:".dimmed(),

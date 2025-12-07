@@ -260,17 +260,6 @@ pub(crate) fn rules() -> Vec<MutationRule> {
             "<<",
         ),
         MutationRule::replace(
-            "replace_zero",
-            "Replace 0 with 1",
-            "The constant 0 is not fully covered. Replacing it with 1 did not affect test results.",
-            MutationLevel::Major,
-            MutationMatcher::Query {
-                query: r#"((number_literal) @num (#eq? @num "0"))"#,
-                capture: "num",
-            },
-            "1",
-        ),
-        MutationRule::replace(
             "remove_logical_not",
             "Remove logical NOT (!)",
             "The logical negation is not fully covered. Removing '!' did not affect test results.",
