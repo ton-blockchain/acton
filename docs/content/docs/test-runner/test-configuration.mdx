@@ -92,6 +92,18 @@ exclude = ["**/integration/**"]    # Skip integration directory
 include = ["**/unit/**"]           # Only include unit test files
 ```
 
+### Execution Options
+
+| Configuration | CLI Flag      | Type    | Description                                  |
+|---------------|---------------|---------|----------------------------------------------|
+| `fail-fast`   | `--fail-fast` | Boolean | Stop executing tests after the first failure |
+
+**Examples:**
+```toml
+[test]
+fail-fast = true
+```
+
 ### Reporter Options
 
 | Configuration | CLI Flag      | Type  | Description                          |

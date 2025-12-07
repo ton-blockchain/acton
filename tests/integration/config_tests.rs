@@ -41,6 +41,7 @@ fn test_filter_via_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -90,6 +91,7 @@ fn test_coverage_via_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -128,6 +130,7 @@ fn test_backtrace_via_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -186,6 +189,7 @@ fn test_filter_and_coverage_via_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -237,6 +241,7 @@ fn test_cli_overrides_config_filter() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build();
 
@@ -290,6 +295,7 @@ fn test_config_with_specific_path() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build();
 
@@ -332,6 +338,7 @@ fn test_empty_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -378,6 +385,7 @@ fn test_exclude_patterns_via_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -426,6 +434,7 @@ fn test_include_patterns_via_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -476,6 +485,7 @@ fn test_reporters_via_config() {
             coverage_file: None,
             junit_path: None,
             junit_merge: None,
+            ..Default::default()
         })
         .build()
         .acton()
@@ -512,6 +522,7 @@ fn test_junit_config_via_config() {
             coverage_file: None,
             junit_path: Some("custom-reports".to_owned()),
             junit_merge: Some(true),
+            ..Default::default()
         })
         .build()
         .acton()
@@ -519,4 +530,57 @@ fn test_junit_config_via_config() {
         .run()
         .success()
         .assert_file_exists("custom-reports/junit-results.xml");
+}
+
+#[test]
+fn test_fail_fast_via_config() {
+    let project = ProjectBuilder::new("fail-fast")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test1",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-first-pass`() {
+                expect(1).toEqual(1);
+            }
+
+            get fun `test-second-fail`() {
+                expect(1).toEqual(2);
+            }
+
+            get fun `test-third-pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .test_file(
+            "test2",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test-fourth-pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .with_test_config(TestConfig {
+            fail_fast: Some(true),
+            ..Default::default()
+        })
+        .build();
+
+    project
+        .acton()
+        .test()
+        .fail_fast()
+        .run()
+        .failure()
+        .assert_passed(1) // only first
+        .assert_failed(1) // second
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_not_contains("third pass")
+        .assert_not_contains("fourth pass")
+        .assert_snapshot_matches("integration/snapshots/test_with_fail_fast_via_config.stdout.txt");
 }

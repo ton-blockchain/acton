@@ -38,7 +38,7 @@ struct DependencyDef {
     path: Option<String>,     // custom output path
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TestConfig {
     pub filter: Option<String>,
     pub exclude_patterns: Option<Vec<String>>,
@@ -52,6 +52,7 @@ pub struct TestConfig {
     pub coverage_file: Option<String>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fail_fast: Option<bool>,
 }
 
 #[allow(dead_code)]
@@ -517,6 +518,10 @@ version = "0.1.0"
                 toml_content.push_str(&format!("junit-merge = {junit_merge}\n"));
             }
 
+            if let Some(fail_fast) = config.fail_fast {
+                toml_content.push_str(&format!("fail-fast = {fail_fast}\n"));
+            }
+
             toml_content.push('\n');
         }
 
@@ -565,6 +570,7 @@ impl Project {
             verify_wallet: None,
             verify_network: None,
             script_broadcast: false,
+            test_fail_fast: false,
         }
     }
 
@@ -606,6 +612,7 @@ pub struct ActonCommand {
     pub(crate) verify_wallet: Option<String>,
     pub(crate) verify_network: Option<String>,
     pub(crate) script_broadcast: bool,
+    pub(crate) test_fail_fast: bool,
 }
 
 #[allow(dead_code)]
@@ -847,6 +854,12 @@ impl ActonCommand {
         self
     }
 
+    /// Enable fail-fast mode
+    pub fn fail_fast(mut self) -> Self {
+        self.test_fail_fast = true;
+        self
+    }
+
     /// Enable JUnit merge mode (all suites in single file)
     ///
     /// # Examples
@@ -967,6 +980,10 @@ impl ActonCommand {
 
         for pattern in &self.test_include_patterns {
             self.cmd = self.cmd.arg("--include").arg(pattern);
+        }
+
+        if self.test_fail_fast {
+            self.cmd = self.cmd.arg("--fail-fast");
         }
 
         if let Some(contract) = self.build_contract {

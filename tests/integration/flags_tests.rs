@@ -178,3 +178,67 @@ fn test_filter_with_no_matches() {
         .success()
         .assert_passed(0);
 }
+
+#[test]
+fn test_fail_fast() {
+    let project = ProjectBuilder::new("fail-fast")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test1",
+            r#"
+            import "../../lib/testing/expect"
+            
+            get fun `test-first-pass`() {
+                expect(1).toEqual(1);
+            }
+            
+            get fun `test-second-fail`() {
+                expect(1).toEqual(2);
+            }
+            
+            get fun `test-third-pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .test_file(
+            "test2",
+            r#"
+            import "../../lib/testing/expect"
+            
+            get fun `test-fourth-pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .build();
+
+    // Without fail-fast: should fail but run all tests
+    project
+        .acton()
+        .test()
+        .run()
+        .failure() // exit code 1 because of failure
+        .assert_passed(3) // first, third, fourth
+        .assert_failed(1) // second
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_contains("third pass")
+        .assert_contains("fourth pass")
+        .assert_snapshot_matches("integration/snapshots/test_without_fail_fast.stdout.txt");
+
+    // With fail-fast: should stop after second test
+    project
+        .acton()
+        .test()
+        .fail_fast()
+        .run()
+        .failure()
+        .assert_passed(1) // only first
+        .assert_failed(1) // second
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_not_contains("third pass")
+        .assert_not_contains("fourth pass")
+        .assert_snapshot_matches("integration/snapshots/test_with_fail_fast.stdout.txt");
+}

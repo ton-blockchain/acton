@@ -133,6 +133,7 @@ impl FixtureProject {
             verify_wallet: None,
             verify_network: None,
             script_broadcast: false,
+            test_fail_fast: false,
         }
     }
 

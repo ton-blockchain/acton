@@ -90,6 +90,7 @@ pub struct TestConfig {
     pub mutate_overrides: Option<String>,
     pub mutate_contract: Option<String>,
     pub disable_rules: Vec<String>,
+    pub fail_fast: bool,
 }
 
 #[derive(Debug)]
@@ -410,6 +411,10 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                 eprintln!("{err}");
                 total_failed += 1;
             }
+        }
+
+        if config.fail_fast && total_failed > 0 {
+            break;
         }
     }
 
@@ -842,6 +847,11 @@ fn run_file_tests(
                     source_map.clone(),
                 )
             }
+        }
+
+        if !test_passed && runner.config.fail_fast {
+            // since test is failed, early break from test loop
+            break;
         }
     }
 

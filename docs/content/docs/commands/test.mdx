@@ -22,12 +22,18 @@ This command will discover and run all test files in the current directory and s
 
 ### Discovery Options
 
+| Option                 | Type      | Description                                                |
+|------------------------|-----------|------------------------------------------------------------|
+| `<PATH>`               | File path | Test file or directory to run (default: current directory) |
+| `--filter <PATTERN>`   | String    | Regex pattern to filter test names                         |
+| `--exclude <PATTERNS>` | Array     | Glob patterns to exclude test files                        |
+| `--include <PATTERNS>` | Array     | Glob patterns to include only test files                   |
+
+### Execution Options
+
 | Option                  | Type      | Description                                               |
 |-------------------------|-----------|-----------------------------------------------------------|
-| `<PATH>`                | File path | Test file or directory to run (default: current directory) |
-| `--filter <PATTERN>`    | String    | Regex pattern to filter test names                        |
-| `--exclude <PATTERNS>`  | Array     | Glob patterns to exclude test files                       |
-| `--include <PATTERNS>`  | Array     | Glob patterns to include only test files                  |
+| `--fail-fast`           | Flag      | Stop executing tests after the first failure              |
 
 ### Reporter Options
 

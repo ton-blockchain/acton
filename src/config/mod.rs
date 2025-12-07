@@ -61,6 +61,7 @@ pub struct TestSettings {
     pub fork_net: Option<String>,
     pub api_key: Option<String>,
     pub mutation: Option<MutationConfig>,
+    pub fail_fast: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -245,6 +246,7 @@ impl TestSettings {
         mutate_overrides_override: Option<String>,
         mutate_contract_override: Option<String>,
         disable_rules_override: Vec<String>,
+        fail_fast_override: Option<bool>,
     ) -> TestConfig {
         let mut final_report_formats = Vec::new();
 
@@ -305,6 +307,7 @@ impl TestSettings {
                     .and_then(|m| m.disable_rules.clone())
                     .unwrap_or_default()
             },
+            fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
         }
     }
 }

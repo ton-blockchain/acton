@@ -77,6 +77,14 @@ enum Commands {
         )]
         include: Vec<String>,
 
+        // Execution
+        #[arg(
+            long,
+            help = "Stop executing tests after the first failure",
+            help_heading = "Execution"
+        )]
+        fail_fast: bool,
+
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
         debug: bool,
@@ -579,6 +587,7 @@ fn main() {
             mutate_overrides,
             mutate_contract,
             disable_rule,
+            fail_fast,
         } => {
             let mut report_formats = Vec::new();
 
@@ -619,6 +628,7 @@ fn main() {
                 mutate_overrides,
                 mutate_contract,
                 disable_rule,
+                Some(fail_fast),
             );
 
             if mutate {
@@ -808,6 +818,7 @@ fn create_test_config(
     mutate_overrides: Option<String>,
     mutate_contract: Option<String>,
     disable_rules: Vec<String>,
+    fail_fast: Option<bool>,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -845,6 +856,7 @@ fn create_test_config(
             mutate_overrides,
             mutate_contract,
             disable_rules,
+            fail_fast,
         );
     }
 
@@ -871,5 +883,6 @@ fn create_test_config(
         mutate_overrides,
         mutate_contract,
         disable_rules,
+        fail_fast: fail_fast.unwrap_or(false),
     }
 }

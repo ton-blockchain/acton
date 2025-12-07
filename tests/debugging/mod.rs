@@ -227,6 +227,7 @@ fn execute_script(
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets: BTreeMap::new(),
+            build_override: BTreeMap::new(),
         },
         io: IoContext {
             stdout_buffer: "".to_string(),
