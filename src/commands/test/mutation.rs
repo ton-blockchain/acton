@@ -3,7 +3,6 @@ use crate::config::ActonConfig;
 use anyhow::anyhow;
 use owo_colors::OwoColorize;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{fs, process};
 use tempfile::TempDir;
@@ -147,7 +146,8 @@ fn replace_node_in_source(source: &str, target: &Node, replacement: &str) -> Str
     new_content
 }
 
-fn get_code_context(source: &str, node: &Node, context_lines: usize) -> String {
+fn get_code_context(source: &str, result: &MutationResult, context_lines: usize) -> String {
+    let node = &result.node;
     let start_line = node.start_position().row;
     let end_line = node.end_position().row;
 
@@ -155,20 +155,71 @@ fn get_code_context(source: &str, node: &Node, context_lines: usize) -> String {
     let context_start = start_line.saturating_sub(context_lines);
     let context_end = (end_line + context_lines + 1).min(lines.len());
 
-    let mut result = String::new();
+    let mut output = String::new();
     for line_idx in context_start..context_end {
         let line = lines.get(line_idx).unwrap_or(&"");
         let line_num = line_idx + 1;
 
         if line_idx >= start_line && line_idx <= end_line {
-            result.push_str(&format!(
-                "  {} {} {}\n",
-                format!("{:4}", line_num).dimmed(),
-                "│".red(),
-                line.red().strikethrough()
-            ));
+            match &result.rule.edit {
+                MutationEdit::Remove => {
+                    output.push_str(&format!(
+                        "  {} {} {}\n",
+                        format!("{:4}", line_num).dimmed(),
+                        "│".red(),
+                        line.red().strikethrough()
+                    ));
+                }
+                MutationEdit::Replace { replacement } => {
+                    let start_col = if line_idx == start_line {
+                        node.start_position().column
+                    } else {
+                        0
+                    };
+                    let end_col = if line_idx == end_line {
+                        node.end_position().column
+                    } else {
+                        line.len()
+                    };
+
+                    // Clamp indices to line length to be safe
+                    let start_col = start_col.min(line.len());
+                    let end_col = end_col.min(line.len());
+
+                    let prefix = &line[..start_col];
+                    let matched = &line[start_col..end_col];
+                    let suffix = &line[end_col..];
+
+                    let mut line_content = String::new();
+                    line_content.push_str(&prefix.dimmed().to_string());
+                    line_content.push_str(&matched.red().strikethrough().to_string());
+                    line_content.push_str(&suffix.dimmed().to_string());
+
+                    output.push_str(&format!(
+                        "  {} {} {}\n",
+                        format!("{:4}", line_num).dimmed(),
+                        "│".dimmed(),
+                        line_content
+                    ));
+
+                    if line_idx == end_line {
+                        let padding: String = prefix
+                            .chars()
+                            .map(|c| if c.is_whitespace() { c } else { ' ' })
+                            .collect();
+
+                        output.push_str(&format!(
+                            "  {} {} {}{}\n",
+                            "    ",
+                            "│".dimmed(),
+                            padding,
+                            replacement.green().bold()
+                        ));
+                    }
+                }
+            }
         } else {
-            result.push_str(&format!(
+            output.push_str(&format!(
                 "  {} {} {}\n",
                 format!("{:4}", line_num).dimmed(),
                 "│".dimmed(),
@@ -176,7 +227,7 @@ fn get_code_context(source: &str, node: &Node, context_lines: usize) -> String {
             ));
         }
     }
-    result
+    output
 }
 
 fn rules() -> Vec<MutationRule> {
@@ -205,12 +256,132 @@ fn rules() -> Vec<MutationRule> {
             },
         ),
         MutationRule::replace(
+            "flip_plus",
+            "Replace + with -",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "+" @op)"#,
+                capture: "op",
+            },
+            "-",
+        ),
+        MutationRule::replace(
+            "flip_minus",
+            "Replace - with +",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "-" @op)"#,
+                capture: "op",
+            },
+            "+",
+        ),
+        MutationRule::replace(
+            "flip_mul_div",
+            "Replace * with /",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "*" @op)"#,
+                capture: "op",
+            },
+            "/",
+        ),
+        MutationRule::replace(
+            "flip_div_mul",
+            "Replace / with *",
+            MutationLevel::Minor,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "/" @op)"#,
+                capture: "op",
+            },
+            "*",
+        ),
+        MutationRule::replace(
+            "flip_eq_ne",
+            "Replace == with !=",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "==" @op)"#,
+                capture: "op",
+            },
+            "!=",
+        ),
+        MutationRule::replace(
+            "flip_ne_eq",
+            "Replace != with ==",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "!=" @op)"#,
+                capture: "op",
+            },
+            "==",
+        ),
+        MutationRule::replace(
+            "flip_lt_le",
+            "Replace < with <=",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "<" @op)"#,
+                capture: "op",
+            },
+            "<=",
+        ),
+        MutationRule::replace(
+            "flip_gt_ge",
+            "Replace > with >=",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: ">" @op)"#,
+                capture: "op",
+            },
+            ">=",
+        ),
+        MutationRule::replace(
+            "flip_le_lt",
+            "Replace <= with <",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: "<=" @op)"#,
+                capture: "op",
+            },
+            "<",
+        ),
+        MutationRule::replace(
+            "flip_ge_gt",
+            "Replace >= with >",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(binary_operator operator_name: ">=" @op)"#,
+                capture: "op",
+            },
+            ">",
+        ),
+        MutationRule::replace(
+            "invert_bool_true",
+            "Replace true with false",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(boolean_literal) @bool"#,
+                capture: "bool",
+            },
+            "false",
+        ),
+        MutationRule::replace(
+            "invert_bool_false",
+            "Replace false with true",
+            MutationLevel::Major,
+            MutationMatcher::Query {
+                query: r#"(boolean_literal) @bool"#,
+                capture: "bool",
+            },
+            "true",
+        ),
+        MutationRule::replace(
             "flip_plus_assign",
             "Replace += with -=",
             MutationLevel::Minor,
             MutationMatcher::Query {
-                query: r#"("+=") @plus_assign"#,
-                capture: "plus_assign",
+                query: r#"(set_assignment operator_name: "+=" @op)"#,
+                capture: "op",
             },
             "-=",
         ),
@@ -219,8 +390,8 @@ fn rules() -> Vec<MutationRule> {
             "Replace -= with +=",
             MutationLevel::Minor,
             MutationMatcher::Query {
-                query: r#"("-=") @minus_assign"#,
-                capture: "minus_assign",
+                query: r#"(set_assignment operator_name: "-=" @op)"#,
+                capture: "op",
             },
             "+=",
         ),
@@ -514,10 +685,11 @@ pub fn test_mutate_cmd(
         for result in results.iter().filter(|r| r.survived) {
             println!("\n  {} Mutation #{}", "✗".red().bold(), (result.index + 1));
             println!(
-                "  {} {} — {}",
-                "Rule".dimmed(),
-                result.rule.name.bright_white(),
-                result.rule.description.dimmed()
+                "  {} {}{}{}",
+                "Rule:".dimmed(),
+                result.rule.description.to_string(),
+                " ".to_string(),
+                format!("[{}]", result.rule.name).dimmed()
             );
             println!(
                 "  {} {}",
@@ -531,7 +703,7 @@ pub fn test_mutate_cmd(
                 result.line.to_string().bright_white(),
                 result.column
             );
-            println!("{}", get_code_context(&content, &result.node, 2));
+            println!("{}", get_code_context(&content, result, 2));
         }
 
         println!("{}", "─".repeat(60).dimmed());
