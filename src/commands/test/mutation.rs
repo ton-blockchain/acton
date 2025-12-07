@@ -56,6 +56,7 @@ enum MutationMatcher {
 struct MutationRule {
     name: &'static str,
     description: &'static str,
+    explanation: &'static str,
     level: MutationLevel,
     edit: MutationEdit,
     matcher: MutationMatcher,
@@ -65,12 +66,14 @@ impl MutationRule {
     fn remove(
         name: &'static str,
         description: &'static str,
+        explanation: &'static str,
         level: MutationLevel,
         matcher: MutationMatcher,
     ) -> Self {
         Self {
             name,
             description,
+            explanation,
             level,
             edit: MutationEdit::Remove,
             matcher,
@@ -80,6 +83,7 @@ impl MutationRule {
     fn replace(
         name: &'static str,
         description: &'static str,
+        explanation: &'static str,
         level: MutationLevel,
         matcher: MutationMatcher,
         replacement: &'static str,
@@ -87,6 +91,7 @@ impl MutationRule {
         Self {
             name,
             description,
+            explanation,
             level,
             edit: MutationEdit::Replace { replacement },
             matcher,
@@ -235,6 +240,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::remove(
             "remove_assert",
             "Remove assert statements",
+            "This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.",
             MutationLevel::Critical,
             MutationMatcher::Query {
                 query: r#"(assert_statement) @assert"#,
@@ -244,6 +250,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::remove(
             "remove_throw",
             "Remove throw keyword",
+            "This exception path is not covered by tests. Missing error handling might leave the contract in an inconsistent state.",
             MutationLevel::Critical,
             MutationMatcher::Callback {
                 predicate: |node, _| -> anyhow::Result<bool> {
@@ -258,6 +265,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_plus",
             "Replace + with -",
+            "This arithmetic operation is not fully covered by tests. Changing + to - did not cause any tests to fail.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "+" @op)"#,
@@ -268,6 +276,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_minus",
             "Replace - with +",
+            "This arithmetic operation is not fully covered by tests. Changing - to + did not cause any tests to fail.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "-" @op)"#,
@@ -278,6 +287,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_mul_div",
             "Replace * with /",
+            "This arithmetic operation is not fully covered by tests. Changing * to / did not cause any tests to fail.",
             MutationLevel::Minor,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "*" @op)"#,
@@ -288,6 +298,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_div_mul",
             "Replace / with *",
+            "This arithmetic operation is not fully covered by tests. Changing / to * did not cause any tests to fail.",
             MutationLevel::Minor,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "/" @op)"#,
@@ -298,6 +309,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_eq_ne",
             "Replace == with !=",
+            "This comparison is not fully covered by tests. Inverting the equality check did not cause any tests to fail.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "==" @op)"#,
@@ -308,6 +320,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_ne_eq",
             "Replace != with ==",
+            "This comparison is not fully covered by tests. Inverting the inequality check did not cause any tests to fail.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "!=" @op)"#,
@@ -318,6 +331,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_lt_le",
             "Replace < with <=",
+            "This comparison boundary is not strictly checked. Changing < to <= did not affect test results.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "<" @op)"#,
@@ -328,6 +342,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_gt_ge",
             "Replace > with >=",
+            "This comparison boundary is not strictly checked. Changing > to >= did not affect test results.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: ">" @op)"#,
@@ -338,6 +353,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_le_lt",
             "Replace <= with <",
+            "This comparison boundary is not strictly checked. Changing <= to < did not affect test results.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: "<=" @op)"#,
@@ -348,6 +364,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_ge_gt",
             "Replace >= with >",
+            "This comparison boundary is not strictly checked. Changing >= to > did not affect test results.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(binary_operator operator_name: ">=" @op)"#,
@@ -358,6 +375,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "invert_bool_true",
             "Replace true with false",
+            "This boolean logic is not fully covered. Replacing 'true' with 'false' did not fail any tests.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(boolean_literal) @bool"#,
@@ -368,6 +386,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "invert_bool_false",
             "Replace false with true",
+            "This boolean logic is not fully covered. Replacing 'false' with 'true' did not fail any tests.",
             MutationLevel::Major,
             MutationMatcher::Query {
                 query: r#"(boolean_literal) @bool"#,
@@ -378,6 +397,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_plus_assign",
             "Replace += with -=",
+            "This compound assignment is not fully covered. Changing += to -= did not affect test results.",
             MutationLevel::Minor,
             MutationMatcher::Query {
                 query: r#"(set_assignment operator_name: "+=" @op)"#,
@@ -388,6 +408,7 @@ fn rules() -> Vec<MutationRule> {
         MutationRule::replace(
             "flip_minus_assign",
             "Replace -= with +=",
+            "This compound assignment is not fully covered. Changing -= to += did not affect test results.",
             MutationLevel::Minor,
             MutationMatcher::Query {
                 query: r#"(set_assignment operator_name: "-=" @op)"#,
@@ -538,16 +559,10 @@ pub fn test_mutate_cmd(
             mutations.len()
         );
         print!(
-            "{}:{}:{} ",
-            contract.src.dimmed(),
-            pos.row + 1,
-            pos.column + 1
+            "{} ",
+            format!("{}:{}:{}", contract.src, pos.row + 1, pos.column + 1).dimmed(),
         );
-        print!(
-            "[{}] {} ",
-            mutation.rule.name.bright_white(),
-            mutation.rule.description.dimmed()
-        );
+        print!("{} ", mutation.rule.description.dimmed());
 
         let new_content = apply_mutation(&content, mutation);
         let contract_src_path = PathBuf::from(&contract.src);
@@ -614,7 +629,7 @@ pub fn test_mutate_cmd(
     let survived_count = results.iter().filter(|r| r.survived).count();
     let executed_total = results.len().saturating_sub(compile_failed_count);
     let mutation_score = if executed_total > 0 {
-        (killed_count as f64 / executed_total as f64) * 100.0
+        ((killed_count + compile_failed_count) as f64 / executed_total as f64) * 100.0
     } else {
         0.0
     };
@@ -704,6 +719,11 @@ pub fn test_mutate_cmd(
                 result.column
             );
             println!("{}", get_code_context(&content, result, 2));
+            println!(
+                "  {} {}",
+                "Why it's bad:".dimmed(),
+                result.rule.explanation.dimmed()
+            );
         }
 
         println!("{}", "─".repeat(60).dimmed());
