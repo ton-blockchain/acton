@@ -39,6 +39,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sccache-
 
+      - name: Cache Cargo registry + git
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Install required system dependencies
         run: |
           brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16 sccache
@@ -233,7 +243,7 @@ jobs:
           name: acton-linux-binary
           path: target/release/acton
 
-  create-nightly-release:
+  create-canary-release:
     needs: [ build-macos ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
@@ -249,22 +259,33 @@ jobs:
         run: |
           chmod +x binaries/macos/acton
 
-      - name: Generate nightly tag
-        id: nightly-tag
+      - name: Create macOS archive
         run: |
-          echo "tag=nightly-$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          mkdir -p dist
+          tar -czf dist/acton-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz \
+            -C binaries/macos acton
 
-      - name: Create nightly release
+      - name: Delete previous canary release and tag
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+        run: |
+          gh release delete canary -y || true
+          
+          gh api \
+            repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
+            -X DELETE || true
+
+      - name: Create canary release
         id: create_release
         uses: actions/create-release@v1
         with:
-          tag_name: ${{ steps.nightly-tag.outputs.tag }}
-          release_name: Nightly Build ${{ steps.nightly-tag.outputs.tag }}
+          tag_name: canary
+          release_name: Canary Build
           body: |
-            Automated nightly build of emulator-rs.
+            Automated canary build of Acton.
 
-            ## Binaries
-            - `acton` - macOS binary
+            ## Archives
+            - `acton-canary-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz` - macOS archive
 
             Built from commit: ${{ github.sha }}
           draft: false
@@ -272,12 +293,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
 
-      - name: Upload macOS binary to release
+      - name: Upload macOS archive to release
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: binaries/macos/acton
-          asset_name: acton-${{ steps.nightly-tag.outputs.tag }}-darwin-${{ needs.build-macos.outputs.arch }}
-          asset_content_type: application/octet-stream
+          asset_path: dist/acton-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
+          asset_name: acton-canary-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
+          asset_content_type: application/gzip
         env:
           GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
