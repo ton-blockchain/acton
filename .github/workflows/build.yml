@@ -31,10 +31,6 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install sccache
-        run: |
-          cargo install sccache
-
       - name: Cache sccache
         uses: actions/cache@v4
         with:
@@ -45,7 +41,7 @@ jobs:
 
       - name: Install required system dependencies
         run: |
-          brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16
+          brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16 sccache
 
       - name: Clone TON repository
         run: |
