@@ -42,7 +42,8 @@ pub fn compile_cmd(
 
     let mut file_cache = FileBuildCache::new(None)?;
 
-    if let Some(cached_entry) = file_cache.get(path, false, 2, "1.2".to_string()) {
+    let need_debug_info = source_map.is_some();
+    if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.2".to_string()) {
         let elapsed = start_time.elapsed();
         info!("Compile {path} from file cache (.acton/cache) in {elapsed:?}");
 
