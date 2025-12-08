@@ -141,6 +141,9 @@ jobs:
           name: acton-macos-binary
           path: target/release/acton
 
+      - name: Run tests
+        run: just test
+
   build-linux:
     runs-on: ubuntu-latest
     if: true
@@ -169,7 +172,7 @@ jobs:
       - name: Install required system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
+          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
       - name: Clone TON repository
@@ -240,6 +243,10 @@ jobs:
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
+      - name: Detect architecture
+        id: detect-arch
+        run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+
       - name: Build acton binary
         env:
           CC: gcc
@@ -255,6 +262,9 @@ jobs:
         with:
           name: acton-linux-binary
           path: target/release/acton
+
+      - name: Run tests
+        run: just test
 
   create-canary-release:
     needs: [ build-macos, build-linux ]
