@@ -155,7 +155,7 @@ jobs:
       - name: Install required system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev libc++-dev libc++abi-dev
+          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
       - name: Clone TON repository
@@ -227,12 +227,10 @@ jobs:
           cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Build acton binary
-        run: |
-          export CC=clang-16
-          export CXX=clang++-16
-          export AR=llvm-ar-16
-          export RANLIB=llvm-ranlib-16
-          cargo build --release --bin acton
+        env:
+          CC: gcc
+          CXX: g++
+        run: cargo build --release --bin acton
 
       - name: Test acton binary
         run: |
