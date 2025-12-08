@@ -489,6 +489,8 @@ jobs:
           asset_path: dist/acton-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
           asset_name: acton-canary-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
           asset_content_type: application/gzip
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
 
       - name: Upload Linux archive to release
         uses: actions/upload-release-asset@v1
