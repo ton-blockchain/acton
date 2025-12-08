@@ -180,6 +180,7 @@ jobs:
 
       - name: Install required system dependencies
         run: |
+          brew install python@3.12 || brew link --overwrite python@3.12
           brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16 sccache just graphviz
 
       - name: Clone TON repository
