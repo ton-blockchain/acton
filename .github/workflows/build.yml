@@ -222,7 +222,6 @@ jobs:
           export CXX=clang++-16
           export AR=llvm-ar-16
           export RANLIB=llvm-ranlib-16
-          export CXXFLAGS=-std=c++17 
           cd ton-repo
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
