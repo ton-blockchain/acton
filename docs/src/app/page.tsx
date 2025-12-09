@@ -12,6 +12,7 @@ import {Header} from '@/components/Header';
 export const metadata: Metadata = {
   title: 'Acton — TON Development Toolkit',
   description: 'Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.',
+  metadataBase: new URL('https://i582.github.io/acton'),
   openGraph: {
     title: 'Acton — TON Development Toolkit',
     description: 'Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.',

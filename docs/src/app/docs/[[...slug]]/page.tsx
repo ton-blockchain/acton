@@ -1,4 +1,4 @@
-import {source} from '@/lib/source';
+import {getPageImage, source} from '@/lib/source';
 import {
   DocsBody,
   DocsDescription,
@@ -30,7 +30,7 @@ export default async function Page(props: PageProps) {
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription className="mb-2">{page.data.description}</DocsDescription>
       <div className="flex flex-row flex-wrap gap-2 items-center border-b pb-6">
-        <LLMCopyButton content={llmText} />
+        <LLMCopyButton content={llmText}/>
         <ViewOptions
           markdownUrl={`${page.url}.mdx`}
           githubUrl={`https://github.com/ton-blockchain/emulator-rs/blob/main/docs2/content/docs/${page.path}`}
@@ -62,5 +62,12 @@ export async function generateMetadata(
   return {
     title: page.data.title,
     description: page.data.description,
+    metadataBase: new URL('https://i582.github.io/acton'),
+    openGraph: {
+      images: getPageImage(page).url,
+    },
+    twitter: {
+      images: getPageImage(page).url,
+    }
   };
 }
