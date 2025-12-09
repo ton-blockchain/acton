@@ -66,6 +66,12 @@ strsim = "0.11.1"
 clap_complete = "4.5.61"
 human-panic = "2.0.4" # better panic handling
 
+# acton up
+semver = "1.0.27"
+indicatif = "0.18.3"
+flate2 = "1.1.5"
+tar = "0.4.44"
+
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir"] }
 strip-ansi-escapes = "0.2.1"

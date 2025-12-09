@@ -8,6 +8,7 @@ pub mod new;
 pub mod script;
 pub mod test;
 pub mod test_gen;
+pub mod up;
 pub mod verify;
 
 use std::collections::HashMap;

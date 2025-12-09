@@ -8,6 +8,7 @@ use acton::commands::new::new_cmd;
 use acton::commands::script::script_cmd;
 use acton::commands::test::{ReportFormat, TestConfig, mutation, test_cmd};
 use acton::commands::test_gen::test_gen_cmd;
+use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::config::ActonConfig;
 use clap::builder::styling::Style;
@@ -388,6 +389,15 @@ enum Commands {
     Library {
         #[command(subcommand)]
         command: LibraryCommand,
+    },
+    #[command(about = "Manage Acton versions")]
+    Up {
+        #[arg(help = "Optional specific version to install")]
+        version: Option<String>,
+        #[arg(long, help = "Install from most recent canary release")]
+        canary: bool,
+        #[arg(long, help = "Install stable release")]
+        stable: bool,
     },
     #[command(
         about = "Generate shell completions for selected shell",
@@ -828,6 +838,11 @@ fn main() {
                 result
             }
         },
+        Commands::Up {
+            version,
+            canary,
+            stable,
+        } => up_cmd(version, canary, stable),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())
