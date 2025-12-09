@@ -51,6 +51,8 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-
 
       - name: Install required system dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
         run: |
           brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16 sccache just graphviz
 
@@ -178,6 +180,8 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-cargo-
 
       - name: Install required system dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
         run: |
           brew install python@3.12 || brew link --overwrite python@3.12
           brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16 sccache just graphviz
