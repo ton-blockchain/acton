@@ -1,12 +1,8 @@
-name: Build and Check Acton
+name: Release Acton
 
 on:
-  pull_request:
-    branches:
-      - master
-  push:
-    branches:
-      - master
+  release:
+    types: [published]
   workflow_dispatch:
 
 concurrency:
@@ -140,9 +136,6 @@ jobs:
         with:
           name: acton-macos-binary
           path: target/release/acton
-
-      - name: Run tests
-        run: just test
 
   build-macos-intel:
     runs-on: macos-15-intel
@@ -388,13 +381,10 @@ jobs:
           name: acton-linux-binary
           path: target/release/acton
 
-      - name: Run tests
-        run: just test
-
-  create-canary-release:
+  create-release:
     needs: [ build-macos, build-macos-intel, build-linux ]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.event_name == 'release'
 
     steps:
       - name: Checkout repository
@@ -427,58 +417,28 @@ jobs:
       - name: Create macOS archive
         run: |
           mkdir -p dist
-          tar -czf dist/acton-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz \
+          tar -czf dist/acton-${{ github.event.release.tag_name }}-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz \
             -C binaries/macos acton
 
       - name: Create macOS x86_64 archive
         run: |
           mkdir -p dist
-          tar -czf dist/acton-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz \
+          tar -czf dist/acton-${{ github.event.release.tag_name }}-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz \
             -C binaries/macos-x86_64 acton
 
       - name: Create Linux archive
         run: |
           mkdir -p dist
-          tar -czf dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
+          tar -czf dist/acton-${{ github.event.release.tag_name }}-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
             -C binaries/linux acton
 
-      - name: Delete previous canary release and tag
-        env:
-          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
-        run: |
-          gh release delete canary -y || true
-          
-          gh api \
-            repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
-            -X DELETE || true
-
-      - name: Create canary release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: canary
-          release_name: Canary Build
-          body: |
-            Automated canary build of Acton.
-
-            ## Archives
-
-            - `acton-canary-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz` — macOS ARM64 archive
-            - `acton-canary-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz` — macOS x86_64 archive
-            - `acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz` — Linux archive
-
-            Built from commit: ${{ github.sha }}
-          draft: false
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
 
       - name: Upload macOS archive to release
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/acton-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
-          asset_name: acton-canary-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: dist/acton-${{ github.event.release.tag_name }}-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
+          asset_name: acton-${{ github.event.release.tag_name }}-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
           asset_content_type: application/gzip
         env:
           GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
@@ -486,9 +446,9 @@ jobs:
       - name: Upload macOS x86_64 archive to release
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/acton-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
-          asset_name: acton-canary-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: dist/acton-${{ github.event.release.tag_name }}-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
+          asset_name: acton-${{ github.event.release.tag_name }}-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
           asset_content_type: application/gzip
         env:
           GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
@@ -496,9 +456,9 @@ jobs:
       - name: Upload Linux archive to release
         uses: actions/upload-release-asset@v1
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_name: acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: dist/acton-${{ github.event.release.tag_name }}-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
+          asset_name: acton-${{ github.event.release.tag_name }}-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
           asset_content_type: application/gzip
         env:
           GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
