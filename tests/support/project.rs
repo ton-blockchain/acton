@@ -704,6 +704,11 @@ impl ActonCommand {
         self
     }
 
+    pub fn env(mut self, key: &str, value: &str) -> Self {
+        self.cmd = self.cmd.env(key, value);
+        self
+    }
+
     /// Start disasm command (without input - use with disasm_file or disasm_string)
     ///
     /// # Examples

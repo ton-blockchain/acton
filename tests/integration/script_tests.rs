@@ -992,3 +992,177 @@ fn test_script_address_print_broadcast_net_mainnet() {
 
     output.assert_contains("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ");
 }
+
+#[test]
+fn test_script_env_vars() {
+    let project = ProjectBuilder::new("script-env-vars")
+        .script_file(
+            "env",
+            r#"
+            import "../../lib/io"
+            import "../../lib/env"
+
+            fun main() {
+                val i = env<int>("TEST_INT");
+                if (i != null) {
+                    println1("int: {}", i);
+                }
+
+                val b = env<bool>("TEST_BOOL");
+                if (b != null) {
+                    println1("bool: {}", b);
+                }
+
+                val s = env<slice>("TEST_SLICE");
+                if (s != null) {
+                    println1("slice: {}", s);
+                }
+
+                val a = env<address>("TEST_ADDRESS");
+                if (a != null) {
+                    println1("address: {}", a);
+                }
+
+                val c = env<cell>("TEST_CELL");
+                if (c != null) {
+                    var slice = c.beginParse();
+                    println1("cell: {}", slice.loadUint(32));
+                }
+            }
+        "#,
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(123, 32).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_hex = Boc::encode_hex(cell);
+
+    project
+        .acton()
+        .script("scripts/env.tolk")
+        .env("TEST_INT", "123")
+        .env("TEST_BOOL", "true")
+        .env("TEST_SLICE", "hello")
+        .env(
+            "TEST_ADDRESS",
+            "EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ",
+        )
+        .env("TEST_CELL", &cell_hex)
+        .run()
+        .success()
+        .assert_contains("int: 123")
+        .assert_contains("bool: true")
+        .assert_contains("slice: hello")
+        .assert_contains("address: kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD")
+        .assert_contains("cell: 123");
+}
+
+#[test]
+fn test_script_env_vars_extended() {
+    let project = ProjectBuilder::new("script-env-vars-extended")
+        .script_file(
+            "env",
+            r#"
+            import "../../lib/io"
+            import "../../lib/env"
+
+            fun main() {
+                val i_hex = env<int>("TEST_INT_HEX");
+                if (i_hex != null) {
+                    println1("int_hex: {}", i_hex);
+                }
+
+                val b_1 = env<bool>("TEST_BOOL_1");
+                if (b_1 != null) {
+                    println1("bool_1: {}", b_1);
+                }
+
+                val b_false = env<bool>("TEST_BOOL_FALSE");
+                if (b_false != null) {
+                    println1("bool_false: {}", b_false);
+                }
+
+                val b_0 = env<bool>("TEST_BOOL_0");
+                if (b_0 != null) {
+                    println1("bool_0: {}", b_0);
+                }
+
+                val a_raw = env<address>("TEST_ADDRESS_RAW");
+                if (a_raw != null) {
+                    println1("address_raw: {}", a_raw);
+                }
+
+                val c_b64 = env<cell>("TEST_CELL_B64");
+                if (c_b64 != null) {
+                    var slice = c_b64.beginParse();
+                    println1("cell_b64: {}", slice.loadUint(32));
+                }
+            }
+        "#,
+        )
+        .build();
+
+    let mut builder = CellBuilder::new();
+    builder.store_uint(456, 32).ok();
+    let cell = builder.build().ok().unwrap_or_default();
+    let cell_b64 = Boc::encode_base64(cell);
+
+    project
+        .acton()
+        .script("scripts/env.tolk")
+        .env("TEST_INT_HEX", "0x1a") // 26
+        .env("TEST_BOOL_1", "1")
+        .env("TEST_BOOL_FALSE", "FALSE")
+        .env("TEST_BOOL_0", "0")
+        .env(
+            "TEST_ADDRESS_RAW",
+            "0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147",
+        )
+        .env("TEST_CELL_B64", &cell_b64)
+        .run()
+        .success()
+        .assert_contains("int_hex: 26")
+        .assert_contains("bool_1: true")
+        .assert_contains("bool_false: false")
+        .assert_contains("bool_0: false")
+        .assert_contains("address_raw: kQCDVtBfh+xRQbNJxeGqfwwXXDq8GP6zCKTVVTkeklmBRxCZ")
+        .assert_contains("cell_b64: 456");
+}
+
+#[test]
+fn test_script_env_or_vars() {
+    let project = ProjectBuilder::new("script-env-or-vars")
+        .script_file(
+            "env",
+            r#"
+            import "../../lib/io"
+            import "../../lib/env"
+
+            fun main() {
+                val i = envOr<int>("TEST_INT", 42);
+                println1("int: {}", i);
+
+                val b = envOr<bool>("TEST_BOOL", false);
+                println1("bool: {}", b);
+
+                val s = envOr<slice>("TEST_SLICE", "default");
+                println1("slice: {}", s);
+
+                val a = envOr<address>("TEST_ADDRESS", address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println1("address: {}", a);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/env.tolk")
+        .run()
+        .success()
+        .assert_contains("int: 42")
+        .assert_contains("bool: false")
+        .assert_contains("slice: default")
+        .assert_contains("address: kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD");
+}
