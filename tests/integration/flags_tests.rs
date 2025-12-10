@@ -40,8 +40,8 @@ fn test_run_specific_test_file() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("in file 1")
-        .assert_not_contains("in file 2");
+        .assert_contains("in-file-1")
+        .assert_not_contains("in-file-2");
 }
 
 #[test]
@@ -73,8 +73,8 @@ fn test_filter_by_name() {
         .run()
         .success()
         .assert_passed(2)
-        .assert_contains("unit 1")
-        .assert_contains("unit 2")
+        .assert_contains("unit-1")
+        .assert_contains("unit-2")
         .assert_not_contains("other");
 }
 
@@ -151,9 +151,9 @@ fn test_combined_path_and_filter() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("unit counter test")
-        .assert_not_contains("unit wallet test")
-        .assert_not_contains("integration counter test");
+        .assert_contains("unit-counter-test")
+        .assert_not_contains("unit-wallet-test")
+        .assert_not_contains("integration-counter-test");
 }
 
 #[test]
@@ -221,10 +221,10 @@ fn test_fail_fast() {
         .failure() // exit code 1 because of failure
         .assert_passed(3) // first, third, fourth
         .assert_failed(1) // second
-        .assert_contains("first pass")
-        .assert_contains("second fail")
-        .assert_contains("third pass")
-        .assert_contains("fourth pass")
+        .assert_contains("first-pass")
+        .assert_contains("second-fail")
+        .assert_contains("third-pass")
+        .assert_contains("fourth-pass")
         .assert_snapshot_matches("integration/snapshots/test_without_fail_fast.stdout.txt");
 
     // With fail-fast: should stop after second test
@@ -236,9 +236,9 @@ fn test_fail_fast() {
         .failure()
         .assert_passed(1) // only first
         .assert_failed(1) // second
-        .assert_contains("first pass")
-        .assert_contains("second fail")
-        .assert_not_contains("third pass")
-        .assert_not_contains("fourth pass")
+        .assert_contains("first-pass")
+        .assert_contains("second-fail")
+        .assert_not_contains("third-pass")
+        .assert_not_contains("fourth-pass")
         .assert_snapshot_matches("integration/snapshots/test_with_fail_fast.stdout.txt");
 }

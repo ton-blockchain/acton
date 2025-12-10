@@ -7,7 +7,7 @@
  TEST  [ROOT]
 
  > ./tests/test_test.tolk (1 test)
-  ✗ with error [TIME]
+  ✗ with-error [TIME]
     └─ exit_code=42
       ├─ at tests/test_test[LINE]
       │     __throw   at tests/test_test[LINE]

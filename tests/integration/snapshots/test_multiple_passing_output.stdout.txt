@@ -7,7 +7,7 @@
  TEST  [ROOT]
 
  > ./tests/test_test.tolk (2 tests)
-  ✓ pass 1 [TIME]
-  ✓ pass 2 [TIME]
+  ✓ pass-1 [TIME]
+  ✓ pass-2 [TIME]
 
  ✓ 2 passed in 1 file

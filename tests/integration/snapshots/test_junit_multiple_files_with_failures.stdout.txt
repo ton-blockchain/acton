@@ -7,8 +7,8 @@
  TEST  [ROOT]
 
  > ./tests/utils_test.tolk (2 tests)
-  ✓ pow2 basic [TIME]
-  ✗ pow2 edge [TIME]
+  ✓ pow2_basic [TIME]
+  ✗ pow2_edge [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
             1,
@@ -17,8 +17,8 @@
       └─ at ./tests/utils_test[LINE]
 
  > ./tests/wallet_test.tolk (2 tests)
-  ✓ wallet balance [TIME]
-  ✓ wallet utils [TIME]
+  ✓ wallet_balance [TIME]
+  ✓ wallet_utils [TIME]
 
  ✓ 3 passed, ✗ 1 failed in 2 files
 

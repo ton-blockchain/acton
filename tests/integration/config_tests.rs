@@ -49,8 +49,8 @@ fn test_filter_via_config() {
         .run()
         .success()
         .assert_passed(2)
-        .assert_contains("unit 1")
-        .assert_contains("unit 2")
+        .assert_contains("unit-1")
+        .assert_contains("unit-2")
         .assert_not_contains("other");
 }
 
@@ -199,8 +199,8 @@ fn test_filter_and_coverage_via_config() {
         .assert_failed(1)
         .assert_contains(" COVERAGE ")
         .assert_contains("utils.tolk")
-        .assert_contains("unit div")
-        .assert_not_contains("integration triple")
+        .assert_contains("unit-div")
+        .assert_not_contains("integration-triple")
         .assert_snapshot_matches(
             "integration/snapshots/test_filter_and_coverage_via_config.stdout.txt",
         );
@@ -307,8 +307,8 @@ fn test_config_with_specific_path() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("in file 1")
-        .assert_not_contains("in file 2");
+        .assert_contains("in-file-1")
+        .assert_not_contains("in-file-2");
 }
 
 #[test]
@@ -578,9 +578,9 @@ fn test_fail_fast_via_config() {
         .failure()
         .assert_passed(1) // only first
         .assert_failed(1) // second
-        .assert_contains("first pass")
-        .assert_contains("second fail")
-        .assert_not_contains("third pass")
-        .assert_not_contains("fourth pass")
+        .assert_contains("first-pass")
+        .assert_contains("second-fail")
+        .assert_not_contains("third-pass")
+        .assert_not_contains("fourth-pass")
         .assert_snapshot_matches("integration/snapshots/test_with_fail_fast_via_config.stdout.txt");
 }

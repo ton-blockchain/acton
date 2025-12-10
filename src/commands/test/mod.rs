@@ -703,7 +703,7 @@ fn run_file_tests(
         .reporter_manager
         .on_suite_started(file_path, &filtered_tests)?;
 
-    let dest_address = contract_address(code_cell);
+    let dest_address = contract_address(code_cell)?;
 
     let mut passed = 0;
     let mut failed = 0;
@@ -896,22 +896,16 @@ fn run_file_tests(
     })
 }
 
-fn contract_address(code: &Arc<Cell>) -> TonAddress {
+fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
     let state_init = CellBuilder::new()
-        .store_bit(false)
-        .expect("Failed to store bounce flag")
-        .store_bit(false)
-        .expect("Failed to store maybe libraries")
-        .store_ref_cell_optional(Some(code))
-        .expect("Failed to store code cell")
-        .store_ref_cell_optional(Some(&ArcCell::default()))
-        .expect("Failed to store data cell")
-        .store_bit(false)
-        .expect("Failed to store maybe tick/tock")
-        .build()
-        .expect("Failed to build state init cell");
+        .store_bit(false)?
+        .store_bit(false)?
+        .store_ref_cell_optional(Some(code))?
+        .store_ref_cell_optional(Some(&ArcCell::default()))?
+        .store_bit(false)?
+        .build()?;
 
-    TonAddress::new(0, state_init.cell_hash())
+    Ok(TonAddress::new(0, state_init.cell_hash()))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

@@ -34,9 +34,9 @@ impl ConsoleReporter {
     }
 
     fn beatify_test_name(&self, name: &str) -> String {
-        name.replace("-", " ")
-            .replace("_", " ")
-            .trim_start_matches("test ")
+        name.trim_start_matches("test ")
+            .trim_start_matches("test-")
+            .trim_start_matches("test_")
             .to_string()
     }
 }

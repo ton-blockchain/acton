@@ -7,7 +7,7 @@
  TEST  [ROOT]
 
  > ./tests/test_test.tolk (1 test)
-  ✗ unit div [TIME]
+  ✗ unit-div [TIME]
     └─ exit_code=4
       ├─ at code/utils[LINE]
       │     _/_   at code/utils[LINE]

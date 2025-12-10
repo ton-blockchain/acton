@@ -7,8 +7,8 @@
  TEST  [ROOT]
 
  > ./tests/test_test.tolk (2 tests)
-  ✓ unit double [TIME]
-  ✓ integration triple [TIME]
+  ✓ unit-double [TIME]
+  ✓ integration-triple [TIME]
 
  ✓ 2 passed in 1 file
 

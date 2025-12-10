@@ -7,8 +7,8 @@
  TEST  [ROOT]
 
  > ./tests/test1_test.tolk (3 tests)
-  ✓ first pass [TIME]
-  ✗ second fail [TIME]
+  ✓ first-pass [TIME]
+  ✗ second-fail [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
             1,

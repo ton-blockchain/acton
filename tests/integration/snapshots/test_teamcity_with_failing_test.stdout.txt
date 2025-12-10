@@ -10,7 +10,7 @@
  > ./tests/counter_test.tolk (2 tests)
 ##teamcity[testSuiteStarted name='counter_test.tolk' nodeId='suite_counter_test.tolk' parentNodeId='0' nodeType='file' locationHint='file://./tests/counter_test.tolk']
 ##teamcity[testStarted name='test-should-increase-counter' nodeId='test_test-should-increase-counter' parentNodeId='suite_counter_test.tolk' locationHint='tolk_qn://./tests/counter_test.tolk:test-should-increase-counter']
-  ✗ should increase counter [TIME]
+  ✗ should-increase-counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
@@ -23,7 +23,7 @@
 ##teamcity[testFailed name='test-should-increase-counter' nodeId='test_test-should-increase-counter' [DURATION] message='expect(<actual>).toHaveSuccessfulTx(<expected>)' details='./tests/counter_test[LINE]']
 ##teamcity[testFinished name='test-should-increase-counter' nodeId='test_test-should-increase-counter' [DURATION] parentNodeId='suite_counter_test.tolk']
 ##teamcity[testStarted name='test-should-reset-counter' nodeId='test_test-should-reset-counter' parentNodeId='suite_counter_test.tolk' locationHint='tolk_qn://./tests/counter_test.tolk:test-should-reset-counter']
-  ✗ should reset counter [TIME]
+  ✗ should-reset-counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted

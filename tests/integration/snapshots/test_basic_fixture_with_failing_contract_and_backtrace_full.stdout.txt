@@ -7,7 +7,7 @@
  TEST  [ROOT]
 
  > ./tests/counter_test.tolk (2 tests)
-  ✗ should increase counter [TIME]
+  ✗ should-increase-counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
@@ -21,7 +21,7 @@
         with:
           exit_code=0
       └─ at ./tests/counter_test[LINE]
-  ✗ should reset counter [TIME]
+  ✗ should-reset-counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
