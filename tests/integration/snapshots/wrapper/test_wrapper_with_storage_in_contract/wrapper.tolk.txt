@@ -41,3 +41,14 @@ fun MyContract.deploy(self, from: address, config: MyContractSendMessageConfig =
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
+/// Send message to the contract with a custom body cell
+fun MyContract.sendAny(self, from: address, body: cell, config: MyContractSendMessageConfig = {}): SendResultList {
+    val msg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body,
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+}
+

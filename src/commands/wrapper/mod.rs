@@ -331,6 +331,9 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
         }
     }
 
+    code.push_str(&generate_send_any_method(&model.contract_name));
+    code.push('\n');
+
     for get_method in &model.abi.get_methods {
         code.push_str(&generate_get_method(&model.contract_name, get_method));
         code.push('\n');
@@ -442,6 +445,25 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
         code.push_str("        },\n");
     }
 
+    code.push_str("    });\n");
+    code.push_str("    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
+    code.push_str("}\n");
+
+    code
+}
+
+fn generate_send_any_method(contract_name: &str) -> String {
+    let mut code = String::new();
+
+    code.push_str("/// Send message to the contract with a custom body cell\n");
+    code.push_str(&format!(
+        "fun {contract_name}.sendAny(self, from: address, body: cell, config: {contract_name}SendMessageConfig = {{}}): SendResultList {{\n",
+    ));
+    code.push_str("    val msg = createMessage({\n");
+    code.push_str("        bounce: config.bounce,\n");
+    code.push_str("        value: config.value,\n");
+    code.push_str("        dest: self.address,\n");
+    code.push_str("        body,\n");
     code.push_str("    });\n");
     code.push_str("    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
     code.push_str("}\n");
