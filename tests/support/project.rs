@@ -651,6 +651,28 @@ impl ActonCommand {
         self
     }
 
+    /// Start wrapper command
+    pub fn wrapper(mut self, contract_id: &str) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wrapper")
+            .arg(contract_id)
+            .current_dir(&self.project.path);
+        self
+    }
+
+    /// Specify output wrapper file
+    pub fn wrapper_output(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--wrapper-output").arg(path);
+        self
+    }
+
+    /// Specify output test file
+    pub fn test_output(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--test-output").arg(path);
+        self
+    }
+
     /// Start script command
     ///
     /// # Examples

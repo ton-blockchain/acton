@@ -40,8 +40,8 @@ fn build_model(
     let contract_path = project_root.join(&contract_config.src);
 
     if !contract_path.exists() {
-        return Err(anyhow!(
-            "Contract file not found: {} (specified in Acton.toml as '{}')",
+        anyhow::bail!(color_print::cformat!(
+            "Contract file for <yellow>{contract_id}</> not found: <yellow>{}</> (specified in Acton.toml as <yellow>{}</>)",
             contract_path.display(),
             contract_config.src
         ));
@@ -79,6 +79,9 @@ fn build_model(
     let wrapper_path = wrapper_output.map(PathBuf::from).unwrap_or(default_wrapper);
     let test_path = test_output.map(PathBuf::from).unwrap_or(default_test);
 
+    let mut message_paths: Vec<PathBuf> = message_paths.iter().map(PathBuf::from).collect();
+    message_paths.sort();
+
     Ok(WrapperModel {
         project_root,
         contract_id: contract_id.to_owned(),
@@ -87,7 +90,7 @@ fn build_model(
         abi,
         handled_messages,
         storage_path: storage_file_path,
-        message_paths: message_paths.iter().map(PathBuf::from).collect(),
+        message_paths,
         wrapper_path,
         test_path,
     })
@@ -101,6 +104,10 @@ pub fn wrapper_cmd(
     let model = build_model(contract_id, wrapper_output, test_output)?;
 
     if let Some(parent) = model.wrapper_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| anyhow!("Failed to create directory {}: {}", parent.display(), e))?;
+    }
+    if let Some(parent) = model.test_path.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| anyhow!("Failed to create directory {}: {}", parent.display(), e))?;
     }
@@ -259,22 +266,36 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     code.push_str("import \"../../.acton/types/message\"\n");
 
     if let Some(types_path) = types_file_path {
-        let types_import = get_relative_import_from_wrapper(&model.wrapper_path, types_path);
-        code.push_str(&format!(
-            "import \"{}\"  // TODO: Move Storage and message types here\n",
-            types_import
-        ));
+        let types_import =
+            get_relative_import(&model.project_root, &model.wrapper_path, types_path);
+        code.push_str(&gen_import_path(types_import));
     }
 
     if let Some(storage_path) = &model.storage_path {
-        let storage_import = get_relative_import_from_wrapper(&model.wrapper_path, storage_path);
-        code.push_str(&format!("import \"{}\"\n", storage_import));
+        let storage_import =
+            get_relative_import(&model.project_root, &model.wrapper_path, storage_path);
+        code.push_str(&gen_import_path(storage_import));
+    }
+
+    for messages_path in &model.message_paths {
+        if messages_path == &model.contract_path {
+            // never import file with contract itself since this will break all
+            continue;
+        }
+
+        let types_import =
+            get_relative_import(&model.project_root, &model.wrapper_path, messages_path);
+        code.push_str(&gen_import_path(types_import));
     }
 
     code.push('\n');
 
     code.push_str("/// Configuration for sending messages to the contract\n");
-    code.push_str("struct SendMessageConfig {\n");
+    // we need prefix this type name to prevent collisions when two wrapper imported in the same file
+    code.push_str(&format!(
+        "struct {}SendMessageConfig {{\n",
+        model.contract_name
+    ));
     code.push_str("    /// The amount of TON to send with the message (default: 0.1 TON)\n");
     code.push_str("    value: coins = ton(\"0.1\")\n");
     code.push_str("    /// Whether to bounce the message if the contract does not exist or fails (default: false)\n");
@@ -286,10 +307,15 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     code.push_str("    init: ContractState\n");
     code.push_str("}\n\n");
 
-    if let Some(storage) = &model.abi.storage {
+    if model.abi.storage.is_some() {
         code.push_str(&generate_from_storage(
             &model.contract_name,
-            storage,
+            &model.contract_id,
+        ));
+        code.push('\n');
+    } else {
+        code.push_str(&generate_empty_from_storage(
+            &model.contract_name,
             &model.contract_id,
         ));
         code.push('\n');
@@ -313,11 +339,7 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     code
 }
 
-fn generate_from_storage(
-    contract_name: &str,
-    _storage: &TypeAbi,
-    contract_build_name: &str,
-) -> String {
+fn generate_from_storage(contract_name: &str, contract_build_name: &str) -> String {
     let mut code = String::new();
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
@@ -342,12 +364,34 @@ fn generate_from_storage(
     code
 }
 
+fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -> String {
+    let mut code = String::new();
+
+    code.push_str("/// Creates a contract wrapper instance from the storage data\n");
+    code.push_str(&format!("fun {}.fromStorage() {{\n", contract_name));
+    code.push_str("    val init = ContractState {\n");
+    code.push_str(&format!(
+        "        code: build(\"{}\"),\n",
+        contract_build_name
+    ));
+    code.push_str("        data: createEmptyCell(),\n");
+    code.push_str("    };\n");
+    code.push_str("    val address = AutoDeployAddress { stateInit: init }.calculateAddress();\n");
+    code.push_str(&format!(
+        "    return {} {{ address, init }}\n",
+        contract_name
+    ));
+    code.push_str("}\n");
+
+    code
+}
+
 fn generate_deploy(contract_name: &str) -> String {
     let mut code = String::new();
 
     code.push_str("/// Deploys the contract to the blockchain\n");
     code.push_str(&format!(
-        "fun {contract_name}.deploy(self, from: address, config: SendMessageConfig = {{}}): SendResultList {{\n",
+        "fun {contract_name}.deploy(self, from: address, config: {contract_name}SendMessageConfig = {{}}): SendResultList {{\n",
     ));
     code.push_str("    val msg = createMessage({\n");
     code.push_str("        bounce: config.bounce,\n");
@@ -381,8 +425,7 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
     };
 
     code.push_str(&format!(
-        "fun {}.{}(self, from: address, {}config: SendMessageConfig = {{}}): SendResultList {{\n",
-        contract_name, method_name, params_str
+        "fun {contract_name}.{method_name}(self, from: address, {params_str}config: {contract_name}SendMessageConfig = {{}}): SendResultList {{\n",
     ));
     code.push_str("    val msg = createMessage({\n");
     code.push_str("        bounce: config.bounce,\n");
@@ -474,12 +517,24 @@ fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) ->
     code.push_str("import \"../.acton/testing/transaction_expect\"\n");
 
     if let Some(types_path) = types_file_override {
-        let types_import = get_relative_import_from_test_to_types(types_path, &model.project_root);
-        code.push_str(&format!("import \"{}\"\n", types_import));
+        let types_import = get_relative_import(&model.project_root, &model.test_path, types_path);
+        code.push_str(&gen_import_path(types_import));
     }
 
-    let wrapper_import = get_relative_import_for_test(&model.wrapper_path);
-    code.push_str(&format!("import \"{}\"\n", wrapper_import));
+    for messages_path in &model.message_paths {
+        if messages_path == &model.contract_path {
+            // never import file with contract itself since this will break all
+            continue;
+        }
+
+        let types_import =
+            get_relative_import(&model.project_root, &model.test_path, messages_path);
+        code.push_str(&gen_import_path(types_import));
+    }
+
+    let wrapper_import =
+        get_relative_import(&model.project_root, &model.test_path, &model.wrapper_path);
+    code.push_str(&gen_import_path(wrapper_import));
     code.push('\n');
 
     code.push_str(&generate_example_test(&model.contract_name));
@@ -490,64 +545,23 @@ fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) ->
     code
 }
 
-fn get_relative_import_from_test_to_types(types_path: &PathBuf, project_root: &Path) -> String {
-    let test_dir = project_root.join("tests");
-
-    let relative_path =
-        pathdiff::diff_paths(types_path, test_dir).unwrap_or_else(|| types_path.to_path_buf());
-
-    let import_path = relative_path.to_string_lossy().to_string();
-    if import_path.ends_with(".tolk") {
-        import_path[..import_path.len() - 5].to_string()
-    } else {
-        import_path
-    }
+fn gen_import_path(path: PathBuf) -> String {
+    let path = path.display().to_string();
+    format!(
+        "import \"{}\"\n",
+        path.trim_start_matches("./").trim_end_matches(".tolk")
+    )
 }
 
-fn get_relative_import_for_test(wrapper_path: &Path) -> String {
-    let wrapper_name = wrapper_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("wrapper");
+fn get_relative_import(project_root: &Path, where_: &Path, what: &Path) -> PathBuf {
+    let Some(where_dir) = where_.parent() else {
+        return what.to_path_buf();
+    };
+    let what_abs_path = project_root.join(what);
+    let where_abs_dir = project_root.join(where_dir);
 
-    format!("wrappers/{}", wrapper_name)
-}
-
-fn get_relative_import_from_wrapper(wrapper_path: &Path, storage_path: &Path) -> String {
-    let wrapper_dir = wrapper_path.parent().unwrap_or_else(|| Path::new("."));
-
-    if let Ok(relative) = storage_path.strip_prefix(wrapper_dir) {
-        let import_path = relative.to_string_lossy().to_string();
-        if import_path.ends_with(".tolk") {
-            import_path[..import_path.len() - 5].to_string()
-        } else {
-            import_path
-        }
-    } else {
-        let mut import_path = String::new();
-        let mut current = wrapper_dir;
-
-        while !storage_path.starts_with(current) {
-            if let Some(parent) = current.parent() {
-                import_path.push_str("../");
-                current = parent;
-            } else {
-                break;
-            }
-        }
-
-        if let Ok(relative) = storage_path.strip_prefix(current) {
-            import_path.push_str(&relative.to_string_lossy());
-        } else {
-            import_path.push_str(&storage_path.to_string_lossy());
-        }
-
-        if import_path.ends_with(".tolk") {
-            import_path[..import_path.len() - 5].to_string()
-        } else {
-            import_path
-        }
-    }
+    let relative_path = pathdiff::diff_paths(&what_abs_path, where_abs_dir);
+    relative_path.unwrap_or(what_abs_path)
 }
 
 fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
@@ -588,7 +602,7 @@ fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
         code.push_str(" });\n");
     } else {
         code.push_str(&format!(
-            "    val contract = {}.fromStorage({{ }});\n",
+            "    val contract = {}.fromStorage();\n",
             contract_name
         ));
     }
@@ -629,10 +643,4 @@ fn generate_example_test(_contract_name: &str) -> String {
     code.push_str("}\n");
 
     code
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_generate_wrapper_for_simple_contract() {}
 }

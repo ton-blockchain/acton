@@ -16,3 +16,4 @@ mod run_tests;
 mod script_tests;
 mod test_tests;
 mod verify_tests;
+mod wrapper_tests;

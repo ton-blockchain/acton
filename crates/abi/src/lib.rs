@@ -258,20 +258,20 @@ fn find_match_patterns(node: &tree_sitter::Node, content: &str) -> Vec<String> {
     let mut patterns = Vec::new();
 
     if node.kind() == "match_expression" {
-        if let Some(body_node) = node.child_by_field_name("body") {
-            if body_node.kind() == "match_body" {
-                let mut cursor = body_node.walk();
-                for child in body_node.children(&mut cursor) {
-                    if child.kind() == "match_arm" {
-                        if let Some(pattern_type_node) = child.child_by_field_name("pattern_type") {
-                            let pattern_text = pattern_type_node
-                                .utf8_text(content.as_bytes())
-                                .unwrap_or("")
-                                .to_string();
+        if let Some(body_node) = node.child_by_field_name("body")
+            && body_node.kind() == "match_body"
+        {
+            let mut cursor = body_node.walk();
+            for child in body_node.children(&mut cursor) {
+                if child.kind() == "match_arm" {
+                    if let Some(pattern_type_node) = child.child_by_field_name("pattern_type") {
+                        let pattern_text = pattern_type_node
+                            .utf8_text(content.as_bytes())
+                            .unwrap_or("")
+                            .to_string();
 
-                            if !pattern_text.is_empty() {
-                                patterns.push(pattern_text);
-                            }
+                        if !pattern_text.is_empty() {
+                            patterns.push(pattern_text);
                         }
                     }
                 }
