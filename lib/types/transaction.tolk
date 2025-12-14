@@ -1,3 +1,26 @@
+/// Module defining transaction types.
+///
+/// This module provides a complete representation of TON transactions as they appear in the blockchain.
+/// It includes structures for all phases of transaction execution: storage, credit, compute, action, and bounce.
+///
+/// Examples:
+/// ```tolk
+/// val tx = results.at(0).tx.load();
+///
+/// // Check gas usage
+/// val gas = tx.getUsedGas();
+/// println1("Gas used: {}", gas);
+///
+/// // Inspect account status change
+/// val description = tx.description.load();
+/// if (description is TransOrd) {
+///     val compute = description.compute_ph;
+///     if (compute is TrComputeVm) {
+///         println1("VM exit code: {}", compute.exit_code);
+///     }
+/// }
+/// ```
+
 import "message"
 import "../testing/assert"
 import "../tlb/maybe"

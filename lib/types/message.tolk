@@ -1,3 +1,26 @@
+/// Module defining message types.
+///
+/// This module provides the core structures for working with TON messages in the emulator.
+/// It defines both internal and external message structures, as well as their components.
+///
+/// Examples:
+/// ```tolk
+/// // Parsing an out action into a typed message
+/// val action = outActions.getSendMessageAt(0);
+/// if (action != null) {
+///     val msg = action.loadMessage<Transfer>();
+///     val body = msg.loadBody();
+///     println1("Transfer amount: {:ton}", body.amount);
+/// }
+///
+/// // Parsing a generic message to check opcode
+/// val genericMsg = action.loadGenericMessage();
+/// val opcode = genericMsg.loadOpcode();
+/// if (opcode == 0x12345678) {
+///     // handle specific opcode...
+/// }
+/// ```
+
 import "../tlb/either"
 import "../tlb/maybe"
 

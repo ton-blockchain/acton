@@ -1,3 +1,23 @@
+/// Module for blockchain emulation.
+///
+/// This is the central module for interacting with the emulated blockchain environment.
+/// It provides capabilities to send messages, manage time, inspect account states, and perform other network-level operations.
+///
+/// Examples:
+/// ```tolk
+/// // Setup
+/// val deployer = net.wallet("deployer");
+/// val contract = build("MyContract");
+///
+/// // Interact
+/// val msg = createMessage({ ... });
+/// val results = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+///
+/// // Check state
+/// val balance = net.balance(contract.address);
+/// val seqno = net.runGetMethod<int>(contract.address, "seqno");
+/// ```
+
 import "@stdlib/common"
 import "@stdlib/gas-payments"
 import "../build/build"

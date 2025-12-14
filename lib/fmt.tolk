@@ -1,3 +1,26 @@
+/// Module for string formatting.
+///
+/// This module provides a set of functions (`format1` to `format5`) for creating formatted strings.
+/// It is similar to `sprintf` in C or `format!` in Rust.
+///
+/// Usage:
+/// The functions are named `formatN` where N is the number of arguments.
+///
+/// Examples:
+/// ```tolk
+/// // Simple string substitution
+/// val greeting = format1("Hello, {}!", "Tolk");
+///
+/// // Formatting numbers
+/// val hex = format1("Value in hex: 0x{:x}", 255); // "Value in hex: 0xff"
+///
+/// // Formatting TON amounts
+/// val balance = format1("Balance: {:ton}", 500000000); // "Balance: 0.5 TON"
+///
+/// // Multiple arguments
+/// val info = format3("User {} has {} items worth {:ton}", "Alice", 5, 1000000000);
+/// ```
+
 import "ffi/ffi"
 
 /// Formats a string with 1 argument.

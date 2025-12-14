@@ -5,6 +5,13 @@ description: "build.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
+Module for building contracts.
+
+This module provides the capability to compile Tolk contracts dynamically during the execution of tests or scripts.
+It interfaces with the Tolk compiler to generate the code cell for a given contract.
+
+## Definitions
+
 ## `build`
 
 ```tolk
@@ -29,5 +36,5 @@ Example:
 val cell = build("jetton-wallet", "contracts/jetton-wallet-contract.tolk");
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/build/build.tolk#L18" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/build/build.tolk#L24" />
 

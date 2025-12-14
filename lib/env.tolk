@@ -1,3 +1,25 @@
+/// Module for accessing environment variables.
+///
+/// This module provides a type-safe way to access environment variables during test execution or script running.
+/// It supports parsing environment variables into standard Tolk types like `int`, `bool`, `slice`, `address`, and `cell`.
+///
+/// Examples:
+/// ```tolk
+/// // Read an integer configuration
+/// val iterations = envOr<int>("TEST_ITERATIONS", 100);
+///
+/// // Read a target address
+/// val target = env<address>("TARGET_ADDRESS");
+/// if (target == null) {
+///     throw 100; // error: target not found
+/// }
+///
+/// // Read a feature flag
+/// if (envOr<bool>("ENABLE_LOGGING", false)) {
+///     println("Logging enabled");
+/// }
+/// ```
+
 import "fmt"
 import "ffi/ffi"
 import "testing/assert"

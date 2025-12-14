@@ -1,3 +1,20 @@
+/// Module for VM interaction.
+///
+/// This module provides low-level access to the TON Virtual Machine (TVM) state during test execution.
+/// It allows reading and writing to control registers (C5, C7) and configuring execution parameters.
+///
+/// Examples:
+/// ```tolk
+/// // Mock time
+/// vm.setTime(1700000000);
+///
+/// // Register a mock library
+/// vm.registerLibrary(myLibCell);
+///
+/// // Inspect actions manually
+/// val rawActions = vm.getC5();
+/// ```
+
 import "../ffi/ffi"
 
 /// Holds the methods to change the VM state.

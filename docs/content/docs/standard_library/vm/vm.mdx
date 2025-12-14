@@ -5,6 +5,25 @@ description: "vm.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
+Module for VM interaction.
+
+This module provides low-level access to the TON Virtual Machine (TVM) state during test execution.
+It allows reading and writing to control registers (C5, C7) and configuring execution parameters.
+
+Examples:
+```tolk
+// Mock time
+vm.setTime(1700000000);
+
+// Register a mock library
+vm.registerLibrary(myLibCell);
+
+// Inspect actions manually
+val rawActions = vm.getC5();
+```
+
+## Definitions
+
 ## `vm`
 
 ```tolk
@@ -13,7 +32,7 @@ struct vm
 
 Holds the methods to change the VM state.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L4" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L21" />
 
 ## `vm.getC7`
 
@@ -24,7 +43,7 @@ fun vm.getC7(): tuple
 
 Read control register C7.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L7" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L24" />
 
 ## `vm.setC7`
 
@@ -35,7 +54,7 @@ fun vm.setC7(c7: tuple): void
 
 Write a new value to control register C7.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L11" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L28" />
 
 ## `vm.getC5`
 
@@ -46,7 +65,7 @@ fun vm.getC5(): cell
 
 Read control register C5.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L15" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L32" />
 
 ## `vm.setC5`
 
@@ -57,7 +76,7 @@ fun vm.setC5(cell: cell): void
 
 Write a new value to control register C5.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L19" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L36" />
 
 ## `vm.getConfigParam`
 
@@ -67,7 +86,7 @@ fun vm.getConfigParam<T>(index: int): T
 
 Generic helper to get a single config parameter.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L23" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L40" />
 
 ## `vm.setConfigParam`
 
@@ -77,7 +96,7 @@ fun vm.setConfigParam<T>(value: T, index: int)
 
 Generic helper to overwrite a single config parameter.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L30" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L47" />
 
 ## `vm.setTime`
 
@@ -87,7 +106,7 @@ fun vm.setTime(now: int)
 
 Override `blockchain.now()` for deterministic testing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L39" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L56" />
 
 ## `vm.setBlockLogicalTime`
 
@@ -97,7 +116,7 @@ fun vm.setBlockLogicalTime(blockLogicalTime: int)
 
 Override the **block** logical time.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L44" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L61" />
 
 ## `vm.setLogicalTime`
 
@@ -107,7 +126,7 @@ fun vm.setLogicalTime(logicalTime: int)
 
 Override the **transaction** logical time.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L49" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L66" />
 
 ## `vm.setOriginalBalance`
 
@@ -117,7 +136,7 @@ fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null)
 
 Override the original balance of the contract.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L54" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L71" />
 
 ## `vm.registerLibrary`
 
@@ -127,7 +146,7 @@ fun vm.registerLibrary(cell: cell)
 
 Register a new library for current test.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L59" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L76" />
 
 ## `vm.convertAddress`
 
@@ -142,7 +161,7 @@ Example:
 val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L69" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L86" />
 
 ## `vm.cellFromHex`
 
@@ -150,5 +169,5 @@ val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5l
 fun vm.cellFromHex(cell_hex: slice): cell
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L74" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L91" />
 

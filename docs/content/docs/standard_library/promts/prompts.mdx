@@ -5,6 +5,29 @@ description: "prompts.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
+Module for user prompts.
+
+This module enables interactive scripts by providing functions to query information from the user via the command line.
+It is useful for deployment scripts or configuration wizards running in an interactive terminal.
+
+Examples:
+```tolk
+// Simple text input
+val name = prompt("Enter your name:", "Guest");
+
+// Confirmation
+if (confirm("Do you want to deploy to mainnet?", false, "This will cost real TON.")) {
+    // perform deployment
+} else {
+    println("Aborted.");
+}
+
+// Selection
+val network = select("Choose network:", ["Mainnet", "Testnet", "Local"]);
+```
+
+## Definitions
+
 ## `prompt`
 
 ```tolk
@@ -22,7 +45,7 @@ val name = prompt("What is your name?", "John");
 println(format1("Hello {}", name));
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/promts/prompts.tolk#L13" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/promts/prompts.tolk#L34" />
 
 ## `select`
 
@@ -38,7 +61,7 @@ val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
 println(format1("Hello {}", name));
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/promts/prompts.tolk#L24" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/promts/prompts.tolk#L45" />
 
 ## `confirm`
 
@@ -56,5 +79,5 @@ if (answer) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/promts/prompts.tolk#L37" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/promts/prompts.tolk#L58" />
 

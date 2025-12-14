@@ -1,3 +1,24 @@
+/// Module for assertion functions.
+///
+/// This module provides the foundational assertion logic used in tests.
+/// While `expect` provides a high-level, fluent API, `Assert` offers direct static methods for verification.
+///
+/// Examples:
+/// ```tolk
+/// // Basic equality
+/// Assert.equal(2 + 2, 4, "Math check");
+///
+/// // Gas usage check for a void function
+/// Assert.consumesLessThan(fun() {
+///     someExpensiveOperation();
+/// }, 10000);
+///
+/// // Gas usage check for a function with arguments
+/// Assert.consumesLessThan2(fun(a: int, b: int) {
+///     return a * b;
+/// }, 10, 20, 500);
+/// ```
+
 import "@stdlib/gas-payments"
 import "../fmt"
 import "../ffi/ffi"

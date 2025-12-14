@@ -1,3 +1,22 @@
+/// Module for file system operations.
+///
+/// This module provides a simple interface for reading files from the local file system.
+/// This is particularly useful for loading test fixtures, configuration files, or external data
+/// needed during contract testing or script execution.
+///
+/// Examples:
+/// ```tolk
+/// // Load a JSON configuration
+/// val configJson = fs.readFile("config/test-settings.json");
+/// if (configJson != null) {
+///     // process json...
+/// }
+///
+/// // Load a BoC file as a slice (note: readFile returns string, so binary data needs specific handling if not hex/base64 text)
+/// // Typically used for text-based formats.
+/// val contractCodeHex = fs.readFile("build/contract.hex");
+/// ```
+
 /// Namespace for file system operations.
 struct fs
 

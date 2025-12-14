@@ -5,6 +5,30 @@ description: "io.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
+Module for input/output operations.
+
+This module provides functions for printing to the standard output (stdout) and standard error (stderr).
+It includes helper functions for formatted output, making it easier to debug contracts and scripts.
+
+Examples:
+```tolk
+// Simple debug print
+println("Starting test...");
+
+// Print structural data
+val point = Point { x: 10, y: 20 };
+println(point); // Output: Point { x: 10, y: 20 }
+
+// Formatted output
+println1("Iteration: {}", 5);
+println1("Address: {}", myAddress);
+
+// Error logging
+eprintln("Critical failure in setup!");
+```
+
+## Definitions
+
 ## `println`
 
 ```tolk
@@ -24,7 +48,7 @@ println(Data {
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L16" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L38" />
 
 ## `println1`
 
@@ -43,7 +67,7 @@ Format supports following format soecifiers:
 - `{:x}` — formats a number as hexadecimal without `0x` prefix
 - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L30" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L52" />
 
 ## `eprintln`
 
@@ -58,5 +82,5 @@ Example:
 eprintln("Something went wrong");
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L40" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L62" />
 

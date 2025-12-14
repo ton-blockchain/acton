@@ -43,6 +43,7 @@ Acton provides a collection of functions for writing scripts and tests in Tolk.
         path: PathBuf,
         file_stem: String,
         symbols: Vec<SymbolInfo>,
+        file_header: Option<String>,
     }
 
     let mut docs = Vec::new();
@@ -68,8 +69,9 @@ Acton provides a collection of functions for writing scripts and tests in Tolk.
 
         let symbols = extract_symbols(root_node, &content);
         let symbols: Vec<_> = symbols.into_iter().filter(|s| !skip_symbol(s)).collect();
+        let file_header = extract_file_header_doc(&content);
 
-        if !symbols.is_empty() {
+        if !symbols.is_empty() || file_header.is_some() {
             let target_rel_path = relative_path.with_extension("");
             for symbol in &symbols {
                 symbol_map.insert(symbol.name.clone(), target_rel_path.clone());
@@ -79,6 +81,7 @@ Acton provides a collection of functions for writing scripts and tests in Tolk.
                 path: path.to_path_buf(),
                 file_stem,
                 symbols,
+                file_header,
             });
         }
     }
@@ -106,6 +109,15 @@ Acton provides a collection of functions for writing scripts and tests in Tolk.
         mdx_content.push_str("---\n\n");
         mdx_content.push_str("import { SourceCodeLink } from '@/components/SourceCodeLink';\n\n");
 
+        if let Some(header) = &doc.file_header {
+            mdx_content.push_str(header);
+            mdx_content.push_str("\n\n");
+        }
+
+        if !doc.symbols.is_empty() {
+            mdx_content.push_str("## Definitions\n\n");
+        }
+
         for symbol in doc.symbols {
             mdx_content.push_str(&format!("## `{}`\n\n", symbol.name));
 
@@ -120,26 +132,31 @@ Acton provides a collection of functions for writing scripts and tests in Tolk.
             mdx_content.push_str("\n```\n\n");
 
             if let Some(doc_text) = symbol.doc.as_ref() {
-                let processed_doc = link_regex.replace_all(doc_text, |caps: &regex::Captures| {
-                    let name = &caps[1];
-                    if let Some(target_path) = symbol_map.get(name) {
-                        if target_path == &current_file_stem_path {
-                            format!("[{}](#{})", name, normalize_symbol_link(name))
-                        } else {
-                            let relative_link_path =
-                                pathdiff::diff_paths(target_path, &current_file_stem_path)
-                                    .unwrap_or_else(|| target_path.clone());
+                if Some(doc_text) == doc.file_header.as_ref() {
+                    // skip if the symbol doc is exactly the same as the file header
+                } else {
+                    let processed_doc =
+                        link_regex.replace_all(doc_text, |caps: &regex::Captures| {
+                            let name = &caps[1];
+                            if let Some(target_path) = symbol_map.get(name) {
+                                if target_path == &current_file_stem_path {
+                                    format!("[{}](#{})", name, normalize_symbol_link(name))
+                                } else {
+                                    let relative_link_path =
+                                        pathdiff::diff_paths(target_path, &current_file_stem_path)
+                                            .unwrap_or_else(|| target_path.clone());
 
-                            let link = relative_link_path.to_string_lossy().to_string();
-                            format!("[{}]({}/#{})", name, link, normalize_symbol_link(name))
-                        }
-                    } else {
-                        eprintln!("Warning: Symbol '{}' not found in documentation", name);
-                        name.to_string()
-                    }
-                });
-                mdx_content.push_str(&processed_doc);
-                mdx_content.push_str("\n\n");
+                                    let link = relative_link_path.to_string_lossy().to_string();
+                                    format!("[{}]({}/#{})", name, link, normalize_symbol_link(name))
+                                }
+                            } else {
+                                eprintln!("Warning: Symbol '{}' not found in documentation", name);
+                                name.to_string()
+                            }
+                        });
+                    mdx_content.push_str(&processed_doc);
+                    mdx_content.push_str("\n\n");
+                }
             }
 
             mdx_content.push_str(&format!("<SourceCodeLink href=\"{}\" />\n\n", source_url));
@@ -313,5 +330,48 @@ fn extract_doc_comment(node: Node, source: &str) -> Option<String> {
     } else {
         lines.reverse();
         Some(lines.join("\n"))
+    }
+}
+
+fn extract_file_header_doc(source: &str) -> Option<String> {
+    let mut lines = Vec::new();
+    let mut parsing_doc = false;
+    let mut has_content = false;
+
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("///") {
+            parsing_doc = true;
+            let content = trimmed.trim_start_matches("///");
+            let content = if let Some(stripped) = content.strip_prefix(' ') {
+                stripped
+            } else {
+                content
+            };
+            lines.push(content);
+            has_content = true;
+        } else if trimmed.is_empty() {
+            if parsing_doc {
+                lines.push("");
+            }
+        } else {
+            // Found a non-comment, non-empty line. Stop.
+            break;
+        }
+    }
+
+    // Trim trailing empty lines from the buffer
+    while let Some(last) = lines.last() {
+        if last.is_empty() {
+            lines.pop();
+        } else {
+            break;
+        }
+    }
+
+    if has_content && !lines.is_empty() {
+        Some(lines.join("\n"))
+    } else {
+        None
     }
 }

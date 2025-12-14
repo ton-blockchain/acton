@@ -1,3 +1,24 @@
+/// Module for asserting properties of out action lists.
+///
+/// This module extends the `Expectation` class specifically for `OutActionList`.
+/// `OutActionList` represents the actions (messages, code updates, etc.) produced by a contract execution.
+///
+/// Examples:
+/// ```tolk
+/// val actions = vm.outActions();
+///
+/// // Check if any actions were produced
+/// expect(actions).toBeNonEmpty();
+///
+/// // Verify the first action is a message of type `TransferNotification`
+/// expect(actions).toBeSendMessageAt<TransferNotification>(0);
+///
+/// // Accessing the body for further checks (using helper methods from `OutActionList` directly)
+/// val msgBody = actions.getSendMessageBodyAt<TransferNotification>(0);
+/// expect(msgBody).toBeNotNull();
+/// expect(msgBody.amount).toEqual(ton("10"));
+/// ```
+
 import "assert"
 import "expect"
 import "../fmt"

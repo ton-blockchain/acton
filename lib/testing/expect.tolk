@@ -1,3 +1,25 @@
+/// Module for high-level assertion API.
+///
+/// This module provides a fluent "expect" style API for writing test assertions.
+/// It wraps the lower-level `Assert` functions and provides a more readable syntax.
+/// It supports a wide range of types including integers, booleans, slices, addresses, tuples, maps, and optionals.
+///
+/// Examples:
+/// ```tolk
+/// // Simple value check
+/// expect(total).toEqual(100);
+///
+/// // Comparison
+/// expect(balance).toBeGreater(ton("1.0"));
+///
+/// // Approximate check (useful for gas calculations)
+/// expect(gasUsed).toBeApproxEqRel(expectedGas, 10); // within 10%
+///
+/// // Map check
+/// expect(balances).toContainKey(userAddress);
+/// expect(balances.get(userAddress)).toEqual(ton("50"));
+/// ```
+
 import "assert"
 import "../fmt"
 import "../ffi/ffi"

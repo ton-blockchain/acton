@@ -1,3 +1,32 @@
+/// Module for asserting properties of transactions.
+///
+/// This module extends the `Expectation` class specifically for `SendResultList` and `SendResult`.
+/// It allows verifying the outcome of network operations, such as checking if a transaction succeeded,
+/// if a contract was deployed, or if specific messages were emitted.
+///
+/// Examples:
+/// ```tolk
+/// val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+///
+/// // Verify general success
+/// expect(results).toHaveSuccessfulTx({
+///     from: wallet.address,
+///     to: contract.address
+/// });
+///
+/// // Verify deployment
+/// expect(results).toHaveSuccessfulDeploy({
+///     to: contract.address
+/// });
+///
+/// // Verify failure case
+/// val failResults = net.send(wallet.address, invalidMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// expect(failResults).toHaveFailedTx({
+///     to: contract.address,
+///     exit_code: 102 // specific error code
+/// });
+/// ```
+
 import "expect"
 import "assert"
 import "../fmt"

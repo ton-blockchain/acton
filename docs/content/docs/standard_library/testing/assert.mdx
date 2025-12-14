@@ -5,13 +5,36 @@ description: "assert.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
+Module for assertion functions.
+
+This module provides the foundational assertion logic used in tests.
+While `expect` provides a high-level, fluent API, `Assert` offers direct static methods for verification.
+
+Examples:
+```tolk
+// Basic equality
+Assert.equal(2 + 2, 4, "Math check");
+
+// Gas usage check for a void function
+Assert.consumesLessThan(fun() {
+    someExpensiveOperation();
+}, 10000);
+
+// Gas usage check for a function with arguments
+Assert.consumesLessThan2(fun(a: int, b: int) {
+    return a * b;
+}, 10, 20, 500);
+```
+
+## Definitions
+
 ## `ASSERTION_FAILED`
 
 ```tolk
 const ASSERTION_FAILED = 567
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L5" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L26" />
 
 ## `Assert`
 
@@ -35,7 +58,7 @@ Example:
 expect(10).toEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L22" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L43" />
 
 ## `Assert.equal`
 
@@ -52,7 +75,7 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L32" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L53" />
 
 ## `Assert.notEqual`
 
@@ -69,7 +92,7 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L56" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L77" />
 
 ## `Assert.fail`
 
@@ -83,7 +106,7 @@ Optional message can be provided to describe the failure.
 Optional location can be provided to specify the location of the failure to
 be printed in the error message.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L77" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L98" />
 
 ## `Assert.consumesLessThan`
 
@@ -106,7 +129,7 @@ If you need to pass arguments to the function, you can use the `consumesLessThan
 `consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
 but accept arguments.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L96" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L117" />
 
 ## `Assert.consumesLessThan1`
 
@@ -128,7 +151,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L117" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L138" />
 
 ## `Assert.consumesLessThan2`
 
@@ -157,7 +180,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L140" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L161" />
 
 ## `Assert.consumesLessThan3`
 
@@ -189,7 +212,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L170" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L191" />
 
 ## `Assert.failWalletNotFound`
 
@@ -204,5 +227,5 @@ It provides detailed information about available wallets and instructions on how
 
 NOT FOR PUBLIC USE.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L190" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L211" />
 
