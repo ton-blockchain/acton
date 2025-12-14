@@ -663,6 +663,11 @@ impl ActonCommand {
         self
     }
 
+    pub fn generate_test_stub(mut self) -> Self {
+        self.cmd = self.cmd.arg("--generate-test-stub");
+        self
+    }
+
     /// Specify output wrapper file
     pub fn wrapper_output(mut self, path: &str) -> Self {
         self.cmd = self.cmd.arg("--wrapper-output").arg(path);

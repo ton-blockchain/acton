@@ -13,7 +13,12 @@ fn test_wrapper_generation_defaults() {
         .contract("my_contract", SIMPLE_CONTRACT)
         .build();
 
-    let output = project.acton().wrapper("my_contract").run().success();
+    let output = project
+        .acton()
+        .wrapper("my_contract")
+        .generate_test_stub()
+        .run()
+        .success();
 
     output
         .assert_contains("Generated")
@@ -36,6 +41,31 @@ fn test_wrapper_generation_defaults() {
 }
 
 #[test]
+fn test_wrapper_generation_without_test_stub() {
+    let project = ProjectBuilder::new("wrapper_simple")
+        .contract("my_contract", SIMPLE_CONTRACT)
+        .build();
+
+    let output = project.acton().wrapper("my_contract").run().success();
+
+    output
+        .assert_contains("Generated")
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/wrappers/MyContract.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_without_test_stub/wrapper.tolk.txt",
+        );
+
+    assert!(
+        !project.path().join("tests/my_contract_test.tolk").exists(),
+        "Test file should not exist"
+    );
+}
+
+#[test]
 fn test_wrapper_custom_output() {
     let project = ProjectBuilder::new("wrapper_custom")
         .contract("my_contract", SIMPLE_CONTRACT)
@@ -44,6 +74,7 @@ fn test_wrapper_custom_output() {
     let output = project
         .acton()
         .wrapper("my_contract")
+        .generate_test_stub()
         .wrapper_output("custom/wrapper.tolk")
         .test_output("custom/test.tolk")
         .run()
@@ -74,6 +105,7 @@ fn test_wrapper_custom_output2() {
     let output = project
         .acton()
         .wrapper("my_contract")
+        .generate_test_stub()
         .wrapper_output("custom/other/nested/wrapper.tolk")
         .test_output("custom/nested/other/test.tolk")
         .run()
@@ -161,6 +193,7 @@ fn test_with_several_files_contract() {
     project
         .acton()
         .wrapper("my_contract")
+        .generate_test_stub()
         .run()
         .success()
         .assert_snapshot_matches(
@@ -202,6 +235,7 @@ fn test_wrapper_with_storage_in_contract() {
     project
         .acton()
         .wrapper("my_contract")
+        .generate_test_stub()
         .run()
         .success()
         .assert_snapshot_matches(
@@ -243,6 +277,7 @@ fn test_wrapper_with_message_in_contract() {
     project
         .acton()
         .wrapper("my_contract")
+        .generate_test_stub()
         .run()
         .success()
         .assert_snapshot_matches(

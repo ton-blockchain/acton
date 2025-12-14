@@ -100,6 +100,7 @@ pub fn wrapper_cmd(
     contract_id: &str,
     wrapper_output: Option<String>,
     test_output: Option<String>,
+    generate_test_stub: bool,
 ) -> anyhow::Result<()> {
     let model = build_model(contract_id, wrapper_output, test_output)?;
 
@@ -129,8 +130,11 @@ pub fn wrapper_cmd(
 
     fs::write(&model.wrapper_path, wrapper_code)
         .map_err(|e| anyhow!("Failed to write wrapper file: {}", e))?;
-    fs::write(&model.test_path, test_code)
-        .map_err(|e| anyhow!("Failed to write test file: {}", e))?;
+
+    if generate_test_stub {
+        fs::write(&model.test_path, test_code)
+            .map_err(|e| anyhow!("Failed to write test file: {}", e))?;
+    }
 
     let wrapper_relative = model
         .wrapper_path
@@ -145,7 +149,10 @@ pub fn wrapper_cmd(
         .to_string_lossy();
 
     println!("   {} {}", "Generated".green().bold(), wrapper_relative);
-    println!("   {} {}", "Generated".green().bold(), test_relative);
+
+    if generate_test_stub {
+        println!("   {} {}", "Generated".green().bold(), test_relative);
+    }
 
     Ok(())
 }

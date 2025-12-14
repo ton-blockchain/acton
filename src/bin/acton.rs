@@ -235,13 +235,21 @@ enum Commands {
         )]
         disable_rule: Vec<String>,
     },
-    #[command(about = "Generate wrapper and test file for a contract")]
+    #[command(about = "Generate wrapper and optionally stub test file for a contract")]
     Wrapper {
         #[arg(help = "Contract ID from Acton.toml")]
         contract_id: String,
         #[arg(long, help = "Output path for wrapper file")]
         wrapper_output: Option<String>,
-        #[arg(long, help = "Output path for test file")]
+
+        #[arg(
+            long,
+            help = "Generate stub test file for contract",
+            default_value = "false",
+            help_heading = "Tests"
+        )]
+        generate_test_stub: bool,
+        #[arg(long, help = "Output path for test file", help_heading = "Tests")]
         test_output: Option<String>,
     },
     #[command(about = "Execute a Tolk script file")]
@@ -763,7 +771,13 @@ fn main() {
             contract_id,
             wrapper_output,
             test_output,
-        } => wrapper_cmd(&contract_id, wrapper_output, test_output),
+            generate_test_stub,
+        } => wrapper_cmd(
+            &contract_id,
+            wrapper_output,
+            test_output,
+            generate_test_stub,
+        ),
         Commands::Script {
             path,
             args,
