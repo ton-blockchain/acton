@@ -197,6 +197,15 @@ pub fn new_cmd(
         "Created {} directory with Tolk standard library",
         ".acton/tolk-stdlib".cyan()
     );
+    println!();
+    println!("Next steps:");
+    println!();
+    println!("  {}", "# Navigate to project".dimmed());
+    println!("  {} {}", "cd".bold(), project_path.display());
+    println!("  {}", "# Build your contract".dimmed());
+    println!("  {} build", "acton".bold());
+    println!("  {}", "# Run tests".dimmed());
+    println!("  {} test", "acton".bold());
 
     Ok(())
 }
@@ -234,6 +243,13 @@ fn initialize_git_repository() -> anyhow::Result<()> {
         .success()
         .then_some(())
         .ok_or_else(|| anyhow::anyhow!("Failed to initialize git repository"))?;
+
+    std::process::Command::new("git")
+        .args(["add", "."])
+        .status()?
+        .success()
+        .then_some(())
+        .ok_or_else(|| anyhow::anyhow!("Failed to add files to git repository"))?;
 
     Ok(())
 }
