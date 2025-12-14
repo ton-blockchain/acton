@@ -1,0 +1,53 @@
+import "@stdlib/gas-payments"
+import "../../.acton/build/build"
+import "../../.acton/emulation/network"
+import "../../.acton/testing/expect"
+import "../../.acton/types/message"
+import "../../contracts/storage"
+
+/// Configuration for sending messages to the contract
+struct MyContractSendMessageConfig {
+    /// The amount of TON to send with the message (default: 0.1 TON)
+    value: coins = ton("0.1")
+    /// Whether to bounce the message if the contract does not exist or fails (default: false)
+    bounce: bool = false
+}
+
+struct MyContract {
+    address: address
+    init: ContractState
+}
+
+/// Creates a contract wrapper instance from the storage data
+fun MyContract.fromStorage(storage: FirstStorage) {
+    val init = ContractState {
+        code: build("my_contract"),
+        data: storage.toCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    return MyContract { address, init }
+}
+
+/// Deploys the contract to the blockchain
+fun MyContract.deploy(self, from: address, config: MyContractSendMessageConfig = {}): SendResultList {
+    val msg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: {
+            stateInit: self.init,
+        },
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+}
+
+/// Send message to the contract with a custom body cell
+fun MyContract.sendAny(self, from: address, body: cell, config: MyContractSendMessageConfig = {}): SendResultList {
+    val msg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body,
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+}
+

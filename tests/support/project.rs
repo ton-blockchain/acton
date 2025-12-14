@@ -663,6 +663,11 @@ impl ActonCommand {
         self
     }
 
+    pub fn storage_struct(mut self, name: &str) -> Self {
+        self.cmd = self.cmd.arg("--storage-struct").arg(name);
+        self
+    }
+
     pub fn generate_test_stub(mut self) -> Self {
         self.cmd = self.cmd.arg("--test");
         self

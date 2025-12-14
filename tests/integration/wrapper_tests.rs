@@ -66,6 +66,129 @@ fn test_wrapper_generation_without_test_stub() {
 }
 
 #[test]
+fn test_wrapper_generation_with_several_storages() {
+    let project = ProjectBuilder::new("wrapper_simple")
+        .contract(
+            "my_contract",
+            r#"
+                import "storage"
+
+                fun onInternalMessage(in: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+        )
+        .file(
+            "contracts/storage",
+            r#"
+                struct FirstStorage {
+                    id: uint32
+                    counter: uint32
+                }
+
+                fun FirstStorage.load() {
+                    return FirstStorage.fromCell(contract.getData());
+                }
+
+                fun FirstStorage.save(self) {
+                    contract.setData(self.toCell());
+                }
+
+                struct SecondStorage {
+                    id: uint32
+                    counter: uint32
+                }
+
+                fun SecondStorage.load() {
+                    return SecondStorage.fromCell(contract.getData());
+                }
+
+                fun SecondStorage.save(self) {
+                    contract.setData(self.toCell());
+                }
+            "#,
+        )
+        .build();
+
+    let output = project
+        .acton()
+        .wrapper("my_contract")
+        .storage_struct("FirstStorage")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Generated")
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/wrappers/MyContract.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_several_storages/first_wrapper.tolk.txt",
+        );
+
+    let output = project
+        .acton()
+        .wrapper("my_contract")
+        .storage_struct("SecondStorage")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Generated")
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/wrappers/MyContract.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_several_storages/second_wrapper.tolk.txt",
+        );
+}
+
+#[test]
+fn test_wrapper_generation_with_unknown_explicit_storage() {
+    let project = ProjectBuilder::new("wrapper_simple")
+        .contract(
+            "my_contract",
+            r#"
+                import "storage"
+
+                fun onInternalMessage(in: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+        )
+        .file(
+            "contracts/storage",
+            r#"
+                struct FirstStorage {
+                    id: uint32
+                    counter: uint32
+                }
+
+                fun FirstStorage.load() {
+                    return FirstStorage.fromCell(contract.getData());
+                }
+
+                fun FirstStorage.save(self) {
+                    contract.setData(self.toCell());
+                }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .storage_struct("SomeStorage")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_generation_with_unknown_explicit_storage/stderr.txt",
+        );
+}
+
+#[test]
 fn test_wrapper_custom_output() {
     let project = ProjectBuilder::new("wrapper_custom")
         .contract("my_contract", SIMPLE_CONTRACT)

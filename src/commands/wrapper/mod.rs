@@ -24,6 +24,7 @@ fn build_model(
     contract_id: &str,
     wrapper_output: Option<String>,
     test_output: Option<String>,
+    storage_struct_name: Option<String>,
 ) -> anyhow::Result<WrapperModel> {
     let project_root = find_project_root_from_current_dir().ok_or_else(|| {
         anyhow!(
@@ -50,7 +51,7 @@ fn build_model(
     let content = fs::read_to_string(&contract_path)
         .map_err(|e| anyhow!("Failed to read contract file: {}", e))?;
 
-    let abi = abi::contract_abi(&content, contract_path.to_str().unwrap());
+    let mut abi = abi::contract_abi(&content, contract_path.to_str().unwrap());
     let handled_messages = abi::extract_handled_messages(&content, contract_path.to_str().unwrap());
 
     let file_stem = contract_path
@@ -59,6 +60,38 @@ fn build_model(
         .unwrap_or(contract_id);
 
     let contract_name = to_pascal_case(file_stem);
+
+    if let Some(storage_name) = storage_struct_name {
+        let storage = abi.types.iter().find(|t| t.name == storage_name).cloned();
+        if let Some(storage) = storage {
+            abi.storage = Some(storage);
+        } else {
+            anyhow::bail!(
+                "Storage struct {} not found in contract {}. Available types:\n{}",
+                storage_name.yellow(),
+                contract_id.yellow(),
+                abi.storages()
+                    .iter()
+                    .map(|t| format!(" {}", t.name.as_str().yellow()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
+        }
+    } else if abi.storage.is_none() {
+        let candidates = abi.storages();
+
+        if candidates.len() == 1 {
+            abi.storage = Some(candidates[0].clone());
+        } else if !abi.storages().is_empty() {
+            let options = abi
+                .storages()
+                .iter()
+                .map(|t| t.name.clone())
+                .collect::<Vec<_>>();
+            let selection = inquire::Select::new("Select storage struct:", options).prompt()?;
+            abi.storage = abi.types.iter().find(|t| t.name == selection).cloned();
+        }
+    }
 
     let storage_file_path = abi.storage.as_ref().map(|typ| PathBuf::from(&typ.pos.uri));
     let message_paths = abi
@@ -101,8 +134,14 @@ pub fn wrapper_cmd(
     wrapper_output: Option<String>,
     test_output: Option<String>,
     generate_test_stub: bool,
+    storage_struct_name: Option<String>,
 ) -> anyhow::Result<()> {
-    let model = build_model(contract_id, wrapper_output, test_output)?;
+    let model = build_model(
+        contract_id,
+        wrapper_output,
+        test_output,
+        storage_struct_name,
+    )?;
 
     if let Some(parent) = model.wrapper_path.parent() {
         fs::create_dir_all(parent)
@@ -198,7 +237,7 @@ fn print_types_warning(contract_path: &Path, types_file_path: &Path, abi: &Contr
     println!(
         "{} Please move the following types to {}:",
         "→".yellow().bold(),
-        types_file_path.display()
+        types_file_path.display().green()
     );
     println!();
 
@@ -318,6 +357,13 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
         code.push_str(&generate_from_storage(
             &model.contract_name,
             &model.contract_id,
+            model
+                .abi
+                .storage
+                .as_ref()
+                .map(|s| s.name.clone())
+                .as_deref()
+                .unwrap_or("Storage"),
         ));
         code.push('\n');
     } else {
@@ -349,26 +395,25 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     code
 }
 
-fn generate_from_storage(contract_name: &str, contract_build_name: &str) -> String {
+fn generate_from_storage(
+    contract_name: &str,
+    contract_build_name: &str,
+    storage_name: &str,
+) -> String {
     let mut code = String::new();
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     code.push_str(&format!(
-        "fun {}.fromStorage(storage: Storage) {{\n",
-        contract_name
+        "fun {contract_name}.fromStorage(storage: {storage_name}) {{\n",
     ));
     code.push_str("    val init = ContractState {\n");
     code.push_str(&format!(
-        "        code: build(\"{}\"),\n",
-        contract_build_name
+        "        code: build(\"{contract_build_name}\"),\n",
     ));
     code.push_str("        data: storage.toCell(),\n");
     code.push_str("    };\n");
     code.push_str("    val address = AutoDeployAddress { stateInit: init }.calculateAddress();\n");
-    code.push_str(&format!(
-        "    return {} {{ address, init }}\n",
-        contract_name
-    ));
+    code.push_str(&format!("    return {contract_name} {{ address, init }}\n",));
     code.push_str("}\n");
 
     code

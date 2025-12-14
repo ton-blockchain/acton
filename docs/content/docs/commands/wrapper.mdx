@@ -19,10 +19,18 @@ Where `<CONTRACT_ID>` is the key defined in your `Acton.toml` (e.g., `[contract.
 |------------------------------|------------------------------------------------------------------------------------------------------|
 | `<CONTRACT_ID>`              | The ID of the contract as defined in `Acton.toml`.                                                   |
 | `-o, --output <PATH>`        | Path where the wrapper file will be generated. Defaults to `tests/wrappers/<ContractName>.tolk`.     |
+| `--storage-struct <NAME>`    | Struct name to use for contract storage (if not named `Storage`).                                    |
 | `-t, --test`                 | If set, generates a test stub file at `tests/<contract_id>_test.tolk`.                               |
 | `--test-output <PATH>`       | Path where the test stub file will be generated (requires `--test` flag).                            |
 
 ## Features
+
+### Storage Struct Resolution
+
+If your contract's storage struct is not named `Storage`, the command will try to find it:
+1.  **Direct match:** If you pass `--storage-struct <NAME>`, it will use that struct.
+2.  **Suffix match:** If there is exactly one struct ending with `Storage` (e.g., `MinterStorage`), it will be used.
+3.  **Interactive:** If there are multiple candidates or none, the command will prompt you to select one from the list of available structs.
 
 ### Type Extraction
 
@@ -31,7 +39,7 @@ The command analyzes your contract's AST to find:
 - **Handled messages:** Generates `send{MessageName}` methods for every message type used in `match` statements.
 - **Get methods:** Generates corresponding methods to call get-methods on the contract.
 
-### Automatic Test Stubbing
+### Automatic Stub Test Generation
 
 When using the `--test` flag, the command generates a stub test file that is ready to run. It includes:
 - **`setupTest()` helper:** Initializes the contract with default storage values, creates deployer accounts, and deploys the contract.

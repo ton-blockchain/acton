@@ -118,6 +118,13 @@ impl ContractAbi {
             .find(|typ| &BigInt::from(typ.id) == id)
             .cloned()
     }
+
+    pub fn storages(&self) -> Vec<&TypeAbi> {
+        self.types
+            .iter()
+            .filter(|t| t.name.ends_with("Storage"))
+            .collect::<Vec<_>>()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
