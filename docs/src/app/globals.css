@@ -206,12 +206,12 @@ code, pre {
 .features-container {
   display: flex;
   flex-direction: column;
-  gap: 8rem;
+  gap: 4rem;
 }
 
 @media (min-width: 768px) {
   .features-container {
-    gap: 12rem;
+    gap: 4rem;
   }
 }
 
@@ -225,7 +225,7 @@ code, pre {
 @media (min-width: 768px) {
   .feature-row {
     flex-direction: row;
-    align-items: flex-start;
+    align-items: center;
     gap: 8rem;
   }
 }
@@ -240,7 +240,7 @@ code, pre {
 @media (min-width: 768px) {
   .feature-row-reverse {
     flex-direction: row-reverse;
-    align-items: flex-start;
+    align-items: center;
     gap: 8rem;
   }
 }

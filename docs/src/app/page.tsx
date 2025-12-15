@@ -8,6 +8,7 @@ import DotGrid from "@/components/Grid";
 import {Typewriter} from '@/components/Typewriter';
 import {InstallationCodeBlock} from '@/components/InstallationCodeBlock';
 import {Header} from '@/components/Header';
+import {getIllustrationForFeature} from '@/components/FeatureIllustrations';
 
 export const metadata: Metadata = {
   title: 'Acton — TON Development Toolkit',
@@ -167,7 +168,9 @@ export default function Home() {
                   </div>
 
                   <div className="feature-image">
-                    {/* placeholder */}
+                    <div className="w-full min-h-[500px] max-h-[400px] rounded-2xl p-0 flex items-center justify-center">
+                      {getIllustrationForFeature(index)}
+                    </div>
                   </div>
                 </div>
               ))}
