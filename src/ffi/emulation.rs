@@ -207,7 +207,12 @@ fn send_message_impl(
     };
 
     if let Some(wallet) = ctx.env.find_wallet_by_address(&src_addr) {
-        let result = send_wallet_message(&message, wallet, &ctx.network());
+        let result = send_wallet_message(
+            &message,
+            wallet,
+            &ctx.network(),
+            ctx.chain.blockchain.get_api_key(),
+        );
         try_ctx!(ctx, result, "Failed to send message to real network: {}");
 
         // Add pseudo transaction to the result list to wait on it
@@ -372,7 +377,12 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
     ])))
 }
 
-fn send_wallet_message(message: &ArcCell, wallet: Wallet, network: &str) -> anyhow::Result<()> {
+fn send_wallet_message(
+    message: &ArcCell,
+    wallet: Wallet,
+    network: &str,
+    api_key: &Option<String>,
+) -> anyhow::Result<()> {
     let expired_at_time = std::time::SystemTime::now() + Duration::from_secs(600);
     let expire_at = expired_at_time
         .duration_since(std::time::UNIX_EPOCH)?
@@ -386,8 +396,12 @@ fn send_wallet_message(message: &ArcCell, wallet: Wallet, network: &str) -> anyh
         vec![message.clone()],
     )?;
 
+    if api_key.is_none() {
+        std::thread::sleep(Duration::from_millis(1000)); // rate limit
+    }
+
     let network = Network::from_str(network)?;
-    let client = TonApiClient::new(network, None);
+    let client = TonApiClient::new(network, api_key.clone());
     client.send_boc(&external.to_boc_b64(false)?)?;
 
     Ok(())
@@ -1292,9 +1306,14 @@ fn wait_for_transaction_impl(
         "Failed to parse network: {}"
     );
 
-    let api_client = TonApiClient::new(network, ctx.chain.blockchain.get_api_key().clone());
+    let api_key = ctx.chain.blockchain.get_api_key();
+    let api_client = TonApiClient::new(network, api_key.clone());
 
     let ext_message_hash_bytes = ext_message_hash.data();
+
+    if api_key.is_none() {
+        std::thread::sleep(Duration::from_millis(1000)); // rate limit
+    }
 
     for attempt in 1..=attempts {
         if !quiet {
@@ -1320,6 +1339,8 @@ fn wait_for_transaction_impl(
                 );
 
                 if msg_hash_bytes == ext_message_hash_bytes {
+                    std::thread::sleep(Duration::from_millis(1000)); // wait a bit more for txs in row
+
                     if !quiet {
                         let hex = base64::engine::general_purpose::STANDARD
                             .decode(tx.transaction_id.hash.clone())
