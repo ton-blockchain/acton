@@ -9,7 +9,7 @@ workchain = 0
 keys = { mnemonic-env = "WALLET_MNEMONIC" }
 
 [wallets.deployer.expected]
-address-testnet = "<ADDRESS>"
+[WALLET_ADDRESS_TESTNET]
 
 See https://i582.github.io/acton/docs/scripting/setup-wallets/ for more information
 
