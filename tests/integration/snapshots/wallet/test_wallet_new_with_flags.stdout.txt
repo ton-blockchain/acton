@@ -1,5 +1,6 @@
 ✓ Wallet successfully created and added to Acton.toml
 ✓ Mnemonic saved to my-wallet.mnemonic
+✓ Wallet address is kQB+WFMkx/1PL1/+NN+aobS4d9rBvkDrlDa4geeRrudM5q3L
 
 NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
 

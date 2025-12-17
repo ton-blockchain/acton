@@ -1,0 +1,15 @@
+[package]
+name = "wallet-new-flags"
+description = "A test project"
+version = "0.1.0"
+license = "MIT"
+
+
+[wallets.my-wallet]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic-file = "my-wallet.mnemonic" }
+
+[wallets.my-wallet.expected]
+address-testnet = "kQB+WFMkx/1PL1/+NN+aobS4d9rBvkDrlDa4geeRrudM5q3L"
+

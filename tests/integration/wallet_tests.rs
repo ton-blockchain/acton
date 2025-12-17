@@ -27,9 +27,14 @@ fn test_wallet_new_with_flags() {
     assert!(acton_toml.contains("kind = \"v5r1\""));
     assert!(acton_toml.contains("mnemonic-file = \"my-wallet.mnemonic\""));
 
-    output.assert_snapshot_matches(
-        "integration/snapshots/wallet/test_wallet_new_with_flags.stdout.txt",
-    );
+    output
+        .assert_file_snapshot_matches(
+            "Acton.toml",
+            "integration/snapshots/wallet/test_wallet_new_with_flags.Acton.toml.txt",
+        )
+        .assert_snapshot_matches(
+            "integration/snapshots/wallet/test_wallet_new_with_flags.stdout.txt",
+        );
 }
 
 #[test]

@@ -8,6 +8,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use tonlib_core::wallet::mnemonic::Mnemonic;
+use tonlib_core::wallet::ton_wallet::TonWallet;
 use tonlib_core::wallet::wallet_version::WalletVersion;
 
 #[derive(Subcommand)]
@@ -103,7 +104,8 @@ fn new_wallet(name: Option<String>, version: Option<String>) -> anyhow::Result<(
     let mnemonic_str = mnemonic_words.join(" ");
 
     let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
-    let _key_pair = mnemonic.to_key_pair()?; // validation
+    let key_pair = mnemonic.to_key_pair()?;
+    let wallet = TonWallet::new(version, key_pair)?;
 
     let mnemonic_file = format!("{}.mnemonic", name);
     if Path::new(&mnemonic_file).exists() {
@@ -111,11 +113,22 @@ fn new_wallet(name: Option<String>, version: Option<String>) -> anyhow::Result<(
     }
     fs::write(&mnemonic_file, &mnemonic_str).context("Failed to write mnemonic file")?;
 
+    let wallet_address = wallet.address.to_base64_std_flags(false, true);
     let config_entry = format!(
-        "\n[wallets.{}]\nkind = \"{}\"\nworkchain = 0\nkeys = {{ mnemonic-file = \"{}\" }}\n",
+        "\n[wallets.{}]
+kind = \"{}\"
+workchain = 0
+keys = {{ mnemonic-file = \"{}\" }}
+
+[wallets.{}.expected]
+address-testnet = \"{}\"
+
+",
         name,
         wallet_version_to_string(&version),
-        mnemonic_file
+        mnemonic_file,
+        name,
+        wallet_address,
     );
 
     let mut file = OpenOptions::new()
@@ -132,6 +145,7 @@ fn new_wallet(name: Option<String>, version: Option<String>) -> anyhow::Result<(
         "Acton.toml".cyan(),
     );
     println!("{} Mnemonic saved to {}", "✓".green(), mnemonic_file.cyan());
+    println!("{} Wallet address is {}", "✓".green(), wallet_address);
 
     println!(
         "\n{}",
