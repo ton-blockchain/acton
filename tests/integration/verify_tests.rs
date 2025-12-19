@@ -87,6 +87,25 @@ fn test_verify_invalid_address() {
 }
 
 #[test]
+fn test_verify_base64_address() {
+    let project = ProjectBuilder::new("verify-base64-address")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .verify()
+        .verify_contract("simple")
+        .verify_address("kQCPzICFdKkkWB7Bs4MSVzf8cHU52+MOyScFB2ARtaF37Vl5")
+        .wallet("nonexistent-wallet")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_verify_base64_address.stderr.txt",
+        );
+}
+
+#[test]
 fn test_verify_wallet_not_found_without_wallets() {
     let project = ProjectBuilder::new("verify-wallet-not-found")
         .contract("simple", SIMPLE_CONTRACT)

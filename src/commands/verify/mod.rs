@@ -8,6 +8,7 @@ use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use ton_api::{Network, StackItem, TonApiClient};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
@@ -77,15 +78,12 @@ pub fn verify_cmd(
     );
 
     let contract_address = if let Some(addr) = address {
-        TonAddress::from_base64_url(&addr)
-            .or_else(|_| TonAddress::from_hex_str(&addr))
-            .with_context(|| error_fmt::invalid_address(&addr))?
+        TonAddress::from_str(&addr).with_context(|| error_fmt::invalid_address(&addr))?
     } else {
         let addr_input = inquire::Text::new("Enter deployed contract address:")
             .prompt()
             .context("Failed to read address")?;
-        TonAddress::from_base64_url(&addr_input)
-            .or_else(|_| TonAddress::from_hex_str(&addr_input))
+        TonAddress::from_str(&addr_input)
             .with_context(|| error_fmt::invalid_address(&addr_input))?
     };
 
