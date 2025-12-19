@@ -764,6 +764,13 @@ fn find_transaction_by_params_impl(
                 return false;
             }
 
+            if let Some(expected_bounce) = &params.bounce
+                && *expected_bounce != info.bounce
+            {
+                // Bounce value mismatch
+                return false;
+            }
+
             if let Some(expected_from_addr) = &params.from
                 && (*expected_from_addr) != info.src
             {

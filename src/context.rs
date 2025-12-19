@@ -50,6 +50,7 @@ pub struct TransactionNotFoundParams {
     pub from: Option<IntAddr>,
     pub exit_code: Option<u32>,
     pub deploy: Option<bool>,
+    pub bounce: Option<bool>,
     pub bounced: Option<bool>,
     pub opcode: Option<u32>,
     pub action_exit_code: Option<i32>,

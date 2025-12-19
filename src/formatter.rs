@@ -1437,6 +1437,16 @@ impl FormatterContext {
                 }
             ))
         }
+        if let Some(bounce) = assert_failure.params.bounce {
+            params.push(format!(
+                "  bounce={}",
+                if bounce {
+                    "true".green().to_string()
+                } else {
+                    "false".red().to_string()
+                }
+            ))
+        }
         if let Some(deploy) = assert_failure.params.deploy {
             params.push(format!(
                 "  deploy={}",

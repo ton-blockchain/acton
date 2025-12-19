@@ -1,5 +1,5 @@
 Step 1 (before):
-  Bytecode position: 43F2F1861ECB80A58FA52099415F3600823A56A2F945320CF52672EE5A591040:2
+  Bytecode position: 7C6F9EF4DFF177FD18F17E902F7579A3F3AD358248E5148484F35FC59DA37014:2
   Code:
      67| }
      68| 
@@ -11,7 +11,7 @@ Step 1 (before):
      73|     println(format1("Counter: {}", counterRes));
 
 Step 2 (step_over):
-  Bytecode position: 43F2F1861ECB80A58FA52099415F3600823A56A2F945320CF52672EE5A591040:2
+  Bytecode position: 7C6F9EF4DFF177FD18F17E902F7579A3F3AD358248E5148484F35FC59DA37014:2
   Code:
      67| }
      68| 
@@ -23,7 +23,7 @@ Step 2 (step_over):
      73|     println(format1("Counter: {}", counterRes));
 
 Step 3 (step_over):
-  Bytecode position: 745C4FC6D6E0396D88006D5B04E00736E4C41FEAEADEE844AF4A8CD9E3469ADD:848
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:856
   Code:
      67| }
      68| 
@@ -38,7 +38,7 @@ Step 3 (step_over):
     '7 = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
 
 Step 4 (step_over):
-  Bytecode position: 745C4FC6D6E0396D88006D5B04E00736E4C41FEAEADEE844AF4A8CD9E3469ADD:848
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:856
   Code:
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
@@ -53,40 +53,40 @@ Step 4 (step_over):
     deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
 
 Step 5 (step_over):
-  Bytecode position: 745C4FC6D6E0396D88006D5B04E00736E4C41FEAEADEE844AF4A8CD9E3469ADD:976
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:984
   Code:
-    624| /// ```
-    625| ///
-    626| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
-    627| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+    626| /// ```
+    627| ///
+    628| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
+    629| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    628|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    629|     return impl.runGetMethodById(addr, method_id, name, args)
-    630| }
+    630|     val method_id = (crc16(name) & 0xffff) | 0x10000;
+    631|     return impl.runGetMethodById(addr, method_id, name, args)
+    632| }
   Variables:
-    '307 = "currentCounter"
+    '309 = "currentCounter"
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
     deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
 
 Step 6 (step_over):
-  Bytecode position: 745C4FC6D6E0396D88006D5B04E00736E4C41FEAEADEE844AF4A8CD9E3469ADD:984
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:992
   Code:
-    624| /// ```
-    625| ///
-    626| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
-    627| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+    626| /// ```
+    627| ///
+    628| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
+    629| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    628|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    629|     return impl.runGetMethodById(addr, method_id, name, args)
-    630| }
+    630|     val method_id = (crc16(name) & 0xffff) | 0x10000;
+    631|     return impl.runGetMethodById(addr, method_id, name, args)
+    632| }
   Variables:
-    '308 = null
-    '307 = "currentCounter"
+    '310 = null
+    '309 = "currentCounter"
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
     deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
 
 Step 7 (step_over):
-  Bytecode position: 745C4FC6D6E0396D88006D5B04E00736E4C41FEAEADEE844AF4A8CD9E3469ADD:984
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:992
   Code:
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
@@ -97,8 +97,8 @@ Step 7 (step_over):
      74| 
      75|     val info = net.getAccountState(counter.address)!;
   Variables:
-    '308 = null
-    '307 = "currentCounter"
+    '310 = null
+    '309 = "currentCounter"
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
     deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
 
@@ -114,7 +114,7 @@ Step 8 (step_over):
      74| 
      75|     val info = net.getAccountState(counter.address)!;
   Variables:
-    '309 = 0
+    '311 = 0
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
     deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
 
@@ -130,7 +130,7 @@ Step 9 (step_over):
      75|     val info = net.getAccountState(counter.address)!;
      76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
   Variables:
-    '317 = "Counter: {}"
+    '319 = "Counter: {}"
     counterRes = 0
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
     deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD

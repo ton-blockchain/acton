@@ -237,6 +237,8 @@ struct SearchParams {
     ///
     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
     deploy: bool? = null
+    /// Whether the transaction message is bounceable.
+    bounce: bool? = null
     /// Whether the transaction is a bounced transaction.
     bounced: bool? = null
     /// Opcode of the in message.
