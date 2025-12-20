@@ -4,7 +4,7 @@
 
  TEST  [ROOT]
 
- > ./tests/test1_test.tolk (3 tests)
+ > ./tests/test1.test.tolk (3 tests)
   ✓ first-pass [TIME]
   ✗ second-fail [TIME]
     └─ Error: expect(actual).toEqual(expected)
@@ -12,7 +12,7 @@
             1,
             2
         )
-      └─ at ./tests/test1_test[LINE]
+      └─ at ./tests/test1.test[LINE]
 
  ✓ 1 passed, ✗ 1 failed in 1 file
 

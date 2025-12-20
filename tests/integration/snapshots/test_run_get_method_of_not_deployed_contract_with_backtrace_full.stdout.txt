@@ -6,14 +6,14 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 test)
+ > ./tests/test.test.tolk (1 test)
   ✗ foo [TIME]
     └─ exit_code=678
       ├─ at [ACTON_LIB]/emulation/network[LINE]
       │     __throw                            at [ACTON_LIB]/emulation/network[LINE]
       │     __throw                            at [ACTON_LIB]/emulation/network[LINE]
       │     impl.runGetMethodById<int,tuple>   at [ACTON_LIB]/emulation/network[LINE]
-      │     net.runGetMethod<int,tuple>        at tests/test_test[LINE]
+      │     net.runGetMethod<int,tuple>        at tests/test.test[LINE]
       └─ Cannot run method of not deployed contract, make sure you're deployed contract first or passed --fork-net
 
  ✗ 1 failed in 1 file

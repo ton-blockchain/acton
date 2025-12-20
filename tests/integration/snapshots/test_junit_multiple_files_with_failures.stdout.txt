@@ -6,7 +6,7 @@
 
  TEST  [ROOT]
 
- > ./tests/utils_test.tolk (2 tests)
+ > ./tests/utils.test.tolk (2 tests)
   ✓ pow2_basic [TIME]
   ✗ pow2_edge [TIME]
     └─ Error: expect(actual).toEqual(expected)
@@ -14,9 +14,9 @@
             1,
             2
         )
-      └─ at ./tests/utils_test[LINE]
+      └─ at ./tests/utils.test[LINE]
 
- > ./tests/wallet_test.tolk (2 tests)
+ > ./tests/wallet.test.tolk (2 tests)
   ✓ wallet_balance [TIME]
   ✓ wallet_utils [TIME]
 

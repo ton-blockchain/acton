@@ -15,4 +15,4 @@ After moving the types, update your contract to import them:
 ═══════════════════════════════════════════════════════════
 
    Generated tests/wrappers/MyContract.tolk
-   Generated tests/my_contract_test.tolk
+   Generated tests/my_contract.test.tolk

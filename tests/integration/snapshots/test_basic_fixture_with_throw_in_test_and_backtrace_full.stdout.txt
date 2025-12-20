@@ -6,12 +6,12 @@
 
  TEST  [ROOT]
 
- > ./tests/counter_test.tolk (2 tests)
+ > ./tests/counter.test.tolk (2 tests)
   ✓ should-increase-counter [TIME]
   ✗ should-reset-counter [TIME]
     └─ exit_code=9
-      ├─ at tests/counter_test[LINE]
-      │     __throw   at tests/counter_test[LINE]
+      ├─ at tests/counter.test[LINE]
+      │     __throw   at tests/counter.test[LINE]
       └─ Phase: Compute phase
 
  ✓ 1 passed, ✗ 1 failed in 1 file

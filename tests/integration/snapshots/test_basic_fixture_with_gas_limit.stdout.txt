@@ -6,7 +6,7 @@
 
  TEST  [ROOT]
 
- > ./tests/counter_test.tolk (2 tests)
+ > ./tests/counter.test.tolk (2 tests)
   ✗ should-increase-counter [TIME]
     └─ Gas limit exceeded: used 161717, limit 100
   ✓ should-reset-counter [TIME]

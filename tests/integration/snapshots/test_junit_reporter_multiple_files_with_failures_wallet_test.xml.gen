@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites name="test-results" tests="2" failures="0" errors="0">
-    <testsuite name="wallet_test.tolk" tests="2" disabled="0" errors="0" failures="0" timestamp="[DATE]" [TIME]>
+    <testsuite name="wallet.test.tolk" tests="2" disabled="0" errors="0" failures="0" timestamp="[DATE]" [TIME]>
         <properties>
-            <property name="file.path" value="./tests/wallet_test.tolk"/>
+            <property name="file.path" value="./tests/wallet.test.tolk"/>
         </properties>
-        <testcase name="test_wallet_balance" classname="wallet_test.tolk" [TIME]>
+        <testcase name="test_wallet_balance" classname="wallet.test.tolk" [TIME]>
         </testcase>
-        <testcase name="test_wallet_utils" classname="wallet_test.tolk" [TIME]>
+        <testcase name="test_wallet_utils" classname="wallet.test.tolk" [TIME]>
         </testcase>
     </testsuite>
 </testsuites>

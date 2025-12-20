@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites name="test-results" tests="2" failures="2" errors="0">
-    <testsuite name="counter_test.tolk" tests="2" disabled="0" errors="0" failures="2" timestamp="[DATE]" [TIME]>
+    <testsuite name="counter.test.tolk" tests="2" disabled="0" errors="0" failures="2" timestamp="[DATE]" [TIME]>
         <properties>
-            <property name="file.path" value="./tests/counter_test.tolk"/>
+            <property name="file.path" value="./tests/counter.test.tolk"/>
         </properties>
-        <testcase name="test-should-increase-counter" classname="counter_test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/counter_test[LINE]</failure>
+        <testcase name="test-should-increase-counter" classname="counter.test.tolk" [TIME]>
+            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/counter.test[LINE]</failure>
         </testcase>
-        <testcase name="test-should-reset-counter" classname="counter_test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/counter_test[LINE]</failure>
+        <testcase name="test-should-reset-counter" classname="counter.test.tolk" [TIME]>
+            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/counter.test[LINE]</failure>
         </testcase>
     </testsuite>
 </testsuites>

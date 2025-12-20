@@ -6,7 +6,7 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 test)
+ > ./tests/test.test.tolk (1 test)
   ✗ foo [TIME]
     └─ exit_code=678
       ├─ Re-run with --backtrace full to get more information

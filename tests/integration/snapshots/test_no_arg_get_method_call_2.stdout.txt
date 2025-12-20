@@ -6,7 +6,7 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 test)
+ > ./tests/test.test.tolk (1 test)
   ✗ foo [TIME]
     └─ Error: Get method 'currentCounter3' (110134) failed due to stack underflow. Make sure you passed all parameters to the get method.
 

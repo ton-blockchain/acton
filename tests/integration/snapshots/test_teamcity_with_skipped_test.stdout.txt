@@ -7,9 +7,9 @@
  TEST  [ROOT]
 
 ##teamcity[testingStarted]
- > ./tests/counter_test.tolk (0 tests)
-##teamcity[testSuiteStarted name='counter_test.tolk' nodeId='suite_counter_test.tolk' parentNodeId='0' nodeType='file' locationHint='file://./tests/counter_test.tolk']
-##teamcity[testSuiteFinished name='counter_test.tolk' nodeId='suite_counter_test.tolk']
+ > ./tests/counter.test.tolk (0 tests)
+##teamcity[testSuiteStarted name='counter.test.tolk' nodeId='suite_counter.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://./tests/counter.test.tolk']
+##teamcity[testSuiteFinished name='counter.test.tolk' nodeId='suite_counter.test.tolk']
 
  ✓ 0 passed in 1 file
 ##teamcity[testingFinished]

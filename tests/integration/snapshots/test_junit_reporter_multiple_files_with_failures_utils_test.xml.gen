@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites name="test-results" tests="2" failures="1" errors="0">
-    <testsuite name="utils_test.tolk" tests="2" disabled="0" errors="0" failures="1" timestamp="[DATE]" [TIME]>
+    <testsuite name="utils.test.tolk" tests="2" disabled="0" errors="0" failures="1" timestamp="[DATE]" [TIME]>
         <properties>
-            <property name="file.path" value="./tests/utils_test.tolk"/>
+            <property name="file.path" value="./tests/utils.test.tolk"/>
         </properties>
-        <testcase name="test_pow2_basic" classname="utils_test.tolk" [TIME]>
+        <testcase name="test_pow2_basic" classname="utils.test.tolk" [TIME]>
         </testcase>
-        <testcase name="test_pow2_edge" classname="utils_test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toEqual(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/utils_test[LINE]</failure>
+        <testcase name="test_pow2_edge" classname="utils.test.tolk" [TIME]>
+            <failure message="expect(&amp;lt;actual&amp;gt;).toEqual(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/utils.test[LINE]</failure>
         </testcase>
     </testsuite>
 </testsuites>

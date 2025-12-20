@@ -6,7 +6,7 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 test)
+ > ./tests/test.test.tolk (1 test)
   ✓ foo [TIME]
     └─ Test output:
        Counter: [BOC_HEX]

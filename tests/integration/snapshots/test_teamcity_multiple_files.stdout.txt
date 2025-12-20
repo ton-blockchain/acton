@@ -7,32 +7,32 @@
  TEST  [ROOT]
 
 ##teamcity[testingStarted]
- > ./tests/utils_test_test.tolk (2 tests)
-##teamcity[testSuiteStarted name='utils_test_test.tolk' nodeId='suite_utils_test_test.tolk' parentNodeId='0' nodeType='file' locationHint='file://./tests/utils_test_test.tolk']
-##teamcity[testStarted name='test_pow2_basic' nodeId='test_test_pow2_basic' parentNodeId='suite_utils_test_test.tolk' locationHint='tolk_qn://./tests/utils_test_test.tolk:test_pow2_basic']
+ > ./tests/utils_test.test.tolk (2 tests)
+##teamcity[testSuiteStarted name='utils_test.test.tolk' nodeId='suite_utils_test.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://./tests/utils_test.test.tolk']
+##teamcity[testStarted name='test_pow2_basic' nodeId='test_test_pow2_basic' parentNodeId='suite_utils_test.test.tolk' locationHint='tolk_qn://./tests/utils_test.test.tolk:test_pow2_basic']
   ✓ pow2_basic [TIME]
-##teamcity[testFinished name='test_pow2_basic' nodeId='test_test_pow2_basic' [DURATION] parentNodeId='suite_utils_test_test.tolk']
-##teamcity[testStarted name='test_pow2_edge' nodeId='test_test_pow2_edge' parentNodeId='suite_utils_test_test.tolk' locationHint='tolk_qn://./tests/utils_test_test.tolk:test_pow2_edge']
+##teamcity[testFinished name='test_pow2_basic' nodeId='test_test_pow2_basic' [DURATION] parentNodeId='suite_utils_test.test.tolk']
+##teamcity[testStarted name='test_pow2_edge' nodeId='test_test_pow2_edge' parentNodeId='suite_utils_test.test.tolk' locationHint='tolk_qn://./tests/utils_test.test.tolk:test_pow2_edge']
   ✗ pow2_edge [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
             1,
             2
         )
-      └─ at ./tests/utils_test_test[LINE]
-##teamcity[testFailed name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='./tests/utils_test_test[LINE]']
-##teamcity[testFinished name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] parentNodeId='suite_utils_test_test.tolk']
-##teamcity[testSuiteFinished name='utils_test_test.tolk' nodeId='suite_utils_test_test.tolk']
+      └─ at ./tests/utils_test.test[LINE]
+##teamcity[testFailed name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='./tests/utils_test.test[LINE]']
+##teamcity[testFinished name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] parentNodeId='suite_utils_test.test.tolk']
+##teamcity[testSuiteFinished name='utils_test.test.tolk' nodeId='suite_utils_test.test.tolk']
 
- > ./tests/wallet_test_test.tolk (2 tests)
-##teamcity[testSuiteStarted name='wallet_test_test.tolk' nodeId='suite_wallet_test_test.tolk' parentNodeId='0' nodeType='file' locationHint='file://./tests/wallet_test_test.tolk']
-##teamcity[testStarted name='test_wallet_balance' nodeId='test_test_wallet_balance' parentNodeId='suite_wallet_test_test.tolk' locationHint='tolk_qn://./tests/wallet_test_test.tolk:test_wallet_balance']
+ > ./tests/wallet_test.test.tolk (2 tests)
+##teamcity[testSuiteStarted name='wallet_test.test.tolk' nodeId='suite_wallet_test.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://./tests/wallet_test.test.tolk']
+##teamcity[testStarted name='test_wallet_balance' nodeId='test_test_wallet_balance' parentNodeId='suite_wallet_test.test.tolk' locationHint='tolk_qn://./tests/wallet_test.test.tolk:test_wallet_balance']
   ✓ wallet_balance [TIME]
-##teamcity[testFinished name='test_wallet_balance' nodeId='test_test_wallet_balance' [DURATION] parentNodeId='suite_wallet_test_test.tolk']
-##teamcity[testStarted name='test_wallet_utils' nodeId='test_test_wallet_utils' parentNodeId='suite_wallet_test_test.tolk' locationHint='tolk_qn://./tests/wallet_test_test.tolk:test_wallet_utils']
+##teamcity[testFinished name='test_wallet_balance' nodeId='test_test_wallet_balance' [DURATION] parentNodeId='suite_wallet_test.test.tolk']
+##teamcity[testStarted name='test_wallet_utils' nodeId='test_test_wallet_utils' parentNodeId='suite_wallet_test.test.tolk' locationHint='tolk_qn://./tests/wallet_test.test.tolk:test_wallet_utils']
   ✓ wallet_utils [TIME]
-##teamcity[testFinished name='test_wallet_utils' nodeId='test_test_wallet_utils' [DURATION] parentNodeId='suite_wallet_test_test.tolk']
-##teamcity[testSuiteFinished name='wallet_test_test.tolk' nodeId='suite_wallet_test_test.tolk']
+##teamcity[testFinished name='test_wallet_utils' nodeId='test_test_wallet_utils' [DURATION] parentNodeId='suite_wallet_test.test.tolk']
+##teamcity[testSuiteFinished name='wallet_test.test.tolk' nodeId='suite_wallet_test.test.tolk']
 
  ✓ 3 passed, ✗ 1 failed in 2 files
 
