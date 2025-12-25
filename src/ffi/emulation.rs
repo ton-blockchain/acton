@@ -293,16 +293,16 @@ fn send_message_impl(
         )
     };
 
-    ctx.chain.emulations.results.push(emulations.clone());
-
     let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
-        SendMessageResult::Success(res) => Some((*res).clone()),
+        SendMessageResult::Success(res) => Some(res),
         SendMessageResult::Error(_) => None,
     });
 
     let transaction_cells = successful_emulations
-        .filter_map(|emulation| emulation_to_send_result(&emulation))
+        .filter_map(emulation_to_send_result)
         .collect::<Vec<_>>();
+
+    ctx.chain.emulations.results.push(emulations);
     stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
 }
 
@@ -685,8 +685,6 @@ fn send_single_message_impl(ctx: &mut Context, stack: &mut Tuple, from: ArcCell,
         }
     };
 
-    ctx.chain.emulations.results.push(vec![emulation.clone()]);
-
     let SendMessageResult::Success(emulation) = emulation else {
         stack.push(TupleItem::Null);
         return;
@@ -696,6 +694,12 @@ fn send_single_message_impl(ctx: &mut Context, stack: &mut Tuple, from: ArcCell,
         stack.push(TupleItem::Null);
         return;
     };
+
+    ctx.chain
+        .emulations
+        .results
+        .push(vec![SendMessageResult::Success(emulation)]);
+
     stack.push(send_result);
 }
 

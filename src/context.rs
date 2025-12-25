@@ -254,7 +254,7 @@ impl Emulations {
             .find(|res| matches!(res, SendMessageResult::Success(res) if res.transaction.lt == lt))
     }
 
-    pub fn find_tx_logs(&self, lt: u64) -> Option<String> {
+    pub fn find_tx_logs(&self, lt: u64) -> Option<&str> {
         self.find_tx_by_lt(lt).map(|res| res.vm_logs())
     }
 
@@ -262,7 +262,7 @@ impl Emulations {
         self.find_tx_by_lt(lt).map(|res| res.debug_logs())
     }
 
-    pub fn find_tx_executor_logs(&self, lt: u64) -> Option<String> {
+    pub fn find_tx_executor_logs(&self, lt: u64) -> Option<&str> {
         self.find_tx_by_lt(lt).map(|res| res.executor_logs())
     }
 }

@@ -591,7 +591,7 @@ impl FormatterContext {
                         let result = self.build_cache.result_for_code(&code);
 
                         if let Some(result) = result {
-                            let info = retrace::find_exception_info(&logs, &result.1.source_map);
+                            let info = retrace::find_exception_info(logs, &result.1.source_map);
                             if let Some(info) = info
                                 && let Some(loc) = info.loc
                             {
@@ -682,7 +682,7 @@ impl FormatterContext {
                     // Trying to collect installed and executed out actions
                     let vm_logs = self.emulations.find_tx_logs(tx.lt);
                     let installed_actions = if let Some(vm_logs) = vm_logs {
-                        retrace::find_installed_actions(&vm_logs)
+                        retrace::find_installed_actions(vm_logs)
                     } else {
                         InstalledActions::empty()
                     };
@@ -700,7 +700,7 @@ impl FormatterContext {
                             child_prefix,
                             tx,
                             installed_actions,
-                            &logs,
+                            logs,
                             contract_letters,
                         );
                         extra_infos.push(actions);

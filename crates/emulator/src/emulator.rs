@@ -23,10 +23,10 @@ pub enum SendMessageResult {
 }
 
 impl SendMessageResult {
-    pub fn vm_logs(&self) -> String {
+    pub fn vm_logs(&self) -> &str {
         match self {
-            SendMessageResult::Success(res) => res.vm_log.clone(),
-            SendMessageResult::Error(res) => res.vm_log.clone().unwrap_or("".to_string()),
+            SendMessageResult::Success(res) => &res.vm_log,
+            SendMessageResult::Error(res) => res.vm_log.as_deref().unwrap_or(""),
         }
     }
 
@@ -42,10 +42,10 @@ impl SendMessageResult {
         }
     }
 
-    pub fn executor_logs(&self) -> String {
+    pub fn executor_logs(&self) -> &str {
         match self {
-            SendMessageResult::Success(res) => res.logs.clone(),
-            SendMessageResult::Error(_) => "".to_string(),
+            SendMessageResult::Success(res) => &res.logs,
+            SendMessageResult::Error(_) => "",
         }
     }
 }
@@ -68,7 +68,7 @@ pub struct SendMessageResultSuccess {
 
 impl SendMessageResultSuccess {
     pub fn opcode(&self) -> Option<u32> {
-        let in_msg = self.transaction.in_msg.clone()?;
+        let in_msg = self.transaction.in_msg.as_deref()?;
         let mut in_msg = in_msg.parse::<RelaxedMessage>().ok()?;
         let opcode = in_msg.body.load_u32().ok()?;
         if opcode == 0xFFFFFFFF {
@@ -109,10 +109,13 @@ impl Emulator {
         let MsgInfo::Int(int_message) = &message_obj.info else {
             anyhow::bail!("message is not an internal message")
         };
+        let dst_addr = int_message.dst.to_string();
 
-        let dest_account = net.get_account(&int_message.dst.to_string());
+        let dest_account = net.get_account(&dst_addr);
+        let code = Executor::get_code_cell(&message_obj, &dest_account);
+
         let (result, logs) = self.executor.run_transaction(
-            message.clone(),
+            message,
             BigInt::from(0),
             RunTransactionArgs {
                 config: crate::config::DEFAULT_CONFIG.to_string(),
@@ -139,7 +142,7 @@ impl Emulator {
             .parse::<ShardAccount>()
             .expect("Failed to load shard account from slice");
 
-        net.update_account(&int_message.dst.to_string(), &shard_account);
+        net.update_account(&dst_addr, &shard_account);
 
         let tx_cell: Cell =
             Boc::decode_base64(&result.transaction).expect("Failed to decode transaction BoC");
@@ -153,14 +156,12 @@ impl Emulator {
             .map(|it| it.to_cell())
             .collect::<Vec<_>>();
 
-        let code = Executor::get_code_cell(&message_obj, &dest_account);
-
         let send_result = SendMessageResultSuccess {
             raw_transaction: result.transaction,
-            transaction: transaction.clone(),
+            transaction,
             parent_transaction: None,
             child_transactions: vec![],
-            shard_account_before: dest_account.clone(),
+            shard_account_before: dest_account,
             shard_account,
             out_messages,
             vm_log: result.vm_log,
