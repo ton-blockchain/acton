@@ -274,7 +274,7 @@ jobs:
           path: target/release/acton
 
   build-linux:
-    runs-on: ubicloud-standard-16
+    runs-on: ubicloud-standard-2
     if: true
 
     outputs:
