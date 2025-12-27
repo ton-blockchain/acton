@@ -168,14 +168,15 @@ fn ws1(i: &mut I) -> PResult<()> {
 }
 
 fn number<'a>(i: &mut I<'a>) -> PResult<&'a str> {
-    let start = i.as_ptr() as usize;
+    let start_ptr = i.as_ptr();
+    let start = start_ptr as usize;
     opt('-').parse_next(i)?;
     digit1.parse_next(i)?;
     let end = i.as_ptr() as usize;
     let len = end - start;
     // SAFETY: We know this is valid UTF-8 since we only consumed ASCII characters
     unsafe {
-        let slice = std::slice::from_raw_parts(start as *const u8, len);
+        let slice = std::slice::from_raw_parts(start_ptr, len);
         Ok(std::str::from_utf8_unchecked(slice))
     }
 }
