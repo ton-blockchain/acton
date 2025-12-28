@@ -21,6 +21,7 @@ use num_bigint::BigInt;
 use num_traits::{ToPrimitive, Zero};
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
+use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -63,6 +64,20 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: 
     if let Some(override_code) = ctx.env.build_override.get(id.as_str()) {
         debug!("Overriding code for {name}");
         stack.push(TupleItem::Cell(override_code.clone()));
+        return;
+    }
+
+    // TODO: add test for this case
+    if path.ends_with(".boc") {
+        // For BoC source we just return it as a Cell
+        let binary_data = try_ctx!(ctx, fs::read(&path), "Cannot read BoC file {}");
+        let cell = try_ctx!(
+            ctx,
+            ArcCell::from_boc(binary_data.as_slice()),
+            "Failed to decode code BoC for {}: {}",
+            path
+        );
+        stack.push(TupleItem::Cell(cell));
         return;
     }
 
