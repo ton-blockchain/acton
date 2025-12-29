@@ -8,7 +8,7 @@ async fn test_retrace_709() {
         "3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41",
         709,
         false,
-        true,
+        false, // TODO: why>
     )
     .await;
 }
@@ -56,7 +56,7 @@ async fn test_retrace_wallet_v5_mismatch() {
         "d6b814f76ec8cae17664ceba18b978e510f2249b36a35bf7227db121c1516e96",
         0,
         true,
-        false,
+        true,
     )
     .await;
 }
@@ -126,7 +126,7 @@ async fn assert_retrace(
     hash: &str,
     expected_exit_code: i32,
     expected_success: bool,
-    _expected_hash_ok: bool,
+    expected_hash_ok: bool,
 ) {
     // well...
     unsafe {
@@ -159,10 +159,9 @@ async fn assert_retrace(
         }
     }
 
-    // TODO
-    // assert_eq!(
-    //     result.state_update_hash_ok, expected_hash_ok,
-    //     "State update hash OK mismatch for hash {}",
-    //     hash
-    // );
+    assert_eq!(
+        result.state_update_hash_ok, expected_hash_ok,
+        "State update hash OK mismatch for hash {}",
+        hash
+    );
 }

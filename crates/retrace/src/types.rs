@@ -150,6 +150,20 @@ pub(crate) struct AccountState {
 // --- Retrace Internal Types ---
 
 /// Detailed information about the compute phase of a transaction.
+///
+/// This enum captures whether the compute phase was skipped or executed,
+/// along with detailed statistics like gas usage and exit codes.
+///
+/// # Example
+///
+/// ```ignore
+/// match result.emulated_tx.compute_info {
+///     ComputeInfo::Skipped => println!("Compute phase skipped"),
+///     ComputeInfo::Success { exit_code, gas_used, .. } => {
+///         println!("Exit code: {}, Gas used: {}", exit_code, gas_used);
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ComputeInfo {
@@ -177,6 +191,13 @@ pub enum ComputeInfo {
 }
 
 /// Information about the incoming message that triggered the transaction.
+///
+/// # Example
+///
+/// ```ignore
+/// let in_msg = &result.in_msg;
+/// println!("From: {:?}, To: {:?}, Amount: {:?}", in_msg.sender, in_msg.contract, in_msg.amount);
+/// ```
 #[derive(Debug, Clone)]
 pub struct TraceInMessage {
     /// Sender address (None for external messages).
@@ -190,6 +211,8 @@ pub struct TraceInMessage {
 }
 
 /// Detailed information about the emulated transaction.
+///
+/// Contains the raw transaction object, execution timing, and full logs.
 #[derive(Debug, Clone)]
 pub struct TraceEmulatedTx {
     /// Emulated transaction.
@@ -211,6 +234,16 @@ pub struct TraceEmulatedTx {
 }
 
 /// Breakdown of money movements and fees within the transaction.
+///
+/// All values are in nanoton (10^-9 TON).
+///
+/// # Example
+///
+/// ```ignore
+/// let money = &result.money;
+/// println!("Fees: {} nanoton", money.total_fees);
+/// println!("Balance after: {} nanoton", money.balance_after);
+/// ```
 #[derive(Debug, Clone)]
 pub struct TraceMoneyResult {
     /// Balance of the account **before** the transaction execution.
@@ -225,6 +258,17 @@ pub struct TraceMoneyResult {
 }
 
 /// The final report containing all data from the transaction retrace process.
+///
+/// This is the primary output of the [`crate::retrace`] function.
+///
+/// # Example
+///
+/// ```ignore
+/// let result = retrace(Network::Mainnet, hash, libs).await?;
+/// if result.state_update_hash_ok {
+///     println!("Deterministic replay verified!");
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct TraceResult {
     /// True if the emulated state‑update hash matches the one recorded on‑chain.

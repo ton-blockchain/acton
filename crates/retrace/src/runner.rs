@@ -16,7 +16,7 @@ use tycho_types::models::{AccountState, ShardAccount, Transaction};
 use tycho_types::num::Tokens;
 use vmlogs::parser::{CellLike, VmLine, VmStackValue, parse_lines};
 
-/// Supported TON networks.
+/// Supported TON networks for transaction retracing.
 #[derive(Debug, Clone, Copy)]
 pub enum Network {
     Mainnet,
@@ -320,6 +320,12 @@ pub async fn retrace_base_tx(
     })
 }
 
+/// Re-emulates all transactions that occurred in the same account within
+/// the same master-block *before* the target transaction.
+///
+/// This is necessary because the sandbox starts with an account state from
+/// the *previous* master-block. To get the exact state before our target tx,
+/// we must apply all intermediate transactions in order.
 fn emulate_previous_transactions(
     prev_txs_in_block: &Vec<Transaction>,
     shard_account: &ShardAccount,
@@ -355,6 +361,7 @@ fn emulate_previous_transactions(
     Ok((balance, shard_account))
 }
 
+/// Helper function to run a single transaction through the TVM executor.
 fn emulate(
     tx: &Transaction,
     block_config: String,

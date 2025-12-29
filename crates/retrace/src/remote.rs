@@ -1,3 +1,5 @@
+//! Internal HTTP clients for interacting with external TON APIs (TonCenter, TonHub, DTON).
+
 use crate::Network;
 use crate::types::{
     AccountFromAPI, BlockInfo, BlocksResponse, TransactionData, TransactionTransactionsResponse,
@@ -5,6 +7,9 @@ use crate::types::{
 use reqwest::Client;
 use serde::Deserialize;
 
+/// Client for TonCenter V2/V3 API.
+///
+/// Used for fetching transaction metadata, block information, and library cells.
 pub(crate) struct TonCenterClient {
     client: Client,
     api_key: Option<String>,
@@ -12,6 +17,7 @@ pub(crate) struct TonCenterClient {
 }
 
 impl TonCenterClient {
+    /// Creates a new TonCenter client for the specified network.
     pub(crate) fn new(network: Network, api_key: Option<String>) -> Self {
         let base_url = match network {
             Network::Mainnet => "https://toncenter.com/api/v3".to_string(),
@@ -24,6 +30,7 @@ impl TonCenterClient {
         }
     }
 
+    /// Fetches transaction metadata by its hash using V3 API.
     pub(crate) async fn get_transactions(
         &self,
         hash: &str,
@@ -54,6 +61,7 @@ impl TonCenterClient {
         Ok(response_data)
     }
 
+    /// Fetches block information by workchain, shard, and seqno using V3 API.
     pub(crate) async fn get_blocks(
         &self,
         workchain: i32,
@@ -89,6 +97,9 @@ impl TonCenterClient {
         Ok(response_data)
     }
 
+    /// Fetches transactions for an account using TonCenter V2 JSON-RPC.
+    ///
+    /// Used as a fallback or for specific V2-only functionality.
     pub(crate) async fn get_transactions_toncenter(
         &self,
         address: &str,
@@ -129,6 +140,7 @@ impl TonCenterClient {
         Ok(result.unwrap_or_default())
     }
 
+    /// Fetches library cells (T-libs) by their hash using V2 API.
     pub(crate) async fn get_libraries(&self, hash: &str) -> anyhow::Result<String> {
         let url = format!(
             "{}/getLibraries",
@@ -161,12 +173,16 @@ impl TonCenterClient {
     }
 }
 
+/// Client for TonHub (TON API v4).
+///
+/// Used for fetching account snapshots and master-block configurations.
 pub(crate) struct TonHubClient {
     client: Client,
     base_url: String,
 }
 
 impl TonHubClient {
+    /// Creates a new TonHub client for the specified network.
     pub(crate) fn new(network: Network) -> Self {
         let base_url = match network {
             Network::Mainnet => "https://mainnet-v4.tonhubapi.com".to_string(),
@@ -178,6 +194,7 @@ impl TonHubClient {
         }
     }
 
+    /// Fetches full transaction details including BoC and blocks for a specific account/lt/hash.
     pub(crate) async fn get_account_transactions(
         &self,
         address: &str,
@@ -198,6 +215,7 @@ impl TonHubClient {
         Ok(response_data)
     }
 
+    /// Fetches master-block information by sequence number.
     pub(crate) async fn get_block(&self, seqno: u32) -> anyhow::Result<BlockInfo> {
         let url = format!("{}/block/{}", self.base_url, seqno);
 
@@ -225,6 +243,7 @@ impl TonHubClient {
             .ok_or_else(|| anyhow::anyhow!("Block info is missing in response"))
     }
 
+    /// Fetches an account snapshot at a specific master-block sequence number.
     pub(crate) async fn get_account(
         &self,
         seqno: u32,
@@ -249,6 +268,7 @@ impl TonHubClient {
         Ok(response_data.account)
     }
 
+    /// Fetches the global configuration for a specific master-block sequence number.
     pub(crate) async fn get_config(&self, seqno: u32) -> anyhow::Result<String> {
         let url = format!("{}/block/{}/config", self.base_url, seqno);
 
@@ -275,12 +295,16 @@ impl TonHubClient {
     }
 }
 
+/// Client for dton.io GraphQL API.
+///
+/// Primarily used as a fallback for fetching library cells.
 pub(crate) struct DtonClient {
     client: Client,
     api_key: String,
 }
 
 impl DtonClient {
+    /// Creates a new Dton client with an optional API key.
     pub(crate) fn new(api_key: Option<String>) -> Self {
         Self {
             client: Client::new(),
@@ -288,6 +312,7 @@ impl DtonClient {
         }
     }
 
+    /// Fetches a library cell by its hash via GraphQL.
     pub(crate) async fn get_lib(&self, network: Network, hash: &str) -> anyhow::Result<String> {
         let endpoint = match network {
             Network::Mainnet => format!("https://dton.io/{}/graphql", self.api_key),

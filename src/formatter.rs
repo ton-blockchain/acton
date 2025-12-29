@@ -782,7 +782,7 @@ impl FormatterContext {
         logs: &str,
         contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
-        let actions = retrace::extract_actions_from_executor_logs(logs);
+        let actions = retrace::ExecutedActions::from(logs).actions;
 
         if actions.is_empty() {
             return String::new();
@@ -807,7 +807,7 @@ impl FormatterContext {
                         };
 
                         (
-                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset),
+                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset as i32),
                             formated,
                         )
                     } else {
@@ -831,7 +831,7 @@ impl FormatterContext {
                     let reserve_action = installed_actions.find_reserve(*mode, reserve);
 
                     let loc = if let Some(action) = reserve_action {
-                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
+                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset as i32)
                     } else {
                         None
                     };

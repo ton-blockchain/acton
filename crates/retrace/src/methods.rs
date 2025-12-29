@@ -60,12 +60,15 @@ pub async fn find_base_tx_by_hash(net: Network, hash: &str) -> anyhow::Result<Ba
     })
 }
 
-/// Returns full information for transaction by base information obtained from [`find_base_tx_by_hash`].
+/// Returns full on-chain transaction information using a base handle.
+///
+/// This function queries multiple blocks via TonHub API to find the complete
+/// record of the transaction, including its raw BoC.
 ///
 /// # Arguments
 ///
-/// * `net`  — network to use
-/// * `info` — base transaction information
+/// * `net`  — Network to use.
+/// * `info` — Base transaction information handle.
 pub(crate) async fn find_raw_tx_by_hash(
     net: Network,
     info: BaseTxInfo,
@@ -95,16 +98,19 @@ pub(crate) async fn find_raw_tx_by_hash(
     Ok(txs)
 }
 
-/// Return the shard-block header that contains a given [`RawTransaction`].
+/// Returns the shard-block header that contains a given [`RawTransaction`].
+///
+/// This is used to extract block-level metadata like `rand_seed` and
+/// master-block references required for emulation.
 ///
 /// # Arguments
 ///
-/// * `net` — network to use
-/// * `tx`  — raw transaction object
+/// * `net` — Network to use.
+/// * `tx`  — Raw transaction object.
 ///
 /// # Returns
 ///
-/// Returns the matching shard-block or `None` if TonCenter cannot find it.
+/// Returns the matching shard-block or `None` if it cannot be found.
 pub(crate) async fn find_shard_block_for_tx(
     net: Network,
     tx: &RawTransaction,
@@ -126,13 +132,13 @@ pub(crate) async fn find_shard_block_for_tx(
     Ok(res.blocks.into_iter().next())
 }
 
-/// Return a master‑block (full representation, including `shards[]`)
-/// by its `seqno` via TON API v4.
+/// Returns a master‑block (full representation, including `shards[]`)
+/// by its sequence number via TON API v4.
 ///
 /// # Arguments
 ///
-/// * `net`   — network to use
-/// * `seqno` — master‑block sequence number
+/// * `net`   — Network to use.
+/// * `seqno` — Master‑block sequence number.
 pub(crate) async fn find_full_block_for_seqno(
     net: Network,
     seqno: u32,
@@ -141,14 +147,15 @@ pub(crate) async fn find_full_block_for_seqno(
     client.get_block(seqno).await
 }
 
-/// Load the global configuration cell valid for the master‑block that
-/// encloses the target transaction. Required by the TVM executor to
-/// calculate gas, random‑seed and limits exactly as onchain.
+/// Loads the global configuration cell for the specified master‑block.
+///
+/// This configuration is required by the TVM executor to calculate gas costs,
+/// random seeds, and limits exactly as they were on-chain at that time.
 ///
 /// # Arguments
 ///
-/// * `net`   — network to use
-/// * `block` — full master‑block object (with `shards[]` array)
+/// * `net`   — Network to use.
+/// * `block` — Full master‑block object.
 ///
 /// # Returns
 ///
@@ -165,20 +172,21 @@ pub(crate) async fn get_block_config(net: Network, block: &BlockInfo) -> anyhow:
     client.get_config(block_seqno).await
 }
 
-/// Retrieve all transactions of a given account whose logical‑time
-/// lies in the interval `(min_lt, base_tx.lt]`, inclusive of `base_tx`.
+/// Retrieves all transactions of an account within a logical-time interval.
 ///
-/// Used to reconstruct in‑block history before emulation.
+/// Fetches transactions in the range `(min_lt, base_tx.lt]`, inclusive of the
+/// target transaction. This is essential for reconstructing the account state
+/// by re-playing all preceding transactions that occurred in the same block.
 ///
 /// # Arguments
 ///
-/// * `net`     — network to use
-/// * `base_tx` — the "upper bound" transaction
-/// * `min_lt`  — lower logical‑time boundary
+/// * `net`     — Network to use.
+/// * `base_tx` — The "upper bound" transaction handle.
+/// * `min_lt`  — Lower logical‑time boundary.
 ///
 /// # Returns
 ///
-/// Returns transactions ordered **newest → oldest**.
+/// Returns transactions ordered from **newest to oldest**.
 pub(crate) async fn find_all_transactions_between(
     net: Network,
     base_tx: &BaseTxInfo,
@@ -209,9 +217,11 @@ pub(crate) async fn find_all_transactions_between(
     Ok(txs)
 }
 
-/// Scan every shard‑summary inside a master‑block and return the
-/// smallest `lt` for the specified account. This value marks the
-/// earliest transaction of the account inside that master‑block.
+/// Computes the smallest logical-time for an account within a master-block.
+///
+/// Scans every shard-summary in the master-block to find the earliest
+/// transaction of the specified account. This marks the starting point
+/// for state reconstruction.
 ///
 /// # Arguments
 ///
@@ -242,19 +252,20 @@ pub(crate) fn compute_min_lt(
     min_lt
 }
 
-/// Return an account snapshot *before* the current master‑block.
-/// The snapshot is converted to [`ShardAccount`] so it can be
-/// directly fed into `run_transaction`.
+/// Returns an account snapshot as it existed *before* the current master‑block.
+///
+/// Fetches the account state at the end of the preceding master-block (N-1)
+/// and converts it into a [`ShardAccount`] suitable for the TVM executor.
 ///
 /// # Arguments
 ///
-/// * `net`     — network to use
-/// * `address` — account address
-/// * `block`   — master‑block N (the one that contains the tx)
+/// * `net`     — Network to use.
+/// * `address` — Account address.
+/// * `block`   — The master‑block (N) containing the target transaction.
 ///
 /// # Returns
 ///
-/// Returns [`ShardAccount`] representing state on master‑block N‑1.
+/// Returns [`ShardAccount`] representing the state on master‑block N‑1.
 pub(crate) async fn get_block_account(
     net: Network,
     address: &StdAddr,
@@ -274,6 +285,10 @@ pub(crate) async fn get_block_account(
     create_shard_account_from_api(api_account, address)
 }
 
+/// Converts an API-provided account snapshot into a [`ShardAccount`].
+///
+/// Handles different account states (Active, Uninit, Frozen) and correctly
+/// maps balance, code, and data into the internal `tycho` model.
 pub(crate) fn create_shard_account_from_api(
     api_account: AccountFromAPI,
     address: &StdAddr,
@@ -353,15 +368,14 @@ pub(crate) fn create_shard_account_from_api(
     Ok(shard_account)
 }
 
-/// Extract the final `c5` register (action list) from emulation results,
-/// decode it into an array of `OutAction`s and
-/// return both the list and the original `c5` cell.
+/// Extracts out-actions from the `c5` register of a successful emulation.
 ///
-/// ## Params
-/// - res — successful emulation result.
+/// Decodes the action list cell and returns both the parsed [`OutAction`]s
+/// and the original `c5` cell.
 ///
-/// ## Returns
-/// A tuple: (list of actions, original c5 cell).
+/// # Arguments
+///
+/// * `res` — Successful emulation result.
 pub(crate) fn find_final_actions(res: &ResultSuccess) -> (Vec<OutAction>, Option<Cell>) {
     let Some(actions_b64) = &res.actions else {
         return (Vec::new(), None);
@@ -383,17 +397,9 @@ pub(crate) fn find_final_actions(res: &ResultSuccess) -> (Vec<OutAction>, Option
     (actions, Some(actions_cell))
 }
 
-/// Sum the value (`tokens`) of every *internal* outgoing message
-/// produced by a transaction. External messages are ignored since its
-/// value is always 0.
+/// Sums the value of all *internal* outgoing messages in a transaction.
 ///
-/// # Arguments
-///
-/// * `tx`  — Parsed `Transaction`.
-///
-/// # Returns
-///
-/// Returns the total tokens sent out by the contract in this tx.
+/// External messages are excluded as they carry no value.
 pub(crate) fn calculate_sent_total(tx: &tycho_types::models::Transaction) -> Tokens {
     let mut total = 0u128;
     for msg in tx.iter_out_msgs() {
@@ -405,7 +411,9 @@ pub(crate) fn calculate_sent_total(tx: &tycho_types::models::Transaction) -> Tok
     Tokens::new(total)
 }
 
-/// Extract the opcode from the incoming message of a transaction.
+/// Extracts the operation opcode from the incoming message of a transaction.
+///
+/// Handles both regular internal messages and bounced messages (skipping the bounce tag).
 pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
     let in_msg = tx.load_in_msg().ok()??;
     let mut slice = in_msg.body;
@@ -421,18 +429,14 @@ pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
     Some(opcode)
 }
 
-/// Convert the raw [`ResultSuccess`] plus the prior balance
-/// into a structured set of money movements, compute‑phase stats and
-/// convenience fields for higher‑level reporting.
+/// Assembles final execution data from successful emulation results.
 ///
-/// # Arguments
-///
-/// * `res`            — Successful result from TVM executor.
-/// * `balance_before` — Balance **before** the emulated tx.
+/// Extracts balance changes, fee breakdown, and compute phase statistics.
 ///
 /// # Returns
 ///
-/// Returns a breakdown containing sender/dest, amounts, gas usage and the parsed `emulated_tx`.
+/// Returns a tuple containing:
+/// (Source, Destination, Amount, MoneyResult, Transaction, ComputeInfo)
 #[allow(clippy::type_complexity)]
 pub(crate) fn compute_final_data(
     res: &ResultSuccess,
@@ -504,21 +508,9 @@ pub(crate) fn compute_final_data(
     Ok((src, dest, amount, money, emulated_tx, compute_info))
 }
 
-/// Load a library cell (T‑lib) from toncenter or dton.io GraphQL by its
-/// 256‑bit hash.
+/// Loads a library cell (T‑lib) by its 256‑bit hash.
 ///
-/// # Arguments
-///
-/// * `net`  — Mainnet/testnet flag.
-/// * `hash` — Hex string of the library hash.
-///
-/// # Returns
-///
-/// Returns the decoded [`Cell`] containing actual code.
-///
-/// # Errors
-///
-/// Returns an error if the library is missing on the server.
+/// Attempts to fetch from TonCenter first, falling back to dton.io if needed.
 pub(crate) async fn get_library_by_hash(net: Network, hash: &str) -> anyhow::Result<Cell> {
     let api_key = std::env::var("TONCENTER_API_KEY").ok();
     let toncenter = TonCenterClient::new(net, api_key);
@@ -560,20 +552,23 @@ async fn add_maybe_exotic_library(
     Ok(Some((lib_hash, actual_code)))
 }
 
-/// Inspect the contract’s current code and (optionally) the init
-/// code of the pending message, detect all **exotic library cells**
-/// (tag 2) and build a dict mapping hash → real library code.
+/// Identifies and collects all exotic library cells used by a contract.
+///
+/// Scans both the current contract code and any `StateInit` in the incoming
+/// message for exotic library references (tag 2). If found, it downloads the
+/// real code via [`get_library_by_hash`] and builds a dictionary for the
+/// TVM executor.
 ///
 /// # Arguments
 ///
-/// * `net`             — Mainnet/testnet flag.
-/// * `account`         — Current [`ShardAccount`] snapshot.
-/// * `tx`              — Transaction whose `in_message` may include `Init`.
-/// * `additional_libs` — Additional libraries to use.
+/// * `net`             — Network to use.
+/// * `account`         — Current account state.
+/// * `tx`              — Incoming transaction.
+/// * `additional_libs` — User-provided libraries to include.
 ///
 /// # Returns
 ///
-/// Returns a tuple: (dictionary cell with libs, actual code cell if original code is exotic lib).
+/// Returns a tuple: (Dictionary cell with resolved libs, Actual code cell if original code was exotic).
 pub(crate) async fn collect_used_libraries(
     net: Network,
     account: &ShardAccount,
