@@ -58,7 +58,6 @@ impl Executor {
     pub fn run_transaction(
         &self,
         message: Cell,
-        _mode: BigInt,
         params: RunTransactionArgs,
     ) -> (EmulationResult, String) {
         let message = CString::new(Boc::encode_base64(message))

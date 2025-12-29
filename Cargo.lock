@@ -52,6 +52,7 @@ dependencies = [
  "rand",
  "regex",
  "reqwest",
+ "retrace",
  "semver",
  "serde",
  "serde_json",
@@ -1916,6 +1917,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "retrace"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "dotenvy",
+ "emulator",
+ "hex",
+ "num-bigint",
+ "num-traits",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tycho-types",
+ "urlencoding",
+ "vmlogs",
+]
+
+[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2498,9 +2519,23 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
+ "parking_lot",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
+ "tokio-macros",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "2.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af407857209536a95c8e56f8231ef2c2e2aff839b22e07a1ffcbc617e9db9fa5"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -2610,9 +2645,9 @@ dependencies = [
 
 [[package]]
 name = "tonlib-core"
-version = "0.26.2"
+version = "0.26.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1243f834c41e73475f2ebdbe8e5aa3737b96ad6b57d714e61ad4f6f84e7e056f"
+checksum = "3b89f65a84ffbccb978520e3e70d93fab021a091aceb211db6d798b8c9df1ded"
 dependencies = [
  "async-trait",
  "base64",

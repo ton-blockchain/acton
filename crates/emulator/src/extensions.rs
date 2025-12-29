@@ -53,9 +53,7 @@ macro_rules! extension {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
-                    match (|| -> Result<$ty, tvmffi::from_stack::ArgError> {
-                        $crate::extensions::pop_arg::<$ty>(__t)
-                    })() {
+                    match $crate::extensions::pop_arg::<$ty>(__t) {
                         Ok($an) => {
                             $body(ctx, __t, $an);
                         }
@@ -72,9 +70,7 @@ macro_rules! extension {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
-                    match (|| -> Result<($($ty),*), tvmffi::from_stack::ArgError> {
-                        pop_args!(__t, $($ty),*)
-                    })() {
+                    match pop_args!(__t, $($ty),*) {
                         Ok(__vals) => {
                             #[allow(non_snake_case, unused_variables)]
                             let ($($an, )*) = __vals;

@@ -14,10 +14,11 @@ vmlogs = { path = "crates/vmlogs" }
 tasm = { path = "crates/tasm" }
 dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
+retrace = { path = "crates/retrace" }
 
 # remote crates
 # base TON libraries
-tonlib-core = "0.26.1"
+tonlib-core = "0.26.6"
 tycho-types = "0.3.0"
 
 num-bigint = "0.4.6"

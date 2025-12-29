@@ -2,7 +2,6 @@ use crate::blockchain::Blockchain;
 use crate::executor::{
     EmulationResult, Executor, ExecutorVerbosity, ResultError, RunTransactionArgs, StoreExt,
 };
-use num_bigint::BigInt;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 use tycho_types::dict::Dict;
@@ -116,7 +115,6 @@ impl Emulator {
 
         let (result, logs) = self.executor.run_transaction(
             message,
-            BigInt::from(0),
             RunTransactionArgs {
                 config: crate::config::DEFAULT_CONFIG.to_string(),
                 libs: libs.clone().into_root(),
