@@ -2,8 +2,8 @@ use crate::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use crate::debugger::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
 use abi::ContractAbi;
-use emulator::blockchain::Blockchain;
-use emulator::emulator::{Emulator, SendMessageResult};
+use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
+use emulator::world_state::WorldState;
 use num_bigint::BigInt;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
@@ -247,23 +247,33 @@ impl Emulations {
         }
     }
 
-    pub fn find_tx_by_lt(&self, lt: u64) -> Option<&SendMessageResult> {
+    pub fn find_tx_by_lt(&self, lt: u64) -> Option<&SendMessageResultSuccess> {
         self.results
             .iter()
             .flatten()
-            .find(|res| matches!(res, SendMessageResult::Success(res) if res.transaction.lt == lt))
+            .flat_map(|res| match res {
+                SendMessageResult::Success(res) => Some(res),
+                SendMessageResult::Error(_) => None,
+            })
+            .find(|res| res.transaction.lt == lt)
     }
 
     pub fn find_tx_logs(&self, lt: u64) -> Option<&str> {
-        self.find_tx_by_lt(lt).map(|res| res.vm_logs())
+        self.find_tx_by_lt(lt).map(|res| res.vm_log.as_ref())
     }
 
     pub fn find_tx_debug_logs(&self, lt: u64) -> Option<String> {
-        self.find_tx_by_lt(lt).map(|res| res.debug_logs())
+        self.find_tx_by_lt(lt).map(|res| {
+            res.vm_log
+                .lines()
+                .filter(|line| line.starts_with("#DEBUG#:"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
     }
 
     pub fn find_tx_executor_logs(&self, lt: u64) -> Option<&str> {
-        self.find_tx_by_lt(lt).map(|res| res.executor_logs())
+        self.find_tx_by_lt(lt).map(|res| res.executor_logs.as_ref())
     }
 }
 
@@ -290,6 +300,8 @@ pub struct Env<'a> {
     pub open_wallets: BTreeMap<String, Wallet>,
     pub build_override: BTreeMap<String, ArcCell>, // contract ID -> code
     pub explorer: Option<Explorer>,
+    pub fork_net: Option<String>,
+    pub api_key: Option<String>,
 }
 
 pub struct Context<'a> {
@@ -317,7 +329,7 @@ pub struct AssertsContext<'a> {
 }
 
 pub struct ChainContext<'a> {
-    pub blockchain: &'a mut Blockchain,
+    pub world_state: &'a mut WorldState,
     pub emulator: &'a mut Emulator,
     pub emulations: &'a mut Emulations,
 }
@@ -338,7 +350,7 @@ pub enum DebugCtx<'a> {
 
 impl<'a> Context<'a> {
     pub fn network(&self) -> String {
-        self.network.clone().unwrap_or("testnet".to_owned())
+        self.env.fork_net.clone().unwrap_or("testnet".to_owned())
     }
 }
 
@@ -379,7 +391,7 @@ impl<'a> ChainContext<'a> {
 
     pub fn build_libs_with_hash_owner(&self, owner: &HashBytes) -> Dict<HashBytes, LibDescr> {
         let mut libs = Dict::<HashBytes, LibDescr>::new();
-        for lib in self.blockchain.libs().iter() {
+        for lib in self.world_state.libs().iter() {
             let mut publishers = Dict::new();
             publishers.add(owner, ()).ok();
 

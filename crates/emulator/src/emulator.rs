@@ -1,5 +1,5 @@
-use crate::blockchain::Blockchain;
 use crate::utils::StoreExt;
+use crate::world_state::WorldState;
 use anyhow::Context;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{
@@ -18,110 +18,36 @@ pub struct Emulator {
     pub executor: Executor,
 }
 
-#[derive(Clone, Debug)]
-pub enum SendMessageResult {
-    Success(SendMessageResultSuccess),
-    Error(RunTransactionResultError),
-}
-
-impl SendMessageResult {
-    pub fn vm_logs(&self) -> &str {
-        match self {
-            SendMessageResult::Success(res) => &res.vm_log,
-            SendMessageResult::Error(res) => res.vm_log.as_deref().unwrap_or(""),
-        }
-    }
-
-    pub fn debug_logs(&self) -> String {
-        match self {
-            SendMessageResult::Success(res) => res
-                .vm_log
-                .lines()
-                .filter(|line| line.starts_with("#DEBUG#:"))
-                .collect::<Vec<_>>()
-                .join("\n"),
-            SendMessageResult::Error(_) => "".to_string(),
-        }
-    }
-
-    pub fn executor_logs(&self) -> &str {
-        match self {
-            SendMessageResult::Success(res) => &res.logs,
-            SendMessageResult::Error(_) => "",
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct SendMessageResultSuccess {
-    pub raw_transaction: String,
-    pub transaction: Transaction,
-    pub parent_transaction: Option<Transaction>,
-    pub child_transactions: Vec<u64>,
-    pub shard_account_before: ShardAccount,
-    pub shard_account: ShardAccount,
-    pub out_messages: Vec<Cell>,
-    pub vm_log: String,
-    pub logs: String,
-    pub actions: Option<String>,
-    pub code: Option<Cell>,
-    pub externals: Vec<Cell>,
-}
-
-impl SendMessageResultSuccess {
-    pub fn opcode(&self) -> Option<u32> {
-        let in_msg = self.transaction.in_msg.as_deref()?;
-        let mut in_msg = in_msg.parse::<RelaxedMessage>().ok()?;
-        let opcode = in_msg.body.load_u32().ok()?;
-        if opcode == 0xFFFFFFFF {
-            let opcode = in_msg.body.load_u32().ok()?;
-            return Some(opcode);
-        }
-        Some(opcode)
-    }
-
-    pub fn used_gas(&self) -> Option<u64> {
-        let info = self.transaction.info.load().ok()?;
-        let TxInfo::Ordinary(info) = info else {
-            return None;
-        };
-        let ComputePhase::Executed(info) = info.compute_phase else {
-            return None;
-        };
-        Some(info.gas_used.into())
-    }
-}
-
 impl Emulator {
-    pub fn new(verbosity: ExecutorVerbosity) -> anyhow::Result<Emulator> {
-        let executor = Executor::new(verbosity, None)?;
+    pub fn new(verbosity: ExecutorVerbosity, config_b64: Option<&str>) -> anyhow::Result<Emulator> {
+        let executor = Executor::new(verbosity, config_b64)?;
         Ok(Emulator { executor })
     }
 
     pub fn send_single_message(
         &self,
-        net: &mut Blockchain,
+        state: &mut WorldState,
         message: Cell,
         libs: &Dict<HashBytes, LibDescr>,
-        src_addr: Option<IntAddr>,
+        from: Option<IntAddr>,
     ) -> anyhow::Result<SendMessageResult> {
-        let message = Emulator::patch_src_addr(message, src_addr);
+        let message = Emulator::patch_src_addr(message, from);
         let message_obj = message.parse::<Message>()?;
         let MsgInfo::Int(int_message) = &message_obj.info else {
             anyhow::bail!("message is not an internal message")
         };
         let dst_addr = int_message.dst.to_string();
 
-        let dest_account = net.get_account(&dst_addr);
+        let dest_account = state.get_account(&dst_addr);
         let code = Self::get_code_cell(&message_obj, &dest_account);
 
-        let (result, logs) = self.executor.run_transaction(
+        let (result, executor_logs) = self.executor.run_transaction(
             &Boc::encode_base64(message),
             RunTransactionArgs {
                 libs: libs.clone().into_root().map(Boc::encode_base64),
                 shard_account: Boc::encode_base64(&dest_account.to_cell()),
-                now: net.get_now(),
-                lt: net.get_lt(),
+                now: state.get_now(),
+                lt: state.get_lt(),
                 random_seed: None,
                 ignore_chksig: false,
                 debug_enabled: true,
@@ -142,7 +68,7 @@ impl Emulator {
             .parse::<ShardAccount>()
             .context("Failed to load shard account from slice")?;
 
-        net.update_account(&dst_addr, &shard_account);
+        state.update_account(&dst_addr, &shard_account);
 
         let tx_cell =
             Boc::decode_base64(&result.transaction).context("Failed to decode transaction BoC")?;
@@ -165,7 +91,7 @@ impl Emulator {
             shard_account,
             out_messages,
             vm_log: result.vm_log,
-            logs,
+            executor_logs,
             actions: result.actions,
             code,
             externals: vec![],
@@ -176,12 +102,12 @@ impl Emulator {
 
     pub fn send_message(
         &self,
-        net: &mut Blockchain,
+        state: &mut WorldState,
         message: Cell,
         libs: &Dict<HashBytes, LibDescr>,
-        src_addr: Option<IntAddr>,
+        from: Option<IntAddr>,
     ) -> Vec<SendMessageResult> {
-        let result = self.send_single_message(net, message, libs, src_addr);
+        let result = self.send_single_message(state, message, libs, from);
         let Ok(SendMessageResult::Success(send_result)) = result else {
             return vec![];
         };
@@ -198,7 +124,7 @@ impl Emulator {
                     return vec![];
                 };
 
-                let mut send_results = self.send_message(net, msg.to_cell(), libs, None);
+                let mut send_results = self.send_message(state, msg.to_cell(), libs, None);
                 for result in &mut send_results {
                     match result {
                         SendMessageResult::Success(result) => {
@@ -250,7 +176,7 @@ impl Emulator {
         message.to_cell()
     }
 
-    pub fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
+    fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
         let state = account
             .account
             .load()
@@ -286,5 +212,53 @@ impl Emulator {
                 }
             }
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum SendMessageResult {
+    Success(SendMessageResultSuccess),
+    Error(RunTransactionResultError),
+}
+
+#[derive(Clone, Debug)]
+pub struct SendMessageResultSuccess {
+    pub raw_transaction: String,
+    pub transaction: Transaction,
+    pub parent_transaction: Option<Transaction>,
+    pub child_transactions: Vec<u64>,
+    pub shard_account_before: ShardAccount,
+    pub shard_account: ShardAccount,
+    pub out_messages: Vec<Cell>,
+    pub vm_log: String,
+    pub executor_logs: String,
+    pub actions: Option<String>,
+    pub code: Option<Cell>,
+    pub externals: Vec<Cell>,
+}
+
+impl SendMessageResultSuccess {
+    pub fn opcode(&self) -> Option<u32> {
+        let in_msg = self.transaction.in_msg.as_deref()?;
+        let mut in_msg = in_msg.parse::<RelaxedMessage>().ok()?;
+        let opcode = in_msg.body.load_u32().ok()?;
+        if let RelaxedMsgInfo::Int(info) = &in_msg.info
+            && info.bounced
+        {
+            let opcode = in_msg.body.load_u32().ok()?;
+            return Some(opcode);
+        }
+        Some(opcode)
+    }
+
+    pub fn used_gas(&self) -> Option<u64> {
+        let info = self.transaction.info.load().ok()?;
+        let TxInfo::Ordinary(info) = info else {
+            return None;
+        };
+        let ComputePhase::Executed(info) = info.compute_phase else {
+            return None;
+        };
+        Some(info.gas_used.into())
     }
 }

@@ -66,6 +66,7 @@ pub struct FormatterContext {
     pub known_code_cells: HashMap<String, String>,
     pub backtrace: Option<String>,
     pub fork_net: Option<String>,
+    pub api_key: Option<String>,
     pub network: Option<String>,
 }
 
@@ -81,6 +82,7 @@ impl FormatterContext {
             backtrace: None,
             fork_net: None,
             network: None,
+            api_key: None,
         }
     }
 
@@ -88,14 +90,15 @@ impl FormatterContext {
     pub fn from_context(ctx: &crate::context::Context) -> Self {
         Self {
             contract_abi: ctx.env.abi.clone(),
-            accounts: ctx.chain.blockchain.get_accounts().clone(),
+            accounts: ctx.chain.world_state.get_accounts().clone(),
             build_cache: ctx.build.build_cache.clone(),
             emulations: ctx.chain.emulations.clone(),
             known_addresses: ctx.build.known_addresses.clone(),
             known_code_cells: ctx.build.known_code_cells.clone(),
             backtrace: ctx.build.backtrace.clone(),
-            fork_net: ctx.chain.blockchain.get_fork_net().clone(),
+            fork_net: ctx.env.fork_net.clone(),
             network: ctx.network.clone(),
+            api_key: ctx.env.api_key.clone(),
         }
     }
 

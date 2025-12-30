@@ -1,8 +1,6 @@
 #![cfg(test)]
 
 use crate::common::ExecutorVerbosity;
-use crate::get::RunGetMethodArgs;
-use crate::get::step::StepGetExecutor;
 use crate::message::Executor;
 use crate::message::types::RunTransactionArgs;
 use std::ffi::c_char;

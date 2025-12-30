@@ -37,7 +37,7 @@ pub struct TransactionInfo {
     pub shard_account_before: String,
     pub shard_account: String,
     pub vm_log_diff: String,
-    pub logs: String,
+    pub executor_logs: String,
     pub actions: Option<String>,
     pub dest_contract_info: Option<String>,
 }
@@ -78,7 +78,7 @@ pub fn dump_test_transactions(
                 shard_account_before: Boc::encode_hex(tx.shard_account_before.to_cell()),
                 shard_account: Boc::encode_hex(tx.shard_account.to_cell()),
                 vm_log_diff: vmlogs::convert_to_diff_logs(&tx.vm_log),
-                logs: tx.logs.clone(),
+                executor_logs: tx.executor_logs.clone(),
                 actions: tx.actions.clone(),
             })
         })

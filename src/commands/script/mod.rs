@@ -12,8 +12,8 @@ use crate::formatter::FormatterContext;
 use crate::wallets;
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
-use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
+use emulator::world_state::{AccountsState, LocalAccountsState, RemoteAccountState, WorldState};
 use log::error;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
@@ -180,8 +180,16 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let mut emulator = Emulator::new(verbosity)?;
-    let mut blockchain = Blockchain::new(fork_net.clone(), fork_block_number, api_key.clone());
+    let mut emulator = Emulator::new(verbosity, None)?;
+    let resolver = match &fork_net {
+        Some(net) => AccountsState::Remote(RemoteAccountState::new(
+            net.clone(),
+            fork_block_number,
+            api_key.clone(),
+        )),
+        None => AccountsState::Local(LocalAccountsState::new()),
+    };
+    let mut world_state = WorldState::new(resolver);
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =
         FileBuildCache::new(None).expect("Failed to create file cache for script execution");
@@ -204,6 +212,8 @@ fn execute_script(
             open_wallets,
             build_override: BTreeMap::new(),
             explorer,
+            fork_net,
+            api_key,
         },
         io: IoContext {
             stdout_buffer: "".to_string(),
@@ -215,7 +225,7 @@ fn execute_script(
             expected_exit_code: &mut expected_exit_code,
         },
         chain: ChainContext {
-            blockchain: &mut blockchain,
+            world_state: &mut world_state,
             emulator: &mut emulator,
             emulations: &mut emulations,
         },

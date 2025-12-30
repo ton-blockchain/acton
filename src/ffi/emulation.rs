@@ -222,12 +222,7 @@ fn send_message_impl(
     };
 
     if let Some(wallet) = ctx.env.find_wallet_by_address(&src_addr) {
-        let result = send_wallet_message(
-            &message,
-            wallet,
-            &ctx.network(),
-            ctx.chain.blockchain.get_api_key(),
-        );
+        let result = send_wallet_message(&message, wallet, &ctx.network(), &ctx.env.api_key);
         try_ctx!(ctx, result, "Failed to send message to real network: {}");
 
         // Add pseudo transaction to the result list to wait on it
@@ -236,7 +231,7 @@ fn send_message_impl(
             lt: 0,
             prev_trans_hash: Default::default(),
             prev_trans_lt: 0,
-            now: ctx.chain.blockchain.get_now(),
+            now: ctx.chain.world_state.get_now(),
             out_msg_count: Default::default(),
             orig_status: AccountStatus::Uninit,
             end_status: AccountStatus::Uninit,
@@ -288,12 +283,12 @@ fn send_message_impl(
     }
 
     let libs = ctx.chain.build_libs(&src_addr);
-    let blockchain = &mut ctx.chain.blockchain;
+    let world_state = &mut ctx.chain.world_state;
 
     let emulations = if ctx.debug.is_enabled() {
         send_message_debug(ctx, &msg_cell, &libs, Some(src_addr))
     } else {
-        emulator.send_message(blockchain, msg_cell, &libs, Some(src_addr))
+        emulator.send_message(world_state, msg_cell, &libs, Some(src_addr))
     };
 
     let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
@@ -435,7 +430,7 @@ fn send_message_debug(
 
     let dest_account = ctx
         .chain
-        .blockchain
+        .world_state
         .get_account(&int_message.dst.to_string());
     let code = Emulator::get_code_cell(&message_obj, &dest_account);
 
@@ -466,8 +461,8 @@ fn send_message_debug(
             RunTransactionArgs {
                 libs: libs.clone().into_root().map(Boc::encode_base64),
                 shard_account: Boc::encode_base64(dest_account.to_cell()),
-                now: ctx.chain.blockchain.get_now(),
-                lt: ctx.chain.blockchain.get_lt(),
+                now: ctx.chain.world_state.get_now(),
+                lt: ctx.chain.world_state.get_lt(),
                 random_seed: None,
                 ignore_chksig: false,
                 debug_enabled: true,
@@ -544,7 +539,7 @@ fn send_message_debug(
     );
 
     ctx.chain
-        .blockchain
+        .world_state
         .update_account(&int_message.dst.to_string(), &shard_account);
 
     let tx_cell: Cell = try_ctx!(
@@ -580,7 +575,7 @@ fn send_message_debug(
         shard_account,
         out_messages,
         vm_log: result.vm_log,
-        logs: "".to_string(),
+        executor_logs: "".to_string(),
         actions: result.actions,
         code,
         externals: vec![],
@@ -673,9 +668,9 @@ fn send_single_message_impl(ctx: &mut Context, stack: &mut Tuple, from: ArcCell,
     };
 
     let libs = ctx.chain.build_libs(&src_addr);
-    let blockchain = &mut ctx.chain.blockchain;
+    let world_state = &mut ctx.chain.world_state;
 
-    let emulation = match emulator.send_single_message(blockchain, msg_cell, &libs, Some(src_addr))
+    let emulation = match emulator.send_single_message(world_state, msg_cell, &libs, Some(src_addr))
     {
         Ok(res) => res,
         Err(err) => {
@@ -865,7 +860,7 @@ fn run_get_method_impl(
     address: ArcCell,
 ) {
     let args = args.unwrap_empty().unwrap_tuple();
-    let blockchain = &mut ctx.chain.blockchain;
+    let world_state = &mut ctx.chain.world_state;
     let address_boc = address.to_boc_hex(false).unwrap();
 
     let address_std = MsgAddrIntStd::from_boc_hex(address_boc.as_str()).unwrap();
@@ -874,7 +869,7 @@ fn run_get_method_impl(
 
     let dest_address = TonAddress::from_msg_address(address_std).unwrap();
 
-    let shard_account = blockchain.get_account(&dst_addr_str);
+    let shard_account = world_state.get_account(&dst_addr_str);
     let state = shard_account.account.load().unwrap().0.map(|s| s.state);
 
     let data = if let Some(AccountState::Active(state)) = state {
@@ -1060,7 +1055,7 @@ fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
         "Failed to decode address: {}"
     );
 
-    let is_deployed = ctx.chain.blockchain.check_deployed(&dst_addr_str);
+    let is_deployed = ctx.chain.world_state.check_deployed(&dst_addr_str);
     stack.push_bool(is_deployed);
 }
 
@@ -1072,13 +1067,13 @@ fn get_deployed_code_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell
         "Failed to decode address: {}"
     );
 
-    let is_deployed = ctx.chain.blockchain.check_deployed(&dst_addr_str);
+    let is_deployed = ctx.chain.world_state.check_deployed(&dst_addr_str);
     if !is_deployed {
         stack.push(TupleItem::Null);
         return;
     }
 
-    let account = ctx.chain.blockchain.get_account(&dst_addr_str);
+    let account = ctx.chain.world_state.get_account(&dst_addr_str);
     let cell = match get_address_code(&account) {
         Some(value) => value,
         None => {
@@ -1179,7 +1174,7 @@ fn account_state_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
 
     let Ok(account) = ctx
         .chain
-        .blockchain
+        .world_state
         .get_account(&addr.to_string())
         .account
         .load()
@@ -1226,7 +1221,7 @@ fn register_lib_impl(ctx: &mut Context, _stack: &mut Tuple, lib: ArcCell) {
         Boc::decode(lib_boc),
         "Failed to decode lib from BoC: {}"
     );
-    ctx.chain.blockchain.register_lib(cell)
+    ctx.chain.world_state.register_lib(cell)
 }
 
 extension!(convert_address in (Context) with (address: String) using convert_address_impl);
@@ -1332,7 +1327,7 @@ fn wait_for_transaction_impl(
         "Failed to parse network: {}"
     );
 
-    let api_key = ctx.chain.blockchain.get_api_key();
+    let api_key = ctx.env.api_key.clone();
     let api_client = TonApiClient::new(network, api_key.clone());
 
     let ext_message_hash_bytes = ext_message_hash.data();
@@ -1439,12 +1434,12 @@ fn disable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) {
 extension!(set_now in (Context) with (now: BigInt) using set_now_impl);
 fn set_now_impl(ctx: &mut Context, _stack: &mut Tuple, now: BigInt) {
     let now_u32 = now.to_u32().unwrap_or(0);
-    ctx.chain.blockchain.set_now(now_u32);
+    ctx.chain.world_state.set_now(now_u32);
 }
 
 extension!(get_now in (Context) using get_now_impl);
 fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) {
-    let now = ctx.chain.blockchain.get_now();
+    let now = ctx.chain.world_state.get_now();
     stack.push(TupleItem::Int(BigInt::from(now)));
 }
 

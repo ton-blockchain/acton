@@ -13,8 +13,8 @@ use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
 use dap_client::DapClient;
-use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
+use emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -207,8 +207,8 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let mut emulator = Emulator::new(verbosity)?;
-    let mut blockchain = Blockchain::new(None, None, None);
+    let mut emulator = Emulator::new(verbosity, None)?;
+    let mut world_state = WorldState::new(AccountsState::Local(LocalAccountsState::new()));
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =
         FileBuildCache::dummy().expect("Failed to create file cache for script execution");
@@ -230,6 +230,8 @@ fn execute_script(
             open_wallets: BTreeMap::new(),
             build_override: BTreeMap::new(),
             explorer: None,
+            fork_net: None,
+            api_key: None,
         },
         io: IoContext {
             stdout_buffer: "".to_string(),
@@ -241,7 +243,7 @@ fn execute_script(
             expected_exit_code: &mut expected_exit_code,
         },
         chain: ChainContext {
-            blockchain: &mut blockchain,
+            world_state: &mut world_state,
             emulator: &mut emulator,
             emulations: &mut emulations,
         },

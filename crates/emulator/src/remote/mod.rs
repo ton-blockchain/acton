@@ -7,7 +7,7 @@ use tycho_types::cell::Cell;
 
 pub fn get_account_info(
     seqno: Option<u64>,
-    address: &String,
+    address: &str,
     network: &str,
     api_key: Option<String>,
 ) -> anyhow::Result<TonCenterAccountInfoResult> {

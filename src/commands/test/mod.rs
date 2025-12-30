@@ -25,8 +25,8 @@ use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
-use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
+use emulator::world_state::{AccountsState, LocalAccountsState, RemoteAccountState, WorldState};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error};
 use num_traits::ToPrimitive;
@@ -221,12 +221,16 @@ impl<'a> TestRunner<'a> {
             prev_blocks_info: None,
         };
 
-        let mut emulator = Emulator::new(verbosity)?;
-        let mut blockchain = Blockchain::new(
-            self.config.fork_net.clone(),
-            self.config.fork_block_number,
-            self.config.api_key.clone(),
-        );
+        let mut emulator = Emulator::new(verbosity, None)?;
+        let resolver = match &self.config.fork_net {
+            Some(net) => AccountsState::Remote(RemoteAccountState::new(
+                net.clone(),
+                self.config.fork_block_number,
+                self.config.api_key.clone(),
+            )),
+            None => AccountsState::Local(LocalAccountsState::new()),
+        };
+        let mut world_state = WorldState::new(resolver);
 
         let mut assert_failure = None;
         let mut expected_exit_code = None;
@@ -240,6 +244,8 @@ impl<'a> TestRunner<'a> {
                 open_wallets: Default::default(), // in tests, we never use real wallets
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
+                api_key: self.config.api_key.clone(),
+                fork_net: self.config.fork_net.clone(),
             },
             io: IoContext {
                 stdout_buffer: "".to_owned(),
@@ -251,7 +257,7 @@ impl<'a> TestRunner<'a> {
                 expected_exit_code: &mut expected_exit_code,
             },
             chain: ChainContext {
-                blockchain: &mut blockchain,
+                world_state: &mut world_state,
                 emulator: &mut emulator,
                 emulations: &mut self.emulations,
             },
@@ -338,7 +344,7 @@ impl<'a> TestRunner<'a> {
             captured_stderr,
             assert_failure,
             expected_exit_code: expected_exit_code.and_then(|value| value.to_i32()),
-            accounts: blockchain.get_accounts().clone(),
+            accounts: world_state.get_accounts().clone(),
         })
     }
 }

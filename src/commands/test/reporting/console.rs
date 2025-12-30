@@ -193,6 +193,7 @@ impl TestReporter for ConsoleReporter {
                 backtrace: test.backtrace.clone(),
                 fork_net: None,
                 network: None,
+                api_key: None,
             };
 
             match &exec.get_result {
