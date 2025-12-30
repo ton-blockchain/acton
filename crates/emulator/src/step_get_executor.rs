@@ -1,15 +1,11 @@
 use crate::config;
-use crate::executor::ExtFunc;
-use crate::get_executor::{
-    GetMethodParams, GetMethodRawResult, GetMethodResult, GetMethodResultSuccess,
-    tvm_emulator_set_gas_limit,
-};
-use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
+use crate::executor::{ExtFunc, RegisterExtMethodCallback};
+use crate::utils::BaseExecutor;
 use std::ffi::{CString, c_void};
 use std::os::raw::c_int;
+use ton_executor::get::{GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::Tuple;
-use tycho_types::boc::Boc;
 
 #[derive(Clone)]
 pub struct StepGetExecutor {
@@ -39,7 +35,7 @@ impl BaseExecutor for StepGetExecutor {
 }
 
 impl StepGetExecutor {
-    pub fn new(stack: Tuple, params: GetMethodParams) -> Self {
+    pub fn new(stack: Tuple, params: RunGetMethodArgs) -> Self {
         let params_str = serde_json::to_string(&params).unwrap();
         let config_cstr = CString::new(config::DEFAULT_CONFIG)
             .expect("Cannot convert Config string to CString, should not happen");
@@ -111,22 +107,15 @@ impl StepGetExecutor {
         let result_cstr = unsafe { sbs_get_method_result(self.inner) };
 
         let output_str = unsafe { CString::from_raw(result_cstr).to_string_lossy().to_string() };
-        let result = serde_json::from_str::<GetMethodRawResult>(&output_str)
+        let result = serde_json::from_str::<GetMethodResult>(&output_str)
             .expect("Failed to parse output, should not happen");
 
         match result {
-            GetMethodRawResult::Success(result) => {
-                GetMethodResult::Success(GetMethodResultSuccess {
-                    success: result.success,
-                    stack: result.stack,
-                    gas_used: result.gas_used,
-                    vm_exit_code: result.vm_exit_code,
-                    vm_log: result.vm_log,
-                    missing_library: result.missing_library,
-                    code: Boc::decode_base64(code).ok(),
-                })
-            }
-            GetMethodRawResult::Error(err) => GetMethodResult::Error(err),
+            GetMethodResult::Success(result) => GetMethodResult::Success(GetMethodResultSuccess {
+                code: code.clone(),
+                ..result
+            }),
+            GetMethodResult::Error(err) => GetMethodResult::Error(err),
         }
     }
 }
@@ -157,4 +146,5 @@ unsafe extern "C" {
         ctx: *mut std::os::raw::c_void,
         callback: ExtFunc,
     ) -> *const std::os::raw::c_char;
+    pub(crate) fn tvm_emulator_set_gas_limit(tvm_emulator: *mut c_void, gas_limit: i64) -> bool;
 }

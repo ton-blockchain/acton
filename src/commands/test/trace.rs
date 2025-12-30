@@ -1,7 +1,7 @@
 use crate::commands::test::{Pos, TestDescriptor};
 use crate::context::BuildCache;
 use emulator::emulator::SendMessageResult;
-use emulator::executor::StoreExt;
+use emulator::utils::StoreExt;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;

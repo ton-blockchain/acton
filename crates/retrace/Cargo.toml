@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 emulator = { path = "../emulator" }
+ton-executor = { path = "../ton-executor" }
 
 tycho-types = "0.3.0"
 num-bigint = "0.4.6"

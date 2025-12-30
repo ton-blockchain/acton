@@ -6,15 +6,10 @@ use crate::ffi::assert::process_txs_and_search_params;
 use crate::formatter::FormatterContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
-use emulator::config::DEFAULT_CONFIG;
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use emulator::executor::{
-    EmulationResult, Executor, ExecutorVerbosity, RunTransactionArgs, StoreExt,
-};
-use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_executor::StepExecutor;
 use emulator::step_get_executor::StepGetExecutor;
-use emulator::traits::BaseExecutor;
+use emulator::utils::{BaseExecutor, StoreExt};
 use emulator::{AnyExecutor, extension, pop_args, register_ext_methods, remote, try_ctx};
 use log::{debug, info, warn};
 use num_bigint::BigInt;
@@ -26,10 +21,13 @@ use std::path::Path;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
+use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
+use ton_executor::message::{EmulationResult, RunTransactionArgs};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::block::msg_address::{MsgAddrIntStd, MsgAddress};
 use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
@@ -291,21 +289,9 @@ fn send_message_impl(
     let blockchain = &mut ctx.chain.blockchain;
 
     let emulations = if ctx.debug.is_enabled() {
-        send_message_debug(
-            ctx,
-            &msg_cell,
-            &libs,
-            Some(src_addr),
-            Some(ctx.env.default_log_level),
-        )
+        send_message_debug(ctx, &msg_cell, &libs, Some(src_addr))
     } else {
-        emulator.send_message(
-            blockchain,
-            msg_cell,
-            &libs,
-            Some(src_addr),
-            Some(ctx.env.default_log_level),
-        )
+        emulator.send_message(blockchain, msg_cell, &libs, Some(src_addr))
     };
 
     let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
@@ -427,7 +413,6 @@ fn send_message_debug(
     msg_cell: &Cell,
     libs: &Dict<HashBytes, LibDescr>,
     src_addr: Option<IntAddr>,
-    verbosity: Option<ExecutorVerbosity>,
 ) -> Vec<SendMessageResult> {
     let mut msg_slice = try_ctx!(
         ctx,
@@ -450,7 +435,7 @@ fn send_message_debug(
         .chain
         .blockchain
         .get_account(&int_message.dst.to_string());
-    let code = Executor::get_code_cell(&message_obj, &dest_account);
+    let code = Emulator::get_code_cell(&message_obj, &dest_account);
 
     let step_executor = StepExecutor::new();
     let source_map = ctx
@@ -477,16 +462,16 @@ fn send_message_debug(
         msg_cell.clone(),
         BigInt::from(0),
         RunTransactionArgs {
-            config: DEFAULT_CONFIG.to_string(),
-            libs: libs.clone().into_root(),
-            verbosity: verbosity.unwrap_or(ExecutorVerbosity::FullLocation),
-            shard_account: dest_account.clone(),
+            libs: libs.clone().into_root().map(Boc::encode_base64),
+            shard_account: Boc::encode_base64(dest_account.to_cell()),
             now: ctx.chain.blockchain.get_now(),
             lt: ctx.chain.blockchain.get_lt(),
             random_seed: None,
             ignore_chksig: false,
             debug_enabled: true,
             prev_blocks_info: None,
+            is_tick_tock: None,
+            is_tock: None,
         },
     );
     if !prepare_result.success {
@@ -579,7 +564,7 @@ fn send_message_debug(
         .map(|it| it.to_cell())
         .collect::<Vec<_>>();
 
-    let code = Executor::get_code_cell(&message_obj, &dest_account);
+    let code = Emulator::get_code_cell(&message_obj, &dest_account);
 
     let send_result = SendMessageResultSuccess {
         raw_transaction: result.transaction,
@@ -607,7 +592,7 @@ fn send_message_debug(
                 return vec![];
             };
 
-            let mut send_results = send_message_debug(ctx, &msg.to_cell(), libs, None, verbosity);
+            let mut send_results = send_message_debug(ctx, &msg.to_cell(), libs, None);
             for result in &mut send_results {
                 match result {
                     SendMessageResult::Success(result) => {
@@ -685,13 +670,8 @@ fn send_single_message_impl(ctx: &mut Context, stack: &mut Tuple, from: ArcCell,
     let libs = ctx.chain.build_libs(&src_addr);
     let blockchain = &mut ctx.chain.blockchain;
 
-    let emulation = match emulator.send_single_message(
-        blockchain,
-        msg_cell,
-        &libs,
-        Some(src_addr),
-        Some(ctx.env.default_log_level),
-    ) {
+    let emulation = match emulator.send_single_message(blockchain, msg_cell, &libs, Some(src_addr))
+    {
         Ok(res) => res,
         Err(err) => {
             ctx.asserts
@@ -904,7 +884,7 @@ fn run_get_method_impl(
     let libs_root = libs.clone().into_root();
 
     let method_id = id.to_i32().unwrap_or(0);
-    let params = GetMethodParams {
+    let params = RunGetMethodArgs {
         code: code.to_boc_b64(false).unwrap(),
         data: Boc::encode_base64(data),
         verbosity: ctx.env.default_log_level,
@@ -965,8 +945,14 @@ fn run_get_method_impl(
 
         step_executor.finish(&params.code)
     } else {
-        let executor = GetExecutor::new(params.clone());
-        executor.run_get_method(args, params, None)
+        let executor = GetExecutor::new(&params).expect("Cannot create get executor");
+        let args = serialize_tuple(&args)
+            .map(|t| t.to_boc_b64(false))
+            .expect("Cannot serialize tuple")
+            .expect("Cannot serialize tuple");
+        executor
+            .run_get_method(&args, &params, None)
+            .expect("Cannot run get method")
     };
 
     match result {

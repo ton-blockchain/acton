@@ -1,5 +1,5 @@
 use crate::context::Context;
-use emulator::traits::BaseExecutor;
+use emulator::utils::BaseExecutor;
 
 pub mod assert;
 pub mod emulation;

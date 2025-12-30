@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum EmulationResult {
-    Success(ResultSuccess),
-    Error(ResultError),
+    Success(RunTransactionResultSuccess),
+    Error(RunTransactionResultError),
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct ResultSuccess {
+pub struct RunTransactionResultSuccess {
     /// Base64 encoded transaction BoC.
     pub transaction: String,
     /// Base64 encoded updated shard account BoC.
@@ -21,7 +21,7 @@ pub struct ResultSuccess {
 }
 
 #[derive(Deserialize, Clone, Debug)]
-pub struct ResultError {
+pub struct RunTransactionResultError {
     /// Error message.
     pub error: String,
     /// Virtual Machine execution logs (if available).

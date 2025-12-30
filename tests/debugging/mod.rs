@@ -15,8 +15,6 @@ use dap_client::DapClient;
 use emulator::AnyExecutor;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
-use emulator::executor::ExecutorVerbosity;
-use emulator::get_executor::{GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
@@ -26,6 +24,8 @@ use std::{fs, thread};
 use tasm::printer::FormatOptions;
 use tolkc::CompilerResult;
 use tolkc::source_map::SourceMap;
+use ton_executor::ExecutorVerbosity;
+use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
@@ -190,7 +190,7 @@ fn execute_script(
 ) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext)> {
     let dest_address = contract_address(code_cell)?;
 
-    let params = GetMethodParams {
+    let params = RunGetMethodArgs {
         code: code_cell.to_boc_b64(false)?.to_string(),
         data: data_cell.to_boc_b64(false)?.to_string(),
         verbosity,
@@ -206,7 +206,7 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let mut emulator = Emulator::new(verbosity);
+    let mut emulator = Emulator::new(verbosity)?;
     let mut blockchain = Blockchain::new(None, None, None);
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =

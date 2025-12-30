@@ -6,9 +6,9 @@ use crate::types::{
 };
 use base64::Engine;
 use base64::engine::general_purpose;
-use emulator::executor::ResultSuccess;
 use std::collections::HashMap;
 use std::str::FromStr;
+use ton_executor::message::RunTransactionResultSuccess;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Lazy;
 use tycho_types::dict::Dict;
@@ -376,7 +376,9 @@ pub(crate) fn create_shard_account_from_api(
 /// # Arguments
 ///
 /// * `res` — Successful emulation result.
-pub(crate) fn find_final_actions(res: &ResultSuccess) -> (Vec<OutAction>, Option<Cell>) {
+pub(crate) fn find_final_actions(
+    res: &RunTransactionResultSuccess,
+) -> (Vec<OutAction>, Option<Cell>) {
     let Some(actions_b64) = &res.actions else {
         return (Vec::new(), None);
     };
@@ -439,7 +441,7 @@ pub(crate) fn tx_opcode(tx: &tycho_types::models::Transaction) -> Option<u32> {
 /// (Source, Destination, Amount, MoneyResult, Transaction, ComputeInfo)
 #[allow(clippy::type_complexity)]
 pub(crate) fn compute_final_data(
-    res: &ResultSuccess,
+    res: &RunTransactionResultSuccess,
     balance_before: Tokens,
 ) -> anyhow::Result<(
     Option<IntAddr>,

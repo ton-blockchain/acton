@@ -1,13 +1,15 @@
 use crate::blockchain::Blockchain;
-use crate::executor::{
-    EmulationResult, Executor, ExecutorVerbosity, ResultError, RunTransactionArgs, StoreExt,
+use crate::utils::StoreExt;
+use ton_executor::ExecutorVerbosity;
+use ton_executor::message::{
+    EmulationResult, Executor, RunTransactionArgs, RunTransactionResultError,
 };
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 use tycho_types::dict::Dict;
 use tycho_types::models::{
-    ComputePhase, IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
-    ShardAccount, Transaction, TxInfo,
+    AccountState, BaseMessage, ComputePhase, IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage,
+    RelaxedMsgInfo, ShardAccount, Transaction, TxInfo,
 };
 use tycho_types::prelude::HashBytes;
 
@@ -18,7 +20,7 @@ pub struct Emulator {
 #[derive(Clone, Debug)]
 pub enum SendMessageResult {
     Success(SendMessageResultSuccess),
-    Error(ResultError),
+    Error(RunTransactionResultError),
 }
 
 impl SendMessageResult {
@@ -90,9 +92,9 @@ impl SendMessageResultSuccess {
 }
 
 impl Emulator {
-    pub fn new(verbosity: ExecutorVerbosity) -> Self {
-        let executor = Executor::new(verbosity);
-        Self { executor }
+    pub fn new(verbosity: ExecutorVerbosity) -> anyhow::Result<Emulator> {
+        let executor = Executor::new(verbosity, None)?;
+        Ok(Emulator { executor })
     }
 
     pub fn send_single_message(
@@ -101,7 +103,6 @@ impl Emulator {
         message: Cell,
         libs: &Dict<HashBytes, LibDescr>,
         src_addr: Option<IntAddr>,
-        verbosity: Option<ExecutorVerbosity>,
     ) -> anyhow::Result<SendMessageResult> {
         let message = Emulator::patch_src_addr(message, src_addr);
         let message_obj = message.parse::<Message>()?;
@@ -111,23 +112,23 @@ impl Emulator {
         let dst_addr = int_message.dst.to_string();
 
         let dest_account = net.get_account(&dst_addr);
-        let code = Executor::get_code_cell(&message_obj, &dest_account);
+        let code = Self::get_code_cell(&message_obj, &dest_account);
 
         let (result, logs) = self.executor.run_transaction(
-            message,
+            &Boc::encode_base64(message),
             RunTransactionArgs {
-                config: crate::config::DEFAULT_CONFIG.to_string(),
-                libs: libs.clone().into_root(),
-                verbosity: verbosity.unwrap_or(ExecutorVerbosity::Short),
-                shard_account: dest_account.clone(),
+                libs: libs.clone().into_root().map(Boc::encode_base64),
+                shard_account: Boc::encode_base64(&dest_account.to_cell()),
                 now: net.get_now(),
                 lt: net.get_lt(),
                 random_seed: None,
                 ignore_chksig: false,
                 debug_enabled: true,
                 prev_blocks_info: None,
+                is_tick_tock: None,
+                is_tock: None,
             },
-        );
+        )?;
         let result = match result {
             EmulationResult::Success(result) => result,
             EmulationResult::Error(err) => return Ok(SendMessageResult::Error(err)),
@@ -142,7 +143,7 @@ impl Emulator {
 
         net.update_account(&dst_addr, &shard_account);
 
-        let tx_cell: Cell =
+        let tx_cell =
             Boc::decode_base64(&result.transaction).expect("Failed to decode transaction BoC");
         let transaction = tx_cell
             .parse::<Transaction>()
@@ -178,11 +179,9 @@ impl Emulator {
         message: Cell,
         libs: &Dict<HashBytes, LibDescr>,
         src_addr: Option<IntAddr>,
-        verbosity: Option<ExecutorVerbosity>,
     ) -> Vec<SendMessageResult> {
-        let Ok(SendMessageResult::Success(send_result)) =
-            self.send_single_message(net, message, libs, src_addr, verbosity)
-        else {
+        let result = self.send_single_message(net, message, libs, src_addr);
+        let Ok(SendMessageResult::Success(send_result)) = result else {
             return vec![];
         };
 
@@ -198,7 +197,7 @@ impl Emulator {
                     return vec![];
                 };
 
-                let mut send_results = self.send_message(net, msg.to_cell(), libs, None, verbosity);
+                let mut send_results = self.send_message(net, msg.to_cell(), libs, None);
                 for result in &mut send_results {
                     match result {
                         SendMessageResult::Success(result) => {
@@ -248,5 +247,43 @@ impl Emulator {
         message.layout = None;
 
         message.to_cell()
+    }
+
+    pub fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
+        let state = account
+            .account
+            .load()
+            .ok()
+            .and_then(|loaded| loaded.0)
+            .map(|s| s.state);
+
+        let Some(AccountState::Active(state)) = state else {
+            return None;
+        };
+
+        let Some(code) = state.code else {
+            return None;
+        };
+
+        Some(code)
+    }
+
+    pub fn get_code_cell<T, B>(
+        message: &BaseMessage<T, B>,
+        account: &ShardAccount,
+    ) -> Option<Cell> {
+        let account_code = Self::get_address_code_cell(&account);
+        match account_code {
+            Some(code) => Some(code),
+            None => {
+                if let Some(init) = &message.init
+                    && let Some(code) = &init.code
+                {
+                    Some(code.clone())
+                } else {
+                    None
+                }
+            }
+        }
     }
 }

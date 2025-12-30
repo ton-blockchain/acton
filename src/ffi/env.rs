@@ -1,5 +1,5 @@
 use crate::context::Context;
-use emulator::traits::BaseExecutor;
+use emulator::utils::BaseExecutor;
 use emulator::{extension, register_ext_methods};
 use num_bigint::BigInt;
 use std::env;

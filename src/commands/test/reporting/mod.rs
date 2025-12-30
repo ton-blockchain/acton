@@ -1,11 +1,11 @@
 use crate::commands::test::TestDescriptor;
 use crate::context::{AssertFailure, BuildCache, Emulations, KnownAddresses};
 use abi::ContractAbi;
-use emulator::get_executor::GetMethodResult;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 use tolkc::source_map::SourceMap;
+use ton_executor::get::GetMethodResult;
 use tycho_types::models::ShardAccount;
 
 pub mod console;

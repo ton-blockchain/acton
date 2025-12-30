@@ -39,6 +39,7 @@
 //! ```
 
 use num_bigint::BigInt;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -47,9 +48,11 @@ use vmlogs::executor_parser::{ExecutorLine, parse_executor_lines};
 use vmlogs::parser::{CellLike, VmLine, VmStack, VmStackValue};
 
 /// A single step or event in the TVM execution trace.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
 pub enum TraceStep {
     /// Normal instruction execution.
+    #[serde(rename = "execute")]
     Execute {
         /// The VM instruction being executed (e.g., `SETCP`, `DICTPUSHCONST`).
         instr: String,
@@ -63,6 +66,7 @@ pub enum TraceStep {
         gas: usize,
     },
     /// An exception occurred during execution.
+    #[serde(rename = "exception")]
     Exception {
         /// Exception error number (e.g., "9" for cell underflow).
         errno: String,
@@ -73,6 +77,7 @@ pub enum TraceStep {
         handled: bool,
     },
     /// Final state of the c5 control register (action list).
+    #[serde(rename = "final_c5")]
     FinalC5 {
         /// Hex representation of the c5 cell.
         cell: String,

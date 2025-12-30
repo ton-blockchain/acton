@@ -4,10 +4,10 @@ use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
 use crate::retrace;
 use emulator::exit_codes;
-use emulator::get_executor::GetMethodResult;
 use owo_colors::OwoColorize;
 use std::path::Path;
 use tolkc::source_map::SourceLocation;
+use ton_executor::get::GetMethodResult;
 
 #[derive(Debug, Clone)]
 pub struct ConsoleConfig {

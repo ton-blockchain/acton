@@ -7,9 +7,11 @@ use crate::types::{BaseTxInfo, TraceEmulatedTx, TraceInMessage, TraceResult};
 use crate::{ComputeInfo, find_base_tx_by_hash};
 use base64::Engine;
 use base64::engine::general_purpose;
-use emulator::executor::{EmulationResult, Executor, ExecutorVerbosity, RunTransactionArgs};
+use emulator::utils::StoreExt;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use ton_executor::ExecutorVerbosity;
+use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{AccountState, ShardAccount, Transaction};
@@ -217,7 +219,12 @@ pub async fn retrace_base_tx(
     // master‑block sequence number that references our shard‑block
     let mc_seqno = block.masterchain_block_ref.seqno;
     // pseudorandom seed from the master‑block header — TVM needs it for deterministic RNG
-    let rand_seed = general_purpose::STANDARD.decode(block.rand_seed)?;
+    let rand_seed_vec = general_purpose::STANDARD.decode(block.rand_seed)?;
+    let mut rand_seed: [u8; 32] = [0; 32];
+    for (i, el) in rand_seed.iter_mut().enumerate() {
+        *el = rand_seed_vec.get(i).cloned().unwrap_or(0)
+    }
+
     // load the complete master‑block object (includes the list of shard‑blocks)
     let full_block = find_full_block_for_seqno(net, mc_seqno).await?;
 
@@ -266,7 +273,7 @@ pub async fn retrace_base_tx(
         &balance,
         libs.as_ref(),
         &block_config,
-        &rand_seed,
+        rand_seed,
     )?;
 
     // finally emulate the target transaction
@@ -332,7 +339,7 @@ fn emulate_previous_transactions(
     balance: &Tokens,
     libs: Option<&Cell>,
     block_config: &str,
-    rand_seed: &[u8],
+    rand_seed: [u8; 32],
 ) -> anyhow::Result<(Tokens, ShardAccount)> {
     let mut balance = *balance;
     let mut shard_account = shard_account.clone();
@@ -343,7 +350,7 @@ fn emulate_previous_transactions(
             block_config.to_owned(),
             shard_account.clone(),
             libs,
-            rand_seed.to_owned(),
+            rand_seed,
         )?;
         let res = match tx_res {
             EmulationResult::Success(res) => res,
@@ -367,27 +374,30 @@ fn emulate(
     block_config: String,
     shard_account: ShardAccount,
     libs: Option<&Cell>,
-    rand_seed: Vec<u8>,
+    rand_seed: [u8; 32],
 ) -> anyhow::Result<(EmulationResult, String)> {
     let Some(in_msg) = &tx.in_msg else {
         anyhow::bail!("No in_message was found in transaction")
     };
 
-    let emulator = Executor::new(ExecutorVerbosity::FullLocationStackVerbose);
+    let emulator = Executor::new(
+        ExecutorVerbosity::FullLocationStackVerbose,
+        Some(&block_config),
+    )?;
     let (tx_res, executor_logs) = emulator.run_transaction(
-        in_msg.clone(),
+        &Boc::encode_base64(in_msg),
         RunTransactionArgs {
-            config: block_config,
-            libs: libs.cloned(),
-            verbosity: ExecutorVerbosity::FullLocationStackVerbose,
-            shard_account,
+            libs: libs.as_deref().map(Boc::encode_base64),
+            shard_account: Boc::encode_base64(shard_account.to_cell()),
             now: tx.now,
             lt: tx.lt.into(),
             random_seed: Some(rand_seed),
             ignore_chksig: false,
             debug_enabled: true,
             prev_blocks_info: None,
+            is_tick_tock: None,
+            is_tock: None,
         },
-    );
+    )?;
     Ok((tx_res, executor_logs))
 }

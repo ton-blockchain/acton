@@ -15,8 +15,6 @@ use emulator::AnyExecutor;
 use emulator::blockchain::Blockchain;
 use emulator::config::DEFAULT_CONFIG;
 use emulator::emulator::Emulator;
-use emulator::executor::ExecutorVerbosity;
-use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use log::error;
 use owo_colors::OwoColorize;
@@ -25,9 +23,12 @@ use std::fs;
 use std::path::Path;
 use tolkc::source_map::SourceMap;
 use ton_api::Network;
+use ton_executor::ExecutorVerbosity;
+use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use vmlogs::parser::{CellLike, VmStackValue, vm_stack_value};
 
@@ -164,7 +165,7 @@ fn execute_script(
 ) -> anyhow::Result<()> {
     let dest_address = contract_address(code_cell)?;
 
-    let params = GetMethodParams {
+    let params = RunGetMethodArgs {
         code: code_cell.to_boc_b64(false)?.to_string(),
         data: data_cell.to_boc_b64(false)?.to_string(),
         verbosity,
@@ -180,7 +181,7 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let mut emulator = Emulator::new(verbosity);
+    let mut emulator = Emulator::new(verbosity)?;
     let mut blockchain = Blockchain::new(fork_net.clone(), fork_block_number, api_key.clone());
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =
@@ -256,10 +257,11 @@ fn execute_script(
         return Ok(());
     }
 
-    let mut executor = GetExecutor::new(params.clone());
+    let mut executor = GetExecutor::new(&params)?;
     ffi::register(&mut executor, &mut ctx);
 
-    let result = executor.run_get_method(stack, params, Some(DEFAULT_CONFIG));
+    let stack = serialize_tuple(&stack)?.to_boc_b64(false)?;
+    let result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
     print_script_result(&mut ctx, ScriptResult { result });
     Ok(())
 }

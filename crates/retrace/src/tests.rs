@@ -8,7 +8,7 @@ async fn test_retrace_709() {
         "3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41",
         709,
         false,
-        false, // TODO: why>
+        true,
     )
     .await;
 }

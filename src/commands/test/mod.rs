@@ -27,8 +27,6 @@ use anyhow::anyhow;
 use emulator::AnyExecutor;
 use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
-use emulator::executor::ExecutorVerbosity;
-use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
 use emulator::step_get_executor::StepGetExecutor;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error};
@@ -42,9 +40,13 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
 use tolkc::source_map::SourceMap;
+use ton_executor::ExecutorVerbosity;
+use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::serde::serialize_tuple;
+use tvmffi::stack::Tuple;
 use tycho_types::models::ShardAccount;
 use walkdir::WalkDir;
 
@@ -199,7 +201,7 @@ impl<'a> TestRunner<'a> {
         let now = std::time::SystemTime::now();
         let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
-        let params = GetMethodParams {
+        let params = RunGetMethodArgs {
             code: code_cell
                 .to_boc_b64(false)
                 .map_err(|err| anyhow!("Failed to encode code cell to BoC: {err}"))?
@@ -219,7 +221,7 @@ impl<'a> TestRunner<'a> {
             prev_blocks_info: None,
         };
 
-        let mut emulator = Emulator::new(verbosity);
+        let mut emulator = Emulator::new(verbosity)?;
         let mut blockchain = Blockchain::new(
             self.config.fork_net.clone(),
             self.config.fork_block_number,
@@ -305,10 +307,12 @@ impl<'a> TestRunner<'a> {
                     ctx.asserts.expected_exit_code.clone(),
                 )
             } else {
-                let mut executor = GetExecutor::new(params.clone());
+                let mut executor = GetExecutor::new(&params)?;
                 ffi::register(&mut executor, &mut ctx);
 
-                let get_result = executor.run_get_method(Default::default(), params, None);
+                let stack = Tuple::empty();
+                let stack = serialize_tuple(&stack)?.to_boc_b64(false)?;
+                let get_result = executor.run_get_method(&stack, &params, None)?;
 
                 if let Some(trace_dir) = &self.config.save_test_trace {
                     trace::dump_test_transactions(

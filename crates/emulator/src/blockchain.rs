@@ -1,6 +1,5 @@
 use crate::remote;
 use anyhow::anyhow;
-use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use std::collections::HashMap;
 use std::env;
@@ -22,7 +21,7 @@ pub fn account_code(accounts: &HashMap<String, ShardAccount>, addr: String) -> O
 
 pub struct Blockchain {
     accounts: HashMap<String, ShardAccount>,
-    current_lt: BigInt,
+    current_lt: u64,
     current_now: u32,
     libraries: Vec<Cell>,
     fork_net: Option<String>,
@@ -38,7 +37,7 @@ impl Blockchain {
     ) -> Self {
         Self {
             accounts: HashMap::new(),
-            current_lt: BigInt::from(0),
+            current_lt: 0,
             current_now: 0,
             libraries: vec![],
             fork_net,
@@ -141,9 +140,9 @@ impl Blockchain {
         self.accounts.insert(addr.clone(), account.clone());
     }
 
-    pub fn get_lt(&mut self) -> BigInt {
-        self.current_lt += BigInt::from(1_000_000);
-        self.current_lt.clone()
+    pub fn get_lt(&mut self) -> u64 {
+        self.current_lt += 1_000_000u64;
+        self.current_lt
     }
 
     pub fn libs(&self) -> Vec<Cell> {

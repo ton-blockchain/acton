@@ -126,7 +126,15 @@ impl GetExecutor {
             .with_context(|| format!("Failed to parse emulator output JSON: {}", output_str))?;
 
         match result {
-            GetInternalResult::Success { output } => Ok(output),
+            GetInternalResult::Success { output } => match output {
+                GetMethodResult::Success(output) => {
+                    Ok(GetMethodResult::Success(GetMethodResultSuccess {
+                        code: args.code.clone(),
+                        ..output
+                    }))
+                }
+                GetMethodResult::Error(err) => Ok(GetMethodResult::Error(err)),
+            },
             GetInternalResult::Fail { message, .. } => {
                 anyhow::bail!("Cannot run get method {}: {}", args.method_id, message);
             }

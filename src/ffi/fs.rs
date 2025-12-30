@@ -1,5 +1,5 @@
 use crate::context::Context;
-use emulator::traits::BaseExecutor;
+use emulator::utils::BaseExecutor;
 use emulator::{extension, register_ext_methods};
 use tvmffi::stack::{Tuple, TupleItem};
 

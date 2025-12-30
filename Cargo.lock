@@ -11,6 +11,7 @@ dependencies = [
  "num-bigint",
  "tolk_parser",
  "tree-sitter",
+ "tycho-types",
 ]
 
 [[package]]
@@ -68,6 +69,7 @@ dependencies = [
  "tolkc",
  "toml",
  "ton-api",
+ "ton-executor",
  "tonlib-core",
  "tree-sitter",
  "tvmffi",
@@ -679,6 +681,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "ton-executor",
  "tonlib-core",
  "tvmffi",
  "tycho-types",
@@ -1932,6 +1935,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "ton-executor",
  "tycho-types",
  "urlencoding",
  "vmlogs",
@@ -2642,6 +2646,16 @@ dependencies = [
  "serde_json",
  "tycho-types",
  "urlencoding",
+]
+
+[[package]]
+name = "ton-executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

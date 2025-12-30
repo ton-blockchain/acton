@@ -15,6 +15,7 @@ d-test:
 test:
     cargo test -p abi -p dap-client -p emulator -p tolk_parser -p ton-api -p tvmffi -p vmlogs \
     && cargo test -p retrace -- --test-threads 1 \
+    && cargo test -p ton-executor -- --test-threads 1 \
     && cargo test --lib commands::up::tests \
     && cargo test --lib config::tests \
     && cargo test --lib file_build_cache::tests \

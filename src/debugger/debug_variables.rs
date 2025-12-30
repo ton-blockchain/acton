@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
 use emulator::AnyExecutor;
-use emulator::executor::StoreExt;
+use emulator::utils::StoreExt;
 use log::debug;
 use std::sync::atomic::Ordering;
 use tonlib_core::cell::ArcCell;

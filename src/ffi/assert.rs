@@ -2,7 +2,7 @@ use crate::context::{
     AssertBinFailure, AssertFailure, Context, FailAssertFailure, TransactionGenericAssertFailure,
     TransactionNotFoundParams, WalletNotFoundFailure,
 };
-use emulator::traits::BaseExecutor;
+use emulator::utils::BaseExecutor;
 use emulator::{extension, pop_args, register_ext_methods};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;

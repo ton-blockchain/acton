@@ -8,6 +8,7 @@ edition = "2024"
 abi = { path = "crates/abi" }
 tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }
+ton-executor = { path = "crates/ton-executor" }
 tolk_parser = { path = "crates/tolk_parser" }
 tvmffi = { path = "crates/tvmffi" }
 vmlogs = { path = "crates/vmlogs" }

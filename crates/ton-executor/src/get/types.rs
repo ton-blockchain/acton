@@ -25,6 +25,10 @@ pub struct GetMethodResultSuccess {
     pub vm_log: String,
     /// Base64 encoded missing library hash (if any).
     pub missing_library: Option<String>,
+
+    #[serde(skip)]
+    /// Base64 encoded code of contract.
+    pub code: String,
 }
 
 /// Get-method execution error details.

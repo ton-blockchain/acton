@@ -1,15 +1,16 @@
 use crate::config::DEFAULT_CONFIG;
 use crate::executor::{
-    EmulationResult, RunTransactionArgs, StoreExt, create_emulator, em_sbs_c7, em_sbs_code_pos,
-    em_sbs_result, em_sbs_stack, em_sbs_step, emulate_sbs, run_common_args_to_internal_params,
-    transaction_emulator_register_extmethod, transaction_emulator_sbs_get_control_register,
+    RegisterExtMethodCallback, create_emulator, em_sbs_c7, em_sbs_code_pos, em_sbs_result,
+    em_sbs_stack, em_sbs_step, emulate_sbs, transaction_emulator_register_extmethod,
+    transaction_emulator_sbs_get_control_register,
 };
-use crate::traits::{BaseExecutor, RegisterExtMethodCallback};
+use crate::utils::{BaseExecutor, EmulationInternalParams};
 use num_bigint::BigInt;
 use serde::Deserialize;
 use std::ffi::{CString, c_void};
 use std::os::raw::c_int;
 use std::ptr::null;
+use ton_executor::message::{EmulationResult, RunTransactionArgs};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
@@ -57,23 +58,17 @@ impl StepExecutor {
         let message = CString::new(Boc::encode_base64(message))
             .expect("Failed to create C string from message BOC");
 
-        let shard_account_cell = params.shard_account.to_cell();
-        let shard_account_b64 = Boc::encode_base64(shard_account_cell);
-        let shard_account_b64_cst = CString::new(shard_account_b64)
+        let shard_account_b64_cst = CString::new(params.shard_account.clone())
             .expect("Failed to create C string from shard account BOC");
 
         let has_libs = params.libs.is_some();
-        let libs = params
-            .libs
-            .clone()
-            .map(|lib| Boc::encode_base64(lib))
-            .unwrap_or("".to_string());
+        let libs = params.libs.as_deref().unwrap_or("");
         let libs_cstr = CString::new(libs).unwrap();
         let libs_ptr = libs_cstr.as_ptr();
 
-        let params = run_common_args_to_internal_params(&params);
-        let params_str =
-            serde_json::to_string(&params).expect("Failed to serialize emulation params to JSON");
+        let internal_params = EmulationInternalParams::from(&params);
+        let params_str = serde_json::to_string(&internal_params)
+            .expect("Failed to serialize emulation params to JSON");
         let params_cstr =
             CString::new(params_str).expect("Failed to create C string from params JSON");
 
