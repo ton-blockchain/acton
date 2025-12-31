@@ -6,11 +6,11 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 test)
-  ✗ with error [TIME]
+ > ./tests/test.test.tolk (1 test)
+  ✗ with-error [TIME]
     └─ exit_code=42
-      ├─ at tests/test_test[LINE]
-      │     __throw   at tests/test_test[LINE]
+      ├─ at tests/test.test[LINE]
+      │     __throw   at tests/test.test[LINE]
       └─ Phase: Action phase
 
  ✗ 1 failed in 1 file

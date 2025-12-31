@@ -1,0 +1,19 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > ./tests/test1.test.tolk (3 tests)
+  ✓ first-pass [TIME]
+  ✗ second-fail [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            1,
+            2
+        )
+      └─ at ./tests/test1.test[LINE]
+
+ ✓ 1 passed, ✗ 1 failed in 1 file
+
+Some tests failed.

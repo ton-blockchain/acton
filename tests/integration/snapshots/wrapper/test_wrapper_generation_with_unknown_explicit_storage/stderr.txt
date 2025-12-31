@@ -1,0 +1,2 @@
+Error: Storage struct SomeStorage not found in contract my_contract. Available types:
+ FirstStorage

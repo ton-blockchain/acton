@@ -1,37 +1,27 @@
+//! This module provides utilities for interacting with remote TON networks.
+//!
+//! It currently supports fetching account information and global libraries
+//! from the TonCenter API for both `mainnet` and `testnet`.
+
 use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, ToBigInt};
+use reqwest::blocking::Response;
 use serde::Deserialize;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
-pub fn get_last_block_seqno(network: &str, api_key: Option<String>) -> anyhow::Result<u64> {
-    let base_url = toncenter_url(network)?;
-    let url = format!("{}/api/v2/getMasterchainInfo", base_url);
-    let client = reqwest::blocking::Client::new();
-    let mut request = client.get(url).header("User-Agent", "acton-cli");
-
-    if let Some(key) = api_key {
-        request = request.header("X-API-Key", key);
-    }
-
-    let response = request
-        .send()
-        .context("Failed to send request to TonCenter")?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("TonCenter API returned status: {}", response.status());
-    }
-
-    let data: TonCenterMasterchainInfoResponse = response
-        .json()
-        .context("Failed to parse TonCenter response")?;
-
-    Ok(data.result.last.seqno)
-}
-
+/// Fetches account information from TonCenter.
+///
+/// # Arguments
+///
+/// * `seqno` - Optional block sequence number to pin the state to.
+/// * `address` - The account address in any valid format.
+/// * `network` - The network name ("mainnet" or "testnet").
+/// * `api_key` - Optional TonCenter API key. If not provided, it will try to
+///   use the `TONCENTER_API_KEY` environment variable.
 pub fn get_account_info(
     seqno: Option<u64>,
-    address: &String,
+    address: &str,
     network: &str,
     api_key: Option<String>,
 ) -> anyhow::Result<TonCenterAccountInfoResult> {
@@ -39,7 +29,7 @@ pub fn get_account_info(
     let url = format!(
         "{}/api/v2/getAddressInformation?address={}{}",
         base_url,
-        urlencoding::encode(address),
+        address,
         seqno
             .map(|seqno| format!("&seqno={seqno}"))
             .unwrap_or("".to_owned()),
@@ -56,7 +46,7 @@ pub fn get_account_info(
         .context("Failed to send request to TonCenter")?;
 
     if !response.status().is_success() {
-        anyhow::bail!("TonCenter API returned status: {}", response.status());
+        return Err(handle_fail(response));
     }
 
     let data: TonCenterAccountInfoResponse = response
@@ -78,6 +68,13 @@ fn toncenter_url(network: &str) -> anyhow::Result<&str> {
     Ok(base_url)
 }
 
+/// Fetches a global library by its hash from TonCenter.
+///
+/// # Arguments
+///
+/// * `network` - The network name ("mainnet" or "testnet").
+/// * `hash` - Hex-encoded hash of the library.
+/// * `api_key` - Optional TonCenter API key.
 pub fn get_library_by_hash(
     network: &str,
     hash: &str,
@@ -99,7 +96,7 @@ pub fn get_library_by_hash(
         .context("Failed to send request to TonCenter for library")?;
 
     if !response.status().is_success() {
-        anyhow::bail!("TonCenter API returned status: {}", response.status());
+        return Err(handle_fail(response));
     }
 
     #[derive(Deserialize)]
@@ -129,6 +126,9 @@ pub fn get_library_by_hash(
     Boc::decode_base64(&data.result.result[0].data).context("Failed to decode library BOC data")
 }
 
+/// Decodes an optional Base64-encoded BoC string into a `Cell`.
+///
+/// Returns `None` if the input string is empty.
 pub fn decode_optional_cell(cell_data: &String) -> anyhow::Result<Option<Cell>> {
     if cell_data.is_empty() {
         return Ok(None);
@@ -136,42 +136,38 @@ pub fn decode_optional_cell(cell_data: &String) -> anyhow::Result<Option<Cell>> 
     Ok(Some(Boc::decode_base64(cell_data)?))
 }
 
-#[derive(Deserialize)]
-struct TonCenterMasterchainInfoResponse {
-    pub result: TonCenterMasterchainInfoResult,
-}
-
-#[derive(Deserialize)]
-struct TonCenterMasterchainInfoResult {
-    pub last: TonCenterMasterchainInfoLastBlock,
-}
-
-#[derive(Deserialize)]
-struct TonCenterMasterchainInfoLastBlock {
-    pub seqno: u64,
-}
-
 #[derive(Deserialize, Debug)]
 struct TonCenterAccountInfoResponse {
     pub result: TonCenterAccountInfoResult,
 }
 
+/// Account information returned by TonCenter API.
 #[derive(Deserialize, Debug)]
 pub struct TonCenterAccountInfoResult {
+    /// Account balance in nanoTONs.
     pub balance: StringOrNumber,
+    /// Base64-encoded code BoC.
     pub code: String,
+    /// Base64-encoded data BoC.
     pub data: String,
+    /// Account state (active, uninitialized, or frozen).
     pub state: String,
+    /// Hash of the state if the account is frozen.
     pub frozen_hash: String,
+    /// Information about the last transaction.
     pub last_transaction_id: TonCenterAccountInfoLastTransactionId,
 }
 
+/// Last transaction ID information from TonCenter.
 #[derive(Deserialize, Debug)]
 pub struct TonCenterAccountInfoLastTransactionId {
+    /// Logical time of the transaction.
     pub lt: String,
+    /// Hash of the transaction.
     pub hash: String,
 }
 
+/// A helper type for JSON values that can be either strings or numbers.
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum StringOrNumber {
@@ -188,4 +184,27 @@ impl StringOrNumber {
                 .ok_or_else(|| anyhow!("cannot convert {num} to bigint")),
         }
     }
+}
+
+fn handle_fail(response: Response) -> anyhow::Error {
+    let status = response.status();
+    let data = match response.json::<TonCenterErrorResponse>() {
+        Ok(res) => res,
+        Err(_) => {
+            return anyhow!("TonCenter API returned status: {status}");
+        }
+    };
+
+    anyhow!(
+        data.error
+            .trim_start_matches("LITE_SERVER_UNKNOWN: ")
+            .to_owned()
+    )
+}
+
+#[derive(Deserialize)]
+struct TonCenterErrorResponse {
+    #[allow(dead_code)]
+    ok: bool,
+    error: String,
 }

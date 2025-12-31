@@ -1,3 +1,24 @@
+/// Module for assertion functions.
+///
+/// This module provides the foundational assertion logic used in tests.
+/// While `expect` provides a high-level, fluent API, `Assert` offers direct static methods for verification.
+///
+/// Examples:
+/// ```tolk
+/// // Basic equality
+/// Assert.equal(2 + 2, 4, "Math check");
+///
+/// // Gas usage check for a void function
+/// Assert.consumesLessThan(fun() {
+///     someExpensiveOperation();
+/// }, 10000);
+///
+/// // Gas usage check for a function with arguments
+/// Assert.consumesLessThan2(fun(a: int, b: int) {
+///     return a * b;
+/// }, 10, 20, 500);
+/// ```
+
 import "@stdlib/gas-payments"
 import "../fmt"
 import "../ffi/ffi"
@@ -81,16 +102,12 @@ fun Assert.fail(message: slice = "", location: slice = ""): never {
 
 /// Asserts that the function without arguments consumes less than the expected amount of gas.
 /// 
-/// Until Tolk supports anonymous functions, you need to pass the standalone function as a parameter.
-/// 
 /// Example:
-/// ```
-/// fun to_track_gas() {
-///     // do something that consumes gas
-/// }
-/// 
+/// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan(to_track_gas, 100);
+///     Assert.consumesLessThan(fun do_something() {
+///         // do something that consumes gas
+///     }, 100);
 /// }
 /// ```
 /// 
@@ -107,18 +124,15 @@ fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
 
 /// Asserts that the function with single argument consumes less than the expected amount of gas.
 /// 
-/// Until Tolk supports anonymous functions, you need to pass the standalone function as a parameter.
-/// 
 /// Example:
-/// ```
-/// fun to_track_gas(a: int) {
-///     // do something that consumes gas
-/// }
-/// 
+/// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan1(to_track_gas, 100, 100);
-/// //                                         ^^^ this argument will be passed 
-/// //                                             to the function as the first argument
+///     Assert.consumesLessThan1(fun do_something(a: int, b: int) {
+///         // do something that consumes gas
+///     }, 100, 100);
+/// //     ^^^  ^^^ this argument will be passed to the function as the second argument
+/// //     | 
+/// //     this argument will be passed to the function as the first argument
 /// }
 /// ```
 fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int) {
@@ -131,19 +145,25 @@ fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected:
 
 /// Asserts that the function with two arguments consumes less than the expected amount of gas.
 /// 
-/// Until Tolk supports anonymous functions, you need to pass the standalone function as a parameter.
-/// 
 /// Example:
-/// ```
-/// fun to_track_gas(a: int, b: int) {
-///     // do something that consumes gas
-/// }
-/// 
+/// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan2(to_track_gas, 100, 100, 100);
+///     Assert.consumesLessThan2(fun do_something(a: int, b: int) {
+///         // do something that consumes gas
+///     }, 100, 100, 100);
+/// //     ^^^  ^^^  ^^^ this argument will be passed to the function as the third argument
+/// //     |    |  
+/// //     |    this argument will be passed to the function as the second argument
+/// //     |
+/// //     this argument will be passed to the function as the first argument
 /// }
 /// ```
-fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(fn: (Arg1, Arg2) -> Ret, arg1: Arg1, arg2: Arg2, expected: int) {
+fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
+    fn: (Arg1, Arg2) -> Ret,
+    arg1: Arg1,
+    arg2: Arg2,
+    expected: int
+) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2);
     val end = getGasConsumedAtTheMoment();
@@ -153,24 +173,44 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(fn: (Arg1, Arg2) -> Ret, arg1: Arg
 
 /// Asserts that the function with three arguments consumes less than the expected amount of gas.
 /// 
-/// Until Tolk supports anonymous functions, you need to pass the standalone function as a parameter.
-/// 
 /// Example:
-/// ```
-/// fun to_track_gas(a: int, b: int, c: int) {
-///     // do something that consumes gas
-/// }
-/// 
+/// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan3(to_track_gas, 100, 100, 100, 100);
+///     Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
+///         // do something that consumes gas
+///     }, 100, 100, 100, 100);
+/// //     ^^^  ^^^  ^^^  ^^^ this argument will be passed to the function as the fourth argument
+/// //     |    |    |
+/// //     |    |    this argument will be passed to the function as the third argument
+/// //     |    |  
+/// //     |    this argument will be passed to the function as the second argument
+/// //     |
+/// //     this argument will be passed to the function as the first argument
 /// }
 /// ```
-fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(fn: (Arg1, Arg2, Arg3) -> Ret, arg1: Arg1, arg2: Arg2, arg3: Arg3, expected: int) {
+fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
+    fn: (Arg1, Arg2, Arg3) -> Ret,
+    arg1: Arg1,
+    arg2: Arg2,
+    arg3: Arg3,
+    expected: int
+) {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2, arg3);
     val end = getGasConsumedAtTheMoment();
     ffi.assert_consumed_less(start, end, expected);
     return result;
+}
+
+/// Fails the test with wallet not found error.
+/// 
+/// This function is used internally by the framework when a wallet is not found.
+/// It provides detailed information about available wallets and instructions on how to add them.
+/// 
+/// NOT FOR PUBLIC USE.
+fun Assert.failWalletNotFound(wallet_name: slice, location: slice = ""): never {
+    ffi.fail_wallet_not_found(wallet_name, location);
+    throw ASSERTION_FAILED;
 }
 
 /// Internal function to assert that the function consumed less than the expected amount of gas.
@@ -202,6 +242,12 @@ fun ffi.assert_bin<V1, V2>(
 /// NOT FOR PUBLIC USE.
 fun ffi.assert_fail(message: slice = "", location: slice = ""): bool
     asm "100 EXTCALL"
+
+/// Internal function to fail when wallet is not found.
+/// 
+/// NOT FOR PUBLIC USE.
+fun ffi.fail_wallet_not_found(wallet_name: slice, location: slice = ""): bool
+    asm "105 EXTCALL"
 
 fun ffi.type_name_by_opcode(id: int): slice?
     asm "14 EXTCALL"

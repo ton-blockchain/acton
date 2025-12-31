@@ -1,0 +1,143 @@
+---
+title: "Contract deployment"
+description: "Learn how to deploy smart contracts"
+icon: Send
+---
+
+In Acton, there is no dedicated `acton deploy` command. Instead, it uses [Tolk scripts](/docs/commands/script/) for deployment.
+
+This approach provides maximum flexibility. Real-world contracts often require complex initialization data—such as dictionaries for metadata, encoded cell structures, or specific initial state configurations—which are cumbersome or impossible to pass via command-line arguments. By using scripts, you can utilize the full power of the Tolk language to prepare deployment data, calculate initial state, and manage the deployment flow programmatically.
+
+## Prerequisites
+
+Before deploying to the real network, you need to configure a wallet in your `wallets.toml` (or global configuration).
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic = "word1 word2 word3 ... word24" }
+```
+
+See the [Setting up wallets](/docs/scripting/setup-wallets/) guide for detailed instructions on configuring wallets safely.
+
+## Writing a Deploy Script
+
+A deploy script is a standard Tolk script that interacts with the network. It typically involves three steps:
+1. Loading the deployer wallet.
+2. Preparing the contract's initial state and code.
+3. Sending the deployment transaction.
+
+Here is an example of a script that deploys a simple Counter contract:
+
+```tolk title="scripts/deploy.tolk"
+import "../.acton/io"
+import "../.acton/emulation/network"
+import "../.acton/build/build"
+
+import "../tests/wrappers/Counter" // Import your contract wrapper
+import "../contracts/types"        // Import types if needed
+
+fun main() {
+    // 1. Load the configured wallet (searches wallets.toml and global wallets)
+    val deployer = net.wallet("deployer");
+
+    // 2. Prepare the contract
+    // We create the contract instance locally with its initial state
+    val counter = Counter.fromStorage(Storage {
+        id: 123,       // Unique ID to randomize address
+        counter: 0,    // Initial counter value
+    });
+
+    println1("Deploying counter to {}", counter.address);
+
+    // 3. Deploy the contract
+    // This sends a transaction from the deployer wallet with the stateInit
+    val result = counter.deploy(deployer.address, { value: ton("0.05") });
+    
+    // Wait for the transaction to be confirmed on the blockchain
+    result.wait();
+
+    println("Deployment complete!");
+}
+```
+
+### Complex Deployments
+
+For more complex contracts like Jettons, you can construct dictionaries and other data structures directly in the script:
+
+```tolk
+// ... imports ...
+
+fun main() {
+    val deployer = net.wallet("deployer");
+
+    // Construct Jetton metadata
+    val content = buildOnchainMetadata({
+        name: "MyJetton",
+        symbol: "JET",
+        description: "A cool jetton on TON",
+        image: "https://example.com/icon.png",
+    });
+
+    val minter = JettonMinter.fromStorage({
+        totalSupply: 1000000000,
+        adminAddress: deployer.address,
+        content: content,
+        jettonWalletCode: build("jetton_wallet"),
+    });
+
+    // Deploy
+    minter.deploy(deployer.address, { value: ton("0.05") }).wait();
+    
+    println1("Jetton deployed at {}", minter.address);
+}
+```
+
+## Running the Deployment
+
+To execute your deployment script on the real blockchain, use the `acton script` command with the `--broadcast` flag.
+
+### Testnet
+
+By default, Acton targets the testnet when broadcasting.
+
+```bash
+acton script scripts/deploy.tolk --broadcast
+```
+
+To deploy to testnet, your wallet must have testnet TONs. You can get them for free from the [Testnet Faucet](https://t.me/testgiver_ton_bot).
+
+### Mainnet
+
+To deploy to the mainnet, specify the network flag:
+
+```bash
+acton script scripts/deploy.tolk --broadcast --net mainnet
+```
+
+<Callout type="warning">
+When deploying to mainnet, real value is transferred. Ensure your contract logic is tested and audit-ready.
+</Callout>
+
+### Using API Keys
+
+For faster and more reliable interactions, especially on mainnet, it is recommended to use an API key from [TonCenter](https://toncenter.com/).
+
+```bash
+acton script scripts/deploy.tolk --broadcast --net mainnet --api-key YOUR_API_KEY
+```
+
+You can also set the `TONCENTER_API_KEY` environment variable to avoid passing it every time.
+
+## Local Testing
+
+One of the biggest advantages of using scripts is that you can test the exact same deployment logic locally before spending money.
+
+Simply run the script **without** the `--broadcast` flag:
+
+```bash
+acton script scripts/deploy.tolk
+```
+
+In this mode, `net.wallet("deployer")` creates a virtual wallet, and the deployment happens in the local emulator. This allows you to verify that your state initialization and logic are correct before spending any money.

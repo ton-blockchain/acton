@@ -11,6 +11,8 @@ pub struct ProjectBuilder {
     contracts: Vec<ContractDef>,
     tests: Vec<(String, String)>,
     files: Vec<(String, String)>,
+    raw_files: Vec<(String, String)>,
+    scripts: Vec<(String, String)>,
     test_config: Option<TestConfig>,
     license: Option<String>,
     create_acton_toml: bool,
@@ -37,7 +39,7 @@ struct DependencyDef {
     path: Option<String>,     // custom output path
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TestConfig {
     pub filter: Option<String>,
     pub exclude_patterns: Option<Vec<String>>,
@@ -51,8 +53,10 @@ pub struct TestConfig {
     pub coverage_file: Option<String>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fail_fast: Option<bool>,
 }
 
+#[allow(dead_code)]
 impl ProjectBuilder {
     pub fn new(name: &str) -> Self {
         let mut temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -63,6 +67,8 @@ impl ProjectBuilder {
             contracts: Vec::new(),
             tests: Vec::new(),
             files: Vec::new(),
+            raw_files: Vec::new(),
+            scripts: Vec::new(),
             test_config: None,
             license: Some("MIT".to_string()),
             create_acton_toml: true,
@@ -84,6 +90,11 @@ impl ProjectBuilder {
     /// ```
     pub fn with_license(mut self, license: Option<&str>) -> Self {
         self.license = license.map(|s| s.to_string());
+        self
+    }
+
+    pub fn script_config(mut self, name: &str, command: &str) -> Self {
+        self.scripts.push((name.to_string(), command.to_string()));
         self
     }
 
@@ -240,6 +251,17 @@ impl ProjectBuilder {
         self
     }
 
+    /// Add a custom raw file to the project (e.g., library files)
+    ///
+    /// # Examples
+    /// ```
+    /// .raw_file("foo.hex", "...")
+    /// ```
+    pub fn raw_file(mut self, path: &str, code: &str) -> Self {
+        self.raw_files.push((path.to_string(), code.to_string()));
+        self
+    }
+
     /// Configure test settings in Acton.toml
     ///
     /// # Examples
@@ -289,7 +311,7 @@ impl ProjectBuilder {
 
         for (name, code) in &self.tests {
             let adjusted_code = Self::adjust_imports(code);
-            let file_path = tests_dir.join(format!("{name}_test.tolk"));
+            let file_path = tests_dir.join(format!("{name}.test.tolk"));
             fs::write(file_path, adjusted_code).expect("Failed to write test file");
         }
 
@@ -301,11 +323,20 @@ impl ProjectBuilder {
             fs::write(file_path, code).expect("Failed to write custom file");
         }
 
+        for (path, code) in &self.raw_files {
+            let file_path = project_path.join(path);
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent).expect("Failed to create parent directories");
+            }
+            fs::write(file_path, code).expect("Failed to write raw file");
+        }
+
         if self.create_acton_toml {
             Self::create_acton_toml(
                 &project_path,
                 &self.name,
                 &self.contracts,
+                &self.scripts,
                 &self.test_config,
                 &self.license,
             );
@@ -336,6 +367,7 @@ impl ProjectBuilder {
         project_path: &Path,
         name: &str,
         contracts: &[ContractDef],
+        scripts: &[(String, String)],
         test_config: &Option<TestConfig>,
         license: &Option<String>,
     ) {
@@ -422,6 +454,14 @@ version = "0.1.0"
             toml_content.push('\n');
         }
 
+        if !scripts.is_empty() {
+            toml_content.push_str("[scripts]\n");
+            for (name, cmd) in scripts {
+                toml_content.push_str(&format!("{} = \"{}\"\n", name, cmd));
+            }
+            toml_content.push('\n');
+        }
+
         // Add [test] section if test_config is provided
         if let Some(config) = test_config {
             toml_content.push_str("[test]\n");
@@ -495,6 +535,10 @@ version = "0.1.0"
                 toml_content.push_str(&format!("junit-merge = {junit_merge}\n"));
             }
 
+            if let Some(fail_fast) = config.fail_fast {
+                toml_content.push_str(&format!("fail-fast = {fail_fast}\n"));
+            }
+
             toml_content.push('\n');
         }
 
@@ -509,6 +553,7 @@ pub struct Project {
 }
 
 impl Project {
+    #[allow(dead_code)]
     pub fn acton(&self) -> ActonCommand {
         let cmd = snapbox::cmd::Command::new(acton_exe()).with_assert(assert_ui());
         ActonCommand {
@@ -521,6 +566,7 @@ impl Project {
             build_contract: None,
             build_clear_cache: false,
             build_graph: None,
+            build_out_dir: None,
             disasm_string: None,
             disasm_output: None,
             disasm_address: None,
@@ -531,8 +577,18 @@ impl Project {
             compile_base64_only: false,
             compile_boc: None,
             compile_fift: None,
+            compile_source_map: None,
             test_reporters: Vec::new(),
             junit_merge: false,
+            test_exclude_patterns: Vec::new(),
+            test_include_patterns: Vec::new(),
+            verify_contract: None,
+            verify_address: None,
+            verify_wallet: None,
+            verify_network: None,
+            script_broadcast: false,
+            test_fail_fast: false,
+            script_fork_net: None,
         }
     }
 
@@ -553,6 +609,7 @@ pub struct ActonCommand {
     pub(crate) build_contract: Option<String>,
     pub(crate) build_clear_cache: bool,
     pub(crate) build_graph: Option<Option<String>>,
+    pub(crate) build_out_dir: Option<String>,
     pub(crate) disasm_string: Option<String>,
     pub(crate) disasm_output: Option<String>,
     pub(crate) disasm_address: Option<String>,
@@ -563,10 +620,21 @@ pub struct ActonCommand {
     pub(crate) compile_base64_only: bool,
     pub(crate) compile_boc: Option<String>,
     pub(crate) compile_fift: Option<String>,
+    pub(crate) compile_source_map: Option<String>,
     pub(crate) test_reporters: Vec<String>,
     pub(crate) junit_merge: bool,
+    pub(crate) test_exclude_patterns: Vec<String>,
+    pub(crate) test_include_patterns: Vec<String>,
+    pub(crate) verify_contract: Option<String>,
+    pub(crate) verify_address: Option<String>,
+    pub(crate) verify_wallet: Option<String>,
+    pub(crate) verify_network: Option<String>,
+    pub(crate) script_broadcast: bool,
+    pub(crate) test_fail_fast: bool,
+    pub(crate) script_fork_net: Option<String>,
 }
 
+#[allow(dead_code)]
 impl ActonCommand {
     pub fn build(mut self) -> Self {
         self.cmd = self.cmd.arg("build").current_dir(&self.project.path);
@@ -585,6 +653,38 @@ impl ActonCommand {
         self
     }
 
+    /// Start wrapper command
+    pub fn wrapper(mut self, contract_id: &str) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wrapper")
+            .arg(contract_id)
+            .current_dir(&self.project.path);
+        self
+    }
+
+    pub fn storage_struct(mut self, name: &str) -> Self {
+        self.cmd = self.cmd.arg("--storage-struct").arg(name);
+        self
+    }
+
+    pub fn generate_test_stub(mut self) -> Self {
+        self.cmd = self.cmd.arg("--test");
+        self
+    }
+
+    /// Specify output wrapper file
+    pub fn wrapper_output(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--output").arg(path);
+        self
+    }
+
+    /// Specify output test file
+    pub fn test_output(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--test-output").arg(path);
+        self
+    }
+
     /// Start script command
     ///
     /// # Examples
@@ -597,6 +697,25 @@ impl ActonCommand {
             .arg("script")
             .arg(script_path)
             .current_dir(&self.project.path);
+        self
+    }
+
+    pub fn run_script_cmd(mut self, script_name: &str) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("run")
+            .arg(script_name)
+            .current_dir(&self.project.path);
+        self
+    }
+
+    pub fn arg(mut self, arg: &str) -> Self {
+        self.cmd = self.cmd.arg(arg);
+        self
+    }
+
+    pub fn env(mut self, key: &str, value: &str) -> Self {
+        self.cmd = self.cmd.env(key, value);
         self
     }
 
@@ -634,7 +753,7 @@ impl ActonCommand {
     /// .disasm_string("base64_encoded_boc")
     /// ```
     pub fn disasm_string(mut self, boc_string: &str) -> Self {
-        self.cmd = self.cmd.arg("disasm").current_dir(&self.project.path);
+        self.cmd = self.cmd.current_dir(&self.project.path);
         self.disasm_string = Some(boc_string.to_string());
         self
     }
@@ -723,12 +842,17 @@ impl ActonCommand {
         self
     }
 
+    pub fn with_source_map(mut self, source_map_path: &str) -> Self {
+        self.compile_source_map = Some(source_map_path.to_string());
+        self
+    }
+
     /// Specify path to test file or directory
     ///
     /// # Examples
     /// ```
     /// .test().path(".")                   // All tests (default)
-    /// .test().path("tests/my_test.tolk")  // Specific file
+    /// .test().path("tests/my.test.tolk")  // Specific file
     /// .test().path("tests/")              // Specific directory
     /// ```
     pub fn path(mut self, path: &str) -> Self {
@@ -745,6 +869,16 @@ impl ActonCommand {
     /// ```
     pub fn filter(mut self, pattern: &str) -> Self {
         self.filter = Some(pattern.to_string());
+        self
+    }
+
+    pub fn exclude_pattern(mut self, pattern: &str) -> Self {
+        self.test_exclude_patterns.push(pattern.to_string());
+        self
+    }
+
+    pub fn include_pattern(mut self, pattern: &str) -> Self {
+        self.test_include_patterns.push(pattern.to_string());
         self
     }
 
@@ -790,6 +924,12 @@ impl ActonCommand {
         self
     }
 
+    /// Enable fail-fast mode
+    pub fn fail_fast(mut self) -> Self {
+        self.test_fail_fast = true;
+        self
+    }
+
     /// Enable JUnit merge mode (all suites in single file)
     ///
     /// # Examples
@@ -809,6 +949,84 @@ impl ActonCommand {
     /// ```
     pub fn contract(mut self, name: &str) -> Self {
         self.build_contract = Some(name.to_string());
+        self
+    }
+
+    pub fn verify(mut self) -> Self {
+        self.cmd = self.cmd.arg("verify").current_dir(&self.project.path);
+        self
+    }
+
+    pub fn verify_contract(mut self, name: &str) -> Self {
+        self.verify_contract = Some(name.to_string());
+        self
+    }
+
+    pub fn verify_address(mut self, address: &str) -> Self {
+        self.verify_address = Some(address.to_string());
+        self
+    }
+
+    pub fn wallet(mut self, wallet: &str) -> Self {
+        self.verify_wallet = Some(wallet.to_string());
+        self
+    }
+
+    pub fn verify_network(mut self, network: &str) -> Self {
+        self.verify_network = Some(network.to_string());
+        self
+    }
+
+    pub fn fork_net(mut self, network: &str) -> Self {
+        self.script_fork_net = Some(network.to_string());
+        self
+    }
+
+    pub fn library(mut self) -> Self {
+        self.cmd = self.cmd.arg("library").current_dir(&self.project.path);
+        self
+    }
+
+    pub fn fetch(mut self, hash: &str) -> Self {
+        self.cmd = self.cmd.arg("fetch").arg(hash);
+        self
+    }
+
+    pub fn publish(mut self) -> Self {
+        self.cmd = self.cmd.arg("publish");
+        self
+    }
+
+    pub fn with_code(mut self, code: &str) -> Self {
+        self.cmd = self.cmd.arg("--code").arg(code);
+        self
+    }
+
+    pub fn wallet_new(mut self) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wallet")
+            .arg("new")
+            .current_dir(&self.project.path);
+        self
+    }
+
+    pub fn wallet_list(mut self) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wallet")
+            .arg("list")
+            .current_dir(&self.project.path);
+        self
+    }
+
+    pub fn with_duration(mut self, duration: &str) -> Self {
+        self.cmd = self.cmd.arg("--duration").arg(duration);
+        self
+    }
+
+    pub fn with_disasm_flag(mut self) -> Self {
+        self.cmd = self.cmd.arg("--disasm");
         self
     }
 
@@ -836,6 +1054,29 @@ impl ActonCommand {
         self
     }
 
+    /// Set output directory for build artifacts (only for build command)
+    ///
+    /// # Examples
+    /// ```
+    /// .build().with_out_dir("artifacts")     // Use artifacts/ directory
+    /// .build().with_out_dir("dist/build")    // Use dist/build/ directory
+    /// ```
+    pub fn with_out_dir(mut self, path: &str) -> Self {
+        self.build_out_dir = Some(path.to_string());
+        self
+    }
+
+    /// Enable broadcast mode for script execution (only for script command)
+    ///
+    /// # Examples
+    /// ```
+    /// .script("deploy.tolk").broadcast()     // Send transactions to blockchain
+    /// ```
+    pub fn broadcast(mut self) -> Self {
+        self.script_broadcast = true;
+        self
+    }
+
     /// Run the command and return output
     pub fn run(mut self) -> TestOutput {
         if let Some(path) = self.test_path {
@@ -856,12 +1097,48 @@ impl ActonCommand {
             self.cmd = self.cmd.arg("--junit-merge");
         }
 
+        for pattern in &self.test_exclude_patterns {
+            self.cmd = self.cmd.arg("--exclude").arg(pattern);
+        }
+
+        for pattern in &self.test_include_patterns {
+            self.cmd = self.cmd.arg("--include").arg(pattern);
+        }
+
+        if self.test_fail_fast {
+            self.cmd = self.cmd.arg("--fail-fast");
+        }
+
         if let Some(contract) = self.build_contract {
             self.cmd = self.cmd.arg(contract);
         }
 
+        if let Some(contract) = self.verify_contract {
+            self.cmd = self.cmd.arg(contract);
+        }
+
+        if let Some(address) = self.verify_address {
+            self.cmd = self.cmd.arg("--address").arg(address);
+        }
+
+        if let Some(wallet) = self.verify_wallet {
+            self.cmd = self.cmd.arg("--wallet").arg(wallet);
+        }
+
+        if let Some(network) = self.verify_network {
+            self.cmd = self.cmd.arg("--net").arg(network);
+        }
+
+        if let Some(network) = self.script_fork_net {
+            self.cmd = self.cmd.arg("--fork-net").arg(network);
+        }
+
         if self.build_clear_cache {
             self.cmd = self.cmd.arg("--clear-cache");
+        }
+
+        if self.script_broadcast {
+            self.cmd = self.cmd.arg("--broadcast");
         }
 
         if let Some(graph_path) = self.build_graph {
@@ -871,6 +1148,10 @@ impl ActonCommand {
             } else {
                 self.cmd = self.cmd.arg("");
             }
+        }
+
+        if let Some(out_dir) = self.build_out_dir {
+            self.cmd = self.cmd.arg("--out-dir").arg(out_dir);
         }
 
         if let Some(boc_string) = self.disasm_string {
@@ -911,6 +1192,10 @@ impl ActonCommand {
 
         if let Some(fift_path) = self.compile_fift {
             self.cmd = self.cmd.arg("--fift").arg(fift_path);
+        }
+
+        if let Some(source_map_path) = self.compile_source_map {
+            self.cmd = self.cmd.arg("--source-map").arg(source_map_path);
         }
 
         self.cmd = self.cmd.env("NO_COLOR", "1");

@@ -6,7 +6,7 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (2 tests)
+ > ./tests/test.test.tolk (2 tests)
   ✓ multiply [TIME]
   ✓ divide [TIME]
 

@@ -1,11 +1,11 @@
 use crate::context::{
     AssertBinFailure, AssertFailure, Context, FailAssertFailure, TransactionGenericAssertFailure,
-    TransactionNotFoundParams,
+    TransactionNotFoundParams, WalletNotFoundFailure,
 };
-use emulator::traits::BaseExecutor;
-use emulator::{extension, pop_args, register_ext_methods};
+use emulator::{extension, register_ext_methods};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use ton_executor::BaseExecutor;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -13,11 +13,17 @@ use tycho_types::cell::Load;
 use tycho_types::models::{IntAddr, Transaction};
 
 extension!(assert_fail in (Context) with (location: String, message: String) using assert_fail_impl);
-fn assert_fail_impl(ctx: &mut Context, _stack: &mut Tuple, location: String, message: String) {
+fn assert_fail_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    location: String,
+    message: String,
+) -> anyhow::Result<()> {
     *ctx.asserts.assert_failure = Some(AssertFailure::Fail(FailAssertFailure {
         message: Some(message),
         location: Some(location),
     }));
+    Ok(())
 }
 
 extension!(assert_bin in (Context) with (location: String, message: String, right: Tuple, right_name: String, left: Tuple, left_name: String, operator: String) using assert_bin_impl);
@@ -32,17 +38,17 @@ fn assert_bin_impl(
     left: Tuple,
     left_name: String,
     operator: String,
-) {
+) -> anyhow::Result<()> {
     let left = left.unwrap_single();
     let right = right.unwrap_single();
 
     if operator == "==" && left == right {
         stack.push_bool(true);
-        return;
+        return Ok(());
     }
     if operator == "!=" && left != right {
         stack.push_bool(true);
-        return;
+        return Ok(());
     }
 
     if (operator == "<" || operator == ">" || operator == "<=" || operator == ">=")
@@ -55,7 +61,7 @@ fn assert_bin_impl(
             || operator == ">=" && left_int >= right_int
         {
             stack.push_bool(true);
-            return;
+            return Ok(());
         }
 
         *ctx.asserts.assert_failure = Some(AssertFailure::Bin(AssertBinFailure {
@@ -68,7 +74,7 @@ fn assert_bin_impl(
             location: Some(location),
         }));
         stack.push_bool(false);
-        return;
+        return Ok(());
     }
 
     *ctx.asserts.assert_failure = Some(AssertFailure::Bin(AssertBinFailure {
@@ -81,11 +87,17 @@ fn assert_bin_impl(
         location: Some(location),
     }));
     stack.push_bool(false);
+    Ok(())
 }
 
 extension!(expect_to_end_with_exit_code in (Context) with (code: BigInt) using expect_to_end_with_exit_code_impl);
-fn expect_to_end_with_exit_code_impl(ctx: &mut Context, _stack: &mut Tuple, code: BigInt) {
+fn expect_to_end_with_exit_code_impl(
+    ctx: &mut Context,
+    _: &mut Tuple,
+    code: BigInt,
+) -> anyhow::Result<()> {
     *ctx.asserts.expected_exit_code = Some(code);
+    Ok(())
 }
 
 extension!(fail_to_find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple, message: String, location: String) using fail_to_find_transaction_by_params_impl);
@@ -96,17 +108,22 @@ fn fail_to_find_transaction_by_params_impl(
     txs: Tuple,
     message: String,
     location: String,
-) {
+) -> anyhow::Result<()> {
     // struct SearchParams {
     //     to: address,
     //     from: address? = null,
     //     exit_code: int32? = null,
     //     deploy: bool? = null,
+    //     bounced: bool? = null,
+    //     opcode: int32? = null,
+    //     action_exit_code: int32? = null,
+    //     compute_phase_skipped: bool? = null,
+    //     body: cell? = null,
     // }
 
     let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
         Some(value) => value,
-        None => return,
+        None => return Ok(()),
     };
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionNotFound(
@@ -118,6 +135,7 @@ fn fail_to_find_transaction_by_params_impl(
             location: Some(location),
         },
     ));
+    Ok(())
 }
 
 extension!(fail_to_not_find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple, message: String, location: String) using fail_to_not_find_transaction_by_params_impl);
@@ -128,17 +146,22 @@ fn fail_to_not_find_transaction_by_params_impl(
     txs: Tuple,
     message: String,
     location: String,
-) {
+) -> anyhow::Result<()> {
     // struct SearchParams {
     //     to: address,
     //     from: address? = null,
     //     exit_code: int32? = null,
     //     deploy: bool? = null,
+    //     bounced: bool? = null,
+    //     opcode: int32? = null,
+    //     action_exit_code: int32? = null,
+    //     compute_phase_skipped: bool? = null,
+    //     body: cell? = null,
     // }
 
     let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
         Some(value) => value,
-        None => return,
+        None => return Ok(()),
     };
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionIsFound(
@@ -158,6 +181,25 @@ fn fail_to_not_find_transaction_by_params_impl(
             },
         },
     ));
+    Ok(())
+}
+
+extension!(fail_wallet_not_found in (Context) with (location: String, wallet_name: String) using fail_wallet_not_found_impl);
+fn fail_wallet_not_found_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    location: String,
+    wallet_name: String,
+) -> anyhow::Result<()> {
+    *ctx.asserts.assert_failure = Some(AssertFailure::WalletNotFound(WalletNotFoundFailure {
+        wallet_name,
+        location: if location.is_empty() {
+            None
+        } else {
+            Some(location)
+        },
+    }));
+    Ok(())
 }
 
 pub fn process_txs_and_search_params(
@@ -165,10 +207,12 @@ pub fn process_txs_and_search_params(
     params: Tuple,
 ) -> Option<(TransactionNotFoundParams, Vec<Transaction>)> {
     let mut params_reader = params.clone().0;
+    let raw_body = params_reader.pop();
     let raw_compute_phase_skipped = params_reader.pop();
     let raw_action_exit_code = params_reader.pop();
     let raw_opcode = params_reader.pop();
     let raw_bounced = params_reader.pop();
+    let raw_bounce = params_reader.pop();
     let raw_deploy = params_reader.pop();
     let raw_exit_code = params_reader.pop();
     let raw_from = params_reader.pop();
@@ -179,10 +223,12 @@ pub fn process_txs_and_search_params(
         from: None,
         exit_code: None,
         deploy: None,
+        bounce: None,
         bounced: None,
         opcode: None,
         action_exit_code: None,
         compute_phase_skipped: None,
+        body: None,
     };
 
     if let Some(raw_opcode) = raw_opcode {
@@ -196,14 +242,21 @@ pub fn process_txs_and_search_params(
         if let TupleItem::Null = raw_bounced {
             params.bounced = None
         } else if let TupleItem::Int(num) = raw_bounced {
-            params.bounced = Some(num == BigInt::from(18446744073709551615u64))
+            params.bounced = Some(num == BigInt::from(-1))
+        }
+    }
+    if let Some(raw_bounce) = raw_bounce {
+        if let TupleItem::Null = raw_bounce {
+            params.bounce = None
+        } else if let TupleItem::Int(num) = raw_bounce {
+            params.bounce = Some(num == BigInt::from(-1))
         }
     }
     if let Some(raw_deploy) = raw_deploy {
         if let TupleItem::Null = raw_deploy {
             params.deploy = None
         } else if let TupleItem::Int(num) = raw_deploy {
-            params.deploy = Some(num == BigInt::from(18446744073709551615u64))
+            params.deploy = Some(num == BigInt::from(-1))
         }
     }
     if let Some(raw_exit_code) = raw_exit_code {
@@ -219,14 +272,14 @@ pub fn process_txs_and_search_params(
         } else if let TupleItem::Tuple(raw_from) = &raw_from
             && let TupleItem::Slice(cell) = &raw_from[0]
         {
-            let cell = Boc::decode_base64(cell.to_boc_b64(false).unwrap()).unwrap();
-            let mut slice = cell.as_slice().unwrap();
+            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
+            let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.from = Some(address);
             }
         } else if let TupleItem::Slice(cell) = raw_from {
-            let cell = Boc::decode_base64(cell.to_boc_b64(false).unwrap()).unwrap();
-            let mut slice = cell.as_slice().unwrap();
+            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
+            let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.from = Some(address);
             }
@@ -238,14 +291,14 @@ pub fn process_txs_and_search_params(
         } else if let TupleItem::Tuple(raw_to) = &raw_to
             && let TupleItem::Slice(cell) = &raw_to[0]
         {
-            let cell = Boc::decode_base64(cell.to_boc_b64(false).unwrap()).unwrap();
-            let mut slice = cell.as_slice().unwrap();
+            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
+            let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.to = Some(address);
             }
         } else if let TupleItem::Slice(cell) = raw_to {
-            let cell = Boc::decode_base64(cell.to_boc_b64(false).unwrap()).unwrap();
-            let mut slice = cell.as_slice().unwrap();
+            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
+            let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.to = Some(address);
             }
@@ -262,7 +315,16 @@ pub fn process_txs_and_search_params(
         if let TupleItem::Null = raw_compute_phase_skipped {
             params.compute_phase_skipped = None
         } else if let TupleItem::Int(num) = raw_compute_phase_skipped {
-            params.compute_phase_skipped = Some(num == BigInt::from(18446744073709551615u64))
+            params.compute_phase_skipped = Some(num == BigInt::from(-1))
+        }
+    }
+    if let Some(raw_body) = raw_body {
+        if let TupleItem::Null = raw_body {
+            params.body = None
+        } else if let TupleItem::Cell(cell) = raw_body {
+            let boc = cell.to_boc(false).ok()?;
+            let decoded_cell = Boc::decode(&boc).ok()?;
+            params.body = Some(decoded_cell);
         }
     }
 
@@ -277,8 +339,8 @@ pub fn process_txs_and_search_params(
             _ => None,
         })
         .filter_map(|x| {
-            let result = x.to_boc_b64(false).ok()?;
-            let tx_cell: tycho_types::cell::Cell = Boc::decode_base64(&result).ok()?;
+            let result = x.to_boc(false).ok()?;
+            let tx_cell = Boc::decode(&result).ok()?;
             let mut tx_slice = tx_cell.as_slice().ok()?;
             Transaction::load_from(&mut tx_slice).ok()
         })
@@ -294,5 +356,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         102 => expect_to_end_with_exit_code,
         103 => fail_to_find_transaction_by_params,
         104 => fail_to_not_find_transaction_by_params,
+        105 => fail_wallet_not_found,
     });
 }

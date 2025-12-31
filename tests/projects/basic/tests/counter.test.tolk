@@ -1,0 +1,92 @@
+import "../../../../lib/build/build"
+import "../../../../lib/emulation/network"
+import "../../../../lib/testing/expect"
+import "../../../../lib/testing/transaction_expect"
+import "../../../../lib/types/message"
+import "../../../../lib/types/out_actions"
+import "../../../../lib/vm/vm"
+import "../../../../lib/io"
+
+import "../contracts/counter_messages"
+
+struct Counter {
+    address: address
+    init: ContractState
+}
+
+fun Counter.fromStorage(storage: Storage) {
+    val init = ContractState {
+        code: build("counter"),
+        data: storage.toCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    return Counter { address, init }
+}
+
+fun Counter.sendIncrease(self, from: address, increaseBy: int) {
+    val msg = createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: self.address,
+        body: IncreaseCounter { queryId: 0, increaseBy },
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun Counter.sendReset(self, from: address) {
+    val msg = createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: self.address,
+        body: ResetCounter { queryId: 0 },
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun Counter.getCounter(self): int {
+    return net.runGetMethod(self.address, "currentCounter")
+}
+
+fun setupTest() {
+    val counter = Counter.fromStorage({ id: 0, counter: 0 });
+
+    val deployer = net.treasury("deployer");
+    val msg = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: counter.init,
+        },
+    });
+    val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+
+    return (counter, deployer)
+}
+
+// SLOT_1: @custom({gas_limit: 100})
+get fun `test-should-increase-counter`() {
+    val (counter, deployer) = setupTest();
+
+    val res = counter.sendIncrease(deployer.address, 100);
+    expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+    expect(counter.getCounter()).toEqual(100);
+
+    // SLOT_2: expect(1).toEqual(2);
+    // SLOT_5: println(res)
+    // SLOT_6: eprintln("error output")
+}
+
+// SLOT_3: @custom({fail_with: 100})
+get fun `test-should-reset-counter`() {
+    // SLOT_4: if (true) { throw 9 }
+    val (counter, deployer) = setupTest();
+
+    val res = counter.sendIncrease(deployer.address, 100);
+    expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+    expect(counter.getCounter()).toEqual(100);
+
+    val resetRes = counter.sendReset(deployer.address);
+    expect(resetRes).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+    expect(counter.getCounter()).toEqual(0);
+}

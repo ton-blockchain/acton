@@ -1,10 +1,10 @@
+use crate::context::to_cell;
+use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::{DebugContext, VARIABLE_REFERENCE_COUNTER};
 use crate::formatter::FormatterContext;
 use anyhow::anyhow;
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
-use emulator::AnyExecutor;
-use emulator::executor::StoreExt;
 use log::debug;
 use std::sync::atomic::Ordering;
 use tonlib_core::cell::ArcCell;
@@ -240,10 +240,10 @@ impl DebugContext {
 
         if let TupleItem::Cell(c5_tuple) = parse_tuple_item(&mut c5_slice)? {
             let c5_boc = c5_tuple
-                .to_boc_b64(false)
+                .to_boc(false)
                 .map_err(|e| anyhow!("Failed to encode c5 tuple to BoC: {e}"))?;
-            let c5_cell = &Boc::decode_base64(&c5_boc)
-                .map_err(|e| anyhow!("Failed to decode c5 BoC: {e}"))?;
+            let c5_cell =
+                &Boc::decode(&c5_boc).map_err(|e| anyhow!("Failed to decode c5 BoC: {e}"))?;
             let c5_slice = c5_cell.as_slice()?;
 
             let out_actions = OutActionsRevIter::new(c5_slice)
@@ -474,7 +474,7 @@ impl DebugContext {
             return Vec::new();
         };
         msg_slice.skip_first(msg_offset.bits, msg_offset.refs).ok();
-        let msg_cell = msg_slice.to_cell();
+        let msg_cell = to_cell(&msg_slice);
 
         variables.push(Variable {
             name: "body".to_string(),

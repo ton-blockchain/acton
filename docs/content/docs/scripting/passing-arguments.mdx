@@ -1,0 +1,202 @@
+---
+title: "Passing Arguments"
+description: "Learn how to pass arguments to your scripts from the command line"
+---
+
+import {Callout} from "fumadocs-ui/components/callout";
+
+Acton allows you to pass arguments from the command line to your Tolk scripts. This enables you to create flexible and reusable scripts for various tasks, from simple calculations to complex contract interactions.
+
+## Basic Argument Passing
+
+To define a script that accepts arguments, simply add parameters to your `main()` function. Acton will automatically map the command-line arguments to these parameters.
+
+For example, consider a script that adds two numbers:
+
+```tolk title="add.tolk"
+import ".acton/lib/io"
+
+fun main(a: int, b: int) {
+    println("The sum is:")
+    println(a + b)
+}
+```
+
+You can run this script and pass the arguments as follows:
+
+```bash
+acton script add.tolk 10 20
+```
+
+The output will be:
+
+```
+The sum is:
+30
+```
+
+## Understanding the Stack
+
+It's important to understand that when you pass arguments to a script, Acton creates a **stack** of values and passes this stack to the TVM executor. The Tolk compiler then generates code that takes these values from the stack and assigns them to your function parameters.
+
+This means you are not limited to simple integers. You can pass any valid TVM stack value, including tuples, cells, and slices.
+
+<Callout type="info">
+    Be careful when passing complex types like structs, as they may consume
+    multiple stack slots. The values must match the expected parameter types in
+    your `main()` function.
+</Callout>
+
+## Passing Complex Types
+
+Beyond simple integers, you can pass various complex data types to your scripts.
+
+### Nullable Values
+
+You can pass null values to work with optional types:
+
+```tolk title="process_optional.tolk"
+import ".acton/lib/io"
+
+fun main(value: int?) {
+    println1("Value: {}", value);
+}
+```
+
+Run it with:
+
+```bash
+# Pass null
+acton script process_optional.tolk null
+
+# Pass an actual value
+acton script process_optional.tolk 42
+```
+
+<Callout type="info">
+    The null value can be represented as `null` or `(null)`.
+</Callout>
+
+### Tuples
+
+You can pass tuples by enclosing the values in `[ ... ]` or `( ... )`.
+
+```tolk title="process_tuple.tolk"
+import ".acton/lib/io"
+
+fun main(data: tuple) {
+    val a: int = data.get(0)
+    val b: int = data.get(1)
+    println1("First element: {}", a)
+    println1("Second element: {}", b)
+}
+```
+
+Run it with:
+
+```bash
+acton script process_tuple.tolk "[(10 20)]"
+```
+
+<Callout type="info">
+    **Quoting is important!** Notice the `"[ ... ]"` syntax. The quotes are
+    necessary for the shell to treat the tuple as a single argument. Without
+    them, the shell would interpret the spaces inside the tuple as argument
+    separators.
+</Callout>
+
+### Structs
+
+You can pass values that will be automatically unpacked into a struct.
+
+```tolk title="process_struct.tolk"
+import ".acton/lib/io"
+
+struct Point {
+    x: int,
+    y: int
+}
+
+fun main(p: Point) {
+    println1("Point x: {}", p.x)
+    println1("Point y: {}", p.y)
+}
+```
+
+Run it like this:
+
+```bash
+acton script process_struct.tolk "[10 20]"
+```
+The stack `[10 20]` will be passed to `main` and automatically converted to a `Point` struct.
+
+### Strings
+
+To pass a string, you need to wrap it in double quotes both for the shell and for Acton's argument parser. This results in a `'"..."'` syntax. The string will be converted into a `slice` containing the UTF-8 bytes of the string.
+
+```tolk title="hello_string.tolk"
+import ".acton/lib/io"
+
+fun main(name: slice) {
+    println1("Hello, {}", name.beginParse())
+}
+```
+
+Execute it with:
+
+```bash
+acton script hello_string.tolk '"World"'
+```
+
+Output:
+
+```
+Hello, World
+```
+
+<Callout type="warning">
+    The double quoting `'"..."'` is crucial. The outer quotes (`'`) are for your
+    shell to treat the argument as a single word, and the inner quotes (`"`) are
+    for Acton to recognize it as a string literal. For long strings, this
+    approach is more convenient than passing hex-encoded cells.
+</Callout>
+
+### Cells and Slices
+
+You can also pass raw cells and slices using the `C{...}` and `CS{...}` syntax, where the content is a hex-encoded Bag of Cells (BoC).
+
+```tolk title="process_cell.tolk"
+import ".acton/lib/io"
+
+fun main(data: cell) {
+    val s = data.beginParse()
+    val value = s.loadUint(32)
+    println1("Value from cell: {}", value)
+}
+```
+
+First, create a cell with some data and get its hex representation. Then, run the script:
+
+```bash
+# Example with a cell containing a 32-bit integer 999
+acton script process_cell.tolk C{b5ee9c72010101010003000003e7}
+```
+
+## Supported Argument Types
+
+Here's a complete reference of all supported argument types:
+
+| Type    | Syntax            | Example             | Notes                                |
+|---------|-------------------|---------------------|--------------------------------------|
+| NaN     | `NaN`             | `NaN`               | Not a number                         |
+| Integer | `number`          | `42`, `-100`        | 257-bit integers                     |
+| Null    | `null` or `()`    | `null`              | For optional types                   |
+| Tuple   | `(value1 value2)` | `(10 20)`           | Requires quoting                     |
+| Tensor  | `[value1 value2]` | `[10 20 30]`        | Auto-unpacked from tuple             |
+| String  | `"text"`          | `"hello"`           | Converted to slice, requires quoting |
+| Cell    | `C{hex}`          | `C{b5ee9c7201...}`  | Hex-encoded BoC                      |
+| Slice   | `CS{hex}`         | `CS{b5ee9c7201...}` | Hex-encoded BoC                      |
+
+<Callout type="warning">
+    **Continuation values are not supported** in script arguments yet.
+</Callout>

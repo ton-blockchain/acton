@@ -24,6 +24,8 @@ fun main() {
     let result = client.execute(|executor| {
         executor.step_over()?;
         executor.step_over()?;
+        executor.step_over()?;
+        executor.step_over()?;
         Ok(())
     })?;
 
@@ -101,6 +103,10 @@ fun main() {
         executor.step_over()?;
         executor.step_over()?;
         executor.step_over()?;
+        executor.step_over()?;
+        executor.step_over()?;
+        executor.step_over()?;
+        executor.step_over()?;
         Ok(())
     })?;
 
@@ -131,7 +137,7 @@ fun main(foo: int?) {
 
     let mut client = session.start();
 
-    let result = client.execute(|executor| {
+    let result = client.execute(|_executor| {
         // TODO: doesn't stop on return
         // executor.step_over()?;
         Ok(())
@@ -164,7 +170,7 @@ fun main(foo: int?) {
 
     let mut client = session.start();
 
-    let result = client.execute(|executor| {
+    let result = client.execute(|_executor| {
         // TODO: doesn't stop on debug.print()
         // executor.step_over()?;
         Ok(())

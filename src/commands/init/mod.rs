@@ -1,3 +1,4 @@
+use crate::commands::common::symlink_global_wallets;
 use crate::config::{ActonConfig, ContractConfig, ContractsConfig};
 use include_dir::{Dir, include_dir};
 use owo_colors::OwoColorize;
@@ -44,6 +45,26 @@ pub fn init_cmd() -> anyhow::Result<()> {
     TOLK_STDLIB_DIR.extract(".acton/tolk-stdlib")?;
 
     println!("{}", "✓ Initialized new Acton project".green().bold());
+
+    if fs::exists(".gitignore").unwrap_or(false) {
+        // Add .acton/ to gitignore automatically
+        let content = fs::read_to_string(".gitignore")?;
+        fs::write(
+            ".gitignore",
+            content
+                + "\n# Acton main directory\n.acton/\n\n# Mnemonic and wallet files\n*.mnemonic\nwallets.toml\nglobal.wallets.toml\n",
+        )?;
+        println!("Patched {} with .acton/ directory", ".gitignore".cyan());
+    }
+
+    if let Err(e) = symlink_global_wallets() {
+        println!(
+            "  {} Failed to symlink global wallets: {}",
+            "Warning:".yellow().bold(),
+            e
+        );
+    }
+
     println!("Created {} with project configuration", "Acton.toml".cyan());
     println!(
         "Created {} directory with standard library",

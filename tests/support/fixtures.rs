@@ -14,6 +14,7 @@ pub struct FixtureProject {
     enabled_slots: HashMap<String, Vec<usize>>,
 }
 
+#[allow(dead_code)]
 impl FixtureProject {
     /// Load a fixture project from tests/projects/{name}
     pub fn load(name: &str) -> Self {
@@ -47,7 +48,7 @@ impl FixtureProject {
     /// # Example
     /// ```
     /// FixtureProject::load("basic")
-    ///     .with_slots("tests/counter_test.tolk", &[1, 2, 3])
+    ///     .with_slots("tests/counter.test.tolk", &[1, 2, 3])
     /// ```
     #[allow(dead_code)]
     pub fn with_slots(mut self, file: &str, slots: &[usize]) -> Self {
@@ -72,13 +73,13 @@ impl FixtureProject {
 
     /// Enable a slot in test file (shorthand)
     pub fn with_test_slot(self, slot: usize) -> Self {
-        self.with_slot("tests/counter_test.tolk", slot)
+        self.with_slot("tests/counter.test.tolk", slot)
     }
 
     /// Enable multiple test slots (shorthand)
     #[allow(dead_code)]
     pub fn with_test_slots(self, slots: &[usize]) -> Self {
-        self.with_slots("tests/counter_test.tolk", slots)
+        self.with_slots("tests/counter.test.tolk", slots)
     }
 
     /// Replace template variables in all files
@@ -111,6 +112,7 @@ impl FixtureProject {
             build_clear_cache: false,
             build_contract: None,
             build_graph: None,
+            build_out_dir: None,
             disasm_string: None,
             disasm_output: None,
             disasm_address: None,
@@ -121,8 +123,18 @@ impl FixtureProject {
             compile_base64_only: false,
             compile_boc: None,
             compile_fift: None,
+            compile_source_map: None,
             test_reporters: vec![],
             junit_merge: false,
+            test_exclude_patterns: vec![],
+            test_include_patterns: vec![],
+            verify_contract: None,
+            verify_address: None,
+            verify_wallet: None,
+            verify_network: None,
+            script_broadcast: false,
+            test_fail_fast: false,
+            script_fork_net: None,
         }
     }
 
@@ -152,7 +164,7 @@ impl FixtureProject {
     }
 
     fn patch_imports(project_path: &Path) {
-        let test_file = project_path.join("tests/counter_test.tolk");
+        let test_file = project_path.join("tests/counter.test.tolk");
         if test_file.exists() {
             let content = fs::read_to_string(&test_file).expect("Failed to read test file");
             let new_content = content.replace("../../../../", "../../");

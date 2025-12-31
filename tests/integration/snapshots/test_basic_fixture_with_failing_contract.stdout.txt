@@ -6,8 +6,8 @@
 
  TEST  [ROOT]
 
- > ./tests/counter_test.tolk (2 tests)
-  ✗ should increase counter [TIME]
+ > ./tests/counter.test.tolk (2 tests)
+  ✗ should-increase-counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
@@ -16,8 +16,8 @@
         Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
         with:
           exit_code=0
-      └─ at ./tests/counter_test[LINE]
-  ✗ should reset counter [TIME]
+      └─ at ./tests/counter.test[LINE]
+  ✗ should-reset-counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
         └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
@@ -26,7 +26,7 @@
         Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
         with:
           exit_code=0
-      └─ at ./tests/counter_test[LINE]
+      └─ at ./tests/counter.test[LINE]
 
  ✗ 2 failed in 1 file
 

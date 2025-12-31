@@ -1,0 +1,126 @@
+---
+title: "Libraries"
+description: "Learn how to work with on-chain libraries in Acton"
+icon: Book
+---
+
+On-chain libraries are a powerful feature of the TON blockchain that allows you to store code once and reuse it across multiple contracts, significantly reducing storage costs.
+
+<Callout title="Learn more">
+  For a deep dive into how libraries work in TON, check out the [official documentation](https://docs.ton.org/contract-dev/using-on-chain-libraries).
+</Callout>
+
+## Publishing a Library
+
+Acton provides a convenient command to publish any code as a library to the Masterchain.
+
+### Step 1: Create a contract
+
+First, create a simple contract that you want to publish as a library. For example, let's create a `math.tolk` file:
+
+```tolk title="contracts/math.tolk"
+fun add(a: int, b: int): int {
+    return a + b;
+}
+```
+
+Make sure to register it in your `Acton.toml`:
+
+```toml title="Acton.toml"
+[contracts.math]
+name = "Math Library"
+src = "contracts/math.tolk"
+```
+
+### Step 2: Publish the library
+
+Use the `acton library publish` command to deploy your library. You can specify the contract ID defined in `Acton.toml`:
+
+```bash
+acton library publish math
+```
+
+The CLI will guide you through the process:
+
+1.  **Compiling**: Acton will compile your contract to get the code cell.
+2.  **Duration**: You'll be asked how long you want to store the library (e.g., `365d` for 1 year).
+3.  **Wallet**: Select a wallet to pay for the deployment.
+4.  **Payment**: Confirm the transaction amount.
+
+<Callout type="info">
+  Libraries are always stored on the Masterchain (workchain -1) to be accessible from all other chains.
+</Callout>
+
+Upon success, you will see the **Library Hash**. This hash is what you'll use to reference the library in other contracts.
+
+```text
+...
+> Send 0.1000 TON to publish library? Note that any extra TON will be refunded. Yes
+  ✓ Transaction sent successfully
+  → Library should be available soon at hash: b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27
+```
+
+### Advanced Options
+
+You can also publish arbitrary code using the `--code` flag or specify options non-interactively:
+
+```bash
+# Publish raw BoC (hex or base64)
+acton library publish --code "te6cckEBAQEAAgAAAEysuc0="
+
+# Non-interactive mode
+acton library publish math --duration 100d --wallet my-wallet --net mainnet
+```
+
+## Fetching a Library
+
+If you want to inspect an existing library or get its code, use the `acton library fetch` command.
+
+```bash
+acton library fetch <LIBRARY_HASH>
+```
+
+### Disassembling Library Code
+
+To understand what a library does, you can disassemble its code immediately after fetching:
+
+```bash
+acton library fetch <LIBRARY_HASH> --disasm
+```
+
+This will print the TVM assembly (TASM) of the library code.
+
+### Saving to File
+
+You can save the library code to a file for further analysis or usage:
+
+```bash
+# Save as base64
+acton library fetch <LIBRARY_HASH> -o library.txt
+
+# Save as binary BoC
+acton library fetch <LIBRARY_HASH> -o library.boc
+
+# Save as TASM
+acton library fetch <LIBRARY_HASH> --disasm -o library.tasm
+```
+
+<Callout title="Command Reference">
+  For a complete list of options and flags, see the [Library Command Reference](/docs/commands/library).
+</Callout>
+
+## Working with libraries in tests and scripts
+
+Acton provides handy functions for working with libraries:
+
+### `net.loadLibrary(hash: slice): cell?`
+
+Loads a library by its hash and returns its code as a cell. Returns null if the library is not found.
+
+### `vm.registerLibrary(cell: cell): void`
+
+Registers a library in the current test blockchain. After this call, contracts can use this library.
+
+### `net.fetchAndRegisterLibrary(hash: slice): bool`
+
+Fetches a library by its hash and registers it in the current test blockchain. Returns true if the library is found and registered, false otherwise.

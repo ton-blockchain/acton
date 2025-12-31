@@ -1,4 +1,5 @@
-use crate::support::{ProjectBuilder, TestOutputExt};
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 
 #[test]
 fn test_action_fail() {
@@ -88,6 +89,6 @@ fn test_action_fail() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_contains("action fail")
+        .assert_contains("action-fail")
         .assert_snapshot_matches("integration/snapshots/test_action_fail.stdout.txt");
 }

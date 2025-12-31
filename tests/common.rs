@@ -40,13 +40,16 @@ pub fn assert_ui() -> snapbox::Assert {
 fn add_regex_redactions(subs: &mut snapbox::Redactions) {
     subs.insert("[TIME]", regex!(r"(\d+\.)?\d+ms")).unwrap();
     subs.insert("[TIME]", regex!(r"(\d+\.)?\d+µs")).unwrap();
+    subs.insert("[TIME]", regex!(r"(\d+\.)?\d+μs")).unwrap();
     subs.insert("[LINE]", regex!(r"(\.tolk):\d+:\d+")).unwrap();
 }
 
+#[allow(dead_code)]
 pub fn acton_exe() -> PathBuf {
     snapbox::cmd::cargo_bin!("acton").to_path_buf()
 }
 
+#[allow(dead_code)]
 pub trait ActonCommandExt {
     fn acton_ui() -> Self;
 }

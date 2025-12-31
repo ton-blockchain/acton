@@ -1,52 +1,69 @@
 Step 1 (before):
+  Bytecode position: 3D049E0207DDD289364534D09B5FAA36CB2D2DC5464F72F3A26F096D73876FEE:8
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 100;
-             ^
+             ^^^
       6|     return foo;
       7| }
 
 Step 2 (step_in):
+  Bytecode position: 3D049E0207DDD289364534D09B5FAA36CB2D2DC5464F72F3A26F096D73876FEE:8
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 100;
-                   ^
+                   ^^^
       6|     return foo;
       7| }
 
 Step 3 (step_in):
+  Bytecode position: 3D049E0207DDD289364534D09B5FAA36CB2D2DC5464F72F3A26F096D73876FEE:8
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 100;
-                   ^
+                   ^^^
       6|     return foo;
       7| }
 
 Step 4 (step_in):
+  Bytecode position: 3D049E0207DDD289364534D09B5FAA36CB2D2DC5464F72F3A26F096D73876FEE:24
   Code:
       2| global foo: int;
       3| 
       4| fun main() {
       5|     foo = 100;
-             ^
+             ^^^
       6|     return foo;
       7| }
   Variables:
     '0 = 100
 
 Step 5 (step_in):
+  Bytecode position: 3D049E0207DDD289364534D09B5FAA36CB2D2DC5464F72F3A26F096D73876FEE:56
   Code:
       3| 
       4| fun main() {
       5|     foo = 100;
       6|     return foo;
-             ^
+             ^^^^^^^^^^
+      7| }
+  Variables:
+    g_foo = 100
+
+Step 6 (step_in):
+  Bytecode position: 3D049E0207DDD289364534D09B5FAA36CB2D2DC5464F72F3A26F096D73876FEE:56
+  Code:
+      3| 
+      4| fun main() {
+      5|     foo = 100;
+      6|     return foo;
+             ^^^^^^^^^^
       7| }
   Variables:
     g_foo = 100

@@ -1,3 +1,20 @@
+/// Module for VM interaction.
+///
+/// This module provides low-level access to the TON Virtual Machine (TVM) state during test execution.
+/// It allows reading and writing to control registers (C5, C7) and configuring execution parameters.
+///
+/// Examples:
+/// ```tolk
+/// // Mock time
+/// vm.setTime(1700000000);
+///
+/// // Register a mock library
+/// vm.registerLibrary(myLibCell);
+///
+/// // Inspect actions manually
+/// val rawActions = vm.getC5();
+/// ```
+
 import "../ffi/ffi"
 
 /// Holds the methods to change the VM state.
@@ -20,7 +37,6 @@ fun vm.setC5(cell: cell): void
     asm "c5 POPCTR";
 
 /// Generic helper to get a single config parameter.
-@inline
 fun vm.getConfigParam<T>(index: int): T {
     var c7 = vm.getC7();
     var params: tuple = c7.get(0);
@@ -28,7 +44,6 @@ fun vm.getConfigParam<T>(index: int): T {
 }
 
 /// Generic helper to overwrite a single config parameter.
-@inline
 fun vm.setConfigParam<T>(value: T, index: int) {
     var c7 = vm.getC7();
     var params: tuple = c7.get(0);
@@ -38,25 +53,21 @@ fun vm.setConfigParam<T>(value: T, index: int) {
 }
 
 /// Override `blockchain.now()` for deterministic testing.
-@inline
 fun vm.setTime(now: int) {
     vm.setConfigParam(now, 3);
 }
 
 /// Override the **block** logical time.
-@inline
 fun vm.setBlockLogicalTime(blockLogicalTime: int) {
     vm.setConfigParam(blockLogicalTime, 4);
 }
 
 /// Override the **transaction** logical time.
-@inline
 fun vm.setLogicalTime(logicalTime: int) {
     vm.setConfigParam(logicalTime, 5);
 }
 
 /// Override the original balance of the contract.
-@inline
 fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null) {
     vm.setConfigParam([balance, extraCurrencies], 7);
 }
@@ -69,7 +80,7 @@ fun vm.registerLibrary(cell: cell) {
 /// Convert a slice with string representation of address to an address type.
 ///
 /// Example:
-/// ```
+/// ```tolk
 /// val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 /// ```
 fun vm.convertAddress(addr: slice): address {

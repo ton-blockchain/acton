@@ -1,21 +1,108 @@
 Step 1 (before):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:8
   Code:
       9| type Msg = First | Second
      10| 
      11| fun main() {
      12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
-                 ^
+                 ^^^
      13|     match (msg) {
      14|         First => {
      15|             return 10
 
 Step 2 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:8
+  Code:
+      9| type Msg = First | Second
+     10| 
+     11| fun main() {
+     12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+     13|     match (msg) {
+     14|         First => {
+     15|             return 10
+
+Step 3 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:120
+  Code:
+      9| type Msg = First | Second
+     10| 
+     11| fun main() {
+     12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+     13|     match (msg) {
+     14|         First => {
+     15|             return 10
+  Variables:
+    '9 = [BOC_HEX]
+
+Step 4 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:120
+  Code:
+      9| type Msg = First | Second
+     10| 
+     11| fun main() {
+     12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     13|     match (msg) {
+     14|         First => {
+     15|             return 10
+  Variables:
+    '9 = [BOC_HEX]
+
+Step 5 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:128
+  Code:
+      9| type Msg = First | Second
+     10| 
+     11| fun main() {
+     12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     13|     match (msg) {
+     14|         First => {
+     15|             return 10
+  Variables:
+    lazyS = "
+"
+
+Step 6 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:128
+  Code:
+      9| type Msg = First | Second
+     10| 
+     11| fun main() {
+     12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     13|     match (msg) {
+     14|         First => {
+     15|             return 10
+  Variables:
+    lazyS = "
+"
+
+Step 7 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:128
+  Code:
+      9| type Msg = First | Second
+     10| 
+     11| fun main() {
+     12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     13|     match (msg) {
+     14|         First => {
+     15|             return 10
+  Variables:
+    lazyS = "
+"
+
+Step 8 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:128
   Code:
      11| fun main() {
      12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
      13|     match (msg) {
      14|         First => {
-                 ^
+                 ^^^^^
      15|             return 10
      16|         }
      17|         Second => {
@@ -23,13 +110,14 @@ Step 2 (step_over):
     lazyS = "
 "
 
-Step 3 (step_over):
+Step 9 (step_over):
+  Bytecode position: 28F3CD55368BE7DDBC6409E35D73A1BCB1C7F66C06D6F8BD6FC266A9825763D2:208
   Code:
      12|     val msg = lazy Msg.fromCell(First { id: 10 }.toCell());
      13|     match (msg) {
      14|         First => {
      15|             return 10
-                     ^
+                     ^^^^^^^^^
      16|         }
      17|         Second => {
      18|             return 20

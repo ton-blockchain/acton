@@ -1,0 +1,3 @@
+Available wallets:
+  [GLOBAL_WALLET_ADDRESS]
+  [LOCAL_WALLET_ADDRESS]

@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
 /// Helper for checking compilation order in build output
+#[allow(dead_code)]
 pub struct CompilationOrder {
     positions: HashMap<String, usize>,
 }
 
+#[allow(dead_code)]
 impl CompilationOrder {
     /// Extract compilation order from build stdout
     pub fn from_stdout(stdout: &str) -> Self {
@@ -54,6 +56,7 @@ impl CompilationOrder {
 }
 
 /// Extract list of compiled contracts from build stdout
+#[allow(dead_code)]
 pub fn extract_compiled_contracts(stdout: &str) -> Vec<String> {
     stdout
         .lines()

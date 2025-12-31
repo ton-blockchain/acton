@@ -1,3 +1,25 @@
+/// Module for high-level assertion API.
+///
+/// This module provides a fluent "expect" style API for writing test assertions.
+/// It wraps the lower-level `Assert` functions and provides a more readable syntax.
+/// It supports a wide range of types including integers, booleans, slices, addresses, tuples, maps, and optionals.
+///
+/// Examples:
+/// ```tolk
+/// // Simple value check
+/// expect(total).toEqual(100);
+///
+/// // Comparison
+/// expect(balance).toBeGreater(ton("1.0"));
+///
+/// // Approximate check (useful for gas calculations)
+/// expect(gasUsed).toBeApproxEqRel(expectedGas, 10); // within 10%
+///
+/// // Map check
+/// expect(balances).toContainKey(userAddress);
+/// expect(balances.get(userAddress)).toEqual(ton("50"));
+/// ```
+
 import "assert"
 import "../fmt"
 import "../ffi/ffi"
@@ -43,7 +65,6 @@ fun Expectation<T>.create(value: T, value_type: slice, location: slice = "") {
 /// ```tolk
 /// expect(10).toEqual(10);
 /// ```
-@noinline
 fun Expectation<T>.toEqual<U>(self, expected: U) {
     Assert.equal(self.value, expected, "expect(<actual>).toEqual(<expected>)", self.location);
 }
@@ -491,7 +512,6 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
 /// Optional location can be provided to specify the location of the expectation to
 /// be printed in the error message. You likely don't want to set this manually,
 /// as the location will be automatically set by the test framework.
-@noinline
 fun expect<T>(value: T, location: slice = "") {
     return Expectation<T>.create(value, value.typeNameOfObject(), location);
 }

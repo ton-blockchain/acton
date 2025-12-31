@@ -2,12 +2,11 @@ use super::{TestReport, TestReporter, TestStatus, TestSuiteStats};
 use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
-use crate::retrace;
-use emulator::exit_codes;
-use emulator::get_executor::GetMethodResult;
+use crate::{exit_codes, retrace};
 use owo_colors::OwoColorize;
 use std::path::Path;
 use tolkc::source_map::SourceLocation;
+use ton_executor::get::GetMethodResult;
 
 #[derive(Debug, Clone)]
 pub struct ConsoleConfig {
@@ -34,9 +33,9 @@ impl ConsoleReporter {
     }
 
     fn beatify_test_name(&self, name: &str) -> String {
-        name.replace("-", " ")
-            .replace("_", " ")
-            .trim_start_matches("test ")
+        name.trim_start_matches("test ")
+            .trim_start_matches("test-")
+            .trim_start_matches("test_")
             .to_string()
     }
 }
@@ -192,6 +191,9 @@ impl TestReporter for ConsoleReporter {
                 known_addresses: exec.known_addresses.clone(),
                 known_code_cells: exec.known_code_cells.clone(),
                 backtrace: test.backtrace.clone(),
+                fork_net: None,
+                network: None,
+                api_key: None,
             };
 
             match &exec.get_result {
@@ -401,8 +403,9 @@ impl TestReporter for ConsoleReporter {
                             println!("      {} Phase: {}", "└─".dimmed(), info.phase.dimmed());
                         } else if exit_code == 678 {
                             println!(
-                                "      {} Cannot run method of not deployed contract",
-                                "└─".dimmed()
+                                "      {} Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
+                                "└─".dimmed(),
+                                "--fork-net".yellow(),
                             );
                         } else if exit_code == 679 {
                             println!(

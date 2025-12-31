@@ -8,3 +8,5 @@ tree-sitter = "0.25.10"
 tolk_parser = { path = "../tolk_parser" }
 crc = "3.2"
 num-bigint = "0.4.6"
+anyhow = "1.0.100"
+tycho-types = { version = "0.3.0", features = ["bigint"] }

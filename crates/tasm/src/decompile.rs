@@ -148,12 +148,12 @@ impl Disassembler {
             });
         }
 
-        let mut slice = cell.as_slice().unwrap();
+        let mut slice = cell.as_slice()?;
         self.decompile_slice(&mut slice, None)
     }
 
     pub fn decompile_dyn_cell(&self, cell: &DynCell) -> anyhow::Result<Code> {
-        let mut slice = cell.as_slice().unwrap();
+        let mut slice = cell.as_slice()?;
         self.decompile_slice(&mut slice, None)
     }
 
@@ -417,7 +417,7 @@ mod tests {
             .decompile_cell(&code)
             .expect("Failed to decompile cell");
 
-        let res = code.print(Default::default());
+        let res = code.print(&Default::default());
         assert_eq!(res.len(), 132511)
     }
 }

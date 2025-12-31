@@ -4,11 +4,13 @@ use snapbox::Data;
 use snapbox::cmd::OutputAssert;
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub struct TestOutput {
     pub output: OutputAssert,
     pub project_path: PathBuf,
 }
 
+#[allow(dead_code)]
 impl TestOutput {
     pub fn success(self) -> TestSuccess {
         let output = self.output.success();
@@ -36,16 +38,19 @@ impl TestOutput {
     }
 }
 
+#[allow(dead_code)]
 pub struct TestSuccess {
     output: OutputAssert,
     project_path: PathBuf,
 }
 
+#[allow(dead_code)]
 pub struct TestFailure {
     output: OutputAssert,
     project_path: PathBuf,
 }
 
+#[allow(dead_code)]
 pub trait TestOutputExt {
     fn assert_passed(&self, count: usize) -> &Self;
     fn assert_failed(&self, count: usize) -> &Self;
@@ -252,7 +257,7 @@ impl TestOutputExt for TestSuccess {
 
         let expected = Data::read_from(&snapshot_full_path, None);
         assertion.eq(
-            normalize_output(&file_content, &PathBuf::from(self.project_path.clone())),
+            normalize_output(&file_content, &self.project_path.clone()),
             expected,
         );
         self
@@ -443,7 +448,7 @@ impl TestOutputExt for TestFailure {
 
         let expected = Data::read_from(&snapshot_full_path, None);
         assertion.eq(
-            normalize_output(&file_content, &PathBuf::from(self.project_path.clone())),
+            normalize_output(&file_content, &self.project_path.clone()),
             expected,
         );
         self

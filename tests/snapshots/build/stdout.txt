@@ -1,20 +1,21 @@
-Build all contracts
+Build the specified contract or all contracts
 
-Usage: acton build [OPTIONS] [CONTRACT]
+Usage: acton build [OPTIONS] [CONTRACT_ID]
 
 Arguments:
-  [CONTRACT]  Contract name to build (builds all if not specified)
+  [CONTRACT_ID]  Contract name to build (builds all if not specified)
 
 Options:
-      --clear-cache    Clear compilation cache before building
-      --graph <GRAPH>  Generate dependency graph as SVG file (requires graphviz)
-  -h, --help           Print help
+      --clear-cache        Clear compilation cache before building
+      --graph <GRAPH>      Generate dependency graph as SVG file (requires graphviz)
+      --out-dir <OUT_DIR>  Output directory for build artifacts [default: build]
+  -h, --help               Print help
 
 Configuration:
      # Configure contracts in Acton.toml
      [contracts.wallet]
      name = "Wallet Contract"
-     root = "contracts/wallet.tolk"
+     src = "contracts/wallet.tolk"
      output = "wallet.boc"
      depends = ["child"]
      # or as library with custom function name and output path

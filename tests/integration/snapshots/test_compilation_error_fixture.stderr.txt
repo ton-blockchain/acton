@@ -1,6 +1,9 @@
-Error: Cannot compile script file [ROOT]/contracts/counter[LINE]: error: field `body2` doesn't exist in type `InMessage`
+Error: In counter:
+
+[ROOT]/contracts/counter[LINE]: error: field `body2` doesn't exist in type `InMessage`
 
     // in function `onInternalMessage`
    6 |     val msg = lazy AllowedMessage.fromSlice(in.body2);
      |                                                ^^^^^
 
+Build failed with 1 error

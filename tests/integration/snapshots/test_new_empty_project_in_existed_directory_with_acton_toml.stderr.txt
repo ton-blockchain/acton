@@ -1,0 +1,3 @@
+Error: Directory [ROOT] is already exists, if you want to create a new project inside this directory run following commands:
+  cd [ROOT]
+  acton new .

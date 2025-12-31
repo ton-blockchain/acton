@@ -1,3 +1,24 @@
+/// Module for asserting properties of out action lists.
+///
+/// This module extends the `Expectation` class specifically for `OutActionList`.
+/// `OutActionList` represents the actions (messages, code updates, etc.) produced by a contract execution.
+///
+/// Examples:
+/// ```tolk
+/// val actions = vm.outActions();
+///
+/// // Check if any actions were produced
+/// expect(actions).toBeNonEmpty();
+///
+/// // Verify the first action is a message of type `TransferNotification`
+/// expect(actions).toBeSendMessageAt<TransferNotification>(0);
+///
+/// // Accessing the body for further checks (using helper methods from `OutActionList` directly)
+/// val msgBody = actions.getSendMessageBodyAt<TransferNotification>(0);
+/// expect(msgBody).toBeNotNull();
+/// expect(msgBody.amount).toEqual(ton("10"));
+/// ```
+
 import "assert"
 import "expect"
 import "../fmt"
@@ -8,7 +29,7 @@ import "../types/out_actions"
 /// Expect the out action list to be non empty.
 /// 
 /// Example:
-/// ```
+/// ```tolk
 /// val out_actions = vm.outActions();
 /// expect(out_actions).toBeNonEmpty();
 /// ```
@@ -19,7 +40,7 @@ fun Expectation<OutActionList>.toBeNonEmpty(self) {
 /// Expect the out action list to be empty.
 /// 
 /// Example:
-/// ```
+/// ```tolk
 /// val out_actions = vm.outActions();
 /// expect(out_actions).toBeEmpty();
 /// ```
@@ -30,7 +51,7 @@ fun Expectation<OutActionList>.toBeEmpty(self) {
 /// Expect the out action at the given index to be a send message.
 /// 
 /// Example:
-/// ```
+/// ```tolk
 /// val out_actions = vm.outActions();
 /// expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 /// ```
@@ -49,7 +70,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 val msg = action.loadGenericMessage();
                 val opcode = msg.loadOpcode();
                 if (opcode == null) {
-                    impl.fail_to_find_out_msg<Msg>(e, self.location);
+                    expect_impl.fail_to_find_out_msg<Msg>(e, self.location);
                     return;
                 }
 
@@ -67,7 +88,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 );
                 return;
             }
-            impl.fail_to_find_out_msg<Msg>(e, self.location);
+            expect_impl.fail_to_find_out_msg<Msg>(e, self.location);
         }
         return;
     }
@@ -78,9 +99,9 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
     );
 }
 
-struct impl
+struct expect_impl
 
-fun impl.fail_to_find_out_msg<Msg>(exit_code: int, location: slice) {
+fun expect_impl.fail_to_find_out_msg<Msg>(exit_code: int, location: slice) {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",

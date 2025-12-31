@@ -1,0 +1,61 @@
+SETCP 0
+DICTPUSHCONST 19 [
+    0 => {
+        INMSG_BOUNCED
+        PUSHCONT_SHORT {
+            DROP
+        }
+        IFJMP
+        DUP
+        SDBEGINSQ x{7e8764efa_}
+        PUSHCONT {
+            NIP
+            PUSHCTR c4
+            CTOS
+            SWAP
+            PLDU 32
+            SWAP
+            LDSLICE 32
+            PLDU 32
+            ROT
+            ADD
+            SWAP
+            NEWC
+            STSLICE
+            STU 32
+            ENDC
+            POPCTR c4
+        }
+        IFJMP
+        SDBEGINSQ x{3a752f06a_}
+        NIP
+        PUSHCONT {
+            DROP
+            PUSHCTR c4
+            CTOS
+            LDSLICE 32
+            DROP
+            NEWC
+            STSLICE
+            STSLICECONST x{}
+            ENDC
+            POPCTR c4
+        }
+        IFJMP
+        PUSHINT_16 4086
+        SWAP
+        SEMPTY
+        THROWANYIFNOT
+    }
+    114199 => {
+    }
+    117456 => {
+        PUSHCTR c4
+        CTOS
+        LDU 32
+        NIP
+        PLDU 32
+    }
+]
+DICTIGETJMPZ
+THROWARG 11

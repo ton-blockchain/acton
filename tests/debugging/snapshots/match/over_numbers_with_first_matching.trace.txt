@@ -1,4 +1,5 @@
 Step 1 (before):
+  Bytecode position: 154F316CA9E079D1B5154EA1B1409989877F02F60FCB118C577C0C87AA31A66C:8
   Code:
       1| 
       2| fun main(foo: int) {
@@ -11,12 +12,13 @@ Step 1 (before):
     foo = 100
 
 Step 2 (step_over):
+  Bytecode position: 154F316CA9E079D1B5154EA1B1409989877F02F60FCB118C577C0C87AA31A66C:8
   Code:
       1| 
       2| fun main(foo: int) {
       3|     match (foo) {
       4|         100 => {
-                 ^
+                 ^^^
       5|             return 10
       6|         }
       7|         200 => {
@@ -24,12 +26,13 @@ Step 2 (step_over):
     foo = 100
 
 Step 3 (step_over):
+  Bytecode position: 154F316CA9E079D1B5154EA1B1409989877F02F60FCB118C577C0C87AA31A66C:56
   Code:
       2| fun main(foo: int) {
       3|     match (foo) {
       4|         100 => {
       5|             return 10
-                     ^
+                     ^^^^^^^^^
       6|         }
       7|         200 => {
       8|             return 20

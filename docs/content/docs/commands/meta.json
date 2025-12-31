@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "new",
+    "compile",
+    "wrapper",
+    "disasm",
+    "test",
+    "script",
+    "run",
+    "verify",
+    "library",
+    "wallet",
+    "shell-completions"
+  ]
+}

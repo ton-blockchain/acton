@@ -1,4 +1,6 @@
-use crate::support::{FixtureProject, ProjectBuilder, TestOutputExt};
+use crate::support::TestOutputExt;
+use crate::support::fixtures::FixtureProject;
+use crate::support::project::ProjectBuilder;
 
 const SIMPLE_CONTRACT: &str = r#"
 fun onInternalMessage(in: InMessage) {}
@@ -68,18 +70,18 @@ fn test_junit_reporter_basic_passing() {
         .run()
         .success()
         .assert_passed(2)
-        .assert_file_exists("test-results/TEST-counter_test.tolk.xml")
+        .assert_file_exists("test-results/TEST-counter.test.tolk.xml")
         .assert_file_contains(
-            "test-results/TEST-counter_test.tolk.xml",
-            r#"<testsuite name="counter_test.tolk""#,
+            "test-results/TEST-counter.test.tolk.xml",
+            r#"<testsuite name="counter.test.tolk""#,
         )
         .assert_file_contains(
-            "test-results/TEST-counter_test.tolk.xml",
+            "test-results/TEST-counter.test.tolk.xml",
             r#"<testcase name="test-should-increase-counter""#,
         )
         .assert_snapshot_matches("integration/snapshots/test_junit_basic_passing.stdout.txt")
         .assert_file_snapshot_matches(
-            "test-results/TEST-counter_test.tolk.xml",
+            "test-results/TEST-counter.test.tolk.xml",
             "integration/snapshots/test_junit_basic_passing.xml.gen",
         );
 }
@@ -97,7 +99,7 @@ fn test_junit_reporter_with_failing_test() {
         .assert_failed(2)
         .assert_contains("exit_code=10")
         .assert_file_snapshot_matches(
-            "test-results/TEST-counter_test.tolk.xml",
+            "test-results/TEST-counter.test.tolk.xml",
             "integration/snapshots/test_junit_reporter_with_failing_test.xml.gen",
         )
         .assert_snapshot_matches("integration/snapshots/test_junit_with_failing_test.stdout.txt");
@@ -208,11 +210,11 @@ fn test_junit_reporter_multiple_files_with_failures() {
         .assert_passed(3)
         .assert_failed(1)
         .assert_file_snapshot_matches(
-            "test-results/TEST-wallet_test.tolk.xml",
+            "test-results/TEST-wallet.test.tolk.xml",
             "integration/snapshots/test_junit_reporter_multiple_files_with_failures_wallet_test.xml.gen",
         )
         .assert_file_snapshot_matches(
-            "test-results/TEST-utils_test.tolk.xml",
+            "test-results/TEST-utils.test.tolk.xml",
             "integration/snapshots/test_junit_reporter_multiple_files_with_failures_utils_test.xml.gen",
         )
         .assert_snapshot_matches(

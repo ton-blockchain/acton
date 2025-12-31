@@ -1,0 +1,231 @@
+---
+title: "assert"
+description: "assert.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Module for assertion functions.
+
+This module provides the foundational assertion logic used in tests.
+While `expect` provides a high-level, fluent API, `Assert` offers direct static methods for verification.
+
+Examples:
+```tolk
+// Basic equality
+Assert.equal(2 + 2, 4, "Math check");
+
+// Gas usage check for a void function
+Assert.consumesLessThan(fun() {
+    someExpensiveOperation();
+}, 10000);
+
+// Gas usage check for a function with arguments
+Assert.consumesLessThan2(fun(a: int, b: int) {
+    return a * b;
+}, 10, 20, 500);
+```
+
+## Definitions
+
+## `ASSERTION_FAILED`
+
+```tolk
+const ASSERTION_FAILED = 567
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L26" />
+
+## `Assert`
+
+```tolk
+struct Assert
+```
+
+Root module for the assertion API.
+
+This structure holds static methods for the assertion API.
+
+Example:
+```tolk
+Assert.equal(10, 10);
+```
+
+For higher-level interface, use the `expect` function.
+
+Example:
+```tolk
+expect(10).toEqual(10);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L43" />
+
+## `Assert.equal`
+
+```tolk
+fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "")
+```
+
+Asserts that two values are equal. If not, throws `ASSERTION_FAILED`.
+
+Optional message can be provided to describe the assertion.
+Optional location can be provided to specify the location of the assertion to
+be printed in the error message.
+
+This is a low-level function. Expectation API provides a higher-level interface
+with automatic location tracking.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L53" />
+
+## `Assert.notEqual`
+
+```tolk
+fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "")
+```
+
+Asserts that two values are NOT equal. If they are, throws `ASSERTION_FAILED`.
+
+Optional message can be provided to describe the assertion.
+Optional location can be provided to specify the location of the assertion to
+be printed in the error message.
+
+This is a low-level function. Expectation API provides a higher-level interface
+with automatic location tracking.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L77" />
+
+## `Assert.fail`
+
+```tolk
+fun Assert.fail(message: slice = "", location: slice = ""): never
+```
+
+Fails the test with the given optional message.
+
+Optional message can be provided to describe the failure.
+Optional location can be provided to specify the location of the failure to
+be printed in the error message.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L98" />
+
+## `Assert.consumesLessThan`
+
+```tolk
+fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int)
+```
+
+Asserts that the function without arguments consumes less than the expected amount of gas.
+
+Example:
+```tolk
+get fun test_gas_consumption() {
+    Assert.consumesLessThan(fun do_something() {
+        // do something that consumes gas
+    }, 100);
+}
+```
+
+If you need to pass arguments to the function, you can use the `consumesLessThan1`,
+`consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
+but accept arguments.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L117" />
+
+## `Assert.consumesLessThan1`
+
+```tolk
+fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int)
+```
+
+Asserts that the function with single argument consumes less than the expected amount of gas.
+
+Example:
+```tolk
+get fun test_gas_consumption() {
+    Assert.consumesLessThan1(fun do_something(a: int, b: int) {
+        // do something that consumes gas
+    }, 100, 100);
+//     ^^^  ^^^ this argument will be passed to the function as the second argument
+//     |
+//     this argument will be passed to the function as the first argument
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L138" />
+
+## `Assert.consumesLessThan2`
+
+```tolk
+fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
+    fn: (Arg1, Arg2) -> Ret,
+    arg1: Arg1,
+    arg2: Arg2,
+    expected: int
+)
+```
+
+Asserts that the function with two arguments consumes less than the expected amount of gas.
+
+Example:
+```tolk
+get fun test_gas_consumption() {
+    Assert.consumesLessThan2(fun do_something(a: int, b: int) {
+        // do something that consumes gas
+    }, 100, 100, 100);
+//     ^^^  ^^^  ^^^ this argument will be passed to the function as the third argument
+//     |    |
+//     |    this argument will be passed to the function as the second argument
+//     |
+//     this argument will be passed to the function as the first argument
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L161" />
+
+## `Assert.consumesLessThan3`
+
+```tolk
+fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
+    fn: (Arg1, Arg2, Arg3) -> Ret,
+    arg1: Arg1,
+    arg2: Arg2,
+    arg3: Arg3,
+    expected: int
+)
+```
+
+Asserts that the function with three arguments consumes less than the expected amount of gas.
+
+Example:
+```tolk
+get fun test_gas_consumption() {
+    Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
+        // do something that consumes gas
+    }, 100, 100, 100, 100);
+//     ^^^  ^^^  ^^^  ^^^ this argument will be passed to the function as the fourth argument
+//     |    |    |
+//     |    |    this argument will be passed to the function as the third argument
+//     |    |
+//     |    this argument will be passed to the function as the second argument
+//     |
+//     this argument will be passed to the function as the first argument
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L191" />
+
+## `Assert.failWalletNotFound`
+
+```tolk
+fun Assert.failWalletNotFound(wallet_name: slice, location: slice = ""): never
+```
+
+Fails the test with wallet not found error.
+
+This function is used internally by the framework when a wallet is not found.
+It provides detailed information about available wallets and instructions on how to add them.
+
+NOT FOR PUBLIC USE.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L211" />
+

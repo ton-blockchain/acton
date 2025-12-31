@@ -1,0 +1,125 @@
+---
+title: "Installation"
+description: "Learn how to install Acton"
+icon: Download
+---
+
+import {Callout} from "fumadocs-ui/components/callout";
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+import {Accordion, Accordions} from "fumadocs-ui/components/accordion";
+import {Step, Steps} from "fumadocs-ui/components/steps";
+import {Card, Cards} from "fumadocs-ui/components/card";
+import {SiApple, SiLinux} from "react-icons/si";
+
+## Overview
+
+Acton ships as a single, dependency-free executable. You can install it via script,
+Homebrew, or download single binary from releases.
+
+<Callout>
+    After installation, verify with `acton --version`
+</Callout>
+
+## Installation
+
+<Tabs items={["macOS", "Linux"]}>
+    <Tab value="macOS">
+
+        ```bash
+        curl -fsSL https://raw.githubusercontent.com/i582/acton/main/install.sh | bash
+        ```
+
+    </Tab>
+    <Tab value="Linux">
+
+        ```bash
+        curl -fsSL https://raw.githubusercontent.com/i582/acton/main/install.sh | bash
+        ```
+
+    </Tab>
+</Tabs>
+
+To check that Acton was installed successfully, open a new terminal window and run:
+
+```bash
+acton --version
+```
+
+You should see the version number of Acton.
+
+<Callout type="warning">
+    If you've installed Acton but are seeing a `command not found` error, you
+    may have to manually add the installation
+    directory to your `PATH`.
+</Callout>
+
+<Accordions>
+    <Accordion title="Add Acton to your PATH">
+        <Tabs items={["macOS & Linux"]}>
+            <Tab value="macOS & Linux">
+                <Steps>
+                    <Step title="Determine which shell you're using">
+                        ```bash
+                        echo $SHELL
+                        # /bin/zsh or /bin/bash or /bin/fish
+                        ```
+                    </Step>
+
+                    <Step title="Open your shell configuration file">
+                        * For bash: `~/.bashrc`
+                        * For zsh: `~/.zshrc`
+                        * For fish: `~/.config/fish/config.fish`
+                    </Step>
+
+                    <Step title="Add the Acton directory to PATH">
+                        Add this line to your configuration file:
+
+                        ```bash
+                        export PATH="PATH_TO_ACTON_BIN:$PATH"
+                        ```
+                    </Step>
+
+                    <Step title="Reload your shell configuration">
+                        ```bash
+                        source ~/.bashrc # or ~/.zshrc
+                        ```
+                    </Step>
+                </Steps>
+            </Tab>
+        </Tabs>
+    </Accordion>
+</Accordions>
+
+<Callout type="info" title="Smart Completions">
+    Setting up [shell completions](/docs/commands/shell-completions) significantly simplifies working with the tool by providing smart suggestions for commands and contract names.
+</Callout>
+
+## Direct Downloads
+
+To download Acton binaries directly, visit the [releases page on GitHub](https://github.com/i582/acton/releases) or use the links below.
+
+<Cards cols={2}>
+    <Card
+        icon={<SiApple/>}
+        title="macOS ARM64"
+        href="https://github.com/i582/acton/releases/latest/download/acton-darwin-aarch64.tar.gz"
+    >
+        Apple Silicon (M1/M2/M3/etc.)
+    </Card>
+
+    <Card
+        icon={<SiApple/>}
+        title="macOS x64"
+        href="https://github.com/i582/acton/releases/latest/download/acton-darwin-x64.tar.gz"
+    >
+        Intel Macs
+    </Card>
+
+    <Card
+        icon={<SiLinux/>}
+        title="Linux x64"
+        href="https://github.com/i582/acton/releases/latest/download/acton-linux-x64.tar.gz"
+    >
+        Standard Linux x64 binary
+    </Card>
+</Cards>

@@ -1,0 +1,168 @@
+---
+title: "Running Tolk scripts"
+description: "Learn how to use the script command to execute standalone Tolk files for experimentation, deployment, and blockchain interaction"
+---
+
+The `script` command executes standalone Tolk files as scripts. Scripts can be used for learning Tolk, experimenting with smart contracts, deploying to the blockchain, and interacting with live contracts. Unlike tests, scripts define a `main()` function as the entry point and can interact with the real TON blockchain when using the `--broadcast` flag.
+
+## Basic Usage
+
+```bash
+acton script my_script.tolk
+```
+
+This command executes `my_script.tolk` in the local emulator environment.
+
+## Command Options
+
+### Input Options
+
+| Option          | Type      | Description                                |
+|-----------------|-----------|--------------------------------------------|
+| `<PATH>`        | File path | Path to the Tolk script file to execute    |
+
+### Network Options
+
+| Option                 | Type   | Description                                            |
+|------------------------|--------|--------------------------------------------------------|
+| `--broadcast`          | Flag   | Execute transactions on real blockchain                |
+| `--net <NETWORK>`      | String | Target network: "testnet" (default) or "mainnet"       |
+| `--fork-net <NETWORK>` | String | Fork blockchain state from network for local execution |
+| `--api-key <API_KEY>`  | String | TonCenter API key for blockchain queries               |
+
+### Debug Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--debug`               | Boolean   | Enable debug mode with DAP server                         |
+| `--debug-port <PORT>`   | Integer   | Debug server port (default: 8080)                         |
+
+### Cache Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--clear-cache`         | Flag      | Clear compilation cache before running                    |
+
+## Script Structure
+
+Every Tolk script must define a `main()` function with no arguments:
+
+```tolk title="hello.tolk"
+import ".acton/lib/io"
+
+fun main() {
+    println("Hello, TON!");
+}
+```
+
+Scripts have access to all functions available in tests, including:
+- Contract deployment and interaction
+- Message sending
+- Get-method execution
+- Blockchain state queries
+- etc.
+
+## Examples
+
+### Local Experimentation
+
+Run a script in the local emulator (no real TON spent):
+
+```bash
+# Basic script execution
+acton script experiment.tolk
+
+# Clear cache before running
+acton script experiment.tolk --clear-cache
+```
+
+### Deploying to Blockchain
+
+Deploy a contract to testnet or mainnet using real wallets:
+
+```bash
+# Deploy to testnet (default)
+acton script deploy.tolk --broadcast
+
+# Deploy to mainnet
+acton script deploy.tolk --broadcast --net mainnet
+```
+
+<Callout type="error" title="Real TON will be spent">
+When using `--broadcast`, your script will send real transactions and spend real TON. Always test without `--broadcast` first!
+</Callout>
+
+Example deployment script:
+
+```tolk title="deploy.tolk"
+import "counter_wrapper"
+import "types"
+
+import "lib/io"
+import "lib/emulation/network"
+import "lib/build/build"
+
+fun main() {
+    // 1. Load the configured wallet (searches wallets.toml and global wallets)
+    val deployer = net.wallet("deployer");
+    val counter = Counter.fromStorage(Storage {
+        id: 8,
+        counter: 0,
+    });
+
+    val result = counter.deploy(deployer.address, ton("0.05"));
+    result.wait(); // optional wait for deployment when broadcasting
+
+    println1("Deployed counter to {}", counter.address);
+}
+```
+
+### Querying Live Contracts
+
+Query state from real blockchain contracts:
+
+```bash
+# Query testnet contract
+acton script query.tolk --fork-net testnet
+
+# Query mainnet contract with API key
+acton script query.tolk --fork-net mainnet --api-key YOUR_API_KEY
+```
+
+Example query script:
+
+```tolk title="query.tolk"
+import "lib/io"
+import "lib/emulation/network"
+
+fun main() {
+    val contractAddress = address("EQDt7LL...");
+    val currentValue: int = net.runGetMethod(contractAddress, "currentCounter");
+    println1("Counter value: {}", currentValue);
+}
+```
+
+## Script Execution Model
+
+Scripts are executed as smart contracts with these characteristics:
+
+1. **Entry Point**: The `main()` function is treated as a get-method with ID=0
+2. **Exit Code**: Script terminates with exit code equal to the `main` execution exit code (capped at 255)
+3. **State**: State is not preserved between script runs
+
+## Execution Modes
+
+| Mode                             | Blockchain State   | Wallets      | Real TON Spent |
+|----------------------------------|--------------------|--------------|----------------|
+| Local (default)                  | Local emulator     | Test wallets | No             |
+| `--fork-net testnet`             | Real testnet state | Test wallets | No             |
+| `--broadcast`                    | Local emulator     | Real wallets | Yes            |
+| `--broadcast --fork-net testnet` | Real testnet state | Real wallets | Yes            |
+
+## Learn More
+
+For detailed guides on writing scripts and blockchain interaction:
+
+- [Scripting overview](/docs/scripting/overview/) — Introduction to scripts and basic examples
+- [Setting up wallets](/docs/scripting/setup-wallets/) — Configure real wallets for broadcasting
+- [Blockchain interaction](/docs/scripting/blockchain-interaction/) — Deploy contracts and send transactions

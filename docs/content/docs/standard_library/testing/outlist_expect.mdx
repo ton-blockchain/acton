@@ -1,0 +1,82 @@
+---
+title: "outlist_expect"
+description: "outlist_expect.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Module for asserting properties of out action lists.
+
+This module extends the `Expectation` class specifically for `OutActionList`.
+`OutActionList` represents the actions (messages, code updates, etc.) produced by a contract execution.
+
+Examples:
+```tolk
+val actions = vm.outActions();
+
+// Check if any actions were produced
+expect(actions).toBeNonEmpty();
+
+// Verify the first action is a message of type `TransferNotification`
+expect(actions).toBeSendMessageAt<TransferNotification>(0);
+
+// Accessing the body for further checks (using helper methods from `OutActionList` directly)
+val msgBody = actions.getSendMessageBodyAt<TransferNotification>(0);
+expect(msgBody).toBeNotNull();
+expect(msgBody.amount).toEqual(ton("10"));
+```
+
+## Definitions
+
+## `Expectation<OutActionList>.toBeNonEmpty`
+
+```tolk
+fun Expectation<OutActionList>.toBeNonEmpty(self)
+```
+
+Expect the out action list to be non empty.
+
+Example:
+```tolk
+val out_actions = vm.outActions();
+expect(out_actions).toBeNonEmpty();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L36" />
+
+## `Expectation<OutActionList>.toBeEmpty`
+
+```tolk
+fun Expectation<OutActionList>.toBeEmpty(self)
+```
+
+Expect the out action list to be empty.
+
+Example:
+```tolk
+val out_actions = vm.outActions();
+expect(out_actions).toBeEmpty();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L47" />
+
+## `Expectation<OutActionList>.toBeSendMessageAt`
+
+```tolk
+fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int)
+```
+
+Expect the out action at the given index to be a send message.
+
+Example:
+```tolk
+val out_actions = vm.outActions();
+expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
+```
+
+Note that you should provide the message type as a generic parameter.
+
+If the action is not a send message, the test will fail.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L62" />
+

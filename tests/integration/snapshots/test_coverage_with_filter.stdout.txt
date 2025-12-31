@@ -4,8 +4,8 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 test)
-  ✓ unit double [TIME]
+ > ./tests/test.test.tolk (1 test)
+  ✓ unit-double [TIME]
 
  ✓ 1 passed in 1 file
 

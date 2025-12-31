@@ -1,0 +1,206 @@
+---
+title: "Shell Completions"
+description: "Learn how to enable autocompletion for the acton CLI in your shell"
+---
+
+The Acton CLI supports two types of shell completions: **Dynamic** (recommended) and **Static**.
+
+## Dynamic Completions (Recommended)
+
+Dynamic completions are more powerful because they provide context-aware suggestions. For example, they can suggest contract names for `build`, `verify`, and other commands by analyzing your project structure.
+
+To enable dynamic completions, add the following command to your shell configuration file.
+
+### Zsh
+
+Add this to your `~/.zshrc`:
+
+```bash
+source <(COMPLETE=zsh acton)
+```
+
+### Bash
+
+Add this to your `~/.bashrc`:
+
+```bash
+source <(COMPLETE=bash acton)
+```
+
+### Fish
+
+Add this to your `~/.config/fish/config.fish`:
+
+```fish
+COMPLETE=fish acton | source
+```
+
+## Static Completions
+
+Static completions are generated once and do not change until you regenerate them. They are faster but less powerful than dynamic completions, as they only support completion of fixed commands and flags.
+
+### Basic Usage
+
+```bash
+acton completions <SHELL>
+```
+
+The command outputs the completion script to stdout. You need to save it to the appropriate location for your shell.
+
+### Supported Shells
+
+Acton supports static autocompletion for the following shells:
+- Bash
+- Zsh
+- Fish
+- PowerShell
+- Elvish
+
+### Installation Instructions
+
+#### Bash
+
+Add completions to your current session:
+
+```bash
+source <(acton completions bash)
+```
+
+For permanent installation, add to your `~/.bashrc`:
+
+```bash
+acton completions bash >> ~/.bashrc
+```
+
+Or install to the system-wide completion directory:
+
+```bash
+acton completions bash | sudo tee /usr/share/bash-completion/completions/acton
+```
+
+#### Zsh
+
+For Zsh, you need to add the completion script to a directory in your `$fpath`:
+
+```bash
+# Create completions directory if it doesn't exist
+mkdir -p ~/.zsh/completions
+
+# Generate completion script
+acton completions zsh > ~/.zsh/completions/_acton
+
+# Add to ~/.zshrc if not already present
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+```
+
+Then restart your shell or run:
+
+```bash
+source ~/.zshrc
+```
+
+#### Fish
+
+Fish shell stores completions in `~/.config/fish/completions/`:
+
+```bash
+acton completions fish > ~/.config/fish/completions/acton.fish
+```
+
+The completions will be available immediately in new fish sessions.
+
+#### PowerShell
+
+Add to your PowerShell profile:
+
+```powershell
+acton completions powershell | Out-String | Invoke-Expression
+```
+
+To make it permanent, add to your profile script:
+
+```bash
+# Find your profile location
+echo $PROFILE
+
+# Add completions to profile
+acton completions powershell >> $PROFILE
+```
+
+#### Elvish
+
+Add to your Elvish configuration (`~/.elvish/rc.elv`):
+
+```bash
+acton completions elvish > ~/.elvish/completions/acton.elv
+```
+
+Then add to your `~/.elvish/rc.elv`:
+
+```bash
+use completions/acton
+```
+
+## Verifying Installation
+
+After installing completions, verify they work by typing:
+
+```bash
+acton <TAB>
+```
+
+You should see available commands like `build`, `test`, `compile`, etc.
+
+Try completing command options:
+
+```bash
+acton test --<TAB>
+```
+
+This should show available flags like `--debug`, `--coverage`, `--filter`, etc.
+
+## Troubleshooting
+
+### Completions not working in Bash
+
+Make sure bash-completion is installed:
+
+```bash
+# Ubuntu/Debian
+sudo apt install bash-completion
+
+# macOS
+brew install bash-completion@2
+```
+
+### Completions not working in Zsh
+
+Ensure `compinit` is called in your `.zshrc` after setting `fpath`:
+
+```bash
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
+```
+
+You may need to delete the completion cache:
+
+```bash
+rm -f ~/.zcompdump
+compinit
+```
+
+### Completions showing old commands
+
+Regenerate the completion script after updating Acton (for static completions):
+
+```bash
+# For Zsh
+acton completions zsh > ~/.zsh/completions/_acton
+
+# For Bash
+acton completions bash | sudo tee /usr/share/bash-completion/completions/acton
+
+# For Fish
+acton completions fish > ~/.config/fish/completions/acton.fish
+```

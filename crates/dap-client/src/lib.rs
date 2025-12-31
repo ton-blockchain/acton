@@ -180,16 +180,20 @@ impl DapClient {
                 return Err(anyhow!("Timeout waiting for response seq={}", seq));
             }
 
-            match self
+            if let Ok((response_seq, response)) = self
                 .response_receiver
                 .recv_timeout(Duration::from_millis(100))
+                && response_seq == seq
             {
-                Ok((response_seq, response)) => {
-                    if response_seq == seq {
-                        return Ok(response);
-                    }
-                }
-                Err(_) => continue,
+                return Ok(response);
+            }
+
+            if let Ok(event) = self.event_receiver.recv_timeout(Duration::from_millis(100))
+                && matches!(event, Event::Terminated(_))
+            {
+                anyhow::bail!(
+                    "The debugger terminated, probably because you stepped too many times, check stacktrace"
+                );
             }
         }
     }

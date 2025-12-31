@@ -1,0 +1,4 @@
+Invalid regex pattern [invalid regex: regex parse error:
+    [invalid regex
+    ^
+error: unclosed character class

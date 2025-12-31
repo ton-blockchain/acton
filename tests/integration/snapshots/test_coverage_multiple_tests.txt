@@ -1,19 +1,19 @@
 Coverage Summary:
 Lines: 3/4 (75.00%)
-Total Hits: 12
+Total Hits: 6
 
 File: [ROOT]/code/calculator.tolk
 Annotated Code:
  1   |                                                          |
  2   |             fun multiply(a: int, b: int): int {          |
- 3 ✓ |                 return a * b;                            | hits:3
+ 3 ✓ |                 return a * b;                            | hits:1
  4   |             }                                            |
  5   |                                                          |
  6   |             fun divide(a: int, b: int): int {            |
  7 ✓ |                 if (b == 0) {                            | hits:4
  8 ✗ |                     throw 100;                           | hits:0
  9   |                 }                                        |
-10 ✓ |                 return a / b;                            | hits:3
+10 ✓ |                 return a / b;                            | hits:1
 11   |             }                                            |
 12   |                                                          |
 

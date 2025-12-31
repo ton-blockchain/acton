@@ -1,6 +1,8 @@
 use crate::common::assertion;
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
-use crate::support::{ProjectBuilder, TestOutputExt};
+
 use std::time::Duration;
 use std::{fs, thread};
 
@@ -46,6 +48,78 @@ fn test_disasm_from_boc_file_with_output() {
 }
 
 #[test]
+fn test_disasm_from_boc_file_with_base64() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.base64", "te6ccgEBBAEAbwABFP8A9KQT9LzyyAsBAgFiAgMAmtD4kZEw4CDXLCP0Oyd8jhgx7UTQAdcLHwHWH9cLH1igAcjOyx/J7VTg1ywh06l4NDGOEjDtRNDWHzDIzs+QAAAAAsntVOCEDwHHAPL0ABehlaHaiaGmPmOuFj8=")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.base64")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_base64.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_from_boc_file_with_hex() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.hex", "b5ee9c7201010401006f000114ff00f4a413f4bcf2c80b0102016203020017a195a1da89a1a63e63ae163f009ad0f8919130e020d72c23f43b277c8e1831ed44d001d70b1f01d61fd70b1f58a001c8cecb1fc9ed54e0d72c21d3a97834318e1230ed44d0d61f30c8cecf9000000002c9ed54e0840f01c700f2f4")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.hex")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_hex.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_from_boc_file_with_hex_with_newlines() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.hex", "\n\nb5ee9c7201010401006f000114ff00f4a413f4bcf2c80b0102016203020017a195a1da89a1a63e63ae163f009ad0f8919130e020d72c23f43b277c8e1831ed44d001d70b1f01d61fd70b1f58a001c8cecb1fc9ed54e0d72c21d3a97834318e1230ed44d0d61f30c8cecf9000000002c9ed54e0840f01c700f2f4\n\n")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.hex")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_hex_with_newlines.stdout.txt",
+        );
+}
+
+#[test]
+fn test_disasm_from_boc_file_with_invalid_hex() {
+    let project = ProjectBuilder::new("disasm-file")
+        .raw_file("simple.hex", "123\n\nb5ee9c7201010401006f000114ff00f4a413f4bcf2c80b0102016203020017a195a1da89a1a63e63ae163f009ad0f8919130e020d72c23f43b277c8e1831ed44d001d70b1f01d61fd70b1f58a001c8cecb1fc9ed54e0d72c21d3a97834318e1230ed44d0d61f30c8cecf9000000002c9ed54e0840f01c700f2f4\n\n")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.hex")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_from_boc_file_with_invalid_hex.stderr.txt",
+        );
+}
+
+#[test]
 fn test_disasm_from_hex_string() {
     let project = ProjectBuilder::new("disasm-hex")
         .contract_with_output("simple", SIMPLE_CONTRACT, "simple.boc")
@@ -58,6 +132,7 @@ fn test_disasm_from_hex_string() {
 
     project
         .acton()
+        .disasm()
         .disasm_string(&hex_string)
         .run()
         .success()
@@ -78,6 +153,7 @@ fn test_disasm_from_base64_string() {
 
     project
         .acton()
+        .disasm()
         .disasm_string(&base64_string)
         .run()
         .success()
@@ -93,7 +169,7 @@ fn test_disasm_file_not_found() {
         .disasm_file("nonexistent.boc")
         .run()
         .failure()
-        .assert_stderr_contains("No such file");
+        .assert_stderr_contains("Cannot find file or director");
 }
 
 #[test]
@@ -108,7 +184,7 @@ fn test_disasm_invalid_boc_data() {
         .disasm_file("data/invalid.boc")
         .run()
         .failure()
-        .assert_stderr_contains("Failed to decode BOC");
+        .assert_stderr_contains("Failed to decode BoC");
 }
 
 #[test]
@@ -117,10 +193,11 @@ fn test_disasm_invalid_hex_string() {
 
     project
         .acton()
+        .disasm()
         .disasm_string("not_valid_hex_or_base64")
         .run()
         .failure()
-        .assert_stderr_contains("Failed to decode BOC");
+        .assert_stderr_contains("Failed to decode BoC");
 }
 
 #[test]
@@ -132,7 +209,7 @@ fn test_disasm_no_input_provided() {
         .disasm()
         .run()
         .failure()
-        .assert_stderr_contains("Either --string/-s, --address or boc_file must be provided");
+        .assert_stderr_contains(" Either --string/-s, --address or BOC_FILE argument must be provided, run with --help for more information");
 }
 
 #[test]
@@ -310,7 +387,7 @@ fn test_disasm_from_blockchain_invalid_address() {
         .with_api_key(toncenter_api_key())
         .run()
         .failure()
-        .assert_stderr_contains("Contract not found");
+        .assert_stderr_contains("Address invalid-address is not a valid address.");
 }
 
 #[test]
@@ -325,5 +402,145 @@ fn test_disasm_from_blockchain_with_wrong_api_key() {
         .with_api_key("wrong-test-api-key")
         .run()
         .failure()
-        .assert_contains("Contract not found on both mainnet and testnet");
+        .assert_contains("Contract with address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM not found on both mainnet and testnet");
+}
+
+#[test]
+fn test_disasm_directory_as_file() {
+    let project = ProjectBuilder::new("disasm-directory")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .disasm_file("contracts") // contracts is a directory
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_directory_as_file.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_invalid_network() {
+    let project = ProjectBuilder::new("disasm-invalid-net")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "simple.boc")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.boc")
+        .with_net("invalid-network")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_invalid_network.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_multiple_input_sources_file_and_string() {
+    let project = ProjectBuilder::new("disasm-multiple-inputs")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "simple.boc")
+        .build();
+
+    project.acton().build().run().success();
+
+    project
+        .acton()
+        .disasm_file("simple.boc")
+        .disasm_string("some_hex_data")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_multiple_input_sources_file_and_string.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_address_with_invalid_network() {
+    let project = ProjectBuilder::new("disasm-addr-invalid-net").build();
+
+    project
+        .acton()
+        .disasm()
+        .with_address("UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM")
+        .with_net("invalid-network")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_address_with_invalid_network.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_empty_address() {
+    let project = ProjectBuilder::new("disasm-empty-addr").build();
+
+    project
+        .acton()
+        .disasm()
+        .with_address("")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_empty_address.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_empty_string() {
+    let project = ProjectBuilder::new("disasm-empty-string").build();
+
+    project
+        .acton()
+        .disasm()
+        .disasm_string("")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_empty_string.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_file_without_read_permission() {
+    let project = ProjectBuilder::new("disasm-no-read")
+        .raw_file("secret.boc", "some boc data")
+        .build();
+
+    // Make the file unreadable (on Unix systems)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let file_path = project.path().join("secret.boc");
+        let mut perms = fs::metadata(&file_path).unwrap().permissions();
+        perms.set_mode(0o000); // no permissions
+        fs::set_permissions(&file_path, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .disasm_file("secret.boc")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_file_without_read_permission.stderr.txt",
+        );
+}
+
+#[test]
+fn test_disasm_empty_file_path() {
+    let project = ProjectBuilder::new("disasm-empty-path").build();
+
+    project
+        .acton()
+        .disasm_file("")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_disasm_empty_file_path.stderr.txt",
+        );
 }

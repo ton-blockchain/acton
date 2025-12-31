@@ -1,0 +1,73 @@
+---
+title: "Mutation Rules"
+description: "Reference of all available mutation rules in Acton"
+---
+
+This page lists all mutation rules available in Acton, categorized by their type.
+
+## Critical Rules
+
+These rules affect control flow and security assertions. Mutations in this category that survive are often indicators of missing tests for edge cases or security validation.
+
+| Rule                       | Description                       | Explanation                                                                                                            |
+|----------------------------|-----------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| `remove_assert`            | Remove assert statements          | This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.  |
+| `remove_throw`             | Remove throw keyword              | This exception path is not covered by tests. Missing error handling might leave the contract in an inconsistent state. |
+| `remove_storage_save_call` | Remove save() method calls        | This storage save operation is not covered by tests. Without this call, data changes won't be persisted to storage.    |
+| `if_condition_true`        | Replace if condition with `true`  | The conditional logic is not fully covered.                                                                            |
+| `if_condition_false`       | Replace if condition with `false` | The conditional logic is not fully covered.                                                                            |
+| `remove_logical_not`       | Remove logical NOT (`!`)          | The logical negation is not fully covered.                                                                             |
+
+## Arithmetic Rules
+
+These rules mutate arithmetic operations to ensure calculations are verified by tests.
+
+| Rule                 | Description              |
+|----------------------|--------------------------|
+| `flip_plus`          | Replace `+` with `-`     |
+| `flip_minus`         | Replace `-` with `+`     |
+| `flip_mul_div`       | Replace `*` with `/`     |
+| `flip_div_mul`       | Replace `/` with `*`     |
+| `flip_mul_assign`    | Replace `*=` with `/=`   |
+| `flip_div_assign`    | Replace `/=` with `*=`   |
+| `flip_mod_assign`    | Replace `%=` with `*=`   |
+| `flip_plus_assign`   | Replace `+=` with `-=`   |
+| `flip_minus_assign`  | Replace `-=` with `+=`   |
+| `remove_unary_minus` | Remove unary minus (`-`) |
+
+## Comparison Rules
+
+These rules mutate comparison operators to check if boundary conditions are tested.
+
+| Rule         | Description            |
+|--------------|------------------------|
+| `flip_eq_ne` | Replace `==` with `!=` |
+| `flip_ne_eq` | Replace `!=` with `==` |
+| `flip_lt_le` | Replace `<` with `<=`  |
+| `flip_gt_ge` | Replace `>` with `>=`  |
+| `flip_le_lt` | Replace `<=` with `<`  |
+| `flip_ge_gt` | Replace `>=` with `>`  |
+
+## Boolean & Logical Rules
+
+These rules invert boolean values and logical operators.
+
+| Rule                | Description                 |
+|---------------------|-----------------------------|
+| `invert_bool_true`  | Replace `true` with `false` |
+| `invert_bool_false` | Replace `false` with `true` |
+| `flip_logical_and`  | Replace `&&` with `\|\|`    |
+| `flip_logical_or`   | Replace `\|\|` with `&&`    |
+
+## Bitwise Rules
+
+These rules mutate bitwise operations.
+
+| Rule                 | Description              |
+|----------------------|--------------------------|
+| `flip_bitwise_and`   | Replace `&` with `\|`    |
+| `flip_bitwise_or`    | Replace `\|` with `&`    |
+| `flip_bitwise_xor`   | Replace `^` with `&`     |
+| `flip_lshift`        | Replace `<<` with `>>`   |
+| `flip_rshift`        | Replace `>>` with `<<`   |
+| `remove_bitwise_not` | Remove bitwise NOT (`~`) |

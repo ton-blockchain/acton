@@ -15,39 +15,52 @@ pub fn pop_arg<T: FromStack>(t: &mut Tuple) -> Result<T, ArgError> {
 #[macro_export]
 macro_rules! pop_args {
     ($tuple:expr, $($ty:ty),+ $(,)?) => {{
-        #[allow(non_snake_case)]
-        {
-            let mut __errors: Option<tvmffi::from_stack::ArgError> = None;
-            let __result = ( $(
-                match $crate::extensions::pop_arg::<$ty>($tuple) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        __errors = Some(e);
-                        Default::default()
-                    }
+        let mut __errors: Option<tvmffi::from_stack::ArgError> = None;
+        let __result = ( $(
+            match $crate::extensions::pop_arg::<$ty>($tuple) {
+                Ok(v) => v,
+                Err(e) => {
+                    __errors = Some(e);
+                    Default::default()
                 }
-            , )+ );
-            if let Some(e) = __errors {
-                Err(e)
-            } else {
-                Ok(__result)
             }
+        , )+ );
+        if let Some(e) = __errors {
+            Err(e)
+        } else {
+            Ok(__result)
         }
     }};
 }
 
 #[macro_export]
 macro_rules! extension {
-    ($fn_name:ident in ($ctx_ty:ty) with ($an:ident : $ty:ty) using $body:expr) => {
-        unsafe extern "C" fn $fn_name(ctx: *mut std::os::raw::c_void, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
+    ($fn_name:ident in ($ctx_ty:ty) using $body:expr) => {
+        unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
-                    match (|| -> Result<$ty, tvmffi::from_stack::ArgError> {
-                        $crate::extensions::pop_arg::<$ty>(__t)
-                    })() {
+                    let r: anyhow::Result<()> = $body(ctx, __t);
+                    if let Err(e) = r {
+                        ctx.asserts.fail(e.to_string());
+                        __t.push(tvmffi::stack::TupleItem::Null);
+                    }
+                })
+            }
+        }
+    };
+    ($fn_name:ident in ($ctx_ty:ty) with ($an:ident : $ty:ty) using $body:expr) => {
+        unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
+            unsafe {
+                let ctx = &mut *(ctx as *mut $ctx_ty);
+                $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
+                    match $crate::extensions::pop_arg::<$ty>(__t) {
                         Ok($an) => {
-                            $body(ctx, __t, $an);
+                            let r: anyhow::Result<()> = $body(ctx, __t, $an);
+                            if let Err(e) = r {
+                                ctx.asserts.fail(e.to_string());
+                                __t.push(tvmffi::stack::TupleItem::Null);
+                            }
                         }
                         Err(e) => {
                             eprintln!("ext_args decode error in {}: {}", stringify!($fn_name), e);
@@ -58,17 +71,21 @@ macro_rules! extension {
         }
     };
     ($fn_name:ident in ($ctx_ty:ty) with ($($an:ident : $ty:ty),+ $(,)?) using $body:expr) => {
-        unsafe extern "C" fn $fn_name(ctx: *mut std::os::raw::c_void, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
+        unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
             unsafe {
+                debug_assert!(!ctx.is_null());
+                debug_assert!(!ptr.is_null());
                 let ctx = &mut *(ctx as *mut $ctx_ty);
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
-                    match (|| -> Result<($($ty),*), tvmffi::from_stack::ArgError> {
-                        pop_args!(__t, $($ty),*)
-                    })() {
+                    match $crate::pop_args!(__t, $($ty),*) {
                         Ok(__vals) => {
                             #[allow(non_snake_case, unused_variables)]
                             let ($($an, )*) = __vals;
-                            $body(ctx, __t, $($an, )*);
+                            let r: anyhow::Result<()> = $body(ctx, __t, $($an, )*);
+                            if let Err(e) = r {
+                                ctx.asserts.fail(e.to_string());
+                                __t.push(tvmffi::stack::TupleItem::Null);
+                            }
                         }
                         Err(e) => {
                             eprintln!("ext_args decode error in {}: {}", stringify!($fn_name), e);
@@ -111,20 +128,7 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
 macro_rules! register_ext_methods {
     ($executor:expr, $ctx:expr, { $($id:expr => $fname:ident),+ $(,)? }) => {{
         $(
-            $executor.register_ext_method($id, ($ctx) as *mut _ as *mut std::ffi::c_void, $fname);
+            $executor.register_ext_method($id, ($ctx), $fname).expect(&format!("cannot register extension with id: {}", $id));
         )+
     }};
-}
-
-#[macro_export]
-macro_rules! try_ctx {
-    ($ctx:expr, $expr:expr, $($arg:tt)*) => {
-        match $expr {
-            Ok(value) => value,
-            Err(e) => {
-                $ctx.asserts.fail(format!($($arg)*, e));
-                return Default::default();
-            }
-        }
-    };
 }

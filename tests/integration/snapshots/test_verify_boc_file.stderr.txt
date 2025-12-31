@@ -1,0 +1,1 @@
+Error: Cannot verify precompiled .boc files. Please specify a .tolk source file.

@@ -1,0 +1,149 @@
+---
+title: "Verifying smart contract source code"
+description: "Learn how to use the verify command to validate that deployed smart contracts match their source code"
+---
+
+The `verify` command allows you to verify that a specific address on the blockchain was compiled from a specific set of source files. This enables validation that the source code matches what was actually deployed to the blockchain.
+
+## Basic Usage
+
+```bash
+acton verify <CONTRACT> --address <ADDRESS>
+```
+
+This command verifies that the specified contract address contains bitcode that was compiled from the local source files.
+
+## Command Options
+
+| Option                         | Type    | Description                                                                        |
+|--------------------------------|---------|------------------------------------------------------------------------------------|
+| `--address <ADDR>`             | String  | Contract address to verify on the blockchain (prompted if not provided)            |
+| `--wallet <WALLET>`            | String  | Wallet name to use for signing verification transaction (prompted if not provided) |
+| `--compiler-version <VERSION>` | String  | Tolk compiler version to use on verifier side (defaults to 1.1.0)                  |
+| `--dry-run`                    | Boolean | Run verification without sending the final transaction                             |
+| `--api-key <KEY>`              | String  | TonCenter API key for blockchain queries (avoids rate limiting)                    |
+
+### Network Options
+
+| Option            | Type   | Description                                        |
+|-------------------|--------|----------------------------------------------------|
+| `--net <NETWORK>` | String | Network to verify against ("mainnet" or "testnet") |
+
+## Examples
+
+### Basic verification
+
+```bash
+# Verify a contract on testnet (default)
+acton verify counter --address EQDt7LL...
+
+# Verify a contract on mainnet
+acton verify counter --address UQDt7LL... --net mainnet
+```
+
+### Verification with specific wallet
+
+```bash
+acton verify counter --address EQDt7LL... --wallet deployer
+```
+
+### Dry run verification
+
+```bash
+# Test verification without sending transaction
+acton verify counter --address EQDt7LL... --dry-run
+```
+
+### Using API key to avoid rate limits
+
+```bash
+# Provide TonCenter API key to skip rate limit delays
+acton verify counter --address EQDt7LL... --api-key YOUR_API_KEY
+```
+
+### Specifying compiler version
+
+```bash
+# Use specific Tolk compiler version (defaults to 1.1.0)
+acton verify counter --address EQDt7LL... --compiler-version 1.0.0
+```
+
+## Verification Process
+
+The verification process consists of several steps:
+
+1. **Contract compilation**: Acton compiles the local source code
+2. **Code hash calculation**: Generates the hash of the compiled bytecode
+3. **Backend verification**: Sends source files to the verification backend
+4. **Signature collection**: Gathers required signatures for the verification
+5. **Transaction submission**: Submits the verification transaction to the blockchain
+
+### Sample Output
+
+```bash
+$ acton verify simple_counter --address EQBUSJzajuPivGpz7oKCavTVUqCDlhRNL4Nl6yzva8ELjYmd
+  → Contract: simple_counter
+  → Compiling contract
+  ✓ Compiled successfully
+  → Code hash: 6731e7e17b908b55e9b3c63264db95789a4f43144924095703c601958b424e46
+  → Contract address: EQBUSJzajuPivGpz7oKCavTVUqCDlhRNL4Nl6yzva8ELjYmd
+  → Using wallet: deployer EQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8XSS
+  → Fetching backends configuration
+  ✓ Found 1 backend for testnet
+  → Collecting source files
+  ✓ Collected 2 source files
+  → Sending sources to backend for verification
+  ✓ Backend verification successful
+  → Collecting signatures (need 1 of 1)
+  ✓ All signatures collected
+  → Sending verification transaction
+  → Waiting for Toncenter rate limit
+  → Waiting for Toncenter rate limit
+  ✓ Transaction sent successfully
+
+✓ Contract verification completed!
+View at: https://verifier.ton.org/EQBUSJzajuPivGpz7oKCavTVUqCDlhRNL4Nl6yzva8ELjYmd?testnet
+```
+
+## Contract and Wallet Selection
+
+If your project contains a single contract, it will be automatically selected. The same applies to the wallet that will be used for verification. If the project contains multiple contracts and wallets, Acton will prompt you to specify the required contract and wallet before verification.
+
+<Callout type="info">
+Learn how to configure wallets in the [Setting up wallets](/docs/scripting/setup-wallets/) guide.
+</Callout>
+
+## Network Configuration
+
+By default, contracts are verified on testnet. To verify a contract on mainnet, use the `--net mainnet` flag. The verification backend will automatically handle the appropriate network configuration.
+
+## Requirements and Limitations
+
+### File Type Requirements
+
+- Only `.tolk` source files can be verified
+- Precompiled `.boc` files cannot be verified
+- The contract must be defined in `Acton.toml`
+- The wallet must be configured in `wallets.toml` or global configuration
+
+### Rate Limiting
+
+Without providing an `--api-key`, the verification process will include 1-second delays between blockchain queries to respect TonCenter rate limits. Provide a TonCenter API key using the `--api-key` option to avoid these delays.
+
+### Compiler Version
+
+By default, the verification uses Tolk compiler version 1.1.0. You can specify a different version using the `--compiler-version` option. Note that the verifier backend must support the specified compiler version.
+
+### Already Verified Contracts
+
+If a contract with the same code hash has already been verified, you'll receive a warning message and no transaction will be sent. Note that even so, the contract will still be considered verified.
+
+### Verification Cost
+
+The verification process requires sending a transaction to the blockchain, which costs **0.1 TON**. This fee covers the network transaction cost for registering the contract verification on the TON Verifier service. The fee is deducted from the wallet used for verification.
+
+## TON Verifier Service
+
+Verification is performed through the [TON Verifier](https://verifier.ton.org/) service.
+
+After successful verification, your contract will be publicly listed on the TON Verifier website, allowing anyone to view and verify that the deployed bytecode matches the published source code. The verification link will be displayed in the command output.

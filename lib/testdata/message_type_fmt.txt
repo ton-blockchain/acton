@@ -3,8 +3,8 @@ MessageRelaxedGeneric {
         ihr_disabled: true,
         bounce: false,
         bounced: false,
-        src: EQAKIOo5BYX6HLXvPp8Ct55dApFwnI0qWrx55yyF_aI9K5e-,
-        dest: EQCaMdGt9cG70iD0tRb-8Dvt8QqRPDgRrLFHP4wanVjLn2ji (counter),
+        src: kQAKIOo5BYX6HLXvPp8Ct55dApFwnI0qWrx55yyF/aI9Kyw0,
+        dest: kQCaMdGt9cG70iD0tRb+8Dvt8QqRPDgRrLFHP4wanVjLn9No (counter),
         value: CurrencyCollection {
             grams: 1999900000,
             other: null

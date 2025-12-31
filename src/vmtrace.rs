@@ -1,14 +1,22 @@
 use tolkc::source_map::{DebugLocation, EntryContextDescription, SourceMap};
 use vmlogs::parser::VmLine;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SkipBlocksMode {
+    None = 0,
+    Before = 1,
+    After = 2,
+}
+
 pub fn build_vm_trace(vm_logs: &str, source_map: &SourceMap) -> Vec<DebugLocation> {
     let lines = vmlogs::parser::parse_lines(vm_logs);
-    build_vm_trace_from_lines(lines, source_map)
+    build_vm_trace_from_lines(lines, source_map, SkipBlocksMode::After)
 }
 
 pub fn build_vm_trace_from_lines(
     lines: Vec<Result<VmLine, String>>,
     source_map: &SourceMap,
+    skip_block_mode: SkipBlocksMode,
 ) -> Vec<DebugLocation> {
     lines
         .iter()
@@ -26,7 +34,7 @@ pub fn build_vm_trace_from_lines(
                 .filter(|(mark_offset, _)| *mark_offset == offset)
                 .collect::<Vec<_>>();
 
-            find_locations_by_debug_marks(source_map, debug_pairs, false)
+            find_locations_by_debug_marks(source_map, debug_pairs, skip_block_mode)
         })
         .collect::<Vec<_>>()
 }
@@ -35,7 +43,7 @@ pub fn low_level_loc_to_debug_locations(
     source_map: &SourceMap,
     hash: &str,
     offset: i32,
-    skip_block_statements: bool,
+    skip_block_statements: SkipBlocksMode,
     allow_approx: bool,
 ) -> Option<Vec<DebugLocation>> {
     let marks = source_map.debug_marks.get(hash)?;
@@ -75,7 +83,7 @@ pub fn low_level_loc_to_debug_locations(
 fn find_locations_by_debug_marks(
     source_map: &SourceMap,
     debug_pairs: Vec<&(i32, i32)>,
-    skip_block_statements: bool,
+    skip_block_mode: SkipBlocksMode,
 ) -> Vec<DebugLocation> {
     let locs = source_map
         .high_level
@@ -94,7 +102,7 @@ fn find_locations_by_debug_marks(
         .cloned()
         .collect::<Vec<_>>();
 
-    if skip_block_statements
+    if skip_block_mode != SkipBlocksMode::None
         && locs.iter().any(|loc| {
             matches!(
                 &loc.context.description,
@@ -102,17 +110,28 @@ fn find_locations_by_debug_marks(
             )
         })
     {
-        let actual_locs = locs
-            .iter()
-            .rev()
-            .take_while(|el| {
-                !matches!(
+        let actual_locs = if skip_block_mode == SkipBlocksMode::Before {
+            locs.iter()
+                .take_while(|el| {
+                    !matches!(
                     &el.context.description,
                     EntryContextDescription::Basic { ast_kind } if ast_kind == "ast_block_statement"
                 )
-            })
-            .cloned()
-            .collect::<Vec<_>>();
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            locs.iter()
+                .rev()
+                .take_while(|el| {
+                    !matches!(
+                    &el.context.description,
+                    EntryContextDescription::Basic { ast_kind } if ast_kind == "ast_block_statement"
+                )
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        };
 
         return actual_locs;
     }
@@ -139,8 +158,8 @@ pub struct TraceStepUnmapped {
     pub gas: usize,
 }
 
-pub fn build_extended_vm_trace(vm_logs: &String, source_map: &SourceMap) -> Vec<TraceStep> {
-    let lines = vmlogs::parser::parse_lines(vm_logs.as_str());
+pub fn build_extended_vm_trace(vm_logs: &str, source_map: &SourceMap) -> Vec<TraceStep> {
+    let lines = vmlogs::parser::parse_lines(vm_logs);
     build_extended_vm_trace_from_lines(lines, source_map)
 }
 
@@ -183,7 +202,11 @@ pub fn build_extended_vm_trace_from_lines(
                             .filter(|(mark_offset, _)| *mark_offset == offset)
                             .collect::<Vec<_>>();
 
-                        let locs = find_locations_by_debug_marks(source_map, debug_pairs, true);
+                        let locs = find_locations_by_debug_marks(
+                            source_map,
+                            debug_pairs,
+                            SkipBlocksMode::After,
+                        );
 
                         if !locs.is_empty() {
                             trace.push(TraceStep::Mapped(TraceStepMapped {

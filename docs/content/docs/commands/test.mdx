@@ -1,0 +1,174 @@
+---
+title: "Running tests"
+description: "Learn how to run Tolk smart contract tests using the test command"
+---
+
+The `test` command runs your Tolk smart contract tests. It discovers and executes test functions from files ending with `.test.tolk`, providing detailed output and various reporting options.
+
+## Basic Usage
+
+```bash
+acton test
+```
+
+This command will discover and run all test files in the current directory and subdirectories.
+
+## Command Options
+
+### Discovery Options
+
+| Option                 | Type      | Description                                                |
+|------------------------|-----------|------------------------------------------------------------|
+| `<PATH>`               | File path | Test file or directory to run (default: current directory) |
+| `--filter <PATTERN>`   | String    | Regex pattern to filter test names                         |
+| `--exclude <PATTERNS>` | Array     | Glob patterns to exclude test files                        |
+| `--include <PATTERNS>` | Array     | Glob patterns to include only test files                   |
+
+### Execution Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--fail-fast`           | Flag      | Stop executing tests after the first failure              |
+
+### Reporter Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--reporter <FORMATS>`  | Array     | Test output format(s)                                     |
+
+**Supported reporters:**
+- `console` — Detailed console output with code context (default)
+- `teamcity` — TeamCity CI integration (minimal output, best combined with console)
+- `junit` — JUnit XML reports for external tools
+
+### Debug Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--debug`               | Boolean   | Enable debug mode                                         |
+| `--debug-port <PORT>`   | Integer   | Debug server port                                         |
+| `--backtrace <LEVEL>`   | String    | Enable stack traces ("full")                              |
+
+### Coverage Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--coverage`            | Boolean   | Enable code coverage                                      |
+| `--format <FORMAT>`     | String    | Coverage output format ("lcov")                           |
+
+### Mutation Testing Options
+
+| Option                    | Type    | Description                                       |
+|---------------------------|---------|---------------------------------------------------|
+| `--mutate`                | Flag    | Run tests in mutation testing mode                |
+| `--mutate-contract <ID>`  | String  | Contract ID from `Acton.toml` to mutate           |
+| `--disable-rule <RULE>`   | Array   | Disable specific mutation rules                   |
+
+### JUnit Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--junit-path <PATH>`   | String    | JUnit XML output directory                                |
+| `--junit-merge`         | Boolean   | Merge all suites into one file                            |
+
+### Cache Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `--clear-cache`         | Flag      | Clear test compilation cache                              |
+
+## Examples
+
+### Basic test execution
+
+```bash
+# Run all tests in current directory
+acton test
+
+# Run tests in specific directory
+acton test ./contracts
+
+# Run specific test file
+acton test my_contract.test.tolk
+```
+
+### Filtering tests
+
+```bash
+# Run tests matching pattern
+acton test --filter "test-wallet"
+
+# Run only integration tests
+acton test --filter "test-integration.*"
+```
+
+### Different output formats
+
+```bash
+# Console output with TeamCity integration
+acton test --reporter console,teamcity
+
+# Generate JUnit XML reports
+acton test --reporter junit --junit-path ./reports
+
+# Generate coverage report
+acton test --coverage --format lcov
+```
+
+### Mutation testing
+
+```bash
+# Run mutation tests for the 'wallet' contract
+acton test --mutate --mutate-contract wallet
+
+# Disable specific rules
+acton test --mutate --mutate-contract wallet --disable-rule remove_assert
+```
+
+### Debug mode
+
+```bash
+# Start debugging session
+acton test --debug --debug-port 8080
+
+# Enable full backtraces
+acton test --backtrace full
+```
+
+## Test Discovery
+
+Acton automatically discovers test files by:
+- Finding files ending with `.test.tolk`
+- Searching in the specified directory and subdirectories
+
+## Configuration
+
+Test behavior can be configured via `Acton.toml`:
+
+```toml
+[test]
+# Default reporter
+reporter = ["console"]
+
+# Enable coverage by default
+coverage = true
+
+# Filter pattern
+filter = "test-.*"
+
+# JUnit output settings
+junit-path = "reports"
+junit-merge = false
+```
+
+## Learn More
+
+For detailed guides on writing tests, see the "Test Runner" section:
+
+- [Writing your first unit test in Tolk](/docs/test-runner/your-first-unit-test-in-tolk/)
+- [Writing your first integration test in Tolk](/docs/test-runner/your-first-integration-test-in-tolk/)
+- [Generating contract wrappers](/docs/test-runner/generating-wrappers/)
+- [Test attributes and configuration](/docs/test-runner/test-attributes/)
+- [Test configuration options](/docs/test-runner/test-configuration/)
+- [Code coverage](/docs/test-runner/code-coverage/)
+- [Mutation testing](/docs/test-runner/mutation-testing/)

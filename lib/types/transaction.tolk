@@ -1,3 +1,26 @@
+/// Module defining transaction types.
+///
+/// This module provides a complete representation of TON transactions as they appear in the blockchain.
+/// It includes structures for all phases of transaction execution: storage, credit, compute, action, and bounce.
+///
+/// Examples:
+/// ```tolk
+/// val tx = results.at(0).tx.load();
+///
+/// // Check gas usage
+/// val gas = tx.getUsedGas();
+/// println1("Gas used: {}", gas);
+///
+/// // Inspect account status change
+/// val description = tx.description.load();
+/// if (description is TransOrd) {
+///     val compute = description.compute_ph;
+///     if (compute is TrComputeVm) {
+///         println1("VM exit code: {}", compute.exit_code);
+///     }
+/// }
+/// ```
+
 import "message"
 import "../testing/assert"
 import "../tlb/maybe"
@@ -49,7 +72,7 @@ struct (0b0111) Transaction {
 /// Note that if message type mismatch, loading will fail with exit code 63.
 /// 
 /// Example:
-/// ```
+/// ```tolk
 /// val result = net.send(address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
 /// val tx = result.findTransaction<IncreaseCounter>({ to: address }).unwrap();
 /// val body = tx.loadBody<IncreaseCounter>();
@@ -81,6 +104,28 @@ fun Transaction.getUsedGas(self) {
     } else {
         Assert.fail("Cannot get used gas for non TransOrd")
     }
+}
+
+/// Returns fee for action phase of the transaction.
+fun Transaction.getActionFee(self): Maybe<coins> {
+    val descr = self.description.load();
+    if (descr is TransOrd) {
+        val action = descr.action;
+        if (action is None) {
+            return None{}
+        }
+        val action_ph = action.value.load();
+        return action_ph.total_action_fees
+    }
+    if (descr is TransTickTock) {
+        val action = descr.action;
+        if (action is None) {
+            return None{}
+        }
+        val action_ph = action.value.load();
+        return action_ph.total_action_fees
+    }
+    return None{}
 }
 
 /// Return address of account of this transaction.

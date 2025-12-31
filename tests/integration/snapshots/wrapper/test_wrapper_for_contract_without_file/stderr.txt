@@ -1,0 +1,1 @@
+Error: Contract file for my_contract not found: [ROOT]/contracts/my_contract.tolk (specified in Acton.toml as contracts/my_contract.tolk)

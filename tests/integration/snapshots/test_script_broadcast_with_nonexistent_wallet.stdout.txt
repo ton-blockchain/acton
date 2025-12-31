@@ -1,0 +1,2 @@
+Attempting to deploy with nonexistent wallet
+Error: Cannot find wallet with name 'nonexistent', check Acton.toml for available wallets

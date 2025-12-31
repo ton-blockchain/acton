@@ -1,0 +1,136 @@
+Step 1 (before):
+  Bytecode position: 7C6F9EF4DFF177FD18F17E902F7579A3F3AD358248E5148484F35FC59DA37014:2
+  Code:
+     67| }
+     68| 
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+                 ^^^^^^^^^^^^^^^^^^^
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
+
+Step 2 (step_over):
+  Bytecode position: 7C6F9EF4DFF177FD18F17E902F7579A3F3AD358248E5148484F35FC59DA37014:2
+  Code:
+     67| }
+     68| 
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+                                       ^^^^^^^^^^^
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
+
+Step 3 (step_over):
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:856
+  Code:
+     67| }
+     68| 
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+                                       ^^^^^^^^^^^
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
+  Variables:
+    '4 = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
+    '7 = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+
+Step 4 (step_over):
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:856
+  Code:
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+                 ^^^^^^^^^^
+     73|     println(format1("Counter: {}", counterRes));
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
+  Variables:
+    counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
+    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+
+Step 5 (step_over):
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:984
+  Code:
+    626| /// ```
+    627| ///
+    628| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
+    629| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+                                                                                           ^^^^
+    630|     val method_id = (crc16(name) & 0xffff) | 0x10000;
+    631|     return impl.runGetMethodById(addr, method_id, name, args)
+    632| }
+  Variables:
+    '309 = "currentCounter"
+    counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
+    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+
+Step 6 (step_over):
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:992
+  Code:
+    626| /// ```
+    627| ///
+    628| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
+    629| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+                                                                                           ^^^^
+    630|     val method_id = (crc16(name) & 0xffff) | 0x10000;
+    631|     return impl.runGetMethodById(addr, method_id, name, args)
+    632| }
+  Variables:
+    '310 = null
+    '309 = "currentCounter"
+    counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
+    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+
+Step 7 (step_over):
+  Bytecode position: 01121742F10B00E064E7DF32BF266CEB3D3769CB8C66ED487888DFD7DC338FE3:992
+  Code:
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     73|     println(format1("Counter: {}", counterRes));
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
+  Variables:
+    '310 = null
+    '309 = "currentCounter"
+    counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
+    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+
+Step 8 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:160
+  Code:
+     69| fun main() {
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     73|     println(format1("Counter: {}", counterRes));
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
+  Variables:
+    '311 = 0
+    counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
+    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+
+Step 9 (step_over):
+  Bytecode position: 1A95655081CE12B89CF942D7C0F5197BBB25694A232C331066F6F308F58C0B44:264
+  Code:
+     70|     val (counter, deployer) = setupTest();
+     71| 
+     72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
+     73|     println(format1("Counter: {}", counterRes));
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     74| 
+     75|     val info = net.getAccountState(counter.address)!;
+     76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
+  Variables:
+    '319 = "Counter: {}"
+    counterRes = 0
+    counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
+    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD

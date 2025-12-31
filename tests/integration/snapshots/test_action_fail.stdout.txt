@@ -8,8 +8,8 @@
 
  TEST  [ROOT]
 
- > ./tests/test_test.tolk (1 test)
-  ✓ action fail [TIME]
+ > ./tests/test.test.tolk (1 test)
+  ✓ action-fail [TIME]
     └─ Test output:
        N/A -> deployer A
        └── empty 0.2 TON -> simple B                                                   gas=2347 aborted action_result_code=37

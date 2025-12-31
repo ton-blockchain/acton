@@ -6,11 +6,13 @@
 
  TEST  [ROOT]
 
- > ./tests/counter_test.tolk (2 tests)
-  ✓ should increase counter [TIME]
+ > ./tests/counter.test.tolk (2 tests)
+  ✓ should-increase-counter [TIME]
     └─ Test output:
        N/A -> deployer A
        └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1508
-  ✓ should reset counter [TIME]
+           └── Debug logs:
+               Hello World
+  ✓ should-reset-counter [TIME]
 
  ✓ 2 passed in 1 file

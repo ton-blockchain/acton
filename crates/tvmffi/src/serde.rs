@@ -98,7 +98,7 @@ pub fn parse_tuple_item(parser: &mut CellParser) -> Result<TupleItem, anyhow::Er
         0 => Ok(TupleItem::Null),
         1 => {
             let value = parser.load_i64(64)?;
-            Ok(TupleItem::Int(BigInt::from(value as u64)))
+            Ok(TupleItem::Int(BigInt::from(value)))
         }
         2 => {
             if parser.load_u64(7)? == 0 {

@@ -1,0 +1,104 @@
+---
+title: "maybe"
+description: "maybe.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Represents an optional value that may or may not be present.
+This is similar to the Option type in other programming languages.
+
+## Definitions
+
+## `None`
+
+```tolk
+struct (0b0) None
+```
+
+Represents the absence of a value.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L6" />
+
+## `Value`
+
+```tolk
+struct (0b1) Value<X> {
+    /// The contained value.
+    value: X
+}
+```
+
+Represents a present value of type X.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L9" />
+
+## `Maybe<X>.none`
+
+```tolk
+fun Maybe<X>.none(): Maybe<X>
+```
+
+Creates a Maybe instance with no value (None).
+
+Example:
+```tolk
+val empty = Maybe<slice>.none();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L20" />
+
+## `Maybe<X>.some`
+
+```tolk
+fun Maybe<X>.some(value: X): Maybe<X>
+```
+
+Creates a Maybe instance with the given value.
+
+Example:
+```tolk
+val present = Maybe.some(42);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L30" />
+
+## `Maybe<X>.unwrap`
+
+```tolk
+fun Maybe<X>.unwrap(self): X
+```
+
+Unwraps the Maybe, returning the contained value if present,
+or throws an exception if None.
+
+This is unsafe — use only when you're certain the value is present.
+For safe access, use `unwrap_or` instead.
+
+Example:
+```tolk
+val maybeValue = Maybe.some(42);
+val value = maybeValue.unwrap(); // Returns 42
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L45" />
+
+## `Maybe<X>.unwrap_or`
+
+```tolk
+fun Maybe<X>.unwrap_or(self, default: X): X
+```
+
+Unwraps the Maybe, returning the contained value if present,
+or the provided default value if None.
+
+This is the safe way to access optional values.
+
+Example:
+```tolk
+val maybeValue = Maybe<slice>.none();
+val name = maybeValue.unwrap_or("default"); // Returns "default"
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L62" />
+

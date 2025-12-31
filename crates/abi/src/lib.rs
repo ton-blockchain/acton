@@ -1,3 +1,5 @@
+pub mod serde;
+
 use num_bigint::BigInt;
 use std::collections::HashSet;
 use std::fs;
@@ -20,21 +22,23 @@ pub struct Field {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum BaseTypeInfo {
-    Void,
+    Unserializable,
     Int { width: usize },
     UInt { width: usize },
     Coins,
     Bool,
     Address,
+    AnyAddress,
+    RemainingBitsAndRefs,
     Bits { width: usize },
-    Cell { inner_type: Option<Box<TypeInfo>> },
-    Slice,
+    Bytes { width: usize },
+    Cell { inner: Option<Box<TypeInfo>> },
     VarInt16,
     VarInt32,
     VarUInt16,
     VarUInt32,
-    Struct { struct_name: String },
-    AnonStruct { fields: Vec<TypeInfo> },
+    Nullable { inner: Box<TypeInfo> },
+    Struct { name: String },
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -49,15 +53,30 @@ pub struct TypeAbi {
     pub opcode: Option<u32>,
     pub opcode_width: Option<usize>,
     pub fields: Vec<Field>,
+    pub pos: Pos,
+}
+
+impl TypeAbi {
+    pub fn is_from_acton_lib(&self) -> bool {
+        // TODO: remove lib/
+        self.pos.uri.contains(".acton/") || self.pos.uri.contains("lib/")
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct GetMethod {
     pub name: String,
     pub id: u32,
-    pub pos: Option<Pos>,
+    pub pos: Pos,
     pub return_type: TypeInfo,
     pub parameters: Vec<Field>,
+}
+
+impl GetMethod {
+    pub fn is_from_acton_lib(&self) -> bool {
+        // TODO: remove lib/
+        self.pos.uri.contains(".acton/") || self.pos.uri.contains("lib/")
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -84,15 +103,31 @@ pub struct ContractAbi {
 }
 
 impl ContractAbi {
-    pub fn find_type(&self, name: &String) -> Option<TypeAbi> {
+    pub fn find_any_type(&self, name: &String) -> Option<TypeAbi> {
         self.types.iter().find(|typ| typ.name == *name).cloned()
     }
 
-    pub fn find_type_by_opcode(&self, id: BigInt) -> Option<TypeAbi> {
+    pub fn find_type_by_opcode(&self, id: &BigInt) -> Option<TypeAbi> {
         self.types
             .iter()
-            .find(|typ| typ.opcode.is_some() && BigInt::from(typ.opcode.unwrap() as u64) == id)
+            .filter(|typ| !typ.is_from_acton_lib())
+            .find(|typ| typ.opcode.is_some() && &BigInt::from(typ.opcode.unwrap() as u64) == id)
             .cloned()
+    }
+
+    pub fn find_get_method_by_id(&self, id: &BigInt) -> Option<GetMethod> {
+        self.get_methods
+            .iter()
+            .filter(|typ| !typ.is_from_acton_lib())
+            .find(|typ| &BigInt::from(typ.id) == id)
+            .cloned()
+    }
+
+    pub fn storages(&self) -> Vec<&TypeAbi> {
+        self.types
+            .iter()
+            .filter(|t| t.name.ends_with("Storage"))
+            .collect::<Vec<_>>()
     }
 }
 
@@ -113,7 +148,7 @@ struct FileInfo {
     tree: tree_sitter::Tree,
 }
 
-pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> Result<Vec<String>, String> {
+pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> anyhow::Result<Vec<String>> {
     if file_path.ends_with(".boc") {
         if include_itself {
             return Ok(vec![file_path.to_owned()]);
@@ -124,12 +159,12 @@ pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> Result<Ve
 
     let content = match fs::read_to_string(file_path) {
         Ok(content) => content,
-        Err(e) => return Err(format!("Failed to read file '{}': {}", file_path, e)),
+        Err(e) => anyhow::bail!("Failed to read file '{}': {}", file_path, e),
     };
 
     let tree = match tolk_parser::parser::parse(&content) {
         Ok(tree) => tree,
-        Err(e) => return Err(format!("Failed to parse file '{}': {:?}", file_path, e)),
+        Err(e) => anyhow::bail!("Failed to parse file '{}': {:?}", file_path, e),
     };
 
     let root_node = tree.root_node();
@@ -185,6 +220,83 @@ pub fn contract_abi(content: &str, file_path: &str) -> ContractAbi {
     }
 }
 
+pub fn extract_handled_messages(content: &str, file_path: &str) -> Vec<String> {
+    let tree = match tolk_parser::parser::parse(content) {
+        Ok(tree) => tree,
+        Err(_) => return Vec::new(),
+    };
+
+    let root_node = tree.root_node();
+    let files = collect_imported_files(&root_node, content, file_path);
+
+    let mut handled_messages = Vec::new();
+
+    for file_info in files {
+        let messages = extract_messages_from_match(&file_info.tree.root_node(), &file_info.content);
+        handled_messages.extend(messages);
+    }
+
+    handled_messages
+}
+
+fn extract_messages_from_match(node: &tree_sitter::Node, content: &str) -> Vec<String> {
+    let mut messages = Vec::new();
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if child.kind() == "function_declaration" {
+            let Some(name_node) = child.child_by_field_name("name") else {
+                continue;
+            };
+
+            let func_name = name_node
+                .utf8_text(content.as_bytes())
+                .unwrap_or("")
+                .to_string();
+
+            if func_name == "onInternalMessage"
+                && let Some(body) = child.child_by_field_name("body")
+            {
+                messages.extend(find_match_patterns(&body, content));
+            }
+        }
+    }
+
+    messages
+}
+
+fn find_match_patterns(node: &tree_sitter::Node, content: &str) -> Vec<String> {
+    let mut patterns = Vec::new();
+
+    if node.kind() == "match_expression"
+        && let Some(body_node) = node.child_by_field_name("body")
+        && body_node.kind() == "match_body"
+    {
+        let mut cursor = body_node.walk();
+        for child in body_node.children(&mut cursor) {
+            if child.kind() == "match_arm"
+                && let Some(pattern_type_node) = child.child_by_field_name("pattern_type")
+            {
+                let pattern_text = pattern_type_node
+                    .utf8_text(content.as_bytes())
+                    .unwrap_or("")
+                    .to_string();
+
+                if !pattern_text.is_empty() {
+                    patterns.push(pattern_text);
+                }
+            }
+        }
+    }
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        patterns.extend(find_match_patterns(&child, content));
+    }
+
+    patterns
+}
+
 fn collect_imported_files(
     root_node: &tree_sitter::Node,
     content: &str,
@@ -233,11 +345,6 @@ fn collect_imported_files_recursive(
         let Some(resolved) = resolved_path else {
             continue;
         };
-
-        if resolved.contains(".acton/") || resolved.contains("lib/") {
-            // skip Acton files
-            continue;
-        }
 
         if processed.contains(&resolved) {
             // recursive dependency, already processed
@@ -414,15 +521,19 @@ fn extract_get_method(
 
     let parameters = extract_parameters(func_node, content, file_path);
 
-    let return_type = TypeInfo {
-        base: BaseTypeInfo::Void,
-        human_readable: "void".to_string(),
+    let return_type = if let Some(return_type_node) = func_node.child_by_field_name("return_type") {
+        extract_type_info(&return_type_node, content)
+    } else {
+        TypeInfo {
+            base: BaseTypeInfo::Unserializable,
+            human_readable: "void".to_string(),
+        }
     };
 
     Some(GetMethod {
         name: func_name,
         id: method_id,
-        pos: Some(pos),
+        pos,
         return_type,
         parameters,
     })
@@ -483,11 +594,18 @@ fn extract_struct_abi(
         }
     }
 
+    let pos = Pos {
+        row: name_node.start_position().row,
+        column: name_node.start_position().column,
+        uri: file_path.to_string(),
+    };
+
     Some(TypeAbi {
         name: struct_name,
         opcode,
         opcode_width,
         fields,
+        pos,
     })
 }
 
@@ -500,20 +618,146 @@ fn extract_field(field_node: &tree_sitter::Node, content: &str, _file_path: &str
         .unwrap_or("")
         .to_string();
 
-    let type_name = type_node
-        .utf8_text(content.as_bytes())
-        .unwrap_or("")
-        .to_string();
-
-    let type_info = TypeInfo {
-        base: BaseTypeInfo::Void,
-        human_readable: type_name.clone(),
-    };
+    let type_info = extract_type_info(&type_node, content);
 
     Some(Field {
         name: field_name,
         type_info,
     })
+}
+
+fn extract_type_info(type_node: &tree_sitter::Node, content: &str) -> TypeInfo {
+    let type_name = type_node
+        .utf8_text(content.as_bytes())
+        .unwrap_or("")
+        .to_string();
+
+    if type_node.kind() == "type_instantiatedTs"
+        && let Some(name_node) = type_node.child_by_field_name("name")
+    {
+        let name = name_node
+            .utf8_text(content.as_bytes())
+            .unwrap_or("")
+            .to_string();
+
+        if name == "Cell"
+            && let Some(args_node) = type_node.child_by_field_name("arguments")
+            && let Some(inner_type_node) = args_node.child_by_field_name("types")
+        {
+            let inner_type_info = extract_type_info(&inner_type_node, content);
+            return TypeInfo {
+                base: BaseTypeInfo::Cell {
+                    inner: Some(Box::new(inner_type_info)),
+                },
+                human_readable: type_name,
+            };
+        }
+
+        if name == "map" {
+            // for now treat map<K, V> as cell?
+            return TypeInfo {
+                base: BaseTypeInfo::Nullable {
+                    inner: Box::new(TypeInfo {
+                        base: BaseTypeInfo::Cell { inner: None },
+                        human_readable: "dict".to_owned(),
+                    }),
+                },
+                human_readable: type_name,
+            };
+        }
+    }
+
+    if type_node.kind() == "tensor_type"
+        || type_node.kind() == "tuple_type"
+        || type_node.kind() == "fun_callable_type"
+        || type_node.kind() == "union_type"
+        || type_node.kind() == "null_literal"
+    {
+        return TypeInfo {
+            base: BaseTypeInfo::Unserializable,
+            human_readable: type_name,
+        };
+    }
+
+    if type_node.kind() == "nullable_type" {
+        let inner_node = type_node.child_by_field_name("inner");
+        if let Some(inner_node) = inner_node {
+            let inner = extract_type_info(&inner_node, content);
+            return TypeInfo {
+                base: BaseTypeInfo::Nullable {
+                    inner: Box::new(inner),
+                },
+                human_readable: type_name,
+            };
+        }
+    }
+
+    let base = match type_name.as_str() {
+        "void" => BaseTypeInfo::Unserializable,
+        "never" => BaseTypeInfo::Unserializable,
+        "null" => BaseTypeInfo::Unserializable,
+        "tuple" => BaseTypeInfo::Unserializable,
+        "continuation" => BaseTypeInfo::Unserializable,
+        "slice" => BaseTypeInfo::Unserializable,
+        "builder" => BaseTypeInfo::Unserializable,
+        "int" => BaseTypeInfo::Unserializable,
+        "coins" => BaseTypeInfo::Coins,
+        "bool" => BaseTypeInfo::Bool,
+        "cell" => BaseTypeInfo::Cell { inner: None },
+        "address" => BaseTypeInfo::Address,
+        "any_address" => BaseTypeInfo::AnyAddress,
+        "dict" => BaseTypeInfo::Nullable {
+            inner: Box::new(TypeInfo {
+                base: BaseTypeInfo::Cell { inner: None },
+                human_readable: "dict".to_owned(),
+            }),
+        },
+        "RemainingBitsAndRefs" => BaseTypeInfo::RemainingBitsAndRefs,
+        // TODO: real type alias resolving
+        "ForwardPayloadRemainder" => BaseTypeInfo::RemainingBitsAndRefs,
+        _ if type_name.starts_with("int") && type_name.len() > 3 => {
+            let width = type_name[3..].parse::<usize>().unwrap_or(0);
+            BaseTypeInfo::Int { width }
+        }
+        _ if type_name.starts_with("uint") && type_name.len() > 4 => {
+            let width = type_name[4..].parse::<usize>().unwrap_or(0);
+            BaseTypeInfo::UInt { width }
+        }
+        _ if type_name.starts_with("varint") && type_name.len() > 6 => {
+            let width = type_name[6..].parse::<usize>().unwrap_or(0);
+            if width == 16 {
+                BaseTypeInfo::VarInt16
+            } else if width == 32 {
+                BaseTypeInfo::VarInt32
+            } else {
+                BaseTypeInfo::Unserializable
+            }
+        }
+        _ if type_name.starts_with("varuint") && type_name.len() > 7 => {
+            let width = type_name[7..].parse::<usize>().unwrap_or(0);
+            if width == 16 {
+                BaseTypeInfo::VarUInt16
+            } else if width == 32 {
+                BaseTypeInfo::VarUInt32
+            } else {
+                BaseTypeInfo::Unserializable
+            }
+        }
+        _ if type_name.starts_with("bits") && type_name.len() > 4 => {
+            let width = type_name[4..].parse::<usize>().unwrap_or(0);
+            BaseTypeInfo::Bits { width }
+        }
+        _ if type_name.starts_with("bytes") && type_name.len() > 5 => {
+            let width = type_name[5..].parse::<usize>().unwrap_or(0);
+            BaseTypeInfo::Bytes { width }
+        }
+        &_ => BaseTypeInfo::Unserializable,
+    };
+
+    TypeInfo {
+        base,
+        human_readable: type_name,
+    }
 }
 
 fn extract_parameters(func_node: &tree_sitter::Node, content: &str, file_path: &str) -> Vec<Field> {

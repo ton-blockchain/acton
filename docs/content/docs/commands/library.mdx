@@ -1,0 +1,121 @@
+---
+title: "Managing Libraries"
+description: "Learn how to use the library command to publish and fetch contract libraries"
+---
+
+The `library` command allows you to manage on-chain libraries in the blockchain. It provides subcommands for publishing new libraries and fetching existing ones.
+
+<Callout title="New to libraries?">
+    Check out the [Libraries](/docs/advanced/libraries) guide for a
+    comprehensive overview and step-by-step usage scenarios.
+</Callout>
+
+## Publish Library
+
+The `publish` subcommand allows you to deploy a contract or arbitrary code as a library to the Masterchain.
+
+### Basic Usage
+
+```bash
+acton library publish [CONTRACT_ID]
+```
+
+This command initiates the publication process for the specified contract. If no options are provided, it will interactively prompt for necessary information.
+
+### Command Options
+
+| Option                  | Type      | Description                                                                 |
+|-------------------------|-----------|-----------------------------------------------------------------------------|
+| `[CONTRACT_ID]`         | Argument  | The ID of the contract in `Acton.toml` to publish                           |
+| `--code <CODE>`         | String    | Base64 or Hex code to publish instead of compiling a contract               |
+| `--duration <DURATION>` | String    | Duration to store the library (e.g., `100d`, `1y`, `31536000s`)             |
+| `--wallet <WALLET>`     | String    | Name of the wallet to use for the transaction                               |
+| `--net <NET>`           | String    | Network to use (`testnet` or `mainnet`), defaults to `testnet`              |
+| `--api-key <KEY>`       | String    | TonCenter API key for blockchain interactions                               |
+
+### Examples
+
+#### Interactive publish
+
+```bash
+acton library publish math
+```
+
+#### Non-interactive publish with specific duration
+
+```bash
+acton library publish math --duration 365d --wallet my-wallet --net mainnet
+```
+
+#### Publishing arbitrary code
+
+```bash
+acton library publish --code "te6cckEBAQEAAgAAAEysuc0=" --duration 100d
+```
+
+## Fetch Library
+
+The `fetch` subcommand retrieves a library from the blockchain by its hash.
+
+### Basic Usage
+
+```bash
+acton library fetch <HASH>
+```
+
+### Command Options
+
+| Option                  | Type      | Description                                                                 |
+|-------------------------|-----------|-----------------------------------------------------------------------------|
+| `<HASH>`                | Argument  | The SHA-256 hash of the library code                                        |
+| `--disasm`              | Flag      | Disassemble the fetched code and print TASM                                 |
+| `-o, --output <FILE>`   | File path | Save fetched code to file (binary if `.boc` extension, else Base64)         |
+| `--json`                | Flag      | Output result as JSON                                                       |
+| `--net <NET>`           | String    | Network to use (`testnet` or `mainnet`), defaults to `testnet`              |
+| `--api-key <KEY>`       | String    | TonCenter API key for blockchain interactions                               |
+
+### Examples
+
+#### Fetch and print code
+
+```bash
+acton library fetch 8F452D7A4DFD74066B682365177259ED05734435BE76B5FD4BD5D8AF2B7C3D68
+```
+
+#### Fetch and disassemble
+
+```bash
+acton library fetch <HASH> --disasm
+```
+
+#### Save code to file
+
+```bash
+# Save as binary BoC
+acton library fetch <HASH> -o library.boc
+
+# Save as Base64 text
+acton library fetch <HASH> -o library.txt
+```
+
+#### JSON Output
+
+```bash
+acton library fetch <HASH> --json
+```
+
+Success output:
+```json
+{
+  "success": true,
+  "code_boc64": "te6ccgEBAQEAKwAAUQAAkcYpqaMXHEovatIzyqsSjoI7NLF4PF9pY6VdLnAhd6XRCFTWD2lA..."
+}
+```
+
+Error output:
+```json
+{
+  "success": false,
+  "error": "Library not found"
+}
+```

@@ -20,6 +20,9 @@ fun main() {
     let result = client.execute(|executor| {
         executor.step_over()?;
         executor.step_over()?;
+        executor.step_over()?;
+        executor.step_over()?;
+        executor.step_over()?;
         Ok(())
     })?;
 
@@ -49,6 +52,10 @@ fun main() {
     let mut client = session.start();
 
     let result = client.execute(|executor| {
+        executor.step_in()?;
+        executor.step_in()?;
+        executor.step_in()?;
+        executor.step_in()?;
         executor.step_in()?;
         executor.step_in()?;
         executor.step_in()?;
@@ -99,6 +106,12 @@ fun main() {
         executor.step_over()?;
         executor.step_over()?;
         executor.step_over()?;
+        executor.step_in()?;
+        executor.step_in()?;
+        executor.step_in()?;
+        executor.step_in()?;
+        executor.step_in()?;
+        executor.step_in()?;
         executor.step_in()?;
         executor.step_in()?;
         executor.step_in()?;

@@ -1,0 +1,139 @@
+---
+title: "Disassembling TVM bytecode"
+description: "Learn how to use the disasm command to convert compiled TVM bytecode back to human-readable TASM instructions"
+---
+
+The `disasm` command allows you to disassemble compiled TVM bytecode back into human-readable TASM (TON Assembly) instructions. This is useful for debugging, understanding compiled code, and analyzing smart contract behavior.
+
+## Basic Usage
+
+```bash
+acton disasm contract.boc
+```
+
+This command will disassemble the bytecode from `contract.boc` and display the TASM instructions.
+
+## Command Options
+
+### Input Options
+
+| Option                      | Type      | Description                                                             |
+|-----------------------------|-----------|-------------------------------------------------------------------------|
+| `<BOC_FILE>`                | File path | Path to the binary BoC file containing the bytecode to disassemble      |
+| `-s, --string <STRING>`     | String    | Pass bytecode as a hex or base64 string instead of a file               |
+| `--address <ADDRESS>`       | String    | Contract address to fetch bytecode from blockchain (mainnet or testnet) |
+| `--api-key <API_KEY>`       | String    | TonCenter API key for blockchain queries                                |
+| `--source-map <SOURCE_MAP>` | File path | Path to source map file for displaying Tolk source code locations       |
+
+### Output Options
+
+| Option                  | Type      | Description                                               |
+|-------------------------|-----------|-----------------------------------------------------------|
+| `-o, --output <OUTPUT>` | File path | Write the disassembled output to a file instead of stdout |
+| `--show-hashes`         | Flag      | Display cell hashes alongside code blocks                 |
+| `--show-offsets`        | Flag      | Display bit offsets within cells for each instruction     |
+
+## Examples
+
+### Basic disassembly
+
+```bash
+acton disasm my_contract.boc
+```
+
+Output:
+```tasm
+SETCP 0
+DICTPUSHCONST 19 [
+    0 => {
+        DROP
+        INMSG_BOUNCED
+        IFRET
+    }
+]
+DICTIGETJMPZ
+THROWARG 11
+```
+
+### Disassembling from blockchain
+
+Fetch and disassemble a live contract directly from the TON blockchain:
+
+```bash
+# Disassemble a wallet contract from mainnet
+acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM
+
+# Use API key for higher rate limits (recommended for frequent use)
+acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --api-key YOUR_API_KEY
+```
+
+<Callout type="info" title="Network Selection">
+The command automatically tries mainnet first. If the contract is not found or inactive, it falls back to testnet.
+</Callout>
+
+<Callout type="warn" title="API Rate Limits">
+For frequent usage, provide an API key with `--api-key` to avoid rate limiting. Free API keys are available at [TonCenter](https://toncenter.com/).
+</Callout>
+
+### Disassembly with source map
+
+If you have a source map file generated during compilation, you can display the original Tolk source code alongside the assembly:
+
+```bash
+acton compile contract.tolk --source-map contract.json --boc contract.boc
+acton disasm contract.boc --show-offsets --source-map contract.json
+```
+
+This will show the corresponding Tolk source code for instructions:
+
+```tasm
+off │ instruction
+────┼───────────────────────────────────────
+0   │ SETCP 0
+16  │ DICTPUSHCONST 19 [
+    │     0 => { // 34590AFC099290F767CC13268CC91EAA4011BCF07F47C6D2FAC...
+8   │         DROP
+16  │         INMSG_BOUNCED
+32  │         IFRET
+40  │         THROW_SHORT 10
+    └────────────────────────────────────────────────────────┐
+                                                             │  simple.tolk:2:11
+                                                             │    1: fun onInternalMessage(in: InMessage) {
+                                                             │    2:     throw 10;
+                                                             │                 ^
+                                                             │  simple.tolk:2:5
+                                                             │    1: fun onInternalMessage(in: InMessage) {
+                                                             │    2:     throw 10;
+                                                             │           ^
+    ┌────────────────────────────────────────────────────────┘
+    │     }
+    │ ]
+40  │ DICTIGETJMPZ
+56  │ THROWARG 11
+```
+
+### Disassembly with offsets and hashes
+
+```bash
+acton disasm my_contract.boc --show-offsets --show-hashes
+```
+
+This displays bit offsets and cell hashes:
+
+```tasm
+off │ instruction
+────┼───────────────────────────────────────
+0   │ SETCP 0
+16  │ DICTPUSHCONST 19 [
+    │     0 => { // 34590AFC099290F767CC13268CC91EAA4011BCF07F47C6D2FAC...
+8   │         DROP
+16  │         INMSG_BOUNCED
+32  │         IFRET
+40  │         THROW_SHORT 10
+    │     }
+    │ ]
+40  │ DICTIGETJMPZ
+56  │ THROWARG 11
+```
+
+This mode is ideal if you want to manually match virtual machine logs with the source code.

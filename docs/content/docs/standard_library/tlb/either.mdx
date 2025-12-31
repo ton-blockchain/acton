@@ -1,0 +1,29 @@
+---
+title: "either"
+description: "either.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Definitions
+
+## `EitherLeft`
+
+```tolk
+struct (0b0) EitherLeft<X> {
+    value: X
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L3" />
+
+## `EitherRight`
+
+```tolk
+struct (0b1) EitherRight<X> {
+    value: X
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L7" />
+

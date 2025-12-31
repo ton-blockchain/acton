@@ -1,13 +1,16 @@
 //! This module contains functionality for working with snake strings.
 //! Since TVM doesn't have a separate string format and data is stored in cells
 //! of up to 1023 bits (~127 bytes) and up to 4 references to other cells, we have to split strings
-//! into 127-bit chunks and store them as a linked list of cells.
+//! into chunks and store them as a linked list of cells.
+//!
+//! To allow for potential prefixes (e.g. 8-bit prefix), we strictly use up to 126 bytes (1008 bits) per cell,
+//! leaving at least 15 bits free in each cell.
 //!
 //! For example, a string of 300 characters will be stored as:
 //! ```text
-//! cell("first 127 bytes")
-//!     cell("second 127 bytes")
-//!         cell("remaining 46 bytes")
+//! cell("first 126 bytes")
+//!     cell("second 126 bytes")
+//!         cell("remaining 48 bytes")
 //! ```
 use crate::stack::{Tuple, TupleItem};
 use tonlib_core::cell::{ArcCell, CellBuilder};
@@ -33,14 +36,8 @@ impl Tuple {
         let bits = parser.load_bits(bytes_to_load * 8).ok()?;
         all_bits.extend_from_slice(&bits);
 
-        if bytes_to_load < 127 {
-            // no need to look up to refs
-            let result = String::from_utf8(all_bits).ok()?;
-            return Some(result);
-        }
-
-        if bytes_to_load == 127 && parser.remaining_refs() == 0 {
-            // this is a single cell snake string
+        if parser.remaining_refs() == 0 {
+            // this is a single cell snake string (or the end of one)
             let result = String::from_utf8(all_bits).ok()?;
             return Some(result);
         }
@@ -73,7 +70,8 @@ impl Tuple {
         let bytes = s.as_bytes();
         let total_bits = bytes.len() * 8;
 
-        if total_bits <= 1023 {
+        // We leave 8 bits free in each cell for prefixes
+        if total_bits <= 1015 {
             // Fast path, the string fits in one cell
             let mut b = CellBuilder::new();
             b.store_bits(total_bits, bytes).unwrap();
@@ -85,7 +83,7 @@ impl Tuple {
         let mut cell_data = Vec::new();
 
         while !remaining_bytes.is_empty() {
-            let chunk_size = std::cmp::min(remaining_bytes.len(), 127); // 127 bytes = 1016 bits < 1023
+            let chunk_size = std::cmp::min(remaining_bytes.len(), 126); // 126 bytes = 1008 bits < 1015
             let chunk = &remaining_bytes[..chunk_size];
             cell_data.push((chunk, chunk.len() * 8));
             remaining_bytes = &remaining_bytes[chunk_size..];
@@ -155,11 +153,11 @@ mod tests {
         let test_cases = vec![
             ("a".to_string(), 1),   // 1 byte
             ("a".repeat(126), 126), // 126 bytes (fits in one cell)
-            ("a".repeat(127), 127), // 127 bytes (fits in one cell)
+            ("a".repeat(127), 127), // 127 bytes (requires two cells)
             ("a".repeat(128), 128), // 128 bytes (requires two cells)
-            ("a".repeat(254), 254), // 254 bytes (last chunk of two cells)
-            ("a".repeat(255), 255), // 255 bytes (requires three cells)
-            ("a".repeat(381), 381), // 381 bytes (three full cells)
+            ("a".repeat(252), 252), // 252 bytes (two full cells: 126 * 2)
+            ("a".repeat(253), 253), // 253 bytes (requires three cells)
+            ("a".repeat(378), 378), // 378 bytes (three full cells: 126 * 3)
         ];
 
         for (test_string, expected_len) in test_cases {
@@ -241,7 +239,8 @@ mod tests {
             ("".to_string(), 0, false),  // empty string, 0 bits, fits in one cell
             ("x".to_string(), 8, false), // single char, 8 bits, fits in one cell
             ("Hello World".to_string(), 88, false), // short string, fits in one cell
-            ("a".repeat(127), 1016, false), // exactly 127 bytes = 1016 bits, fits in one cell
+            ("a".repeat(126), 1008, false), // exactly 126 bytes = 1008 bits, fits in one cell
+            ("a".repeat(127), 1016, true), // 127 bytes = 1016 bits, requires multiple cells (max 126 per cell)
             ("a".repeat(128), 1024, true), // 128 bytes = 1024 bits, requires multiple cells
         ];
 
@@ -264,8 +263,8 @@ mod tests {
 
             if requires_multiple_cells {
                 assert_eq!(
-                    actual_bits, 1016,
-                    "First cell should contain 1016 bits for multi-cell string: {}",
+                    actual_bits, 1008,
+                    "First cell should contain 1008 bits for multi-cell string: {}",
                     test_string
                 );
                 assert_eq!(

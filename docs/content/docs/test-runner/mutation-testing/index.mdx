@@ -1,0 +1,117 @@
+---
+title: "Mutation Testing"
+description: "Learn how to use mutation testing to assess the quality of your test suite"
+---
+
+Mutation testing is a powerful technique to evaluate the quality of your test suite. Unlike code coverage, which only tells you *which* lines of code were executed, mutation testing tells you *how well* those lines are tested.
+
+It works by automatically making small changes (mutations) to your code — like changing `+` to `-` or removing an `assert` — and checking if your tests fail. If the tests still pass (the mutant "survives"), it means your tests didn't catch that change, revealing a potential gap in your test suite.
+
+## Why Mutation Testing?
+
+Code coverage can be misleading. Consider this example:
+
+```tolk
+fun add(a: int, b: int): int {
+    assert (a > 0) throw 5; // Validation
+    return a + b;
+}
+```
+
+If you write a test `add(1, 2)`, you might achieve 100% line coverage. However, what if you forgot to test the validation logic?
+
+Mutation testing will try to **remove** the `assert (a > 0) throw 5` statement. If your test suite doesn't have a test case like `add(-1, 2)` that expects a failure, the mutant will survive. This tells you that even though the line is "covered", the logic within it is not actually verified.
+
+This is especially critical for smart contracts where assertions guard security invariants. If an assertion can be removed without any test failing, that security check might be effectively untested.
+
+Beyond testing gaps, mutation testing can also reveal implementation issues. For example, if you have two `storage.save()` calls and removing the second one doesn't cause tests to fail, it might indicate that the second call is redundant and could be removed to optimize gas usage.
+
+## How It Works
+
+1.  **Mutant Generation**: Acton scans your contract code and identifies places where it can introduce bugs (mutants).
+2.  **Compilation**: Each mutant is compiled. If a mutant doesn't compile (e.g., syntax error), it's discarded.
+3.  **Testing**: Acton runs your test suite against each valid mutant.
+4.  **Reporting**:
+    - **Killed**: The tests failed (good!).
+    - **Survived**: The tests passed (bad!). This indicates a gap in testing.
+
+## Running Mutation Tests
+
+To run mutation tests, you need to specify the contract you want to mutate using the `--mutate-contract` flag. This corresponds to the contract ID defined in your `Acton.toml`.
+
+```bash
+acton test --mutate --mutate-contract wallet
+```
+
+### Options
+
+| Option                            | Description                                                    |
+|-----------------------------------|----------------------------------------------------------------|
+| `--mutate`                        | Enables mutation testing mode.                                 |
+| `--mutate-contract <CONTRACT_ID>` | Specifies which contract from `Acton.toml` to mutate.          |
+| `--disable-rule <RULE>`           | Disables specific mutation rules (can be used multiple times). |
+
+### Requirements
+
+For mutation testing to work correctly, your tests must build contracts using their ID from `Acton.toml`, not direct file paths:
+
+```tolk
+// ✅ Correct — uses contract ID
+val wallet = build("jetton-wallet");
+
+// ❌ Incorrect — uses direct file path
+val wallet = build("wallet", "./contracts/jetton-wallet-contract.tolk");
+```
+
+Mutation testing analyzes the contract specified by `--mutate-contract` and its dependencies. When tests use direct file paths, the mutated code won't be used, making mutation testing inefficient.
+
+## Mutation Rules
+
+Acton includes several built-in mutation rules categorized by their impact level.
+See [Mutation Rules](/docs/test-runner/mutation-testing/rules) for complete list.
+
+## Interpreting Results
+
+After running mutation tests, you will see a summary of the results:
+
+```text
+Mutation Testing
+────────────────────────────────────────────────────────────
+Contract: Wallet
+Main Source: .jetton/contracts/jetton-wallet-contract.tolk
+Files:    6
+Mutants:  51
+
+  ◉ Mutation 1/51 contracts/jetton-wallet.tolk:36:17 Remove assert statements KILLED
+  ◉ Mutation 2/51 contracts/jetton-wallet.tolk:77:13 Remove assert statements SURVIVED
+  ◉ Mutation 3/51 contracts/jetton-wallet.tolk:78:13 Remove assert statements KILLED
+  ◉ Mutation 4/51 contracts/jetton-wallet.tolk:81:13 Remove assert statements KILLED
+  ◉ Mutation 5/51 contracts/jetton-wallet.tolk:82:13 Remove assert statements KILLED
+  ◉ Mutation 6/51 contracts/jetton-wallet.tolk:87:13 Remove assert statements KILLED
+  ◉ Mutation 7/51 contracts/jetton-wallet.tolk:113:13 Remove assert statements KILLED
+  ◉ Mutation 8/51 contracts/jetton-wallet.tolk:114:13 Remove assert statements KILLED
+  ◉ Mutation 9/51 contracts/jetton-wallet.tolk:134:13 Remove assert statements SURVIVED
+  ...
+```
+
+- **KILLED**: Your tests successfully detected the bug.
+- **SURVIVED**: Your tests failed to detect the bug. You should add a test case to cover this scenario.
+
+For survived mutants, Acton provides a diff showing exactly what was changed and explains why it's an issue:
+
+```text
+  ✗ Mutation #2
+  Rule:  Remove assert statements [remove_assert]
+  Level: critical
+  Group: assertion
+  at contracts/jetton-minter.tolk:46:13
+    44 │ 
+    45 │         RequestWalletAddress => {
+    46 │             assert (
+    47 │                 in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND
+    48 │             ) throw ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND;
+    49 │ 
+    50 │             var respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
+
+  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.
+```

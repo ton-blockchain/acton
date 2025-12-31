@@ -6,9 +6,9 @@
 
  TEST  [ROOT]
 
- > ./tests/counter_test.tolk (2 tests)
-  ✓ should increase counter [TIME]
-  ✗ should reset counter [TIME]
+ > ./tests/counter.test.tolk (2 tests)
+  ✓ should-increase-counter [TIME]
+  ✗ should-reset-counter [TIME]
     └─ exit_code=9
       ├─ Re-run with --backtrace full to get more information
       └─ Phase: Compute phase

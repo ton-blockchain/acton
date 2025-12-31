@@ -1,0 +1,1 @@
+Error: Cannot provide both --string/-s and BOC_FILE argument

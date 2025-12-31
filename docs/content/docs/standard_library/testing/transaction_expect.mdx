@@ -1,0 +1,184 @@
+---
+title: "transaction_expect"
+description: "transaction_expect.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Module for asserting properties of transactions.
+
+This module extends the `Expectation` class specifically for `SendResultList` and `SendResult`.
+It allows verifying the outcome of network operations, such as checking if a transaction succeeded,
+if a contract was deployed, or if specific messages were emitted.
+
+Examples:
+```tolk
+val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+
+// Verify general success
+expect(results).toHaveSuccessfulTx({
+    from: wallet.address,
+    to: contract.address
+});
+
+// Verify deployment
+expect(results).toHaveSuccessfulDeploy({
+    to: contract.address
+});
+
+// Verify failure case
+val failResults = net.send(wallet.address, invalidMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+expect(failResults).toHaveFailedTx({
+    to: contract.address,
+    exit_code: 102 // specific error code
+});
+```
+
+## Definitions
+
+## `Expectation<SendResultList>.toHaveSuccessfulDeploy`
+
+```tolk
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params: SearchParams = {})
+```
+
+Expect the transaction list to have a successful deploy transaction.
+
+Transaction is considered as "deploy" if previous status was "NonExisting" and end status was "Active".
+
+Example:
+
+```tolk
+expect(txs).toHaveSuccessfulDeploy({
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L48" />
+
+## `Expectation<SendResultList>.toHaveSuccessfulTx`
+
+```tolk
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: SearchParams = {})
+```
+
+Expect the transaction list to have a successful transaction.
+
+Transaction is considered as "successful" if exit code is 0, but exit code
+can be overridden by the `exit_code` parameter.
+
+Example:
+```tolk
+expect(txs).toHaveSuccessfulTx({
+    from: deployer.address,
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L77" />
+
+## `Expectation<SendResultList>.toHaveTx`
+
+```tolk
+fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams = {})
+```
+
+Expect the transaction list to have a transaction with specified parameters.
+
+Example:
+```tolk
+expect(txs).toHaveTx({
+    from: deployer.address,
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L104" />
+
+## `Expectation<SendResultList>.toNotHaveTx`
+
+```tolk
+fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchParams = {})
+```
+
+Expect the transaction list to NOT have a transaction with specified parameters.
+
+Example:
+```tolk
+expect(txs).toNotHaveTx({
+    from: deployer.address,
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L128" />
+
+## `Expectation<SendResultList>.toHaveBouncedTx`
+
+```tolk
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: SearchParams = {})
+```
+
+Expect the transaction list to have a **bounced** transaction.
+
+Example:
+```tolk
+expect(txs).toHaveBouncedTx({
+    from: deployer.address,
+    to: counter.address,
+});
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L152" />
+
+## `Expectation<SendResultList>.toHaveFailedTx`
+
+```tolk
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: SearchParams = {})
+```
+
+Expect the transaction list to have a **failed** transaction.
+Exit code in parameters must be set to non zero value.
+
+Example:
+```tolk
+expect(txs).toHaveFailedTx({
+    from: deployer.address,
+    to: counter.address,
+    exit_code: 123,
+});
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L179" />
+
+## `Expectation<SendResultList>.toEmitExternalMessage`
+
+```tolk
+fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self)
+```
+
+Expect the transaction to emit an external message of given type.
+
+Example:
+```tolk
+expect(txs).toEmitExternalMessage<IncreaseCounter>();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L207" />
+
+## `Expectation<SendResult>.toConsumeLessThan`
+
+```tolk
+fun Expectation<SendResult>.toConsumeLessThan(self, amount: int)
+```
+
+Expect the transaction to consume less than the expected amount of gas.
+
+Example:
+```tolk
+val result = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+expect(result.at(0)).toConsumeLessThan(1000);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L243" />
+

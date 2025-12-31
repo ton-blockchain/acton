@@ -1,0 +1,132 @@
+---
+title: "fmt"
+description: "fmt.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Module for string formatting.
+
+This module provides a set of functions (`format1` to `format5`) for creating formatted strings.
+It is similar to `sprintf` in C or `format!` in Rust.
+
+Usage:
+The functions are named `formatN` where N is the number of arguments.
+
+Examples:
+```tolk
+// Simple string substitution
+val greeting = format1("Hello, {}!", "Tolk");
+
+// Formatting numbers
+val hex = format1("Value in hex: 0x{:x}", 255); // "Value in hex: 0xff"
+
+// Formatting TON amounts
+val balance = format1("Balance: {:ton}", 500000000); // "Balance: 0.5 TON"
+
+// Multiple arguments
+val info = format3("User {} has {} items worth {:ton}", "Alice", 5, 1000000000);
+```
+
+## Definitions
+
+## `format1`
+
+```tolk
+fun format1<T1>(fmt: slice, arg1: T1): slice
+```
+
+Formats a string with 1 argument.
+
+Example:
+```tolk
+val msg = format1("Hello {}", "world");
+println(msg);  // prints "Hello world"
+```
+
+Format supports following format soecifiers:
+- `{:x}` — formats a number as hexadecimal without `0x` prefix
+- `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L37" />
+
+## `format2`
+
+```tolk
+fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice
+```
+
+Formats a string with 2 arguments.
+
+Example:
+```tolk
+val msg = format2("{}: {}", "name", "John");
+println(msg);  // prints "name: John"
+```
+
+Format supports following format soecifiers:
+- `{:x}` — formats a number as hexadecimal without `0x` prefix
+- `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L52" />
+
+## `format3`
+
+```tolk
+fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice
+```
+
+Formats a string with 3 arguments.
+
+Example:
+```tolk
+val msg = format3("{} + {} = {}", 2, 3, 5);
+println(msg);  // prints "2 + 3 = 5"
+```
+
+Format supports following format soecifiers:
+- `{:x}` — formats a number as hexadecimal without `0x` prefix
+- `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L67" />
+
+## `format4`
+
+```tolk
+fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4): slice
+```
+
+Formats a string with 4 arguments.
+
+Example:
+```tolk
+val msg = format4("{} {} {} {}", "a", "b", "c", "d");
+println(msg);  // prints "a b c d"
+```
+
+Format supports following format soecifiers:
+- `{:x}` — formats a number as hexadecimal without `0x` prefix
+- `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L82" />
+
+## `format5`
+
+```tolk
+fun format5<T1, T2, T3, T4, T5>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): slice
+```
+
+Formats a string with 5 arguments.
+
+Example:
+```tolk
+val msg = format5("{} {} {} {} {}", 1, 2, 3, 4, 5);
+println(msg);  // prints "1 2 3 4 5"
+```
+
+Format supports following format soecifiers:
+- `{:x}` — formats a number as hexadecimal without `0x` prefix
+- `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L97" />
+

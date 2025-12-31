@@ -1,21 +1,36 @@
+use crate::commands::common::error_fmt;
 use crate::config::{ActonConfig, ContractConfig, ContractDependency, DependencyKind};
 use crate::file_build_cache::FileBuildCache;
 use anyhow::anyhow;
 use log::debug;
 use owo_colors::OwoColorize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
+use tempfile::TempDir;
 use tycho_types::boc::Boc;
 
 mod dep_graph;
 
 pub fn build_cmd(
-    contract_filter: Option<String>,
+    contract_id: Option<String>,
     clear_cache: bool,
     graph_output: Option<String>,
+    out_dir: Option<String>,
 ) -> anyhow::Result<()> {
+    // Due to global variables, we need to enable debug mode for emulator as early as possible
+    // since first compilation WITHOUT debug mode will set debug=false forever
+    enable_emulator_debug_mode()?;
+
+    let out_dir = out_dir.unwrap_or_else(|| "build".to_string());
+
+    if !Path::new(&out_dir).exists() {
+        fs::create_dir_all(&out_dir)?;
+    }
+
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
         file_cache.clear()?;
@@ -30,7 +45,15 @@ pub fn build_cmd(
         Some(contracts) => contracts,
         None => {
             println!(
-                "No contracts found in Acton.toml. Run 'acton init' first or add contracts manually."
+                "No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = \"MyContract\"
+src = \"contracts/my-contract.tolk\"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
             );
             return Ok(());
         }
@@ -41,21 +64,21 @@ pub fn build_cmd(
         return Ok(());
     }
 
-    let mut file_cache = FileBuildCache::new(None)?;
-    let failure_count = 0;
-    let total_start = Instant::now();
-
-    if let Some(filter) = &contract_filter
+    if let Some(filter) = &contract_id
         && !contracts.iter().any(|(key, _)| key == filter)
     {
-        return Err(anyhow!("Contract '{filter}' not found in Acton.toml"));
+        anyhow::bail!(error_fmt::contract_not_found(&config, filter))
     }
+
+    let mut file_cache = FileBuildCache::new(None)?;
+    let mut failure_count = 0;
+    let total_start = Instant::now();
 
     let flatten_contracts = contracts.iter().collect::<Vec<_>>();
     let compilation_order = dep_graph::build_dependency_graph(&flatten_contracts)?;
     debug!("Compilation order: {compilation_order:?}");
 
-    let filtered_compilation_order = if let Some(filter) = &contract_filter {
+    let filtered_compilation_order = if let Some(filter) = &contract_id {
         dep_graph::filter_compilation_order_for_contract(filter, &compilation_order, contracts)?
     } else {
         compilation_order
@@ -77,6 +100,7 @@ pub fn build_cmd(
     }
 
     let mut compiled_contracts: HashMap<String, String> = HashMap::new();
+    let mut compile_errors = BTreeMap::new();
 
     for contract_key in filtered_compilation_order {
         let Some(contract_config) = contracts.get(&contract_key) else {
@@ -86,9 +110,24 @@ pub fn build_cmd(
 
         generate_dependency_files(&contract_key, contract_config, &compiled_contracts, &config)?;
 
-        let code_boc64 = process_contract(&mut file_cache, contract_config, contract_path)?;
+        let (code_boc64, code_hash) =
+            match process_contract(&mut file_cache, contract_config, contract_path) {
+                Ok((code, hash)) => (code, hash),
+                Err(err) => {
+                    failure_count += 1;
+                    compile_errors.insert(contract_key.clone(), err);
+                    continue;
+                }
+            };
 
         compiled_contracts.insert(contract_key.clone(), code_boc64.clone());
+
+        if let Err(e) = save_build_artifact(&out_dir, &contract_key, &code_boc64, &code_hash) {
+            eprintln!(
+                "Warning: Failed to save build artifact file for {}: {}",
+                contract_config.name, e
+            );
+        }
 
         if let Err(e) = save_boc_file(contract_config, &code_boc64) {
             eprintln!(
@@ -104,11 +143,22 @@ pub fn build_cmd(
         println!("    {} in {:?}", "Finished".green().bold(), total_elapsed);
         Ok(())
     } else {
-        Err(anyhow!(
-            "Build failed with {} error{}",
-            failure_count,
-            if failure_count == 1 { "" } else { "s" }
-        ))
+        let mut whole_error = "".to_owned();
+
+        for (contract, err) in compile_errors {
+            whole_error += color_print::cformat!("In <yellow>{contract}</>:\n\n{err}\n").as_str()
+        }
+
+        whole_error.push_str(
+            color_print::cformat!(
+                "<red>Build failed</> with {} error{}",
+                failure_count,
+                if failure_count == 1 { "" } else { "s" }
+            )
+            .as_str(),
+        );
+
+        Err(anyhow!(whole_error))
     }
 }
 
@@ -116,12 +166,15 @@ fn process_contract(
     file_cache: &mut FileBuildCache,
     contract_config: &ContractConfig,
     contract_path: &String,
-) -> anyhow::Result<String> {
-    let code_boc64 = if contract_path.ends_with(".boc") {
+) -> anyhow::Result<(String, String)> {
+    let (code_boc64, code_hash) = if contract_path.ends_with(".boc") {
         debug!("Loading BoC file: {contract_path}");
         match fs::read(contract_path) {
             Ok(boc_data) => match Boc::decode(&boc_data) {
-                Ok(boc) => Boc::encode_base64(&boc),
+                Ok(boc) => {
+                    let code_boc64 = Boc::encode_base64(&boc);
+                    (code_boc64, boc.repr_hash().to_string())
+                }
                 Err(e) => {
                     anyhow::bail!("Failed to decode BoC file {contract_path}: {e}");
                 }
@@ -135,7 +188,7 @@ fn process_contract(
 
         if let Some(cached_result) = cached_result {
             debug!("Cache hit, use cached result for '{contract_path}'");
-            cached_result.code_boc64
+            (cached_result.code_boc64, cached_result.code_hash_hex)
         } else {
             debug!("Cache miss, recompile '{contract_path}'");
             let compile_start = Instant::now();
@@ -157,15 +210,15 @@ fn process_contract(
 
                     println!("    {} in {:?}", "Finished".green(), compile_time);
 
-                    result.code_boc64
+                    (result.code_boc64, result.code_hash_hex)
                 }
                 tolkc::CompilerResult::Error(error) => {
-                    return Err(anyhow!("Cannot compile script file {}", error.message));
+                    anyhow::bail!(error.message);
                 }
             }
         }
     };
-    Ok(code_boc64)
+    Ok((code_boc64, code_hash))
 }
 
 fn save_boc_file(contract_config: &ContractConfig, code_boc64: &str) -> anyhow::Result<()> {
@@ -173,6 +226,26 @@ fn save_boc_file(contract_config: &ContractConfig, code_boc64: &str) -> anyhow::
         let code = Boc::decode_base64(code_boc64)?;
         fs::write(output_path, Boc::encode(code))?;
     }
+    Ok(())
+}
+
+fn save_build_artifact(
+    out_dir: &str,
+    contract_key: &str,
+    code_boc64: &str,
+    code_hash: &str,
+) -> anyhow::Result<()> {
+    use serde_json::json;
+
+    let json_data = json!({
+        "code_boc64": code_boc64,
+        "hash": code_hash
+    });
+
+    let filename = format!("{}.json", contract_key);
+    let path = Path::new(out_dir).join(filename);
+    fs::write(path, serde_json::to_string_pretty(&json_data)?)?;
+
     Ok(())
 }
 
@@ -305,4 +378,15 @@ fun {func_name}(): cell asm \"\"\"
 \"\"\"
 "
     )
+}
+
+fn enable_emulator_debug_mode() -> anyhow::Result<()> {
+    // hacky init VM with debug enabled due to global variables :/
+    let dummy_contract: &'static str = "fun onInternalMessage(in: InMessage) {}";
+    let tmp_dir = TempDir::new()?;
+    let tmp_file_path = tmp_dir.path().join("enable_debug.tolk");
+    let mut tmp_file = File::create(&tmp_file_path)?;
+    tmp_file.write_all(dummy_contract.as_bytes())?;
+    let _ = tolkc::compile(tmp_file_path.as_ref(), true);
+    Ok(())
 }

@@ -20,7 +20,7 @@
     },
     {
       "name": "constant.numeric",
-      "match": "(-?([\\d]+|0x[\\da-fA-F]+|0b[01]+))\\b"
+      "match": "\\b(-?([\\d]+|0x[\\da-fA-F]+|0b[01]+))\\b"
     },
     {
       "name": "keyword.control",
@@ -32,11 +32,33 @@
     },
     {
       "name": "keyword.other",
-      "match": "\\b(import|export|true|false|null|redef|mutate|tolk|as|is|!is)\\b"
+      "match": "\\b(import|export|true|false|null|redef|mutate|tolk|as|is|!is|private|readonly)\\b"
+    },
+    {
+      "name": "keyword.other",
+      "match": "\\bself\\b"
+    },
+    {
+      "name": "entity.name.type.parameter",
+      "match": "\\b[TU]\\b"
+    },
+    {
+      "match": "\\b(val|var)\\s+(?:type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|tuple|builder|continuation|never|coins|address|int\\d+|uint\\d+|bits\\d+|bytes\\d+)\\b",
+      "captures": {
+        "1": { "name": "storage.modifier" }
+      }
+    },
+    {
+      "name": "constant.other",
+      "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
     },
     {
       "name": "storage.type",
-      "match": "\\b(type|enum|int|cell|void|bool|slice|tuple|builder|continuation|never|coins|int\\d+|uint\\d+)\\b"
+      "match": "\\b(type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|tuple|builder|continuation|never|coins|int\\d+|uint\\d+|bits\\d+|bytes\\d+)\\b"
+    },
+    {
+      "name": "storage.type",
+      "match": "(?<!\\.)\\baddress\\b(?!\\s*:)"
     },
     {
       "name": "storage.modifier",
@@ -48,15 +70,11 @@
     },
     {
       "name": "entity.name.function",
-      "match": "(`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\()"
+      "match": "(`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\s*(?:<[^>]+>)?\\s*\\()"
     },
     {
-      "name": "variable.language",
-      "match": "\bself\b"
-    },
-    {
-      "name": "variable.name",
-      "match": "`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*"
+      "name": "entity.name.type",
+      "match": "\\b[A-Z][a-zA-Z0-9]*\\b"
     }
   ],
   "scopeName": "source.tolk"

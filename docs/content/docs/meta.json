@@ -1,0 +1,22 @@
+{
+  "pages": [
+    "--- Get started ---",
+    "welcome.mdx",
+    "installation.mdx",
+    "quickstart.mdx",
+    "--- First steps ---",
+    "project-init.mdx",
+    "contract-deployment.mdx",
+    "contract-verification.mdx",
+    "--- Digging deeper ---",
+    "commands",
+    "build-system",
+    "test-runner",
+    "scripting",
+    "--- Advanced ---",
+    "advanced/libraries",
+    "--- Miscellaneous ---",
+    "miscellaneous/ide-support.mdx",
+    "standard_library"
+  ]
+}

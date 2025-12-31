@@ -1,0 +1,126 @@
+---
+title: "Code Coverage"
+description: "Learn how to measure and analyze code coverage in your Tolk smart contract tests"
+---
+
+Code coverage is a metric that measures how much of your code is executed during testing. It helps you identify untested parts of your codebase and ensure comprehensive test suites. Acton's test runner provides built-in code coverage support with detailed reporting and LCOV export capabilities.
+
+## What is Code Coverage?
+
+Code coverage measures the percentage of your code that is executed when running tests. It helps answer questions like:
+
+- Which parts of my code are tested?
+- Are there dead code paths?
+- How thorough are my tests?
+- Where should I add more tests?
+
+Acton's test runner measures **line coverage** — the percentage of executable lines that were executed during test runs.
+
+## Enabling Coverage
+
+### Command Line Flag
+
+To enable coverage collection, use the `--coverage` flag:
+
+```bash
+acton test --coverage
+```
+
+This will run all tests and collect coverage data, then display a summary report.
+
+### Coverage for Specific Tests
+
+You can combine coverage with other flags:
+
+```bash
+# Run specific test file with coverage
+acton test counter.test.tolk --coverage
+
+# Run tests matching a pattern with coverage
+acton test --filter "test-increase" --coverage
+```
+
+## Understanding Coverage Reports
+
+When you enable coverage, you'll see a detailed report after test execution:
+
+```
+───────────────────────────────────────────────────────────────────────────────────────
+ File                                            Covered Lines   Total Lines   % Lines 
+───────────────────────────────────────────────────────────────────────────────────────
+ All files                                                 128           141     90.8% 
+ .jetton/contracts/jetton-wallet-contract.tolk              57            68     83.8% 
+ .jetton/contracts/jetton-minter-contract.tolk              54            56     96.4% 
+ .jetton/contracts/fees-management.tolk                      1             1    100.0% 
+ .jetton/contracts/jetton-utils.tolk                         9             9    100.0% 
+ .jetton/contracts/storage.tolk                              4             4    100.0% 
+ .jetton/contracts/errors.tolk                               3             3    100.0%
+```
+
+### Coverage Metrics Explained
+
+- **Covered Lines**: Number of lines that were executed during testing
+- **Total Lines**: Total number of executable lines in the file
+- **% Lines**: Percentage of executable lines that were covered
+
+## Exporting Coverage Data
+
+### LCOV Format
+
+Acton's test runner can export coverage data to LCOV format, which is compatible with many coverage visualization tools like:
+
+- VS Code Coverage Gutters
+- IntelliJ IDEA Coverage
+- lcov tools and report generators
+
+To generate an LCOV file:
+
+```bash
+acton test --coverage --format lcov
+```
+
+This creates a `lcov.info` file in your project root.
+
+### Using LCOV with External Tools
+
+Once you have the `lcov.info` file, you can use various tools:
+
+```bash
+# Generate HTML report
+genhtml lcov.info -o coverage-report/
+
+# View coverage in VS Code with Coverage Gutters extension
+# The lcov.info file will be automatically detected
+
+# Use with other CI/CD tools that support LCOV
+```
+
+## Best Practices
+
+### 1. Aim for High Coverage
+
+- Target ≥80% line coverage for critical business logic, but don't obsess over 100% coverage
+- Focus on thorough testing of complex functions
+
+### 2. Understand Coverage Limitations
+
+- Coverage doesn't measure test quality
+- 100% coverage doesn't guarantee bug-free code
+- Focus on testing edge cases and error conditions (see [mutation testing](/docs/test-runner/mutation-testing))
+
+## Troubleshooting
+
+### Performance Considerations
+
+- Coverage collection adds overhead to test execution
+- For large test suites, consider running coverage less frequently
+- Use `--format lcov` to collect data once and analyze offline
+
+## Summary
+
+Code coverage helps you:
+
+1. Measure Test Effectiveness: See which parts of your code are tested
+2. Identify Gaps: Find untested code paths and edge cases
+3. Guide Development: Focus testing efforts where they're most needed
+4. Maintain Quality: Ensure new code doesn't reduce coverage

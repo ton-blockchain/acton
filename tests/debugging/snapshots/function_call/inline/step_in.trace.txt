@@ -1,64 +1,70 @@
 Step 1 (before):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:8
   Code:
       6| }
       7| 
       8| fun main() {
       9|     foo = 300;
-             ^
+             ^^^
      10|     return my_sum(foo, foo);
      11| }
 
 Step 2 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:8
   Code:
       6| }
       7| 
       8| fun main() {
       9|     foo = 300;
-                   ^
+                   ^^^
      10|     return my_sum(foo, foo);
      11| }
 
 Step 3 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:8
   Code:
       6| }
       7| 
       8| fun main() {
       9|     foo = 300;
-                   ^
+                   ^^^
      10|     return my_sum(foo, foo);
      11| }
 
 Step 4 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:32
   Code:
       6| }
       7| 
       8| fun main() {
       9|     foo = 300;
-             ^
+             ^^^
      10|     return my_sum(foo, foo);
      11| }
   Variables:
     '0 = 300
 
 Step 5 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:80
   Code:
       7| 
       8| fun main() {
       9|     foo = 300;
      10|     return my_sum(foo, foo);
-                    ^
+                    ^^^^^^^^^^^^^^^^
      11| }
   Variables:
     g_foo = 300
     g_foo = 300
 
 Step 6 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:80
   Code:
       2| global foo: int;
       3| 
       4| fun my_sum(a: int, b: int): int {
       5|     return a + b;
-                    ^
+                    ^^^^^
       6| }
       7| 
       8| fun main() {
@@ -67,23 +73,55 @@ Step 6 (step_in):
     g_foo = 300
 
 Step 7 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:88
   Code:
+      2| global foo: int;
+      3| 
+      4| fun my_sum(a: int, b: int): int {
+      5|     return a + b;
+                    ^^^^^
+      6| }
+      7| 
+      8| fun main() {
+  Variables:
+    '5 = 600
+
+Step 8 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:88
+  Code:
+      2| global foo: int;
+      3| 
+      4| fun my_sum(a: int, b: int): int {
+      5|     return a + b;
+             ^^^^^^^^^^^^
+      6| }
+      7| 
+      8| fun main() {
+  Variables:
+    '5 = 600
+
+Step 9 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:88
+  Code:
+      3| 
+      4| fun my_sum(a: int, b: int): int {
+      5|     return a + b;
+      6| }
+         
       7| 
       8| fun main() {
       9|     foo = 300;
-     10|     return my_sum(foo, foo);
-             ^
-     11| }
   Variables:
     '4 = 600
 
-Step 8 (step_in):
+Step 10 (step_in):
+  Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:88
   Code:
       7| 
       8| fun main() {
       9|     foo = 300;
      10|     return my_sum(foo, foo);
-                    ^
+                    ^^^^^^^^^^^^^^^^
      11| }
   Variables:
     '4 = 600

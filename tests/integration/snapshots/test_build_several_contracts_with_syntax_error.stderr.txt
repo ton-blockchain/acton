@@ -1,0 +1,14 @@
+Error: In broken1:
+
+[ROOT]/contracts/broken1[LINE]: error: expected <expression>, got `;`
+   3 |                 val x = ;
+     |                         ^
+
+In broken2:
+
+[ROOT]/contracts/broken2[LINE]: error: provide a type for a variable, because its default value is omitted:
+           > var x: <type>;
+   3 |                 val x;
+     |                      ^
+
+Build failed with 2 errors

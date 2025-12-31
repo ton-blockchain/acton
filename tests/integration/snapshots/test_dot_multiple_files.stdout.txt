@@ -5,14 +5,14 @@
      Running tests
 ··x
 
-stdout | ./tests/first_test_test.tolk > test_first
+stdout | ./tests/first_test.test.tolk > test_first
 First test output
 
 FAIL test_second_fail: expect(<actual>).toEqual(<expected>)
-  ./tests/second_test_test[LINE]
+  ./tests/second_test.test[LINE]
 
-stdout | ./tests/second_test_test.tolk > test_second_fail
+stdout | ./tests/second_test.test.tolk > test_second_fail
 This test will fail
 
-stderr | ./tests/second_test_test.tolk > test_second_fail
+stderr | ./tests/second_test.test.tolk > test_second_fail
 Error output

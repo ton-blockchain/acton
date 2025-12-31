@@ -1,0 +1,15 @@
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > ./tests/test.test.tolk (1 test)
+  ✗ foo [TIME]
+    └─ Error: Get method 'currentCounter3' (110134) failed due to stack underflow. Make sure you passed all parameters to the get method.
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

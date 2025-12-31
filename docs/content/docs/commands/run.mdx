@@ -1,0 +1,80 @@
+---
+title: "Execute command scripts"
+description: "Run scripts defined in Acton.toml"
+---
+
+The `run` command executes scripts defined in the `[scripts]` section of your `Acton.toml` file. This is similar to `npm run` and allows you to define shortcuts for common tasks, long commands, or complex workflows.
+
+## Basic Usage
+
+```bash
+acton run <script-name> [args...]
+```
+
+## Configuration
+
+To use `acton run`, you first need to define scripts in your `Acton.toml` file under the `[scripts]` section.
+
+```toml title="Acton.toml"
+[package]
+name = "my-project"
+# ...
+
+[scripts]
+deploy = "acton script scripts/deploy.tolk --broadcast"
+test-unit = "acton test tests/unit"
+custom-task = "echo 'Running custom task...'"
+```
+
+## Examples
+
+### Running a script
+
+To run the `deploy` script defined above:
+
+```bash
+acton run deploy
+```
+
+This will execute:
+```bash
+acton script scripts/deploy.tolk --broadcast
+```
+
+### Passing arguments
+
+You can pass additional arguments to the script. Any arguments provided after the script name will be appended to the command.
+
+```bash
+acton run deploy -- --net mainnet
+```
+
+This will execute:
+```bash
+acton script scripts/deploy.tolk --broadcast --net mainnet
+```
+
+### Running arbitrary shell commands
+
+Scripts can contain any shell command, not just `acton` commands.
+
+```bash
+acton run custom-task
+```
+
+Output:
+```
+> echo 'Running custom task...'
+Running custom task...
+```
+
+## Error Handling
+
+If the script command fails (exits with a non-zero code), `acton run` will also exit with the same code.
+
+## Cross-Platform Compatibility
+
+- On **Unix-like systems** (Linux, macOS), scripts are executed using `sh -c`.
+- On **Windows**, scripts are executed using `cmd /C`.
+
+Ensure your scripts are compatible with the platform you are running on, or use cross-platform tools.

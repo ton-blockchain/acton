@@ -19,7 +19,7 @@ pub fn collect_profile(runner: &TestRunner, abi: &ContractAbi) -> anyhow::Result
         let Some(opcode) = result.opcode() else {
             continue;
         };
-        let Some(msg_abi) = abi.find_type_by_opcode(BigInt::from(opcode)) else {
+        let Some(msg_abi) = abi.find_type_by_opcode(&BigInt::from(opcode)) else {
             continue;
         };
 
@@ -179,7 +179,7 @@ pub fn collect_profile(runner: &TestRunner, abi: &ContractAbi) -> anyhow::Result
         }
     }
 
-    println!("{table}");
+    println!("{table}\n");
 
     // we don't want to override previous snapshot in compare mode
     if let Some(snapshot_filename) = &runner.config.snapshot

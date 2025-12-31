@@ -1,4 +1,6 @@
-use crate::support::{ProjectBuilder, TestOutputExt};
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
+
 use std::fs;
 
 const SIMPLE_CONTRACT: &str = r#"
@@ -32,7 +34,7 @@ fn test_compile_file_not_found() {
         .compile("nonexistent.tolk")
         .run()
         .failure()
-        .assert_contains("No such file or directory");
+        .assert_contains("Cannot find file or directory");
 }
 
 #[test]
@@ -75,7 +77,7 @@ fn test_compile_syntax_error() {
         .compile("contracts/broken.tolk")
         .run()
         .failure()
-        .assert_contains("Compilation failed");
+        .assert_contains("Error:");
 }
 
 #[test]
@@ -318,4 +320,205 @@ fn test_compile_with_both_outputs() {
 
     assert!(project.path().join("output.boc").exists());
     assert!(project.path().join("output.fif").exists());
+}
+
+#[test]
+fn test_compile_empty_path() {
+    let project = ProjectBuilder::new("compile-empty-path").build();
+
+    project
+        .acton()
+        .compile("")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches("integration/snapshots/test_compile_empty_path.stderr.txt");
+}
+
+#[test]
+fn test_compile_file_without_read_permission() {
+    let project = ProjectBuilder::new("compile-no-read")
+        .contract("secret", SIMPLE_CONTRACT)
+        .build();
+
+    // Make the file unreadable (on Unix systems)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let file_path = project.path().join("contracts/secret.tolk");
+        let mut perms = fs::metadata(&file_path).unwrap().permissions();
+        perms.set_mode(0o000); // no permissions
+        fs::set_permissions(&file_path, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .compile("contracts/secret.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_compile_file_without_read_permission.stderr.txt",
+        );
+}
+
+#[test]
+fn test_compile_corrupted_cache_file() {
+    let project = ProjectBuilder::new("compile-corrupted-cache")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // First compile to create cache
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .run()
+        .success();
+
+    // Manually corrupt the cache file
+    let cache_dir = project.path().join(".acton/cache");
+    if cache_dir.exists() {
+        for entry in fs::read_dir(&cache_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.extension().unwrap_or_default() == "cache" {
+                fs::write(&path, "corrupted cache data!!!").unwrap();
+                break;
+            }
+        }
+    }
+
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_compile_corrupted_cache_file.stdout.txt",
+        );
+}
+
+#[test]
+fn test_compile_boc_output_write_error() {
+    let project = ProjectBuilder::new("compile-boc-write-err")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // Create a readonly directory
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444); // readonly
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .with_boc_output("readonly/output.boc")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_compile_boc_output_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_compile_fift_output_write_error() {
+    let project = ProjectBuilder::new("compile-fift-write-err")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // Create a readonly directory
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444); // readonly
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .with_fift_output("readonly/output.fif")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_compile_fift_output_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_compile_source_map_write_error() {
+    let project = ProjectBuilder::new("compile-sourcemap-write-err")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // Create a readonly directory
+    let readonly_dir = project.path().join("readonly");
+    fs::create_dir(&readonly_dir).expect("Create readonly dir");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+        perms.set_mode(0o444); // readonly
+        fs::set_permissions(&readonly_dir, perms).unwrap();
+    }
+
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .with_source_map("readonly/sourcemap.json")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_compile_source_map_write_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_compile_invalid_boc_output_path() {
+    let project = ProjectBuilder::new("compile-invalid-boc-path")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // Create a directory where we want to create boc file
+    fs::create_dir(project.path().join("output.boc")).expect("Create dir blocking boc output");
+
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .with_boc_output("output.boc")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_compile_invalid_boc_output_path.stderr.txt",
+        );
+}
+
+#[test]
+fn test_compile_invalid_fift_output_path() {
+    let project = ProjectBuilder::new("compile-invalid-fift-path")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    // Create a directory where we want to create fift file
+    fs::create_dir(project.path().join("output.fif")).expect("Create dir blocking fift output");
+
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .with_fift_output("output.fif")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_compile_invalid_fift_output_path.stderr.txt",
+        );
 }

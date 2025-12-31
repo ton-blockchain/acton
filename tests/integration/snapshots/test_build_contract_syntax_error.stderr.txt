@@ -1,0 +1,7 @@
+Error: In broken:
+
+[ROOT]/contracts/broken[LINE]: error: expected <expression>, got `;`
+   3 |                 val x = ;
+     |                         ^
+
+Build failed with 1 error

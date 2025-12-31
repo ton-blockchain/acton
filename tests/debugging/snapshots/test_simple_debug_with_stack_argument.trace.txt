@@ -1,28 +1,31 @@
 Step 1 (before):
+  Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:8
   Code:
       2| global result: int;
       3| 
       4| fun main(arg: int) {
       5|     result = arg * 2;
-             ^
+             ^^^^^^
       6|     return result;
       7| }
   Variables:
     arg = 21
 
 Step 2 (step_in):
+  Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:8
   Code:
       2| global result: int;
       3| 
       4| fun main(arg: int) {
       5|     result = arg * 2;
-                      ^
+                      ^^^^^^^
       6|     return result;
       7| }
   Variables:
     arg = 21
 
 Step 3 (step_in):
+  Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:8
   Code:
       2| global result: int;
       3| 
@@ -35,48 +38,52 @@ Step 3 (step_in):
     arg = 21
 
 Step 4 (step_in):
+  Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:8
   Code:
       2| global result: int;
       3| 
       4| fun main(arg: int) {
       5|     result = arg * 2;
-                      ^
+                      ^^^^^^^
       6|     return result;
       7| }
   Variables:
     arg = 21
 
 Step 5 (step_in):
+  Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:24
   Code:
       2| global result: int;
       3| 
       4| fun main(arg: int) {
       5|     result = arg * 2;
-                      ^
+                      ^^^^^^^
       6|     return result;
       7| }
   Variables:
     '3 = 42
 
 Step 6 (step_in):
+  Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:24
   Code:
       2| global result: int;
       3| 
       4| fun main(arg: int) {
       5|     result = arg * 2;
-             ^
+             ^^^^^^
       6|     return result;
       7| }
   Variables:
     '1 = 42
 
 Step 7 (step_in):
+  Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:56
   Code:
       3| 
       4| fun main(arg: int) {
       5|     result = arg * 2;
       6|     return result;
-             ^
+             ^^^^^^^^^^^^^
       7| }
   Variables:
     g_result = 42

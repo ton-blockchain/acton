@@ -1,0 +1,18 @@
+
+WARNING
+═══════════════════════════════════════════════════════════
+
+Your contract defines types in the same file as the contract logic.
+Tests and wrappers cannot import from contract files directly.
+
+→ Please move the following types to [ROOT]/contracts/types.tolk:
+
+  • Storage struct
+
+After moving the types, update your contract to import them:
+  import "types"
+
+═══════════════════════════════════════════════════════════
+
+   Generated tests/wrappers/MyContract.tolk
+   Generated tests/my_contract.test.tolk

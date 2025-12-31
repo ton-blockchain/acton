@@ -1,0 +1,3 @@
+Error: Contract nonexistent not found in Acton.toml
+Available contracts:
+ existing

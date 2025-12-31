@@ -8,6 +8,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use tolkc::source_map::{EntryContextDescription, SourceMap};
+use tycho_types::boc::Boc;
 
 #[derive(Debug, Clone)]
 pub struct Coverage {
@@ -55,7 +56,10 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
     }
 
     for get_result in &emulations.get_results {
-        let Some(build_result) = build_cache.result_for_code(&get_result.code) else {
+        let Ok(code) = Boc::decode_base64(&get_result.code) else {
+            continue;
+        };
+        let Some(build_result) = build_cache.result_for_code(&Some(code)) else {
             continue;
         };
 
@@ -126,7 +130,7 @@ fn build_executable_lines_per_file(
             || loc.loc.file.is_empty()
             || loc.loc.file.contains("/lib/")
             || loc.loc.file.contains("/.acton/")
-            || loc.loc.file.contains("_test.tolk")
+            || loc.loc.file.contains(".test.tolk")
         {
             continue;
         }

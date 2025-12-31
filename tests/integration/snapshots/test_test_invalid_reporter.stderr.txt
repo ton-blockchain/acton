@@ -1,0 +1,1 @@
+Warning: Unknown report format 'invalid-reporter'. Supported formats: console, teamcity, junit, dot

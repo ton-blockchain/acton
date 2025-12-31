@@ -1,0 +1,15 @@
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > ./tests/test.test.tolk (1 test)
+  ✓ foo [TIME]
+    └─ Test output:
+       N/A -> treasury A
+       └── empty 1 TON -> some unknown contract B                                      compute phase skipped aborted
+
+ ✓ 1 passed in 1 file

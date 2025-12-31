@@ -4,35 +4,37 @@ use acton::context::{
     AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, Emulations, Env,
     IoContext, KnownAddresses,
 };
+use acton::debugger::any_executor::AnyExecutor;
 use acton::debugger::debug_context::DebugContext;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
 use acton::{debugger, ffi};
-use anyhow::anyhow;
 use dap::events::Event;
 use dap::responses::ContinueResponse;
+use dap::types::StackFrame;
 use dap_client::DapClient;
-use emulator::AnyExecutor;
-use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
-use emulator::executor::ExecutorVerbosity;
-use emulator::get_executor::{GetMethodParams, GetMethodResult};
-use emulator::step_get_executor::StepGetExecutor;
+use emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use owo_colors::OwoColorize;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::collections::{BTreeMap, HashMap};
+use std::path::Path;
 use std::time::Duration;
-use std::{env, fs, thread};
+use std::{fs, thread};
 use tasm::printer::FormatOptions;
 use tolkc::CompilerResult;
 use tolkc::source_map::SourceMap;
+use ton_executor::get::step::StepGetExecutor;
+use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
+use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
 
 mod debug_test;
+mod real_test;
 mod support;
 mod tests;
 
@@ -92,19 +94,9 @@ impl DebuggerClient {
         self.client.step_out(thread_id)
     }
 
-    pub fn stack_trace(&mut self, thread_id: i64) -> anyhow::Result<Vec<SourcePosition>> {
+    pub fn stack_trace(&mut self, thread_id: i64) -> anyhow::Result<Vec<StackFrame>> {
         let trace = self.client.stack_trace(thread_id)?;
-        let positions = trace
-            .stack_frames
-            .iter()
-            .filter_map(|frame| {
-                frame.source.as_ref().and_then(|source| {
-                    source.path.as_ref().map(|path| {
-                        SourcePosition::new(path.clone(), frame.line as u32, frame.column as u32)
-                    })
-                })
-            })
-            .collect();
+        let positions = trace.stack_frames;
         Ok(positions)
     }
 
@@ -113,65 +105,10 @@ impl DebuggerClient {
         Ok(variables.variables)
     }
 
-    pub fn assert_position(
-        &mut self,
-        thread_id: i64,
-        expected: &SourcePosition,
-    ) -> anyhow::Result<()> {
-        let positions = self.stack_trace(thread_id)?;
-        let actual = positions
-            .first()
-            .ok_or_else(|| anyhow!("No stack frames available"))?;
-
-        println!("Position: {}", actual);
-
-        if actual == expected {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Position mismatch: expected {}, got {}",
-                expected,
-                actual
-            ))
-        }
-    }
-
+    #[allow(dead_code)]
     pub fn terminate(&mut self) -> anyhow::Result<()> {
         self.client.terminate()
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SourcePosition {
-    pub file: String,
-    pub line: u32,
-    pub column: u32,
-}
-
-impl SourcePosition {
-    pub fn new(file: String, line: u32, column: u32) -> Self {
-        Self {
-            file: normalize_path(&file),
-            line,
-            column,
-        }
-    }
-}
-
-impl std::fmt::Display for SourcePosition {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.file, self.line, self.column)
-    }
-}
-
-fn normalize_path(path: &str) -> String {
-    let path_buf = PathBuf::from(path);
-    if let Ok(current_dir) = env::current_dir()
-        && let Ok(relative) = path_buf.strip_prefix(&current_dir)
-    {
-        return relative.to_string_lossy().to_string();
-    }
-    path.to_string()
 }
 
 fn wait_for_initialized(client: &mut DapClient) -> anyhow::Result<()> {
@@ -254,7 +191,7 @@ fn execute_script(
 ) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext)> {
     let dest_address = contract_address(code_cell)?;
 
-    let params = GetMethodParams {
+    let params = RunGetMethodArgs {
         code: code_cell.to_boc_b64(false)?.to_string(),
         data: data_cell.to_boc_b64(false)?.to_string(),
         verbosity,
@@ -270,8 +207,8 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let mut emulator = Emulator::new(verbosity);
-    let mut blockchain = Blockchain::new(None, None);
+    let mut emulator = Emulator::new(verbosity, None)?;
+    let mut world_state = WorldState::new(AccountsState::Local(LocalAccountsState::new()));
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =
         FileBuildCache::dummy().expect("Failed to create file cache for script execution");
@@ -282,11 +219,19 @@ fn execute_script(
     let mut assert_failure = None;
     let mut expected_exit_code = None;
 
+    let config = ActonConfig::load()?;
+
     let mut ctx = Context {
         env: Env {
-            config: &ActonConfig::load()?,
+            config: &config,
             abi,
             default_log_level: verbosity,
+            wallets: config.wallets.as_ref(),
+            open_wallets: BTreeMap::new(),
+            build_override: BTreeMap::new(),
+            explorer: None,
+            fork_net: None,
+            api_key: None,
         },
         io: IoContext {
             stdout_buffer: "".to_string(),
@@ -298,7 +243,7 @@ fn execute_script(
             expected_exit_code: &mut expected_exit_code,
         },
         chain: ChainContext {
-            blockchain: &mut blockchain,
+            world_state: &mut world_state,
             emulator: &mut emulator,
             emulations: &mut emulations,
         },
@@ -311,9 +256,13 @@ fn execute_script(
             backtrace: None,
         },
         debug: DebugCtx::Disabled,
+        is_broadcasting: false,
+        network: None,
     };
 
-    let mut executor = StepGetExecutor::new(stack.clone(), params.clone());
+    let stack = serialize_tuple(&stack)?.to_boc_b64(false)?;
+
+    let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
     ffi::register(&mut executor, &mut ctx);
 
     let transport = debugger::start_dap_server(debug_port);
@@ -327,11 +276,11 @@ fn execute_script(
 
     ctx.debug = DebugCtx::new(&mut dbg_ctx);
 
-    executor.prepare(0, stack);
+    executor.prepare(0, &stack)?;
 
     ctx.debug.ctx().process_incoming_requests(true)?;
 
-    let result = executor.finish(&params.code);
+    let result = executor.finish(&params.code)?;
     let formatter = FormatterContext::from_context(&ctx);
     let io = ctx.io;
     Ok((result, io, formatter))
@@ -344,6 +293,10 @@ fn get_script_result(
 ) -> anyhow::Result<String> {
     match &result {
         GetMethodResult::Success(result) => {
+            if result.vm_exit_code != 0 {
+                anyhow::bail!("VM exit code {}", result.vm_exit_code)
+            }
+
             let cell = ArcCell::from_boc_b64(&result.stack)?;
 
             let tuple = Tuple::deserialize(&cell)?;
@@ -351,28 +304,20 @@ fn get_script_result(
 
             Ok(tuple_str + io.stdout_buffer.as_str() + io.stderr_buffer.as_str())
         }
-        GetMethodResult::Error(error) => Ok(format!(
-            "{} {}",
-            "Execution error:".red(),
-            error.error.red()
-        )),
+        GetMethodResult::Error(error) => {
+            anyhow::bail!("{} {}", "Execution error:".red(), error.error.red())
+        }
     }
 }
 
 fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
     let state_init = CellBuilder::new()
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store bounce flag: {}", e))?
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store maybe libraries: {}", e))?
-        .store_ref_cell_optional(Some(code))
-        .map_err(|e| anyhow!("Failed to store code cell: {}", e))?
-        .store_ref_cell_optional(Some(&ArcCell::default()))
-        .map_err(|e| anyhow!("Failed to store data cell: {}", e))?
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store maybe tick/tock: {}", e))?
-        .build()
-        .map_err(|e| anyhow!("Failed to build state init cell: {}", e))?;
+        .store_bit(false)?
+        .store_bit(false)?
+        .store_ref_cell_optional(Some(code))?
+        .store_ref_cell_optional(Some(&ArcCell::default()))?
+        .store_bit(false)?
+        .build()?;
 
     let dest_address = TonAddress::new(0, state_init.cell_hash());
     Ok(dest_address)

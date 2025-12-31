@@ -1,15 +1,15 @@
 use crate::context::{BuildCache, Emulations, KnownAddresses, TransactionGenericAssertFailure};
+use crate::exit_codes::get_exit_code_info;
 use crate::retrace;
 use crate::retrace::{ExecutedAction, InstalledActions};
 use abi::{ContractAbi, TypeAbi};
-use emulator::blockchain::account_code;
-use emulator::exit_codes::get_exit_code_info;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Write;
 use tolkc::source_map::SourceLocation;
+use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
@@ -65,6 +65,9 @@ pub struct FormatterContext {
     pub known_addresses: KnownAddresses,
     pub known_code_cells: HashMap<String, String>,
     pub backtrace: Option<String>,
+    pub fork_net: Option<String>,
+    pub api_key: Option<String>,
+    pub network: Option<String>,
 }
 
 impl FormatterContext {
@@ -77,6 +80,9 @@ impl FormatterContext {
             known_addresses: KnownAddresses::new(),
             known_code_cells: HashMap::new(),
             backtrace: None,
+            fork_net: None,
+            network: None,
+            api_key: None,
         }
     }
 
@@ -84,12 +90,15 @@ impl FormatterContext {
     pub fn from_context(ctx: &crate::context::Context) -> Self {
         Self {
             contract_abi: ctx.env.abi.clone(),
-            accounts: ctx.chain.blockchain.get_accounts().clone(),
+            accounts: ctx.chain.world_state.get_accounts().clone(),
             build_cache: ctx.build.build_cache.clone(),
             emulations: ctx.chain.emulations.clone(),
             known_addresses: ctx.build.known_addresses.clone(),
             known_code_cells: ctx.build.known_code_cells.clone(),
             backtrace: ctx.build.backtrace.clone(),
+            fork_net: ctx.env.fork_net.clone(),
+            network: ctx.network.clone(),
+            api_key: ctx.env.api_key.clone(),
         }
     }
 
@@ -103,7 +112,7 @@ impl FormatterContext {
         if parser.remaining_bits() == 267
             && let Ok(address) = parser.load_address()
         {
-            return address.to_string();
+            return self.address_to_string(&address);
         }
 
         slice
@@ -111,19 +120,26 @@ impl FormatterContext {
             .unwrap_or("<invalid slice>".to_string())
     }
 
+    fn address_to_string(&self, address: &TonAddress) -> String {
+        let need_mainnet_address = self.fork_net.as_deref() == Some("mainnet")
+            || self.network.as_deref() == Some("mainnet");
+        address.to_base64_std_flags(false, !need_mainnet_address)
+    }
+
     fn format_address_slice(&self, slice: &ArcCell) -> String {
         let mut parser = slice.parser();
         if let Ok(address) = parser.load_address() {
             let addr = Self::arc_cell_to_addr(slice);
+            let address_base64 = self.address_to_string(&address);
 
             if let Some(addr) = &addr {
                 let contract_type = self.get_contract_type(addr);
                 if let Some(contract_type) = contract_type {
-                    return format!("{address} ({contract_type})");
+                    return format!("{address_base64} ({contract_type})");
                 }
             }
 
-            return address.to_string();
+            return address_base64;
         }
 
         slice
@@ -132,7 +148,7 @@ impl FormatterContext {
     }
 
     fn arc_cell_to_addr(slice: &ArcCell) -> Option<IntAddr> {
-        let cell = Boc::decode_hex(slice.to_boc_hex(false).ok()?).ok()?;
+        let cell = Boc::decode(slice.to_boc(false).ok()?).ok()?;
         let mut slice = cell.as_slice().ok()?;
         let addr = IntAddr::load_from(&mut slice);
         addr.ok()
@@ -167,8 +183,8 @@ impl FormatterContext {
                         TupleItem::Tuple(out_messages),
                         TupleItem::Tuple(externals),
                     ) => {
-                        let result = tx.to_boc_b64(false).ok()?;
-                        let tx_cell: Cell = Boc::decode_base64(&result).ok()?;
+                        let result = tx.to_boc(false).ok()?;
+                        let tx_cell: Cell = Boc::decode(&result).ok()?;
                         let tx = tx_cell.parse::<Transaction>().ok()?;
                         Some(SendResult {
                             tx,
@@ -196,8 +212,8 @@ impl FormatterContext {
                                 .iter()
                                 .filter_map(|ext| match ext {
                                     TupleItem::Cell(cell) => {
-                                        let boc = cell.to_boc_b64(false).ok()?;
-                                        let cell = Boc::decode_base64(&boc).ok()?;
+                                        let boc = cell.to_boc(false).ok()?;
+                                        let cell = Boc::decode(&boc).ok()?;
                                         Some(cell)
                                     }
                                     _ => None,
@@ -573,11 +589,11 @@ impl FormatterContext {
                         && let Ok(Some(in_msg)) = &in_msg
                         && let MsgInfo::Int(info) = &in_msg.info
                     {
-                        let code = account_code(&self.accounts, info.dst.to_string());
+                        let code = Self::account_code(&self.accounts, info.dst.to_string());
                         let result = self.build_cache.result_for_code(&code);
 
                         if let Some(result) = result {
-                            let info = retrace::find_exception_info(&logs, &result.1.source_map);
+                            let info = retrace::find_exception_info(logs, &result.1.source_map);
                             if let Some(info) = info
                                 && let Some(loc) = info.loc
                             {
@@ -668,7 +684,7 @@ impl FormatterContext {
                     // Trying to collect installed and executed out actions
                     let vm_logs = self.emulations.find_tx_logs(tx.lt);
                     let installed_actions = if let Some(vm_logs) = vm_logs {
-                        retrace::find_installed_actions(&vm_logs)
+                        retrace::find_installed_actions(vm_logs)
                     } else {
                         InstalledActions::empty()
                     };
@@ -686,7 +702,7 @@ impl FormatterContext {
                             child_prefix,
                             tx,
                             installed_actions,
-                            &logs,
+                            logs,
                             contract_letters,
                         );
                         extra_infos.push(actions);
@@ -768,7 +784,7 @@ impl FormatterContext {
         logs: &str,
         contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
-        let actions = retrace::extract_actions_from_executor_logs(logs);
+        let actions = retrace::ExecutedActions::from(logs).actions;
 
         if actions.is_empty() {
             return String::new();
@@ -793,7 +809,7 @@ impl FormatterContext {
                         };
 
                         (
-                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset),
+                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset as i32),
                             formated,
                         )
                     } else {
@@ -817,7 +833,7 @@ impl FormatterContext {
                     let reserve_action = installed_actions.find_reserve(*mode, reserve);
 
                     let loc = if let Some(action) = reserve_action {
-                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
+                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset as i32)
                     } else {
                         None
                     };
@@ -890,7 +906,7 @@ impl FormatterContext {
     ) -> Option<SourceLocation> {
         let in_msg = tx.load_in_msg().ok()??;
         if let MsgInfo::Int(info) = &in_msg.info {
-            let code = account_code(&self.accounts, info.dst.to_string());
+            let code = Self::account_code(&self.accounts, info.dst.to_string());
             let result = self.build_cache.result_for_code(&code);
 
             if let Some(result) = result {
@@ -932,44 +948,42 @@ impl FormatterContext {
         }
     }
 
-    /// Extract opcode from message body
     fn extract_opcode(&self, in_msg: &RelaxedMessage) -> u32 {
         let mut body = in_msg.body;
+        let bounced = match &in_msg.info {
+            RelaxedMsgInfo::Int(info) => info.bounced,
+            RelaxedMsgInfo::ExtOut(_) => false,
+        };
         let mut opcode = body.load_u32().unwrap_or(0);
-        if opcode == 0xFFFFFFFF {
-            // if bounce read another 32 bit to get actual opcode
+        if bounced {
+            // if bounced read another 32 bit to get the actual opcode
             opcode = body.load_u32().unwrap_or(0);
         }
         opcode
     }
 
-    /// Get message name from opcode
     fn get_message_name(&self, opcode: u32) -> String {
-        let message_abi = self
-            .contract_abi
-            .messages
-            .iter()
-            .find(|msg| msg.opcode != Some(0) && msg.opcode == Some(opcode));
-
-        if let Some(message_abi) = message_abi {
-            message_abi.name.as_str().purple().bold().to_string()
+        let message_abi = self.contract_abi.find_type_by_opcode(&BigInt::from(opcode));
+        let name = if let Some(message_abi) = &message_abi {
+            message_abi.name.as_str()
         } else if opcode == 0 {
-            "empty".purple().bold().to_string()
+            "empty"
         } else {
-            format!("0x{opcode:x}").purple().bold().to_string()
-        }
+            &format!("0x{opcode:x}")
+        };
+
+        name.purple().bold().to_string()
     }
 
-    /// Get contract type for address
     fn get_contract_type(&self, addr: &IntAddr) -> Option<String> {
         let known_address = self
             .known_addresses
             .addresses
             .iter()
-            .find(|(address, _info)| address.to_string() == addr.to_string());
+            .find(|(address, _)| address.to_string() == addr.to_string());
 
-        if let Some(known_address) = known_address {
-            return Some(known_address.1.name.clone());
+        if let Some((_, known_address)) = known_address {
+            return Some(known_address.name.clone());
         }
 
         if let Some(account) = self.accounts.get(&addr.to_string()) {
@@ -1050,7 +1064,7 @@ impl FormatterContext {
                     return self.format_transaction_list(items);
                 }
 
-                let abi = self.contract_abi.find_type(type_name);
+                let abi = self.contract_abi.find_any_type(type_name);
 
                 // Format structure as Foo { ... }
                 if let Some(struct_desc) = abi {
@@ -1069,10 +1083,10 @@ impl FormatterContext {
                 if let TupleItem::Int(value) = &items[0]
                     && type_name == "bool"
                 {
-                    return if value == &num_bigint::BigInt::from(0) {
-                        "false".to_string()
-                    } else if value == &num_bigint::BigInt::from(18446744073709551615u64) {
-                        "true".to_string()
+                    return if value == &BigInt::from(0) {
+                        "false".to_owned()
+                    } else if value == &BigInt::from(-1) {
+                        "true".to_owned()
                     } else {
                         format!("{value}")
                     };
@@ -1086,7 +1100,7 @@ impl FormatterContext {
             }
             TupleItem::Slice(cell) => {
                 if cell.bit_len() == 0 && cell.references().is_empty() {
-                    return "empty slice".to_string();
+                    return "empty slice".to_owned();
                 }
 
                 if let Some(string) = Tuple::parse_snake_string(cell) {
@@ -1096,24 +1110,21 @@ impl FormatterContext {
                 self.format_slice(cell)
             }
             TupleItem::Int(value) => {
-                if *value == BigInt::from(18446744073709551615u64) {
-                    return "-1".to_string();
-                }
                 format!("{value}")
             }
-            TupleItem::Null => "null".to_string(),
-            TupleItem::Nan => "NaN".to_string(),
+            TupleItem::Null => "null".to_owned(),
+            TupleItem::Nan => "NaN".to_owned(),
             TupleItem::Cell(cell) => cell
                 .to_boc_hex(false)
-                .unwrap_or("<invalid cell>".to_string()),
+                .unwrap_or("<invalid cell>".to_owned()),
             TupleItem::Builder(cell) => cell
                 .to_boc_hex(false)
-                .unwrap_or("<invalid builder>".to_string()),
+                .unwrap_or("<invalid builder>".to_owned()),
             TupleItem::Tuple(items) => {
                 if items.len() == 1 {
                     return self.format(&items[0]);
                 }
-                let mut res = "".to_string();
+                let mut res = "".to_owned();
                 write!(res, "(").ok();
                 for (i, item) in items.iter().enumerate() {
                     if i > 0 {
@@ -1139,7 +1150,7 @@ impl FormatterContext {
 
         for (i, field) in struct_desc.fields.iter().enumerate() {
             let field_type = field.type_info.human_readable.clone();
-            let field_value = if let Some(abi) = self.contract_abi.find_type(&field_type) {
+            let field_value = if let Some(abi) = self.contract_abi.find_any_type(&field_type) {
                 let result = self.format_structure(abi, level, items);
                 Self::add_indent_to_lines_except_first(result.as_str(), (level + 1) * 4)
             } else if let Some(field_value) = items.pop_front() {
@@ -1265,7 +1276,7 @@ impl FormatterContext {
             );
         }
 
-        let abi = self.contract_abi.find_type(&left_type.to_string());
+        let abi = self.contract_abi.find_any_type(&left_type.to_string());
         if let Some(struct_desc) = abi {
             if left_items.len() == struct_desc.fields.len() {
                 let mut result = format!("{left_type} {{\n");
@@ -1400,7 +1411,7 @@ impl FormatterContext {
     ) -> Vec<String> {
         let mut params = vec![];
         if let Some(opcode) = assert_failure.params.opcode {
-            let opcode_type = abi.find_type_by_opcode(BigInt::from(opcode));
+            let opcode_type = abi.find_type_by_opcode(&BigInt::from(opcode));
             params.push(format!(
                 "  opcode={} {}",
                 format!("0x{opcode:x}").green(),
@@ -1419,6 +1430,16 @@ impl FormatterContext {
             params.push(format!(
                 "  bounced={}",
                 if bounced {
+                    "true".green().to_string()
+                } else {
+                    "false".red().to_string()
+                }
+            ))
+        }
+        if let Some(bounce) = assert_failure.params.bounce {
+            params.push(format!(
+                "  bounce={}",
+                if bounce {
                     "true".green().to_string()
                 } else {
                     "false".red().to_string()
@@ -1465,6 +1486,9 @@ impl FormatterContext {
                 }
             ))
         }
+        if let Some(body) = &assert_failure.params.body {
+            params.push(format!("  body={}", Boc::encode_hex(body)))
+        }
         params
     }
 
@@ -1474,5 +1498,23 @@ impl FormatterContext {
             .replace("<expected>", &"expected".green().to_string());
 
         result.to_string()
+    }
+
+    pub fn format_exit_code(code: i32) -> String {
+        if let Some(info) = get_exit_code_info(code as i64) {
+            return info.name.to_owned();
+        }
+
+        code.to_string()
+    }
+
+    pub fn account_code(accounts: &HashMap<String, ShardAccount>, addr: String) -> Option<Cell> {
+        let account = accounts.get(&addr);
+        let state = account?.account.load().ok()?.0?.state;
+        match state {
+            AccountState::Uninit => None,
+            AccountState::Active(state) => state.code,
+            AccountState::Frozen(_) => None,
+        }
     }
 }

@@ -1,0 +1,609 @@
+---
+title: "expect"
+description: "expect.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Module for high-level assertion API.
+
+This module provides a fluent "expect" style API for writing test assertions.
+It wraps the lower-level `Assert` functions and provides a more readable syntax.
+It supports a wide range of types including integers, booleans, slices, addresses, tuples, maps, and optionals.
+
+Examples:
+```tolk
+// Simple value check
+expect(total).toEqual(100);
+
+// Comparison
+expect(balance).toBeGreater(ton("1.0"));
+
+// Approximate check (useful for gas calculations)
+expect(gasUsed).toBeApproxEqRel(expectedGas, 10); // within 10%
+
+// Map check
+expect(balances).toContainKey(userAddress);
+expect(balances.get(userAddress)).toEqual(ton("50"));
+```
+
+## Definitions
+
+## `Expectation`
+
+```tolk
+struct Expectation<T> {
+    /// The value to be expected.
+    private value: T
+    /// The type of the value to be expected.
+    private value_type: slice
+    /// The location of the expectation to be printed in the error message.
+    /// This field is set by the test framework and should not be set manually.
+    private location: slice = ""
+}
+```
+
+Internal struct to represent an expectation for a value.
+
+Don't use this struct directly. Use the `expect` function instead.
+
+Example:
+```tolk
+expect(10).toEqual(10);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L36" />
+
+## `Expectation<T>.create`
+
+```tolk
+fun Expectation<T>.create(value: T, value_type: slice, location: slice = "")
+```
+
+Internal function to create a new expectation for the given value.
+
+Don't use this function directly. Use the `expect` function instead.
+
+Example:
+```tolk
+expect(10).toEqual(10);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L54" />
+
+## `Expectation<T>.toEqual`
+
+```tolk
+fun Expectation<T>.toEqual<U>(self, expected: U)
+```
+
+Asserts that actual value is equal to expected value.
+
+Example:
+```tolk
+expect(10).toEqual(10);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L68" />
+
+## `Expectation<T>.toNotEqual`
+
+```tolk
+fun Expectation<T>.toNotEqual<U>(self, expected: U)
+```
+
+Asserts that actual value is not equal to expected value.
+
+Example:
+```tolk
+expect(10).toNotEqual(20);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L78" />
+
+## `Expectation<T>.toBeLess`
+
+```tolk
+fun Expectation<T>.toBeLess<U>(self, expected: U)
+```
+
+Asserts that actual value is less than expected value.
+
+Example:
+```tolk
+expect(5).toBeLess(10);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L88" />
+
+## `Expectation<T>.toBeGreater`
+
+```tolk
+fun Expectation<T>.toBeGreater<U>(self, expected: U)
+```
+
+Asserts that actual value is greater than expected value.
+
+Example:
+```tolk
+expect(10).toBeGreater(5);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L104" />
+
+## `Expectation<T>.toBeLessOrEqual`
+
+```tolk
+fun Expectation<T>.toBeLessOrEqual<U>(self, expected: U)
+```
+
+Asserts that actual value is less than or equal to expected value.
+
+Example:
+```tolk
+expect(5).toBeLessOrEqual(10);
+expect(10).toBeLessOrEqual(10);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L121" />
+
+## `Expectation<T>.toBeGreaterOrEqual`
+
+```tolk
+fun Expectation<T>.toBeGreaterOrEqual<U>(self, expected: U)
+```
+
+Asserts that actual value is greater than or equal to expected value.
+
+Example:
+```tolk
+expect(10).toBeGreaterOrEqual(5);
+expect(10).toBeGreaterOrEqual(10);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L138" />
+
+## `Expectation<int>.toBeApproxEqAbs`
+
+```tolk
+fun Expectation<int>.toBeApproxEqAbs(self, expected: int, max_delta: int)
+```
+
+Asserts that actual value is approximately equal to expected value using absolute difference.
+
+Example:
+```tolk
+expect(10).toBeApproxEqAbs(15, 10); // ok, difference is 5, which is less than maximum allowed difference of 10
+expect(10).toBeApproxEqAbs(20, 5); // error, difference is 10, which is greater than maximum allowed difference of 5
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L155" />
+
+## `Expectation<int>.toBeApproxEqRel`
+
+```tolk
+fun Expectation<int>.toBeApproxEqRel(self, expected: int, max_delta: int)
+```
+
+Asserts that actual value is approximately equal to expected value using difference in percentage.
+
+Example:
+```tolk
+expect(10).toBeApproxEqRel(15, 60); // ok, difference is 50%, which is less than maximum allowed difference of 60%
+expect(10).toBeApproxEqRel(20, 50); // error, difference is 100%, which is greater than maximum allowed difference of 50%
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L179" />
+
+## `Expectation<T?>.toBeNull`
+
+```tolk
+fun Expectation<T?>.toBeNull(self)
+```
+
+Asserts that actual value is null.
+
+Example:
+```tolk
+expect(null).toBeNull();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L203" />
+
+## `Expectation<T?>.toBeNotNull`
+
+```tolk
+fun Expectation<T?>.toBeNotNull(self)
+```
+
+Asserts that actual value is not null.
+
+Example:
+```tolk
+expect(null).toBeNotNull();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L213" />
+
+## `Expectation<Maybe<T>>.toBeDefined`
+
+```tolk
+fun Expectation<Maybe<T>>.toBeDefined(self)
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L217" />
+
+## `Expectation<Maybe<T>>.toBeNone`
+
+```tolk
+fun Expectation<Maybe<T>>.toBeNone(self)
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L222" />
+
+## `Expectation<slice>.toBeNonEmpty`
+
+```tolk
+fun Expectation<slice>.toBeNonEmpty(self)
+```
+
+Asserts that actual value is not empty.
+
+Example:
+```tolk
+expect("").toBeNonEmpty();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L234" />
+
+## `Expectation<slice>.toBeEmpty`
+
+```tolk
+fun Expectation<slice>.toBeEmpty(self)
+```
+
+Asserts that actual value is empty.
+
+Example:
+```tolk
+expect("").toBeEmpty();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L244" />
+
+## `Expectation<int>.toBeNaN`
+
+```tolk
+fun Expectation<int>.toBeNaN(self)
+```
+
+Asserts that actual value is NaN.
+
+Example:
+```tolk
+expect(nan()).toBeNaN();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L254" />
+
+## `Expectation<int>.toBeNonNaN`
+
+```tolk
+fun Expectation<int>.toBeNonNaN(self)
+```
+
+Asserts that actual value is not NaN.
+
+Example:
+```tolk
+expect(nan()).toBeNonNaN();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L264" />
+
+## `Expectation<bool>.toBeTrue`
+
+```tolk
+fun Expectation<bool>.toBeTrue(self)
+```
+
+Asserts that actual value is true.
+
+Example:
+```tolk
+expect(true).toBeTrue();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L274" />
+
+## `Expectation<bool>.toBeFalse`
+
+```tolk
+fun Expectation<bool>.toBeFalse(self)
+```
+
+Asserts that actual value is false.
+
+Example:
+```tolk
+expect(false).toBeFalse();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L284" />
+
+## `Expectation<any_address>.toBeInternalAddress`
+
+```tolk
+fun Expectation<any_address>.toBeInternalAddress(self)
+```
+
+Asserts that actual address is internal.
+
+Example:
+```tolk
+expect(addr).toBeInternalAddress();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L294" />
+
+## `Expectation<any_address>.toBeNoneAddress`
+
+```tolk
+fun Expectation<any_address>.toBeNoneAddress(self)
+```
+
+Asserts that actual address is none.
+
+Example:
+```tolk
+expect(addr).toBeNoneAddress();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L306" />
+
+## `Expectation<any_address>.toBeExternalAddress`
+
+```tolk
+fun Expectation<any_address>.toBeExternalAddress(self)
+```
+
+Asserts that actual address is external.
+
+Example:
+```tolk
+expect(addr).toBeExternalAddress();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L318" />
+
+## `Expectation<tuple>.toContain`
+
+```tolk
+fun Expectation<tuple>.toContain<U>(self, expected: U)
+```
+
+Asserts that actual value represeneted as tuple contains the expected value.
+
+Example:
+```tolk
+var tuple = createEmptyTuple();
+tuple.push(1);
+tuple.push(2);
+tuple.push(3);
+expect(tuple).toContain(2);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L334" />
+
+## `Expectation<tuple>.toNotContain`
+
+```tolk
+fun Expectation<tuple>.toNotContain<U>(self, expected: U)
+```
+
+Asserts that actual value represeneted as tuple does not contain the expected value.
+
+Example:
+```tolk
+var tuple = createEmptyTuple();
+tuple.push(1);
+tuple.push(2);
+tuple.push(3);
+expect(tuple).toNotContain(4);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L356" />
+
+## `Expectation<tuple>.toHaveLength`
+
+```tolk
+fun Expectation<tuple>.toHaveLength(self, length: int)
+```
+
+Asserts that actual value represeneted as tuple has the expected length.
+
+Example:
+```tolk
+var tuple = createEmptyTuple();
+tuple.push(1);
+tuple.push(2);
+tuple.push(3);
+expect(tuple).toHaveLength(3);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L377" />
+
+## `Expectation<map<K, V>>.toContainKey`
+
+```tolk
+fun Expectation<map<K, V>>.toContainKey(self, key: K)
+```
+
+Asserts that actual value represeneted as map contains the expected key.
+
+Example:
+```tolk
+var map = createEmptyMap<int32, int32>();
+map.set(1, 2);
+map.set(2, 3);
+expect(map).toContainKey(2);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L390" />
+
+## `Expectation<map<K, V>>.toNotContainKey`
+
+```tolk
+fun Expectation<map<K, V>>.toNotContainKey(self, key: K)
+```
+
+Asserts that actual value represeneted as map does NOT contain the expected key.
+
+Example:
+```tolk
+var map = createEmptyMap<int32, int32>();
+map.set(1, 2);
+map.set(2, 3);
+expect(map).toNotContainKey(4);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L406" />
+
+## `Expectation<map<K, V>>.toContainValue`
+
+```tolk
+fun Expectation<map<K, V>>.toContainValue(self, value: V)
+```
+
+Asserts that actual value represeneted as map contains the expected value.
+
+Example:
+```tolk
+var map = createEmptyMap<int32, int32>();
+map.set(1, 2);
+map.set(2, 3);
+expect(map).toContainValue(2);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L422" />
+
+## `Expectation<map<K, V>>.toNotContainValue`
+
+```tolk
+fun Expectation<map<K, V>>.toNotContainValue(self, value: V)
+```
+
+Asserts that actual value represeneted as map does NOT contain the expected value.
+
+Example:
+```tolk
+var map = createEmptyMap<int32, int32>();
+map.set(1, 2);
+map.set(2, 3);
+expect(map).toNotContainValue(4);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L444" />
+
+## `Expectation<map<K, V>>.toBeEmpty`
+
+```tolk
+fun Expectation<map<K, V>>.toBeEmpty(self)
+```
+
+Asserts that actual value represeneted as map is empty.
+
+Example:
+```tolk
+var map = createEmptyMap<int32, int32>();
+expect(map).toBeEmpty();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L462" />
+
+## `Expectation<map<K, V>>.toBeNonEmpty`
+
+```tolk
+fun Expectation<map<K, V>>.toBeNonEmpty(self)
+```
+
+Asserts that actual value represeneted as map is not empty.
+
+Example:
+```tolk
+var map = createEmptyMap<int32, int32>();
+map.set(1, 2);
+map.set(2, 3);
+expect(map).toBeNonEmpty();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L477" />
+
+## `Expectation<map<K, V>>.toHaveLength`
+
+```tolk
+fun Expectation<map<K, V>>.toHaveLength(self, length: int)
+```
+
+Asserts that actual value represeneted as map has the expected length.
+
+Example:
+```tolk
+var map = createEmptyMap<int32, int32>();
+map.set(1, 2);
+map.set(2, 3);
+expect(map).toHaveLength(2);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L492" />
+
+## `expect`
+
+```tolk
+fun expect<T>(value: T, location: slice = "")
+```
+
+Creates a new expectation for the given value.
+
+After creation, the expectation can be used to assert the value.
+
+For example:
+```tolk
+expect(10).toEqual(10);
+```
+
+Optional location can be provided to specify the location of the expectation to
+be printed in the error message. You likely don't want to set this manually,
+as the location will be automatically set by the test framework.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L515" />
+
+## `expectToEndWithExitCode`
+
+```tolk
+fun expectToEndWithExitCode(code: int): void
+    asm "102 EXTCALL"
+```
+
+Sets the expected exit code for the test.
+
+Example:
+```tolk
+expectToEndWithExitCode(10);
+throw 10; // Test will end with exit code 10 and be considered as passed
+```
+
+Alternatively, you can use `@custom({ fail_with: 10 })` annotation to set
+the expected exit code for the whole test.
+
+```tolk
+@custom({ fail_with: 10 })
+get fun test_fail_with() {
+    throw 10; // ok
+}
+```
+
+This function is more flexible and can be used conditionally in the test.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L538" />
+

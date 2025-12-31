@@ -3,12 +3,15 @@
 //! ## Example
 //!
 //! ```
-//! let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
+//! use std::path::Path;
+//!
+//! let tmp_test_filename = "file.tolk";
+//! let compilation_result = tolkc::compile(Path::new(&tmp_test_filename), false);
 //! match compilation_result {
-//!     tolkc::CompilerInternalResult::Success(result) => {
+//!     tolkc::CompilerResult::Success(result) => {
 //!         // ... use result.code_boc64
 //!     }
-//!     tolkc::CompilerInternalResult::Error(error) => {
+//!     tolkc::CompilerResult::Error(error) => {
 //!         eprintln!("Cannot compile test file {}", error.message); // :(
 //!     }
 //! }

@@ -1,0 +1,108 @@
+---
+title: "Creating projects"
+description: "Learn how to initialize new Acton projects using the new command"
+---
+
+import { File, Folder, Files } from 'fumadocs-ui/components/files';
+
+The `new` command initializes a new Tolk project. It sets up the directory structure, configuration files, and standard libraries required for development. You can choose from various templates to get started quickly.
+
+## Basic Usage
+
+```bash
+acton new <PATH>
+```
+
+This command creates a new project in the specified directory. If the directory does not exist, it will be created.
+
+## Command Options
+
+| Option               | Type   | Description                                                           |
+|----------------------|--------|-----------------------------------------------------------------------|
+| `<PATH>`             | String | Directory to create the project in (use `.` for current directory)    |
+| `--name <NAME>`      | String | Project name (defaults to directory name)                             |
+| `--desc <DESC>`      | String | Project description                                                   |
+| `--template <NAME>`  | String | Project template to use (empty, counter, jetton)                      |
+| `--license <LICENSE>`| String | Project license (MIT, Apache-2.0, etc.)                               |
+
+## Interactive Mode
+
+If you run `acton new` without providing all optional flags, it will launch an interactive wizard to guide you through the setup process.
+
+```bash
+$ acton new my-project
+? Project name: my-project
+? Description: A TON blockchain project
+? Template: counter
+? License: MIT
+```
+
+## Examples
+
+### Interactive creation
+
+```bash
+# Create project in a new directory 'my-token'
+acton new my-token
+
+# Initialize project in current directory
+acton new .
+```
+
+### Non-interactive creation
+
+You can skip prompts by providing all necessary flags:
+
+```bash
+# Create a minimal project
+acton new my-project --template empty --license MIT
+
+# Create a Jetton project with description
+acton new token-project --template jetton --desc "My Awesome Token"
+```
+
+## Templates
+
+Acton provides several built-in templates:
+
+| Template | Description |
+|----------|-------------|
+| `empty`  | Minimal structure with a single empty contract. Best for experienced users. |
+| `counter`| Simple counter contract with tests and deployment script. Good for learning. |
+| `jetton` | Complete Jetton (token) implementation with Minter and Wallet contracts. |
+
+## Project Structure
+
+A newly created project contains the following structure:
+
+<Files>
+  <Folder name=".acton" defaultOpen>
+    <File name="tolk-stdlib/" />
+    <File name="..." />
+  </Folder>
+  <Folder name="contracts" defaultOpen>
+    <File name="contract.tolk" />
+  </Folder>
+  <Folder name="scripts" defaultOpen>
+    <File name="deploy.tolk" />
+  </Folder>
+  <Folder name="tests" defaultOpen>
+    <File name="contract.test.tolk" />
+  </Folder>
+  <File name="Acton.toml" />
+  <File name="LICENSE" />
+  <File name=".gitignore" />
+</Files>
+
+- **`.acton/`**: Standard libraries and internal files
+- **`contracts/`**: Smart contract source files
+- **`scripts/`**: Deployment and utility scripts
+- **`tests/`**: Test files
+- **`Acton.toml`**: Project configuration
+- **`LICENSE`**: License file
+- **`.gitignore`**: Git configuration
+
+## Learn More
+
+- [Project Initialization Guide](/docs/init-project/) — Detailed walkthrough of project creation
+- [Project Configuration](/docs/build-system/configuration-reference/) — Learn about `Acton.toml`

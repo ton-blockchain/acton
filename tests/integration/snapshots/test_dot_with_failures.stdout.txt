@@ -6,7 +6,7 @@
 xx
 
 FAIL test-should-increase-counter: expect(<actual>).toHaveSuccessfulTx(<expected>)
-  ./tests/counter_test[LINE]
+  ./tests/counter.test[LINE]
 
 FAIL test-should-reset-counter: expect(<actual>).toHaveSuccessfulTx(<expected>)
-  ./tests/counter_test[LINE]
+  ./tests/counter.test[LINE]

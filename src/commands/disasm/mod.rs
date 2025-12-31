@@ -1,12 +1,16 @@
-use emulator::remote;
+use crate::commands::common::error_fmt;
+use anyhow::anyhow;
+use owo_colors::OwoColorize;
 use std::fs;
+use std::path::Path;
 use tasm::decompile::Disassembler;
 use tasm::printer::FormatOptions;
 use tasm::types::Instruction;
+use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
 use tycho_types::cell::HashBytes;
 
-mod toncenter;
+mod remote;
 
 #[allow(clippy::too_many_arguments)]
 pub fn disasm_cmd(
@@ -19,16 +23,46 @@ pub fn disasm_cmd(
     net: String,
     follow_libraries: bool,
 ) -> anyhow::Result<()> {
+    if boc_file.is_some() && boc_string.is_some() {
+        anyhow::bail!(color_print::cformat!(
+            "Cannot provide both <yellow>--string</>/<yellow>-s</> and <yellow>BOC_FILE</> argument"
+        ));
+    }
+
     let boc_data = if let Some(string) = boc_string {
         string
-    } else if let Some(file_path) = boc_file {
-        let binary_data = fs::read(&file_path)?;
-        hex::encode(binary_data)
+    } else if let Some(path) = boc_file {
+        if !fs::exists(&path).unwrap_or(false) {
+            anyhow::bail!(error_fmt::file_not_found(&path));
+        }
+
+        let metadata = fs::metadata(&path).map_err(|err| {
+            anyhow!(color_print::cformat!(
+                "Cannot access <yellow>{path}</>: {err}"
+            ))
+        })?;
+        if !metadata.is_file() {
+            anyhow::bail!("{} is not a file", path.yellow());
+        }
+
+        // BoC file can be binary file or file with hex/base64 encoded data
+        let binary_data = fs::read(&path).map_err(|err| {
+            anyhow!(color_print::cformat!(
+                "Cannot access <yellow>{path}</>: {err}"
+            ))
+        })?;
+        if let Ok(cell) = Boc::decode_base64(binary_data.trim_ascii()) {
+            Boc::encode_hex(cell)
+        } else if let Ok(cell) = Boc::decode_hex(binary_data.trim_ascii()) {
+            Boc::encode_hex(cell)
+        } else {
+            hex::encode(binary_data)
+        }
     } else if let Some(addr) = address {
-        toncenter::fetch_contract_boc(&addr, api_key.as_deref())?
+        remote::fetch_contract_boc(&addr, api_key.as_deref())?
     } else {
-        return Err(anyhow::anyhow!(
-            "Either --string/-s, --address or boc_file must be provided"
+        anyhow::bail!(color_print::cformat!(
+            "Either <yellow>--string</>/<yellow>-s</>, <yellow>--address</> or <yellow>BOC_FILE</> argument must be provided, run with <yellow>--help</> for more information"
         ));
     };
 
@@ -38,10 +72,11 @@ pub fn disasm_cmd(
         cell
     } else {
         return Err(anyhow::anyhow!(
-            "Failed to decode BOC data as hex or base64"
+            "Failed to decode BoC data as hex or base64"
         ));
     };
 
+    let network = Network::from_str(&net)?;
     let disassembler = Disassembler::new();
     let mut final_cell = cell;
 
@@ -55,7 +90,8 @@ pub fn disasm_cmd(
         if instructions.len() == 1
             && let Some(lib_hash) = extract_library_hash_from_instruction(&instructions[0])
         {
-            match remote::get_library_by_hash(&net, &lib_hash.to_string(), api_key.clone()) {
+            let client = TonApiClient::new(network, api_key.map(|s| s.to_string()));
+            match client.get_library_by_hash(&lib_hash.to_string()) {
                 Ok(lib_cell) => {
                     final_cell = lib_cell;
                 }
@@ -71,6 +107,17 @@ pub fn disasm_cmd(
     let output = code.print(&opts);
 
     if let Some(output_path) = output_file {
+        // Create parent directories if they don't exist
+        if let Some(parent_dir) = Path::new(&output_path).parent()
+            && let Err(err) = fs::create_dir_all(parent_dir)
+        {
+            anyhow::bail!(
+                "Failed to create output directory {}: {}",
+                parent_dir.display(),
+                err
+            );
+        }
+
         fs::write(&output_path, &output)?;
         println!("Disassembled code written to {output_path}");
     } else {

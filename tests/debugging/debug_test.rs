@@ -21,11 +21,12 @@ fun main() {
         executor.step_in()?;
         executor.step_in()?;
         executor.step_in()?;
+        executor.step_in()?;
         Ok(())
     })?;
 
     let debug_output = DebugTestOutput::new(result);
-    debug_output.assert_trace_steps(5);
+    debug_output.assert_trace_steps(6);
     debug_output.assert_trace_snapshot_matches(
         "debugging/snapshots/test_simple_step_by_step_execution.trace.txt",
     );

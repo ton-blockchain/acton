@@ -1,0 +1,11 @@
+[WALLET_CREATED_ADDED]
+✓ [WALLET_ADDRESS]
+
+NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
+
+To get testnet coins, check official documentation: https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
+
+SECURITY WARNING:
+[SECURITY_WARNING_MNEMONIC]
+  - Do NOT commit this file to version control (already added to .gitignore)
+  - Keep your mnemonic safe and secret

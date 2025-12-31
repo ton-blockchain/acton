@@ -1,0 +1,1 @@
+Error: Test file must end with .test.tolk

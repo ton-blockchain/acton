@@ -1,14 +1,19 @@
 use crate::context::Context;
-use emulator::traits::BaseExecutor;
-use emulator::{extension, pop_args, register_ext_methods};
+use emulator::{extension, register_ext_methods};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use ton_executor::BaseExecutor;
 use tvmffi::from_stack::FromStack;
 use tvmffi::stack::{Tuple, TupleItem};
 
 extension!(println in (Context) with (s: TupleItem, type_name: String) using println_impl);
-fn println_impl(ctx: &mut Context, _stack: &mut Tuple, arg: TupleItem, type_name: String) {
+fn println_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    arg: TupleItem,
+    type_name: String,
+) -> anyhow::Result<()> {
     let typed_arg = arg.unwrap_single().to_typed(&type_name);
 
     let formatter = crate::formatter::FormatterContext::from_context(ctx);
@@ -20,23 +25,32 @@ fn println_impl(ctx: &mut Context, _stack: &mut Tuple, arg: TupleItem, type_name
     } else {
         println!("{formatted}");
     }
+    Ok(())
 }
 
 extension!(eprintln in (Context) with (s: String) using eprintln_impl);
-fn eprintln_impl(ctx: &mut Context, _stack: &mut Tuple, s: String) {
+fn eprintln_impl(ctx: &mut Context, _stack: &mut Tuple, s: String) -> anyhow::Result<()> {
     if ctx.io.capture_output {
         ctx.io.stderr_buffer.push_str(&s);
         ctx.io.stderr_buffer.push('\n');
     } else {
         eprintln!("{s}");
     }
+    Ok(())
 }
 
 extension!(format1 in (Context) with (arg1: TupleItem, type1: String, fmt: String) using format1_impl);
-fn format1_impl(ctx: &mut Context, stack: &mut Tuple, arg1: TupleItem, type1: String, fmt: String) {
+fn format1_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    arg1: TupleItem,
+    type1: String,
+    fmt: String,
+) -> anyhow::Result<()> {
     let args = vec![(type1, arg1)];
     let result = format_args(ctx, fmt, args);
-    stack.push_string(&result)
+    stack.push_string(&result);
+    Ok(())
 }
 
 extension!(format2 in (Context) with (arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format2_impl);
@@ -48,10 +62,11 @@ fn format2_impl(
     arg1: TupleItem,
     type1: String,
     fmt: String,
-) {
+) -> anyhow::Result<()> {
     let args = vec![(type1, arg1), (type2, arg2)];
     let result = format_args(ctx, fmt, args);
-    stack.push_string(&result)
+    stack.push_string(&result);
+    Ok(())
 }
 
 extension!(format3 in (Context) with (arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format3_impl);
@@ -66,10 +81,11 @@ fn format3_impl(
     arg1: TupleItem,
     type1: String,
     fmt: String,
-) {
+) -> anyhow::Result<()> {
     let args = vec![(type1, arg1), (type2, arg2), (type3, arg3)];
     let result = format_args(ctx, fmt, args);
-    stack.push_string(&result)
+    stack.push_string(&result);
+    Ok(())
 }
 
 extension!(format4 in (Context) with (arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format4_impl);
@@ -86,10 +102,11 @@ fn format4_impl(
     arg1: TupleItem,
     type1: String,
     fmt: String,
-) {
+) -> anyhow::Result<()> {
     let args = vec![(type1, arg1), (type2, arg2), (type3, arg3), (type4, arg4)];
     let result = format_args(ctx, fmt, args);
-    stack.push_string(&result)
+    stack.push_string(&result);
+    Ok(())
 }
 
 extension!(format5 in (Context) with (arg5: TupleItem, type5: String, arg4: TupleItem, type4: String, arg3: TupleItem, type3: String, arg2: TupleItem, type2: String, arg1: TupleItem, type1: String, fmt: String) using format5_impl);
@@ -108,7 +125,7 @@ fn format5_impl(
     arg1: TupleItem,
     type1: String,
     fmt: String,
-) {
+) -> anyhow::Result<()> {
     let args = vec![
         (type1, arg1),
         (type2, arg2),
@@ -117,7 +134,8 @@ fn format5_impl(
         (type5, arg5),
     ];
     let result = format_args(ctx, fmt, args);
-    stack.push_string(&result)
+    stack.push_string(&result);
+    Ok(())
 }
 
 fn format_args(ctx: &mut Context, mut fmt: String, args: Vec<(String, TupleItem)>) -> String {
@@ -166,20 +184,31 @@ fn strip_quotes(formatted: String) -> String {
 }
 
 extension!(prompt in (Context) with (placeholder: String, message: String) using prompt_impl);
-fn prompt_impl(_ctx: &mut Context, stack: &mut Tuple, placeholder: String, message: String) {
+fn prompt_impl(
+    _ctx: &mut Context,
+    stack: &mut Tuple,
+    placeholder: String,
+    message: String,
+) -> anyhow::Result<()> {
     let text = Text::new(&message)
         .with_placeholder(&placeholder)
         .prompt()
         .unwrap_or("".to_string());
 
     stack.push_string(&text);
+    Ok(())
 }
 
 extension!(select in (Context) with (variants: TupleItem, message: String) using select_impl);
-fn select_impl(_ctx: &mut Context, stack: &mut Tuple, variants: TupleItem, message: String) {
+fn select_impl(
+    _ctx: &mut Context,
+    stack: &mut Tuple,
+    variants: TupleItem,
+    message: String,
+) -> anyhow::Result<()> {
     let TupleItem::Tuple(raw_variants) = variants else {
         stack.push_string("");
-        return;
+        return Ok(());
     };
 
     let variants = raw_variants
@@ -196,6 +225,7 @@ fn select_impl(_ctx: &mut Context, stack: &mut Tuple, variants: TupleItem, messa
         .unwrap_or("".to_string());
 
     stack.push_string(&result);
+    Ok(())
 }
 
 extension!(confirm in (Context) with (help_message: String, default: BigInt, message: String) using confirm_impl);
@@ -205,7 +235,7 @@ fn confirm_impl(
     help_message: String,
     default: BigInt,
     message: String,
-) {
+) -> anyhow::Result<()> {
     let res = Confirm::new(&message)
         .with_default(default != BigInt::from(0))
         .with_help_message(&help_message)
@@ -213,6 +243,7 @@ fn confirm_impl(
         .unwrap_or(false);
 
     stack.push_bool(res);
+    Ok(())
 }
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {

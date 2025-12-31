@@ -1,0 +1,83 @@
+---
+title: "Generating Wrappers"
+description: "Reference for the wrapper command"
+---
+
+The `wrapper` command generates Tolk wrappers. These wrappers are used in integration tests and scripts to interact with contracts.
+
+## Basic Usage
+
+```bash
+acton wrapper <CONTRACT_ID> [OPTIONS]
+```
+
+Where `<CONTRACT_ID>` is the key defined in your `Acton.toml` (e.g., `[contract.my-contract]`).
+
+## Options
+
+| Option                       | Description                                                                                          |
+|------------------------------|------------------------------------------------------------------------------------------------------|
+| `<CONTRACT_ID>`              | The ID of the contract as defined in `Acton.toml`.                                                   |
+| `-o, --output <PATH>`        | Path where the wrapper file will be generated. Defaults to `tests/wrappers/<ContractName>.tolk`.     |
+| `--storage-struct <NAME>`    | Struct name to use for contract storage (if not named `Storage`).                                    |
+| `-t, --test`                 | If set, generates a test stub file at `tests/<contract_id>.test.tolk`.                               |
+| `--test-output <PATH>`       | Path where the test stub file will be generated (requires `--test` flag).                            |
+
+## Features
+
+### Storage Struct Resolution
+
+If your contract's storage struct is not named `Storage`, the command will try to find it:
+1.  **Direct match:** If you pass `--storage-struct <NAME>`, it will use that struct.
+2.  **Suffix match:** If there is exactly one struct ending with `Storage` (e.g., `MinterStorage`), it will be used.
+3.  **Interactive:** If there are multiple candidates or none, the command will prompt you to select one from the list of available structs.
+
+### Type Extraction
+
+The command analyzes your contract's AST to find:
+- **Storage structure:** Generates a `fromStorage` method to initialize the contract state.
+- **Handled messages:** Generates `send{MessageName}` methods for every message type used in `match` statements.
+- **Get methods:** Generates corresponding methods to call get-methods on the contract.
+
+### Automatic Stub Test Generation
+
+When using the `--test` flag, the command generates a stub test file that is ready to run. It includes:
+- **`setupTest()` helper:** Initializes the contract with default storage values, creates deployer accounts, and deploys the contract.
+- **Example test case:** A placeholder test that calls `setupTest()` so you can verify the deployment works immediately.
+
+### Automatic Type Handling
+
+If the command detects that message types or storage are defined inside the contract file (which prevents importing them in tests), it will:
+1.  Create a `types.tolk` file in the contract's directory.
+2.  Warn you to move the type definitions there.
+3.  Generate the wrapper assuming the types are in `types.tolk`.
+
+## Examples
+
+### Generate default wrapper
+
+```bash
+acton wrapper counter
+```
+
+Generates: `tests/wrappers/Counter.tolk`
+
+### Generate wrapper and test stub
+
+```bash
+acton wrapper counter --test
+```
+
+Generates:
+*   `tests/wrappers/Counter.tolk`
+*   `tests/counter.test.tolk` (ready to run with `acton test counter.test.tolk`)
+
+### Generate to custom locations
+
+```bash
+# Custom wrapper path
+acton wrapper counter -o lib/wrappers/MyWrapper.tolk
+
+# Custom test path
+acton wrapper counter --test --test-output tests/my_contract/test.tolk
+```

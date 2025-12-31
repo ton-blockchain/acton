@@ -4,7 +4,5 @@ pub mod fixtures;
 pub mod project;
 pub mod snapshots;
 
+#[allow(unused_imports)]
 pub use assertions::TestOutputExt;
-pub use compilation::{CompilationOrder, extract_compiled_contracts};
-pub use fixtures::FixtureProject;
-pub use project::{ProjectBuilder, TestConfig};

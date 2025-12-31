@@ -1,4 +1,4 @@
-name: Build emulator-rs with TON static libraries
+name: Build and Check Acton
 
 on:
   pull_request:
@@ -13,21 +13,48 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build-macos:
     runs-on: macos-latest
+    if: false
+
+    outputs:
+      arch: ${{ steps.detect-arch.outputs.arch }}
 
     steps:
-      - name: Check out emulator-rs repository
+      - name: Check out Acton repository
         uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sccache
+          key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-
+
+      - name: Cache Cargo registry + git + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-
+
       - name: Install required system dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
         run: |
-          brew update
-          brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16
+          brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16 sccache just graphviz
 
       - name: Clone TON repository
         run: |
@@ -46,16 +73,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ton-repo/build
-          key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-build-${{ runner.os }}-
+          key: ton-build-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-build-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
         uses: actions/cache@v4
         with:
           path: ton-repo/artifacts
-          key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ runner.os }}-
+          key: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
         id: cache-ton-deps
@@ -65,15 +92,15 @@ jobs:
             ton-repo/openssl_3
             ton-repo/lz4
             ton-repo/zlib
-          key: ton-deps-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-deps-${{ runner.os }}-
+          key: ton-deps-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-deps-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ccache-${{ runner.os }}-
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -93,9 +120,18 @@ jobs:
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
+      - name: Detect architecture
+        id: detect-arch
+        run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+
       - name: Build acton binary
+        env:
+          RUSTC_WRAPPER: sccache
         run: |
           cargo build --release --bin acton
+
+      - name: Show sccache stats
+        run: sccache --show-stats || true
 
       - name: Test acton binary
         run: |
@@ -107,22 +143,48 @@ jobs:
           name: acton-macos-binary
           path: target/release/acton
 
-  build-linux:
-    runs-on: ubuntu-latest
+      - name: Run tests
+        run: just test
+
+  build-macos-intel:
+    runs-on: macos-15-intel
     if: false
 
+    outputs:
+      arch: ${{ steps.detect-arch.outputs.arch }}
+
     steps:
-      - name: Check out emulator-rs repository
+      - name: Check out Acton repository
         uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/sccache
+          key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sccache-
+
+      - name: Cache Cargo registry + git + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-cargo-
+
       - name: Install required system dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
-          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+          brew install python@3.12 || brew link --overwrite python@3.12
+          brew install ccache ninja libsodium libmicrohttpd pkg-config automake libtool autoconf gnutls llvm@16 sccache just graphviz
 
       - name: Clone TON repository
         run: |
@@ -141,16 +203,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ton-repo/build
-          key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-build-${{ runner.os }}-
+          key: ton-build-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-build-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
         uses: actions/cache@v4
         with:
           path: ton-repo/artifacts
-          key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ runner.os }}-
+          key: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
         id: cache-ton-deps
@@ -160,15 +222,137 @@ jobs:
             ton-repo/openssl_3
             ton-repo/lz4
             ton-repo/zlib
-          key: ton-deps-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-deps-${{ runner.os }}-
+          key: ton-deps-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-deps-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Build TON static libraries
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        run: |
+          cd ton-repo
+          cp assembly/native/build-macos-static.sh .
+          chmod +x build-macos-static.sh
+          ./build-macos-static.sh -a -c
+
+      - name: Show ccache stats
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        run: ccache -s
+
+      - name: Copy TON artifacts to objs directory
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
+      - name: Detect architecture
+        id: detect-arch
+        run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+
+      - name: Build acton binary
+        env:
+          RUSTC_WRAPPER: sccache
+        run: |
+          cargo build --release --bin acton
+
+      - name: Show sccache stats
+        run: sccache --show-stats || true
+
+      - name: Test acton binary
+        run: |
+          ./target/release/acton --help
+
+      - name: Upload acton binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: acton-macos-x86_64-binary
+          path: target/release/acton
+
+  build-linux:
+    runs-on: ubicloud-standard-2
+    if: true
+
+    outputs:
+      arch: ${{ steps.detect-arch.outputs.arch }}
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry + git + target
+        uses: ubicloud/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install required system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
+          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+
+      - name: Clone TON repository
+        run: |
+          git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch --depth=1 ton-repo
+          cd ton-repo
+
+      - name: Get TON commit hash
+        id: ton-commit
+        run: |
+          TON_COMMIT=$(git ls-remote https://github.com/i582/ton.git pmakhnev/acton | cut -f1)
+          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
+
+      - name: Cache TON build directory
+        id: cache-ton-build
+        uses: ubicloud/cache@v4
+        with:
+          path: ton-repo/build
+          key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-build-${{ runner.os }}-
+
+      - name: Cache TON artifacts
+        id: cache-ton-artifacts
+        uses: ubicloud/cache@v4
+        with:
+          path: ton-repo/artifacts
+          key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-artifacts-${{ runner.os }}-
+
+      - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
+        id: cache-ton-deps
+        uses: ubicloud/cache@v4
+        with:
+          path: |
+            ton-repo/openssl_3
+            ton-repo/lz4
+            ton-repo/zlib
+          key: ton-deps-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-deps-${{ runner.os }}-
+
+      - name: Cache ccache
+        uses: ubicloud/cache@v4
+        with:
+          path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ccache-${{ runner.os }}-
+
+      - name: Init submodules for build
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        run: |
+          git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -192,13 +376,15 @@ jobs:
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
+      - name: Detect architecture
+        id: detect-arch
+        run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+
       - name: Build acton binary
-        run: |
-          export CC=clang-16
-          export CXX=clang++-16
-          export AR=llvm-ar-16
-          export RANLIB=llvm-ranlib-16
-          cargo build --release --bin acton
+        env:
+          CC: gcc
+          CXX: g++
+        run: cargo build --release --bin acton
 
       - name: Test acton binary
         run: |
@@ -210,51 +396,117 @@ jobs:
           name: acton-linux-binary
           path: target/release/acton
 
-  create-nightly-release:
-    needs: [ build-macos ]
+      - name: Run tests
+        run: just test
+
+  create-canary-release:
+    needs: [ build-macos, build-macos-intel, build-linux ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download macOS binary
         uses: actions/download-artifact@v4
         with:
           name: acton-macos-binary
           path: binaries/macos/
 
+      - name: Download macOS x86_64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: acton-macos-x86_64-binary
+          path: binaries/macos-x86_64/
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: acton-linux-binary
+          path: binaries/linux/
+
       - name: Make binaries executable
         run: |
           chmod +x binaries/macos/acton
+          chmod +x binaries/macos-x86_64/acton
+          chmod +x binaries/linux/acton
 
-      - name: Generate nightly tag
-        id: nightly-tag
+      - name: Create macOS archive
         run: |
-          echo "tag=nightly-$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          mkdir -p dist
+          tar -czf dist/acton-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz \
+            -C binaries/macos acton
 
-      - name: Create nightly release
+      - name: Create macOS x86_64 archive
+        run: |
+          mkdir -p dist
+          tar -czf dist/acton-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz \
+            -C binaries/macos-x86_64 acton
+
+      - name: Create Linux archive
+        run: |
+          mkdir -p dist
+          tar -czf dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
+            -C binaries/linux acton
+
+      - name: Delete previous canary release and tag
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+        run: |
+          gh release delete canary -y || true
+          
+          gh api \
+            repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
+            -X DELETE || true
+
+      - name: Create canary release
         id: create_release
         uses: actions/create-release@v1
         with:
-          tag_name: ${{ steps.nightly-tag.outputs.tag }}
-          release_name: Nightly Build ${{ steps.nightly-tag.outputs.tag }}
+          tag_name: canary
+          release_name: Canary Build
           body: |
-            Automated nightly build of emulator-rs.
+            Automated canary build of Acton.
 
-            ## Binaries
-            - `acton` - macOS binary
+            ## Archives
+
+            - `acton-canary-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz` — macOS ARM64 archive
+            - `acton-canary-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz` — macOS x86_64 archive
+            - `acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz` — Linux archive
 
             Built from commit: ${{ github.sha }}
           draft: false
           prerelease: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
 
-      - name: Upload macOS binary to release
+      - name: Upload macOS archive to release
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: binaries/macos/acton
-          asset_name: acton
-          asset_content_type: application/octet-stream
+          asset_path: dist/acton-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
+          asset_name: acton-canary-darwin-${{ needs.build-macos.outputs.arch }}.tar.gz
+          asset_content_type: application/gzip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
+
+      - name: Upload macOS x86_64 archive to release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/acton-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
+          asset_name: acton-canary-darwin-${{ needs.build-macos-intel.outputs.arch }}.tar.gz
+          asset_content_type: application/gzip
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
+
+      - name: Upload Linux archive to release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
+          asset_name: acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
+          asset_content_type: application/gzip
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}

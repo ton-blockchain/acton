@@ -3,7 +3,15 @@ use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+#[derive(clap::ValueEnum, Debug, Copy, Clone)]
+pub enum Explorer {
+    Tonscan,
+    Toncx,
+    Dton,
+    Tonviewer,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Default)]
 pub enum DependencyKind {
@@ -32,6 +40,9 @@ pub struct ActonConfig {
     pub package: PackageConfig,
     pub test: Option<TestSettings>,
     pub contracts: Option<ContractsConfig>,
+    #[serde(skip)] // we build wallets manually
+    pub wallets: Option<WalletsConfig>,
+    pub scripts: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,12 +70,58 @@ pub struct TestSettings {
     pub junit_merge: Option<bool>,
     pub fork_net: Option<String>,
     pub api_key: Option<String>,
+    pub fork_block_number: Option<u64>,
+    pub mutation: Option<MutationConfig>,
+    pub fail_fast: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct MutationConfig {
+    pub disable_rules: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ContractsConfig {
     #[serde(flatten)]
     pub contracts: BTreeMap<String, ContractConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletKeys {
+    #[serde(rename = "mnemonic-env")]
+    pub mnemonic_env: Option<String>,
+    #[serde(rename = "mnemonic-file")]
+    pub mnemonic_file: Option<String>,
+    pub mnemonic: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletExpectedAddresses {
+    #[serde(rename = "address-mainnet")]
+    pub address_mainnet: Option<String>,
+    #[serde(rename = "address-testnet")]
+    pub address_testnet: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletConfig {
+    pub kind: String,
+    pub workchain: Option<i32>,
+    pub keys: WalletKeys,
+    #[serde(default)]
+    pub expected: Option<WalletExpectedAddresses>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WalletsConfig {
+    #[serde(flatten)]
+    pub wallets: BTreeMap<String, WalletConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WalletsFile {
+    pub wallets: Option<WalletsConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +143,8 @@ impl Default for ActonConfig {
             },
             test: None,
             contracts: None,
+            wallets: None,
+            scripts: None,
         }
     }
 }
@@ -147,12 +206,49 @@ impl ActonConfig {
         let config_path = Path::new("Acton.toml");
         if !config_path.exists() {
             return Err(anyhow!(
-                "Acton.toml not found. Run 'acton init' to create a new project."
+                "Acton.toml not found. Run 'acton init' to initialize Acton in the project."
             ));
         }
 
         let content = fs::read_to_string(config_path)?;
-        let config: ActonConfig = toml::from_str(&content)?;
+        let mut config: ActonConfig = toml::from_str(&content)?;
+
+        // Merge wallets from different sources
+        // Order of importance (later overrides earlier):
+        // 1. Global ~/.acton/wallets/global.wallets.toml
+        // 2. Local wallets.toml
+
+        let mut merged_wallets = BTreeMap::new();
+
+        // 1. Load global wallets
+        if let Some(global_path) = global_wallets_path()
+            && global_path.exists()
+        {
+            let global_content = fs::read_to_string(&global_path)?;
+            let global_wallets: WalletsFile = toml::from_str(&global_content)?;
+            if let Some(wallets) = global_wallets.wallets {
+                for (name, wallet) in wallets.wallets {
+                    merged_wallets.insert(name, wallet);
+                }
+            }
+        }
+
+        // 2. Load local wallets.toml
+        let local_wallets_path = Path::new("wallets.toml");
+        if local_wallets_path.exists() {
+            let local_content = fs::read_to_string(local_wallets_path)?;
+            let local_wallets: WalletsFile = toml::from_str(&local_content)?;
+            if let Some(wallets) = local_wallets.wallets {
+                for (name, wallet) in wallets.wallets {
+                    merged_wallets.insert(name, wallet);
+                }
+            }
+        }
+
+        config.wallets = Some(WalletsConfig {
+            wallets: merged_wallets,
+        });
+
         Ok(config)
     }
 
@@ -169,6 +265,28 @@ impl ActonConfig {
     pub fn get_contract(&self, name: &str) -> Option<&ContractConfig> {
         self.contracts.as_ref()?.contracts.get(name)
     }
+
+    pub fn wallets(&self) -> Option<&BTreeMap<String, WalletConfig>> {
+        self.wallets.as_ref().map(|w| &w.wallets)
+    }
+
+    pub fn get_wallet(&self, name: &str) -> Option<&WalletConfig> {
+        self.wallets.as_ref()?.wallets.get(name)
+    }
+}
+
+pub fn global_wallets_path() -> Option<PathBuf> {
+    #[cfg(windows)]
+    let home = std::env::var("USERPROFILE").ok()?;
+    #[cfg(not(windows))]
+    let home = std::env::var("HOME").ok()?;
+
+    Some(
+        PathBuf::from(home)
+            .join(".acton")
+            .join("wallets")
+            .join("global.wallets.toml"),
+    )
 }
 
 impl TestSettings {
@@ -192,6 +310,13 @@ impl TestSettings {
         baseline_gas_override: Option<String>,
         fork_net_override: Option<String>,
         api_key_override: Option<String>,
+        fork_block_number_override: Option<u64>,
+        save_test_trace_override: Option<String>,
+        mutate_override: bool,
+        mutate_overrides_override: Option<String>,
+        mutate_contract_override: Option<String>,
+        disable_rules_override: Vec<String>,
+        fail_fast_override: Option<bool>,
     ) -> TestConfig {
         let mut final_report_formats = Vec::new();
 
@@ -240,6 +365,20 @@ impl TestSettings {
             baseline_snapshot: baseline_gas_override,
             fork_net: fork_net_override.or_else(|| self.fork_net.clone()),
             api_key: api_key_override.or_else(|| self.api_key.clone()),
+            fork_block_number: fork_block_number_override.or(self.fork_block_number),
+            save_test_trace: save_test_trace_override,
+            mutate: mutate_override,
+            mutate_overrides: mutate_overrides_override,
+            mutate_contract: mutate_contract_override,
+            disable_rules: if !disable_rules_override.is_empty() {
+                disable_rules_override
+            } else {
+                self.mutation
+                    .as_ref()
+                    .and_then(|m| m.disable_rules.clone())
+                    .unwrap_or_default()
+            },
+            fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
         }
     }
 }
@@ -326,5 +465,65 @@ junit-merge = true
         assert_eq!(test_settings.include, Some(vec!["**/unit/**".to_string()]));
         assert_eq!(test_settings.junit_path, Some("custom-reports".to_string()));
         assert_eq!(test_settings.junit_merge, Some(true));
+    }
+
+    #[test]
+    fn test_wallet_config_parsing() -> anyhow::Result<()> {
+        let toml_content = r#"
+[wallets.deployer]
+kind = "v4R2"
+workchain = 0
+keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
+
+[wallets.deployer.expected]
+address-mainnet = "EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot"
+address-testnet = "EQD_testnet_address_here"
+
+[wallets.user]
+kind = "v5R1"
+workchain = -1
+keys = { mnemonic-file = "user-keys.txt" }
+
+[wallets.direct]
+kind = "v4R2"
+keys = { mnemonic = "word1 word2 word3" }
+"#;
+
+        let wallets_file: WalletsFile = toml::from_str(toml_content)?;
+        let wallets = wallets_file.wallets.unwrap().wallets;
+        assert_eq!(wallets.len(), 3);
+
+        let deployer = wallets.get("deployer").unwrap();
+        assert_eq!(deployer.kind, "v4R2");
+        assert_eq!(deployer.workchain, Some(0));
+        assert_eq!(
+            deployer.keys.mnemonic_env,
+            Some("DEPLOYER_MNEMONIC".to_string())
+        );
+        assert_eq!(deployer.keys.mnemonic_file, None);
+
+        // Check expected addresses
+        let expected = deployer.expected.as_ref().unwrap();
+        assert_eq!(
+            expected.address_mainnet,
+            Some("EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot".to_string())
+        );
+        assert_eq!(
+            expected.address_testnet,
+            Some("EQD_testnet_address_here".to_string())
+        );
+
+        let user = wallets.get("user").unwrap();
+        assert_eq!(user.kind, "v5R1");
+        assert_eq!(user.workchain, Some(-1));
+        assert_eq!(user.keys.mnemonic_file, Some("user-keys.txt".to_string()));
+        assert_eq!(user.keys.mnemonic_env, None);
+        assert!(user.expected.is_none());
+
+        let direct = wallets.get("direct").unwrap();
+        assert_eq!(direct.kind, "v4R2");
+        assert_eq!(direct.keys.mnemonic, Some("word1 word2 word3".to_string()));
+
+        Ok(())
     }
 }

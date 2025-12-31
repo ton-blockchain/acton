@@ -1,0 +1,324 @@
+---
+title: "message"
+description: "message.tolk standard library file"
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+Module defining message types.
+
+This module provides the core structures for working with TON messages in the emulator.
+It defines both internal and external message structures, as well as their components.
+
+Examples:
+```tolk
+// Parsing an out action into a typed message
+val action = outActions.getSendMessageAt(0);
+if (action != null) {
+    val msg = action.loadMessage<Transfer>();
+    val body = msg.loadBody();
+    println1("Transfer amount: {:ton}", body.amount);
+}
+
+// Parsing a generic message to check opcode
+val genericMsg = action.loadGenericMessage();
+val opcode = genericMsg.loadOpcode();
+if (opcode == 0x12345678) {
+    // handle specific opcode...
+}
+```
+
+## Definitions
+
+## `MessageRelaxedGeneric`
+
+```tolk
+struct MessageRelaxedGeneric {
+    info: IntMsgInfoRelaxed
+    init: Maybe<Either<StateInit, Cell<StateInit>>>
+    body: RemainingBitsAndRefs
+}
+```
+
+Represents a generic relaxed message. Unlike [MessageRelaxed](#messagerelaxed), this message does not
+load the body of the message. Instead body is represented as a slice and can be parsed
+later manually (for example to load the opcode).
+
+Example:
+```tolk
+val out_actions = vm.outActions();
+val action = out_actions.at(0);
+if (action is OutActionSendMessage) {
+    val message = action.loadGenericMessage();
+    val opcode = message.loadOpcode();
+    println(opcode);
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L41" />
+
+## `MessageRelaxedGeneric.loadOpcode`
+
+```tolk
+fun MessageRelaxedGeneric.loadOpcode(self, skip_bounce: bool = false): int?
+```
+
+Loads the opcode of the message.
+
+If skip_bounce is true, the 0xFFFFFFFF prefix is skipped.
+
+Example:
+```tolk
+val out_actions = vm.outActions();
+val action = out_actions.at(0);
+if (action is OutActionSendMessage) {
+    val message = action.loadGenericMessage();
+    val opcode = message.loadOpcode(true);
+    println(opcode);
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L61" />
+
+## `ExtMessageRelaxedGeneric`
+
+```tolk
+struct ExtMessageRelaxedGeneric {
+    info: ExtMsgInfoRelaxed
+    init: Maybe<Either<StateInit, Cell<StateInit>>>
+    body: RemainingBitsAndRefs
+}
+```
+
+Represents a generic external message. Unlike [ExtMessageRelaxed](#extmessagerelaxed), this message does not
+load the body of the message. Instead body is represented as a slice and can be parsed
+later manually (for example to load the opcode).
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L68" />
+
+## `ExtMessageRelaxedGeneric.loadOpcode`
+
+```tolk
+fun ExtMessageRelaxedGeneric.loadOpcode(self, skip_bounce: bool = false): int?
+```
+
+Loads the opcode of the message.
+
+If skip_bounce is true, the 0xFFFFFFFF prefix is skipped.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L77" />
+
+## `MessageRelaxed`
+
+```tolk
+@overflow1023_policy("suppress")
+struct MessageRelaxed<X> {
+    info: IntMsgInfoRelaxed
+    init: Maybe<Either<StateInit, Cell<StateInit>>>
+    body: Either<X, Cell<X>>
+}
+```
+
+Represents a generic message. Unlike [MessageRelaxedGeneric](#messagerelaxedgeneric), this message loads
+the body of the message with passed type.
+
+If actual message body has a different type, loading will fail with exit code 63.
+
+Example:
+```tolk
+val out_actions = vm.outActions();
+val action = out_actions.at(0);
+if (action is OutActionSendMessage) {
+    val message = action.loadMessage<IncreaseCounter>();
+    val body = message.loadBody();
+    println(body.increaseBy);
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L96" />
+
+## `MessageRelaxed<X>.loadBody`
+
+```tolk
+fun MessageRelaxed<X>.loadBody(self): X
+```
+
+Loads the body of the message.
+
+Note that if message type mismatch, loading will fail with exit code 63.
+
+Example:
+```tolk
+val out_actions = vm.outActions();
+val action = out_actions.at(0);
+if (action is OutActionSendMessage) {
+    val message = action.loadMessage<IncreaseCounter>();
+    val body = message.loadBody();
+    println(body.increaseBy);
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L117" />
+
+## `ExtMessageRelaxed`
+
+```tolk
+@overflow1023_policy("suppress")
+struct ExtMessageRelaxed<X> {
+    info: ExtMsgInfoRelaxed
+    init: Maybe<Either<StateInit, Cell<StateInit>>>
+    body: Either<X, Cell<X>>
+}
+```
+
+Represents a generic external message. Unlike [ExtMessageRelaxedGeneric](#extmessagerelaxedgeneric), this message
+loads the body of the message with passed type.
+
+If actual message body has a different type, loading will fail with exit code 63.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L128" />
+
+## `ExtMessageRelaxed<X>.loadBody`
+
+```tolk
+fun ExtMessageRelaxed<X>.loadBody(self): X
+```
+
+Loads the body of the message.
+
+Note that if message type mismatch, loading will fail with exit code 63.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L138" />
+
+## `IntMsgInfoRelaxed`
+
+```tolk
+struct (0b0) IntMsgInfoRelaxed {
+    ihr_disabled: bool
+    bounce: bool
+    bounced: bool
+    src: any_address
+    dest: address
+    value: CurrencyCollection
+    extra_flags: varuint16
+    fwd_fee: coins
+    created_lt: uint64
+    created_at: uint32
+}
+```
+
+Represents common message info for internal relaxed message.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L146" />
+
+## `ExtMsgInfoRelaxed`
+
+```tolk
+struct (0b11) ExtMsgInfoRelaxed {
+    src: address
+    dest: any_address
+    created_lt: uint64
+    created_at: uint32
+}
+```
+
+Represents common message info for external relaxed message.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L160" />
+
+## `CurrencyCollection`
+
+```tolk
+struct CurrencyCollection {
+    /// Amount in nanoton.
+    grams: coins
+    /// Extra currencies.
+    other: map<int32, varuint32>
+}
+```
+
+Represents a currency collection as TON amount + extra currencies.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L168" />
+
+## `InternalMessage`
+
+```tolk
+struct (0b0) InternalMessage {
+    ihrDisabled: bool
+    bounce: bool
+    bounced: bool
+    src: address
+    dest: address
+    value: CurrencyCollection
+    extraFlags: varuint16
+    forwardFee: coins
+    createdLT: uint64
+    createdAt: uint32
+}
+```
+
+```tlb
+int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+               src:MsgAddressInt dest:MsgAddressInt
+               value:CurrencyCollection extra_flags:(VarUInteger 16) fwd_fee:Grams
+               created_lt:uint64 created_at:uint32 = CommonMsgInfo;
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L181" />
+
+## `ExternalInMessageInfo`
+
+```tolk
+struct (0b10) ExternalInMessageInfo {
+    src: any_address
+    dest: address
+    importFee: coins
+}
+```
+
+```tlb
+ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
+                   import_fee:Grams = CommonMsgInfo;
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L198" />
+
+## `ExternalOutMessageInfo`
+
+```tolk
+struct (0b11) ExternalOutMessageInfo {
+    src: address
+    dest: any_address
+    createdLt: uint64
+    createdAt: uint32
+}
+```
+
+```tlb
+ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
+                    created_lt:uint64 created_at:uint32 = CommonMsgInfo;
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L208" />
+
+## `Message`
+
+```tolk
+struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
+    info: TInfo
+    init: Maybe<Either<StateInit, Cell<StateInit>>>
+    body: Either<TBody, Cell<TBody>>
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L220" />
+
+## `Message<TBody, TInfo>.loadBody`
+
+```tolk
+fun Message<TBody, TInfo>.loadBody(self): TBody
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L226" />
+

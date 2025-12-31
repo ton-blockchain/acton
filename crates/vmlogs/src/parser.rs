@@ -34,6 +34,17 @@ impl<'a> VmStack<'a> {
     pub fn parsed(&self) -> Vec<VmStackValue<'a>> {
         parse_stack_content(self.raw_content)
     }
+
+    pub fn to_string(&self) -> String {
+        format!(
+            "[ {} ]",
+            self.parsed()
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
 }
 
 fn parse_stack_content(input: &str) -> Vec<VmStackValue<'_>> {
@@ -82,7 +93,34 @@ pub enum VmStackValue<'a> {
     Continuation(&'a str),
     Builder(&'a str),
     CellSlice(CellSlice<'a>),
+    String(&'a str),
     Unknown,
+}
+
+impl<'a> VmStackValue<'a> {
+    pub fn to_string(&self) -> String {
+        match self {
+            VmStackValue::Null => "()".to_string(),
+            VmStackValue::NaN => "NaN".to_string(),
+            VmStackValue::Integer(s) => s.to_string(),
+            VmStackValue::Tuple(items) => {
+                format!(
+                    "[ {} ]",
+                    items
+                        .iter()
+                        .map(|v| v.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
+            VmStackValue::Cell(cell) => cell.to_string(),
+            VmStackValue::Continuation(s) => format!("Cont{{{}}}", s),
+            VmStackValue::Builder(s) => format!("BC{{{}}}", s),
+            VmStackValue::CellSlice(cs) => cs.to_string(),
+            VmStackValue::String(s) => format!("\"{}\"", s),
+            VmStackValue::Unknown => "???".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -91,11 +129,34 @@ pub enum CellLike<'a> {
     Builder(&'a str), // BC{hex}
 }
 
+impl<'a> CellLike<'a> {
+    pub fn to_string(&self) -> String {
+        match self {
+            CellLike::Cell(s) => format!("C{{{}}}", s),
+            CellLike::Builder(s) => format!("BC{{{}}}", s),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CellSlice<'a> {
     pub value: &'a str,
     pub bits: Option<(&'a str, &'a str)>,
     pub refs: Option<(&'a str, &'a str)>,
+}
+
+impl<'a> CellSlice<'a> {
+    pub fn to_string(&self) -> String {
+        match (&self.bits, &self.refs) {
+            (Some((bits_start, bits_end)), Some((refs_start, refs_end))) => {
+                format!(
+                    "CS{{Cell{{{}}} bits:{}..{} ; refs:{}..{}}}",
+                    self.value, bits_start, bits_end, refs_start, refs_end
+                )
+            }
+            _ => format!("CS{{{}}}", self.value),
+        }
+    }
 }
 
 fn ws0(i: &mut I) -> PResult<()> {
@@ -107,14 +168,15 @@ fn ws1(i: &mut I) -> PResult<()> {
 }
 
 fn number<'a>(i: &mut I<'a>) -> PResult<&'a str> {
-    let start = i.as_ptr() as usize;
+    let start_ptr = i.as_ptr();
+    let start = start_ptr as usize;
     opt('-').parse_next(i)?;
     digit1.parse_next(i)?;
     let end = i.as_ptr() as usize;
     let len = end - start;
     // SAFETY: We know this is valid UTF-8 since we only consumed ASCII characters
     unsafe {
-        let slice = std::slice::from_raw_parts(start as *const u8, len);
+        let slice = std::slice::from_raw_parts(start_ptr, len);
         Ok(std::str::from_utf8_unchecked(slice))
     }
 }
@@ -134,8 +196,9 @@ fn tag(i: &mut I, mut s: &'static str) -> PResult<()> {
 // Null / NaN / Integer
 fn null_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue<'a>> {
     alt((
-        delimited("(", ws0, delimited("", ws0, ")")).value(VmStackValue::Null), // "()" с пробелами
+        delimited("(", ws0, delimited("", ws0, ")")).value(VmStackValue::Null),
         "(null)".value(VmStackValue::Null),
+        "null".value(VmStackValue::Null),
     ))
     .parse_next(i)
     .or_else(|_| "NaN".value(VmStackValue::NaN).parse_next(i))
@@ -230,11 +293,17 @@ fn cell_slice<'a>(i: &mut I<'a>) -> PResult<VmStackValue<'a>> {
     .parse_next(i)
 }
 
+fn string_literal<'a>(i: &mut I<'a>) -> PResult<VmStackValue<'a>> {
+    delimited("\"", take_while(0.., |c: char| c != '"'), "\"")
+        .map(VmStackValue::String)
+        .parse_next(i)
+}
+
 fn unknown_val<'a>(i: &mut I<'a>) -> PResult<VmStackValue<'a>> {
     "???".value(VmStackValue::Unknown).parse_next(i)
 }
 
-fn vm_stack_value<'a>(i: &mut I<'a>) -> PResult<VmStackValue<'a>> {
+pub fn vm_stack_value<'a>(i: &mut I<'a>) -> PResult<VmStackValue<'a>> {
     preceded(
         ws0,
         alt((
@@ -249,6 +318,7 @@ fn vm_stack_value<'a>(i: &mut I<'a>) -> PResult<VmStackValue<'a>> {
                 CellLike::Cell(_) => unreachable!(),
             }),
             cell_slice,
+            string_literal,
             unknown_val,
         )),
     )

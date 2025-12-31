@@ -1,0 +1,1 @@
+Warning: Unknown coverage format 'invalid-format'. Supported formats: lcov, text

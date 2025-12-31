@@ -1,0 +1,1 @@
+Error: Unsupported network: invalid-network. Supported: mainnet, testnet

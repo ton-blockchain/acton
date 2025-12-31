@@ -1,3 +1,24 @@
+/// Module for user prompts.
+///
+/// This module enables interactive scripts by providing functions to query information from the user via the command line.
+/// It is useful for deployment scripts or configuration wizards running in an interactive terminal.
+///
+/// Examples:
+/// ```tolk
+/// // Simple text input
+/// val name = prompt("Enter your name:", "Guest");
+///
+/// // Confirmation
+/// if (confirm("Do you want to deploy to mainnet?", false, "This will cost real TON.")) {
+///     // perform deployment
+/// } else {
+///     println("Aborted.");
+/// }
+///
+/// // Selection
+/// val network = select("Choose network:", ["Mainnet", "Testnet", "Local"]);
+/// ```
+
 import "../ffi/ffi"
 
 /// Prompts the user for input.

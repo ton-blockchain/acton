@@ -6,8 +6,8 @@
 
  TEST  [ROOT]
 
- > ./tests/counter_test.tolk (2 tests)
-  ✓ should increase counter [TIME]
-  ✓ should reset counter [TIME]
+ > ./tests/counter.test.tolk (2 tests)
+  ✓ should-increase-counter [TIME]
+  ✓ should-reset-counter [TIME]
 
  ✓ 2 passed in 1 file

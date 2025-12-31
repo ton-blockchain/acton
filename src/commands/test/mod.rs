@@ -1,4 +1,5 @@
 use crate::commands::build::build_cmd;
+use crate::commands::common::error_fmt;
 use crate::commands::test::coverage::{
     Coverage, collect_coverage, generate_lcov_file, generate_text_file, merge_coverages,
     print_coverage_summary,
@@ -17,40 +18,45 @@ use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     Emulations, Env, IoContext, KnownAddresses,
 };
+use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::dap::DapTransport;
 use crate::debugger::debug_context::DebugContext;
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use abi::{ContractAbi, contract_abi};
 use anyhow::anyhow;
-use emulator::AnyExecutor;
-use emulator::blockchain::Blockchain;
 use emulator::emulator::Emulator;
-use emulator::executor::ExecutorVerbosity;
-use emulator::get_executor::{GetExecutor, GetMethodParams, GetMethodResult};
-use emulator::step_get_executor::StepGetExecutor;
+use emulator::world_state::{AccountsState, LocalAccountsState, RemoteAccountState, WorldState};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error};
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use regex::Regex;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
 use tolkc::source_map::SourceMap;
+use ton_executor::ExecutorVerbosity;
+use ton_executor::get::step::StepGetExecutor;
+use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::serde::serialize_tuple;
+use tvmffi::stack::Tuple;
 use tycho_types::models::ShardAccount;
 use walkdir::WalkDir;
 
 mod annotations;
 mod coverage;
 mod instrumentation;
+pub mod mutation;
 mod profiling;
 mod reporting;
+mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -81,6 +87,13 @@ pub struct TestConfig {
     pub baseline_snapshot: Option<String>,
     pub fork_net: Option<String>,
     pub api_key: Option<String>,
+    pub fork_block_number: Option<u64>,
+    pub save_test_trace: Option<String>,
+    pub mutate: bool,
+    pub mutate_overrides: Option<String>,
+    pub mutate_contract: Option<String>,
+    pub disable_rules: Vec<String>,
+    pub fail_fast: bool,
 }
 
 #[derive(Debug)]
@@ -96,6 +109,7 @@ pub struct TestResult {
 #[derive(Debug)]
 pub struct TestRunner<'a> {
     config: TestConfig,
+    acton_config: ActonConfig,
     build_cache: BuildCache,
     file_build_cache: &'a mut FileBuildCache,
     known_addresses: KnownAddresses,
@@ -103,13 +117,16 @@ pub struct TestRunner<'a> {
     emulations: Emulations,
     transport: DapTransport,
     reporter_manager: &'a mut ReporterManager,
+    mutation_overrides: BTreeMap<String, ArcCell>,
 }
 
 impl<'a> TestRunner<'a> {
     pub fn new(
+        acton_config: ActonConfig,
         config: TestConfig,
         cache: &'a mut FileBuildCache,
         reporter_manager: &'a mut ReporterManager,
+        mutation_overrides: BTreeMap<String, ArcCell>,
     ) -> TestRunner<'a> {
         let transport = if config.debug {
             crate::debugger::start_dap_server(config.debug_port)
@@ -119,6 +136,7 @@ impl<'a> TestRunner<'a> {
 
         Self {
             config,
+            acton_config,
             build_cache: BuildCache::new(),
             file_build_cache: cache,
             known_addresses: KnownAddresses::new(),
@@ -126,6 +144,7 @@ impl<'a> TestRunner<'a> {
             emulations: Emulations::new(),
             transport,
             reporter_manager,
+            mutation_overrides,
         }
     }
 
@@ -166,7 +185,7 @@ impl<'a> TestRunner<'a> {
             return ExecutorVerbosity::FullLocation;
         }
 
-        ExecutorVerbosity::Short
+        ExecutorVerbosity::Full
     }
 
     fn execute_test(
@@ -178,45 +197,59 @@ impl<'a> TestRunner<'a> {
         source_map: &SourceMap,
     ) -> anyhow::Result<TestResult> {
         let verbosity = self.minimal_log_verbosity();
-        let params = GetMethodParams {
+
+        let now = std::time::SystemTime::now();
+        let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+
+        let params = RunGetMethodArgs {
             code: code_cell
                 .to_boc_b64(false)
-                .expect("Failed to encode code cell to BoC")
+                .map_err(|err| anyhow!("Failed to encode code cell to BoC: {err}"))?
                 .to_string(),
-            data: ArcCell::default()
-                .to_boc_b64(false)
-                .expect("Failed to encode data cell to BoC")
-                .to_string(),
+            data: ArcCell::default().to_boc_b64(false)?.to_string(), // for tests, we use empty cell as a data
             verbosity,
-            libs: "".to_string(),
+            libs: Default::default(),
             address: dest_address.to_string(),
-            unixtime: 0,
-            balance: "10".to_string(),
+            unixtime: duration_since_epoch.as_secs().try_into()?,
+            balance: "10".to_owned(),
             rand_seed: "0000000000000000000000000000000000000000000000000000000000000000"
-                .to_string(),
-            gas_limit: "0".to_string(),
+                .to_owned(),
+            gas_limit: "0".to_owned(),
             method_id: test.id,
             debug_enabled: true,
             extra_currencies: HashMap::new(),
             prev_blocks_info: None,
         };
 
-        let mut emulator = Emulator::new(verbosity);
-        let mut blockchain =
-            Blockchain::new(self.config.fork_net.clone(), self.config.api_key.clone());
+        let mut emulator = Emulator::new(verbosity, None)?;
+        let resolver = match &self.config.fork_net {
+            Some(net) => AccountsState::Remote(RemoteAccountState::new(
+                net.clone(),
+                self.config.fork_block_number,
+                self.config.api_key.clone(),
+            )),
+            None => AccountsState::Local(LocalAccountsState::new()),
+        };
+        let mut world_state = WorldState::new(resolver);
 
         let mut assert_failure = None;
         let mut expected_exit_code = None;
 
         let mut ctx = Context {
             env: Env {
-                config: &ActonConfig::load()?,
+                config: &self.acton_config,
                 abi,
                 default_log_level: verbosity,
+                wallets: self.acton_config.wallets.as_ref(),
+                open_wallets: Default::default(), // in tests, we never use real wallets
+                build_override: self.mutation_overrides.clone(),
+                explorer: None,
+                api_key: self.config.api_key.clone(),
+                fork_net: self.config.fork_net.clone(),
             },
             io: IoContext {
-                stdout_buffer: "".to_string(),
-                stderr_buffer: "".to_string(),
+                stdout_buffer: "".to_owned(),
+                stderr_buffer: "".to_owned(),
                 capture_output: true,
             },
             asserts: AssertsContext {
@@ -224,7 +257,7 @@ impl<'a> TestRunner<'a> {
                 expected_exit_code: &mut expected_exit_code,
             },
             chain: ChainContext {
-                blockchain: &mut blockchain,
+                world_state: &mut world_state,
                 emulator: &mut emulator,
                 emulations: &mut self.emulations,
             },
@@ -234,16 +267,19 @@ impl<'a> TestRunner<'a> {
                 known_addresses: &mut self.known_addresses,
                 known_code_cells: &mut self.known_code_cells,
                 need_debug_info: self.config.debug
-                    || self.config.backtrace == Some("full".to_string())
+                    || self.config.backtrace == Some("full".to_owned())
                     || self.config.coverage,
                 backtrace: self.config.backtrace.clone(),
             },
             debug: DebugCtx::Disabled,
+            is_broadcasting: false,
+            network: self.config.fork_net.clone(),
         };
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
             if self.config.debug {
-                let mut executor = StepGetExecutor::new(Default::default(), params.clone());
+                let stack = serialize_tuple(&Tuple::empty())?.to_boc_b64(false)?;
+                let mut executor = StepGetExecutor::new(&stack, &params, None)?;
                 ffi::register(&mut executor, &mut ctx);
 
                 let mut dbg_ctx = DebugContext::new(
@@ -255,11 +291,20 @@ impl<'a> TestRunner<'a> {
 
                 ctx.debug = DebugCtx::new(&mut dbg_ctx);
 
-                executor.prepare(test.id, Default::default());
+                executor.prepare(test.id, &stack)?;
 
                 ctx.debug.ctx().process_incoming_requests(true)?;
 
-                let get_result = executor.finish(&params.code);
+                let get_result = executor.finish(&params.code)?;
+
+                if let Some(trace_dir) = &self.config.save_test_trace {
+                    trace::dump_test_transactions(
+                        test,
+                        ctx.build.build_cache,
+                        &ctx.chain.emulations.results,
+                        trace_dir,
+                    )?;
+                }
 
                 (
                     get_result,
@@ -269,10 +314,20 @@ impl<'a> TestRunner<'a> {
                     ctx.asserts.expected_exit_code.clone(),
                 )
             } else {
-                let mut executor = GetExecutor::new(params.clone());
+                let mut executor = GetExecutor::new(&params)?;
                 ffi::register(&mut executor, &mut ctx);
 
-                let get_result = executor.run_get_method(Default::default(), params);
+                let stack = serialize_tuple(&Tuple::empty())?.to_boc_b64(false)?;
+                let get_result = executor.run_get_method(&stack, &params, None)?;
+
+                if let Some(trace_dir) = &self.config.save_test_trace {
+                    trace::dump_test_transactions(
+                        test,
+                        ctx.build.build_cache,
+                        &ctx.chain.emulations.results,
+                        trace_dir,
+                    )?;
+                }
 
                 (
                     get_result,
@@ -289,25 +344,39 @@ impl<'a> TestRunner<'a> {
             captured_stderr,
             assert_failure,
             expected_exit_code: expected_exit_code.and_then(|value| value.to_i32()),
-            accounts: blockchain.get_accounts().clone(),
+            accounts: world_state.get_accounts().clone(),
         })
     }
 }
 
 pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()> {
     // First we need to build all contracts and generate all dependency files with code
-    build_cmd(None, config.clear_cache, None)?;
+    build_cmd(None, config.clear_cache, None, None)?;
     println!("     {} tests", "Running".green().bold());
 
     // If path is omitted, default to current directory
     let path = path.unwrap_or_else(|| ".".to_string());
 
-    let metadata = fs::metadata(&path)?;
-    let test_files = if metadata.is_file() {
-        if !path.ends_with("_test.tolk") {
-            anyhow::bail!("Test file must end with _test.tolk");
+    if !fs::exists(&path).unwrap_or(false) {
+        anyhow::bail!(error_fmt::file_not_found(&path));
+    }
+
+    let metadata = match fs::metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(err) => {
+            anyhow::bail!("Cannot access '{path}': {err}")
         }
-        vec![path.clone()]
+    };
+    let test_files = if metadata.is_file() {
+        if !path.ends_with(".test.tolk") {
+            anyhow::bail!("Test file must end with {}", ".test.tolk".yellow());
+        }
+        vec![
+            fs::canonicalize(&path)
+                .unwrap_or_else(|_| PathBuf::from(&path))
+                .to_string_lossy()
+                .to_string(),
+        ]
     } else if metadata.is_dir() {
         find_test_files_recursively(&path, &config.exclude_patterns, &config.include_patterns)?
             .into_iter()
@@ -317,13 +386,12 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         anyhow::bail!("Path '{path}' is neither a file nor a directory");
     };
 
+    let acton_config = ActonConfig::load()?;
+
     let mut global_reporter = ReporterManager::new();
     TestRunner::setup_reporters(&mut global_reporter, config);
     global_reporter.init()?;
     global_reporter.on_testing_started()?;
-
-    // hacky init VM with debug enabled due to global variables :/
-    tolkc::compile("./testdata/simple.tolk".as_ref(), true);
 
     let mut file_cache = FileBuildCache::new(None)?;
 
@@ -334,7 +402,13 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let mut coverages = vec![];
 
     for (index, file) in test_files.iter().enumerate() {
-        let result = run_tests_for_file(file, config, &mut file_cache, &mut global_reporter);
+        let result = run_tests_for_file(
+            file,
+            &acton_config,
+            config,
+            &mut file_cache,
+            &mut global_reporter,
+        );
         match result {
             Ok(stats) => {
                 total_passed += stats.passed;
@@ -353,9 +427,13 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                 }
             }
             Err(err) => {
-                println!("{} {}", "Error:".red(), err);
+                eprintln!("{err}");
                 total_failed += 1;
             }
+        }
+
+        if config.fail_fast && total_failed > 0 {
+            break;
         }
     }
 
@@ -421,7 +499,12 @@ pub fn find_test_files_recursively(
     for p in exclude_patterns {
         exclude_builder.add(Glob::new(p)?);
     }
-    for p in ["**/node_modules/**", "**/.git/**", "**/target/**"] {
+    for p in [
+        "**/node_modules/**",
+        "**/.git/**",
+        "**/target/**",
+        "**/.acton/**",
+    ] {
         exclude_builder.add(Glob::new(p)?);
     }
     let excludes: GlobSet = exclude_builder.build()?;
@@ -467,11 +550,11 @@ pub fn find_test_files_recursively(
             let rel = path.strip_prefix(root).unwrap_or(path);
 
             if let Some(name) = rel.file_name().and_then(|s| s.to_str()) {
-                if name.ends_with("_test.tolk_test.tolk") {
+                if name.ends_with(".test.tolk.test.tolk") {
                     // skip temp test file
                     continue;
                 }
-                if !name.ends_with("_test.tolk") {
+                if !name.ends_with(".test.tolk") {
                     continue;
                 }
             } else {
@@ -539,10 +622,11 @@ fn compile_test_file(
 
 fn run_tests_for_file(
     file: &str,
+    acton_config: &ActonConfig,
     config: &TestConfig,
     file_cache: &mut FileBuildCache,
     reporter_manager: &mut ReporterManager,
-) -> Result<TestStats, anyhow::Error> {
+) -> anyhow::Result<TestStats> {
     let content = match fs::read_to_string(file) {
         Ok(content) => content,
         Err(err) => {
@@ -550,12 +634,12 @@ fn run_tests_for_file(
         }
     };
 
-    let tests = find_all_test(&content);
+    let tests = find_all_test(file, &content);
 
     let abi = contract_abi(content.as_str(), file);
 
     let executable_code = inject_locations_into_expect_calls(&content, file);
-    let tmp_test_filename = file.to_owned() + "_test.tolk";
+    let tmp_test_filename = file.to_owned() + ".test.tolk";
 
     fs::write(&tmp_test_filename, executable_code)?;
 
@@ -571,7 +655,25 @@ fn run_tests_for_file(
 
             let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
 
-            let mut runner = TestRunner::new(config.clone(), file_cache, reporter_manager);
+            let mut mutation_overrides = BTreeMap::new();
+
+            if let Some((first, second)) = config
+                .mutate_overrides
+                .as_ref()
+                .unwrap_or(&"".to_owned())
+                .split_once(":")
+            {
+                let code_cell = ArcCell::from_boc_b64(second)?;
+                mutation_overrides.insert(first.to_owned(), code_cell);
+            }
+
+            let mut runner = TestRunner::new(
+                acton_config.clone(),
+                config.clone(),
+                file_cache,
+                reporter_manager,
+                mutation_overrides,
+            );
             let stats = run_file_tests(
                 &mut runner,
                 file,
@@ -579,23 +681,23 @@ fn run_tests_for_file(
                 &code_cell,
                 &abi,
                 &result.source_map.unwrap_or(Default::default()),
-            );
+            )?;
             Ok(stats)
         }
         tolkc::CompilerResult::Error(error) => {
             let _ = fs::remove_file(&tmp_test_filename);
             let normalized_filepath = error.message.replace(&tmp_test_filename, file);
             let trimmed_message = normalized_filepath.trim();
-            Err(anyhow!(trimmed_message.to_string()))
+            anyhow::bail!(trimmed_message.to_string())
         }
-    }?
+    }
 }
 
 fn run_file_tests(
     runner: &mut TestRunner,
     file_path: &str,
     tests: Vec<TestDescriptor>,
-    code_cell: &Arc<Cell>,
+    code_cell: &ArcCell,
     abi: &ContractAbi,
     source_map: &SourceMap,
 ) -> anyhow::Result<TestStats> {
@@ -603,14 +705,9 @@ fn run_file_tests(
         let regex = match Regex::new(pattern) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("Invalid regex pattern '{pattern}': {e}");
-                return Ok(TestStats {
-                    passed: 0,
-                    failed: 0,
-                    skipped: 0,
-                    todo: 0,
-                    coverage: None,
-                });
+                anyhow::bail!(color_print::cformat!(
+                    "Invalid regex pattern <yellow>{pattern}</>: {e}"
+                ));
             }
         };
         tests
@@ -625,7 +722,7 @@ fn run_file_tests(
         .reporter_manager
         .on_suite_started(file_path, &filtered_tests)?;
 
-    let dest_address = contract_address(code_cell);
+    let dest_address = contract_address(code_cell)?;
 
     let mut passed = 0;
     let mut failed = 0;
@@ -670,7 +767,7 @@ fn run_file_tests(
         let result = match runner.execute_test(test, code_cell, &dest_address, abi, source_map) {
             Ok(result) => result,
             Err(err) => {
-                println!(
+                eprintln!(
                     "{}: Cannot execute test '{}': {}",
                     "Error".red(),
                     test.name,
@@ -699,10 +796,15 @@ fn run_file_tests(
             GetMethodResult::Error(_) => (999, 0),
         };
 
+        let mut test_passed: bool = true; // assume that test is passed
+
         let expected_exit_code = dyn_expected_exit_code
             .or(test.expected_exit_code)
             .unwrap_or(0);
-        let mut test_passed = exit_code == expected_exit_code;
+
+        if exit_code != expected_exit_code {
+            test_passed = false;
+        }
 
         if let Some(limit) = test.gas_limit
             && gas_used > limit
@@ -755,20 +857,20 @@ fn run_file_tests(
             // For coverage, we need to process test logs as well, so register it here
             if let GetMethodResult::Success(get_result) = get_result {
                 runner.emulations.get_results.push(get_result);
+                // TODO: remove this memoize somehow
                 runner.build_cache.memoize(
                     &test.name,
                     file_path,
-                    &code_cell
-                        .to_boc_b64(false)
-                        .expect("Failed to encode code cell to BoC"),
-                    &code_cell
-                        .cell_hash()
-                        .expect("Failed to get code cell hash")
-                        .to_hex()
-                        .to_ascii_uppercase(),
+                    &code_cell.to_boc_b64(false)?,
+                    &code_cell.cell_hash()?.to_hex().to_ascii_uppercase(),
                     source_map.clone(),
                 )
             }
+        }
+
+        if !test_passed && runner.config.fail_fast {
+            // since test is failed, early break from test loop
+            break;
         }
     }
 
@@ -813,22 +915,23 @@ fn run_file_tests(
     })
 }
 
-fn contract_address(code: &Arc<Cell>) -> TonAddress {
+fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
     let state_init = CellBuilder::new()
-        .store_bit(false)
-        .expect("Failed to store bounce flag")
-        .store_bit(false)
-        .expect("Failed to store maybe libraries")
-        .store_ref_cell_optional(Some(code))
-        .expect("Failed to store code cell")
-        .store_ref_cell_optional(Some(&ArcCell::default()))
-        .expect("Failed to store data cell")
-        .store_bit(false)
-        .expect("Failed to store maybe tick/tock")
-        .build()
-        .expect("Failed to build state init cell");
+        .store_bit(false)?
+        .store_bit(false)?
+        .store_ref_cell_optional(Some(code))?
+        .store_ref_cell_optional(Some(&ArcCell::default()))?
+        .store_bit(false)?
+        .build()?;
 
-    TonAddress::new(0, state_init.cell_hash())
+    Ok(TonAddress::new(0, state_init.cell_hash()))
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Pos {
+    pub row: usize,
+    pub column: usize,
+    pub uri: String,
 }
 
 #[derive(Debug)]
@@ -839,9 +942,10 @@ pub struct TestDescriptor {
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
     pub todo_description: Option<String>,
+    pub pos: Pos,
 }
 
-fn find_all_test(content: &String) -> Vec<TestDescriptor> {
+fn find_all_test(file_path: &str, content: &str) -> Vec<TestDescriptor> {
     let Ok(tree) = tolk_parser::parser::parse(content) else {
         return vec![];
     };
@@ -875,6 +979,11 @@ fn find_all_test(content: &String) -> Vec<TestDescriptor> {
                         expected_exit_code: test_annotations.expected_exit_code,
                         gas_limit: test_annotations.gas_limit,
                         todo_description: test_annotations.todo_description,
+                        pos: Pos {
+                            row: name_node.start_position().row,
+                            column: name_node.start_position().column,
+                            uri: file_path.to_owned(),
+                        },
                     });
                 }
             };

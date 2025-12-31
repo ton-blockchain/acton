@@ -1,0 +1,44 @@
+import "../../../../lib/build/build"
+import "../../../../lib/emulation/network"
+import "../../../../lib/testing/expect"
+import "../../../../lib/testing/transaction_expect"
+import "../../../../lib/types/message"
+import "../../../../lib/types/out_actions"
+import "../../../../lib/vm/vm"
+
+import "../contracts/messages"
+
+struct Counter {
+    address: address
+    init: ContractState
+}
+
+fun Counter.fromStorage(storage: Storage) {
+    val init = ContractState {
+        code: build("counter"),
+        data: storage.toCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    return Counter { address, init }
+}
+
+fun setupTest() {
+    val counter = Counter.fromStorage({});
+
+    val deployer = net.treasury("deployer");
+    val msg = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: counter.init,
+        },
+    });
+    val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+
+    return (counter, deployer)
+}
+
+get fun `test-should-setup-test`() {
+    setupTest();
+}

@@ -1,3 +1,4 @@
+use crate::commands::common::error_fmt;
 use crate::file_build_cache::FileBuildCache;
 use anyhow::anyhow;
 use log::info;
@@ -6,6 +7,7 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
+use tolkc::source_map::SourceMap;
 use tycho_types::boc::Boc;
 
 pub fn compile_cmd(
@@ -25,18 +27,23 @@ pub fn compile_cmd(
 
     let start_time = Instant::now();
 
+    if !fs::exists(path).unwrap_or(false) {
+        anyhow::bail!(error_fmt::file_not_found(path));
+    }
+
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() {
-        return Err(anyhow!("Path '{path}' is not a file"));
+        anyhow::bail!("{} is not a file", path.yellow());
     }
 
     if !path.ends_with(".tolk") {
-        return Err(anyhow!("File must end with .tolk"));
+        anyhow::bail!("File must end with {}", ".tolk".yellow());
     }
 
     let mut file_cache = FileBuildCache::new(None)?;
 
-    if let Some(cached_entry) = file_cache.get(path, false, 2, "1.2".to_string()) {
+    let need_debug_info = source_map.is_some();
+    if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.2".to_string()) {
         let elapsed = start_time.elapsed();
         info!("Compile {path} from file cache (.acton/cache) in {elapsed:?}");
 
@@ -44,6 +51,8 @@ pub fn compile_cmd(
             cached_entry.code_boc64,
             cached_entry.code_hash_hex,
             cached_entry.fift_code,
+            cached_entry.source_map,
+            source_map,
             json,
             base64_only,
             boc,
@@ -72,26 +81,12 @@ pub fn compile_cmd(
                 eprintln!("Warning: Failed to cache compilation result: {e}");
             }
 
-            if let Some(source_map_path) = &source_map {
-                if let Some(source_map_data) = &result.source_map {
-                    if let Ok(json_string) = serde_json::to_string_pretty(source_map_data) {
-                        if let Err(e) = fs::write(source_map_path, json_string) {
-                            eprintln!(
-                                "Warning: Failed to write source map to {source_map_path}: {e}"
-                            );
-                        }
-                    } else {
-                        eprintln!("Warning: Failed to serialize source map");
-                    }
-                } else if !json && !base64_only {
-                    eprintln!("Warning: No source map data available");
-                }
-            }
-
             handle_compilation_result(
                 result.code_boc64,
                 result.code_hash_hex,
                 result.fift_code,
+                result.source_map,
+                source_map,
                 json,
                 base64_only,
                 boc,
@@ -113,14 +108,10 @@ pub fn compile_cmd(
                     "error": error.message
                 });
                 println!("{}", serde_json::to_string_pretty(&json_output)?);
+                std::process::exit(1);
             } else {
-                println!(
-                    "{} {}",
-                    "✗ Compilation failed".red().bold(),
-                    error.message.red()
-                );
+                anyhow::bail!(error.message);
             }
-            std::process::exit(1);
         }
     }
 }
@@ -130,6 +121,8 @@ fn handle_compilation_result(
     code_boc64: String,
     code_hash_hex: String,
     fift_code: String,
+    source_map: Option<SourceMap>,
+    source_map_path: Option<String>,
     json: bool,
     base64_only: bool,
     boc: Option<String>,
@@ -140,13 +133,37 @@ fn handle_compilation_result(
     let code = Boc::decode_base64(code_boc64.clone())?;
     let code_hex = Boc::encode_hex(&code);
 
-    if let Some(fift_path) = fift {
-        fs::write(fift_path, &fift_code)?;
+    if let Some(source_map_path) = &source_map_path {
+        if let Some(source_map_data) = &source_map {
+            if let Ok(json_string) = serde_json::to_string_pretty(source_map_data) {
+                fs::write(source_map_path, json_string).map_err(|err| {
+                    anyhow!(color_print::cformat!(
+                        "Failed to save source map <yellow>{source_map_path}</>: {err}"
+                    ))
+                })?;
+            } else {
+                eprintln!("Warning: Failed to serialize source map");
+            }
+        } else if !json && !base64_only {
+            eprintln!("Warning: No source map data available");
+        }
     }
 
-    if let Some(boc_path) = boc {
+    if let Some(fift_path) = &fift {
+        fs::write(fift_path, &fift_code).map_err(|err| {
+            anyhow!(color_print::cformat!(
+                "Failed to save Fift file <yellow>{fift_path}</>: {err}"
+            ))
+        })?;
+    }
+
+    if let Some(boc_path) = &boc {
         let bytes = Boc::encode(code);
-        fs::write(boc_path, bytes)?;
+        fs::write(boc_path, bytes).map_err(|err| {
+            anyhow!(color_print::cformat!(
+                "Failed to save BoC file <yellow>{boc_path}</>: {err}"
+            ))
+        })?;
         return Ok(());
     }
 

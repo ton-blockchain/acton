@@ -16,9 +16,14 @@ pub struct SourceMap {
 impl SourceMap {
     pub fn hash(&self) -> String {
         let mut hasher = DefaultHasher::new();
-        self.high_level.files.iter().for_each(|file| {
-            file.path.hash(&mut hasher);
-        });
+        self.high_level.version.hash(&mut hasher);
+        self.high_level.language.hash(&mut hasher);
+        self.high_level.compiler_version.hash(&mut hasher);
+        for loc in &self.high_level.locations {
+            loc.loc.file.hash(&mut hasher);
+            loc.loc.line.hash(&mut hasher);
+            loc.loc.column.hash(&mut hasher);
+        }
         format!("{:x}", hasher.finish())
     }
 }
@@ -38,7 +43,6 @@ pub struct HighLevelSourceMap {
     pub version: String,
     pub language: Option<String>,
     pub compiler_version: Option<String>,
-    pub files: Vec<SourceFile>,
     pub globals: Vec<GlobalVariable>,
     pub locations: Vec<DebugLocation>,
 }
@@ -58,7 +62,7 @@ pub struct GlobalVariable {
     pub loc: SourceLocation,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct SourceLocation {
     pub file: String,
     pub line: i64,
@@ -79,7 +83,7 @@ impl SourceLocation {
     }
 
     pub fn normalize_path(file: &String) -> String {
-        let normalized = file.replace("_test.tolk_test.tolk", "_test.tolk");
+        let normalized = file.replace(".test.tolk.test.tolk", ".test.tolk");
 
         if let Ok(cwd) = std::env::current_dir() {
             let file_path = Path::new(&normalized);
@@ -99,11 +103,18 @@ impl SourceLocation {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BytecodeLocation {
+    pub hash: String,
+    pub offset: i32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct DebugLocation {
     pub idx: i64,
     pub loc: SourceLocation,
     pub variables: Vec<Variable>,
     pub context: EntryContext,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub debug: Option<DebugInfo>,
 }
 
@@ -112,16 +123,21 @@ pub struct Variable {
     pub name: String,
     #[serde(rename = "type")]
     pub var_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub is_temporary: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub constant_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub possible_qualifier_types: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct EntryContext {
     pub description: EntryContextDescription,
     pub inlining: InliningInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub event: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub event_function: Option<String>,
     pub containing_function: String,
 }
@@ -143,7 +159,15 @@ pub enum EntryContextDescription {
     },
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+impl Default for EntryContextDescription {
+    fn default() -> Self {
+        EntryContextDescription::Basic {
+            ast_kind: "".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct InliningInfo {
     pub inlined_to_func: Option<String>,
     pub containing_func_inline_mode: i64,
@@ -207,7 +231,7 @@ fn get_final_slice(dc: &Cell, key: &str) -> Cell {
 }
 
 fn dyn_cell_to_cell(cell: &DynCell) -> Cell {
-    Boc::decode_base64(Boc::encode_base64(cell)).unwrap()
+    Boc::decode(Boc::encode(cell)).unwrap()
 }
 
 fn get_real_code_hashes(code: &Cell) -> HashMap<String, (String, i32)> {
@@ -247,11 +271,11 @@ pub fn parse_marks_dict(
     marks_boc64: &String,
     code_boc64: &String,
 ) -> HashMap<String, Vec<(i32, i32)>> {
-    let code_cell = Boc::decode_base64(&*code_boc64).unwrap();
+    let code_cell = Boc::decode_base64(code_boc64).unwrap();
 
     let real_code_hashes = get_real_code_hashes(&code_cell);
 
-    let debug_marks_cell = Boc::decode_base64(&*marks_boc64).unwrap();
+    let debug_marks_cell = Boc::decode_base64(marks_boc64).unwrap();
 
     let dict = RawDict::<256>::from(Some(debug_marks_cell));
     let mut marks = HashMap::<String, Vec<(i32, i32)>>::new();

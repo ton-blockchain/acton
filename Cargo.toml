@@ -8,16 +8,19 @@ edition = "2024"
 abi = { path = "crates/abi" }
 tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }
+ton-executor = { path = "crates/ton-executor" }
 tolk_parser = { path = "crates/tolk_parser" }
 tvmffi = { path = "crates/tvmffi" }
 tvmffi-macros = { path = "crates/tvmffi-macros" }
 vmlogs = { path = "crates/vmlogs" }
 tasm = { path = "crates/tasm" }
 dap-client = { path = "crates/dap-client" }
+ton-api = { path = "crates/ton-api" }
+retrace = { path = "crates/retrace" }
 
 # remote crates
 # base TON libraries
-tonlib-core = "0.26.1"
+tonlib-core = "0.26.6"
 tycho-types = "0.3.0"
 
 num-bigint = "0.4.6"
@@ -54,13 +57,38 @@ fs2 = "0.4" # build cache locking
 quick-junit = "0.5.2" # junit format for tests
 
 # disasm for blockchain addresses
-reqwest = { version = "0.12", features = ["json", "blocking"] }
+reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
 urlencoding = "2.1"
+base64 = "0.22.1"
+rand = "0.8"
 
-tempfile = "3.23.0"# testing
+tempfile = "3.23.0" # testing
+dotenvy = "0.15.7"
+pathdiff = "0.2.3"
+strsim = "0.11.1"
+clap_complete = { version = "4.5.61", features = ["unstable-dynamic"] }
+human-panic = "2.0.5" # better panic handling
+
+# acton up
+semver = "1.0.27"
+indicatif = "0.18.3"
+flate2 = "1.1.5"
+tar = "0.4.44"
+
+# acton wallet
+hmac = "0.12.1"
+pbkdf2 = "0.12.2"
+
+tokio = { version = "1.41", features = ["rt-multi-thread", "macros"] }
+once_cell = "1.21.3"
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir"] }
 strip-ansi-escapes = "0.2.1"
 fs_extra = "1.3.0"
 base64 = "0.22.1"
+
+# save ~15% of size (29mb -> 23mb), but very slow to compile/link
+[profile.release-size]
+inherits = "release"
+lto = "fat"

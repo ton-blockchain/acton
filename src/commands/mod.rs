@@ -1,10 +1,19 @@
 pub mod build;
+pub mod common;
 pub mod compile;
 pub mod disasm;
+pub mod docgen;
 pub mod init;
+pub mod library;
 pub mod new;
+pub mod retrace;
+pub mod run;
 pub mod script;
 pub mod test;
+pub mod up;
+pub mod verify;
+pub mod wallet;
+pub mod wrapper;
 
 use std::collections::HashMap;
 

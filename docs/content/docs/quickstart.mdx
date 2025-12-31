@@ -1,0 +1,194 @@
+---
+title: "Quickstart"
+description: "Build, test, and deploy your first Tolk smart contract with Acton"
+icon: Sparkle
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+
+In this guide, we will explore Acton's capabilities and develop a simple smart contract. We'll write tests, deploy it to the testnet, and verify its source code.
+
+<Callout>
+    We won't dive deep into the specific details of the contract logic here. To learn more about Tolk and smart contract development, check out [Your first smart contract](https://docs.ton.org/contract-dev/first-smart-contract) in the official documentation.
+</Callout>
+
+## Get started
+
+<Steps>
+    <Step title="Initialize new project">
+        First, let's create a directory for our project. Acton provides the `acton new` command to scaffold a new project. We'll use the `counter` template which comes with a pre-configured contract, tests, and deployment script.
+
+        ```bash
+        acton new first_counter --template counter
+        ```
+
+        This will create a new directory `first_counter` with the project structure. You should see output similar to this:
+
+        ```
+        $ acton new first_counter --template counter
+        ✓ Created new Acton project
+          Project name: first_counter
+          Description: A TON blockchain project
+          Template: counter
+          License: MIT
+
+        Created Acton.toml with project configuration
+        Created .acton/ directory with standard library
+        Created .acton/tolk-stdlib directory with Tolk standard library
+        ```
+
+        Navigate to the project folder:
+
+        ```bash
+        cd first_counter
+        ```
+
+        The project is already set up with `contracts/counter.tolk` and `contracts/types.tolk`.
+    </Step>
+
+    <Step title="Build contract">
+        Since the template already configured `Acton.toml`, you can immediately build the contract:
+
+        ```bash
+        acton build
+        ```
+
+        This command compiles the contract and places the build artifacts (including a JSON report) in the `build/` folder.
+
+        ```json title="build/counter.json"
+        {
+          "code_boc64": "te6ccgEBBAEAbwABFP8A9KQT9Lzy...",
+          "hash": "1F6548A25E04497496242AD7804B653E6DA9A47E474DC17436313FFA04E15F18"
+        }
+        ```
+
+        Congratulations! You've successfully built your first contract with Acton.
+    </Step>
+
+    <Step title="Test contract">
+        Acton includes a powerful test runner that allows you to write tests in **Tolk**. The template includes a test file `tests/counter.test.tolk` and generated wrappers in `tests/wrappers/`.
+
+        Let's look at the included test in `tests/counter.test.tolk`:
+
+        ```tolk title="tests/counter.test.tolk"
+        get fun `test-increase-counter`() {
+            val (contract, deployer, _) = setupTest();
+
+            val res = contract.sendIncreaseCounter(deployer.address, 123);
+            expect(res).toHaveSuccessfulTx<IncreaseCounter>({
+                from: deployer.address,
+                to: contract.address
+            });
+
+            expect(contract.currentCounter()).toEqual(123)
+        }
+        ```
+
+        Run the tests:
+
+        ```bash
+        acton test
+        ```
+
+        Output:
+
+        ```
+        $ acton test
+           Compiling contracts
+            Finished in 726.375µs
+             Running tests
+
+         TEST  <root>/first_counter
+
+         > ./tests/counter.test.tolk (3 tests)
+          ✓ increase-counter 4ms
+          ✓ reset-counter 3ms
+          ✓ unknown-message 2ms
+
+         ✓ 3 passed in 1 file
+        ```
+
+        Acton also supports **coverage analysis**:
+
+        ```bash
+        acton test --coverage
+        ```
+
+        And **mutation testing** to find gaps in your tests:
+
+        ```bash
+        acton test --mutate --mutate-contract counter
+        ```
+    </Step>
+
+    <Step title="Setup Wallet">
+        To deploy to the blockchain, you need a wallet. Let's create a new one using the `wallet` command:
+
+        ```bash
+        acton wallet new --name deployer --local
+        ```
+
+        This will generate a new wallet and save it to `wallets.toml` in your project root. The mnemonic will be stored directly in this file.
+
+        <Callout type="warn">
+            `wallets.toml` contains your private mnemonic in plain text. **Never commit it to git!** Acton automatically adds it to `.gitignore`.
+        </Callout>
+
+        Since this is a testnet wallet, you'll need some testnet TONs. Get them from the **[Testnet Giver Bot](https://t.me/testgiver_ton_bot)** by sending your new wallet address.
+    </Step>
+
+    <Step title="Deploying contract">
+        Now that our contract is tested and we have a funded wallet, we can deploy it to the testnet.
+
+        The template includes a deployment script `scripts/deploy.tolk`:
+
+        ```tolk title="scripts/deploy.tolk"
+        import "../tests/wrappers/Counter"
+        import "../contracts/types"
+
+        import "../.acton/io"
+        import "../.acton/emulation/network"
+        import "../.acton/build/build"
+
+        fun main() {
+            val deployer = net.wallet("deployer");
+
+            val counter = Counter.fromStorage(Storage { id: 0, counter: 0 });
+            val res = counter.deploy(deployer.address, { value: ton("0.005") });
+            res.wait();
+
+            println1("Deployed counter to {}", counter.address);
+        }
+        ```
+
+        Let's use it:
+
+        ```bash
+        acton script scripts/deploy.tolk --broadcast --net testnet
+        ```
+
+        If successful, you'll see the deployment transaction hash and the contract address.
+    </Step>
+
+    <Step title="Verify contract">
+        Finally, let's verify our contract source code on the blockchain explorer. This proves that the deployed bytecode matches your source code.
+
+        ```bash
+        acton verify --contract counter --net testnet --address <YOUR_CONTRACT_ADDRESS>
+        ```
+
+        Replace `<YOUR_CONTRACT_ADDRESS>` with the address from the previous step.
+
+    </Step>
+</Steps>
+
+## Next Steps
+
+Congratulations! You've successfully built, tested, deployed, and verified a smart contract on the TON blockchain using Acton! 
+
+Explore more advanced topics:
+
+- **[Testing Guide](/docs/test-runner)** — deep dive into writing comprehensive tests.
+- **[Standard Library](/docs/standard_library)** — learn about the built-in functions available in Acton.
+- **[Commands Reference](/docs/commands)** — detailed documentation for all CLI commands.

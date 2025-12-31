@@ -1,6 +1,8 @@
 use crate::common::assertion;
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output;
-use crate::support::{ProjectBuilder, TestOutputExt};
+
 use std::fs;
 
 const SIMPLE_CONTRACT: &str = r#"
@@ -287,4 +289,32 @@ fn test_init_output_format() {
         .run()
         .success()
         .assert_snapshot_matches("integration/snapshots/test_init_output_format.stdout.txt");
+}
+
+#[test]
+fn test_init_project_symlinks_global_wallets() {
+    let project = ProjectBuilder::new("init-symlink")
+        .without_acton_toml()
+        .build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    let global_wallets_dir = home_path.join(".acton").join("wallets");
+    fs::create_dir_all(&global_wallets_dir).unwrap();
+    let global_config = global_wallets_dir.join("global.wallets.toml");
+    fs::write(
+        &global_config,
+        "[wallets.global]\nkind=\"v5r1\"\nkeys={mnemonic=\"word1\"}",
+    )
+    .unwrap();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
+
+    let symlink = project.path().join("global.wallets.toml");
+    assert!(symlink.exists());
 }

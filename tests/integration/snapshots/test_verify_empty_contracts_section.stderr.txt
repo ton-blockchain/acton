@@ -1,0 +1,1 @@
+Error: No contracts configured in Acton.toml. Please add a contract configuration.

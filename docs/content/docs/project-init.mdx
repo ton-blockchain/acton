@@ -1,0 +1,132 @@
+---
+title: "Project initialization"
+description: "Learn how to initialize your project with Acton"
+icon: SquareTerminal
+---
+
+import { File, Folder, Files } from 'fumadocs-ui/components/files';
+
+The `acton new` command is the starting point for any new Tolk project. It sets up the project structure, installs necessary dependencies, and allows you to start from a pre-built template.
+
+## Usage
+
+To create a new project, run:
+
+```bash
+acton new <PATH>
+```
+
+Where `<PATH>` is the directory where you want to create the project. If you want to create the project in the current directory, use `.`:
+
+```bash
+acton new .
+```
+
+## Interactive Setup
+
+If you don't provide additional flags, Acton will guide you through an interactive setup process to configure your project:
+
+1.  **Project Name**: The name of your project (default: directory name).
+2.  **Description**: A short description of your project.
+3.  **Template**: Choose a starting template (see [Templates](#templates) below).
+4.  **License**: Select an open-source license (MIT, Apache-2.0, etc.).
+
+Example interaction:
+
+```text
+$ acton new my-project
+? Project name: my-project
+? Description: A TON blockchain project
+? Template: counter
+? License: MIT
+```
+
+## Templates
+
+Acton comes with several built-in templates to help you get started quickly:
+
+### `empty`
+A minimal project structure with a single empty contract. Best for starting from scratch when you know exactly what you want to build.
+
+### `counter`
+A simple example demonstrating state management in Tolk. It includes:
+- A basic counter contract.
+- A wrapper class for testing.
+- Unit tests.
+- A deployment script.
+
+### `jetton`
+A comprehensive example of a [Jetton](https://docs.ton.org/develop/dapps/asset-processing/jettons) (Token) implementation. This is a great reference for building complex multi-contract applications. It includes:
+- **Minter Contract**: Manages the total supply and minting of tokens.
+- **Wallet Contract**: Manages individual user balances.
+- **Tests**: Full suite of tests covering minting, transferring, and burning.
+
+## Project Structure
+
+After initialization, your project will have the following structure:
+
+<Files>
+  <Folder name=".acton" defaultOpen>
+    <File name="tolk-stdlib/" />
+    <File name="..." />
+  </Folder>
+  <Folder name="contracts" defaultOpen>
+    <File name="contract.tolk" />
+  </Folder>
+  <Folder name="scripts" defaultOpen>
+    <File name="deploy.tolk" />
+  </Folder>
+  <Folder name="tests" defaultOpen>
+    <File name="contract.test.tolk" />
+    <Folder name="wrappers">
+      <File name="Contract.tolk" />
+    </Folder>
+  </Folder>
+  <Folder name="build">
+    <File name="contract.pkg" />
+  </Folder>
+  <File name="Acton.toml" />
+  <File name="wallets.toml" />
+  <File name="global.wallets.toml" />
+  <File name="LICENSE" />
+  <File name=".gitignore" />
+</Files>
+
+### Directory Overview
+
+- **`.acton/`**: Contains internal files and standard libraries managed by Acton. You generally shouldn't edit files in here manually.
+- **`contracts/`**: This is where your `.tolk` smart contract source files live.
+- **`scripts/`**: Contains auxiliary Tolk scripts for deployment, administration, and interaction with your contracts.
+- **`tests/`**: Contains your unit and integration tests.
+- **`tests/wrappers/`**: Contains contract wrappers that provide an interface for testing your contracts.
+- **`build/`**: (Generated) This folder is created when you run `acton build`. It contains the compiled bytecode (BOC files) and other build artifacts.
+- **`Acton.toml`**: The main configuration file for your project. It defines your package metadata, contracts, and dependencies.
+- **`wallets.toml`**: Project-specific wallet configurations (added to `.gitignore`).
+- **`global.wallets.toml`**: A symbolic link to your global wallets (shared across all projects).
+
+## Configuration
+
+The project configuration is stored in `Acton.toml`. This file defines your package metadata, contracts, and dependencies. Wallet configurations are stored in separate `wallets.toml` files for security and convenience.
+
+Example `Acton.toml`:
+
+```toml
+[package]
+name = "my-project"
+description = "A TON blockchain project"
+license = "MIT"
+
+[contracts.counter]
+name = "counter"
+src = "contracts/counter.tolk"
+```
+
+## Next Steps
+
+Once your project is created, navigate into the directory and try running the build and tests:
+
+```bash
+cd my-project
+acton build
+acton test
+```
