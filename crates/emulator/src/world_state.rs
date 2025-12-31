@@ -83,7 +83,7 @@ impl LocalAccountsState {
         }
 
         let acc = ShardAccount {
-            account: Lazy::new(&OptionalAccount(None)).unwrap(),
+            account: Lazy::new(&OptionalAccount(None)).expect("Failed to create empty account"),
             last_trans_hash: HashBytes::ZERO,
             last_trans_lt: current_lt,
         };
@@ -132,7 +132,8 @@ impl RemoteAccountState {
             Err(_) => {
                 // don't cache account on error
                 ShardAccount {
-                    account: Lazy::new(&OptionalAccount(None)).unwrap(),
+                    account: Lazy::new(&OptionalAccount(None))
+                        .expect("Failed to create empty account"),
                     last_trans_hash: HashBytes::ZERO,
                     last_trans_lt: current_lt,
                 }

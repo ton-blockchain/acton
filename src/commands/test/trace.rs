@@ -71,7 +71,7 @@ pub fn dump_test_transactions(
 
             Some(TransactionInfo {
                 raw_transaction: tx.raw_transaction.clone(),
-                parent_transaction: tx.parent_transaction.as_ref().map(|tx| tx.lt),
+                parent_transaction: tx.parent_transaction,
                 dest_contract_info: contract_info.as_ref().map(|info| info.name.clone()),
                 child_transactions: tx.child_transactions.clone(),
                 shard_account_before: Boc::encode_hex(to_cell(&tx.shard_account_before)),

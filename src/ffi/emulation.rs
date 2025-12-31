@@ -275,7 +275,7 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
             .collect::<Vec<_>>(),
     );
     let parent_lt = match &emulation.parent_transaction {
-        Some(parent_tx) => TupleItem::Int(BigInt::from(parent_tx.lt)),
+        Some(parent_lt) => TupleItem::Int(BigInt::from(*parent_lt)),
         None => TupleItem::Null,
     };
     let actions = match &emulation.actions {
@@ -404,7 +404,7 @@ fn send_message_debug(
         )
         .expect("Cannot send response");
 
-    let msg_cell = Emulator::patch_src_addr(msg_cell.clone(), src_addr.clone());
+    let msg_cell = Emulator::patch_src_addr(msg_cell.clone(), src_addr.clone())?;
     let prepare_result = step_executor
         .prepare_transaction(
             &Boc::encode_base64(msg_cell),
@@ -527,7 +527,7 @@ fn send_message_debug(
             for result in &mut send_results {
                 match result {
                     SendMessageResult::Success(result) => {
-                        result.parent_transaction = Some(transaction.clone());
+                        result.parent_transaction = Some(transaction.lt);
                     }
                     SendMessageResult::Error(_) => {}
                 }
@@ -580,7 +580,7 @@ fn send_single_message_impl(
     let world_state = &mut ctx.chain.world_state;
 
     let emulation = emulator
-        .send_single_message(world_state, msg_cell, &libs, Some(src_addr))
+        .send_transaction(world_state, msg_cell, &libs, Some(src_addr))
         .context("Cannot emulate transaction")?;
 
     let SendMessageResult::Success(emulation) = emulation else {

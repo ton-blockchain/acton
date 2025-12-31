@@ -1,3 +1,8 @@
+//! This module provides utilities for interacting with remote TON networks.
+//!
+//! It currently supports fetching account information and global libraries
+//! from the TonCenter API for both `mainnet` and `testnet`.
+
 use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
@@ -5,6 +10,15 @@ use serde::Deserialize;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
+/// Fetches account information from TonCenter.
+///
+/// # Arguments
+///
+/// * `seqno` - Optional block sequence number to pin the state to.
+/// * `address` - The account address in any valid format.
+/// * `network` - The network name ("mainnet" or "testnet").
+/// * `api_key` - Optional TonCenter API key. If not provided, it will try to
+///   use the `TONCENTER_API_KEY` environment variable.
 pub fn get_account_info(
     seqno: Option<u64>,
     address: &str,
@@ -54,6 +68,13 @@ fn toncenter_url(network: &str) -> anyhow::Result<&str> {
     Ok(base_url)
 }
 
+/// Fetches a global library by its hash from TonCenter.
+///
+/// # Arguments
+///
+/// * `network` - The network name ("mainnet" or "testnet").
+/// * `hash` - Hex-encoded hash of the library.
+/// * `api_key` - Optional TonCenter API key.
 pub fn get_library_by_hash(
     network: &str,
     hash: &str,
@@ -105,6 +126,9 @@ pub fn get_library_by_hash(
     Boc::decode_base64(&data.result.result[0].data).context("Failed to decode library BOC data")
 }
 
+/// Decodes an optional Base64-encoded BoC string into a `Cell`.
+///
+/// Returns `None` if the input string is empty.
 pub fn decode_optional_cell(cell_data: &String) -> anyhow::Result<Option<Cell>> {
     if cell_data.is_empty() {
         return Ok(None);
@@ -117,22 +141,33 @@ struct TonCenterAccountInfoResponse {
     pub result: TonCenterAccountInfoResult,
 }
 
+/// Account information returned by TonCenter API.
 #[derive(Deserialize, Debug)]
 pub struct TonCenterAccountInfoResult {
+    /// Account balance in nanoTONs.
     pub balance: StringOrNumber,
+    /// Base64-encoded code BoC.
     pub code: String,
+    /// Base64-encoded data BoC.
     pub data: String,
+    /// Account state (active, uninitialized, or frozen).
     pub state: String,
+    /// Hash of the state if the account is frozen.
     pub frozen_hash: String,
+    /// Information about the last transaction.
     pub last_transaction_id: TonCenterAccountInfoLastTransactionId,
 }
 
+/// Last transaction ID information from TonCenter.
 #[derive(Deserialize, Debug)]
 pub struct TonCenterAccountInfoLastTransactionId {
+    /// Logical time of the transaction.
     pub lt: String,
+    /// Hash of the transaction.
     pub hash: String,
 }
 
+/// A helper type for JSON values that can be either strings or numbers.
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum StringOrNumber {
