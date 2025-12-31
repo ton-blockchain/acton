@@ -143,7 +143,7 @@ impl Default for TupleItem {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Flattened<T>(pub T);
 
 impl<T> Deref for Flattened<T> {

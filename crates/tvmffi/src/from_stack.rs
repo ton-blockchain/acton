@@ -106,6 +106,15 @@ impl FromStack for u32 {
     }
 }
 
+impl FromStack for u64 {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        match item {
+            TupleItem::Int(i) => i.to_u64().ok_or(ArgError::TypeMismatch { expected: "u64" }),
+            _ => Err(ArgError::TypeMismatch { expected: "Int" }),
+        }
+    }
+}
+
 /// Convert a TupleItem to a bool.
 ///
 /// Note that in the TVM true is -1 and false is 0.

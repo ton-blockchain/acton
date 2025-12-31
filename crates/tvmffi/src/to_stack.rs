@@ -63,6 +63,12 @@ impl ToStack for u32 {
     }
 }
 
+impl ToStack for u64 {
+    fn to_item(&self) -> Result<TupleItem, SerializationError> {
+        Ok(TupleItem::Int(BigInt::from(*self)))
+    }
+}
+
 impl ToStack for ArcCell {
     fn to_item(&self) -> Result<TupleItem, SerializationError> {
         Ok(TupleItem::Cell(self.clone()))

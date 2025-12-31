@@ -58,7 +58,7 @@ pub fn tuple_serialize_derive(input: TokenStream) -> TokenStream {
         impl #impl_generics #name #ty_generics #where_clause {
             pub fn to_tuple(&self, _options: tvmffi::to_stack::SerializationOptions) -> Result<tvmffi::stack::Tuple, tvmffi::to_stack::SerializationError> {
                 let mut tuple = tvmffi::stack::Tuple(vec![]);
-                #(#field_serializations);*
+                #(#field_serializations;)*
                 Ok(tuple)
             }
         }
