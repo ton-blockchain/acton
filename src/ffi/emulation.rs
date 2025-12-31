@@ -5,10 +5,11 @@ use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
 use crate::ffi::assert::process_txs_and_search_params;
 use crate::formatter::FormatterContext;
+use anyhow::Context as AnyhowContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use emulator::{extension, register_ext_methods, remote, try_ctx};
+use emulator::{extension, register_ext_methods, remote};
 use log::{debug, info, warn};
 use num_bigint::BigInt;
 use num_traits::{ToPrimitive, Zero};
@@ -40,10 +41,18 @@ use tycho_types::models::{
 };
 
 extension!(build in (Context) with (path: String, name: String) using build_impl);
-fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: String) {
+fn build_impl(
+    ctx: &mut Context,
+    stk: &mut Tuple,
+    path: String,
+    name: String,
+) -> anyhow::Result<()> {
     debug!("Building {name}");
     let id = name.clone();
     let start_time = Instant::now();
+
+    let mut path = path;
+    let mut name = name;
 
     if path.is_empty() {
         debug!("No path provided, search in contracts");
@@ -54,44 +63,35 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: 
             name = found_contract.name; // use actual name instead of id
             path = found_contract.src.clone();
         } else {
-            ctx.asserts
-                .fail(error_fmt::contract_not_found(ctx.env.config, &name));
-            return;
+            anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, &name));
         }
     }
 
     if let Some(override_code) = ctx.env.build_override.get(id.as_str()) {
         debug!("Overriding code for {name}");
-        stack.push(TupleItem::Cell(override_code.clone()));
-        return;
+        stk.push(TupleItem::Cell(override_code.clone()));
+        return Ok(());
     }
 
     // TODO: add test for this case
     if path.ends_with(".boc") {
         // For BoC source we just return it as a Cell
-        let binary_data = try_ctx!(ctx, fs::read(&path), "Cannot read BoC file {}");
-        let cell = try_ctx!(
-            ctx,
-            ArcCell::from_boc(binary_data.as_slice()),
-            "Failed to decode code BoC for {}: {}",
-            path
-        );
-        stack.push(TupleItem::Cell(cell));
-        return;
+        let binary_data =
+            fs::read(&path).with_context(|| format!("Cannot read BoC file {path}"))?;
+        let cell = ArcCell::from_boc(binary_data.as_slice())
+            .map_err(|e| anyhow::anyhow!("Failed to decode code BoC for {}: {}", path, e))?;
+        stk.push(TupleItem::Cell(cell));
+        return Ok(());
     }
 
     if let Some(cached) = ctx.build.build_cache.built.get(&path) {
         let elapsed = start_time.elapsed();
         info!("Build {path} from memory cache in {elapsed:?}");
 
-        let code_cell = try_ctx!(
-            ctx,
-            ArcCell::from_boc_b64(&cached.code_boc64),
-            "Failed to decode cached code BoC for {}: {}",
-            path
-        );
-        stack.push(TupleItem::Cell(code_cell));
-        return;
+        let code_cell = ArcCell::from_boc_b64(&cached.code_boc64)
+            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {}: {}", path, e))?;
+        stk.push(TupleItem::Cell(code_cell));
+        return Ok(());
     }
 
     if let Some(cached_entry) =
@@ -110,14 +110,10 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: 
             cached_entry.source_map.clone().unwrap_or_default(),
         );
 
-        let code_cell = try_ctx!(
-            ctx,
-            ArcCell::from_boc_b64(&cached_entry.code_boc64),
-            "Failed to decode cached code BoC for {}: {}",
-            path
-        );
-        stack.push(TupleItem::Cell(code_cell));
-        return;
+        let code_cell = ArcCell::from_boc_b64(&cached_entry.code_boc64)
+            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {}: {}", path, e))?;
+        stk.push(TupleItem::Cell(code_cell));
+        return Ok(());
     }
 
     let compile_start = Instant::now();
@@ -148,13 +144,10 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: 
                 &success.code_hash_hex,
                 success.source_map.unwrap_or(Default::default()),
             );
-            let code_cell = try_ctx!(
-                ctx,
-                ArcCell::from_boc_b64(&success.code_boc64),
-                "Failed to decode compiled code BoC for {}: {}",
-                path
-            );
-            stack.push(TupleItem::Cell(code_cell))
+            let code_cell = ArcCell::from_boc_b64(&success.code_boc64).map_err(|e| {
+                anyhow::anyhow!("Failed to decode compiled code BoC for {}: {}", path, e)
+            })?;
+            stk.push(TupleItem::Cell(code_cell))
         }
         tolkc::CompilerResult::Error(error) => {
             let total_elapsed = start_time.elapsed();
@@ -163,66 +156,39 @@ fn build_impl(ctx: &mut Context, stack: &mut Tuple, mut path: String, mut name: 
                 path, total_elapsed, error.message
             );
 
-            ctx.asserts
-                .fail(format!("Compilation failed: {}", error.message));
-            stack.push(TupleItem::Null);
+            anyhow::bail!("Compilation failed: {}", error.message);
         }
     };
+
+    Ok(())
 }
 
-extension!(send_message in (Context) with (mode: BigInt, from: ArcCell, message: ArcCell) using send_message_impl);
+extension!(send_message in (Context) with (mode: BigInt, src: ArcCell, msg: ArcCell) using send_message_impl);
 fn send_message_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
-    _mode: BigInt,
-    from: ArcCell,
-    message: ArcCell,
-) {
+    _: BigInt,
+    src: ArcCell,
+    msg: ArcCell,
+) -> anyhow::Result<()> {
     let emulator = &ctx.chain.emulator;
 
-    let msg_b64 = try_ctx!(
-        ctx,
-        message.to_boc(false),
-        "Failed to encode message to BoC: {}"
-    );
-    let msg_cell = try_ctx!(
-        ctx,
-        Boc::decode(msg_b64),
-        "Failed to decode message from BoC: {}"
-    );
+    let msg_cell = Boc::decode(msg.to_boc(false)?)?;
+    let src_cell = Boc::decode(src.to_boc(false)?)?;
 
-    let from_b64 = try_ctx!(
-        ctx,
-        from.to_boc(false),
-        "Failed to encode from address to BoC: {}"
-    );
-    let from_cell = try_ctx!(
-        ctx,
-        Boc::decode(from_b64),
-        "Failed to decode from address from BoC: {}"
-    );
-    let mut from_slice = try_ctx!(
-        ctx,
-        from_cell.as_slice(),
-        "Failed to create slice `from` from address cell: {}"
-    );
-    let src_addr = IntAddr::load_from(&mut from_slice);
-    let src_addr = match src_addr {
-        Ok(src_addr) => src_addr,
-        Err(err) => {
-            ctx.asserts.fail(format!(
-                "Failed to decode src address from x{{{}}} with length={}: {}",
-                from_slice.display_data(),
-                from_slice.size_bits(),
-                err
-            ));
-            return;
-        }
-    };
+    let src_addr = src_cell.parse::<IntAddr>().map_err(|err| {
+        let from_slice = src_cell.as_slice_allow_exotic();
+        anyhow::anyhow!(
+            "Failed to decode src address from x{{{}}} with length={}: {}",
+            from_slice.display_data(),
+            from_slice.size_bits(),
+            err
+        )
+    })?;
 
     if let Some(wallet) = ctx.env.find_wallet_by_address(&src_addr) {
-        let result = send_wallet_message(&message, wallet, &ctx.network(), &ctx.env.api_key);
-        try_ctx!(ctx, result, "Failed to send message to real network: {}");
+        send_wallet_message(&msg, wallet, &ctx.network(), &ctx.env.api_key)
+            .context("Failed to send message to real network")?;
 
         // Add pseudo transaction to the result list to wait on it
         let tx = Transaction {
@@ -234,14 +200,7 @@ fn send_message_impl(
             out_msg_count: Default::default(),
             orig_status: AccountStatus::Uninit,
             end_status: AccountStatus::Uninit,
-            in_msg: Some(
-                Boc::decode(
-                    message
-                        .to_boc(false)
-                        .expect("Unreachable, cannot encode valid message cell"),
-                )
-                .expect("Unreachable, cannot decode/encode message cell"),
-            ),
+            in_msg: Some(msg_cell),
             out_msgs: Default::default(),
             total_fees: Default::default(),
             state_update: Lazy::new(&HashUpdate {
@@ -278,14 +237,14 @@ fn send_message_impl(
             TupleItem::Tuple(Tuple::empty()),
         ]))];
         stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
-        return;
+        return Ok(());
     }
 
     let libs = ctx.chain.build_libs(&src_addr);
     let world_state = &mut ctx.chain.world_state;
 
     let emulations = if ctx.debug.is_enabled() {
-        send_message_debug(ctx, &msg_cell, &libs, Some(src_addr))
+        send_message_debug(ctx, &msg_cell, &libs, Some(src_addr))?
     } else {
         emulator.send_message(world_state, msg_cell, &libs, Some(src_addr))
     };
@@ -301,6 +260,7 @@ fn send_message_impl(
 
     ctx.chain.emulations.results.push(emulations);
     stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
+    Ok(())
 }
 
 fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<TupleItem> {
@@ -409,22 +369,13 @@ fn send_message_debug(
     msg_cell: &Cell,
     libs: &Dict<HashBytes, LibDescr>,
     src_addr: Option<IntAddr>,
-) -> Vec<SendMessageResult> {
-    let mut msg_slice = try_ctx!(
-        ctx,
-        msg_cell.as_slice(),
-        "Failed to create slice from message cell: {}"
-    );
-    let message_obj = try_ctx!(
-        ctx,
-        RelaxedMessage::load_from(&mut msg_slice),
-        "Failed to load message from slice: {}"
-    );
+) -> anyhow::Result<Vec<SendMessageResult>> {
+    let message_obj: RelaxedMessage = msg_cell
+        .parse()
+        .context("Failed to load message from cell")?;
 
     let RelaxedMsgInfo::Int(int_message) = &message_obj.info else {
-        ctx.asserts
-            .fail("Emulator only supports internal messages for now".to_string());
-        return vec![];
+        anyhow::bail!("Emulator only supports internal messages for now");
     };
 
     let dest_account = ctx
@@ -479,8 +430,8 @@ fn send_message_debug(
         ctx.debug
             .ctx()
             .finish_thread(2)
-            .expect("Cannot send response");
-        return vec![];
+            .context("Cannot send response")?;
+        return Ok(vec![]);
     }
 
     // Step to update internal state
@@ -495,17 +446,17 @@ fn send_message_debug(
         ctx.debug
             .ctx()
             .process_incoming_requests(false)
-            .expect("Cannot send response");
+            .context("Cannot send response")?;
     }
 
     let result = step_executor
         .finish_transaction()
-        .expect("Cannot finish transaction");
+        .context("Cannot finish transaction")?;
 
     ctx.debug
         .ctx()
         .finish_thread(2)
-        .expect("Cannot send response");
+        .context("Cannot send response")?;
 
     if ctx.debug.ctx().performing_step != Some(StepMode::Continue) {
         // When we step out from nested message/get method, send stop message to client to
@@ -516,46 +467,26 @@ fn send_message_debug(
     let result = match result {
         EmulationResult::Success(result) => result,
         EmulationResult::Error(_) => {
-            return vec![];
+            return Ok(vec![]);
         }
     };
 
     let shard_account_after = &result.shard_account;
-    let shard_account_cell = try_ctx!(
-        ctx,
-        Boc::decode_base64(shard_account_after),
-        "Failed to decode shard account BoC: {}"
-    );
-    let mut shard_account_slice = try_ctx!(
-        ctx,
-        shard_account_cell.as_slice(),
-        "Failed to create slice from shard account cell: {}"
-    );
-    let shard_account = try_ctx!(
-        ctx,
-        ShardAccount::load_from(&mut shard_account_slice),
-        "Failed to load shard account from slice: {}"
-    );
+    let shard_account_cell =
+        Boc::decode_base64(shard_account_after).context("Failed to decode shard account BoC")?;
+    let shard_account: ShardAccount = shard_account_cell
+        .parse()
+        .context("Failed to load shard account from cell")?;
 
     ctx.chain
         .world_state
         .update_account(&int_message.dst.to_string(), &shard_account);
 
-    let tx_cell: Cell = try_ctx!(
-        ctx,
-        Boc::decode_base64(&result.transaction),
-        "Failed to decode transaction BoC: {}"
-    );
-    let mut tx_slice = try_ctx!(
-        ctx,
-        tx_cell.as_slice(),
-        "Failed to create slice from transaction cell: {}"
-    );
-    let transaction = try_ctx!(
-        ctx,
-        Transaction::load_from(&mut tx_slice),
-        "Failed to load transaction from slice: {}"
-    );
+    let tx_cell =
+        Boc::decode_base64(&result.transaction).context("Failed to decode transaction BoC")?;
+    let transaction: Transaction = tx_cell
+        .parse()
+        .context("Failed to load transaction from cell")?;
 
     let out_messages = transaction
         .iter_out_msgs()
@@ -591,7 +522,8 @@ fn send_message_debug(
                 return vec![];
             };
 
-            let mut send_results = send_message_debug(ctx, &to_cell(&msg), libs, None);
+            let mut send_results =
+                send_message_debug(ctx, &to_cell(&msg), libs, None).unwrap_or_default();
             for result in &mut send_results {
                 match result {
                     SendMessageResult::Success(result) => {
@@ -619,74 +551,46 @@ fn send_message_debug(
         result.externals = externals;
     }
 
-    all_results
+    Ok(all_results)
 }
 
-extension!(send_single_message in (Context) with (from: ArcCell, message: ArcCell) using send_single_message_impl);
-fn send_single_message_impl(ctx: &mut Context, stack: &mut Tuple, from: ArcCell, message: ArcCell) {
+extension!(send_single_message in (Context) with (src: ArcCell, msg: ArcCell) using send_single_message_impl);
+fn send_single_message_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    src: ArcCell,
+    msg: ArcCell,
+) -> anyhow::Result<()> {
     let emulator = &ctx.chain.emulator;
 
-    let msg_b64 = try_ctx!(
-        ctx,
-        message.to_boc(false),
-        "Failed to encode message to BoC: {}"
-    );
-    let msg_cell = try_ctx!(
-        ctx,
-        Boc::decode(msg_b64),
-        "Failed to decode message from BoC: {}"
-    );
+    let msg_cell = Boc::decode(msg.to_boc(false)?)?;
+    let src_cell = Boc::decode(src.to_boc(false)?)?;
 
-    let from_b64 = try_ctx!(
-        ctx,
-        from.to_boc(false),
-        "Failed to encode from address to BoC: {}"
-    );
-    let from_cell = try_ctx!(
-        ctx,
-        Boc::decode(from_b64),
-        "Failed to decode from address from BoC: {}"
-    );
-    let mut from_slice = try_ctx!(
-        ctx,
-        from_cell.as_slice(),
-        "Failed to create slice `from` from address cell: {}"
-    );
-    let src_addr = IntAddr::load_from(&mut from_slice);
-    let src_addr = match src_addr {
-        Ok(src_addr) => src_addr,
-        Err(err) => {
-            ctx.asserts.fail(format!(
-                "Failed to decode src address from x{{{}}} with length={}: {}",
-                from_slice.display_data(),
-                from_slice.size_bits(),
-                err
-            ));
-            return;
-        }
-    };
+    let src_addr = src_cell.parse::<IntAddr>().map_err(|err| {
+        let from_slice = src_cell.as_slice_allow_exotic();
+        anyhow::anyhow!(
+            "Failed to decode src address from x{{{}}} with length={}: {}",
+            from_slice.display_data(),
+            from_slice.size_bits(),
+            err
+        )
+    })?;
 
     let libs = ctx.chain.build_libs(&src_addr);
     let world_state = &mut ctx.chain.world_state;
 
-    let emulation = match emulator.send_single_message(world_state, msg_cell, &libs, Some(src_addr))
-    {
-        Ok(res) => res,
-        Err(err) => {
-            ctx.asserts
-                .fail(format!("Cannot emulate transaction: {}", err));
-            return;
-        }
-    };
+    let emulation = emulator
+        .send_single_message(world_state, msg_cell, &libs, Some(src_addr))
+        .context("Cannot emulate transaction")?;
 
     let SendMessageResult::Success(emulation) = emulation else {
         stack.push(TupleItem::Null);
-        return;
+        return Ok(());
     };
 
     let Some(send_result) = emulation_to_send_result(&emulation) else {
         stack.push(TupleItem::Null);
-        return;
+        return Ok(());
     };
 
     ctx.chain
@@ -695,25 +599,26 @@ fn send_single_message_impl(ctx: &mut Context, stack: &mut Tuple, from: ArcCell,
         .push(vec![SendMessageResult::Success(emulation)]);
 
     stack.push(send_result);
+    Ok(())
 }
 
 extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple) using find_transaction_by_params_impl);
 fn find_transaction_by_params_impl(
-    ctx: &mut Context,
+    _ctx: &mut Context,
     stack: &mut Tuple,
     params: Tuple,
     txs: Tuple,
-) {
+) -> anyhow::Result<()> {
     if txs.0.is_empty() {
         stack.push(TupleItem::Null);
-        return;
+        return Ok(());
     }
 
     let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
         Some(value) => value,
         None => {
             stack.push(TupleItem::Null);
-            return;
+            return Ok(());
         }
     };
 
@@ -833,17 +738,14 @@ fn find_transaction_by_params_impl(
     let Some(first) = txs.first() else {
         // No transaction found
         stack.push(TupleItem::Null);
-        return;
+        return Ok(());
     };
 
-    let tx_base64 = Boc::encode_base64(to_cell(&first));
-    let tx_cell = try_ctx!(
-        ctx,
-        ArcCell::from_boc_b64(&tx_base64),
-        "Failed to decode transaction BoC: {}"
-    );
+    let tx_boc = Boc::encode(to_cell(&first));
+    let tx_cell = ArcCell::from_boc(&tx_boc)?;
 
     stack.push(TupleItem::Cell(tx_cell));
+    Ok(())
 }
 
 extension!(run_get_method in (Context) with (args: Tuple, return_type_name: String, name: String, id: BigInt, code: ArcCell, address: ArcCell) using run_get_method_impl);
@@ -857,19 +759,28 @@ fn run_get_method_impl(
     id: BigInt,
     code: ArcCell,
     address: ArcCell,
-) {
+) -> anyhow::Result<()> {
     let args = args.unwrap_empty().unwrap_tuple();
     let world_state = &mut ctx.chain.world_state;
-    let address_boc = address.to_boc_hex(false).unwrap();
+    let address_boc = address
+        .to_boc_hex(false)
+        .context("Failed to encode address to BOC hex")?;
 
-    let address_std = MsgAddrIntStd::from_boc_hex(address_boc.as_str()).unwrap();
+    let address_std = MsgAddrIntStd::from_boc_hex(address_boc.as_str())
+        .context("Failed to parse address from BOC hex")?;
     let address_hash = address_std.address.clone();
     let dst_addr_str = format!("{}:{}", &address_std.workchain, hex::encode(&address_hash));
 
-    let dest_address = TonAddress::from_msg_address(address_std).unwrap();
+    let dest_address =
+        TonAddress::from_msg_address(address_std).context("Failed to create TonAddress")?;
 
     let shard_account = world_state.get_account(&dst_addr_str);
-    let state = shard_account.account.load().unwrap().0.map(|s| s.state);
+    let state = shard_account
+        .account
+        .load()
+        .context("Failed to load account")?
+        .0
+        .map(|s| s.state);
 
     let data = if let Some(AccountState::Active(state)) = state {
         state.data.unwrap_or(Cell::default())
@@ -884,7 +795,7 @@ fn run_get_method_impl(
 
     let method_id = id.to_i32().unwrap_or(0);
     let params = RunGetMethodArgs {
-        code: code.to_boc_b64(false).unwrap(),
+        code: code.to_boc_b64(false)?,
         data: Boc::encode_base64(data),
         verbosity: ctx.env.default_log_level,
         libs: libs_root.map(Boc::encode_base64).unwrap_or("".to_string()),
@@ -902,15 +813,15 @@ fn run_get_method_impl(
     let result = if ctx.debug.is_enabled() {
         let args = serialize_tuple(&args)
             .map(|t| t.to_boc_b64(false))
-            .expect("Cannot serialize tuple")
-            .expect("Cannot serialize tuple");
+            .context("Cannot serialize tuple")?
+            .context("Cannot serialize tuple")?;
         let step_executor =
-            StepGetExecutor::new(&args, &params, None).expect("Cannot create get executor");
+            StepGetExecutor::new(&args, &params, None).context("Cannot create get executor")?;
 
         let source_map = ctx
             .build
             .build_cache
-            .result_for_code(&Some(Boc::decode(code.to_boc(false).unwrap()).unwrap()))
+            .result_for_code(&Some(Boc::decode(code.to_boc(false)?)?))
             .map(|res| res.1.source_map);
 
         let dbg_ctx = ctx.debug.ctx();
@@ -922,11 +833,11 @@ fn run_get_method_impl(
                 "Send internal message".to_string(),
                 dbg_ctx.need_to_stop_child_thread_on_start(),
             )
-            .expect("Cannot send response");
+            .context("Cannot send response")?;
 
         step_executor
             .prepare(method_id, &args)
-            .expect("Cannot prepare get method");
+            .context("Cannot prepare get method")?;
 
         // Step to update internal state
         if dbg_ctx.need_to_stop_child_thread_on_start() {
@@ -938,10 +849,10 @@ fn run_get_method_impl(
         if !dbg_ctx.stepper.is_terminated() {
             dbg_ctx
                 .process_incoming_requests(false)
-                .expect("Cannot send response");
+                .context("Cannot send response")?;
         }
 
-        dbg_ctx.finish_thread(2).expect("Cannot send response");
+        dbg_ctx.finish_thread(2).context("Cannot send response")?;
 
         if dbg_ctx.performing_step != Some(StepMode::Continue) {
             // When we step out from nested message/get method, send stop message to client to
@@ -951,32 +862,25 @@ fn run_get_method_impl(
 
         step_executor
             .finish(&params.code)
-            .expect("Cannot run get method")
+            .context("Cannot run get method")?
     } else {
-        let executor = GetExecutor::new(&params).expect("Cannot create get executor");
+        let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
         let args = serialize_tuple(&args)
             .map(|t| t.to_boc_b64(false))
-            .expect("Cannot serialize tuple")
-            .expect("Cannot serialize tuple");
+            .context("Cannot serialize tuple")?
+            .context("Cannot serialize tuple")?;
         executor
             .run_get_method(&args, &params, None)
-            .expect("Cannot run get method")
+            .context("Cannot run get method")?
     };
 
     match result {
         GetMethodResult::Success(result) => {
             ctx.chain.emulations.get_results.push(result.clone());
 
-            let cell = try_ctx!(
-                ctx,
-                ArcCell::from_boc_b64(&result.stack),
-                "Failed to decode stack BoC: {}"
-            );
-            let tuple = try_ctx!(
-                ctx,
-                Tuple::deserialize(&cell),
-                "Failed to deserialize tuple: {}"
-            );
+            let cell =
+                ArcCell::from_boc_b64(&result.stack).context("Failed to decode stack BoC")?;
+            let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
 
             if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
                 let get_method = ctx.env.abi.find_get_method_by_id(&id);
@@ -987,7 +891,7 @@ fn run_get_method_impl(
                 };
 
                 if result.vm_exit_code == 11 {
-                    // TODO: right now get methods can not include all get methods
+                    // TODO: right now get methods may not include all get methods
                     let get_methods: Vec<&str> = ctx
                         .env
                         .abi
@@ -998,26 +902,24 @@ fn run_get_method_impl(
                     let suggested_name = suggest_name(&name, &get_methods);
 
                     if let Some(suggested_name) = suggested_name {
-                        ctx.asserts.fail(format!(
+                        anyhow::bail!(
                             "Cannot execute unknown get method {get_method_presentation}, did you mean '{suggested_name}'",
-                        ));
+                        );
                     } else {
-                        ctx.asserts.fail(format!(
+                        anyhow::bail!(
                             "Cannot execute unknown get method {get_method_presentation}",
-                        ));
+                        );
                     }
                 } else if result.vm_exit_code == 2 {
-                    ctx.asserts.fail(format!(
+                    anyhow::bail!(
                         "Get method {get_method_presentation} failed due to stack underflow. Make sure you passed all parameters to the get method.",
-                    ));
+                    );
                 } else {
-                    ctx.asserts.fail(format!(
+                    anyhow::bail!(
                         "Cannot execute get method {get_method_presentation}: exit code {}",
                         FormatterContext::format_exit_code(result.vm_exit_code)
-                    ));
+                    );
                 }
-                stack.push(TupleItem::Null);
-                return;
             }
 
             stack.push(TupleItem::TypedTuple {
@@ -1029,6 +931,8 @@ fn run_get_method_impl(
             println!("Error: {}", result.error);
         }
     };
+
+    Ok(())
 }
 
 fn suggest_name<'a>(input: &str, candidates: &'a [&'a str]) -> Option<&'a str> {
@@ -1047,41 +951,36 @@ fn suggest_name<'a>(input: &str, candidates: &'a [&'a str]) -> Option<&'a str> {
 }
 
 extension!(is_deployed in (Context) with (address: ArcCell) using is_deployed_impl);
-fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
-    let dst_addr_str = try_ctx!(
-        ctx,
-        cell_address_to_raw(address),
-        "Failed to decode address: {}"
-    );
+fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) -> anyhow::Result<()> {
+    // TODO: looks ugly
+    let dst_addr_str = cell_address_to_raw(address).context("Failed to decode address")?;
 
     let is_deployed = ctx.chain.world_state.check_deployed(&dst_addr_str);
     stack.push_bool(is_deployed);
+    Ok(())
 }
 
-extension!(get_deployed_code in (Context) with (address: ArcCell) using get_deployed_code_impl);
-fn get_deployed_code_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
-    let dst_addr_str = try_ctx!(
-        ctx,
-        cell_address_to_raw(address),
-        "Failed to decode address: {}"
-    );
+extension!(get_deployed_code in (Context) with (addr: ArcCell) using get_deployed_code_impl);
+fn get_deployed_code_impl(ctx: &mut Context, stk: &mut Tuple, addr: ArcCell) -> anyhow::Result<()> {
+    let dst_addr_str = cell_address_to_raw(addr).context("Failed to decode address")?;
 
     let is_deployed = ctx.chain.world_state.check_deployed(&dst_addr_str);
     if !is_deployed {
-        stack.push(TupleItem::Null);
-        return;
+        stk.push(TupleItem::Null);
+        return Ok(());
     }
 
     let account = ctx.chain.world_state.get_account(&dst_addr_str);
     let cell = match get_address_code(&account) {
         Some(value) => value,
         None => {
-            stack.push(TupleItem::Null);
-            return;
+            stk.push(TupleItem::Null);
+            return Ok(());
         }
     };
 
-    stack.push(TupleItem::Cell(cell));
+    stk.push(TupleItem::Cell(cell));
+    Ok(())
 }
 
 fn cell_address_to_raw(address: ArcCell) -> anyhow::Result<String> {
@@ -1103,73 +1002,68 @@ fn get_address_code(account: &ShardAccount) -> Option<ArcCell> {
 }
 
 extension!(crc16 in (Context) with (data: String) using crc16_impl);
-fn crc16_impl(_ctx: &mut Context, stack: &mut Tuple, data: String) {
+fn crc16_impl(_ctx: &mut Context, stack: &mut Tuple, data: String) -> anyhow::Result<()> {
     let crc = Crc::<u16>::new(&CRC_16_XMODEM);
     let result = crc.checksum(data.as_bytes());
     stack.push(TupleItem::Int(BigInt::from(result)));
+    Ok(())
 }
 
 extension!(type_name_by_opcode in (Context) with (id: BigInt) using type_name_by_opcode_impl);
-fn type_name_by_opcode_impl(ctx: &mut Context, stack: &mut Tuple, id: BigInt) {
+fn type_name_by_opcode_impl(ctx: &mut Context, stk: &mut Tuple, id: BigInt) -> anyhow::Result<()> {
     let type_abi = ctx.env.abi.find_type_by_opcode(&id);
     match type_abi {
         None => {
-            stack.push(TupleItem::Null);
+            stk.push(TupleItem::Null);
         }
         Some(type_abi) => {
-            stack.push_string(&type_abi.name);
+            stk.push_string(&type_abi.name);
         }
     }
+    Ok(())
 }
 
 extension!(register_address in (Context) with (name: String, address: ArcCell) using register_address_impl);
-fn register_address_impl(ctx: &mut Context, _stack: &mut Tuple, name: String, address: ArcCell) {
-    let address_boc = try_ctx!(
-        ctx,
-        address.to_boc(false),
-        "Failed to encode address to BoC: {}"
-    );
-    let address_cell = try_ctx!(
-        ctx,
-        Boc::decode(address_boc),
-        "Failed to decode address from BoC: {}"
-    );
+fn register_address_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    name: String,
+    address: ArcCell,
+) -> anyhow::Result<()> {
+    let address_boc = address
+        .to_boc(false)
+        .context("Failed to encode address to BoC")?;
+    let address_cell = Boc::decode(address_boc).context("Failed to decode address from BoC")?;
 
-    let addr = try_ctx!(
-        ctx,
-        address_cell.parse::<IntAddr>(),
-        "Failed to load address from slice: {}"
-    );
+    let addr = address_cell
+        .parse::<IntAddr>()
+        .context("Failed to load address from slice")?;
 
     ctx.build
         .known_addresses
         .addresses
         .insert(addr, KnownAddress { name });
+    Ok(())
 }
 
 extension!(register_code in (Context) with (name: String, address: ArcCell) using register_code_impl);
-fn register_code_impl(ctx: &mut Context, _stack: &mut Tuple, name: String, code: ArcCell) {
-    let hash = try_ctx!(ctx, code.cell_hash(), "Failed to get cell hash: {}");
+fn register_code_impl(
+    ctx: &mut Context,
+    _: &mut Tuple,
+    name: String,
+    code: ArcCell,
+) -> anyhow::Result<()> {
+    let hash = code.cell_hash().context("Failed to get cell hash")?;
     ctx.build.known_code_cells.insert(hash.to_hex(), name);
+    Ok(())
 }
 
-extension!(account_state in (Context) with (address: ArcCell) using account_state_impl);
-fn account_state_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
-    let address_boc = try_ctx!(
-        ctx,
-        address.to_boc(false),
-        "Failed to encode address to BoC: {}"
-    );
-    let address_cell = try_ctx!(
-        ctx,
-        Boc::decode(address_boc),
-        "Failed to decode address from BoC: {}"
-    );
-    let addr = try_ctx!(
-        ctx,
-        address_cell.parse::<IntAddr>(),
-        "Failed to load address from slice: {}"
-    );
+extension!(account_state in (Context) with (addr: ArcCell) using account_state_impl);
+fn account_state_impl(ctx: &mut Context, stk: &mut Tuple, addr: ArcCell) -> anyhow::Result<()> {
+    let address_cell = Boc::decode(addr.to_boc(false)?)?;
+    let addr = address_cell
+        .parse::<IntAddr>()
+        .context("Failed to load internal address from slice")?;
 
     let Ok(account) = ctx
         .chain
@@ -1177,116 +1071,95 @@ fn account_state_impl(ctx: &mut Context, stack: &mut Tuple, address: ArcCell) {
         .get_account(&addr.to_string())
         .account
         .load()
+        .map_err(|e| anyhow::anyhow!("Failed to load account: {}", e))
     else {
-        stack.push(TupleItem::Null);
-        return;
+        stk.push(TupleItem::Null);
+        return Ok(());
     };
 
     let Some(account) = account.0 else {
-        stack.push(TupleItem::Null);
-        return;
+        stk.push(TupleItem::Null);
+        return Ok(());
     };
 
     let mut builder = CellBuilder::new();
-    try_ctx!(
-        ctx,
-        builder.store_bit(true),
-        "Failed to store bit in cell builder: {}"
-    );
-    try_ctx!(
-        ctx,
-        account.store_into(&mut builder, Cell::empty_context()),
-        "Failed to store account into cell builder: {}"
-    );
-    let cell = try_ctx!(
-        ctx,
-        builder.build(),
-        "Failed to build cell from builder: {}"
-    );
+    builder.store_bit(true)?;
+    account.store_into(&mut builder, Cell::empty_context())?;
+    let cell = builder.build()?;
 
     let Ok(cell) = ArcCell::from_boc_b64(&Boc::encode_base64(cell)) else {
-        stack.push(TupleItem::Null);
-        return;
+        stk.push(TupleItem::Null);
+        return Ok(());
     };
 
-    stack.push(TupleItem::Cell(cell))
+    stk.push(TupleItem::Cell(cell));
+    Ok(())
 }
 
 extension!(register_lib in (Context) with (lib: ArcCell) using register_lib_impl);
-fn register_lib_impl(ctx: &mut Context, _stack: &mut Tuple, lib: ArcCell) {
-    let lib_boc = try_ctx!(ctx, lib.to_boc(false), "Failed to encode lib to BoC: {}");
-    let cell = try_ctx!(
-        ctx,
-        Boc::decode(lib_boc),
-        "Failed to decode lib from BoC: {}"
-    );
-    ctx.chain.world_state.register_lib(cell)
+fn register_lib_impl(ctx: &mut Context, _stack: &mut Tuple, lib: ArcCell) -> anyhow::Result<()> {
+    let cell = Boc::decode(lib.to_boc(false)?)?;
+    ctx.chain.world_state.register_lib(cell);
+    Ok(())
 }
 
 extension!(convert_address in (Context) with (address: String) using convert_address_impl);
-fn convert_address_impl(ctx: &mut Context, stack: &mut Tuple, address: String) {
-    let addr = try_ctx!(
-        ctx,
-        TonAddress::from_str(address.as_str()),
-        "Failed to convert address from {address}: {}"
-    );
-
-    let cell = try_ctx!(
-        ctx,
-        addr.to_msg_address().to_cell(),
-        "Failed to convert address to cell: {}"
-    );
-
-    stack.push(TupleItem::Cell(cell.to_arc()))
+fn convert_address_impl(_: &mut Context, stack: &mut Tuple, address: String) -> anyhow::Result<()> {
+    let addr = TonAddress::from_str(address.as_str())
+        .with_context(|| format!("Failed to convert address from {address}"))?;
+    let cell = addr.to_msg_address().to_cell()?;
+    stack.push(TupleItem::Cell(cell.to_arc()));
+    Ok(())
 }
 
 extension!(cell_from_hex in (Context) with (cell_hex: String) using cell_from_hex_impl);
-fn cell_from_hex_impl(ctx: &mut Context, stack: &mut Tuple, cell_hex: String) {
-    let cell = try_ctx!(
-        ctx,
-        ArcCell::from_boc_hex(cell_hex.as_str()),
-        "Failed to decode cell hex {cell_hex}: {}"
-    );
-
-    stack.push(TupleItem::Cell(cell))
+fn cell_from_hex_impl(_: &mut Context, stack: &mut Tuple, cell_hex: String) -> anyhow::Result<()> {
+    let cell = ArcCell::from_boc_hex(cell_hex.as_str())
+        .with_context(|| format!("Failed to decode cell hex {cell_hex}"))?;
+    stack.push(TupleItem::Cell(cell));
+    Ok(())
 }
 
 extension!(load_library_by_hash in (Context) with (hash: String) using load_library_by_hash_impl);
-fn load_library_by_hash_impl(ctx: &mut Context, stack: &mut Tuple, hash: String) {
+fn load_library_by_hash_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    hash: String,
+) -> anyhow::Result<()> {
     let lib = remote::get_library_by_hash(&ctx.network(), hash.as_str(), None);
     match lib {
         Ok(lib) => {
-            let lib_b64 = Boc::encode_base64(lib);
-            let lib_cell = try_ctx!(
-                ctx,
-                ArcCell::from_boc_b64(&lib_b64),
-                "Failed to decode lib from BoC: {}"
-            );
-
-            stack.push(TupleItem::Cell(lib_cell))
+            let cell = ArcCell::from_boc(&Boc::encode(lib))?;
+            stack.push(TupleItem::Cell(cell))
         }
         Err(_) => stack.push(TupleItem::Null),
     }
+
+    Ok(())
 }
 
 extension!(is_broadcasting in (Context) using is_broadcasting_impl);
-fn is_broadcasting_impl(ctx: &mut Context, stack: &mut Tuple) {
-    stack.push_bool(ctx.is_broadcasting)
+fn is_broadcasting_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
+    stack.push_bool(ctx.is_broadcasting);
+    Ok(())
 }
 
 extension!(get_wallet_by_name in (Context) with (name: String) using get_wallet_by_name_impl);
-fn get_wallet_by_name_impl(ctx: &mut Context, stack: &mut Tuple, name: String) {
+fn get_wallet_by_name_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    name: String,
+) -> anyhow::Result<()> {
     if let Some(wallet) = ctx.env.open_wallets.get(&name) {
-        let address_cell = try_ctx!(
-            ctx,
-            wallet.wallet.address.to_msg_address().to_cell(),
-            "Cannot build cell from wallet address: {}"
-        );
-        stack.push(TupleItem::Cell(address_cell.to_arc()));
-        return;
+        let cell = wallet.address().to_msg_address().to_cell();
+        let cell = cell.context("Cannot build cell from wallet address:")?;
+        stack.push(TupleItem::Cell(cell.to_arc()));
+        return Ok(());
     }
 
     stack.push(TupleItem::Null);
+
+    Ok(())
 }
 
 extension!(wait_for_transaction in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: BigInt, ext_message_hash: ArcCell, address: ArcCell) using wait_for_transaction_impl);
@@ -1299,9 +1172,9 @@ fn wait_for_transaction_impl(
     quiet: BigInt,
     ext_message_hash: ArcCell,
     address: ArcCell,
-) {
+) -> anyhow::Result<()> {
     if !ctx.is_broadcasting {
-        return;
+        return Ok(());
     }
 
     let quiet = !quiet.is_zero();
@@ -1309,22 +1182,12 @@ fn wait_for_transaction_impl(
     let sleep_duration_ms = sleep_duration.to_u64().unwrap_or(2000);
 
     if attempts == 0 {
-        ctx.asserts
-            .fail("Attempt number must be positive".to_owned());
-        return;
+        anyhow::bail!("Attempt number must be positive");
     }
 
-    let address_str = try_ctx!(
-        ctx,
-        cell_address_to_raw(address.clone()),
-        "Failed to decode address: {}"
-    );
+    let address_str = cell_address_to_raw(address.clone()).context("Failed to decode address")?;
 
-    let network = try_ctx!(
-        ctx,
-        Network::from_str(&ctx.network()),
-        "Failed to parse network: {}"
-    );
+    let network = Network::from_str(&ctx.network()).context("Failed to parse network")?;
 
     let api_key = ctx.env.api_key.clone();
     let api_client = TonApiClient::new(network, api_key.clone());
@@ -1352,11 +1215,9 @@ fn wait_for_transaction_impl(
             if let Some(in_msg) = &tx.in_msg
                 && let Some(body_hash) = &in_msg.body_hash
             {
-                let msg_hash_bytes = try_ctx!(
-                    ctx,
-                    base64::engine::general_purpose::STANDARD.decode(body_hash),
-                    "Failed to decode message body hash: {}"
-                );
+                let msg_hash_bytes = base64::engine::general_purpose::STANDARD
+                    .decode(body_hash)
+                    .context("Failed to decode message body hash")?;
 
                 if msg_hash_bytes == ext_message_hash_bytes {
                     std::thread::sleep(Duration::from_millis(1000)); // wait a bit more for txs in row
@@ -1372,7 +1233,7 @@ fn wait_for_transaction_impl(
                         println!("You can view it at {}", url.underline());
                     }
                     stack.push_bool(true);
-                    return;
+                    return Ok(());
                 }
             }
         }
@@ -1387,6 +1248,7 @@ fn wait_for_transaction_impl(
             .to_owned(),
     );
     stack.push_bool(false);
+    Ok(())
 }
 
 fn get_transaction_link(
@@ -1421,25 +1283,29 @@ fn get_transaction_link(
 }
 
 extension!(enable_broadcast in (Context) using enable_broadcast_impl);
-fn enable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) {
+fn enable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) -> anyhow::Result<()> {
     ctx.is_broadcasting = true;
+    Ok(())
 }
 
 extension!(disable_broadcast in (Context) using disable_broadcast_impl);
-fn disable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) {
+fn disable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) -> anyhow::Result<()> {
     ctx.is_broadcasting = false;
+    Ok(())
 }
 
 extension!(set_now in (Context) with (now: BigInt) using set_now_impl);
-fn set_now_impl(ctx: &mut Context, _stack: &mut Tuple, now: BigInt) {
+fn set_now_impl(ctx: &mut Context, _: &mut Tuple, now: BigInt) -> anyhow::Result<()> {
     let now_u32 = now.to_u32().unwrap_or(0);
     ctx.chain.world_state.set_now(now_u32);
+    Ok(())
 }
 
 extension!(get_now in (Context) using get_now_impl);
-fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) {
+fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     let now = ctx.chain.world_state.get_now();
     stack.push(TupleItem::Int(BigInt::from(now)));
+    Ok(())
 }
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {

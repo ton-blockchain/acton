@@ -11,6 +11,7 @@ use tolkc::source_map::SourceMap;
 use ton_api::{Network, TonApiClient};
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
+use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tvmffi::stack::{Tuple, TupleItem};
@@ -289,6 +290,10 @@ impl Wallet {
         let network = Network::from_str(net)?;
         let client = TonApiClient::new(network, None);
         client.get_wallet_seqno(&self.wallet.address.to_base64_std())
+    }
+
+    pub fn address(&self) -> &TonAddress {
+        &self.wallet.address
     }
 }
 

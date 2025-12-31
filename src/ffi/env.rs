@@ -10,7 +10,7 @@ use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
 
 extension!(env_int in (Context) with (name: String) using env_int_impl);
-fn env_int_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
+fn env_int_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
             if let Ok(num) = BigInt::from_str(&val) {
@@ -27,10 +27,12 @@ fn env_int_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
         }
         Err(_) => stack.push(TupleItem::Null),
     }
+
+    Ok(())
 }
 
 extension!(env_bool in (Context) with (name: String) using env_bool_impl);
-fn env_bool_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
+fn env_bool_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
             let v = val.to_lowercase();
@@ -42,20 +44,22 @@ fn env_bool_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
         }
         Err(_) => stack.push(TupleItem::Null),
     }
+    Ok(())
 }
 
 extension!(env_slice in (Context) with (name: String) using env_slice_impl);
-fn env_slice_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
+fn env_slice_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
             stack.push_string(&val);
         }
         Err(_) => stack.push(TupleItem::Null),
     }
+    Ok(())
 }
 
 extension!(env_address in (Context) with (name: String) using env_address_impl);
-fn env_address_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
+fn env_address_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
             if let Ok(addr) = TonAddress::from_str(&val) {
@@ -64,17 +68,18 @@ fn env_address_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
                     && let Ok(cell) = builder.build()
                 {
                     stack.push(TupleItem::Slice(cell.to_arc()));
-                    return;
+                    return Ok(());
                 }
             }
             stack.push(TupleItem::Null);
         }
         Err(_) => stack.push(TupleItem::Null),
     }
+    Ok(())
 }
 
 extension!(env_cell in (Context) with (name: String) using env_cell_impl);
-fn env_cell_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
+fn env_cell_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
             let cell = if let Ok(b) = ArcCell::from_boc_b64(&val) {
@@ -85,12 +90,13 @@ fn env_cell_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) {
 
             if let Some(cell) = cell {
                 stack.push(TupleItem::Cell(cell));
-                return;
+                return Ok(());
             }
             stack.push(TupleItem::Null);
         }
         Err(_) => stack.push(TupleItem::Null),
     }
+    Ok(())
 }
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {

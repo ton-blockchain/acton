@@ -40,7 +40,11 @@ macro_rules! extension {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
-                    $body(ctx, __t);
+                    let r: anyhow::Result<()> = $body(ctx, __t);
+                    if let Err(e) = r {
+                        ctx.asserts.fail(e.to_string());
+                        __t.push(tvmffi::stack::TupleItem::Null);
+                    }
                 })
             }
         }
@@ -52,7 +56,11 @@ macro_rules! extension {
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
                     match $crate::extensions::pop_arg::<$ty>(__t) {
                         Ok($an) => {
-                            $body(ctx, __t, $an);
+                            let r: anyhow::Result<()> = $body(ctx, __t, $an);
+                            if let Err(e) = r {
+                                ctx.asserts.fail(e.to_string());
+                                __t.push(tvmffi::stack::TupleItem::Null);
+                            }
                         }
                         Err(e) => {
                             eprintln!("ext_args decode error in {}: {}", stringify!($fn_name), e);
@@ -73,7 +81,11 @@ macro_rules! extension {
                         Ok(__vals) => {
                             #[allow(non_snake_case, unused_variables)]
                             let ($($an, )*) = __vals;
-                            $body(ctx, __t, $($an, )*);
+                            let r: anyhow::Result<()> = $body(ctx, __t, $($an, )*);
+                            if let Err(e) = r {
+                                ctx.asserts.fail(e.to_string());
+                                __t.push(tvmffi::stack::TupleItem::Null);
+                            }
                         }
                         Err(e) => {
                             eprintln!("ext_args decode error in {}: {}", stringify!($fn_name), e);
@@ -119,17 +131,4 @@ macro_rules! register_ext_methods {
             $executor.register_ext_method($id, ($ctx), $fname).expect(&format!("cannot register extension with id: {}", $id));
         )+
     }};
-}
-
-#[macro_export]
-macro_rules! try_ctx {
-    ($ctx:expr, $expr:expr, $($arg:tt)*) => {
-        match $expr {
-            Ok(value) => value,
-            Err(e) => {
-                $ctx.asserts.fail(format!($($arg)*, e));
-                return Default::default();
-            }
-        }
-    };
 }

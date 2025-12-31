@@ -13,11 +13,17 @@ use tycho_types::cell::Load;
 use tycho_types::models::{IntAddr, Transaction};
 
 extension!(assert_fail in (Context) with (location: String, message: String) using assert_fail_impl);
-fn assert_fail_impl(ctx: &mut Context, _stack: &mut Tuple, location: String, message: String) {
+fn assert_fail_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    location: String,
+    message: String,
+) -> anyhow::Result<()> {
     *ctx.asserts.assert_failure = Some(AssertFailure::Fail(FailAssertFailure {
         message: Some(message),
         location: Some(location),
     }));
+    Ok(())
 }
 
 extension!(assert_bin in (Context) with (location: String, message: String, right: Tuple, right_name: String, left: Tuple, left_name: String, operator: String) using assert_bin_impl);
@@ -32,17 +38,17 @@ fn assert_bin_impl(
     left: Tuple,
     left_name: String,
     operator: String,
-) {
+) -> anyhow::Result<()> {
     let left = left.unwrap_single();
     let right = right.unwrap_single();
 
     if operator == "==" && left == right {
         stack.push_bool(true);
-        return;
+        return Ok(());
     }
     if operator == "!=" && left != right {
         stack.push_bool(true);
-        return;
+        return Ok(());
     }
 
     if (operator == "<" || operator == ">" || operator == "<=" || operator == ">=")
@@ -55,7 +61,7 @@ fn assert_bin_impl(
             || operator == ">=" && left_int >= right_int
         {
             stack.push_bool(true);
-            return;
+            return Ok(());
         }
 
         *ctx.asserts.assert_failure = Some(AssertFailure::Bin(AssertBinFailure {
@@ -68,7 +74,7 @@ fn assert_bin_impl(
             location: Some(location),
         }));
         stack.push_bool(false);
-        return;
+        return Ok(());
     }
 
     *ctx.asserts.assert_failure = Some(AssertFailure::Bin(AssertBinFailure {
@@ -81,11 +87,17 @@ fn assert_bin_impl(
         location: Some(location),
     }));
     stack.push_bool(false);
+    Ok(())
 }
 
 extension!(expect_to_end_with_exit_code in (Context) with (code: BigInt) using expect_to_end_with_exit_code_impl);
-fn expect_to_end_with_exit_code_impl(ctx: &mut Context, _stack: &mut Tuple, code: BigInt) {
+fn expect_to_end_with_exit_code_impl(
+    ctx: &mut Context,
+    _: &mut Tuple,
+    code: BigInt,
+) -> anyhow::Result<()> {
     *ctx.asserts.expected_exit_code = Some(code);
+    Ok(())
 }
 
 extension!(fail_to_find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple, message: String, location: String) using fail_to_find_transaction_by_params_impl);
@@ -96,7 +108,7 @@ fn fail_to_find_transaction_by_params_impl(
     txs: Tuple,
     message: String,
     location: String,
-) {
+) -> anyhow::Result<()> {
     // struct SearchParams {
     //     to: address,
     //     from: address? = null,
@@ -111,7 +123,7 @@ fn fail_to_find_transaction_by_params_impl(
 
     let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
         Some(value) => value,
-        None => return,
+        None => return Ok(()),
     };
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionNotFound(
@@ -123,6 +135,7 @@ fn fail_to_find_transaction_by_params_impl(
             location: Some(location),
         },
     ));
+    Ok(())
 }
 
 extension!(fail_to_not_find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple, message: String, location: String) using fail_to_not_find_transaction_by_params_impl);
@@ -133,7 +146,7 @@ fn fail_to_not_find_transaction_by_params_impl(
     txs: Tuple,
     message: String,
     location: String,
-) {
+) -> anyhow::Result<()> {
     // struct SearchParams {
     //     to: address,
     //     from: address? = null,
@@ -148,7 +161,7 @@ fn fail_to_not_find_transaction_by_params_impl(
 
     let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
         Some(value) => value,
-        None => return,
+        None => return Ok(()),
     };
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionIsFound(
@@ -168,6 +181,7 @@ fn fail_to_not_find_transaction_by_params_impl(
             },
         },
     ));
+    Ok(())
 }
 
 extension!(fail_wallet_not_found in (Context) with (location: String, wallet_name: String) using fail_wallet_not_found_impl);
@@ -176,7 +190,7 @@ fn fail_wallet_not_found_impl(
     _stack: &mut Tuple,
     location: String,
     wallet_name: String,
-) {
+) -> anyhow::Result<()> {
     *ctx.asserts.assert_failure = Some(AssertFailure::WalletNotFound(WalletNotFoundFailure {
         wallet_name,
         location: if location.is_empty() {
@@ -185,6 +199,7 @@ fn fail_wallet_not_found_impl(
             Some(location)
         },
     }));
+    Ok(())
 }
 
 pub fn process_txs_and_search_params(
