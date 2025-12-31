@@ -676,9 +676,6 @@ dependencies = [
  "hex",
  "num-bigint",
  "num-traits",
- "once_cell",
- "owo-colors",
- "pkg-config",
  "reqwest",
  "serde",
  "serde_json",
@@ -686,7 +683,6 @@ dependencies = [
  "tonlib-core",
  "tvmffi",
  "tycho-types",
- "urlencoding",
 ]
 
 [[package]]
@@ -1927,18 +1923,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
- "dotenvy",
- "emulator",
- "hex",
  "num-bigint",
- "num-traits",
  "reqwest",
  "serde",
  "serde_json",
  "tokio",
  "ton-executor",
  "tycho-types",
- "urlencoding",
  "vmlogs",
 ]
 

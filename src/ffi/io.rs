@@ -1,5 +1,5 @@
 use crate::context::Context;
-use emulator::{extension, pop_args, register_ext_methods};
+use emulator::{extension, register_ext_methods};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;

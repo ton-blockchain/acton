@@ -1,10 +1,10 @@
+use crate::context::to_cell;
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::{DebugContext, VARIABLE_REFERENCE_COUNTER};
 use crate::formatter::FormatterContext;
 use anyhow::anyhow;
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
-use emulator::utils::StoreExt;
 use log::debug;
 use std::sync::atomic::Ordering;
 use tonlib_core::cell::ArcCell;
@@ -474,7 +474,7 @@ impl DebugContext {
             return Vec::new();
         };
         msg_slice.skip_first(msg_offset.bits, msg_offset.refs).ok();
-        let msg_cell = msg_slice.to_cell();
+        let msg_cell = to_cell(&msg_slice);
 
         variables.push(Variable {
             name: "body".to_string(),

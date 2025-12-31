@@ -15,23 +15,20 @@ pub fn pop_arg<T: FromStack>(t: &mut Tuple) -> Result<T, ArgError> {
 #[macro_export]
 macro_rules! pop_args {
     ($tuple:expr, $($ty:ty),+ $(,)?) => {{
-        #[allow(non_snake_case)]
-        {
-            let mut __errors: Option<tvmffi::from_stack::ArgError> = None;
-            let __result = ( $(
-                match $crate::extensions::pop_arg::<$ty>($tuple) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        __errors = Some(e);
-                        Default::default()
-                    }
+        let mut __errors: Option<tvmffi::from_stack::ArgError> = None;
+        let __result = ( $(
+            match $crate::extensions::pop_arg::<$ty>($tuple) {
+                Ok(v) => v,
+                Err(e) => {
+                    __errors = Some(e);
+                    Default::default()
                 }
-            , )+ );
-            if let Some(e) = __errors {
-                Err(e)
-            } else {
-                Ok(__result)
             }
+        , )+ );
+        if let Some(e) = __errors {
+            Err(e)
+        } else {
+            Ok(__result)
         }
     }};
 }
@@ -43,7 +40,7 @@ macro_rules! extension {
             unsafe {
                 let ctx = &mut *(ctx as *mut $ctx_ty);
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
-                    $body(ctx, __t)
+                    $body(ctx, __t);
                 })
             }
         }
@@ -68,9 +65,11 @@ macro_rules! extension {
     ($fn_name:ident in ($ctx_ty:ty) with ($($an:ident : $ty:ty),+ $(,)?) using $body:expr) => {
         unsafe extern "C" fn $fn_name(ctx: *mut $ctx_ty, ptr: *const std::os::raw::c_char) -> *const std::os::raw::c_char {
             unsafe {
+                debug_assert!(!ctx.is_null());
+                debug_assert!(!ptr.is_null());
                 let ctx = &mut *(ctx as *mut $ctx_ty);
                 $crate::extensions::with_tuple(ptr, |__t: &mut tvmffi::stack::Tuple| {
-                    match pop_args!(__t, $($ty),*) {
+                    match $crate::pop_args!(__t, $($ty),*) {
                         Ok(__vals) => {
                             #[allow(non_snake_case, unused_variables)]
                             let ($($an, )*) = __vals;

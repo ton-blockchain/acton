@@ -15,7 +15,7 @@ pub fn get_account_info(
     let url = format!(
         "{}/api/v2/getAddressInformation?address={}{}",
         base_url,
-        urlencoding::encode(address),
+        address,
         seqno
             .map(|seqno| format!("&seqno={seqno}"))
             .unwrap_or("".to_owned()),

@@ -1,6 +1,6 @@
 use crate::commands::common::error_fmt;
 use crate::config::Explorer;
-use crate::context::{Context, KnownAddress, Wallet};
+use crate::context::{Context, KnownAddress, Wallet, to_cell};
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
 use crate::ffi::assert::process_txs_and_search_params;
@@ -8,8 +8,7 @@ use crate::formatter::FormatterContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use emulator::utils::StoreExt;
-use emulator::{extension, pop_args, register_ext_methods, remote, try_ctx};
+use emulator::{extension, register_ext_methods, remote, try_ctx};
 use log::{debug, info, warn};
 use num_bigint::BigInt;
 use num_traits::{ToPrimitive, Zero};
@@ -265,7 +264,7 @@ fn send_message_impl(
             .expect("Invalid transaction info"),
         };
 
-        let tx_cell = tx.to_cell();
+        let tx_cell = to_cell(&tx);
         let tx_cell = ArcCell::from_boc_hex(&Boc::encode_hex(tx_cell))
             .expect("Unreachable, cannot decode/encode cell");
 
@@ -336,7 +335,7 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
             .iter_out_msgs()
             .filter_map(|msg| msg.ok())
             .filter_map(|msg| {
-                let cell = msg.to_cell();
+                let cell = to_cell(&msg);
                 let boc = Boc::encode_base64(&cell);
                 ArcCell::from_boc_b64(&boc).ok()
             })
@@ -460,7 +459,7 @@ fn send_message_debug(
             &Boc::encode_base64(msg_cell),
             RunTransactionArgs {
                 libs: libs.clone().into_root().map(Boc::encode_base64),
-                shard_account: Boc::encode_base64(dest_account.to_cell()),
+                shard_account: Boc::encode_base64(to_cell(&dest_account)),
                 now: ctx.chain.world_state.get_now(),
                 lt: ctx.chain.world_state.get_lt(),
                 random_seed: None,
@@ -561,7 +560,7 @@ fn send_message_debug(
     let out_messages = transaction
         .iter_out_msgs()
         .filter_map(|it| it.ok())
-        .map(|it| it.to_cell())
+        .map(|it| to_cell(&it))
         .collect::<Vec<_>>();
 
     let code = Emulator::get_code_cell(&message_obj, &dest_account);
@@ -588,11 +587,11 @@ fn send_message_debug(
             let Ok(msg) = msg else { return vec![] };
 
             if let MsgInfo::ExtOut(_) = &msg.info {
-                externals.push(msg.to_cell());
+                externals.push(to_cell(&msg));
                 return vec![];
             };
 
-            let mut send_results = send_message_debug(ctx, &msg.to_cell(), libs, None);
+            let mut send_results = send_message_debug(ctx, &to_cell(&msg), libs, None);
             for result in &mut send_results {
                 match result {
                     SendMessageResult::Success(result) => {
@@ -786,7 +785,7 @@ fn find_transaction_by_params_impl(
 
             if let Some(expected_body) = &params.body {
                 let expected_hash = expected_body.repr_hash();
-                let body_cell = in_msg.body.to_cell();
+                let body_cell = to_cell(&in_msg.body);
                 let actual_hash = body_cell.repr_hash();
                 if expected_hash != actual_hash {
                     // Message body hash mismatch
@@ -837,7 +836,7 @@ fn find_transaction_by_params_impl(
         return;
     };
 
-    let tx_base64 = Boc::encode_base64(first.to_cell());
+    let tx_base64 = Boc::encode_base64(to_cell(&first));
     let tx_cell = try_ctx!(
         ctx,
         ArcCell::from_boc_b64(&tx_base64),
@@ -1228,7 +1227,7 @@ extension!(convert_address in (Context) with (address: String) using convert_add
 fn convert_address_impl(ctx: &mut Context, stack: &mut Tuple, address: String) {
     let addr = try_ctx!(
         ctx,
-        tonlib_core::TonAddress::from_str(address.as_str()),
+        TonAddress::from_str(address.as_str()),
         "Failed to convert address from {address}: {}"
     );
 

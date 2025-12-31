@@ -85,9 +85,7 @@ pub(crate) async fn find_raw_tx_by_hash(
 
     let mut txs = vec![];
     for (id, block) in resp.blocks.iter().enumerate() {
-        let Some(cell): Option<&tycho_types::cell::Cell> = cells.get(id) else {
-            continue;
-        };
+        let Some(cell) = cells.get(id) else { break };
         let tx: tycho_types::models::Transaction = cell.parse()?;
         txs.push(RawTransaction {
             block: block.clone(),

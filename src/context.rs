@@ -14,7 +14,7 @@ use ton_executor::get::GetMethodResultSuccess;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tvmffi::stack::{Tuple, TupleItem};
-use tycho_types::cell::{Cell, HashBytes};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{IntAddr, LibDescr, Transaction};
 
@@ -425,4 +425,11 @@ impl<'a> DebugCtx<'a> {
             }
         }
     }
+}
+
+pub(crate) fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
+    let mut builder = CellBuilder::new();
+    obj.store_into(&mut builder, Cell::empty_context())
+        .expect("Failed to store data into cell builder");
+    builder.build().expect("Failed to build cell from builder")
 }

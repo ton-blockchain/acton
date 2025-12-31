@@ -1,7 +1,6 @@
 use crate::commands::test::{Pos, TestDescriptor};
-use crate::context::BuildCache;
+use crate::context::{BuildCache, to_cell};
 use emulator::emulator::SendMessageResult;
-use emulator::utils::StoreExt;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -75,8 +74,8 @@ pub fn dump_test_transactions(
                 parent_transaction: tx.parent_transaction.as_ref().map(|tx| tx.lt),
                 dest_contract_info: contract_info.as_ref().map(|info| info.name.clone()),
                 child_transactions: tx.child_transactions.clone(),
-                shard_account_before: Boc::encode_hex(tx.shard_account_before.to_cell()),
-                shard_account: Boc::encode_hex(tx.shard_account.to_cell()),
+                shard_account_before: Boc::encode_hex(to_cell(&tx.shard_account_before)),
+                shard_account: Boc::encode_hex(to_cell(&tx.shard_account)),
                 vm_log_diff: vmlogs::convert_to_diff_logs(&tx.vm_log),
                 executor_logs: tx.executor_logs.clone(),
                 actions: tx.actions.clone(),

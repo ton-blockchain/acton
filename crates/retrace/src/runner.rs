@@ -4,16 +4,15 @@ use crate::methods::{
     find_raw_tx_by_hash, find_shard_block_for_tx, get_block_account, get_block_config, tx_opcode,
 };
 use crate::types::{BaseTxInfo, TraceEmulatedTx, TraceInMessage, TraceResult};
-use crate::{ComputeInfo, find_base_tx_by_hash};
+use crate::{ComputeInfo, find_base_tx_by_hash, methods};
 use base64::Engine;
 use base64::engine::general_purpose;
-use emulator::utils::StoreExt;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::models::{AccountState, ShardAccount, Transaction};
 use tycho_types::num::Tokens;
 use vmlogs::parser::{CellLike, VmLine, VmStackValue, parse_lines};
@@ -166,7 +165,7 @@ async fn try_load_as_library(
 
     let lib_hash = cs.load_u256()?;
     let lib_hash_hex = format!("{:X}", lib_hash);
-    let actual_code = crate::methods::get_library_by_hash(net, &lib_hash_hex).await?;
+    let actual_code = methods::get_library_by_hash(net, &lib_hash_hex).await?;
     Ok(Some((lib_hash, actual_code)))
 }
 
@@ -387,10 +386,10 @@ fn emulate(
     let (tx_res, executor_logs) = emulator.run_transaction(
         &Boc::encode_base64(in_msg),
         RunTransactionArgs {
-            libs: libs.as_deref().map(Boc::encode_base64),
-            shard_account: Boc::encode_base64(shard_account.to_cell()),
+            libs: libs.map(Boc::encode_base64),
+            shard_account: Boc::encode_base64(to_cell(&shard_account)),
             now: tx.now,
-            lt: tx.lt.into(),
+            lt: tx.lt,
             random_seed: Some(rand_seed),
             ignore_chksig: false,
             debug_enabled: true,
@@ -400,4 +399,11 @@ fn emulate(
         },
     )?;
     Ok((tx_res, executor_logs))
+}
+
+fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
+    let mut builder = CellBuilder::new();
+    obj.store_into(&mut builder, Cell::empty_context())
+        .expect("Failed to store data into cell builder");
+    builder.build().expect("Failed to build cell from builder")
 }

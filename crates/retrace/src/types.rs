@@ -124,19 +124,6 @@ pub(crate) struct BlockRef {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct MessageContent {
-    pub hash: String,
-    pub body: String,
-    pub decoded: Option<HashMap<String, serde_json::Value>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct InitState {
-    pub hash: String,
-    pub body: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AccountState {
     pub hash: String,
     pub balance: Option<String>,
@@ -421,17 +408,6 @@ pub(crate) struct RawTransactionBlock {
     pub root_hash: String,
     #[serde(rename = "fileHash")]
     pub file_hash: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct GetLibResponse {
-    pub data: GetLibData,
-    pub errors: Vec<serde_json::Value>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct GetLibData {
-    pub get_lib: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,4 +1,3 @@
-use crate::utils::StoreExt;
 use crate::world_state::WorldState;
 use anyhow::Context;
 use ton_executor::ExecutorVerbosity;
@@ -6,7 +5,7 @@ use ton_executor::message::{
     EmulationResult, Executor, RunTransactionArgs, RunTransactionResultError,
 };
 use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{
     AccountState, BaseMessage, ComputePhase, IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage,
@@ -45,7 +44,7 @@ impl Emulator {
             &Boc::encode_base64(message),
             RunTransactionArgs {
                 libs: libs.clone().into_root().map(Boc::encode_base64),
-                shard_account: Boc::encode_base64(&dest_account.to_cell()),
+                shard_account: Boc::encode_base64(&to_cell(&dest_account)),
                 now: state.get_now(),
                 lt: state.get_lt(),
                 random_seed: None,
@@ -79,7 +78,7 @@ impl Emulator {
         let out_messages = transaction
             .iter_out_msgs()
             .filter_map(|it| it.ok())
-            .map(|it| it.to_cell())
+            .map(|it| to_cell(&it))
             .collect::<Vec<_>>();
 
         let send_result = SendMessageResultSuccess {
@@ -120,11 +119,11 @@ impl Emulator {
                 let Ok(msg) = msg else { return vec![] };
 
                 if let MsgInfo::ExtOut(_) = &msg.info {
-                    externals.push(msg.to_cell());
+                    externals.push(to_cell(&msg));
                     return vec![];
                 };
 
-                let mut send_results = self.send_message(state, msg.to_cell(), libs, None);
+                let mut send_results = self.send_message(state, to_cell(&msg), libs, None);
                 for result in &mut send_results {
                     match result {
                         SendMessageResult::Success(result) => {
@@ -173,7 +172,7 @@ impl Emulator {
         // For some reason this set to wrong value
         message.layout = None;
 
-        message.to_cell()
+        to_cell(&message)
     }
 
     fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
@@ -261,4 +260,11 @@ impl SendMessageResultSuccess {
         };
         Some(info.gas_used.into())
     }
+}
+
+fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
+    let mut builder = CellBuilder::new();
+    obj.store_into(&mut builder, Cell::empty_context())
+        .expect("Failed to store data into cell builder");
+    builder.build().expect("Failed to build cell from builder")
 }
