@@ -6,6 +6,7 @@ use std::path::Path;
 pub mod error_fmt {
     use crate::config::ActonConfig;
     use owo_colors::OwoColorize;
+    use std::path::Path;
 
     pub fn contract_not_found(config: &ActonConfig, name: &str) -> String {
         let available = available_contracts(config);
@@ -57,10 +58,17 @@ pub mod error_fmt {
         if path.is_empty() {
             return "Empty file path is not allowed".to_string();
         }
+        let path = Path::new(path);
+
         let cwd = std::env::current_dir().unwrap_or(".".into());
+        let absolute_path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            cwd.join(path)
+        };
         format!(
             "Cannot find file or directory {}",
-            format!("{}/{path}", cwd.display()).yellow(),
+            absolute_path.display().to_string().yellow(),
         )
     }
 

@@ -1005,6 +1005,32 @@ depends = []
 }
 
 #[test]
+fn test_build_contract_source_file_not_found_with_abs_path() {
+    let project = ProjectBuilder::new("contract-file-missing").build();
+
+    let toml_content = r#"[package]
+name = "contract-file-missing"
+description = ""
+version = "0.1.0"
+
+[contracts.missing]
+name = "missing"
+src = "/contracts/missing_file.tolk"
+depends = []
+"#;
+    fs::write(project.path().join("Acton.toml"), toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_build_contract_source_file_not_found_with_abs_path.stderr.txt",
+        );
+}
+
+#[test]
 fn test_build_contract_invalid_file_extension() {
     let project = ProjectBuilder::new("invalid-extension")
         .raw_file("contracts/simple.txt", SIMPLE_CONTRACT)
