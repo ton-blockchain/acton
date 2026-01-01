@@ -56,7 +56,6 @@ jobs:
         run: |
           git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch --depth=1 ton-repo
           cd ton-repo
-          git submodule update --init --recursive
 
       - name: Get TON commit hash
         id: ton-commit
@@ -97,6 +96,11 @@ jobs:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Init submodules for build
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        run: |
+          git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -191,7 +195,6 @@ jobs:
         run: |
           git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch --depth=1 ton-repo
           cd ton-repo
-          git submodule update --init --recursive
 
       - name: Get TON commit hash
         id: ton-commit
@@ -232,6 +235,11 @@ jobs:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Init submodules for build
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        run: |
+          git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -309,7 +317,6 @@ jobs:
         run: |
           git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch --depth=1 ton-repo
           cd ton-repo
-          git submodule update --init --recursive
 
       - name: Get TON commit hash
         id: ton-commit
@@ -350,6 +357,11 @@ jobs:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ccache-${{ runner.os }}-
+
+      - name: Init submodules for build
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        run: |
+          git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
