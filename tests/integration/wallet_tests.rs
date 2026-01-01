@@ -112,7 +112,7 @@ fn test_wallet_new_unknown_kind() {
         .run()
         .failure();
 
-    output.assert_contains("Unsupported wallet version 1111. Supported versions: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2");
+    output.assert_contains("[possible values: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2]");
 }
 
 #[test]

@@ -1,1 +1,4 @@
-Error: Unsupported network: invalid. Supported: mainnet, testnet
+error: invalid value 'invalid' for '--net <NET>'
+  [possible values: mainnet, testnet]
+
+For more information, try '--help'.

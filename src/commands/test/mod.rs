@@ -13,7 +13,7 @@ use crate::commands::test::reporting::{
     ReporterManager, TestExecutionContext, TestReport, TestStatus, TestSuiteStats,
     extract_suite_name,
 };
-use crate::config::ActonConfig;
+use crate::config::{ActonConfig, Network};
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     Emulations, Env, IoContext, KnownAddresses,
@@ -62,7 +62,8 @@ mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq)]
+#[clap(rename_all = "lowercase")]
 pub enum ReportFormat {
     Console,
     TeamCity,
@@ -70,15 +71,43 @@ pub enum ReportFormat {
     Dot,
 }
 
+#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
+pub enum CoverageFormat {
+    Lcov,
+    Text,
+}
+
+impl std::fmt::Display for CoverageFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CoverageFormat::Lcov => write!(f, "lcov"),
+            CoverageFormat::Text => write!(f, "text"),
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
+pub enum BacktraceMode {
+    Full,
+}
+
+impl std::fmt::Display for BacktraceMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BacktraceMode::Full => write!(f, "full"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TestConfig {
     pub report_formats: Vec<ReportFormat>,
     pub debug: bool,
     pub debug_port: u16,
-    pub backtrace: Option<String>,
+    pub backtrace: Option<BacktraceMode>,
     pub coverage: bool,
     pub filter: Option<String>,
-    pub coverage_format: Option<String>,
+    pub coverage_format: Option<CoverageFormat>,
     pub coverage_file: Option<String>,
     pub exclude_patterns: Vec<String>,
     pub include_patterns: Vec<String>,
@@ -87,7 +116,7 @@ pub struct TestConfig {
     pub junit_merge: bool,
     pub snapshot: Option<String>,
     pub baseline_snapshot: Option<String>,
-    pub fork_net: Option<String>,
+    pub fork_net: Option<Network>,
     pub api_key: Option<String>,
     pub fork_block_number: Option<u64>,
     pub save_test_trace: Option<String>,
@@ -179,7 +208,7 @@ impl<'a> TestRunner<'a> {
     }
 
     fn minimal_log_verbosity(&self) -> ExecutorVerbosity {
-        if self.config.debug || self.config.backtrace == Some("full".to_owned()) {
+        if self.config.debug || self.config.backtrace == Some(BacktraceMode::Full) {
             // for these modes we need all logs for work
             return ExecutorVerbosity::FullLocationStackVerbose;
         }
@@ -228,7 +257,7 @@ impl<'a> TestRunner<'a> {
         let mut emulator = Emulator::new(verbosity, None)?;
         let state = match &self.config.fork_net {
             Some(net) => AccountsState::Remote(RemoteAccountState::new(
-                net.clone(),
+                net.to_string(),
                 self.config.fork_block_number,
                 self.config.api_key.clone(),
                 self.remote_cache.clone(),
@@ -250,7 +279,7 @@ impl<'a> TestRunner<'a> {
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
                 api_key: self.config.api_key.clone(),
-                fork_net: self.config.fork_net.clone(),
+                fork_net: self.config.fork_net.as_ref().map(|n| n.to_string()),
             },
             io: IoContext {
                 stdout_buffer: "".to_owned(),
@@ -272,13 +301,13 @@ impl<'a> TestRunner<'a> {
                 known_addresses: &mut self.known_addresses,
                 known_code_cells: &mut self.known_code_cells,
                 need_debug_info: self.config.debug
-                    || self.config.backtrace == Some("full".to_owned())
+                    || self.config.backtrace == Some(BacktraceMode::Full)
                     || self.config.coverage,
-                backtrace: self.config.backtrace.clone(),
+                backtrace: self.config.backtrace.as_ref().map(|b| b.to_string()),
             },
             debug: DebugCtx::Disabled,
             is_broadcasting: false,
-            network: self.config.fork_net.clone(),
+            network: self.config.fork_net.as_ref().map(|n| n.to_string()),
         };
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
@@ -461,8 +490,8 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 
         if let Some(format_type) = &config.coverage_format {
             println!();
-            match format_type.as_str() {
-                "lcov" => {
+            match format_type {
+                CoverageFormat::Lcov => {
                     let lcov_path = config.coverage_file.as_deref().unwrap_or("lcov.info");
                     if let Err(err) = generate_lcov_file(&merged_coverage, lcov_path) {
                         eprintln!("Warning: Failed to generate LCOV file '{lcov_path}': {err}");
@@ -470,7 +499,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                         println!("LCOV file saved in {lcov_path}");
                     }
                 }
-                "text" => {
+                CoverageFormat::Text => {
                     let text_path = config.coverage_file.as_deref().unwrap_or("coverage.txt");
                     if let Err(err) = generate_text_file(&merged_coverage, text_path) {
                         eprintln!(
@@ -479,11 +508,6 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                     } else {
                         println!("Text coverage file saved in {text_path}");
                     }
-                }
-                _ => {
-                    eprintln!(
-                        "Warning: Unknown coverage format '{format_type}'. Supported formats: lcov, text"
-                    );
                 }
             }
         }
@@ -664,7 +688,7 @@ fn run_tests_for_file(
     fs::write(&tmp_test_filename, executable_code)?;
 
     let need_debug_info =
-        config.debug || config.backtrace == Some("full".to_string()) || config.coverage;
+        config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
     let now = Instant::now();
     let compilation_result = compile_test_file(file_cache, &tmp_test_filename, need_debug_info)?;
     debug!("Test file '{file}' compilation time: {:?}", now.elapsed());
@@ -762,7 +786,7 @@ fn run_file_tests(
             details: None,
             abi: abi.clone(),
             source_map: source_map.clone(),
-            backtrace: runner.config.backtrace.clone(),
+            backtrace: runner.config.backtrace.as_ref().map(|b| b.to_string()),
             execution: None,
         };
 

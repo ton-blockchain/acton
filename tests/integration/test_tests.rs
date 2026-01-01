@@ -299,7 +299,7 @@ fn test_test_invalid_coverage_format() {
         .with_coverage()
         .with_coverage_format("invalid-format")
         .run()
-        .success()
+        .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_test_invalid_coverage_format.stderr.txt",
         );
@@ -324,7 +324,7 @@ fn test_test_invalid_reporter() {
         .test()
         .with_reporter("invalid-reporter")
         .run()
-        .success()
+        .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_test_invalid_reporter.stderr.txt",
         );

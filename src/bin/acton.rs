@@ -9,12 +9,14 @@ use acton::commands::new::new_cmd;
 use acton::commands::retrace::retrace_cmd;
 use acton::commands::run::run_cmd;
 use acton::commands::script::script_cmd;
-use acton::commands::test::{ReportFormat, TestConfig, mutation, test_cmd};
+use acton::commands::test::{
+    BacktraceMode, CoverageFormat, ReportFormat, TestConfig, mutation, test_cmd,
+};
 use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::commands::wallet::{WalletCommand, wallet_cmd};
 use acton::commands::wrapper::wrapper_cmd;
-use acton::config::{ActonConfig, Explorer};
+use acton::config::{ActonConfig, Explorer, Network};
 use clap::builder::styling::Style;
 use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory};
@@ -47,17 +49,15 @@ struct Cli {
 enum Commands {
     #[command(
         about = "Initialize a new project in the current directory",
-        long_about = "Initialize a new project in the current directory. Suitable if you want to use Acton in an existing project."
+        long_about = "Initialize a new project in the current directory. This is useful for adding Acton support to an existing project."
     )]
     Init,
     #[command(
-        about = "Create a new project in the specified directory",
-        long_about = "Create a new project in the specified directory. Suitable if you want to create a new project with Acton."
+        about = "Create a new project in a specified directory",
+        long_about = "Create a new project in a specified directory. This will create a new directory with a basic project template."
     )]
     New {
-        #[arg(
-            help = "Directory to create the project in (use '.' to create a project in the current directory)"
-        )]
+        #[arg(help = "Directory to create the project in (use '.' for the current directory)")]
         path: String,
         #[arg(long, help = "Project name")]
         name: Option<String>,
@@ -119,22 +119,18 @@ enum Commands {
             help_heading = "Debugging"
         )]
         debug_port: u16,
-        #[arg(
-            long,
-            help = "Enable backtraces (currently only \"full\" mode is available)",
-            help_heading = "Debugging"
-        )]
-        backtrace: Option<String>,
+        #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
+        backtrace: Option<BacktraceMode>,
 
         // Coverage
         #[arg(long, help = "Generate a coverage profile", help_heading = "Coverage")]
         coverage: bool,
         #[arg(
             long,
-            help = "Output coverage profile in specified format (lcov, text)",
+            help = "Output coverage profile in specified format",
             help_heading = "Coverage"
         )]
-        coverage_format: Option<String>,
+        coverage_format: Option<CoverageFormat>,
         #[arg(
             long,
             help = "Output coverage profile to specified file (default: lcov.info for lcov, coverage.txt for text)",
@@ -163,7 +159,7 @@ enum Commands {
             value_delimiter = ',',
             help_heading = "Reporting"
         )]
-        reporter: Vec<String>,
+        reporter: Vec<ReportFormat>,
         #[arg(
             long,
             default_value = "test-results",
@@ -189,10 +185,10 @@ enum Commands {
         // Remote
         #[arg(
             long,
-            help = "Fork from network (testnet or mainnet) for remote account resolution",
+            help = "Fork from network for remote account resolution",
             help_heading = "Remote"
         )]
-        fork_net: Option<String>,
+        fork_net: Option<Network>,
         #[arg(
             long,
             help = "Block sequence number to fork from (for historical state)",
@@ -249,7 +245,7 @@ enum Commands {
     },
     #[command(about = "Generate wrapper and optionally stub test file for a contract")]
     Wrapper {
-        #[arg(help = "Contract ID from Acton.toml", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract ID to generate wrapper", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: String,
         #[arg(long, short, help = "Output path for wrapper file")]
         output: Option<String>,
@@ -297,10 +293,10 @@ enum Commands {
         // Remote
         #[arg(
             long,
-            help = "Fork from network (testnet or mainnet) for remote account resolution",
+            help = "Fork from network for remote account resolution",
             help_heading = "Remote"
         )]
-        fork_net: Option<String>,
+        fork_net: Option<Network>,
         #[arg(
             long,
             help = "Block sequence number to fork from (for historical state)",
@@ -325,10 +321,10 @@ enum Commands {
 
         #[arg(
             long,
-            help = "Network to use for broadcasting (mainnet, testnet)",
+            help = "Network to use for broadcasting",
             help_heading = "Broadcasting"
         )]
-        net: Option<String>,
+        net: Option<Network>,
 
         #[arg(
             value_enum,
@@ -344,7 +340,7 @@ enum Commands {
         after_help = example_build_usage()
     )]
     Build {
-        #[arg(help = "Contract name to build (builds all if not specified)", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract ID to build (defaults to all if not specified)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Clear compilation cache before building")]
         clear_cache: bool,
@@ -412,14 +408,14 @@ enum Commands {
             help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)"
         )]
         address: Option<String>,
-        #[arg(long, help = "TonCenter API key (optional)")]
+        #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
         #[arg(
             long,
-            help = "Network to use for fetching libraries (testnet or mainnet)",
+            help = "Network to use for fetching from blockchain",
             default_value = "mainnet"
         )]
-        net: String,
+        net: Network,
         #[arg(
             long,
             help = "Follow library references and disassemble the actual library code instead of showing library hash"
@@ -428,28 +424,18 @@ enum Commands {
     },
     #[command(about = "Verify contract source code on verifier.ton.org")]
     Verify {
-        #[arg(help = "Contract ID from Acton.toml (optional, will prompt if not provided)", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract ID to verify (prompts if not provided)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
-        #[arg(
-            long,
-            help = "Deployed contract address (optional, will prompt if not provided)"
-        )]
+        #[arg(long, help = "Deployed contract address (prompts if not provided)")]
         address: Option<String>,
+        #[arg(long, help = "Network to use", default_value = "testnet")]
+        net: Network,
         #[arg(
             long,
-            help = "Network to use (mainnet or testnet)",
-            default_value = "testnet"
-        )]
-        net: String,
-        #[arg(
-            long,
-            help = "Wallet from Acton.toml to use for verification (optional, will use default if only one wallet configured)"
+            help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)"
         )]
         wallet: Option<String>,
-        #[arg(
-            long,
-            help = "Tolk compiler version to use on verifier side (optional)"
-        )]
+        #[arg(long, help = "Tolk compiler version to use on verifier side")]
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
@@ -458,11 +444,11 @@ enum Commands {
     },
     #[command(about = "Retrace a transaction by its hash")]
     Retrace {
-        #[arg(help = "Transaction hash in hex format")]
+        #[arg(help = "Transaction hash in hex format to retrace")]
         hash: String,
-        #[arg(long, help = "Network to use (mainnet or testnet)")]
-        net: Option<String>,
-        #[arg(long, help = "TonCenter API key (optional)")]
+        #[arg(long, help = "Network to use")]
+        net: Option<Network>,
+        #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
         #[arg(
             short,
@@ -480,11 +466,11 @@ enum Commands {
     },
     #[command(about = "Manage Acton versions")]
     Up {
-        #[arg(help = "Optional specific version to install")]
+        #[arg(help = "Specific version to install")]
         version: Option<String>,
-        #[arg(long, help = "Install from most recent canary release")]
+        #[arg(long, help = "Install the most recent canary release")]
         canary: bool,
-        #[arg(long, help = "Install stable release")]
+        #[arg(long, help = "Install the latest stable release")]
         stable: bool,
     },
     #[command(
@@ -509,28 +495,21 @@ enum Commands {
 pub enum LibraryCommand {
     #[command(about = "Publish a library to the blockchain")]
     Publish {
-        #[arg(help = "Contract ID from Acton.toml to publish (see --code to pass arbitrary code)", add = ArgValueCompleter::new(complete_contracts))]
+        #[arg(help = "Contract ID to publish (see --code to pass arbitrary code)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
         contract_id: Option<String>,
         #[arg(long, help = "Code to use instead of compiling contract")]
         code: Option<String>,
         #[arg(
             long,
-            help = "Duration to publish the library for (e.g. 100d, 1y) (optional, will prompt if not provided)"
+            help = "Duration to publish the library for (e.g. 100d, 1y); prompts if not provided"
         )]
         duration: Option<String>,
-        #[arg(
-            long,
-            help = "Wallet to use for publishing (optional, will prompt if not provided)"
-        )]
+        #[arg(long, help = "Wallet to use for publishing (prompts if not provided)")]
         wallet: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
-        #[arg(
-            long,
-            help = "Network to use (mainnet or testnet)",
-            default_value = "testnet"
-        )]
-        net: String,
+        #[arg(long, help = "Network to use", default_value = "testnet")]
+        net: Network,
     },
     #[command(about = "Fetch a library from the blockchain")]
     Fetch {
@@ -546,12 +525,8 @@ pub enum LibraryCommand {
             help = "Output file for fetched code (BoC, base64 or TASM if --disasm provided)"
         )]
         output: Option<String>,
-        #[arg(
-            long,
-            help = "Network to use (mainnet or testnet)",
-            default_value = "testnet"
-        )]
-        net: String,
+        #[arg(long, help = "Network to use", default_value = "testnet")]
+        net: Network,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
@@ -777,22 +752,6 @@ fn main() {
             fail_fast,
             fork_block_number,
         } => {
-            let mut report_formats = Vec::new();
-
-            for format_str in reporter {
-                match format_str.to_lowercase().as_str() {
-                    "console" => report_formats.push(ReportFormat::Console),
-                    "teamcity" => report_formats.push(ReportFormat::TeamCity),
-                    "junit" => report_formats.push(ReportFormat::JUnit),
-                    "dot" => report_formats.push(ReportFormat::Dot),
-                    _ => {
-                        eprintln!(
-                            "Warning: Unknown report format '{format_str}'. Supported formats: console, teamcity, junit, dot"
-                        );
-                    }
-                }
-            }
-
             let config = create_test_config(
                 filter,
                 debug,
@@ -804,7 +763,7 @@ fn main() {
                 exclude,
                 include,
                 clear_cache,
-                report_formats,
+                reporter,
                 junit_path,
                 junit_merge,
                 snapshot,
@@ -833,7 +792,7 @@ fn main() {
             api_key,
             verbose,
             logs_dir,
-        } => retrace_cmd(hash, net, api_key, verbose, logs_dir),
+        } => retrace_cmd(hash, net.map(|n| n.to_string()), api_key, verbose, logs_dir),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,
@@ -865,11 +824,11 @@ fn main() {
             debug,
             debug_port,
             clear_cache,
-            fork_net,
+            fork_net.map(|n| n.to_string()),
             api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
             fork_block_number,
             broadcast,
-            net,
+            net.map(|n| n.to_string()),
             explorer,
         ),
         Commands::Build {
@@ -927,7 +886,7 @@ fn main() {
                 },
                 address,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net,
+                net.to_string(),
                 follow_libraries,
             ),
             Err(err) => Err(err),
@@ -943,7 +902,7 @@ fn main() {
         } => verify_cmd(
             contract_id,
             address,
-            net,
+            net.to_string(),
             wallet,
             compiler_version,
             dry_run,
@@ -963,7 +922,7 @@ fn main() {
                 duration,
                 wallet,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net,
+                net.to_string(),
             ),
             LibraryCommand::Fetch {
                 hash,
@@ -978,7 +937,7 @@ fn main() {
                     disasm,
                     api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     output,
-                    net,
+                    net.to_string(),
                     json,
                 );
                 if json {
@@ -1064,9 +1023,9 @@ fn create_test_config(
     filter: Option<String>,
     debug: bool,
     debug_port: u16,
-    backtrace: Option<String>,
+    backtrace: Option<BacktraceMode>,
     coverage: bool,
-    coverage_format: Option<String>,
+    coverage_format: Option<CoverageFormat>,
     coverage_file: Option<String>,
     exclude: Vec<String>,
     include: Vec<String>,
@@ -1076,7 +1035,7 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
-    fork_net: Option<String>,
+    fork_net: Option<Network>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
     save_test_trace: Option<String>,

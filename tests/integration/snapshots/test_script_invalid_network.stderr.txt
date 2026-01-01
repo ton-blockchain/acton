@@ -1,1 +1,4 @@
-Error: Unsupported network: invalid-network-name. Supported: mainnet, testnet
+error: invalid value 'invalid-network-name' for '--net <NET>'
+  [possible values: mainnet, testnet]
+
+For more information, try '--help'.

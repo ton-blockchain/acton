@@ -15,20 +15,56 @@ use tonlib_core::wallet::mnemonic::Mnemonic;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tonlib_core::wallet::wallet_version::WalletVersion;
 
+#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
+#[clap(rename_all = "lowercase")]
+pub enum WalletVersionArg {
+    V1R1,
+    V1R2,
+    V1R3,
+    V2R1,
+    V2R2,
+    V3R1,
+    V3R2,
+    V4R1,
+    V4R2,
+    V5R1,
+    HighloadV1R1,
+    HighloadV1R2,
+    HighloadV2,
+    HighloadV2R1,
+    HighloadV2R2,
+}
+
+impl From<WalletVersionArg> for WalletVersion {
+    fn from(arg: WalletVersionArg) -> Self {
+        match arg {
+            WalletVersionArg::V1R1 => WalletVersion::V1R1,
+            WalletVersionArg::V1R2 => WalletVersion::V1R2,
+            WalletVersionArg::V1R3 => WalletVersion::V1R3,
+            WalletVersionArg::V2R1 => WalletVersion::V2R1,
+            WalletVersionArg::V2R2 => WalletVersion::V2R2,
+            WalletVersionArg::V3R1 => WalletVersion::V3R1,
+            WalletVersionArg::V3R2 => WalletVersion::V3R2,
+            WalletVersionArg::V4R1 => WalletVersion::V4R1,
+            WalletVersionArg::V4R2 => WalletVersion::V4R2,
+            WalletVersionArg::V5R1 => WalletVersion::V5R1,
+            WalletVersionArg::HighloadV1R1 => WalletVersion::HighloadV1R1,
+            WalletVersionArg::HighloadV1R2 => WalletVersion::HighloadV1R2,
+            WalletVersionArg::HighloadV2 => WalletVersion::HighloadV2,
+            WalletVersionArg::HighloadV2R1 => WalletVersion::HighloadV2R1,
+            WalletVersionArg::HighloadV2R2 => WalletVersion::HighloadV2R2,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum WalletCommand {
     #[command(about = "Generate a new testnet wallet")]
     New {
-        #[arg(
-            long,
-            help = "Name of the wallet (optional, will prompt if not provided)"
-        )]
+        #[arg(long, help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
-        #[arg(
-            long,
-            help = "Version of the wallet (optional, will prompt if not provided)"
-        )]
-        version: Option<String>,
+        #[arg(long, help = "Version of the wallet (prompts if not provided)")]
+        version: Option<WalletVersionArg>,
         #[arg(long, help = "Save wallet to global config")]
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
@@ -36,18 +72,12 @@ pub enum WalletCommand {
     },
     #[command(about = "Import an existing wallet from mnemonic")]
     Import {
-        #[arg(
-            long,
-            help = "Name of the wallet (optional, will prompt if not provided)"
-        )]
+        #[arg(long, help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
         #[arg(help = "Mnemonic words of the wallet")]
         mnemonics: Vec<String>,
-        #[arg(
-            long,
-            help = "Version of the wallet (optional, will prompt if not provided)"
-        )]
-        version: Option<String>,
+        #[arg(long, help = "Version of the wallet (prompts if not provided)")]
+        version: Option<WalletVersionArg>,
         #[arg(long, help = "Save wallet to global config")]
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
@@ -57,7 +87,7 @@ pub enum WalletCommand {
     List {
         #[arg(short, long, help = "Show wallet balance")]
         balance: bool,
-        #[arg(long, help = "Toncenter API key")]
+        #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
     },
 }
@@ -264,9 +294,9 @@ fn get_config_path(name: &str, is_global: bool) -> anyhow::Result<PathBuf> {
     }
 }
 
-fn get_or_prompt_version(version: Option<String>) -> anyhow::Result<WalletVersion> {
-    if let Some(k) = version {
-        parse_wallet_version(&k)
+fn get_or_prompt_version(version: Option<WalletVersionArg>) -> anyhow::Result<WalletVersion> {
+    if let Some(v) = version {
+        Ok(v.into())
     } else {
         let versions = [
             WalletVersion::V5R1,
@@ -370,7 +400,7 @@ fn save_wallet_to_config(
 
 fn new_wallet(
     name: Option<String>,
-    version: Option<String>,
+    version: Option<WalletVersionArg>,
     global_flag: bool,
     local_flag: bool,
 ) -> anyhow::Result<()> {
@@ -430,7 +460,7 @@ fn new_wallet(
 fn import_wallet(
     name: Option<String>,
     mnemonics: Vec<String>,
-    version: Option<String>,
+    version: Option<WalletVersionArg>,
     global_flag: bool,
     local_flag: bool,
 ) -> anyhow::Result<()> {

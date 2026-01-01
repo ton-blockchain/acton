@@ -4,7 +4,7 @@ Usage: acton <COMMAND>
 
 Commands:
   init         Initialize a new project in the current directory
-  new          Create a new project in the specified directory
+  new          Create a new project in a specified directory
   wallet       Manage wallets
   test         Execute tests in file or directory
   wrapper      Generate wrapper and optionally stub test file for a contract

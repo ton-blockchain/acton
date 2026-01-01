@@ -1,9 +1,25 @@
-use crate::commands::test::{ReportFormat, TestConfig};
+use crate::commands::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Network {
+    Mainnet,
+    Testnet,
+}
+
+impl std::fmt::Display for Network {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Network::Mainnet => write!(f, "mainnet"),
+            Network::Testnet => write!(f, "testnet"),
+        }
+    }
+}
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone)]
 pub enum Explorer {
@@ -297,9 +313,9 @@ impl TestSettings {
         report_formats: Vec<ReportFormat>,
         debug_override: Option<bool>,
         debug_port_override: Option<u16>,
-        backtrace_override: Option<String>,
+        backtrace_override: Option<BacktraceMode>,
         coverage_override: Option<bool>,
-        coverage_format_override: Option<String>,
+        coverage_format_override: Option<CoverageFormat>,
         coverage_file_override: Option<String>,
         exclude_override: Option<Vec<String>>,
         include_override: Option<Vec<String>>,
@@ -308,7 +324,7 @@ impl TestSettings {
         junit_merge_override: bool,
         snapshot_override: Option<String>,
         baseline_gas_override: Option<String>,
-        fork_net_override: Option<String>,
+        fork_net_override: Option<Network>,
         api_key_override: Option<String>,
         fork_block_number_override: Option<u64>,
         save_test_trace_override: Option<String>,
@@ -342,9 +358,24 @@ impl TestSettings {
             report_formats: final_report_formats,
             debug: debug_override.unwrap_or_else(|| self.debug.unwrap_or(false)),
             debug_port: debug_port_override.unwrap_or_else(|| self.debug_port.unwrap_or(12345)),
-            backtrace: backtrace_override.or_else(|| self.backtrace.clone()),
+            backtrace: backtrace_override.or_else(|| {
+                self.backtrace
+                    .as_ref()
+                    .and_then(|b| match b.to_lowercase().as_str() {
+                        "full" => Some(BacktraceMode::Full),
+                        _ => None,
+                    })
+            }),
             coverage: coverage_override.unwrap_or_else(|| self.coverage.unwrap_or(false)),
-            coverage_format: coverage_format_override.or_else(|| self.coverage_format.clone()),
+            coverage_format: coverage_format_override.or_else(|| {
+                self.coverage_format
+                    .as_ref()
+                    .and_then(|f| match f.to_lowercase().as_str() {
+                        "lcov" => Some(CoverageFormat::Lcov),
+                        "text" => Some(CoverageFormat::Text),
+                        _ => None,
+                    })
+            }),
             coverage_file: coverage_file_override.or_else(|| self.coverage_file.clone()),
             exclude_patterns: exclude_override
                 .unwrap_or_else(|| self.exclude.clone().unwrap_or_default()),
@@ -363,7 +394,15 @@ impl TestSettings {
             junit_merge: junit_merge_override || self.junit_merge.unwrap_or(false),
             snapshot: snapshot_override,
             baseline_snapshot: baseline_gas_override,
-            fork_net: fork_net_override.or_else(|| self.fork_net.clone()),
+            fork_net: fork_net_override.or_else(|| {
+                self.fork_net
+                    .as_ref()
+                    .and_then(|n| match n.to_lowercase().as_str() {
+                        "mainnet" => Some(Network::Mainnet),
+                        "testnet" => Some(Network::Testnet),
+                        _ => None,
+                    })
+            }),
             api_key: api_key_override.or_else(|| self.api_key.clone()),
             fork_block_number: fork_block_number_override.or(self.fork_block_number),
             save_test_trace: save_test_trace_override,
