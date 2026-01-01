@@ -46,16 +46,7 @@ pub fn init_cmd() -> anyhow::Result<()> {
 
     println!("{}", "✓ Initialized new Acton project".green().bold());
 
-    if fs::exists(".gitignore").unwrap_or(false) {
-        // Add .acton/ to gitignore automatically
-        let content = fs::read_to_string(".gitignore")?;
-        fs::write(
-            ".gitignore",
-            content
-                + "\n# Acton main directory\n.acton/\n\n# Mnemonic and wallet files\n*.mnemonic\nwallets.toml\nglobal.wallets.toml\n",
-        )?;
-        println!("Patched {} with .acton/ directory", ".gitignore".cyan());
-    }
+    patch_or_create_gitignore()?;
 
     if let Err(e) = symlink_global_wallets() {
         println!(
@@ -75,6 +66,46 @@ pub fn init_cmd() -> anyhow::Result<()> {
         ".acton/tolk-stdlib".cyan()
     );
 
+    Ok(())
+}
+
+fn patch_or_create_gitignore() -> anyhow::Result<()> {
+    let content = if fs::exists(".gitignore").unwrap_or(false) {
+        fs::read_to_string(".gitignore")?
+    } else {
+        String::new()
+    };
+    let lines = content.lines().map(|l| l.trim()).collect::<Vec<_>>();
+
+    let mut to_add = String::new();
+
+    if !lines.contains(&".acton/") {
+        to_add.push_str("\n# Acton main directory\n.acton/\n");
+    }
+
+    let wallet_patterns = ["*.mnemonic", "wallets.toml", "global.wallets.toml"];
+    let missing_wallets: Vec<_> = wallet_patterns
+        .iter()
+        .filter(|p| !lines.contains(p))
+        .collect();
+
+    if !missing_wallets.is_empty() {
+        to_add.push_str("\n# Mnemonic and wallet files\n");
+        for p in missing_wallets {
+            to_add.push_str(p);
+            to_add.push('\n');
+        }
+    }
+
+    if !to_add.is_empty() {
+        let mut new_content = content.clone();
+        if !new_content.ends_with('\n') && !new_content.is_empty() {
+            new_content.push('\n');
+        }
+        new_content.push_str(&to_add);
+        fs::write(".gitignore", new_content)?;
+        println!("Patched {} with Acton patterns", ".gitignore".cyan());
+    }
     Ok(())
 }
 

@@ -1,0 +1,6 @@
+.acton/
+wallets.toml
+
+# Mnemonic and wallet files
+*.mnemonic
+global.wallets.toml

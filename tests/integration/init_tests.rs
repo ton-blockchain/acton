@@ -318,3 +318,54 @@ fn test_init_project_symlinks_global_wallets() {
     let symlink = project.path().join("global.wallets.toml");
     assert!(symlink.exists());
 }
+
+#[test]
+fn test_init_patches_gitignore_no_duplicates() {
+    let project = ProjectBuilder::new("init-gitignore-duplicates")
+        .without_acton_toml()
+        .raw_file(".gitignore", ".acton/\nwallets.toml\n")
+        .build();
+
+    let output = project.acton().init().run().success();
+
+    let gitignore_path = project.path().join(".gitignore");
+    let content = fs::read_to_string(&gitignore_path).unwrap();
+    let lines = content.lines().map(|l| l.trim()).collect::<Vec<_>>();
+
+    let acton_count = lines.iter().filter(|&&l| l == ".acton/").count();
+    assert_eq!(
+        acton_count, 1,
+        "Should only have one .acton/ entry, found {}\nContent:\n{}",
+        acton_count, content
+    );
+
+    let wallets_count = lines.iter().filter(|&&l| l == "wallets.toml").count();
+    assert_eq!(
+        wallets_count, 1,
+        "Should only have one wallets.toml entry, found {}\nContent:\n{}",
+        wallets_count, content
+    );
+
+    output.assert_file_snapshot_matches(
+        ".gitignore",
+        "integration/snapshots/test_init_patches_gitignore_no_duplicates.gitignore",
+    );
+}
+
+#[test]
+fn test_init_creates_gitignore_if_not_exists() {
+    let project = ProjectBuilder::new("init-gitignore-create")
+        .without_acton_toml()
+        .build();
+
+    project.acton().init().run().success();
+
+    let gitignore_path = project.path().join(".gitignore");
+    assert!(gitignore_path.exists());
+    let content = fs::read_to_string(&gitignore_path).unwrap();
+
+    assert!(content.contains(".acton/"));
+    assert!(content.contains("wallets.toml"));
+    assert!(content.contains("*.mnemonic"));
+    assert!(content.contains("global.wallets.toml"));
+}
