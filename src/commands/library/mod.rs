@@ -31,6 +31,8 @@ pub fn publish_cmd(
     wallet_name: Option<String>,
     api_key: Option<String>,
     net: String,
+    amount_arg: Option<f64>,
+    yes: bool,
 ) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
     let network = Network::from_str(&net)?;
@@ -131,26 +133,32 @@ pub fn publish_cmd(
         wallet.wallet.address.to_base64_std().dimmed()
     );
 
-    let amount_to_send = Text::new("Enter amount in TON (leave empty to cancel):").prompt()?;
+    let custom_ton = if let Some(amount) = amount_arg {
+        amount
+    } else {
+        let amount_to_send = Text::new("Enter amount in TON (leave empty to cancel):").prompt()?;
 
-    if amount_to_send.trim().is_empty() {
-        return Ok(());
-    }
+        if amount_to_send.trim().is_empty() {
+            return Ok(());
+        }
 
-    let custom_ton: f64 = amount_to_send
-        .trim()
-        .parse()
-        .context("Invalid TON amount")?;
+        amount_to_send
+            .trim()
+            .parse()
+            .context("Invalid TON amount")?
+    };
 
-    let confirm_custom = inquire::Confirm::new(&format!(
-        "Send {:.4} TON to publish library? Note that any extra TON will be refunded.",
-        custom_ton
-    ))
-    .with_default(true)
-    .prompt()?;
+    if !yes {
+        let confirm_custom = inquire::Confirm::new(&format!(
+            "Send {:.4} TON to publish library? Note that any extra TON will be refunded.",
+            custom_ton
+        ))
+        .with_default(true)
+        .prompt()?;
 
-    if !confirm_custom {
-        return Ok(());
+        if !confirm_custom {
+            return Ok(());
+        }
     }
 
     let amount_to_send = (custom_ton * 1_000_000_000.0) as u128;

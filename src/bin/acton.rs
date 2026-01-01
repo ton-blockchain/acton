@@ -472,6 +472,8 @@ enum Commands {
         canary: bool,
         #[arg(long, help = "Install the latest stable release")]
         stable: bool,
+        #[arg(short, long, help = "Skip confirmation prompts")]
+        yes: bool,
     },
     #[command(
         about = "Generate shell completions for selected shell",
@@ -510,6 +512,10 @@ pub enum LibraryCommand {
         api_key: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
         net: Network,
+        #[arg(long, help = "Amount of TON to send for publication")]
+        amount: Option<f64>,
+        #[arg(short, long, help = "Skip confirmation prompts")]
+        yes: bool,
     },
     #[command(about = "Fetch a library from the blockchain")]
     Fetch {
@@ -916,6 +922,8 @@ fn main() {
                 wallet,
                 api_key,
                 net,
+                amount,
+                yes,
             } => publish_cmd(
                 contract_id,
                 code,
@@ -923,6 +931,8 @@ fn main() {
                 wallet,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                 net.to_string(),
+                amount,
+                yes,
             ),
             LibraryCommand::Fetch {
                 hash,
@@ -959,7 +969,8 @@ fn main() {
             version,
             canary,
             stable,
-        } => up_cmd(version, canary, stable),
+            yes,
+        } => up_cmd(version, canary, stable, yes),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())

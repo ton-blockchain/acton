@@ -1,1 +1,4 @@
-Warning: Unknown coverage format 'invalid-format'. Supported formats: lcov, text
+error: invalid value 'invalid-format' for '--coverage-format <COVERAGE_FORMAT>'
+  [possible values: lcov, text]
+
+For more information, try '--help'.

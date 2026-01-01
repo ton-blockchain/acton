@@ -10,7 +10,7 @@ use std::env;
 use client::GitHubClient;
 use workflow::run_update;
 
-pub fn up_cmd(version: Option<String>, canary: bool, stable: bool) -> Result<()> {
+pub fn up_cmd(version: Option<String>, canary: bool, stable: bool, yes: bool) -> Result<()> {
     let client = GitHubClient::new();
     let current_exe = env::current_exe()?;
     let current_version_str = env!("CARGO_PKG_VERSION");
@@ -22,5 +22,6 @@ pub fn up_cmd(version: Option<String>, canary: bool, stable: bool) -> Result<()>
         version,
         canary,
         stable,
+        yes,
     )
 }

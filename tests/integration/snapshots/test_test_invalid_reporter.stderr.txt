@@ -1,1 +1,4 @@
-Warning: Unknown report format 'invalid-reporter'. Supported formats: console, teamcity, junit, dot
+error: invalid value 'invalid-reporter' for '--reporter <REPORTER>'
+  [possible values: console, teamcity, junit, dot]
+
+For more information, try '--help'.

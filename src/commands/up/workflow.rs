@@ -16,8 +16,9 @@ pub fn run_update<C: ReleaseClient>(
     version: Option<String>,
     canary: bool,
     stable: bool,
+    yes: bool,
 ) -> Result<()> {
-    check_homebrew(current_exe)?;
+    check_homebrew(current_exe, yes)?;
 
     let current_version = Version::parse(current_version_str);
 
@@ -118,7 +119,7 @@ pub fn run_update<C: ReleaseClient>(
     Ok(())
 }
 
-fn check_homebrew(exe: &Path) -> Result<()> {
+fn check_homebrew(exe: &Path, yes: bool) -> Result<()> {
     let path_str = exe.to_string_lossy();
     if path_str.contains("Cellar") || path_str.contains("homebrew") {
         eprintln!(
@@ -126,6 +127,10 @@ fn check_homebrew(exe: &Path) -> Result<()> {
             "Warning: Acton seems to be installed via Homebrew.".yellow()
         );
         eprintln!("It is recommended to update using `brew upgrade acton`.");
+
+        if yes {
+            return Ok(());
+        }
 
         let ans = inquire::Confirm::new("Do you want to proceed with built-in update anyway?")
             .with_default(false)
