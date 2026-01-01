@@ -2660,6 +2660,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "hex",
+ "pkg-config",
  "serde",
  "serde_json",
 ]

@@ -20,7 +20,7 @@ use acton::config::{ActonConfig, Explorer, Network};
 use clap::builder::styling::Style;
 use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory};
-use clap::{Parser, Subcommand, arg};
+use clap::{Parser, Subcommand};
 use clap_complete::CompleteEnv;
 use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
 use commands::common::error_fmt;

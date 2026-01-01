@@ -23,5 +23,10 @@ fn main() {
     #[cfg(target_os = "linux")]
     {
         println!("cargo:rustc-link-lib=dylib=stdc++");
+
+        pkg_config::Config::new()
+            .atleast_version("3.0.0")
+            .probe("openssl")
+            .expect("OpenSSL not found via pkg-config. Install pkg-config and libssl-dev.");
     }
 }
