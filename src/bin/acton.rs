@@ -30,7 +30,7 @@ use owo_colors::OwoColorize;
 use std::fs::OpenOptions;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
-use tolkc::source_map::SourceMap;
+use ton_source_map::SourceMap;
 
 #[derive(Parser)]
 #[command(

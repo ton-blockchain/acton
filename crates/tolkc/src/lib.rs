@@ -18,6 +18,5 @@
 //! ```
 
 pub mod compiler;
-pub mod source_map;
 
 pub use compiler::{Compiler, CompilerInternalResult, CompilerResult, compile, compile_fast};

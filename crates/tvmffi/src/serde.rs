@@ -32,14 +32,14 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
             }
             // Use int257 for larger values
             builder.store_u16(15, 0x0100)?;
-            builder.store_int(257, &value.clone().into())?;
+            builder.store_int(257, &value.clone())?;
         }
         TupleItem::Nan => {
             builder.store_u16(16, 0x02ff)?;
         }
         TupleItem::Cell(cell) => {
             builder.store_u8(8, 0x03)?;
-            builder.store_reference(&cell)?;
+            builder.store_reference(cell)?;
         }
         TupleItem::Slice(cell) => {
             builder.store_u8(8, 0x04)?;
@@ -47,20 +47,18 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
             builder.store_u32(10, cell.bit_len() as u32)?;
             builder.store_u32(3, 0)?;
             builder.store_u32(3, cell.references().len() as u32)?;
-            builder.store_reference(&cell)?;
+            builder.store_reference(cell)?;
         }
         TupleItem::Builder(cell) => {
             builder.store_u8(8, 0x05)?;
-            builder.store_reference(&cell)?;
+            builder.store_reference(cell)?;
         }
         TupleItem::Tuple(items) => {
             let mut head: Option<ArcCell> = None;
             let mut tail: Option<ArcCell> = None;
 
             for (i, item) in items.iter().enumerate() {
-                let s = head;
-                head = tail;
-                tail = s;
+                std::mem::swap(&mut head, &mut tail);
 
                 if i > 1 {
                     let mut bc = CellBuilder::new();
@@ -185,7 +183,7 @@ pub fn parse_tuple_item(parser: &mut CellParser) -> Result<TupleItem, anyhow::Er
             // TODO: support continuation
             Ok(TupleItem::Null)
         }
-        _ => Err(anyhow!("Unsupported stack item kind: {}", kind).into()),
+        _ => Err(anyhow!("Unsupported stack item kind: {}", kind)),
     }
 }
 
@@ -193,7 +191,7 @@ pub fn parse_tuple_item(parser: &mut CellParser) -> Result<TupleItem, anyhow::Er
 pub fn serialize_tuple(src: &Tuple) -> Result<ArcCell, anyhow::Error> {
     let mut builder = CellBuilder::new();
     builder.store_uint(24, &BigUint::from(src.0.len()))?;
-    serialize_tuple_tail(&*src.0, &mut builder)?;
+    serialize_tuple_tail(&src.0, &mut builder)?;
     Ok(ArcCell::new(builder.build()?))
 }
 

@@ -3,6 +3,7 @@ use anyhow::anyhow;
 use owo_colors::OwoColorize;
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 use tasm::decompile::Disassembler;
 use tasm::printer::FormatOptions;
 use tasm::types::Instruction;

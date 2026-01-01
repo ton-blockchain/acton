@@ -812,7 +812,7 @@ impl From<&SpecInstruction> for SpecInstruction {
 }
 impl SpecInstruction {}
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InstructionInputs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -825,17 +825,9 @@ impl From<&InstructionInputs> for InstructionInputs {
         value.clone()
     }
 }
-impl Default for InstructionInputs {
-    fn default() -> Self {
-        Self {
-            registers: Default::default(),
-            stack: Default::default(),
-        }
-    }
-}
 impl InstructionInputs {}
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InstructionOutputs {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -848,17 +840,9 @@ impl From<&InstructionOutputs> for InstructionOutputs {
         value.clone()
     }
 }
-impl Default for InstructionOutputs {
-    fn default() -> Self {
-        Self {
-            registers: Default::default(),
-            stack: Default::default(),
-        }
-    }
-}
 impl InstructionOutputs {}
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InstructionSignature {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -871,15 +855,6 @@ pub struct InstructionSignature {
 impl From<&InstructionSignature> for InstructionSignature {
     fn from(value: &InstructionSignature) -> Self {
         value.clone()
-    }
-}
-impl Default for InstructionSignature {
-    fn default() -> Self {
-        Self {
-            inputs: Default::default(),
-            outputs: Default::default(),
-            stack_string: Default::default(),
-        }
     }
 }
 impl InstructionSignature {}
@@ -1048,7 +1023,7 @@ impl From<&Mutation> for Mutation {
 }
 impl Mutation {}
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct MutationLength {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1059,14 +1034,6 @@ pub struct MutationLength {
 impl From<&MutationLength> for MutationLength {
     fn from(value: &MutationLength) -> Self {
         value.clone()
-    }
-}
-impl Default for MutationLength {
-    fn default() -> Self {
-        Self {
-            amount_arg: Default::default(),
-            stack_amount_arg: Default::default(),
-        }
     }
 }
 impl MutationLength {}
@@ -1330,7 +1297,7 @@ impl From<&S1Arg> for S1Arg {
 }
 impl S1Arg {}
 
-#[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Savelist {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1345,16 +1312,6 @@ pub struct Savelist {
 impl From<&Savelist> for Savelist {
     fn from(value: &Savelist) -> Self {
         value.clone()
-    }
-}
-impl Default for Savelist {
-    fn default() -> Self {
-        Self {
-            c0: Default::default(),
-            c1: Default::default(),
-            c2: Default::default(),
-            c3: Default::default(),
-        }
     }
 }
 impl Savelist {}

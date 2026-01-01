@@ -576,10 +576,10 @@ fn extract_struct_abi(
         // Clean the number by removing underscores
         let clean_text = prefix_text.replace('_', "");
 
-        let (prefix_val, radix) = if clean_text.starts_with("0x") {
-            (u32::from_str_radix(&clean_text[2..], 16), 16)
-        } else if clean_text.starts_with("0b") {
-            (u32::from_str_radix(&clean_text[2..], 2), 2)
+        let (prefix_val, radix) = if let Some(stripped) = clean_text.strip_prefix("0x") {
+            (u32::from_str_radix(stripped, 16), 16)
+        } else if let Some(stripped) = clean_text.strip_prefix("0b") {
+            (u32::from_str_radix(stripped, 2), 2)
         } else {
             (clean_text.parse::<u32>(), 10)
         };
@@ -807,8 +807,8 @@ fn get_explicit_method_id(func_node: &tree_sitter::Node, content: &str) -> Optio
                 if arg.kind() == "number_literal" {
                     let value_text = arg.utf8_text(content.as_bytes()).unwrap_or("").to_string();
 
-                    let id = if value_text.starts_with("0x") {
-                        u32::from_str_radix(&value_text[2..], 16).ok()
+                    let id = if let Some(stripped) = value_text.strip_prefix("0x") {
+                        u32::from_str_radix(stripped, 16).ok()
                     } else {
                         value_text.parse::<u32>().ok()
                     };

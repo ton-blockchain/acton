@@ -26,7 +26,7 @@ impl Tuple {
 
         let mut parser = cell.parser();
         let bits_to_load = cell.bit_len();
-        if (bits_to_load % 8) != 0 {
+        if !bits_to_load.is_multiple_of(8) {
             // this is most likely not a snake string
             return None;
         }
@@ -164,7 +164,7 @@ mod tests {
             assert_eq!(test_string.len(), expected_len);
 
             let mut tuple = Tuple::empty();
-            tuple.push_string(&*test_string);
+            tuple.push_string(&test_string);
             let serialized = serialize_tuple(&tuple).unwrap();
             let deserialized = parse_tuple(&serialized).unwrap();
             assert_eq!(tuple, deserialized);
@@ -191,7 +191,7 @@ mod tests {
 
         for test_string in test_cases {
             let mut tuple = Tuple::empty();
-            tuple.push_string(&*test_string);
+            tuple.push_string(&test_string);
             let serialized = serialize_tuple(&tuple).unwrap();
             let deserialized = parse_tuple(&serialized).unwrap();
             assert_eq!(tuple, deserialized);
@@ -217,7 +217,7 @@ mod tests {
 
         for original in test_strings {
             let mut tuple = Tuple::empty();
-            tuple.push_string(&*original);
+            tuple.push_string(&original);
 
             if let Some(TupleItem::Slice(slice)) = tuple.0.first() {
                 let parsed = Tuple::parse_snake_string(slice);
@@ -246,7 +246,7 @@ mod tests {
 
         for (test_string, expected_total_bits, requires_multiple_cells) in test_cases {
             let mut tuple = Tuple::empty();
-            tuple.push_string(&*test_string);
+            tuple.push_string(&test_string);
 
             assert_eq!(
                 tuple.0.len(),

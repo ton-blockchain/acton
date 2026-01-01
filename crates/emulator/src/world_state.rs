@@ -71,6 +71,12 @@ pub struct LocalAccountsState {
     pub accounts: HashMap<String, ShardAccount>,
 }
 
+impl Default for LocalAccountsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LocalAccountsState {
     /// Creates a new empty local state.
     pub fn new() -> Self {
@@ -108,6 +114,12 @@ pub struct RemoteCacheKey {
 #[derive(Clone, Debug)]
 pub struct RemoteSnapshotCache {
     inner: Rc<RefCell<HashMap<RemoteCacheKey, ShardAccount>>>,
+}
+
+impl Default for RemoteSnapshotCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RemoteSnapshotCache {
@@ -300,7 +312,7 @@ impl WorldState {
             return account
                 .account
                 .load()
-                .and_then(|acc| Ok(acc.0.is_some()))
+                .map(|acc| acc.0.is_some())
                 .unwrap_or(false);
         }
         deployed

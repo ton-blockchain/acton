@@ -273,10 +273,7 @@ impl Emulator {
             return None;
         };
 
-        let Some(code) = state.code else {
-            return None;
-        };
-
+        let code = state.code?;
         Some(code)
     }
 
@@ -288,7 +285,7 @@ impl Emulator {
         message: &BaseMessage<T, B>,
         account: &ShardAccount,
     ) -> Option<Cell> {
-        let account_code = Self::get_address_code_cell(&account);
+        let account_code = Self::get_address_code_cell(account);
         match account_code {
             Some(code) => Some(code),
             None => {
@@ -305,6 +302,7 @@ impl Emulator {
 }
 
 /// The result of a message emulation.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum SendMessageResult {
     /// The transaction was executed successfully (though it might have failed in TVM).

@@ -3,6 +3,15 @@ name = "acton"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = ["crates/*"]
+
+# experimental projects
+exclude = [
+    "crates/txtracer-mcp",
+    "crates/txtracer-tui",
+]
+
 [dependencies]
 # local creates
 abi = { path = "crates/abi" }
@@ -16,6 +25,7 @@ tasm = { path = "crates/tasm" }
 dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
 retrace = { path = "crates/retrace" }
+ton-source-map = { path = "crates/ton-source-map" }
 
 # remote crates
 # base TON libraries

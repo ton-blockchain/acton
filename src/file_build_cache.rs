@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 use tolkc::compiler::CompilerResultSuccess;
-use tolkc::source_map::SourceMap;
+use ton_source_map::SourceMap;
 
 const CACHE_SCHEMA_VERSION: u32 = 2;
 

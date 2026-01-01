@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use tolkc::source_map::SourceMap;
+use ton_source_map::SourceMap;
 use tycho_types::boc::Boc;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

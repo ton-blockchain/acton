@@ -18,7 +18,7 @@ use log::debug;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
-use tolkc::source_map::{BytecodeLocation, DebugLocation, EntryContextDescription, SourceMap};
+use ton_source_map::{BytecodeLocation, DebugLocation, EntryContextDescription, SourceMap};
 use tvmffi::stack::TupleItem;
 use tycho_types::models::{OutAction, OwnedRelaxedMessage, RelaxedMsgInfo, StateInit};
 

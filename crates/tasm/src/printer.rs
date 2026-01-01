@@ -1,6 +1,6 @@
 use crate::types::{ArgValue, Instruction};
 use std::fs;
-use tolkc::source_map::SourceMap;
+use ton_source_map::{SourceLocation, SourceMap};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 
@@ -68,25 +68,23 @@ impl Instruction {
 
         if let Some(source_map) = &opts.source_map
             && let Some(off) = offset
+            && let Some(locations) =
+                get_source_locations(source_map, instr.source_cell.as_ref(), off as i32)
+            && !locations.is_empty()
         {
-            if let Some(locations) =
-                get_source_locations(&source_map, instr.source_cell.as_ref(), off as i32)
-                && !locations.is_empty()
-            {
-                let source_contexts: Vec<String> = locations
-                    .iter()
-                    .filter_map(|location| format_source_context(location))
-                    .collect();
+            let source_contexts: Vec<String> = locations
+                .iter()
+                .filter_map(|location| format_source_context(location))
+                .collect();
 
-                if !source_contexts.is_empty() {
-                    let before = format!("    └{}┐\n", "─".repeat(56));
-                    let after = format!("    ┌{}┘", "─".repeat(56));
-                    let source_output = source_contexts.join("");
-                    return format!(
-                        "{}{:>padding$}\n{before}{}{after}",
-                        result, "", source_output
-                    );
-                }
+            if !source_contexts.is_empty() {
+                let before = format!("    └{}┐\n", "─".repeat(56));
+                let after = format!("    ┌{}┘", "─".repeat(56));
+                let source_output = source_contexts.join("");
+                return format!(
+                    "{}{:>padding$}\n{before}{}{after}",
+                    result, "", source_output
+                );
             }
         }
 
@@ -98,7 +96,7 @@ fn get_source_locations<'a>(
     source_map: &'a SourceMap,
     cell: Option<&Cell>,
     offset: i32,
-) -> Option<Vec<&'a tolkc::source_map::SourceLocation>> {
+) -> Option<Vec<&'a SourceLocation>> {
     if let Some(cell) = cell {
         let hash = cell.repr_hash().to_string().to_uppercase();
         if let Some(marks) = source_map.debug_marks.get(&hash) {
@@ -114,7 +112,7 @@ fn get_source_locations<'a>(
                 .collect();
 
             if !debug_ids.is_empty() {
-                let locations: Vec<&tolkc::source_map::SourceLocation> = debug_ids
+                let locations: Vec<&SourceLocation> = debug_ids
                     .iter()
                     .filter_map(|debug_id| {
                         source_map
@@ -135,7 +133,7 @@ fn get_source_locations<'a>(
     None
 }
 
-fn format_source_context(location: &tolkc::source_map::SourceLocation) -> Option<String> {
+fn format_source_context(location: &SourceLocation) -> Option<String> {
     let content = fs::read_to_string(&location.file).ok()?;
     let lines: Vec<&str> = content.lines().collect();
 
@@ -151,14 +149,13 @@ fn format_source_context(location: &tolkc::source_map::SourceLocation) -> Option
     result.push_str(&format!(
         "{:<60} │  {}:{}:{}",
         " ",
-        tolkc::source_map::SourceLocation::normalize_path(&location.file),
+        SourceLocation::normalize_path(&location.file),
         location.line + 1,
         location.column + 2
     ));
 
-    for i in start_line..end_line {
+    for (i, line_content) in lines.iter().enumerate().take(end_line).skip(start_line) {
         let line_num = i + 1;
-        let line_content = lines[i];
         result.push_str(&format!(
             "\n{:>60}{}│  {:>3}: {}",
             "", " ", line_num, line_content
@@ -246,7 +243,7 @@ fn format_arg(arg: &ArgValue, depth: usize, opts: &FormatOptions) -> String {
 
                 builder.push_str(&indent);
                 builder.push_str(&format!("    {} => ", method.id));
-                builder.push_str("{");
+                builder.push('{');
                 if opts.show_hashes {
                     builder.push_str(&format!(
                         " // {}",
@@ -291,7 +288,7 @@ fn format_cell(s: &Cell) -> String {
 
 fn format_slice(slice: &CellSlice) -> String {
     if slice.size_refs() == 0 {
-        format!("x{{{}}}", slice.display_data().to_string())
+        format!("x{{{}}}", slice.display_data())
     } else {
         let mut builder = CellBuilder::new();
         builder.store_slice(slice).ok();

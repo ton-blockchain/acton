@@ -5,8 +5,8 @@ use crate::formatter::FormatterContext;
 use crate::{exit_codes, retrace};
 use owo_colors::OwoColorize;
 use std::path::Path;
-use tolkc::source_map::SourceLocation;
 use ton_executor::get::GetMethodResult;
+use ton_source_map::SourceLocation;
 
 #[derive(Debug, Clone)]
 pub struct ConsoleConfig {

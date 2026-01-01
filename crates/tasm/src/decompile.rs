@@ -332,7 +332,7 @@ impl Disassembler {
                 let real_length = (y + 1) * 8;
                 let r = slice.load_prefix(real_length as u16, 0)?;
                 let mut builder = CellBuilder::new();
-                builder.store_slice(&r)?;
+                builder.store_slice(r)?;
                 args.push(ArgValue::Cell(builder.build()?));
             }
             &Arg::SetcpArg(_) | &Arg::InlineDictArg(_) | &Arg::ExoticCellArg(_) => {}
@@ -377,7 +377,7 @@ impl Disassembler {
         let r = r.load_prefix(length as u16, 0)?;
 
         let mut builder = CellBuilder::new();
-        builder.store_slice(&r)?;
+        builder.store_slice(r)?;
         for _ in 0..count_refs {
             builder.store_reference(dyn_cell_to_cell(slice.load_reference()?))?;
         }

@@ -7,7 +7,7 @@ use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
 use tycho_types::prelude::DynCell;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SourceMap {
     pub high_level: HighLevelSourceMap,
     pub debug_marks: HashMap<String, Vec<(i32, i32)>>,
@@ -25,15 +25,6 @@ impl SourceMap {
             loc.loc.column.hash(&mut hasher);
         }
         format!("{:x}", hasher.finish())
-    }
-}
-
-impl Default for SourceMap {
-    fn default() -> Self {
-        Self {
-            high_level: Default::default(),
-            debug_marks: Default::default(),
-        }
     }
 }
 
@@ -82,7 +73,7 @@ impl SourceLocation {
         )
     }
 
-    pub fn normalize_path(file: &String) -> String {
+    pub fn normalize_path(file: &str) -> String {
         let normalized = file.replace(".test.tolk.test.tolk", ".test.tolk");
 
         if let Ok(cwd) = std::env::current_dir() {

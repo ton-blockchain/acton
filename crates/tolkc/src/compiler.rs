@@ -1,4 +1,3 @@
-use crate::source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -6,6 +5,7 @@ use std::ffi::{CStr, CString, c_char};
 use std::fs::{canonicalize, read_to_string};
 use std::io::Error;
 use std::path::{Path, PathBuf};
+use ton_source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
 
 /// Compiles passed file with Tolk compiler.
 ///
@@ -134,9 +134,7 @@ impl Compiler {
                         };
 
                         let content = if file_path.contains("@stdlib/") {
-                            let filename = file_path
-                                .strip_prefix("@stdlib/")
-                                .unwrap_or_else(|| file_path);
+                            let filename = file_path.strip_prefix("@stdlib/").unwrap_or(file_path);
                             match read_stdlib_file(filename).map(|s| s.to_string()) {
                                 Some(content) => content,
                                 None => {
@@ -151,9 +149,7 @@ impl Compiler {
                                 }
                             }
                         } else if file_path.contains("@fiftlib/") {
-                            let filename = file_path
-                                .strip_prefix("@fiftlib/")
-                                .unwrap_or_else(|| file_path);
+                            let filename = file_path.strip_prefix("@fiftlib/").unwrap_or(file_path);
                             match read_fift_stdlib_file(filename).map(|s| s.to_string()) {
                                 Some(content) => content,
                                 None => {
@@ -243,6 +239,7 @@ pub struct CompilerConfig {
     pub collect_source_map: bool,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum CompilerResult {
     Success(CompilerResultSuccess),

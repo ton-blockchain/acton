@@ -1,4 +1,5 @@
 use crate::parser::{VmStack, VmStackValue};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone)]
 pub enum StackDiff {
@@ -8,16 +9,18 @@ pub enum StackDiff {
     Changed { index: usize, value: String },
 }
 
-impl StackDiff {
-    fn to_string(&self) -> String {
+impl Display for StackDiff {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            StackDiff::Same(n) => format!("={}", n),
-            StackDiff::Removed(n) => format!("-{}", n),
-            StackDiff::Added(val) => format!("+{}", val),
-            StackDiff::Changed { index, value } => format!("~{}:{}", index, value),
+            StackDiff::Same(n) => write!(f, "={}", n),
+            StackDiff::Removed(n) => write!(f, "-{}", n),
+            StackDiff::Added(val) => write!(f, "+{}", val),
+            StackDiff::Changed { index, value } => write!(f, "~{}:{}", index, value),
         }
     }
+}
 
+impl StackDiff {
     fn from_string(s: &str) -> Option<Self> {
         if let Some(n) = s.strip_prefix('=') {
             n.parse().ok().map(StackDiff::Same)
@@ -27,13 +30,13 @@ impl StackDiff {
             Some(StackDiff::Added(val.to_string()))
         } else if let Some(rest) = s.strip_prefix('~') {
             let parts: Vec<&str> = rest.splitn(2, ':').collect();
-            if parts.len() == 2 {
-                if let Ok(index) = parts[0].parse() {
-                    return Some(StackDiff::Changed {
-                        index,
-                        value: parts[1].to_string(),
-                    });
-                }
+            if parts.len() == 2
+                && let Ok(index) = parts[0].parse()
+            {
+                return Some(StackDiff::Changed {
+                    index,
+                    value: parts[1].to_string(),
+                });
             }
             None
         } else {
@@ -170,12 +173,12 @@ pub fn convert_from_diff_logs(input: &str) -> String {
             output.push_str(line);
             output.push('\n');
 
-            if line.starts_with("stack: ") {
-                if let Some(stack_content) = line.strip_prefix("stack: ") {
-                    let content = stack_content.trim();
-                    let stack = VmStack::new(content);
-                    current_stack = stack.parsed().iter().map(|v| v.to_string()).collect();
-                }
+            if line.starts_with("stack: ")
+                && let Some(stack_content) = line.strip_prefix("stack: ")
+            {
+                let content = stack_content.trim();
+                let stack = VmStack::new(content);
+                current_stack = stack.parsed().iter().map(|v| v.to_string()).collect();
             }
         }
     }
@@ -216,10 +219,10 @@ fn parse_diff_line(content: &str) -> Vec<StackDiff> {
         }
     }
 
-    if !current.is_empty() {
-        if let Some(diff) = StackDiff::from_string(&current) {
-            diffs.push(diff);
-        }
+    if !current.is_empty()
+        && let Some(diff) = StackDiff::from_string(&current)
+    {
+        diffs.push(diff);
     }
 
     diffs

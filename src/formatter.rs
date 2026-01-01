@@ -8,7 +8,7 @@ use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Write;
-use tolkc::source_map::SourceLocation;
+use ton_source_map::SourceLocation;
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;

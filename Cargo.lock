@@ -72,6 +72,7 @@ dependencies = [
  "toml_edit",
  "ton-api",
  "ton-executor",
+ "ton-source-map",
  "tonlib-core",
  "tree-sitter",
  "tvmffi",
@@ -182,6 +183,12 @@ name = "anyhow"
 version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
+
+[[package]]
+name = "arrayvec"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "async-trait"
@@ -731,6 +738,10 @@ checksum = "4316185f709b23713e41e3195f90edef7fb00c3ed4adc79769cf09cc762a3b29"
 dependencies = [
  "log",
 ]
+
+[[package]]
+name = "ffi-test"
+version = "0.1.0"
 
 [[package]]
 name = "fiat-crypto"
@@ -1760,6 +1771,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pretty"
+version = "0.12.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d22152487193190344590e4f30e219cf3fe140d9e7a3fdb683d82aa2c5f4156"
+dependencies = [
+ "arrayvec",
+ "typed-arena",
+ "unicode-width",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2392,7 +2414,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
- "tolkc",
+ "ton-source-map",
  "tycho-types",
 ]
 
@@ -2582,11 +2604,19 @@ dependencies = [
 name = "tolkc"
 version = "0.1.0"
 dependencies = [
- "color-print",
  "include_dir",
  "serde",
  "serde_json",
- "tycho-types",
+ "ton-source-map",
+]
+
+[[package]]
+name = "tolkfmt2"
+version = "0.1.0"
+dependencies = [
+ "pretty",
+ "tolk_parser",
+ "tree-sitter",
 ]
 
 [[package]]
@@ -2663,6 +2693,15 @@ dependencies = [
  "pkg-config",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ton-source-map"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tycho-types",
 ]
 
 [[package]]
@@ -2817,9 +2856,9 @@ dependencies = [
 
 [[package]]
 name = "tycho-types"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4f5833c3db328b9ec5544de8a2a7ff4a6d8d654d6f58d6ad5bf8b774dccf969"
+checksum = "c2ccb37e250becb5c4b827536644c777c247b41ac6c9ddd30902ff1db29818a7"
 dependencies = [
  "ahash",
  "base64",
@@ -2849,6 +2888,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "typed-arena"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
 
 [[package]]
 name = "typeid"
@@ -2888,9 +2933,9 @@ checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
 name = "unicode-width"
-version = "0.2.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
+checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unit-prefix"

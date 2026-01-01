@@ -11,4 +11,4 @@ num-traits = "0.2.19"
 tycho-types = { version = "0.3.0", features = ["bigint"] }
 smallvec = "1.15.1"
 anyhow = "1.0.100"
-tolkc = { path = "../tolkc" }
+ton-source-map = { path = "../ton-source-map" }

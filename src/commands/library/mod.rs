@@ -10,6 +10,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use tasm::printer::FormatOptions;
 use tempfile::TempDir;
 use tolkc::CompilerResult;

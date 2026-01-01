@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
-use tolkc::source_map::{EntryContextDescription, SourceMap};
+use ton_source_map::{EntryContextDescription, SourceMap};
 use tycho_types::boc::Boc;
 
 #[derive(Debug, Clone)]

@@ -107,6 +107,9 @@ fn cell_to_ffi_boc64(cell: ArcCell) -> *const c_char {
         .cast_const()
 }
 
+/// # Safety
+///
+/// Well...
 pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *const c_char {
     let c = unsafe { CStr::from_ptr(ptr) };
     let boc = match c.to_str() {
@@ -117,7 +120,7 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
     let mut tuple = ArcCell::from_boc_b64(boc)
         .ok()
         .and_then(|c| tvmffi::serde::parse_tuple(&c).ok())
-        .unwrap_or_else(|| Tuple::empty());
+        .unwrap_or_else(Tuple::empty);
 
     f(&mut tuple);
 

@@ -1,4 +1,4 @@
-use tolkc::source_map::{DebugLocation, EntryContextDescription, SourceMap};
+use ton_source_map::{DebugLocation, EntryContextDescription, SourceMap};
 use vmlogs::parser::VmLine;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

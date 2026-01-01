@@ -13,9 +13,9 @@ impl Tuple {
     }
 
     /// Creates wrapper over values with specified type.
-    pub fn to_typed(&self, type_name: &String) -> TupleItem {
+    pub fn to_typed(&self, type_name: &str) -> TupleItem {
         TupleItem::TypedTuple {
-            type_name: type_name.clone(),
+            type_name: type_name.to_owned(),
             inner: self.clone(),
         }
     }
@@ -26,8 +26,8 @@ impl Tuple {
     /// (()) -> ()
     /// ```
     pub fn unwrap_empty(&self) -> Tuple {
-        if let Some(TupleItem::Tuple(item)) = &self.0.get(0)
-            && item.len() == 0
+        if let Some(TupleItem::Tuple(item)) = &self.0.first()
+            && item.is_empty()
         {
             return Tuple(vec![]);
         }
@@ -41,7 +41,7 @@ impl Tuple {
     /// ((x)) -> (x)
     /// ```
     pub fn unwrap_single(&self) -> Tuple {
-        if let Some(TupleItem::Tuple(item)) = &self.0.get(0)
+        if let Some(TupleItem::Tuple(item)) = &self.0.first()
             && item.len() == 1
         {
             return Tuple(vec![item[0].clone()]);
@@ -51,7 +51,7 @@ impl Tuple {
     }
 
     pub fn unwrap_tuple(&self) -> Tuple {
-        if let Some(TupleItem::Tuple(item)) = &self.0.get(0) {
+        if let Some(TupleItem::Tuple(item)) = &self.0.first() {
             return Tuple(item.0.clone());
         }
 
@@ -91,8 +91,9 @@ impl PartialEq for Tuple {
 }
 
 /// Represents a stack value in TVM
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TupleItem {
+    #[default]
     Null,
     Int(BigInt),
     Nan,
@@ -100,21 +101,24 @@ pub enum TupleItem {
     Slice(ArcCell),
     Builder(ArcCell),
     Tuple(Tuple),
-    TypedTuple { type_name: String, inner: Tuple },
+    TypedTuple {
+        type_name: String,
+        inner: Tuple,
+    },
 }
 
 impl TupleItem {
     /// Creates wrapper over values with specified type.
-    pub fn to_typed(&self, type_name: &String) -> TupleItem {
+    pub fn to_typed(&self, type_name: &str) -> TupleItem {
         if let TupleItem::Tuple(item) = self {
             return TupleItem::TypedTuple {
-                type_name: type_name.clone(),
+                type_name: type_name.to_owned(),
                 inner: item.clone(),
             };
         }
 
         TupleItem::TypedTuple {
-            type_name: type_name.clone(),
+            type_name: type_name.to_owned(),
             inner: Tuple(vec![self.clone()]),
         }
     }
@@ -134,11 +138,5 @@ impl TupleItem {
         }
 
         (*self).clone()
-    }
-}
-
-impl Default for TupleItem {
-    fn default() -> Self {
-        TupleItem::Null
     }
 }

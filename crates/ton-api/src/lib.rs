@@ -2,6 +2,7 @@ use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
+use std::str::FromStr;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
@@ -11,19 +12,23 @@ pub enum Network {
     Testnet,
 }
 
+impl FromStr for Network {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "mainnet" => Ok(Network::Mainnet),
+            "testnet" => Ok(Network::Testnet),
+            _ => anyhow::bail!("Unsupported network: {}. Supported: mainnet, testnet", s),
+        }
+    }
+}
+
 impl Network {
     pub fn as_str(&self) -> &'static str {
         match self {
             Network::Mainnet => "mainnet",
             Network::Testnet => "testnet",
-        }
-    }
-
-    pub fn from_str(s: &str) -> anyhow::Result<Self> {
-        match s.to_lowercase().as_str() {
-            "mainnet" => Ok(Network::Mainnet),
-            "testnet" => Ok(Network::Testnet),
-            _ => anyhow::bail!("Unsupported network: {}. Supported: mainnet, testnet", s),
         }
     }
 
@@ -259,7 +264,7 @@ impl TonApiClient {
     pub fn get_account_info(
         &self,
         seqno: Option<u64>,
-        address: &String,
+        address: &str,
     ) -> anyhow::Result<TonCenterAccountInfoResult> {
         let url = format!(
             "{}/api/v2/getAddressInformation?address={}{}",

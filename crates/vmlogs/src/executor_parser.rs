@@ -241,7 +241,7 @@ pub fn parse_executor_line(input: &str) -> Result<ExecutorLine<'_>, String> {
     }
     let message_part = parts[1];
 
-    match terminated(executor_line, opt(eof)).parse(&mut message_part.as_ref()) {
+    match terminated(executor_line, opt(eof)).parse(message_part.as_ref()) {
         Ok(v) => Ok(v),
         Err(e) => Err(format!("{e:?} @ {:?}", message_part)),
     }
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_parse_executor_logs() {
-        let results = parse_executor_lines(&TEST_EXECUTOR_LOGS);
+        let results = parse_executor_lines(TEST_EXECUTOR_LOGS);
 
         for (i, result) in results.iter().enumerate() {
             match result {
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn test_parse_steps_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tsteps: 28 gas: used=1421, max=1000000, limit=1000000, credit=0";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::Steps {
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_parse_out_of_gas_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tout_of_gas=false, accepted=true, success=true, time=0.000000s, cpu_time=0.000000";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::OutOfGas {
@@ -331,9 +331,9 @@ mod tests {
             cpu_time,
         }) = result
         {
-            assert_eq!(out_of_gas, false);
-            assert_eq!(accepted, true);
-            assert_eq!(success, true);
+            assert!(!out_of_gas);
+            assert!(accepted);
+            assert!(success);
             assert_eq!(time, "0.000000s");
             assert_eq!(cpu_time, "0.000000");
         } else {
@@ -344,7 +344,7 @@ mod tests {
     #[test]
     fn test_parse_gas_fees_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tgas fees: 568400 = 26214400 * 1421 /2^16 ; price=26214400; flat rate=[40000 for 100]; remaining balance=998442400ng";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::GasFees {
@@ -368,7 +368,7 @@ mod tests {
     #[test]
     fn test_parse_process_send_message_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tprocess send message 96444DE3098C2942729F6B0AD6D215138CF00724C38F3E560ED0C79D2ABF8EE7";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::ProcessSendMessage { message_hash }) = result {
@@ -384,7 +384,7 @@ mod tests {
     #[test]
     fn test_parse_process_raw_reserve_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tprocess raw reserve with mode 16";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::ProcessRawReserve { mode }) = result {
@@ -397,7 +397,7 @@ mod tests {
     #[test]
     fn test_parse_remaining_balance_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tremaining balance 96968400ng";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::RemainingBalance { balance }) = result {
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn test_parse_action_reserve_currency_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\taction_reserve_currency: mode=0, reserve=10000ng, balance=96334000ng, original balance=999753200ng";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::ActionReserveCurrency {
@@ -432,7 +432,7 @@ mod tests {
     #[test]
     fn test_parse_changed_balance_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tchanged remaining balance to 96324000ng, reserved balance to 10000ng";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::ChangedBalance {
@@ -450,7 +450,7 @@ mod tests {
     #[test]
     fn test_parse_unknown_line() {
         let line = "[ 4][t 0][2025-11-04 08:57:12.814271][transaction.cpp:1948]\tsome unknown message here";
-        let result = parse_executor_line(&line);
+        let result = parse_executor_line(line);
         assert!(result.is_ok());
 
         if let Ok(ExecutorLine::Unknown { text }) = result {
