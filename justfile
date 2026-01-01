@@ -41,7 +41,7 @@ coverage:
     cargo llvm-cov --workspace --all-features --all-targets --lcov --output-path lcov.info -- --test-threads 1
 
 coverage-html:
-    cargo llvm-cov --workspace --all-features --all-targets --open -- --test-threads 1
+    cargo llvm-cov --workspace --all-features --all-targets --html -- --test-threads 1
 
 coverage-clean:
     cargo llvm-cov clean

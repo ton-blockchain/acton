@@ -46,7 +46,11 @@ fn add_regex_redactions(subs: &mut snapbox::Redactions) {
 
 #[allow(dead_code)]
 pub fn acton_exe() -> PathBuf {
-    snapbox::cmd::cargo_bin!("acton").to_path_buf()
+    if let Ok(exe) = std::env::var("CARGO_BIN_EXE_acton") {
+        PathBuf::from(exe)
+    } else {
+        snapbox::cmd::cargo_bin!("acton").to_path_buf()
+    }
 }
 
 #[allow(dead_code)]
