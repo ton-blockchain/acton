@@ -36,6 +36,9 @@ pub fn normalize_output(stdout: &str, project_path: &Path) -> String {
         .insert("[TIME]", regex!(r#"time="\d+\.\d+""#))
         .unwrap();
     redactions
+        .insert("[TIMESTAMP]", regex!(r#"Timestamp: \d+"#))
+        .unwrap();
+    redactions
         .insert("[ROOT]", "/private".to_owned() + tmp_dir.as_str())
         .unwrap();
     redactions

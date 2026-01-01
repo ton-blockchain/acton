@@ -124,7 +124,7 @@ pub struct WalletsFile {
     pub wallets: Option<WalletsConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ContractConfig {
     pub name: String,
     pub src: String,
