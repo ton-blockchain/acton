@@ -51,6 +51,14 @@ lcov.info
 gen/
 ";
 
+const BASE_DOT_ENV: &str = "
+# Acton uses Toncenter to access blockchain data and send messages.
+# Since there's a 1 RPS limit in key-less mode, some operations require additional waiting to avoid
+# exceeding the limit. We recommend obtaining a key to speed up your transactions in Acton.
+# You can obtain a key in the bot at https://t.me/toncenter.
+# TONCENTER_API_KEY=\"your-key-here\"
+";
+
 pub fn new_cmd(
     path: &str,
     name: Option<String>,
@@ -206,6 +214,7 @@ pub fn new_cmd(
     }
 
     fs::write(".gitignore", BASE_GITIGNORE.trim_start())?;
+    fs::write(".env", BASE_DOT_ENV.trim_start())?;
 
     if let Err(e) = symlink_global_wallets() {
         println!(

@@ -204,3 +204,45 @@ fn test_new_project_symlinks_global_wallets() {
         .join("global.wallets.toml");
     assert!(symlink.exists());
 }
+
+#[test]
+fn test_new_empty_project_with_dot_env() {
+    let project = ProjectBuilder::new("new-dot-env")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("test-project")
+        .arg("--description")
+        .arg("test description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Created new Acton project")
+        .assert_contains("Project name: test-project")
+        .assert_contains("Template: empty")
+        .assert_contains("License: MIT");
+
+    let acton_toml = project.path().join("foobar/Acton.toml");
+    assert!(acton_toml.exists());
+
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "test-project""#));
+    assert!(content.contains(r#"description = "test description""#));
+    assert!(content.contains(r#"license = "MIT""#));
+
+    assert!(project.path().join("foobar/contracts").exists());
+    assert!(project.path().join("foobar/tests").exists());
+    assert!(project.path().join("foobar/LICENSE").exists());
+    assert!(project.path().join("foobar/.gitignore").exists());
+    assert!(project.path().join("foobar/.env").exists());
+}
