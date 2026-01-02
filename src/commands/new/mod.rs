@@ -201,6 +201,17 @@ pub fn new_cmd(
         ..Default::default()
     });
 
+    let mut scripts = BTreeMap::new();
+    scripts.insert(
+        "deploy-emulation".to_owned(),
+        "acton script scripts/deploy.tolk".to_owned(),
+    );
+    scripts.insert(
+        "deploy-testnet".to_owned(),
+        "acton script scripts/deploy.tolk --broadcast --net testnet".to_owned(),
+    );
+    config.scripts = Some(scripts);
+
     config.save()?;
 
     fs::create_dir_all(".acton/tolk-stdlib")?;
