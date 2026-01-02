@@ -9,6 +9,41 @@ use tar::Archive;
 
 use super::client::{Asset, Release, ReleaseClient};
 
+#[derive(serde::Serialize)]
+pub struct UpdateInfo {
+    pub success: bool,
+    pub current_version: String,
+    pub latest_version: String,
+    pub update_available: bool,
+}
+
+pub fn check_update<C: ReleaseClient>(client: &C, current_version_str: &str) -> Result<UpdateInfo> {
+    let release = client.get_release(None, false)?;
+    let latest_version = release.tag_name;
+    let is_canary = current_version_str == "canary";
+
+    let update_available = if is_canary {
+        // don't report anything for canary release user
+        false
+    } else {
+        let current_v =
+            Version::parse(current_version_str).context("Cannot parse current version")?;
+        let latest_v_str = latest_version.trim_start_matches('v');
+        if let Ok(latest_v) = Version::parse(latest_v_str) {
+            latest_v > current_v
+        } else {
+            false
+        }
+    };
+
+    Ok(UpdateInfo {
+        success: true,
+        current_version: current_version_str.to_string(),
+        latest_version,
+        update_available,
+    })
+}
+
 pub fn run_update<C: ReleaseClient>(
     client: &C,
     current_exe: &Path,
@@ -122,8 +157,6 @@ pub fn run_update<C: ReleaseClient>(
     }
 
     let asset = find_asset(&release)?;
-    // println!("Found asset: {}", asset.name);
-
     let tarball_path = client.download_asset(asset)?;
 
     install_binary(&tarball_path, current_exe, current_version_str)?;

@@ -476,6 +476,8 @@ enum Commands {
         yes: bool,
         #[arg(long, help = "List available versions")]
         list: bool,
+        #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
+        check: bool,
     },
     #[command(
         about = "Generate shell completions for selected shell",
@@ -966,15 +968,7 @@ fn main() {
                     json,
                 );
                 if json {
-                    if let Err(err) = result {
-                        println!(
-                            "{}",
-                            serde_json::json!({
-                                "success": false,
-                                "error": err.to_string()
-                            })
-                        );
-                    }
+                    report_error_as_json(result);
                     return;
                 }
                 result
@@ -986,7 +980,15 @@ fn main() {
             stable,
             yes,
             list,
-        } => up_cmd(version, canary, stable, yes, list),
+            check,
+        } => {
+            let result = up_cmd(version, canary, stable, yes, list, check);
+            if check {
+                report_error_as_json(result);
+                return;
+            }
+            result
+        }
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())
@@ -997,6 +999,18 @@ fn main() {
     if let Err(err) = result {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1)
+    }
+}
+
+fn report_error_as_json<T>(result: anyhow::Result<T>) {
+    if let Err(err) = result {
+        println!(
+            "{}",
+            serde_json::json!({
+                "success": false,
+                "error": err.to_string()
+            })
+        );
     }
 }
 

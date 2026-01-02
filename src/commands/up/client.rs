@@ -115,7 +115,7 @@ impl ReleaseClient for GitHubClient {
         pb.set_style(
             ProgressStyle::default_bar()
                 .template(&format!(
-                    " {} [{{bar:40.cyan/blue}}] {{bytes}}/{{total_bytes}} ({{eta}})",
+                    " {} [{{bar:40.}}] {{bytes}}/{{total_bytes}} ({{eta}})",
                     "Downloading".green().bold()
                 ))?
                 .progress_chars("=> "),

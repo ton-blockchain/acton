@@ -9,7 +9,7 @@ use owo_colors::OwoColorize;
 use std::env;
 
 use client::{GitHubClient, ReleaseClient};
-use workflow::run_update;
+use workflow::{check_update, run_update};
 
 pub fn up_cmd(
     version: Option<String>,
@@ -17,11 +17,18 @@ pub fn up_cmd(
     stable: bool,
     yes: bool,
     list: bool,
+    check: bool,
 ) -> Result<()> {
     let token = env::var("GITHUB_TOKEN").ok();
     let client = GitHubClient::new(token);
     let current_exe = env::current_exe()?;
     let current_version_str = env!("CARGO_PKG_VERSION");
+
+    if check {
+        let info = check_update(&client, current_version_str)?;
+        println!("{}", serde_json::to_string_pretty(&info)?);
+        return Ok(());
+    }
 
     if list {
         let releases = client.list_releases()?;
