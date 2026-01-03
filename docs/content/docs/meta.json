@@ -13,6 +13,7 @@
     "build-system",
     "test-runner",
     "scripting",
+    "acton-toml.mdx",
     "--- Advanced ---",
     "advanced/libraries",
     "--- Miscellaneous ---",

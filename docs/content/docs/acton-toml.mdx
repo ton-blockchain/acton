@@ -1,0 +1,141 @@
+---
+title: Acton Manifest
+description: Detailed reference for the Acton.toml configuration file
+icon: FileText
+---
+
+The `Acton.toml` file is the manifest for your Acton project. It defines package metadata, contract definitions, test settings, and custom scripts.
+
+## Root Section
+
+The top-level of `Acton.toml` contains the following sections:
+
+- `[package]` — Project metadata.
+- `[contracts]` — Definition of smart contracts in the project.
+- `[test]` — Configuration for the test runner.
+- `[scripts]` — Custom shell commands or scripts.
+
+---
+
+## `[package]` Section
+
+Defines the metadata for your Acton project.
+
+| Field         | Type     | Required | Description                                                       |
+|:--------------|:---------|:---------|:------------------------------------------------------------------|
+| `name`        | `string` | **Yes**  | The name of your project.                                         |
+| `description` | `string` | **Yes**  | A short description of the project.                               |
+| `version`     | `string` | **Yes**  | The current version of the project (e.g., `0.1.0`).               |
+| `repository`  | `string` | No       | The URL of the project's source code repository.                  |
+| `license`     | `string` | No       | The license under which the project is distributed (e.g., `MIT`). |
+
+Example:
+```toml
+[package]
+name = "my-awesome-contract"
+description = "A project with Tolk smart contracts"
+version = "0.1.0"
+repository = "https://github.com/user/my-awesome-contract"
+license = "MIT"
+```
+
+---
+
+## `[contracts]` Section
+
+This section is a map where each key is a unique contract identifier and the value is a contract configuration object.
+
+| Field     | Type     | Required | Description                                                             |
+|:----------|:---------|:---------|:------------------------------------------------------------------------|
+| `name`    | `string` | **Yes**  | Human-readable name of the contract.                                    |
+| `src`     | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
+| `depends` | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
+| `output`  | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
+
+### Contract Dependencies
+
+Dependencies can be specified in two ways:
+
+1. **Simple format**: Just the name of another contract defined in `Acton.toml`.
+```toml
+depends = ["AnotherContract"]
+   ```
+
+2. **Detailed format**: An object with additional settings.
+- `name`: Name of the contract to depend on.
+- `kind`: Dependency type. Either `embed_code` (default) or `library_ref`.
+- `function`: Custom name for the generated code function.
+- `path`: Custom output path for the generated code file.
+
+Example:
+```toml
+[contracts.MainContract]
+name = "Main Contract"
+src = "contracts/main.tolk"
+depends = [
+    "ChildContract",
+    { name = "LibraryContract", kind = "library_ref", function = "get_lib_code" }
+]
+```
+
+---
+
+## `[test]` Section
+
+Configures the behavior of `acton test`.
+
+| Field               | Type       | Default       | Description                                               |
+|:--------------------|:-----------|:--------------|:----------------------------------------------------------|
+| `filter`            | `string`   | -             | Regex pattern to filter tests by name.                    |
+| `reporter`          | `string[]` | `["console"]` | List of reporters: `console`, `teamcity`, `junit`, `dot`. |
+| `debug`             | `boolean`  | `false`       | Enable debug mode (activates debugger).                   |
+| `debug-port`        | `integer`  | `12345`       | Port for the debug server.                                |
+| `backtrace`         | `string`   | -             | Set to `full` to enable full stack traces on failure.     |
+| `coverage`          | `boolean`  | `false`       | Enable code coverage collection.                          |
+| `coverage-format`   | `string`   | `lcov`        | Format for coverage report (`lcov`, `text`).              |
+| `coverage-file`     | `string`   | -             | Path to save the coverage report.                         |
+| `exclude`           | `string[]` | -             | Glob patterns of files to exclude from testing.           |
+| `include`           | `string[]` | -             | Glob patterns of files to include in testing.             |
+| `junit-path`        | `string`   | -             | Directory for JUnit XML reports.                          |
+| `junit-merge`       | `boolean`  | `false`       | Merge all test results into a single JUnit file.          |
+| `fork-net`          | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).   |
+| `api-key`           | `string`   | -             | API key for the network provider when forking.            |
+| `fork-block-number` | `integer`  | -             | Specific block number to fork from.                       |
+| `fail-fast`         | `boolean`  | `false`       | Stop execution after the first test failure.              |
+| `mutation`          | `object`   | -             | Configuration for mutation testing (see below).           |
+
+### Mutation Testing Configuration
+
+The `[test.mutation]` subsection allows disabling specific mutation rules.
+
+| Field           | Type       | Description                                          |
+|:----------------|:-----------|:-----------------------------------------------------|
+| `disable-rules` | `string[]` | List of rule IDs to disable during mutation testing. |
+
+Example:
+```toml
+[test]
+reporter = ["console", "junit"]
+coverage = true
+fail-fast = true
+
+[test.mutation]
+disable-rules = ["flip_plus"]
+```
+
+---
+
+## `[scripts]` Section
+
+Allows defining custom scripts that can be executed via `acton run <name>`.
+
+Example:
+```toml
+[scripts]
+deploy = "acton script scripts/deploy.tolk"
+check = "acton test --filter=.*_check"
+```
+
+## Additional Properties
+
+Acton allows adding arbitrary metadata fields to any section of `Acton.toml`. These fields are ignored by Acton itself but can be used by third-party tools or for project-specific metadata.
