@@ -9,38 +9,47 @@ use tree_sitter::Node;
 use walkdir::WalkDir;
 
 pub fn init_cmd() -> anyhow::Result<()> {
-    if Path::new("Acton.toml").exists() {
-        println!("{}", "Acton.toml already exists!".yellow());
-        return Ok(());
-    }
+    let acton_toml_exists = Path::new("Acton.toml").exists();
 
-    let mut config = ActonConfig::default();
+    if !acton_toml_exists {
+        let mut config = ActonConfig::default();
 
-    let discovered_contracts = discover_contracts();
-    let contract_count = discovered_contracts.len();
+        let discovered_contracts = discover_contracts();
+        let contract_count = discovered_contracts.len();
 
-    if !discovered_contracts.is_empty() {
-        println!(
-            "Discovered {} contract{}:",
-            contract_count,
-            if contract_count == 1 { "" } else { "s" }
-        );
-        for (key, contract) in &discovered_contracts {
-            println!("  {} ({})", contract.name.cyan(), key);
+        if !discovered_contracts.is_empty() {
+            println!(
+                "  {} {} contract{}",
+                "Discovered".bold().green(),
+                contract_count,
+                if contract_count == 1 { "" } else { "s" }
+            );
+            for (key, contract) in &discovered_contracts {
+                println!("             {} ({})", contract.name.cyan(), key);
+            }
+            config.contracts = Some(ContractsConfig {
+                contracts: discovered_contracts,
+            });
+        } else {
+            println!(
+                "       {} no contracts in the current directory",
+                "Found".green().bold()
+            );
         }
-        println!();
-        config.contracts = Some(ContractsConfig {
-            contracts: discovered_contracts,
-        });
-    } else {
-        println!("No contracts found in the current directory.");
-    }
 
-    config.save()?;
+        config.save()?;
+        println!(
+            "     {} Acton.toml with project configuration",
+            "Created".green().bold()
+        );
+    } else {
+        println!(
+            "    {} Acton.toml project configuration",
+            "Skipping".green().bold()
+        );
+    }
 
     stdlib::ensure_latest(Path::new("."))?;
-
-    println!("{}", "✓ Initialized new Acton project".green().bold());
 
     patch_or_create_gitignore()?;
 
@@ -52,7 +61,11 @@ pub fn init_cmd() -> anyhow::Result<()> {
         );
     }
 
-    println!("Created {} with project configuration", "Acton.toml".cyan());
+    if !acton_toml_exists {
+        println!("\n{}", "✓ Initialized new Acton project".green().bold());
+    } else {
+        println!("\n{}", "✓ Updated Acton project".green().bold());
+    }
 
     Ok(())
 }
@@ -92,7 +105,10 @@ fn patch_or_create_gitignore() -> anyhow::Result<()> {
         }
         new_content.push_str(&to_add);
         fs::write(".gitignore", new_content)?;
-        println!("Patched {} with Acton patterns", ".gitignore".cyan());
+        println!(
+            "     {} .gitignore with Acton patterns",
+            "Patched".green().bold()
+        );
     }
     Ok(())
 }

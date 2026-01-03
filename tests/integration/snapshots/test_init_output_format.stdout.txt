@@ -1,8 +1,8 @@
-Discovered 2 contracts:
-  Contract1 (contract1)
-  Contract2 (contract2)
-
+  Discovered 2 contracts
+             Contract1 (contract1)
+             Contract2 (contract2)
+     Created Acton.toml with project configuration
   Installing standard library v0.1.0
+     Patched .gitignore with Acton patterns
+
 ✓ Initialized new Acton project
-Patched .gitignore with Acton patterns
-Created Acton.toml with project configuration

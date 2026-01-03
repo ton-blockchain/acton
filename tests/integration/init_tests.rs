@@ -55,10 +55,88 @@ fn test_init_already_initialized() {
 
     project.acton().init().run().success();
 
-    // Second init should warn
+    // Second init should update project
     let output = project.acton().init().run().success();
 
-    output.assert_contains("Acton.toml already exists");
+    output.assert_contains("Updated Acton project");
+}
+
+#[test]
+fn test_init_updates_stdlib_if_already_initialized() {
+    let project = ProjectBuilder::new("init-update-stdlib")
+        .without_acton_toml()
+        .build();
+
+    // Initialize first time
+    project.acton().init().run().success();
+
+    // Delete stdlib
+    fs::remove_dir_all(project.path().join(".acton/")).unwrap();
+    assert!(!project.path().join(".acton/").exists());
+
+    // Second init should restore stdlib
+    let output = project.acton().init().run().success();
+    output.assert_contains("Updated Acton project");
+
+    assert!(project.path().join(".acton/tolk-stdlib").exists());
+}
+
+#[test]
+fn test_init_patches_gitignore_if_already_initialized() {
+    let project = ProjectBuilder::new("init-update-gitignore")
+        .without_acton_toml()
+        .build();
+
+    // Initialize first time
+    project.acton().init().run().success();
+
+    // Wipe gitignore
+    fs::write(project.path().join(".gitignore"), "some-other-file\n").unwrap();
+
+    // Second init should patch gitignore
+    let output = project.acton().init().run().success();
+    output
+        .assert_contains("Updated Acton project")
+        .assert_contains("Patched .gitignore");
+
+    let gitignore_content = fs::read_to_string(project.path().join(".gitignore")).unwrap();
+    assert!(gitignore_content.contains(".acton/"));
+    assert!(gitignore_content.contains("wallets.toml"));
+}
+
+#[test]
+fn test_init_symlinks_global_wallets_if_already_initialized() {
+    let project = ProjectBuilder::new("init-update-symlink")
+        .without_acton_toml()
+        .build();
+
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+    let global_wallets_dir = home_path.join(".acton").join("wallets");
+    fs::create_dir_all(&global_wallets_dir).unwrap();
+    let global_config = global_wallets_dir.join("global.wallets.toml");
+    fs::write(
+        &global_config,
+        "[wallets.global]\nkind=\"v5r1\"\nkeys={mnemonic=\"word1\"}",
+    )
+    .unwrap();
+
+    // Initialize first time
+    project.acton().init().run().success();
+
+    // Remove symlink
+    fs::remove_file(project.path().join("global.wallets.toml")).unwrap();
+
+    // Second init should restore symlink
+    let output = project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
+
+    output.assert_contains("Updated Acton project");
+    assert!(project.path().join("global.wallets.toml").exists());
 }
 
 #[test]
@@ -70,7 +148,7 @@ fn test_init_with_no_contracts() {
 
     let output = project.acton().init().run().success();
 
-    output.assert_contains("No contracts found in the current directory");
+    output.assert_contains("Found no contracts in the current directory");
 
     let acton_file = project.path().join("Acton.toml");
     assert!(acton_file.exists());
