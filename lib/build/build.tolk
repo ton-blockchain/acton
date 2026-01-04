@@ -21,4 +21,6 @@ import "../ffi/ffi"
 /// ```tolk
 /// val cell = build("jetton-wallet", "contracts/jetton-wallet-contract.tolk");
 /// ```
+///
+/// Note that the path should be absolute or relative to the root project directory with Acton.toml.
 fun build(name: slice, path: slice = ""): cell asm "6 EXTCALL"
