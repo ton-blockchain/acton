@@ -492,15 +492,15 @@ fn new_wallet(
 }
 
 fn maybe_store_mnemonic_in_keystore(
-    name: &String,
-    mnemonic_str: &String,
+    name: &str,
+    mnemonic_str: &str,
     use_secure_store: bool,
 ) -> anyhow::Result<(Option<String>, Option<String>)> {
     let (mnemonic_str_opt, mnemonic_keyring_opt) = if use_secure_store {
-        wallets::store_mnemonic_in_keyring(&name, &mnemonic_str)?;
-        (None, Some(name.clone()))
+        wallets::store_mnemonic_in_keyring(name, mnemonic_str)?;
+        (None, Some(name.to_owned()))
     } else {
-        (Some(mnemonic_str.clone()), None)
+        (Some(mnemonic_str.to_owned()), None)
     };
     Ok((mnemonic_str_opt, mnemonic_keyring_opt))
 }
