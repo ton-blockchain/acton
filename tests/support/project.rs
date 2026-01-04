@@ -1014,6 +1014,8 @@ impl ActonCommand {
             .cmd
             .arg("wallet")
             .arg("new")
+            .arg("--secure")
+            .arg("false")
             .current_dir(&self.project.path);
         self
     }
@@ -1023,6 +1025,8 @@ impl ActonCommand {
             .cmd
             .arg("wallet")
             .arg("import")
+            .arg("--secure")
+            .arg("false")
             .current_dir(&self.project.path);
         self
     }

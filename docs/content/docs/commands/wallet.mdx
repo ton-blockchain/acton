@@ -3,7 +3,7 @@ title: "Managing Wallets"
 description: "Learn how to create and manage testnet wallets for your Acton projects"
 ---
 
-The `wallet` command allows you to generate new wallets for testing purposes and list existing ones. It automatically creates a wallet configuration and stores the mnemonic in configuration file.
+The `wallet` command allows you to generate new wallets for testing purposes and list existing ones. It automatically creates a wallet configuration and offers to store the mnemonic securely in the system keyring or in the configuration file.
 
 <Callout type="warn">
     Wallets created by this command are configured for **testnet** by default.
@@ -24,12 +24,13 @@ This command will start an interactive prompt to guide you through the wallet cr
 
 #### Options
 
-| Option                | Type   | Description                                           |
-|-----------------------|--------|-------------------------------------------------------|
-| `--name <NAME>`       | String | Name of the wallet (default: prompts user)            |
-| `--version <VERSION>` | String | Version of the wallet (default: prompts user)         |
-| `--local`             | Flag   | Save wallet to local `wallets.toml`                   |
-| `--global`            | Flag   | Save wallet to global `global.wallets.toml`           |
+| Option                | Type   | Description                                                    |
+|-----------------------|--------|----------------------------------------------------------------|
+| `--name <NAME>`       | String | Name of the wallet (default: prompts user)                     |
+| `--version <VERSION>` | String | Version of the wallet (default: prompts user)                  |
+| `--local`             | Flag   | Save wallet to local `wallets.toml`                            |
+| `--global`            | Flag   | Save wallet to global `global.wallets.toml`                    |
+| `--secure`            | Bool   | Use secure native store (Keyring) (default: true if available) |
 
 **Supported wallet versions:**
 - `v5r1` (Default)
@@ -52,6 +53,7 @@ You will be prompted to:
 1. Enter a name for your wallet
 2. Choose where to save it (local or global)
 3. Select the wallet version from a list
+4. Choose whether to store the mnemonic in the system's secure keyring (recommended)
 
 **Non-interactive Creation:**
 
@@ -67,11 +69,20 @@ acton wallet new --name shared-sender --version highloadv2r2 --global
 
 When you create a new wallet, the configuration is added to either `wallets.toml` (local) or `~/.acton/wallets/global.wallets.toml` (global).
 
+**Example (Plain Text):**
 ```toml
 [wallets.deployer]
 kind = "v5r1"
 workchain = 0
 keys = { mnemonic = "word1 word2 ... word24" }
+```
+
+**Example (Secure Keyring):**
+```toml
+[wallets.deployer]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic-keyring = "deployer" }
 ```
 
 ---
@@ -88,12 +99,13 @@ This command allows you to import an existing wallet by providing its mnemonic p
 
 #### Options
 
-| Option                | Type   | Description                                           |
-|-----------------------|--------|-------------------------------------------------------|
-| `--name <NAME>`       | String | Name of the wallet (default: prompts user)            |
-| `--version <VERSION>` | String | Version of the wallet (default: prompts user)         |
-| `--local`             | Flag   | Save wallet to local `wallets.toml`                   |
-| `--global`            | Flag   | Save wallet to global `global.wallets.toml`           |
+| Option                | Type   | Description                                                    |
+|-----------------------|--------|----------------------------------------------------------------|
+| `--name <NAME>`       | String | Name of the wallet (default: prompts user)                     |
+| `--version <VERSION>` | String | Version of the wallet (default: prompts user)                  |
+| `--local`             | Flag   | Save wallet to local `wallets.toml`                            |
+| `--global`            | Flag   | Save wallet to global `global.wallets.toml`                    |
+| `--secure`            | Bool   | Use secure native store (Keyring) (default: true if available) |
 
 #### Examples
 
@@ -155,16 +167,19 @@ For more methods (like web-based faucets), check the [official documentation](ht
 
 ## Security
 
+<Callout type="info">
+    **Recommended: Secure Keyring**
+
+    Acton supports storing mnemonics in your system's secure native store (Keyring/Keychain). This is the recommended way to handle wallet keys as they are not stored in plain text.
+</Callout>
+
 <Callout type="error">
-    **SECURITY WARNING**
+    **SECURITY WARNING (Plain Text Storage)**
 
-    The generated mnemonic is stored in **plain text** directly in the
-    configuration file (`wallets.toml` or global config).
+    If you choose not to use the secure keyring, the generated mnemonic is stored in **plain text** directly in the configuration file (`wallets.toml` or global config).
 
-    - **NEVER** commit `wallets.toml` or `global.wallets.toml` to version
-    control (git).
-    - Acton automatically adds these files to your `.gitignore` when
-    initializing a project, but you should verify this.
+    - **NEVER** commit `wallets.toml` or `global.wallets.toml` to version control (git) if they contain plain text mnemonics.
+    - Acton automatically adds these files to your `.gitignore` when initializing a project, but you should verify this.
     - These wallets are intended for **development and testing only**.
     - Do NOT use these wallets for mainnet funds or valuable assets.
 </Callout>

@@ -38,21 +38,33 @@ This configuration creates a wallet named `deployer` that:
 
 ## Providing Mnemonic Phrases
 
-Acton supports three methods for providing wallet mnemonics.
+Acton supports four methods for providing wallet mnemonics.
 
-### 1. Direct Mnemonic (Default)
+### 1. Secure Native Store (Keyring) - Recommended
 
-The simplest way is to store the mnemonic directly in your `wallets.toml` or global config. This is the default when creating a new wallet via `acton wallet new`.
+The most secure way to store mnemonics is using your system's secure native store (Keyring on Linux, Keychain on macOS, Credential Manager on Windows). This is the recommended method and is offered by default when creating or importing a wallet via `acton wallet new` or `acton wallet import`.
 
 ```toml title="wallets.toml"
 [wallets.deployer]
 kind = "v5r1"
-keys = { mnemonic = "word1 word2 word3 ... word24" }
+keys = { mnemonic-keyring = "deployer" }
 ```
 
-### 2. Environment Variables
+Acton will automatically retrieve the mnemonic from your system's secure storage when needed.
 
-For higher security, especially in CI/CD environments, you can store mnemonics in environment variables:
+### 2. Direct Mnemonic
+
+You can store the mnemonic directly in your `wallets.toml` or global config. This is simple but less secure as it stores the mnemonic in plain text.
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+keys = { mnemonic = "word1 word2 ... word24" }
+```
+
+### 3. Environment Variables
+
+For higher security in environments where a secure keyring is not available (like CI/CD), you can store mnemonics in environment variables:
 
 ```toml title="wallets.toml"
 [wallets.deployer]
@@ -63,11 +75,11 @@ keys = { mnemonic-env = "WALLET_MNEMONIC" }
 Set the environment variable before running your script:
 
 ```bash
-export WALLET_MNEMONIC="word1 word2 word3 ... word24"
+export WALLET_MNEMONIC="word1 word2 ... word24"
 acton script deploy.tolk --broadcast
 ```
 
-### 3. File References
+### 4. File References
 
 Alternatively, store the mnemonic in a separate file and reference it:
 
@@ -181,11 +193,12 @@ Without `--broadcast`, `net.wallet()` creates a local test wallet with the same 
 
 ## Security Best Practices
 
-1. **Never commit mnemonics**: Always use environment variables or files listed in `.gitignore`
-2. **Use expected addresses**: Configure `expected.address-testnet` and `expected.address-mainnet` to catch configuration errors
-3. **Test first**: Run scripts without `--broadcast` to test locally before interacting with the real blockchain
-4. **Separate wallets**: Use different wallets for testnet and mainnet operations
-5. **Start with testnet**: Always test your scripts on testnet before running them on mainnet
+1. **Use Secure Native Store**: Always prefer `mnemonic-keyring` for local development. It's the most secure way to handle your keys.
+2. **Never commit mnemonics**: If you don't use the keyring, always use environment variables or files listed in `.gitignore`.
+3. **Use expected addresses**: Configure `expected.address-testnet` and `expected.address-mainnet` to catch configuration errors.
+4. **Test first**: Run scripts without `--broadcast` to test locally before interacting with the real blockchain.
+5. **Separate wallets**: Use different wallets for testnet and mainnet operations.
+6. **Start with testnet**: Always test your scripts on testnet before running them on mainnet.
 
 ## Next Steps
 

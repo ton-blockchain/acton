@@ -7,6 +7,6 @@ NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
 To get testnet coins, check official documentation: https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
 
 SECURITY WARNING:
-[SECURITY_WARNING_MNEMONIC]
-  - Do NOT commit this file to version control (already added to .gitignore)
-  - Keep your mnemonic safe and secret
+- The mnemonic is stored in plain text in /var/folders/z4/7mh2czxx4ng1pqxtsdj423bm0000gn/T/.tmp3lEfMr/.acton/wallets/global.wallets.toml
+- Do NOT commit this file to version control (already added to .gitignore)
+- Keep your mnemonic safe and secret

@@ -113,6 +113,8 @@ pub struct WalletKeys {
     #[serde(rename = "mnemonic-file")]
     pub mnemonic_file: Option<String>,
     pub mnemonic: Option<String>,
+    #[serde(rename = "mnemonic-keyring")]
+    pub mnemonic_keyring: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

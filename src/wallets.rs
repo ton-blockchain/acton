@@ -1,7 +1,8 @@
 use crate::config::ActonConfig;
 use crate::context::Wallet;
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use hmac::{Hmac, Mac};
+use keyring::Entry;
 use owo_colors::OwoColorize;
 use pbkdf2::password_hash::Output;
 use pbkdf2::{Params, pbkdf2_hmac};
@@ -18,6 +19,40 @@ use tonlib_core::wallet::versioned::{
     DEFAULT_WALLET_ID, DEFAULT_WALLET_ID_V5R1, DEFAULT_WALLET_ID_V5R1_TESTNET,
 };
 use tonlib_core::wallet::wallet_version::WalletVersion;
+
+const KEYRING_SERVICE: &str = "ton.acton.wallet";
+
+pub fn load_mnemonic_from_keyring(id: &str) -> anyhow::Result<String> {
+    let entry = Entry::new(KEYRING_SERVICE, id)?;
+    entry
+        .get_password()
+        .with_context(|| format!("Failed to load mnemonic from keyring for {id}"))
+}
+
+pub fn store_mnemonic_in_keyring(id: &str, mnemonic: &str) -> anyhow::Result<()> {
+    let entry = Entry::new(KEYRING_SERVICE, id)?;
+    entry
+        .set_password(mnemonic)
+        .with_context(|| format!("Failed to store mnemonic in keyring for {id}"))
+}
+
+pub fn is_keyring_supported() -> bool {
+    // Try to perform a dummy operation to check if the keyring backend is functional.
+    // Real native backends will succeed (or return NoEntry for get),
+    // while the default no-op mock will fail on set_password.
+    let entry = match Entry::new("ton.acton.check", "healthcheck") {
+        Ok(e) => e,
+        Err(_) => return false,
+    };
+
+    match entry.set_password("test") {
+        Ok(_) => {
+            let _ = entry.delete_credential();
+            true
+        }
+        Err(_) => false,
+    }
+}
 
 pub fn open_wallets(
     config: &ActonConfig,
@@ -57,6 +92,8 @@ pub fn open_wallets(
                     .trim()
                     .to_string(),
             )
+        } else if let Some(keyring_id) = wallet.keys.mnemonic_keyring {
+            Some(load_mnemonic_from_keyring(&keyring_id)?)
         } else {
             wallet.keys.mnemonic
         };

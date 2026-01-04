@@ -3,6 +3,6 @@
 ✓ [WALLET_ADDRESS]
 
 SECURITY WARNING:
-[SECURITY_WARNING_MNEMONIC]
-  - Do NOT commit this file to version control (already added to .gitignore)
-  - Keep your mnemonic safe and secret
+- The mnemonic is stored in plain text in wallets.toml
+- Do NOT commit this file to version control (already added to .gitignore)
+- Keep your mnemonic safe and secret

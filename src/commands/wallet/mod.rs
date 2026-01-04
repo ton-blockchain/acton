@@ -3,7 +3,7 @@ use crate::config::{ActonConfig, WalletsFile, global_wallets_path};
 use crate::wallets;
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
-use inquire::{Select, Text};
+use inquire::{Confirm, Select, Text};
 use log::error;
 use owo_colors::OwoColorize;
 use std::env;
@@ -69,6 +69,13 @@ pub enum WalletCommand {
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
         local: bool,
+        #[arg(
+            long,
+            help = "Use secure native store for mnemonic (defaults to true if available)",
+            default_missing_value = "true",
+            num_args = 0..=1
+        )]
+        secure: Option<bool>,
     },
     #[command(about = "Import an existing wallet from mnemonic")]
     Import {
@@ -82,6 +89,13 @@ pub enum WalletCommand {
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
         local: bool,
+        #[arg(
+            long,
+            help = "Use secure native store for mnemonic (defaults to true if available)",
+            default_missing_value = "true",
+            num_args = 0..=1
+        )]
+        secure: Option<bool>,
     },
     #[command(about = "List available wallets")]
     List {
@@ -99,14 +113,16 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             version,
             global,
             local,
-        } => new_wallet(name, version, global, local),
+            secure,
+        } => new_wallet(name, version, global, local, secure),
         WalletCommand::Import {
             name,
             mnemonics,
             version,
             global,
             local,
-        } => import_wallet(name, mnemonics, version, global, local),
+            secure,
+        } => import_wallet(name, mnemonics, version, global, local, secure),
         WalletCommand::List { balance, api_key } => list_wallets(balance, api_key),
     }
 }
@@ -178,6 +194,8 @@ fn get_wallet_address(name: &str, wallet: &crate::config::WalletConfig) -> anyho
             .context(format!("Could not read mnemonic file {}", file))?
             .trim()
             .to_string()
+    } else if let Some(keyring_id) = &wallet.keys.mnemonic_keyring {
+        wallets::load_mnemonic_from_keyring(keyring_id)?
     } else if let Some(m) = &wallet.keys.mnemonic {
         m.clone()
     } else {
@@ -327,7 +345,8 @@ fn save_wallet_to_config(
     config_path: &Path,
     name: &str,
     version: WalletVersion,
-    mnemonic_str: &str,
+    mnemonic_str: Option<String>,
+    mnemonic_keyring: Option<String>,
     wallet_address: &str,
     is_global: bool,
 ) -> anyhow::Result<()> {
@@ -361,7 +380,12 @@ fn save_wallet_to_config(
     wallet["workchain"] = value(0i64);
 
     let mut keys = toml_edit::InlineTable::new();
-    keys.insert("mnemonic", mnemonic_str.into());
+    if let Some(m) = mnemonic_str {
+        keys.insert("mnemonic", m.into());
+    }
+    if let Some(k) = mnemonic_keyring {
+        keys.insert("mnemonic-keyring", k.into());
+    }
     wallet["keys"] = value(keys);
 
     let expected = wallet
@@ -403,6 +427,7 @@ fn new_wallet(
     version: Option<WalletVersionArg>,
     global_flag: bool,
     local_flag: bool,
+    secure: Option<bool>,
 ) -> anyhow::Result<()> {
     let _ = ActonConfig::load()?;
     let name = get_or_prompt_name(name)?;
@@ -421,11 +446,17 @@ fn new_wallet(
 
     let wallet_address = wallet.address.to_base64_std_flags(false, true);
 
+    let use_secure_store = get_or_promt_use_keystore(secure)?;
+
+    let (mnemonic_str_opt, mnemonic_keyring_opt) =
+        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store)?;
+
     save_wallet_to_config(
         &config_path,
         &name,
         version,
-        &mnemonic_str,
+        mnemonic_str_opt,
+        mnemonic_keyring_opt,
         &wallet_address,
         is_global,
     )?;
@@ -437,6 +468,13 @@ fn new_wallet(
     );
     println!("{} Wallet address is {}", "✓".green(), wallet_address);
 
+    if use_secure_store {
+        println!(
+            "{} The mnemonic is securely stored in your system's keyring",
+            "✓".green()
+        );
+    }
+
     println!(
         "\n{}",
         "NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.".yellow()
@@ -446,15 +484,25 @@ fn new_wallet(
         "https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet"
             .underline(),
     );
-    println!("\n{}", "SECURITY WARNING:".red());
-    println!(
-        "  - The mnemonic is stored in plain text in {}",
-        config_path.display().cyan()
-    );
-    println!("  - Do NOT commit this file to version control (already added to .gitignore)");
-    println!("  - Keep your mnemonic safe and secret");
+    if !use_secure_store {
+        show_security_warning(config_path);
+    }
 
     Ok(())
+}
+
+fn maybe_store_mnemonic_in_keystore(
+    name: &String,
+    mnemonic_str: &String,
+    use_secure_store: bool,
+) -> anyhow::Result<(Option<String>, Option<String>)> {
+    let (mnemonic_str_opt, mnemonic_keyring_opt) = if use_secure_store {
+        wallets::store_mnemonic_in_keyring(&name, &mnemonic_str)?;
+        (None, Some(name.clone()))
+    } else {
+        (Some(mnemonic_str.clone()), None)
+    };
+    Ok((mnemonic_str_opt, mnemonic_keyring_opt))
 }
 
 fn import_wallet(
@@ -463,6 +511,7 @@ fn import_wallet(
     version: Option<WalletVersionArg>,
     global_flag: bool,
     local_flag: bool,
+    secure: Option<bool>,
 ) -> anyhow::Result<()> {
     let _ = ActonConfig::load()?;
     let name = get_or_prompt_name(name)?;
@@ -486,11 +535,17 @@ fn import_wallet(
 
     let wallet_address = wallet.address.to_base64_std_flags(false, true);
 
+    let use_secure_store = get_or_promt_use_keystore(secure)?;
+
+    let (mnemonic_str_opt, mnemonic_keyring_opt) =
+        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store)?;
+
     save_wallet_to_config(
         &config_path,
         &name,
         version,
-        &mnemonic_str,
+        mnemonic_str_opt,
+        mnemonic_keyring_opt,
         &wallet_address,
         is_global,
     )?;
@@ -501,15 +556,48 @@ fn import_wallet(
         config_path.display().cyan(),
     );
     println!("{} Wallet address is {}", "✓".green(), wallet_address);
+    if use_secure_store {
+        println!(
+            "\n{} The mnemonic is securely stored in your system's keyring.",
+            "✓".green()
+        );
+    }
 
+    if !use_secure_store {
+        show_security_warning(config_path);
+    }
+    Ok(())
+}
+
+fn show_security_warning(config_path: PathBuf) {
     println!("\n{}", "SECURITY WARNING:".red());
     println!(
-        "  - The mnemonic is stored in plain text in {}",
+        "- The mnemonic is stored in plain text in {}",
         config_path.display().cyan()
     );
-    println!("  - Do NOT commit this file to version control (already added to .gitignore)");
-    println!("  - Keep your mnemonic safe and secret");
-    Ok(())
+    println!("- Do NOT commit this file to version control (already added to .gitignore)");
+    println!("- Keep your mnemonic safe and secret");
+}
+
+fn get_or_promt_use_keystore(secure: Option<bool>) -> anyhow::Result<bool> {
+    let use_secure_store = if wallets::is_keyring_supported() {
+        if let Some(s) = secure {
+            s
+        } else {
+            Confirm::new("Store mnemonic in secure native store?")
+                .with_default(true)
+                .with_help_message("This will store your mnemonic in the system keychain instead of plain text in Acton.toml")
+                .prompt()?
+        }
+    } else {
+        if let Some(true) = secure {
+            anyhow::bail!(
+                "Secure native store is not supported or accessible in this environment, but --secure was explicitly requested."
+            );
+        }
+        false
+    };
+    Ok(use_secure_store)
 }
 
 fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
