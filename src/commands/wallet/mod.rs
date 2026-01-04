@@ -446,7 +446,7 @@ fn new_wallet(
 
     let wallet_address = wallet.address.to_base64_std_flags(false, true);
 
-    let use_secure_store = get_or_promt_use_keystore(secure)?;
+    let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
     let project_name = if !is_global {
         config.map(|c| c.package.name)
@@ -551,7 +551,7 @@ fn import_wallet(
 
     let wallet_address = wallet.address.to_base64_std_flags(false, true);
 
-    let use_secure_store = get_or_promt_use_keystore(secure)?;
+    let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
     let project_name = if !is_global {
         config.map(|c| c.package.name)
@@ -601,7 +601,7 @@ fn show_security_warning(config_path: PathBuf) {
     println!("- Keep your mnemonic safe and secret");
 }
 
-fn get_or_promt_use_keystore(secure: Option<bool>) -> anyhow::Result<bool> {
+fn get_or_prompt_use_keystore(secure: Option<bool>) -> anyhow::Result<bool> {
     let use_secure_store = if wallets::is_keyring_supported() {
         if let Some(s) = secure {
             s
