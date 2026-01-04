@@ -85,7 +85,7 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
     redactions
         .insert(
             "[SECURITY_WARNING_MNEMONIC]",
-            regex!(r"  - The mnemonic is stored in plain text in .*"),
+            regex!(r"- The mnemonic is stored in plain text in .*"),
         )
         .unwrap();
     redactions
