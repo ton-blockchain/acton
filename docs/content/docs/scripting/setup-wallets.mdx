@@ -132,6 +132,16 @@ You can also check their balances on the testnet:
 acton wallet list --balance
 ```
 
+### Retrieving a Wallet Mnemonic
+
+If you need to view the mnemonic phrase for a configured wallet (e.g., to import it into another app), use the `acton wallet get` command:
+
+```bash
+acton wallet get deployer
+```
+
+This will display the mnemonic phrase, regardless of whether it's stored in a plain text file, environment variable, or secure system keyring.
+
 ## Address Safety Checks
 
 To prevent accidental use of wrong wallets, configure expected addresses:

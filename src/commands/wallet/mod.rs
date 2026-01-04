@@ -1,4 +1,4 @@
-use crate::commands::common::create_symlink;
+use crate::commands::common::{create_symlink, error_fmt, select_wallet};
 use crate::config::{ActonConfig, WalletsFile, global_wallets_path};
 use crate::wallets;
 use anyhow::{Context, anyhow};
@@ -104,6 +104,11 @@ pub enum WalletCommand {
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
     },
+    #[command(about = "Get wallet mnemonic")]
+    Get {
+        #[arg(help = "Name of the wallet (prompts if not provided)")]
+        name: Option<String>,
+    },
 }
 
 pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
@@ -124,16 +129,32 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             secure,
         } => import_wallet(name, mnemonics, version, global, local, secure),
         WalletCommand::List { balance, api_key } => list_wallets(balance, api_key),
+        WalletCommand::Get { name } => get_mnemonic(name),
     }
+}
+
+fn get_mnemonic(name: Option<String>) -> anyhow::Result<()> {
+    let config = ActonConfig::load()?;
+
+    let name = select_wallet(name, &config)?;
+
+    let wallet = config
+        .get_wallet(&name)
+        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
+
+    let mnemonic = wallets::load_mnemonic(wallet)?;
+
+    println!("Mnemonic for wallet {}:", name.cyan().bold());
+    println!("{}", mnemonic.green());
+
+    Ok(())
 }
 
 fn list_wallets(balance: bool, api_key: Option<String>) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
     let wallets = config
-        .wallets
-        .as_ref()
-        .map(|w| &w.wallets)
-        .ok_or_else(|| anyhow!("No wallets found"))?;
+        .wallets()
+        .ok_or_else(|| anyhow!(error_fmt::no_wallets_found()))?;
 
     if wallets.is_empty() {
         println!("No wallets found");
@@ -180,27 +201,14 @@ fn list_wallets(balance: bool, api_key: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_wallet_address(name: &str, wallet: &crate::config::WalletConfig) -> anyhow::Result<String> {
+fn get_wallet_address(_name: &str, wallet: &crate::config::WalletConfig) -> anyhow::Result<String> {
     if let Some(expected) = &wallet.expected
         && let Some(addr) = &expected.address_testnet
     {
         return Ok(addr.clone());
     }
 
-    let mnemonic_str = if let Some(env_var) = &wallet.keys.mnemonic_env {
-        env::var(env_var).context(format!("Env var {} not set", env_var))?
-    } else if let Some(file) = &wallet.keys.mnemonic_file {
-        fs::read_to_string(file)
-            .context(format!("Could not read mnemonic file {}", file))?
-            .trim()
-            .to_string()
-    } else if let Some(keyring_id) = &wallet.keys.mnemonic_keyring {
-        wallets::load_mnemonic_from_keyring(keyring_id)?
-    } else if let Some(m) = &wallet.keys.mnemonic {
-        m.clone()
-    } else {
-        anyhow::bail!("No mnemonic or expected address for wallet {}", name);
-    };
+    let mnemonic_str = wallets::load_mnemonic(wallet)?;
 
     let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
     let version = parse_wallet_version(&wallet.kind)?;

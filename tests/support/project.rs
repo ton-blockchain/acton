@@ -1040,6 +1040,15 @@ impl ActonCommand {
         self
     }
 
+    pub fn wallet_get(mut self) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wallet")
+            .arg("get")
+            .current_dir(&self.project.path);
+        self
+    }
+
     pub fn with_duration(mut self, duration: &str) -> Self {
         self.cmd = self.cmd.arg("--duration").arg(duration);
         self

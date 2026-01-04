@@ -54,6 +54,32 @@ pub fn is_keyring_supported() -> bool {
     }
 }
 
+pub fn load_mnemonic(wallet: &crate::config::WalletConfig) -> anyhow::Result<String> {
+    if let Some(env) = &wallet.keys.mnemonic_env {
+        std::env::var(env).map_err(|err| {
+            anyhow!(
+                "Cannot access env variable {} for wallet mnemonic: {err}",
+                env.yellow()
+            )
+        })
+    } else if let Some(file) = &wallet.keys.mnemonic_file {
+        fs::read_to_string(file)
+            .map_err(|err| {
+                anyhow!(
+                    "Cannot access file {} for wallet mnemonic: {err}",
+                    file.yellow()
+                )
+            })
+            .map(|s| s.trim().to_string())
+    } else if let Some(keyring_id) = &wallet.keys.mnemonic_keyring {
+        load_mnemonic_from_keyring(keyring_id)
+    } else if let Some(mnemonic) = &wallet.keys.mnemonic {
+        Ok(mnemonic.clone())
+    } else {
+        anyhow::bail!("No mnemonic source found for wallet")
+    }
+}
+
 pub fn open_wallets(
     config: &ActonConfig,
     net: Option<&str>,
@@ -73,36 +99,10 @@ pub fn open_wallets(
     let mut open_wallets: BTreeMap<String, Wallet> = BTreeMap::new();
 
     for (name, wallet) in wallets {
-        let mnemonic = if let Some(env) = wallet.keys.mnemonic_env {
-            Some(std::env::var(&env).map_err(|err| {
-                anyhow!(
-                    "Cannot access env variable {} for wallet mnemonic: {err}",
-                    env.yellow()
-                )
-            })?)
-        } else if let Some(file) = wallet.keys.mnemonic_file {
-            Some(
-                fs::read_to_string(&file)
-                    .map_err(|err| {
-                        anyhow!(
-                            "Cannot access file {} for wallet mnemonic: {err}",
-                            file.yellow()
-                        )
-                    })?
-                    .trim()
-                    .to_string(),
-            )
-        } else if let Some(keyring_id) = wallet.keys.mnemonic_keyring {
-            Some(load_mnemonic_from_keyring(&keyring_id)?)
-        } else {
-            wallet.keys.mnemonic
-        };
+        let mnemonic_str = load_mnemonic(&wallet)
+            .with_context(|| format!("No mnemonic found for '{name}' wallet"))?;
 
-        let Some(mnemonic) = mnemonic else {
-            anyhow::bail!("No mnemonic found for '{name}' wallet")
-        };
-
-        let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::from_str(&mnemonic, &None)?;
+        let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::from_str(&mnemonic_str, &None)?;
 
         let wallet_version = parse_wallet_version(&wallet.kind)?;
         let wallet_id = wallet_id(wallet_version, net);

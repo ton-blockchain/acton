@@ -342,3 +342,45 @@ address-testnet = "EQD_existing_address"
         "integration/snapshots/wallet/test_wallet_preserves_comments.wallets.toml.txt",
     );
 }
+
+#[test]
+fn test_wallet_get_success() {
+    let project = ProjectBuilder::new("wallet-get-success").build();
+    let mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("my-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(mnemonic)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .wallet_get()
+        .arg("my-wallet")
+        .run()
+        .success();
+
+    output.assert_contains("Mnemonic for wallet my-wallet:");
+    output.assert_contains(mnemonic);
+}
+
+#[test]
+fn test_wallet_get_not_found() {
+    let project = ProjectBuilder::new("wallet-get-not-found").build();
+
+    let output = project
+        .acton()
+        .wallet_get()
+        .arg("non-existent")
+        .run()
+        .failure();
+
+    output.assert_contains("Wallet non-existent not found in wallets.toml and global.wallets.toml");
+}
