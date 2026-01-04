@@ -429,7 +429,7 @@ fn new_wallet(
     local_flag: bool,
     secure: Option<bool>,
 ) -> anyhow::Result<()> {
-    let _ = ActonConfig::load()?;
+    let config = ActonConfig::load().ok();
     let name = get_or_prompt_name(name)?;
     let is_global = get_is_global(global_flag, local_flag)?;
     let config_path = get_config_path(&name, is_global)?;
@@ -448,8 +448,14 @@ fn new_wallet(
 
     let use_secure_store = get_or_promt_use_keystore(secure)?;
 
+    let project_name = if !is_global {
+        config.map(|c| c.package.name)
+    } else {
+        None
+    };
+
     let (mnemonic_str_opt, mnemonic_keyring_opt) =
-        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store)?;
+        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store, project_name)?;
 
     save_wallet_to_config(
         &config_path,
@@ -495,14 +501,24 @@ fn maybe_store_mnemonic_in_keystore(
     name: &str,
     mnemonic_str: &str,
     use_secure_store: bool,
+    project_name: Option<String>,
 ) -> anyhow::Result<(Option<String>, Option<String>)> {
     let (mnemonic_str_opt, mnemonic_keyring_opt) = if use_secure_store {
-        wallets::store_mnemonic_in_keyring(name, mnemonic_str)?;
-        (None, Some(name.to_owned()))
+        let keyring_id = keyring_id_for_wallet(name, project_name);
+        wallets::store_mnemonic_in_keyring(&keyring_id, mnemonic_str)?;
+        (None, Some(keyring_id))
     } else {
         (Some(mnemonic_str.to_owned()), None)
     };
     Ok((mnemonic_str_opt, mnemonic_keyring_opt))
+}
+
+fn keyring_id_for_wallet(name: &str, project_name: Option<String>) -> String {
+    if let Some(pn) = project_name {
+        format!("{}:{}", pn, name)
+    } else {
+        name.to_string()
+    }
 }
 
 fn import_wallet(
@@ -513,7 +529,7 @@ fn import_wallet(
     local_flag: bool,
     secure: Option<bool>,
 ) -> anyhow::Result<()> {
-    let _ = ActonConfig::load()?;
+    let config = ActonConfig::load().ok();
     let name = get_or_prompt_name(name)?;
     let is_global = get_is_global(global_flag, local_flag)?;
     let config_path = get_config_path(&name, is_global)?;
@@ -537,8 +553,14 @@ fn import_wallet(
 
     let use_secure_store = get_or_promt_use_keystore(secure)?;
 
+    let project_name = if !is_global {
+        config.map(|c| c.package.name)
+    } else {
+        None
+    };
+
     let (mnemonic_str_opt, mnemonic_keyring_opt) =
-        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store)?;
+        maybe_store_mnemonic_in_keystore(&name, &mnemonic_str, use_secure_store, project_name)?;
 
     save_wallet_to_config(
         &config_path,
