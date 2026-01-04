@@ -93,7 +93,7 @@ expect(txs).toHaveTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L104" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L105" />
 
 ## `Expectation<SendResultList>.toNotHaveTx`
 
@@ -111,7 +111,7 @@ expect(txs).toNotHaveTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L128" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L129" />
 
 ## `Expectation<SendResultList>.toHaveBouncedTx`
 
@@ -129,7 +129,7 @@ expect(txs).toHaveBouncedTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L152" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L153" />
 
 ## `Expectation<SendResultList>.toHaveFailedTx`
 
@@ -149,7 +149,23 @@ expect(txs).toHaveFailedTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L179" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L180" />
+
+## `Expectation<SendResultList>.toHaveAllSuccessfulTxs`
+
+```tolk
+fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self)
+```
+
+Expect all transactions in the list to be successful.
+
+Example:
+```tolk
+val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+expect(results).toHaveAllSuccessfulTxs();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L209" />
 
 ## `Expectation<SendResultList>.toEmitExternalMessage`
 
@@ -164,7 +180,7 @@ Example:
 expect(txs).toEmitExternalMessage<IncreaseCounter>();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L207" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L233" />
 
 ## `Expectation<SendResult>.toConsumeLessThan`
 
@@ -180,5 +196,5 @@ val result = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
 expect(result.at(0)).toConsumeLessThan(1000);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L243" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L269" />
 

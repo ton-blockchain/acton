@@ -303,17 +303,28 @@ impl TestReporter for ConsoleReporter {
                             let params = formatter
                                 .format_search_transaction_parameters(assert_failure, &test.abi);
 
+                            let from_to = if assert_failure.params.from.is_none()
+                                && assert_failure.params.to.is_none()
+                            {
+                                "".to_owned()
+                            } else {
+                                format!(
+                                    " from {} to {}",
+                                    formatter.format_address(
+                                        &assert_failure.txs,
+                                        &assert_failure.params.from
+                                    ),
+                                    formatter.format_address(
+                                        &assert_failure.txs,
+                                        &assert_failure.params.to,
+                                    ),
+                                )
+                            };
+
                             let diff_output = format!(
-                                "{}\nUnexpected transaction from {} to {}\n{}{}",
+                                "{}\nUnexpected transaction{}\n{}{}",
                                 formatter.format(&assert_failure.txs),
-                                formatter.format_address(
-                                    &assert_failure.txs,
-                                    &assert_failure.params.from
-                                ),
-                                formatter.format_address(
-                                    &assert_failure.txs,
-                                    &assert_failure.params.to,
-                                ),
+                                from_to,
                                 if !params.is_empty() { "with:\n" } else { "" },
                                 params.join("\n"),
                             );

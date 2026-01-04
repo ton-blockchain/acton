@@ -991,3 +991,109 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
         .failure()
         .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code.stdout.txt");
 }
+
+#[test]
+fn test_test_all_successful_tx_matcher_with_fail() {
+    let project = ProjectBuilder::new("test-get")
+        .contract(
+            "simple",
+            r#"
+            fun onInternalMessage(in: InMessage) {
+                throw 10
+            }
+            "#,
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/io"
+            import "../../lib/build/build"
+            import "../../lib/emulation/network"
+            import "../../lib/testing/expect"
+            import "../../lib/testing/transaction_expect"
+
+            get fun `test-foo`() {
+                val init = ContractState {
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress {
+                    stateInit: init,
+                };
+
+                val sender = net.treasury("sender");
+                val msg = createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: address,
+                    body: beginCell().storeUint(1, 32).endCell(),
+                });
+                val res = net.send(sender.address, msg, 0);
+                expect(res).toHaveAllSuccessfulTxs();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_test_all_successful_tx_matcher_with_fail.stdout.txt",
+        );
+}
+
+#[test]
+fn test_test_all_successful_tx_matcher_without_fail() {
+    let project = ProjectBuilder::new("test-get")
+        .contract(
+            "simple",
+            r#"
+            fun onInternalMessage(in: InMessage) {
+                throw 0
+            }
+            "#,
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/io"
+            import "../../lib/build/build"
+            import "../../lib/emulation/network"
+            import "../../lib/testing/expect"
+            import "../../lib/testing/transaction_expect"
+
+            get fun `test-foo`() {
+                val init = ContractState {
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress {
+                    stateInit: init,
+                };
+
+                val sender = net.treasury("sender");
+                val msg = createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: address,
+                    body: beginCell().storeUint(1, 32).endCell(),
+                });
+                val res = net.send(sender.address, msg, 0);
+                expect(res).toHaveAllSuccessfulTxs();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_test_all_successful_tx_matcher_without_fail.stdout.txt",
+        );
+}

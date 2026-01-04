@@ -199,6 +199,31 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: Search
     }
 }
 
+/// Expect all transactions in the list to be successful.
+/// 
+/// Example:
+/// ```tolk
+/// val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// expect(results).toHaveAllSuccessfulTxs();
+/// ```
+fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
+    val params = SearchParams {
+        success: false,
+    };
+    // trying to find some transaction with success=false
+    val tx = ffi.findTransactionByParams(self.value, params.toTuple());
+    if (tx != null) {
+        // we found one, so matcher fail
+        ffi.failToNotFindTransactionByParams(
+            self.location,
+            "expect(<actual>).toHaveAllSuccessfulTxs(<expected>)",
+            self.value,
+            params.toTuple()
+        );
+        throw 567;
+    }
+}
+
 /// Expect the transaction to emit an external message of given type.
 /// 
 /// Example:
