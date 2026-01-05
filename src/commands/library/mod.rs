@@ -148,10 +148,28 @@ pub fn publish_cmd(
             .dimmed()
     );
 
+    let (bits, cells) = calculate_cell_size(library_code_cell.as_ref(), &mut HashSet::new());
+
+    // Masterchain storage prices (config 18)
+    // See https://tonviewer.com/config#18
+    let bit_price = 1_000u128;
+    let cell_price = 500_000u128;
+    let bits_part = (bits as u128 * bit_price * duration_seconds as u128) >> 16;
+    let cells_part = (cells as u128 * cell_price * duration_seconds as u128) >> 16;
+    let storage_fee_nanotons = bits_part + cells_part;
+
+    // 120% of storage fee + 0.05 TON for gas/fees
+    let suggested_amount = (storage_fee_nanotons as f64 * 1.2 / 1_000_000_000.0) + 0.06;
+
     let custom_ton = if let Some(amount) = amount_arg {
         amount
     } else {
-        let amount_to_send = Text::new("Enter amount in TON (leave empty to cancel):").prompt()?;
+        let prompt = format!(
+            "Enter amount in TON (at least {:.4} TON for {}):",
+            suggested_amount,
+            format_duration(duration_seconds)
+        );
+        let amount_to_send = Text::new(&prompt).prompt()?;
 
         if amount_to_send.trim().is_empty() {
             return Ok(());
@@ -223,8 +241,6 @@ pub fn publish_cmd(
         "→".blue().bold(),
         hex::encode(library_hash).dimmed()
     );
-
-    let (bits, cells) = calculate_cell_size(library_code_cell.as_ref(), &mut HashSet::new());
 
     save_library(
         contract_id.as_deref().unwrap_or("unknown"),
