@@ -66,7 +66,7 @@ pub enum WalletCommand {
         name: Option<String>,
         #[arg(long, help = "Version of the wallet (prompts if not provided)")]
         version: Option<WalletVersionArg>,
-        #[arg(long, help = "Save wallet to global config")]
+        #[arg(long, help = "Save wallet to global global.wallets.toml")]
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
         local: bool,
@@ -88,7 +88,7 @@ pub enum WalletCommand {
         mnemonics: Vec<String>,
         #[arg(long, help = "Version of the wallet (prompts if not provided)")]
         version: Option<WalletVersionArg>,
-        #[arg(long, help = "Save wallet to global config")]
+        #[arg(long, help = "Save wallet to global global.wallets.toml")]
         global: bool,
         #[arg(long, help = "Save wallet to local wallets.toml")]
         local: bool,

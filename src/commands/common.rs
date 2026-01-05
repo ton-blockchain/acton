@@ -1,4 +1,4 @@
-use crate::config::{ActonConfig, global_wallets_path};
+use crate::config::{ActonConfig, global_libraries_path, global_wallets_path};
 use anyhow::{Context, anyhow};
 use inquire::Select;
 use std::path::Path;
@@ -49,6 +49,30 @@ pub mod error_fmt {
             .unwrap_or_else(|| "none".to_string());
         format!(
             "Wallet {} not found in wallets.toml and global.wallets.toml\nAvailable wallets:\n{}",
+            name.yellow(),
+            available
+        )
+    }
+
+    pub fn library_not_found(config: &ActonConfig, name: &str) -> String {
+        let libraries = config.libraries();
+        if libraries.is_none() || libraries.as_ref().map(|c| c.is_empty()).unwrap_or(false) {
+            return format!(
+                "Library {} not found. {}",
+                name.yellow(),
+                no_libraries_found()
+            );
+        }
+        let available = libraries
+            .map(|libs| {
+                libs.keys()
+                    .map(|s| format!(" {}", s.yellow()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .unwrap_or_else(|| "none".to_string());
+        format!(
+            "Library {} not found in libraries.toml and global.libraries.toml\nAvailable libraries:\n{}",
             name.yellow(),
             available
         )
@@ -151,6 +175,16 @@ script-name = \"command invocation\""
             "keys = { mnemonic = \"...\" }".green()
         )
     }
+
+    pub fn no_libraries_found() -> String {
+        format!(
+            "No libraries configured in {} or {}.\nTo add a library use {} or add a record to {} manually.",
+            "libraries.toml".yellow(),
+            "global.libraries.toml".yellow(),
+            "acton library publish".yellow(),
+            "libraries.toml".green()
+        )
+    }
 }
 
 pub fn select_contract(
@@ -227,6 +261,18 @@ pub fn symlink_global_wallets() -> anyhow::Result<()> {
         && global_path.exists()
     {
         let symlink_path = Path::new("global.wallets.toml");
+        if !symlink_path.exists() {
+            create_symlink(&global_path, symlink_path)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn symlink_global_libraries() -> anyhow::Result<()> {
+    if let Some(global_path) = global_libraries_path()
+        && global_path.exists()
+    {
+        let symlink_path = Path::new("global.libraries.toml");
         if !symlink_path.exists() {
             create_symlink(&global_path, symlink_path)?;
         }

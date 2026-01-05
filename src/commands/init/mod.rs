@@ -1,4 +1,4 @@
-use crate::commands::common::symlink_global_wallets;
+use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
 use crate::config::{ActonConfig, ContractConfig, ContractsConfig};
 use crate::stdlib;
 use owo_colors::OwoColorize;
@@ -56,6 +56,14 @@ pub fn init_cmd() -> anyhow::Result<()> {
     if let Err(e) = symlink_global_wallets() {
         println!(
             "  {} Failed to symlink global wallets: {}",
+            "Warning:".yellow().bold(),
+            e
+        );
+    }
+
+    if let Err(e) = symlink_global_libraries() {
+        println!(
+            "  {} Failed to symlink global libraries: {}",
             "Warning:".yellow().bold(),
             e
         );

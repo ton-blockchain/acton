@@ -1,11 +1,13 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
-use crate::config::ActonConfig;
+use crate::config::{ActonConfig, global_libraries_path};
 use crate::wallets::open_wallets;
 use anyhow::{Context, anyhow};
-use inquire::Text;
+use chrono::{DateTime, Local};
+use inquire::{Select, Text};
 use num_bigint::BigUint;
 use owo_colors::OwoColorize;
+use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -14,6 +16,7 @@ use std::str::FromStr;
 use tasm::printer::FormatOptions;
 use tempfile::TempDir;
 use tolkc::CompilerResult;
+use toml_edit::{DocumentMut, Item, Table, value};
 use ton_api::{Network, TonApiClient};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
@@ -24,10 +27,11 @@ use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tonlib_core::tlb_types::primitives::reference::Ref;
 use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::Boc;
+use tycho_types::cell::{CellImpl, HashBytes};
 
 #[allow(clippy::too_many_arguments)]
 pub fn publish_cmd(
-    contract_id: Option<String>,
+    contract: Option<String>,
     code_arg: Option<String>,
     duration_arg: Option<String>,
     wallet_name: Option<String>,
@@ -35,7 +39,10 @@ pub fn publish_cmd(
     net: String,
     amount_arg: Option<f64>,
     yes: bool,
+    local: bool,
+    global: bool,
 ) -> anyhow::Result<()> {
+    let mut contract_id = contract;
     let config = ActonConfig::load()?;
     let network = Network::from_str(&net)?;
 
@@ -48,7 +55,7 @@ pub fn publish_cmd(
             anyhow::bail!("Failed to decode BoC data as hex or base64");
         }
     } else {
-        let contract_key = select_contract(contract_id, &config)?;
+        let contract_key = select_contract(contract_id.clone(), &config)?;
         let contract = config
             .get_contract(&contract_key)
             .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &contract_key)))?;
@@ -60,6 +67,8 @@ pub fn publish_cmd(
                 "Contract source must be a <yellow>.tolk</> file"
             ));
         }
+
+        contract_id = Some(contract_key.clone());
 
         println!("  {} Compiling contract", "→".blue().bold());
         let compilation_result = tolkc::compile(Path::new(&contract_path), false);
@@ -132,7 +141,11 @@ pub fn publish_cmd(
         "  {} Using wallet: {} {}",
         "→".blue().bold(),
         wallet_name.cyan(),
-        wallet.wallet.address.to_base64_std().dimmed()
+        wallet
+            .wallet
+            .address
+            .to_base64_url_flags(true, net == "testnet")
+            .dimmed()
     );
 
     let custom_ton = if let Some(amount) = amount_arg {
@@ -211,7 +224,41 @@ pub fn publish_cmd(
         hex::encode(library_hash).dimmed()
     );
 
+    let (bits, cells) = calculate_cell_size(library_code_cell.as_ref(), &mut HashSet::new());
+
+    save_library(
+        contract_id.as_deref().unwrap_or("unknown"),
+        &hex::encode(library_hash),
+        &Boc::encode_base64(&library_code_cell),
+        &publisher_address.to_base64_url_flags(true, net == "testnet"),
+        duration_seconds,
+        net,
+        bits,
+        cells,
+        local,
+        global,
+    )?;
+
+    println!("  {} Library info saved", "✓".green().bold());
     Ok(())
+}
+
+fn calculate_cell_size(cell: &dyn CellImpl, seen: &mut HashSet<HashBytes>) -> (u64, u64) {
+    let mut bits = cell.bit_len() as u64;
+    let mut cells = 0u64;
+    for i in 0..4 {
+        if let Some(r) = cell.reference(i) {
+            if !seen.insert(*r.repr_hash()) {
+                // already processed
+                continue;
+            }
+
+            let (b, r_count) = calculate_cell_size(r, seen);
+            bits += b;
+            cells += 1 + r_count;
+        }
+    }
+    (bits, cells)
 }
 
 pub fn fetch_cmd(
@@ -273,6 +320,221 @@ pub fn fetch_cmd(
         } else {
             println!("{}", boc_base64);
         }
+    }
+
+    Ok(())
+}
+
+pub fn info_cmd(name: Option<String>) -> anyhow::Result<()> {
+    let config = ActonConfig::load()?;
+    let libraries = config
+        .libraries()
+        .ok_or_else(|| anyhow!(error_fmt::no_libraries_found()))?;
+
+    if libraries.is_empty() {
+        anyhow::bail!(error_fmt::no_libraries_found());
+    }
+
+    let lib_name = if let Some(n) = name {
+        n
+    } else {
+        let names = libraries.keys().cloned().collect::<Vec<_>>();
+        Select::new("Select library:", names).prompt()?
+    };
+
+    let lib = libraries
+        .get(&lib_name)
+        .ok_or_else(|| anyhow!(error_fmt::library_not_found(&config, &lib_name)))?;
+
+    let w = 12;
+    println!("{:<w$} {}", "Library:".dimmed(), lib_name.cyan().bold());
+    println!("{:<w$} {}", "Contract:".dimmed(), lib.name);
+    println!("{:<w$} {}", "Network:".dimmed(), lib.network);
+    println!("{:<w$} {}", "Hash:".dimmed(), lib.hash.yellow());
+    println!("{:<w$} {}", "Account:".dimmed(), lib.account.yellow());
+    println!(
+        "{:<w$} {} ({}s)",
+        "Funded for:".dimmed(),
+        format_duration(lib.duration),
+        lib.duration
+    );
+    println!(
+        "{:<w$} {} ({})",
+        "Deployed at:".dimmed(),
+        lib.timestamp,
+        format_relative_time(&lib.timestamp),
+        w = w
+    );
+    println!(
+        "{:<w$} {} bits, {} cells",
+        "Size:".dimmed(),
+        lib.bits,
+        lib.cells
+    );
+    println!("{:<w$} {}", "Code:".dimmed(), lib.code.magenta());
+
+    Ok(())
+}
+
+fn format_duration(seconds: u64) -> String {
+    let mut remaining = seconds;
+    let years = remaining / 31_536_000;
+    remaining %= 31_536_000;
+    let days = remaining / 86_400;
+    remaining %= 86_400;
+    let hours = remaining / 3600;
+    remaining %= 3600;
+    let minutes = remaining / 60;
+    let seconds = remaining % 60;
+
+    let mut parts = Vec::new();
+    if years > 0 {
+        parts.push(format!(
+            "{} year{}",
+            years,
+            if years > 1 { "s" } else { "" }
+        ));
+    }
+    if days > 0 {
+        parts.push(format!("{} day{}", days, if days > 1 { "s" } else { "" }));
+    }
+    if hours > 0 {
+        parts.push(format!(
+            "{} hour{}",
+            hours,
+            if hours > 1 { "s" } else { "" }
+        ));
+    }
+    if minutes > 0 {
+        parts.push(format!(
+            "{} minute{}",
+            minutes,
+            if minutes > 1 { "s" } else { "" }
+        ));
+    }
+    if seconds > 0 || parts.is_empty() {
+        parts.push(format!(
+            "{} second{}",
+            seconds,
+            if seconds > 1 { "s" } else { "" }
+        ));
+    }
+
+    parts.join(" ")
+}
+
+fn format_relative_time(timestamp_str: &str) -> String {
+    let Ok(dt) = DateTime::parse_from_rfc3339(timestamp_str) else {
+        return timestamp_str.to_string();
+    };
+    let now = Local::now();
+    let duration = now.signed_duration_since(dt);
+
+    if duration.num_seconds() < 60 {
+        return "just now".to_string();
+    }
+    if duration.num_minutes() < 60 {
+        return format!("{} min ago", duration.num_minutes());
+    }
+    if duration.num_hours() < 24 {
+        return format!("{} hours ago", duration.num_hours());
+    }
+    if duration.num_days() < 30 {
+        return format!("{} days ago", duration.num_days());
+    }
+    if duration.num_days() < 365 {
+        let months = duration.num_days() / 30;
+        return format!("{} month{} ago", months, if months > 1 { "s" } else { "" });
+    }
+    let years = duration.num_days() / 365;
+    format!("{} year{} ago", years, if years > 1 { "s" } else { "" })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn save_library(
+    contract_name: &str,
+    hash: &str,
+    code: &str,
+    account: &str,
+    duration: u64,
+    network: String,
+    bits: u64,
+    cells: u64,
+    local: bool,
+    global: bool,
+) -> anyhow::Result<()> {
+    let is_global = if global {
+        true
+    } else if local {
+        false
+    } else {
+        let options = vec![
+            "Local (libraries.toml)",
+            "Global (~/.acton/libraries/global.libraries.toml)",
+        ];
+        let selection = Select::new("Save library info to:", options).prompt()?;
+        selection.starts_with("Global")
+    };
+
+    let config_path = if is_global {
+        let global_dir = global_libraries_path()
+            .ok_or_else(|| anyhow!("Could not determine global libraries path"))?
+            .parent()
+            .ok_or_else(|| anyhow!("Invalid global libraries path"))?
+            .to_path_buf();
+
+        fs::create_dir_all(&global_dir)?;
+        global_dir.join("global.libraries.toml")
+    } else {
+        PathBuf::from("libraries.toml")
+    };
+
+    let mut doc = if config_path.exists() {
+        let content = fs::read_to_string(&config_path)?;
+        content.parse::<DocumentMut>()?
+    } else {
+        DocumentMut::new()
+    };
+
+    if !doc.contains_key("libraries") {
+        doc.insert("libraries", Item::Table(Table::new()));
+    }
+
+    let libraries = doc["libraries"]
+        .as_table_mut()
+        .ok_or_else(|| anyhow!("Invalid libraries.toml format"))?;
+
+    let mut final_name = contract_name.to_string();
+    if libraries.contains_key(&final_name) {
+        let mut i = 1;
+        while libraries.contains_key(&format!("{}-{}", contract_name, i)) {
+            i += 1;
+        }
+        final_name = format!("{}-{}", contract_name, i);
+    }
+
+    let mut lib_table = Table::new();
+    lib_table.insert("name", value(contract_name));
+    lib_table.insert("hash", value(hash));
+    lib_table.insert("code", value(code));
+    lib_table.insert("account", value(account));
+    lib_table.insert("duration", value(duration as i64));
+    lib_table.insert("network", value(network));
+    lib_table.insert("timestamp", value(Local::now().to_rfc3339()));
+    lib_table.insert("bits", value(bits as i64));
+    lib_table.insert("cells", value(cells as i64));
+
+    libraries.insert(&final_name, Item::Table(lib_table));
+
+    fs::write(config_path, doc.to_string())?;
+
+    if final_name != contract_name {
+        println!(
+            "  {} Library with ID '{}' already exists, saved as '{}'",
+            "ℹ".blue().bold(),
+            contract_name,
+            final_name
+        );
     }
 
     Ok(())

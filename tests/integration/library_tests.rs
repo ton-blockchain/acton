@@ -396,3 +396,117 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
             "integration/snapshots/test_library_publish_unknown_wallet.stderr.txt",
         );
 }
+
+#[test]
+fn test_library_info_basic() {
+    let project = ProjectBuilder::new("library-info-basic").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+
+    let toml_content = r#"[libraries.my-lib]
+name = "MyLib"
+hash = "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27"
+code = "b5ee9c72..."
+account = "EQD..."
+duration = 31536000
+network = "testnet"
+timestamp = "2026-01-05T12:00:00Z"
+bits = 1024
+cells = 4
+"#;
+    fs::write(project.path().join("libraries.toml"), toml_content).expect("Write libraries.toml");
+
+    project
+        .acton()
+        .env("HOME", home_temp.path().to_str().unwrap())
+        .library()
+        .arg("info")
+        .arg("my-lib")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/test_library_info_basic.stdout.txt");
+}
+
+#[test]
+fn test_library_info_not_found() {
+    let project = ProjectBuilder::new("library-info-not-found").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+
+    let toml_content = r#"[libraries.my-lib]
+name = "MyLib"
+hash = "..."
+code = "..."
+account = "..."
+duration = 100
+network = "testnet"
+timestamp = "2026-01-05T12:00:00Z"
+bits = 10
+cells = 1
+"#;
+    fs::write(project.path().join("libraries.toml"), toml_content).expect("Write libraries.toml");
+
+    project
+        .acton()
+        .env("HOME", home_temp.path().to_str().unwrap())
+        .library()
+        .arg("info")
+        .arg("nonexistent")
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "Library nonexistent not found in libraries.toml and global.libraries.toml",
+        )
+        .assert_stderr_contains("Available libraries:")
+        .assert_stderr_contains("my-lib");
+}
+
+#[test]
+fn test_library_info_no_libraries() {
+    let project = ProjectBuilder::new("library-info-no-libs").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+
+    project
+        .acton()
+        .env("HOME", home_temp.path().to_str().unwrap())
+        .library()
+        .arg("info")
+        .arg("any")
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "No libraries configured in libraries.toml or global.libraries.toml",
+        );
+}
+
+#[test]
+fn test_library_info_global() {
+    let project = ProjectBuilder::new("library-info-global").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let global_libs_dir = home_temp.path().join(".acton").join("libraries");
+    fs::create_dir_all(&global_libs_dir).expect("Create global libs dir");
+
+    let toml_content = r#"[libraries.global-lib]
+name = "GlobalLib"
+hash = "..."
+code = "..."
+account = "..."
+duration = 100
+network = "mainnet"
+timestamp = "2026-01-05T12:00:00Z"
+bits = 20
+cells = 2
+"#;
+    fs::write(global_libs_dir.join("global.libraries.toml"), toml_content)
+        .expect("Write global.libraries.toml");
+
+    project
+        .acton()
+        .env("HOME", home_temp.path().to_str().unwrap())
+        .library()
+        .arg("info")
+        .arg("global-lib")
+        .run()
+        .success()
+        .assert_contains("Library:     global-lib")
+        .assert_contains("Contract:    GlobalLib")
+        .assert_contains("Network:     mainnet");
+}

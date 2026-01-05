@@ -100,6 +100,9 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
             regex!(r"✓ Wallet successfully created and added to .*"),
         )
         .unwrap();
+    redactions
+        .insert("[DEPLOYED_AT]", regex!(r"Deployed at: .*"))
+        .unwrap();
 
     redactions.redact(&content)
 }

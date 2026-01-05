@@ -59,6 +59,32 @@ pub struct ActonConfig {
     pub scripts: Option<BTreeMap<String, String>>,
     #[serde(skip)] // we build wallets manually
     pub wallets: Option<WalletsConfig>,
+    #[serde(skip)] // we build libraries manually
+    pub libraries: Option<LibrariesConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LibrariesConfig {
+    #[serde(flatten)]
+    pub libraries: BTreeMap<String, LibraryConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LibraryConfig {
+    pub name: String,
+    pub hash: String,
+    pub code: String,
+    pub account: String,
+    pub duration: u64,
+    pub network: Network,
+    pub timestamp: String,
+    pub bits: u64,
+    pub cells: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LibrariesFile {
+    pub libraries: Option<LibrariesConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,6 +192,7 @@ impl Default for ActonConfig {
             test: None,
             contracts: None,
             wallets: None,
+            libraries: None,
             scripts: None,
         }
     }
@@ -271,6 +298,38 @@ impl ActonConfig {
             wallets: merged_wallets,
         });
 
+        // Merge libraries from different sources
+        let mut merged_libraries = BTreeMap::new();
+
+        // 1. Load global libraries
+        if let Some(global_path) = global_libraries_path()
+            && global_path.exists()
+        {
+            let global_content = fs::read_to_string(&global_path)?;
+            let global_libraries: LibrariesFile = toml::from_str(&global_content)?;
+            if let Some(libraries) = global_libraries.libraries {
+                for (name, library) in libraries.libraries {
+                    merged_libraries.insert(name, library);
+                }
+            }
+        }
+
+        // 2. Load local libraries.toml
+        let local_libraries_path = Path::new("libraries.toml");
+        if local_libraries_path.exists() {
+            let local_content = fs::read_to_string(local_libraries_path)?;
+            let local_libraries: LibrariesFile = toml::from_str(&local_content)?;
+            if let Some(libraries) = local_libraries.libraries {
+                for (name, library) in libraries.libraries {
+                    merged_libraries.insert(name, library);
+                }
+            }
+        }
+
+        config.libraries = Some(LibrariesConfig {
+            libraries: merged_libraries,
+        });
+
         Ok(config)
     }
 
@@ -295,6 +354,14 @@ impl ActonConfig {
     pub fn get_wallet(&self, name: &str) -> Option<&WalletConfig> {
         self.wallets.as_ref()?.wallets.get(name)
     }
+
+    pub fn libraries(&self) -> Option<&BTreeMap<String, LibraryConfig>> {
+        self.libraries.as_ref().map(|l| &l.libraries)
+    }
+
+    pub fn get_library(&self, name: &str) -> Option<&LibraryConfig> {
+        self.libraries.as_ref()?.libraries.get(name)
+    }
 }
 
 pub fn global_wallets_path() -> Option<PathBuf> {
@@ -308,6 +375,20 @@ pub fn global_wallets_path() -> Option<PathBuf> {
             .join(".acton")
             .join("wallets")
             .join("global.wallets.toml"),
+    )
+}
+
+pub fn global_libraries_path() -> Option<PathBuf> {
+    #[cfg(windows)]
+    let home = std::env::var("USERPROFILE").ok()?;
+    #[cfg(not(windows))]
+    let home = std::env::var("HOME").ok()?;
+
+    Some(
+        PathBuf::from(home)
+            .join(".acton")
+            .join("libraries")
+            .join("global.libraries.toml"),
     )
 }
 

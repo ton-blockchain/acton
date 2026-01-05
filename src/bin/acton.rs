@@ -5,7 +5,7 @@ use acton::commands::disasm::disasm_cmd;
 use acton::commands::docgen::docgen_cmd;
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
-use acton::commands::library::{fetch_cmd, publish_cmd};
+use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
 use acton::commands::new::new_cmd;
 use acton::commands::retrace::retrace_cmd;
 use acton::commands::run::run_cmd;
@@ -556,6 +556,10 @@ pub enum LibraryCommand {
         amount: Option<f64>,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
+        #[arg(long, help = "Save library info to local libraries.toml")]
+        local: bool,
+        #[arg(long, help = "Save library info to global.libraries.toml")]
+        global: bool,
     },
     #[command(about = "Fetch a library from the blockchain")]
     Fetch {
@@ -575,6 +579,11 @@ pub enum LibraryCommand {
         net: Network,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
+    },
+    #[command(about = "Display information about a deployed library")]
+    Info {
+        #[arg(help = "Library name to show info for")]
+        name: Option<String>,
     },
 }
 
@@ -1158,6 +1167,8 @@ fn main() {
                 net,
                 amount,
                 yes,
+                local,
+                global,
             } => publish_cmd(
                 contract_id,
                 code,
@@ -1167,6 +1178,8 @@ fn main() {
                 net.to_string(),
                 amount,
                 yes,
+                local,
+                global,
             ),
             LibraryCommand::Fetch {
                 hash,
@@ -1190,6 +1203,7 @@ fn main() {
                 }
                 result
             }
+            LibraryCommand::Info { name } => info_cmd(name),
         },
         Commands::Up {
             version,
