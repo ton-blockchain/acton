@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { type RawNodeDatum, Tree, type TreeLinkDatum } from "react-d3-tree"
 import type { ContractData, TransactionInfo } from "../../../types/transaction"
 import { formatCurrency } from "../../../utils/format"
+import { getTransactionOpcode } from "../../../utils/transaction"
 import { TransactionDetails } from "../TransactionDetails/TransactionDetails"
 import { SmartTooltip } from "./SmartTooltip"
 import styles from "./TransactionTree.module.css"
@@ -162,7 +163,7 @@ export function TransactionTree({
   const transactionMap = useMemo(() => {
     const map: Map<string, TransactionInfo> = new Map()
     for (const tx of transactions) {
-      map.set(tx.transaction.lt.toString(), tx)
+      map.set(tx.lt, tx)
     }
     return map
   }, [transactions])
@@ -173,7 +174,7 @@ export function TransactionTree({
 
     forceHideTooltip()
 
-    if (selectedTransaction?.transaction.lt.toString() === lt) {
+    if (selectedTransaction?.lt === lt) {
       setSelectedTransaction(undefined)
     } else {
       setSelectedTransaction(transaction)
@@ -184,27 +185,28 @@ export function TransactionTree({
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     triggerRectRef.current = rect
 
-    const computeInfo = tx.computeInfo
-    const computePhase = {
-      success: computeInfo === "skipped" ? true : computeInfo.success,
-      exitCode: computeInfo === "skipped" ? undefined : computeInfo.exitCode,
-      gasUsed: computeInfo === "skipped" ? undefined : computeInfo.gasUsed,
-      vmSteps: computeInfo === "skipped" ? undefined : computeInfo.vmSteps,
-    }
-
-    const fees = {
-      gasFees: computeInfo === "skipped" ? undefined : computeInfo.gasFees,
-      totalFees: tx.money.totalFees,
-    }
-
-    const srcAddress = tx.transaction.inMessage?.info.src
-    const fromAddressStr = srcAddress ? formatAddressShort(srcAddress as Address) : "unknown"
+    const description = tx.transaction.description
+    const computePhase = description.type === "generic" ? description.computePhase : undefined
+    const actionPhase = description.type === "generic" ? description.actionPhase : undefined
 
     const tooltipData: TransactionTooltipData = {
-      fromAddress: fromAddressStr,
-      computePhase,
-      fees,
-      sentTotal: tx.money.sentTotal,
+      fromAddress: tx.transaction.inMessage?.info.src
+        ? formatAddressShort(tx.transaction.inMessage.info.src as Address)
+        : "unknown",
+      computePhase: {
+        success: computePhase?.type === "vm" ? computePhase.success : true,
+        exitCode: computePhase?.type === "vm" ? computePhase.exitCode : undefined,
+        gasUsed: computePhase?.type === "vm" ? computePhase.gasUsed : undefined,
+        vmSteps: computePhase?.type === "vm" ? computePhase.vmSteps : undefined,
+      },
+      fees: {
+        gasFees: computePhase?.type === "vm" ? computePhase.gasFees : undefined,
+        totalFees: tx.transaction.totalFees.coins,
+      },
+      sentTotal: Array.from(tx.transaction.outMessages.values()).reduce(
+        (acc, msg) => acc + (msg.info.type === "internal" ? msg.info.value.coins : 0n),
+        0n,
+      ),
     }
 
     showTooltip({
@@ -219,49 +221,39 @@ export function TransactionTree({
       const thisAddress = tx.address
       const addressName = formatAddress(thisAddress, contracts)
 
-      const computePhase =
-        tx.transaction.description.type === "generic"
-          ? tx.transaction.description.computePhase
-          : null
+      const description = tx.transaction.description
+      const computePhase = description.type === "generic" ? description.computePhase : undefined
+      const actionPhase = description.type === "generic" ? description.actionPhase : undefined
 
       const inMessage = tx.transaction.inMessage
       const withInitCode = inMessage?.init?.code !== undefined
       const isBounced = inMessage?.info.type === "internal" ? inMessage.info.bounced : false
 
       const isSuccess = computePhase?.type === "vm" ? computePhase.success : true
-      const exitCode =
-        computePhase?.type === "vm"
-          ? computePhase.exitCode === 0
-            ? tx.transaction.description.type === "generic"
-              ? (tx.transaction.description.actionPhase?.resultCode ?? 0)
-              : 0
-            : computePhase.exitCode
-          : undefined
+      const exitCode = computePhase?.type === "vm" ? computePhase.exitCode : undefined
 
-      const value =
-        tx.transaction.inMessage?.info.type === "internal"
-          ? tx.transaction.inMessage.info.value.coins
-          : undefined
+      const value = inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined
 
-      const opcode = tx.opcode
+      const opcode = getTransactionOpcode(tx.transaction)
 
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-      let typeAbi = targetContract?.abi?.messages.find((it: any) => it.opcode === tx.opcode)
+      let typeAbi = targetContract?.abi?.messages.find((it: any) => it.opcode === opcode)
       if (typeAbi === undefined) {
         ;[...contracts.values()].forEach((c) => {
-          typeAbi = c.abi?.messages.find((it: any) => it.opcode === tx.opcode)
+          if (!typeAbi) {
+            typeAbi = c.abi?.messages.find((it: any) => it.opcode === opcode)
+          }
         })
       }
       const opcodeName = typeAbi?.name
-
-      const opcodeHex = opcodeName ?? (opcode ? "0x" + opcode.toString(16) : "empty")
+      const opcodeHex = opcodeName ?? (opcode !== undefined ? "0x" + opcode.toString(16) : "empty")
 
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
 
-      const lt = tx.transaction.lt.toString()
-      const isSelected = selectedTransaction?.transaction.lt.toString() === lt
+      const lt = tx.lt
+      const isSelected = selectedTransaction?.lt === lt
 
-      const hasExternalOut = tx.transaction.outMessages.values().some((outMsg) => {
+      const hasExternalOut = Array.from(tx.transaction.outMessages.values()).some((outMsg) => {
         return outMsg.info.type === "external-out"
       })
 
@@ -281,8 +273,8 @@ export function TransactionTree({
       return {
         name: addressName,
         attributes: {
-          from: tx.transaction.inMessage?.info.src?.toString() ?? "unknown",
-          to: tx.transaction.inMessage?.info.dest?.toString() ?? "unknown",
+          from: inMessage?.info.src?.toString() ?? "unknown",
+          to: inMessage?.info.dest?.toString() ?? "unknown",
           lt,
           success: isSuccess ? "✓" : "✗",
           exitCode: exitCode?.toString() ?? "0",
@@ -348,9 +340,9 @@ export function TransactionTree({
       const parentLt = nodeDatum.attributes.parentLt as string
       const parentTx = transactionMap.get(parentLt)
 
-      const externalOutMsg = parentTx?.transaction.outMessages
-        .values()
-        .find((msg) => msg.info.type === "external-out")
+      const externalOutMsg = Array.from(parentTx?.transaction.outMessages.values() ?? []).find(
+        (msg) => msg.info.type === "external-out",
+      )
       const externalOutDest = externalOutMsg?.info.dest?.toString() ?? "External"
       const createdLt =
         externalOutMsg?.info.type === "external-out" ? externalOutMsg.info.createdLt.toString() : ""

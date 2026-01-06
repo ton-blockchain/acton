@@ -1,7 +1,7 @@
 import type React from "react"
 import type { ContractData } from "../../../types/transaction"
+import { formatAddress } from "../../../utils/format"
 import styles from "./ContractChip.module.css"
-import {formatAddress} from "../../../utils/format";
 
 interface ContractChipProps {
   readonly address: string | undefined

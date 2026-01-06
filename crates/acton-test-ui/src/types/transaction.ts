@@ -1,45 +1,25 @@
 import type { Address, Cell, OutAction, Transaction } from "@ton/core"
 
-export interface DeployedContract {
-  readonly name: string
-  readonly address: string
-  readonly abi?: any
-}
-
 export interface TransactionInfo {
+  readonly lt: string
   readonly address: Address | undefined
   readonly transaction: Transaction
-  readonly fields: Record<string, unknown>
-  readonly opcode: number | undefined
-  readonly computeInfo: ComputeInfo
-  readonly money: TransactionMoney
-  readonly amount: bigint | undefined
+  readonly vmLogDiff: string
+  readonly executorLogs: string
+  readonly actions: Cell | undefined
   readonly outActions: OutAction[]
-  readonly c5: Cell | undefined
-  readonly code: Cell | undefined
-  readonly sourceMap: any | undefined
   readonly contractName: string | undefined
-  readonly parent: TransactionInfo | undefined
-  readonly children: readonly TransactionInfo[]
-  readonly oldStorage: Cell | undefined
-  readonly newStorage: Cell | undefined
-  readonly callStack: string | undefined
+  readonly shardAccountBefore: string
+  readonly shardAccountAfter: string
+  parent: TransactionInfo | undefined
+  children: readonly TransactionInfo[]
 }
 
-export type ComputeInfo =
-  | "skipped"
-  | {
-      readonly success: boolean
-      readonly exitCode: number
-      readonly vmSteps: number
-      readonly gasUsed: bigint
-      readonly gasFees: bigint
-    }
-
-export interface TransactionMoney {
-  readonly sentTotal: bigint
-  readonly totalFees: bigint
-  readonly forwardFee: bigint
+export interface ContractData {
+  readonly displayName: string
+  readonly address: Address
+  readonly letter: string
+  readonly abi?: any
 }
 
 export const SEND_MODE_CONSTANTS = {
@@ -70,8 +50,14 @@ export const SEND_MODE_CONSTANTS = {
   },
 } as const
 
-export function parseSendMode(mode: number) {
-  const flags = []
+export interface SendModeInfo {
+  readonly name: string
+  readonly value: number
+  readonly description: string
+}
+
+export function parseSendMode(mode: number): SendModeInfo[] {
+  const flags: SendModeInfo[] = []
   for (const [value, constant] of Object.entries(SEND_MODE_CONSTANTS)) {
     const flagValue = Number.parseInt(value)
     if (flagValue === 0) continue
@@ -79,7 +65,7 @@ export function parseSendMode(mode: number) {
       flags.push({ name: constant.name, value: flagValue, description: constant.description })
     }
   }
-  if (flags.length === 0 && (mode === 0 || mode === undefined)) {
+  if (flags.length === 0 && mode === 0) {
     flags.push({
       name: SEND_MODE_CONSTANTS[0].name,
       value: 0,
@@ -87,11 +73,4 @@ export function parseSendMode(mode: number) {
     })
   }
   return flags
-}
-
-export interface ContractData {
-  displayName: string
-  address: Address
-  letter: string
-  abi?: any
 }

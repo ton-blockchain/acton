@@ -88,8 +88,8 @@ pub fn dump_test_transactions(
                             .iter()
                             .map(|lt| lt.to_string())
                             .collect(),
-                        shard_account_before: Boc::encode_hex(to_cell(&tx.shard_account_before)),
-                        shard_account: Boc::encode_hex(to_cell(&tx.shard_account)),
+                        shard_account_before: Boc::encode_base64(to_cell(&tx.shard_account_before)),
+                        shard_account: Boc::encode_base64(to_cell(&tx.shard_account)),
                         vm_log_diff: vmlogs::convert_to_diff_logs(&tx.vm_log),
                         executor_logs: tx.executor_logs.clone(),
                         actions: tx.actions.clone(),

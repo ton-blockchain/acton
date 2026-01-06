@@ -2,7 +2,7 @@ import React, { type JSX, useState } from "react"
 import { FiChevronDown, FiChevronUp } from "react-icons/fi"
 import type { ContractData, TransactionInfo } from "../../../types/transaction"
 import { formatCurrency, formatNumber } from "../../../utils/format"
-import { computeSendMode } from "../../../utils/transaction"
+import { computeSendMode, getTransactionOpcode } from "../../../utils/transaction"
 import { ContractChip } from "../ContractChip/ContractChip"
 import { ExitCodeChip } from "../ExitCodeChip/ExitCodeChip"
 import { OpcodeChip } from "../OpcodeChip/OpcodeChip"
@@ -71,38 +71,46 @@ export function TransactionDetails({
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
 
-  if (tx.transaction.description.type !== "generic") {
+  const description = tx.transaction.description
+  if (description.type !== "generic") {
     return (
       <div className={styles.transactionDetailsContainer}>
         <div className={styles.detailRow}>
           <div className={styles.detailValue}>
-            Non-generic transaction not supported (Type: {tx.transaction.description.type})
+            Non-generic transaction not supported (Type: {description.type})
           </div>
         </div>
       </div>
     )
   }
 
-  const computeInfo = tx.computeInfo
+  const computePhase = description.computePhase
+  const actionPhase = description.actionPhase
+
   const formatBoolean = (v: boolean): React.JSX.Element => (
     <span className={v ? styles.booleanTrue : styles.booleanFalse}>{v ? "Yes" : "No"}</span>
   )
 
-  const isSuccess = tx.computeInfo !== "skipped" && tx.computeInfo.success
   const inMessage = tx.transaction.inMessage
-  const money = tx.money
-  const sendMode = computeSendMode(tx, transactions)
+  const sendMode = computeSendMode(tx)
+
+  const opcode = getTransactionOpcode(tx.transaction)
 
   const thisAddress = tx.address
   const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-  let typeAbi = targetContract?.abi?.messages.find((it: any) => it.opcode === tx.opcode)
+  let typeAbi = targetContract?.abi?.messages.find((it: any) => it.opcode === opcode)
   if (typeAbi === undefined) {
     ;[...contracts.values()].forEach((c) => {
-      typeAbi = c.abi?.messages.find((it: any) => it.opcode === tx.opcode)
+      typeAbi = c.abi?.messages.find((it: any) => it.opcode === opcode)
     })
   }
   const opcodeName = typeAbi?.name
-  const knownExitCodes = contracts.get(tx.address?.toString() ?? "")?.abi?.exitCodes
+  const knownExitCodes = targetContract?.abi?.exitCodes
+
+  const sentTotal = Array.from(tx.transaction.outMessages.values()).reduce(
+    (acc, msg) => acc + (msg.info.type === "internal" ? msg.info.value.coins : 0n),
+    0n,
+  )
 
   return (
     <div className={styles.transactionDetailsContainer}>
@@ -177,7 +185,7 @@ export function TransactionDetails({
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Opcode</div>
               <div className={styles.multiColumnItemValue}>
-                <OpcodeChip opcode={tx.opcode} abiName={opcodeName} />
+                <OpcodeChip opcode={opcode} abiName={opcodeName} />
               </div>
             </div>
           </div>
@@ -190,27 +198,25 @@ export function TransactionDetails({
           <div className={styles.multiColumnRow}>
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Amount Sent (Total)</div>
-              <div className={`${styles.multiColumnItemValue}`}>
-                {formatCurrency(money.sentTotal)}
-              </div>
+              <div className={`${styles.multiColumnItemValue}`}>{formatCurrency(sentTotal)}</div>
             </div>
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Total Fee</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {formatCurrency(money.totalFees)}
+                {formatCurrency(tx.transaction.totalFees.coins)}
               </div>
             </div>
             <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Gas Fee</div>
               <div className={`${styles.multiColumnItemValue}`}>
-                {tx.computeInfo === "skipped" ? "N/A" : formatCurrency(tx.computeInfo.gasFees)}
+                {computePhase.type === "skipped" ? "N/A" : formatCurrency(computePhase.gasFees)}
               </div>
             </div>
             {tx.transaction.inMessage?.info.type === "internal" && (
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Forward Fee</div>
                 <div className={`${styles.multiColumnItemValue}`}>
-                  {formatCurrency(money.forwardFee)}
+                  {formatCurrency(tx.transaction.inMessage.info.forwardFee)}
                 </div>
               </div>
             )}
@@ -221,36 +227,36 @@ export function TransactionDetails({
       <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Compute Phase</div>
         <div className={styles.labeledSectionContent}>
-          {computeInfo === "skipped" ? (
-            <div className={styles.multiColumnItemValue}>Skipped</div>
+          {computePhase.type === "skipped" ? (
+            <div className={styles.multiColumnItemValue}>Skipped ({computePhase.reason})</div>
           ) : (
             <div className={styles.multiColumnRow}>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Success</div>
                 <div className={styles.multiColumnItemValue}>
-                  {formatBoolean(computeInfo.success)}
+                  {formatBoolean(computePhase.success)}
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip exitCode={computeInfo.exitCode} exitCodes={knownExitCodes} />
+                  <ExitCodeChip exitCode={computePhase.exitCode} exitCodes={knownExitCodes} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>VM Steps</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
-                  {computeInfo.vmSteps}
+                  {computePhase.vmSteps}
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Gas Used</div>
-                <div className={styles.multiColumnItemValue}>{computeInfo.gasUsed.toString()}</div>
+                <div className={styles.multiColumnItemValue}>{computePhase.gasUsed.toString()}</div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Gas Fee</div>
                 <div className={styles.multiColumnItemValue}>
-                  {formatCurrency(computeInfo.gasFees)}
+                  {formatCurrency(computePhase.gasFees)}
                 </div>
               </div>
             </div>
@@ -261,36 +267,40 @@ export function TransactionDetails({
       <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Action Phase</div>
         <div className={styles.labeledSectionContent}>
-          <div className={styles.multiColumnRow}>
-            <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>Success</div>
-              <div
-                className={`${styles.multiColumnItemValue} ${isSuccess ? styles.booleanTrue : styles.booleanFalse}`}
-              >
-                {formatBoolean(isSuccess)}
+          {!actionPhase ? (
+            <div className={styles.multiColumnItemValue}>No action phase</div>
+          ) : (
+            <div className={styles.multiColumnRow}>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Success</div>
+                <div
+                  className={`${styles.multiColumnItemValue} ${actionPhase.success ? styles.booleanTrue : styles.booleanFalse}`}
+                >
+                  {formatBoolean(actionPhase.success)}
+                </div>
+              </div>
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Total Actions</div>
+                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                  {formatNumber(tx.outActions.length)}
+                  {tx.outActions.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setShowActions(!showActions)
+                      }}
+                      className={styles.actionsToggleButton}
+                      aria-label={showActions ? "Hide actions" : "Show actions"}
+                    >
+                      {showActions ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+                      <span className={styles.actionsToggleText}>
+                        {showActions ? "Hide" : "Show"}
+                      </span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-            <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>Total Actions</div>
-              <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
-                {formatNumber(tx.outActions.length)}
-                {tx.outActions.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setShowActions(!showActions)
-                    }}
-                    className={styles.actionsToggleButton}
-                    aria-label={showActions ? "Hide actions" : "Show actions"}
-                  >
-                    {showActions ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-                    <span className={styles.actionsToggleText}>
-                      {showActions ? "Hide" : "Show"}
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

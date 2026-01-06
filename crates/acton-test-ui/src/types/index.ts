@@ -13,10 +13,17 @@ export interface TestReport {
   readonly trace_path?: string
 }
 
-export interface Transaction {
-  readonly dest_contract_info: string
+export interface BackendTransaction {
+  readonly lt: string
+  readonly raw_transaction: string
+  readonly parent_transaction: string | null
+  readonly child_transactions: string[]
+  readonly shard_account_before: string
+  readonly shard_account: string
   readonly vm_log_diff: string
   readonly executor_logs: string
+  readonly actions?: string
+  readonly dest_contract_info?: string
 }
 
 export interface TransactionList {
@@ -35,22 +42,4 @@ export interface BackendContractInfo {
   readonly code_boc64: string
   readonly source_map: any
   readonly abi?: any
-}
-
-export interface BackendTransaction {
-  readonly lt: string
-  readonly raw_transaction: string
-  readonly parent_transaction: string | null
-  readonly child_transactions: string[]
-  readonly shard_account_before: string
-  readonly shard_account: string
-  readonly vm_log_diff: string
-  readonly executor_logs: string
-  readonly actions?: string
-  readonly dest_contract_info?: string
-}
-
-export interface AppState {
-  readonly reports: TestReport[]
-  readonly currentTrace?: Trace
 }

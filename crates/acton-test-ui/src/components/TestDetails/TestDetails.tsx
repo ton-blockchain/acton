@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react"
 import { useContracts } from "../../hooks/useContracts"
 import type { TestReport, Trace } from "../../types"
 import type { ContractData } from "../../types/transaction"
+import { formatAddress } from "../../utils/format"
 import { processTransactions } from "../../utils/transaction"
 import { TransactionTree } from "../TransactionView/TransactionTree/TransactionTree"
 import styles from "./TestDetails.module.css"
-import {formatAddress} from "../../utils/format";
 
 interface TestDetailsProps {
   readonly test: TestReport
@@ -56,7 +56,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
 
     // 2. Add contracts from transactions
     if (parsedTransactions) {
-      parsedTransactions.forEach((tx) => {
+      for (const tx of parsedTransactions) {
         if (tx.address && !map.has(tx.address.toString())) {
           const addressStr = tx.address.toString()
           const backendContract = tx.contractName ? backendContracts[tx.contractName] : undefined
@@ -67,7 +67,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
             abi: backendContract?.abi,
           } as ContractData)
         }
-      })
+      }
     }
     return map
   }, [parsedTransactions, trace, backendContracts])
