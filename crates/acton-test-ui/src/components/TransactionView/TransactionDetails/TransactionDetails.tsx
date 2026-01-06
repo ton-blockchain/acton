@@ -12,61 +12,12 @@ import { ActionsSummary } from "./ActionsSummary"
 
 import styles from "./TransactionDetails.module.css"
 
-const formatDetailedTimestamp = (
-  timestampInput: number | string | undefined,
-  showShort: boolean = true,
-): JSX.Element | string => {
-  if (timestampInput === undefined) return "—"
-
-  const date =
-    typeof timestampInput === "string" ? new Date(timestampInput) : new Date(timestampInput * 1000)
-
-  const pad = (num: number): string => num.toString().padStart(2, "0")
-  const monthAbbrs = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ]
-
-  const day = date.getDate()
-  const monthIndex = date.getMonth()
-  const monthNum = monthIndex + 1
-  const year = date.getFullYear()
-  const hours = date.getHours()
-  const minutes = date.getMinutes()
-  const seconds = date.getSeconds()
-
-  const fullPart = `${pad(day)}.${pad(monthNum)}.${year}, ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-  const shortPart = `${pad(day)} ${monthAbbrs[monthIndex]}, ${pad(hours)}:${pad(minutes)}`
-
-  return (
-    <>
-      {fullPart}
-      {showShort && <span className={styles.timestampDetailSecondary}> — {shortPart}</span>}
-    </>
-  )
-}
-
 export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
-  readonly onContractClick?: (address: string) => void
 }
 
-export function TransactionDetails({
-  tx,
-  contracts,
-  onContractClick,
-}: TransactionDetailsProps): React.JSX.Element {
+export function TransactionDetails({ tx, contracts }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
 
   const description = tx.transaction.description
@@ -98,9 +49,9 @@ export function TransactionDetails({
   const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
   let typeAbi = targetContract?.abi?.messages.find((it) => it.opcode === opcode)
   if (typeAbi === undefined) {
-    ;[...contracts.values()].forEach((c) => {
-      typeAbi = c.abi?.messages.find((it) => it.opcode === opcode)
-    })
+    for (const contract of [...contracts.values()]) {
+      typeAbi = contract.abi?.messages.find((it) => it.opcode === opcode)
+    }
   }
   const opcodeName = typeAbi?.name
   const knownExitCodes = targetContract?.abi?.exitCodes
@@ -118,13 +69,11 @@ export function TransactionDetails({
           <ContractChip
             address={tx.transaction.inMessage?.info.src?.toString()}
             contracts={contracts}
-            onContractClick={onContractClick}
           />
           {" → "}
           <ContractChip
             address={tx.transaction.inMessage?.info.dest?.toString()}
             contracts={contracts}
-            onContractClick={onContractClick}
           />
         </div>
       </div>
@@ -311,7 +260,6 @@ export function TransactionDetails({
               actions={tx.outActions}
               contracts={contracts}
               contractAddress={tx.address?.toString() ?? ""}
-              onContractClick={onContractClick}
             />
           </div>
         </div>
@@ -324,5 +272,49 @@ export function TransactionDetails({
         </div>
       </div>
     </div>
+  )
+}
+
+function formatDetailedTimestamp(
+  timestampInput: number | string | undefined,
+  showShort: boolean = true,
+): JSX.Element | string {
+  if (timestampInput === undefined) return "—"
+
+  const date =
+    typeof timestampInput === "string" ? new Date(timestampInput) : new Date(timestampInput * 1000)
+
+  const pad = (num: number): string => num.toString().padStart(2, "0")
+  const monthAbbrs = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ]
+
+  const day = date.getDate()
+  const monthIndex = date.getMonth()
+  const monthNum = monthIndex + 1
+  const year = date.getFullYear()
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const seconds = date.getSeconds()
+
+  const fullPart = `${pad(day)}.${pad(monthNum)}.${year}, ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  const shortPart = `${pad(day)} ${monthAbbrs[monthIndex]}, ${pad(hours)}:${pad(minutes)}`
+
+  return (
+    <>
+      {fullPart}
+      {showShort && <span className={styles.timestampDetailSecondary}> — {shortPart}</span>}
+    </>
   )
 }

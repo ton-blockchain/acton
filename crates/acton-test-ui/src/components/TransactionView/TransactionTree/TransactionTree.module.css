@@ -190,6 +190,6 @@
 }
 
 .contractStateData {
-  font-family: var(--font-mono), "monospace";
+  font-family: var(--font-mono), monospace;
   font-size: 0.75rem;
 }

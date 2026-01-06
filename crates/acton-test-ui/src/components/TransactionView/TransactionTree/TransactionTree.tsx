@@ -37,35 +37,6 @@ interface TransactionTreeProps {
   readonly contracts: Map<string, ContractData>
 }
 
-const formatAddress = (
-  address: Address | undefined,
-  contracts: Map<string, ContractData>,
-): string => {
-  if (!address) {
-    return "unknown"
-  }
-
-  const addressStr = address.toString()
-  const meta = contracts.get(addressStr)
-  if (meta) {
-    const name = meta.displayName
-    if (name !== "Unknown Contract") {
-      return name
-    }
-  }
-
-  return `${addressStr.slice(0, 5)}...${addressStr.slice(-5)}`
-}
-
-const formatAddressShort = (address: Address | undefined): string => {
-  if (!address) {
-    return "unknown"
-  }
-
-  const addressStr = address.toString()
-  return `${addressStr.slice(0, 5)}...${addressStr.slice(-5)}`
-}
-
 function TransactionTooltipContent({ data }: { data: TransactionTooltipData }): React.JSX.Element {
   return (
     <div className={styles.tooltipContent}>
@@ -195,7 +166,7 @@ export function TransactionTree({
 
     const tooltipData: TransactionTooltipData = {
       fromAddress: tx.transaction.inMessage?.info.src
-        ? formatAddressShort(tx.transaction.inMessage.info.src as Address)
+        ? formatAddress(tx.transaction.inMessage.info.src as Address, new Map())
         : "unknown",
       computePhase: {
         success: computePhase?.type === "vm" ? computePhase.success : true,
@@ -242,11 +213,9 @@ export function TransactionTree({
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
       let typeAbi = targetContract?.abi?.messages.find((it) => it.opcode === opcode)
       if (typeAbi === undefined) {
-        ;[...contracts.values()].forEach((c) => {
-          if (!typeAbi) {
-            typeAbi = c.abi?.messages.find((it) => it.opcode === opcode)
-          }
-        })
+        for (const contract of [...contracts.values()]) {
+          typeAbi = contract.abi?.messages.find((it) => it.opcode === opcode)
+        }
       }
       const opcodeName = typeAbi?.name
       const opcodeHex = opcodeName ?? (opcode !== undefined ? `0x${opcode.toString(16)}` : "empty")
@@ -585,4 +554,21 @@ export function TransactionTree({
       )}
     </div>
   )
+}
+
+function formatAddress(address: Address | undefined, contracts: Map<string, ContractData>): string {
+  if (!address) {
+    return "unknown"
+  }
+
+  const addressStr = address.toString()
+  const meta = contracts.get(addressStr)
+  if (meta) {
+    const name = meta.displayName
+    if (name !== "Unknown Contract") {
+      return name
+    }
+  }
+
+  return `${addressStr.slice(0, 5)}...${addressStr.slice(-5)}`
 }
