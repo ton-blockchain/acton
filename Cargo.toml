@@ -2,9 +2,13 @@
 name = "acton"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.90.0"
 
 [workspace]
 members = ["crates/*"]
+
+[workspace.package]
+rust-version = "1.90.0"
 
 # experimental projects
 exclude = [
