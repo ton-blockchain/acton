@@ -1,5 +1,5 @@
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Sidebar } from "./components/Sidebar/Sidebar"
 import { TestDetails } from "./components/TestDetails/TestDetails"
 import type { TestReport, Trace } from "./types"
@@ -11,23 +11,7 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [detailsLoading, setDetailsLoading] = useState(false)
 
-  useEffect(() => {
-    fetch("/api/reports")
-      .then((res) => res.json())
-      .then((data) => {
-        setReports(data)
-        if (data.length > 0 && !selectedTest) {
-          handleSelectTest(data[0])
-        }
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error("Failed to fetch reports", err)
-        setLoading(false)
-      })
-  }, [])
-
-  const handleSelectTest = (test: TestReport) => {
+  const handleSelectTest = useCallback((test: TestReport) => {
     setSelectedTest(test)
     if (test.trace_path) {
       setDetailsLoading(true)
@@ -45,7 +29,23 @@ export const App: React.FC = () => {
     } else {
       setCurrentTrace(null)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/reports")
+      .then((res) => res.json())
+      .then((data) => {
+        setReports(data)
+        if (data.length > 0 && !selectedTest) {
+          handleSelectTest(data[0])
+        }
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error("Failed to fetch reports", err)
+        setLoading(false)
+      })
+  }, [handleSelectTest, selectedTest])
 
   if (loading && reports.length === 0) {
     return (

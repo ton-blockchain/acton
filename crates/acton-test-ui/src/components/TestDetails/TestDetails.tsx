@@ -19,10 +19,12 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
   const [selectedTraceIndex, setSelectedTraceIndex] = useState<number>(0)
 
   const contractNames = useMemo(() => trace?.contracts ?? [], [trace])
-  const { contracts: backendContracts, loading: contractsLoading } = useContracts(contractNames)
+  const { contracts: backendContracts } = useContracts(contractNames)
 
   useEffect(() => {
-    setSelectedTraceIndex(0)
+    if (trace) {
+      setSelectedTraceIndex(0)
+    }
   }, [trace])
 
   const parsedTransactions = useMemo(() => {
@@ -96,7 +98,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
         if (!content) return null
 
         return (
-          <div key={idx} className={styles.txLogs}>
+          <div key={tx.lt} className={styles.txLogs}>
             <div className={styles.txHeader}>
               <span>Transaction #{idx + 1}</span>
               {tx.dest_contract_info && (
@@ -162,9 +164,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
 
       {trace && trace.traces.length > 1 && (
         <div className={styles.traceSelector}>
-          {trace.traces.map((_, index) => (
+          {trace.traces.map((_t, index) => (
             <button
-              key={index}
+              key={`${trace.name}-${index}`}
               type="button"
               className={`${styles.traceTab} ${selectedTraceIndex === index ? styles.activeTraceTab : ""}`}
               onClick={() => setSelectedTraceIndex(index)}

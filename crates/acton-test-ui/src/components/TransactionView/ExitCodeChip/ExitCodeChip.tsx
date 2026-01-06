@@ -10,7 +10,9 @@ interface ExitCodeChipProps {
 
 export const ExitCodeChip: React.FC<ExitCodeChipProps> = ({ exitCode, exitCodes }) => {
   const isSuccess = exitCode === 0 || exitCode === 1
-  const standardDesc = (EXIT_CODE_DESCRIPTIONS as any)[exitCode]
+  const standardDesc = (
+    EXIT_CODE_DESCRIPTIONS as Record<number, { name: string; description: string; phase: string }>
+  )[exitCode]
   const customDesc = exitCodes?.[exitCode]
 
   return (

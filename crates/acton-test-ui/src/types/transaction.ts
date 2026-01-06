@@ -15,11 +15,21 @@ export interface TransactionInfo {
   children: readonly TransactionInfo[]
 }
 
+export interface AbiMessage {
+  readonly name: string
+  readonly opcode: number | undefined
+}
+
+export interface Abi {
+  readonly messages: AbiMessage[]
+  readonly exitCodes?: Record<number, string>
+}
+
 export interface ContractData {
   readonly displayName: string
   readonly address: Address
   readonly letter: string
-  readonly abi?: any
+  readonly abi?: Abi
 }
 
 export const SEND_MODE_CONSTANTS = {
@@ -59,7 +69,7 @@ export interface SendModeInfo {
 export function parseSendMode(mode: number): SendModeInfo[] {
   const flags: SendModeInfo[] = []
   for (const [value, constant] of Object.entries(SEND_MODE_CONSTANTS)) {
-    const flagValue = Number.parseInt(value)
+    const flagValue = Number.parseInt(value, 10)
     if (flagValue === 0) continue
     if (mode & flagValue) {
       flags.push({ name: constant.name, value: flagValue, description: constant.description })

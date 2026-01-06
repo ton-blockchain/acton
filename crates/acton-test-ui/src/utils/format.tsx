@@ -1,4 +1,3 @@
-import type { Address, ExternalAddress } from "@ton/core"
 import type React from "react"
 
 export const formatCurrency = (value: bigint | undefined): string => {

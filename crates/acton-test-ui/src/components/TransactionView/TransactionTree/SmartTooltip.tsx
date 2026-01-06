@@ -159,6 +159,9 @@ export function SmartTooltip({
       {bridgeRect && (
         <div
           ref={bridgeRef}
+          role="button"
+          tabIndex={-1}
+          aria-label="Tooltip bridge"
           className={`${styles.bridge} ${styles[`bridge--${position.placement}`]}`}
           style={{
             left: bridgeRect.x,
@@ -173,6 +176,7 @@ export function SmartTooltip({
 
       <div
         ref={tooltipRef}
+        role="tooltip"
         className={`${styles.tooltip} ${styles[`tooltip--${position.placement}`]} ${isVisible ? styles.tooltipVisible : ""}`}
         style={{
           left: position.x,

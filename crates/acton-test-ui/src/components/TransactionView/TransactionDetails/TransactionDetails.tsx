@@ -58,7 +58,6 @@ const formatDetailedTimestamp = (
 
 export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
-  readonly transactions: TransactionInfo[]
   readonly contracts: Map<string, ContractData>
   readonly onContractClick?: (address: string) => void
 }
@@ -67,7 +66,6 @@ export function TransactionDetails({
   tx,
   contracts,
   onContractClick,
-  transactions,
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
 
@@ -98,10 +96,10 @@ export function TransactionDetails({
 
   const thisAddress = tx.address
   const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-  let typeAbi = targetContract?.abi?.messages.find((it: any) => it.opcode === opcode)
+  let typeAbi = targetContract?.abi?.messages.find((it) => it.opcode === opcode)
   if (typeAbi === undefined) {
     ;[...contracts.values()].forEach((c) => {
-      typeAbi = c.abi?.messages.find((it: any) => it.opcode === opcode)
+      typeAbi = c.abi?.messages.find((it) => it.opcode === opcode)
     })
   }
   const opcodeName = typeAbi?.name
@@ -285,6 +283,7 @@ export function TransactionDetails({
                   {formatNumber(tx.outActions.length)}
                   {tx.outActions.length > 0 && (
                     <button
+                      type="button"
                       onClick={() => {
                         setShowActions(!showActions)
                       }}

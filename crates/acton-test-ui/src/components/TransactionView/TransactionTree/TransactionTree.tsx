@@ -3,7 +3,12 @@
 import type { Address } from "@ton/core"
 import type React from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { type RawNodeDatum, Tree, type TreeLinkDatum } from "react-d3-tree"
+import {
+  type CustomNodeElementProps,
+  type RawNodeDatum,
+  Tree,
+  type TreeLinkDatum,
+} from "react-d3-tree"
 import type { ContractData, TransactionInfo } from "../../../types/transaction"
 import { formatCurrency } from "../../../utils/format"
 import { getTransactionOpcode } from "../../../utils/transaction"
@@ -49,7 +54,7 @@ const formatAddress = (
     }
   }
 
-  return addressStr.slice(0, 5) + "..." + addressStr.slice(-5)
+  return `${addressStr.slice(0, 5)}...${addressStr.slice(-5)}`
 }
 
 const formatAddressShort = (address: Address | undefined): string => {
@@ -58,7 +63,7 @@ const formatAddressShort = (address: Address | undefined): string => {
   }
 
   const addressStr = address.toString()
-  return addressStr.slice(0, 5) + "..." + addressStr.slice(-5)
+  return `${addressStr.slice(0, 5)}...${addressStr.slice(-5)}`
 }
 
 function TransactionTooltipContent({ data }: { data: TransactionTooltipData }): React.JSX.Element {
@@ -187,7 +192,6 @@ export function TransactionTree({
 
     const description = tx.transaction.description
     const computePhase = description.type === "generic" ? description.computePhase : undefined
-    const actionPhase = description.type === "generic" ? description.actionPhase : undefined
 
     const tooltipData: TransactionTooltipData = {
       fromAddress: tx.transaction.inMessage?.info.src
@@ -223,7 +227,6 @@ export function TransactionTree({
 
       const description = tx.transaction.description
       const computePhase = description.type === "generic" ? description.computePhase : undefined
-      const actionPhase = description.type === "generic" ? description.actionPhase : undefined
 
       const inMessage = tx.transaction.inMessage
       const withInitCode = inMessage?.init?.code !== undefined
@@ -237,16 +240,16 @@ export function TransactionTree({
       const opcode = getTransactionOpcode(tx.transaction)
 
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-      let typeAbi = targetContract?.abi?.messages.find((it: any) => it.opcode === opcode)
+      let typeAbi = targetContract?.abi?.messages.find((it) => it.opcode === opcode)
       if (typeAbi === undefined) {
         ;[...contracts.values()].forEach((c) => {
           if (!typeAbi) {
-            typeAbi = c.abi?.messages.find((it: any) => it.opcode === opcode)
+            typeAbi = c.abi?.messages.find((it) => it.opcode === opcode)
           }
         })
       }
       const opcodeName = typeAbi?.name
-      const opcodeHex = opcodeName ?? (opcode !== undefined ? "0x" + opcode.toString(16) : "empty")
+      const opcodeHex = opcodeName ?? (opcode !== undefined ? `0x${opcode.toString(16)}` : "empty")
 
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
 
@@ -312,11 +315,7 @@ export function TransactionTree({
     }
   }, [rootTransactions, contracts, selectedTransaction])
 
-  const renderCustomNodeElement = ({
-    nodeDatum,
-  }: {
-    nodeDatum: RawNodeDatum
-  }): React.JSX.Element => {
+  const renderCustomNodeElement = ({ nodeDatum }: CustomNodeElementProps): React.JSX.Element => {
     if (nodeDatum.attributes?.isRoot === "true") {
       return (
         <g>
@@ -363,6 +362,7 @@ export function TransactionTree({
               xmlns="http://www.w3.org/2000/svg"
               className={styles.iconSvg}
             >
+              <title>Internal Out</title>
               <path
                 d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
                 fill="var(--text-muted)"
@@ -394,7 +394,7 @@ export function TransactionTree({
     }
 
     const opcode = (nodeDatum.attributes?.opcode as string | undefined) ?? "empty opcode"
-    const isNumberOpcode = !Number.isNaN(Number.parseInt(opcode))
+    const isNumberOpcode = !Number.isNaN(Number.parseInt(opcode, 10))
     const isSelected = nodeDatum.attributes?.isSelected as boolean
     const lt = nodeDatum.attributes?.lt as string
     const tx = transactionMap.get(lt)
@@ -415,6 +415,7 @@ export function TransactionTree({
             xmlns="http://www.w3.org/2000/svg"
             className={styles.iconSvg}
           >
+            <title>External Out</title>
             <path
               d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
               fill="var(--text-muted)"
@@ -423,6 +424,9 @@ export function TransactionTree({
         </foreignObject>
         <circle
           r={15}
+          role="button"
+          tabIndex={0}
+          aria-label={`Transaction ${lt}`}
           fill={
             isSelected
               ? "var(--text-primary)"
@@ -435,6 +439,11 @@ export function TransactionTree({
           onClick={() => {
             handleNodeClick(lt)
           }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              handleNodeClick(lt)
+            }
+          }}
           onMouseEnter={(event) => {
             if (!tx) return
             showTransactionTooltip(event, tx)
@@ -442,7 +451,7 @@ export function TransactionTree({
           onMouseLeave={() => {
             hideTooltip()
           }}
-          className={styles.nodeCircle}
+          className={isSelected ? styles.nodeCircleSelected : styles.nodeCircle}
         />
 
         <text
@@ -460,6 +469,7 @@ export function TransactionTree({
         <foreignObject width="150" height="100" x="-180" y="-40">
           <div
             className={styles.edgeText}
+            role="note"
             onMouseEnter={(event) => {
               if (!tx) return
               showTransactionTooltip(event, tx)
@@ -493,11 +503,11 @@ export function TransactionTree({
 
   const getDynamicPathClass = ({ target }: TreeLinkDatum): string => {
     const attributes = target.data.attributes
-    if (attributes && attributes.withInitCode) {
-      return styles.edgeStyle + ` ${styles.edgeStyleWithInit}`
+    if (attributes?.withInitCode) {
+      return `${styles.edgeStyle} ${styles.edgeStyleWithInit}`
     }
-    if (attributes && attributes.isBounced) {
-      return styles.edgeStyle + ` ${styles.edgeStyleBounced}`
+    if (attributes?.isBounced) {
+      return `${styles.edgeStyle} ${styles.edgeStyleBounced}`
     }
 
     return styles.edgeStyle
@@ -507,8 +517,10 @@ export function TransactionTree({
 
   useEffect(() => {
     // deselect transaction if we select other transaction details
-    setSelectedTransaction(undefined)
-  }, [transactions])
+    if (transactions.length >= 0) {
+      setSelectedTransaction(undefined)
+    }
+  }, [transactions.length])
 
   return (
     <div className={styles.container}>
@@ -539,7 +551,7 @@ export function TransactionTree({
             }}
             nodeSize={{ x: 200, y: 120 }}
             separation={{ siblings: 0.7, nonSiblings: 1 }}
-            renderCustomNodeElement={renderCustomNodeElement as any}
+            renderCustomNodeElement={renderCustomNodeElement}
             pathClassFunc={getDynamicPathClass}
             translate={{ x: 50, y: treeDimensions.height / 2 }}
             zoom={1}
@@ -568,11 +580,7 @@ export function TransactionTree({
 
       {selectedTransaction && (
         <div className={styles.transactionDetails}>
-          <TransactionDetails
-            tx={selectedTransaction}
-            transactions={transactions}
-            contracts={contracts}
-          />
+          <TransactionDetails tx={selectedTransaction} contracts={contracts} />
         </div>
       )}
     </div>

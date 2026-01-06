@@ -37,6 +37,11 @@
       "quoteProperties": "asNeeded"
     }
   },
+  "css": {
+    "parser": {
+      "cssModules": true
+    }
+  },
   "files": {
     "includes": ["**", "!**/dist", "!**/node_modules"]
   }
