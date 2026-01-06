@@ -1,6 +1,7 @@
 use crate::commands::test::TestDescriptor;
 use crate::context::{AssertFailure, BuildCache, Emulations, KnownAddresses};
 use abi::ContractAbi;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
@@ -12,6 +13,7 @@ pub mod console;
 pub mod dot;
 pub mod junit;
 pub mod teamcity;
+pub mod ui;
 
 #[derive(Debug, Clone)]
 pub struct TestExecutionContext {
@@ -28,23 +30,32 @@ pub struct TestExecutionContext {
     pub known_code_cells: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TestReport {
     pub name: String,
     pub suite_name: String,
+    #[serde(skip)]
     pub file_path: String,
+    #[serde(skip)]
     pub duration: Duration,
+    #[serde(skip)]
     pub gas_limit: Option<u64>,
     pub status: TestStatus,
     pub message: Option<String>,
+    #[serde(skip)]
     pub details: Option<String>,
+    #[serde(skip)]
     pub abi: ContractAbi,
+    #[serde(skip)]
     pub source_map: SourceMap,
+    #[serde(skip)]
     pub backtrace: Option<String>,
+    #[serde(skip)]
     pub execution: Option<TestExecutionContext>,
+    pub trace_path: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum TestStatus {
     Passed,
     Failed,

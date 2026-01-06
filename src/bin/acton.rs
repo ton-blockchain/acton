@@ -247,6 +247,12 @@ enum Commands {
             value_name = "RULE"
         )]
         disable_rule: Vec<String>,
+        #[arg(
+            long,
+            help = "Open test results in a browser",
+            help_heading = "Reporting"
+        )]
+        ui: bool,
     },
     #[command(
         about = "Generate wrapper and optionally stub test file for a contract",
@@ -1031,6 +1037,7 @@ fn main() {
             disable_rule,
             fail_fast,
             fork_block_number,
+            ui,
         } => {
             let config = create_test_config(
                 filter,
@@ -1057,6 +1064,7 @@ fn main() {
                 mutate_contract,
                 disable_rule,
                 Some(fail_fast),
+                ui,
             );
 
             if mutate {
@@ -1365,6 +1373,7 @@ fn create_test_config(
     mutate_contract: Option<String>,
     disable_rules: Vec<String>,
     fail_fast: Option<bool>,
+    ui: bool,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -1404,6 +1413,7 @@ fn create_test_config(
             mutate_contract,
             disable_rules,
             fail_fast,
+            ui,
         );
     }
 
@@ -1432,5 +1442,6 @@ fn create_test_config(
         mutate_contract,
         disable_rules,
         fail_fast: fail_fast.unwrap_or(false),
+        ui,
     }
 }

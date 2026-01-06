@@ -23,3 +23,6 @@ Thumbs.db
 *.mnemonic
 wallets.toml
 global.wallets.toml
+
+crates/acton-test-ui/node_modules
+crates/acton-test-ui/dist

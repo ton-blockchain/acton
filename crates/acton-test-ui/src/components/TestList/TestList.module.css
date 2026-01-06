@@ -1,0 +1,89 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item {
+  background: var(--card-bg);
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: var(--shadow);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info {
+  flex-grow: 1;
+}
+
+.name {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.suite {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+.actions {
+  margin-top: 10px;
+}
+
+.actionLink {
+  font-size: 0.85em;
+  color: var(--link-color);
+  background: none;
+  border: 1px solid var(--link-color);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.actionLink:hover {
+  background-color: var(--link-color);
+  color: #fff;
+}
+
+.status {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.85em;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.statusPassed {
+  background-color: var(--color-passed-bg);
+  color: var(--color-passed-text);
+}
+
+.statusFailed {
+  background-color: var(--color-failed-bg);
+  color: var(--color-failed-text);
+}
+
+.statusSkipped {
+  background-color: var(--color-skipped-bg);
+  color: var(--color-skipped-text);
+}
+
+.statusTodo {
+  background-color: var(--color-todo-bg);
+  color: var(--color-todo-text);
+}
+
+.errorMessage {
+  margin-top: 10px;
+  padding: 10px;
+  background: #fff5f5;
+  border-left: 4px solid var(--color-failed);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  color: #c0392b;
+}

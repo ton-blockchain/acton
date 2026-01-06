@@ -1,0 +1,87 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.backLink {
+  background: none;
+  border: none;
+  color: var(--link-color);
+  font-size: 0.9em;
+  cursor: pointer;
+  padding: 0;
+}
+
+.txCard {
+  background: var(--card-bg);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+
+.txHeader {
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.txTitle {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.contractName {
+  color: #e67e22;
+  font-family: var(--font-mono);
+}
+
+.logSection {
+  margin-top: 15px;
+}
+
+.logTitle {
+  font-size: 0.8em;
+  font-weight: bold;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.pre {
+  background: #2d3436;
+  color: #dfe6e9;
+  padding: 15px;
+  border-radius: 5px;
+  font-size: 0.85em;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.txMeta {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+.tag {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.tagDest {
+  background: #e1f5fe;
+  color: #01579b;
+}

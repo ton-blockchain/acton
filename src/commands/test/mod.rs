@@ -9,6 +9,7 @@ use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
 use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
 use crate::commands::test::reporting::teamcity::TeamCityReporter;
+use crate::commands::test::reporting::ui::{UiReporter, start_ui_server};
 use crate::commands::test::reporting::{
     ReporterManager, TestExecutionContext, TestReport, TestStatus, TestSuiteStats,
     extract_suite_name,
@@ -63,17 +64,19 @@ mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
-#[derive(clap::ValueEnum, Debug, Clone, PartialEq)]
+#[derive(clap::ValueEnum, Debug, Clone, PartialEq, Default)]
 #[clap(rename_all = "lowercase")]
 pub enum ReportFormat {
+    #[default]
     Console,
     TeamCity,
     JUnit,
     Dot,
 }
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum CoverageFormat {
+    #[default]
     Lcov,
     Text,
 }
@@ -87,8 +90,9 @@ impl std::fmt::Display for CoverageFormat {
     }
 }
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum BacktraceMode {
+    #[default]
     Full,
 }
 
@@ -100,7 +104,7 @@ impl std::fmt::Display for BacktraceMode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TestConfig {
     pub report_formats: Vec<ReportFormat>,
     pub debug: bool,
@@ -126,6 +130,7 @@ pub struct TestConfig {
     pub mutate_contract: Option<String>,
     pub disable_rules: Vec<String>,
     pub fail_fast: bool,
+    pub ui: bool,
 }
 
 #[derive(Debug)]
@@ -228,12 +233,20 @@ impl<'a> TestRunner<'a> {
         }
     }
 
-    fn setup_reporters(reporter_manager: &mut ReporterManager, config: &TestConfig) {
+    fn setup_reporters(
+        reporter_manager: &mut ReporterManager,
+        config: &TestConfig,
+        ui_reporter: Option<UiReporter>,
+    ) {
         if config.report_formats.is_empty()
             || config.report_formats.contains(&ReportFormat::Console)
         {
             let console_config = ConsoleConfig { show_output: true };
             reporter_manager.add_reporter(Box::new(ConsoleReporter::new(console_config)));
+        }
+
+        if let Some(ui_reporter) = ui_reporter {
+            reporter_manager.add_reporter(Box::new(ui_reporter));
         }
 
         if config.report_formats.contains(&ReportFormat::TeamCity) {
@@ -474,8 +487,16 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 
     let acton_config = ActonConfig::load()?;
 
+    let ui_reporter = if config.ui {
+        Some(UiReporter::new())
+    } else {
+        None
+    };
+
+    let reports_for_ui = ui_reporter.as_ref().map(|r| r.get_reports_arc());
+
     let mut global_reporter = ReporterManager::new();
-    TestRunner::setup_reporters(&mut global_reporter, config);
+    TestRunner::setup_reporters(&mut global_reporter, config, ui_reporter);
     global_reporter.init()?;
     global_reporter.on_testing_started()?;
 
@@ -566,6 +587,17 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     }
 
     global_reporter.finalize()?;
+
+    if config.ui
+        && let Some(reports_arc) = reports_for_ui
+    {
+        let reports = reports_arc.lock().unwrap().clone();
+        let trace_dir = config.save_test_trace.clone();
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?;
+        rt.block_on(async { start_ui_server(reports, trace_dir).await })?;
+    }
 
     if let Some(filter) = &config.filter
         && total_tests == 0
@@ -841,6 +873,11 @@ fn run_file_tests(
             source_map: source_map.clone(),
             backtrace: runner.config.backtrace.as_ref().map(|b| b.to_string()),
             execution: None,
+            trace_path: runner
+                .config
+                .save_test_trace
+                .as_ref()
+                .map(|_| format!("{}_trace.json", test.name)),
         };
 
         runner.reporter_manager.on_test_started(&test_report)?;

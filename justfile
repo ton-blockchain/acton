@@ -48,6 +48,10 @@ coverage-clean:
 
 clean:
     cargo clean
+    rm -rf crates/acton-test-ui/dist
+
+build-ui:
+    cd crates/acton-test-ui && bun run build
 
 precommit:
-    just build && just check
+    just build && just check && just build-ui

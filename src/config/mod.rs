@@ -116,6 +116,7 @@ pub struct TestSettings {
     pub fork_block_number: Option<u64>,
     pub mutation: Option<MutationConfig>,
     pub fail_fast: Option<bool>,
+    pub ui: Option<bool>,
     #[serde(flatten)]
     pub metadata: BTreeMap<String, toml::Value>,
 }
@@ -420,6 +421,7 @@ impl TestSettings {
         mutate_contract_override: Option<String>,
         disable_rules_override: Vec<String>,
         fail_fast_override: Option<bool>,
+        ui_override: bool,
     ) -> TestConfig {
         let mut final_report_formats = Vec::new();
 
@@ -505,6 +507,7 @@ impl TestSettings {
                     .unwrap_or_default()
             },
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
+            ui: ui_override || self.ui.unwrap_or(false),
         }
     }
 }

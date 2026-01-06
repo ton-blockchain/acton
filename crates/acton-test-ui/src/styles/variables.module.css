@@ -1,0 +1,37 @@
+:root {
+  --bg-color: #f4f7f6;
+  --card-bg: #ffffff;
+  --text-primary: #2c3e50;
+  --text-secondary: #7f8c8d;
+  --text-muted: #95a5a6;
+
+  --color-passed: #27ae60;
+  --color-passed-bg: #d4edda;
+  --color-passed-text: #155724;
+
+  --color-failed: #e74c3c;
+  --color-failed-bg: #f8d7da;
+  --color-failed-text: #721c24;
+
+  --color-skipped: #f39c12;
+  --color-skipped-bg: #fff3cd;
+  --color-skipped-text: #856404;
+
+  --color-todo: #3498db;
+  --color-todo-bg: #d1ecf1;
+  --color-todo-text: #0c5460;
+
+  --link-color: #3498db;
+  --border-color: #eeeeee;
+  --shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+
+  --font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Fira Code", "Source Code Pro", Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+.variables {
+  /* This is just a placeholder to export variables if needed via CSS modules, 
+     but mostly we'll use them via var() */
+  display: none;
+}
