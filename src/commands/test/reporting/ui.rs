@@ -55,6 +55,7 @@ pub async fn start_ui_server(
     let app = Router::new()
         .route("/api/reports", get(handle_api_reports))
         .route("/api/trace/{name}", get(handle_api_trace))
+        .route("/api/contract/{name}", get(handle_api_contract))
         .fallback_service(
             ServeDir::new(dist_path)
                 .fallback(ServeDir::new("crates/acton-test-ui/dist/index.html")),
@@ -94,5 +95,26 @@ async fn handle_api_trace(
             Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Invalid trace JSON").into_response(),
         },
         Err(_) => (StatusCode::NOT_FOUND, "Trace not found").into_response(),
+    }
+}
+
+async fn handle_api_contract(
+    AxumPath(name): AxumPath<String>,
+    State(state): State<Arc<UiServerState>>,
+) -> impl IntoResponse {
+    let Some(trace_dir) = &state.trace_dir else {
+        return (StatusCode::NOT_FOUND, "Traces not enabled").into_response();
+    };
+
+    let contract_path = PathBuf::from(trace_dir)
+        .join("contracts")
+        .join(format!("{}.json", name));
+
+    match tokio::fs::read_to_string(contract_path).await {
+        Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
+            Ok(json) => Json(json).into_response(),
+            Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Invalid contract JSON").into_response(),
+        },
+        Err(_) => (StatusCode::NOT_FOUND, "Contract not found").into_response(),
     }
 }

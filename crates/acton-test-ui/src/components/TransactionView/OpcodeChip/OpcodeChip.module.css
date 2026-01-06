@@ -1,0 +1,24 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+
+.name {
+  font-weight: bold;
+  color: var(--color-todo);
+}
+
+.hex {
+  color: var(--text-secondary);
+}
+
+.empty {
+  color: var(--text-muted);
+  font-style: italic;
+}

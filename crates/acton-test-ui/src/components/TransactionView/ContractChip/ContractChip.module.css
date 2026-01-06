@@ -1,0 +1,35 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  gap: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.chip:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.letter {
+  background-color: var(--color-todo);
+  color: white;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.unknown {
+  color: var(--text-muted);
+  font-style: italic;
+}

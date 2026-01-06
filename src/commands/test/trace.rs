@@ -1,5 +1,6 @@
 use crate::commands::test::{Pos, TestDescriptor};
-use crate::context::{BuildCache, to_cell};
+use crate::context::{BuildCache, KnownAddresses, to_cell};
+use abi::ContractAbi;
 use emulator::emulator::SendMessageResult;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -7,13 +8,15 @@ use std::fs;
 use std::path::Path;
 use ton_source_map::SourceMap;
 use tycho_types::boc::Boc;
+use tycho_types::models::IntAddr;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TestTrace {
     pub name: String,
     pub pos: Pos,
-    pub txs: TransactionList,
-    pub contracts: Vec<ContractInfo>,
+    pub traces: Vec<TransactionList>,
+    pub contracts: Vec<String>,
+    pub wallets: BTreeMap<String, String>, // Address -> Name
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,13 +29,15 @@ pub struct ContractInfo {
     pub name: String,
     pub code_boc64: String,
     pub source_map: SourceMap,
+    pub abi: Option<ContractAbi>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TransactionInfo {
+    pub lt: String,
     pub raw_transaction: String,
-    pub parent_transaction: Option<u64>,
-    pub child_transactions: Vec<u64>,
+    pub parent_transaction: Option<String>,
+    pub child_transactions: Vec<String>,
     pub shard_account_before: String,
     pub shard_account: String,
     pub vm_log_diff: String,
@@ -44,51 +49,74 @@ pub struct TransactionInfo {
 pub fn dump_test_transactions(
     test: &TestDescriptor,
     build_cache: &BuildCache,
+    known_addresses: &KnownAddresses,
     txs: &[Vec<SendMessageResult>],
     output_dir: &str,
 ) -> anyhow::Result<()> {
     let mut known_contracts = BTreeMap::new();
 
-    let txs = txs
+    let traces = txs
         .iter()
-        .flatten()
-        .flat_map(|tx| {
-            let SendMessageResult::Success(tx) = tx else {
-                return None;
-            };
+        .map(|txs| {
+            let transactions = txs
+                .iter()
+                .flat_map(|tx| {
+                    let SendMessageResult::Success(tx) = tx else {
+                        return None;
+                    };
 
-            let build = build_cache.result_for_code(&tx.code);
+                    let build = build_cache.result_for_code(&tx.code);
 
-            let contract_info = build.map(|(_, info)| ContractInfo {
-                name: info.name.clone(),
-                code_boc64: info.code_boc64.clone(),
-                source_map: info.source_map.clone(),
-            });
+                    let contract_info = build.map(|(_, info)| ContractInfo {
+                        name: info.name.clone(),
+                        code_boc64: info.code_boc64.clone(),
+                        source_map: info.source_map.clone(),
+                        abi: info.abi.clone(),
+                    });
 
-            if let Some(contract_info) = &contract_info {
-                known_contracts.insert(contract_info.name.clone(), contract_info.clone());
-            }
+                    if let Some(contract_info) = &contract_info {
+                        known_contracts.insert(contract_info.name.clone(), contract_info.clone());
+                    }
 
-            Some(TransactionInfo {
-                raw_transaction: tx.raw_transaction.clone(),
-                parent_transaction: tx.parent_transaction,
-                dest_contract_info: contract_info.as_ref().map(|info| info.name.clone()),
-                child_transactions: tx.child_transactions.clone(),
-                shard_account_before: Boc::encode_hex(to_cell(&tx.shard_account_before)),
-                shard_account: Boc::encode_hex(to_cell(&tx.shard_account)),
-                vm_log_diff: vmlogs::convert_to_diff_logs(&tx.vm_log),
-                executor_logs: tx.executor_logs.clone(),
-                actions: tx.actions.clone(),
-            })
+                    Some(TransactionInfo {
+                        lt: tx.transaction.lt.to_string(),
+                        raw_transaction: tx.raw_transaction.clone(),
+                        parent_transaction: tx.parent_transaction.map(|lt| lt.to_string()),
+                        dest_contract_info: contract_info.as_ref().map(|info| info.name.clone()),
+                        child_transactions: tx
+                            .child_transactions
+                            .iter()
+                            .map(|lt| lt.to_string())
+                            .collect(),
+                        shard_account_before: Boc::encode_hex(to_cell(&tx.shard_account_before)),
+                        shard_account: Boc::encode_hex(to_cell(&tx.shard_account)),
+                        vm_log_diff: vmlogs::convert_to_diff_logs(&tx.vm_log),
+                        executor_logs: tx.executor_logs.clone(),
+                        actions: tx.actions.clone(),
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            TransactionList { transactions }
         })
         .collect::<Vec<_>>();
 
-    let list = TransactionList { transactions: txs };
+    let mut wallets = BTreeMap::new();
+    for (addr, known) in &known_addresses.addresses {
+        if let IntAddr::Std(addr) = addr {
+            wallets.insert(
+                addr.display_base64_url(true).to_string(),
+                known.name.clone(),
+            );
+        }
+    }
+
     let test_info = TestTrace {
         name: test.name.clone(),
         pos: test.pos.clone(),
-        txs: list,
-        contracts: known_contracts.values().cloned().collect(),
+        traces,
+        contracts: known_contracts.keys().cloned().collect(),
+        wallets,
     };
 
     let str = serde_json::to_string(&test_info)?;
@@ -96,6 +124,20 @@ pub fn dump_test_transactions(
     let output_path = Path::new(output_dir);
     if !output_path.exists() {
         fs::create_dir_all(output_path)?;
+    }
+
+    // Save contracts separately
+    let contracts_dir = output_path.join("contracts");
+    if !contracts_dir.exists() {
+        fs::create_dir_all(&contracts_dir)?;
+    }
+
+    for (name, info) in known_contracts {
+        let contract_file = contracts_dir.join(format!("{}.json", name));
+        if !contract_file.exists() {
+            let info_json = serde_json::to_string(&info)?;
+            fs::write(contract_file, info_json)?;
+        }
     }
 
     let filename = format!("{}_trace.json", test.name);

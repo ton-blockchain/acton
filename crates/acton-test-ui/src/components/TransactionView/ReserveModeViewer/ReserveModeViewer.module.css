@@ -1,0 +1,12 @@
+.constant {
+  color: var(--color-todo);
+  text-decoration: underline dotted;
+  cursor: help;
+  font-size: 0.85rem;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.85rem;
+}

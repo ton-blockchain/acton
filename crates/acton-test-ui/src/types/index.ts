@@ -19,11 +19,35 @@ export interface Transaction {
   readonly executor_logs: string
 }
 
+export interface TransactionList {
+  readonly transactions: BackendTransaction[]
+}
+
 export interface Trace {
   readonly name: string
-  readonly txs: {
-    readonly transactions: Transaction[]
-  }
+  readonly traces: TransactionList[]
+  readonly contracts: string[]
+  readonly wallets: Record<string, string>
+}
+
+export interface BackendContractInfo {
+  readonly name: string
+  readonly code_boc64: string
+  readonly source_map: any
+  readonly abi?: any
+}
+
+export interface BackendTransaction {
+  readonly lt: string
+  readonly raw_transaction: string
+  readonly parent_transaction: string | null
+  readonly child_transactions: string[]
+  readonly shard_account_before: string
+  readonly shard_account: string
+  readonly vm_log_diff: string
+  readonly executor_logs: string
+  readonly actions?: string
+  readonly dest_contract_info?: string
 }
 
 export interface AppState {

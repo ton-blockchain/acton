@@ -1,0 +1,28 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+
+.success {
+  background-color: var(--color-passed-bg);
+  color: var(--color-passed-text);
+}
+
+.error {
+  background-color: var(--color-failed-bg);
+  color: var(--color-failed-text);
+}
+
+.code {
+  font-weight: bold;
+}
+
+.description {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}

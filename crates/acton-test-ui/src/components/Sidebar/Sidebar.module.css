@@ -1,0 +1,87 @@
+.sidebar {
+  width: 320px;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--card-bg);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.suite {
+  margin-top: 8px;
+}
+
+.suiteHeader {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.testList {
+  display: flex;
+  flex-direction: column;
+}
+
+.testItem {
+  display: flex;
+  align-items: center;
+  padding: 6px 16px 6px 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.testItem:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.testItem.selected {
+  background-color: var(--color-todo-bg);
+  color: var(--color-todo-text);
+}
+
+.testName {
+  margin-left: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.passed {
+  color: var(--color-passed);
+}
+.failed {
+  color: var(--color-failed);
+}
+.skipped {
+  color: var(--color-skipped);
+}
+.todo {
+  color: var(--color-todo);
+}

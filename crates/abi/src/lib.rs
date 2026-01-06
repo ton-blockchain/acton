@@ -1,26 +1,30 @@
-pub mod serde;
+pub mod abi_serde;
 
 use num_bigint::BigInt;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Pos {
     pub row: usize,
     pub column: usize,
     pub uri: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Field {
     pub name: String,
     pub type_info: TypeInfo,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum BaseTypeInfo {
     Unserializable,
     Int { width: usize },
@@ -41,13 +45,15 @@ pub enum BaseTypeInfo {
     Struct { name: String },
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TypeInfo {
     pub base: BaseTypeInfo,
     pub human_readable: String,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TypeAbi {
     pub name: String,
     pub opcode: Option<u32>,
@@ -63,7 +69,8 @@ impl TypeAbi {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetMethod {
     pub name: String,
     pub id: u32,
@@ -79,19 +86,22 @@ impl GetMethod {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExitCodeInfo {
     pub constant_name: String,
     pub value: i32,
     pub usage_positions: Vec<Pos>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EntryPoint {
     pub pos: Option<Pos>,
 }
 
-#[derive(Debug, Clone, Eq, Default, PartialEq)]
+#[derive(Debug, Clone, Eq, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ContractAbi {
     pub name: String,
     pub entry_point: Option<EntryPoint>,
@@ -100,6 +110,7 @@ pub struct ContractAbi {
     pub get_methods: Vec<GetMethod>,
     pub messages: Vec<TypeAbi>,
     pub types: Vec<TypeAbi>,
+    pub exit_codes: Vec<ExitCodeInfo>,
 }
 
 impl ContractAbi {
@@ -139,6 +150,7 @@ struct AbiInfo {
     storage: Option<TypeAbi>,
     entry_point: Option<EntryPoint>,
     external_entry_point: Option<EntryPoint>,
+    exit_codes: Vec<ExitCodeInfo>,
 }
 
 #[derive(Debug)]
@@ -198,6 +210,7 @@ pub fn contract_abi(content: &str, file_path: &str) -> ContractAbi {
         storage: None,
         entry_point: None,
         external_entry_point: None,
+        exit_codes: Vec::new(),
     };
 
     for file_info in files {
@@ -217,6 +230,7 @@ pub fn contract_abi(content: &str, file_path: &str) -> ContractAbi {
         get_methods: abi_info.get_methods,
         messages: abi_info.messages,
         types: abi_info.types,
+        exit_codes: abi_info.exit_codes,
     }
 }
 
@@ -411,6 +425,7 @@ fn merge_abi_info(target: &mut AbiInfo, source: AbiInfo) {
     target.get_methods.extend(source.get_methods);
     target.messages.extend(source.messages);
     target.types.extend(source.types);
+    target.exit_codes.extend(source.exit_codes);
 
     if target.storage.is_none() && source.storage.is_some() {
         target.storage = source.storage;
@@ -431,6 +446,7 @@ fn collect_abi_info(node: &tree_sitter::Node, content: &str, file_path: &str) ->
         storage: None,
         entry_point: None,
         external_entry_point: None,
+        exit_codes: Vec::new(),
     };
 
     let mut cursor = node.walk();

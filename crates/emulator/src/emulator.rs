@@ -222,11 +222,9 @@ impl Emulator {
                 }
                 MsgInfo::Int(_) => {
                     let mut sub_results = self.send_message(state, out_msg_cell, libs, None)?;
-                    for sub_res in &mut sub_results {
-                        if let SendMessageResult::Success(res) = sub_res {
-                            res.parent_transaction = Some(main_tx.lt);
-                            child_lts.push(res.transaction.lt);
-                        }
+                    if let Some(SendMessageResult::Success(res)) = sub_results.get_mut(0) {
+                        res.parent_transaction = Some(main_tx.lt);
+                        child_lts.push(res.transaction.lt);
                     }
                     results.extend(sub_results);
                 }

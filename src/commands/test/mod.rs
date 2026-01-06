@@ -400,6 +400,7 @@ impl<'a> TestRunner<'a> {
                     trace::dump_test_transactions(
                         test,
                         ctx.build.build_cache,
+                        ctx.build.known_addresses,
                         &ctx.chain.emulations.results,
                         trace_dir,
                     )?;
@@ -423,6 +424,7 @@ impl<'a> TestRunner<'a> {
                     trace::dump_test_transactions(
                         test,
                         ctx.build.build_cache,
+                        ctx.build.known_addresses,
                         &ctx.chain.emulations.results,
                         trace_dir,
                     )?;
@@ -992,12 +994,14 @@ fn run_file_tests(
             if let GetMethodResult::Success(get_result) = get_result {
                 runner.emulations.get_results.push(get_result);
                 // TODO: remove this memoize somehow
+                let content = fs::read_to_string(file_path).unwrap_or_default();
                 runner.build_cache.memoize(
                     &test.name,
                     file_path,
                     &code_cell.to_boc_b64(false)?,
                     &code_cell.cell_hash()?.to_hex().to_ascii_uppercase(),
                     source_map.clone(),
+                    Some(contract_abi(&content, file_path)),
                 )
             }
         }

@@ -177,6 +177,7 @@ impl BuildCache {
         code: &str,
         code_hash: &str,
         source_map: SourceMap,
+        abi: Option<ContractAbi>,
     ) {
         self.built.insert(
             path.to_owned(),
@@ -185,6 +186,7 @@ impl BuildCache {
                 code_boc64: code.to_owned(),
                 code_hash: code_hash.to_owned(),
                 source_map,
+                abi,
             },
         );
     }
@@ -205,6 +207,7 @@ pub struct CompilationResult {
     pub code_boc64: String,
     pub code_hash: String,
     pub source_map: SourceMap,
+    pub abi: Option<ContractAbi>,
 }
 
 #[derive(Debug, Clone)]

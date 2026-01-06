@@ -9,6 +9,7 @@ dependencies = [
  "anyhow",
  "crc",
  "num-bigint",
+ "serde",
  "tolk_parser",
  "tree-sitter",
  "tycho-types",

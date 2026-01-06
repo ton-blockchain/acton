@@ -1,0 +1,176 @@
+.details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--card-bg);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.header {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.titleInfo {
+  font-size: 1rem;
+}
+
+.suiteName {
+  color: var(--text-secondary);
+}
+
+.testName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.status {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.passed {
+  background-color: var(--color-passed-bg);
+  color: var(--color-passed-text);
+}
+.failed {
+  background-color: var(--color-failed-bg);
+  color: var(--color-failed-text);
+}
+.skipped {
+  background-color: var(--color-skipped-bg);
+  color: var(--color-skipped-text);
+}
+.todo {
+  background-color: var(--color-todo-bg);
+  color: var(--color-todo-text);
+}
+
+.errorMessage {
+  margin: 16px 24px 0;
+  padding: 12px;
+  background-color: var(--color-failed-bg);
+  color: var(--color-failed-text);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.traceSelector {
+  display: flex;
+  padding: 8px 16px;
+  gap: 8px;
+  background-color: rgba(0, 0, 0, 0.01);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.traceTab {
+  padding: 4px 12px;
+  border: 1px solid var(--border-color);
+  background-color: var(--card-bg);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.traceTab:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.activeTraceTab {
+  color: var(--text-primary);
+  background-color: var(--bg-color);
+  font-weight: 600;
+  border-color: var(--color-todo);
+  box-shadow: 0 0 0 1px var(--color-todo);
+}
+
+.tabs {
+  display: flex;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid var(--border-color);
+  gap: 16px;
+}
+
+.tab {
+  padding: 6px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.activeTab {
+  color: var(--color-todo);
+  border-bottom-color: var(--color-todo);
+}
+
+.tabContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.treeWrapper {
+  height: 100%;
+  width: 100%;
+  margin: -16px;
+}
+
+.txLogs {
+  margin-bottom: 24px;
+}
+
+.txHeader {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.txDest {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: normal;
+  font-family: var(--font-mono);
+}
+
+.logContent {
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  padding: 16px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  margin-top: 40px;
+}
