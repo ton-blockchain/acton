@@ -122,7 +122,12 @@ fn test_init_symlinks_global_wallets_if_already_initialized() {
     .unwrap();
 
     // Initialize first time
-    project.acton().init().run().success();
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .init()
+        .run()
+        .success();
 
     // Remove symlink
     fs::remove_file(project.path().join("global.wallets.toml")).unwrap();
