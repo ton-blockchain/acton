@@ -4,7 +4,7 @@ use tolk_ast::{
     Assignment, BinaryOperator, BooleanLiteral, CallArgument, CastAsOperator, DotAccess,
     DotAccessField, Expression, FunctionCall, GenericInstantiation, Ident, InstanceArgument,
     IsTypeOperator, LambdaExpression, LazyExpression, MatchArm, MatchArmBody, MatchBody, MatchExpr,
-    MatchExpression, MatchPattern, NotNullOperator, NumberLiteral, NumericIndex, ObjectLiteral,
+    MatchExpression, MatchPattern, NotNullOperator, NumberLiteral, ObjectLiteral,
     ParenthesizedExpression, SetAssignment, StringLiteral, TensorExpression, TernaryOperator,
     TypedTuple, Underscore,
 };
@@ -35,7 +35,6 @@ pub fn print_expression<'a>(ctx: &mut Context, expr: &Expression) -> Option<RcDo
         Expression::NullLiteral(lit) => print_null_literal(ctx, lit),
         Expression::Underscore(und) => print_underscore(ctx, und),
         Expression::Ident(ident) => print_ident(ctx, ident),
-        Expression::NumericIndex(index) => print_numeric_index(ctx, index),
         Expression::Unmapped(node) => common::print_node_text(ctx, &node.0),
     }
 }
@@ -549,8 +548,4 @@ pub fn print_underscore<'a>(_ctx: &mut Context, _und: &Underscore) -> Option<RcD
 
 pub fn print_ident<'a>(ctx: &mut Context, ident: &Ident) -> Option<RcDoc<'a>> {
     common::print_node_text(ctx, &ident.0)
-}
-
-pub fn print_numeric_index<'a>(ctx: &mut Context, index: &NumericIndex) -> Option<RcDoc<'a>> {
-    common::print_node_text(ctx, &index.0)
 }

@@ -45,6 +45,25 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_type_instantiated_ts() {
+        // TODO: remove?
+        check(
+            "const x: Foo<> = 0;",
+            expect![[r#"
+                const x: Foo<> = 0;"#]],
+        );
+    }
+
+    #[test]
+    fn test_single_type_instantiated_ts() {
+        check(
+            "const x: Foo<int> = 0;",
+            expect![[r#"
+                const x: Foo<int> = 0;"#]],
+        );
+    }
+
+    #[test]
     fn test_type_instantiated_ts_breaking() {
         check_with_width(
             "const x: VeryLongTypeName<FirstType, SecondType, ThirdType> = 0;",
@@ -88,6 +107,14 @@ mod tests {
                 const x: () = ();"#]],
         );
     }
+    #[test]
+    fn test_single_tensor_type() {
+        check(
+            "const x: (int) = 0;",
+            expect![[r#"
+                const x: (int) = 0;"#]],
+        );
+    }
 
     #[test]
     fn test_tensor_type_breaking() {
@@ -107,6 +134,15 @@ mod tests {
             "const x: [int, slice] = 0;",
             expect![[r#"
                 const x: [int, slice] = 0;"#]],
+        );
+    }
+
+    #[test]
+    fn test_single_tuple_type() {
+        check(
+            "const x: [int] = 0;",
+            expect![[r#"
+                const x: [int] = 0;"#]],
         );
     }
 

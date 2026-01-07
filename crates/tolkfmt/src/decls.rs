@@ -535,9 +535,6 @@ where
 
 pub fn print_annotation_list<'a>(ctx: &mut Context, a: &AnnotationList) -> Option<RcDoc<'a>> {
     let annotations = a.annotations();
-    if annotations.is_empty() {
-        return Some(RcDoc::nil());
-    }
 
     let mut parts = vec![];
     for annotation in annotations {

@@ -43,6 +43,9 @@ coverage:
 coverage-html:
     cargo llvm-cov --workspace --all-features --all-targets --html -- --test-threads 1
 
+coverage-fmt-html:
+    cargo llvm-cov -p tolkfmt --all-features --all-targets --html --open
+
 coverage-clean:
     cargo llvm-cov clean
 

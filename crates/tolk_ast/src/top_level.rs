@@ -140,10 +140,11 @@ impl<'tree> FunctionBody<'tree> {
 
 impl<'t> From<Node<'t>> for FunctionBody<'t> {
     fn from(node: Node<'t>) -> Self {
-        match node.kind() {
+        let kind = node.kind();
+        match kind {
             "block_statement" => FunctionBody::BlockStatement(BlockStatement(node)),
             "asm_body" => FunctionBody::AsmBody(AsmBody(node)),
-            "builtin" => FunctionBody::BuiltinSpecifier(BuiltinSpecifier(node)),
+            "builtin_specifier" => FunctionBody::BuiltinSpecifier(BuiltinSpecifier(node)),
             _ => FunctionBody::Unmapped(RawNode::new(node)),
         }
     }
@@ -160,7 +161,10 @@ impl<'t> From<Node<'t>> for AsmBody<'t> {
 
 impl<'tree> AsmBody<'tree> {
     pub fn params(&self) -> Vec<Ident<'tree>> {
-        let Some(params_node) = self.0.child_by_field_name("params") else {
+        let Some(rearrange) = self.0.child_by_field_name("rearrange") else {
+            return vec![];
+        };
+        let Some(params_node) = rearrange.child_by_field_name("params") else {
             return vec![];
         };
         let mut cursor = params_node.walk();
@@ -172,7 +176,10 @@ impl<'tree> AsmBody<'tree> {
     }
 
     pub fn return_values(&self) -> Vec<NumberLiteral<'tree>> {
-        let Some(return_node) = self.0.child_by_field_name("return") else {
+        let Some(rearrange) = self.0.child_by_field_name("rearrange") else {
+            return vec![];
+        };
+        let Some(return_node) = rearrange.child_by_field_name("return") else {
             return vec![];
         };
         let mut cursor = return_node.walk();

@@ -99,7 +99,6 @@ pub trait Walker<'tree> {
             Expression::NullLiteral(node) => self.walk_null_literal(node),
             Expression::Underscore(node) => self.walk_underscore(node),
             Expression::Ident(node) => self.walk_ident(node),
-            Expression::NumericIndex(node) => self.walk_numeric_index(node),
             Expression::Unmapped(_) => self.default_result(),
         }
     }

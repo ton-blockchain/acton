@@ -287,6 +287,28 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_tuple_destructuring() {
+        check(
+            "fun test() { var [] = []; }",
+            expect![[r#"
+                fun test() {
+                    var [] = [];
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_single_tuple_destructuring() {
+        check(
+            "fun test() { var [a] = [1]; }",
+            expect![[r#"
+                fun test() {
+                    var [a] = [1];
+                }"#]],
+        );
+    }
+
+    #[test]
     fn test_tuple_destructuring() {
         check(
             "fun test() { var [a, b] = [1, 2]; }",
@@ -304,6 +326,28 @@ mod tests {
             expect![[r#"
                 fun test() {
                     var [a: int, b: slice] = [1, 2];
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_empty_tensor_destructuring() {
+        check(
+            "fun test() { var () = (); }",
+            expect![[r#"
+                fun test() {
+                    var () = ();
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_single_tensor_destructuring() {
+        check(
+            "fun test() { var (a) = (1); }",
+            expect![[r#"
+                fun test() {
+                    var (a) = (1);
                 }"#]],
         );
     }

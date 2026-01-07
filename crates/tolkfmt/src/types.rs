@@ -31,7 +31,10 @@ pub fn print_union_type<'a>(ctx: &mut Context, union: &UnionType) -> Option<RcDo
 
     let (first, rest) = parts_docs.split_first()?;
 
-    let first_doc = RcDoc::concat([RcDoc::flat_alt(RcDoc::text("| "), RcDoc::nil()), first.clone()]);
+    let first_doc = RcDoc::concat([
+        RcDoc::flat_alt(RcDoc::text("| "), RcDoc::nil()),
+        first.clone(),
+    ]);
 
     let mut tail_docs = vec![];
     for doc in rest {
@@ -133,11 +136,7 @@ pub fn print_fun_callable_type<'a>(ctx: &mut Context, fun: &FunCallableType) -> 
     let params_doc = print_type(ctx, &params)?;
     let ret_doc = print_type(ctx, &ret)?;
 
-    Some(RcDoc::concat([
-        params_doc,
-        RcDoc::text(" -> "),
-        ret_doc,
-    ]))
+    Some(RcDoc::concat([params_doc, RcDoc::text(" -> "), ret_doc]))
 }
 
 pub fn print_type_instantiated_ts<'a>(
@@ -179,12 +178,7 @@ pub fn print_type_instantiated_ts<'a>(
     Some(RcDoc::group(RcDoc::concat([
         name_doc,
         RcDoc::text("<"),
-        RcDoc::concat([
-            RcDoc::softline_(),
-            first.clone(),
-            RcDoc::concat(tail_docs),
-        ])
-        .nest(4),
+        RcDoc::concat([RcDoc::softline_(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
         RcDoc::softline_(),
         RcDoc::text(">"),
     ])))

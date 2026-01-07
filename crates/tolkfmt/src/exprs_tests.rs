@@ -10,7 +10,7 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
@@ -144,6 +144,20 @@ mod tests {
                         .very_long_field_name;
                 }"#]],
             30,
+        );
+    }
+
+    #[test]
+    fn test_dot_access_for_struct_litral() {
+        check_with_width(
+            "fun test() { Foo { loooooooooong }.toCell() }",
+            expect![[r#"
+                fun test() {
+                    Foo {
+                        loooooooooong,
+                    }.toCell();
+                }"#]],
+            20,
         );
     }
 
@@ -602,6 +616,17 @@ line"""; }"#,
                     );
                 }"#]],
             50,
+        );
+    }
+
+    #[test]
+    fn test_empty_match_expression() {
+        check(
+            "fun test() { match (1) {}; }",
+            expect![[r#"
+                fun test() {
+                    match (1) {}
+                }"#]],
         );
     }
 

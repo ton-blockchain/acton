@@ -118,7 +118,6 @@ pub enum Expression<'tree> {
     NullLiteral(NullLiteral<'tree>),
     Underscore(Underscore<'tree>),
     Ident(Ident<'tree>),
-    NumericIndex(NumericIndex<'tree>),
     Unmapped(RawNode<'tree>),
 }
 
@@ -153,7 +152,6 @@ impl<'tree> Expression<'tree> {
             Expression::NullLiteral(n) => n.0,
             Expression::Underscore(n) => n.0,
             Expression::Ident(n) => n.0,
-            Expression::NumericIndex(n) => n.0,
             Expression::Unmapped(n) => n.0,
         }
     }
@@ -188,7 +186,6 @@ impl<'t> From<Node<'t>> for Expression<'t> {
             "null_literal" => Expression::NullLiteral(NullLiteral(node)),
             "underscore" => Expression::Underscore(Underscore(node)),
             "identifier" => Expression::Ident(Ident(node)),
-            "numeric_index" => Expression::NumericIndex(NumericIndex(node)),
             _ => Expression::Unmapped(RawNode::new(node)),
         }
     }

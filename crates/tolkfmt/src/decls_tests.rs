@@ -10,6 +10,8 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
+        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
             tree: tree.clone(),
@@ -368,6 +370,22 @@ mod tests {
                 }"#]],
         );
     }
+    #[test]
+    fn test_function_generics_with_default_type() {
+        check(
+            "fun identity<T = int>(x: T): T { return x; }",
+            expect![[r#"
+                fun identity<T = int>(x: T): T {
+                    return x;
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_function_no_generics() {
+        // TODO: remove?
+        check("fun foo<>() {}", expect!["fun foo<>() {}"]);
+    }
 
     #[test]
     fn test_function_parameters() {
@@ -375,6 +393,17 @@ mod tests {
             "fun add(a: int, b: int): int { return a + b; }",
             expect![[r#"
                 fun add(a: int, b: int): int {
+                    return a + b;
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_function_parameter_with_default() {
+        check(
+            "fun add(a: int = 10, b: int = 20 + 10): int { return a + b; }",
+            expect![[r#"
+                fun add(a: int = 10, b: int = 20 + 10): int {
                     return a + b;
                 }"#]],
         );
@@ -471,6 +500,17 @@ mod tests {
             "fun int.add(other: int): int { return self + other; }",
             expect![[r#"
                 fun int.add(other: int): int {
+                    return self + other;
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_method_declaration_with_type_parameters() {
+        check(
+            "fun int.add<T>(other: T): int | T { return self + other; }",
+            expect![[r#"
+                fun int.add<T>(other: T): int | T {
                     return self + other;
                 }"#]],
         );
@@ -578,6 +618,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_method_declaration_with_builtin() {
+        check(
+            "get fun balance(): int builtin",
+            expect![[r#"
+                get fun balance(): int
+                    builtin"#]],
+        );
+    }
+
+    #[test]
+    fn test_get_method_declaration_with_asm() {
+        check(
+            "get fun balance(): int asm \"NOP\"",
+            expect![[r#"
+                get fun balance(): int
+                    asm "NOP""#]],
+        );
+    }
+
+    #[test]
     fn test_asm_body() {
         check(
             "fun foo() asm \"NOP\";",
@@ -589,7 +649,7 @@ mod tests {
             "fun add(a: int, b: int) asm(a b -> 1) \"ADD\";",
             expect![[r#"
                 fun add(a: int, b: int)
-                    asm "ADD""#]],
+                    asm(a b -> 1) "ADD""#]],
         );
     }
 
@@ -609,7 +669,7 @@ mod tests {
             "fun complex(a: int, b: int, c: int) asm(a b c -> 1 2) \"TRIPLE\";",
             expect![[r#"
                 fun complex(a: int, b: int, c: int)
-                    asm "TRIPLE""#]],
+                    asm(a b c -> 1 2) "TRIPLE""#]],
         );
     }
 
@@ -619,7 +679,7 @@ mod tests {
             "fun int.double() asm(self -> 1) \"DBL\";",
             expect![[r#"
                 fun int.double()
-                    asm "DBL""#]],
+                    asm(self -> 1) "DBL""#]],
         );
     }
 

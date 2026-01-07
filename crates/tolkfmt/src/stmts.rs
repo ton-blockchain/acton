@@ -192,7 +192,7 @@ pub(crate) fn print_throw_statement<'a>(
     ctx: &mut Context,
     throw_stmt: &ThrowStatement,
 ) -> Option<RcDoc<'a>> {
-    let expr = throw_stmt.expression();
+    let expr = throw_stmt.expression()?;
 
     // 10 => throw 10,
     let in_match_arm = throw_stmt
@@ -202,16 +202,12 @@ pub(crate) fn print_throw_statement<'a>(
         .unwrap_or(false);
     let end_semicolon = if in_match_arm { "" } else { ";" };
 
-    if let Some(expr) = expr {
-        let expr_doc = exprs::print_expression(ctx, &expr)?;
-        Some(RcDoc::concat([
-            RcDoc::text("throw "),
-            expr_doc,
-            RcDoc::text(end_semicolon),
-        ]))
-    } else {
-        Some(RcDoc::text(format!("throw{}", end_semicolon)))
-    }
+    let expr_doc = exprs::print_expression(ctx, &expr)?;
+    Some(RcDoc::concat([
+        RcDoc::text("throw "),
+        expr_doc,
+        RcDoc::text(end_semicolon),
+    ]))
 }
 
 fn print_assert_statement<'a>(
@@ -396,10 +392,6 @@ fn print_tensor_tuple_lhs<'a>(
             parts.push(RcDoc::text(", "));
         }
         parts.push(print_var_declaration_lhs(ctx, var)?);
-    }
-
-    if parts.is_empty() {
-        return Some(RcDoc::text(format!("{}{}", open_quote, close_quote)));
     }
 
     if parts.len() == 1 {
