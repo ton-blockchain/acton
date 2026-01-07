@@ -23,6 +23,7 @@ tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }
 ton-executor = { path = "crates/ton-executor" }
 tolk_parser = { path = "crates/tolk_parser" }
+tolk_ast = { path = "crates/tolk_ast" }
 tvmffi = { path = "crates/tvmffi" }
 vmlogs = { path = "crates/vmlogs" }
 tasm = { path = "crates/tasm" }
