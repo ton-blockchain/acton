@@ -43,7 +43,7 @@ pub fn print_function<'a>(ctx: &mut Context, func: &Function) -> Option<RcDoc<'a
     let name_doc = exprs::print_ident(ctx, &name)?;
 
     let parameters = func.parameters();
-    let parameters_doc = RcDoc::text("()"); // TODO
+    let parameters_doc = print_parameter_list(ctx, &parameters)?;
 
     let body = func.body()?;
     let body_doc = print_function_body(ctx, &body)?;
@@ -57,6 +57,110 @@ pub fn print_function<'a>(ctx: &mut Context, func: &Function) -> Option<RcDoc<'a
     ]);
 
     Some(result)
+}
+
+pub fn print_parameter_list<'a, P>(ctx: &mut Context, params: &[P]) -> Option<RcDoc<'a>>
+where
+    P: ParameterTrait,
+{
+    if params.is_empty() {
+        return Some(RcDoc::text("()"));
+    }
+
+    let mut parts = vec![];
+    for p in params {
+        parts.push(print_parameter_declaration(ctx, p)?);
+    }
+
+    if parts.len() == 1 {
+        return Some(RcDoc::concat([
+            RcDoc::text("("),
+            parts.into_iter().next().unwrap(),
+            RcDoc::text(")"),
+        ]));
+    }
+
+    let (first, rest) = parts.split_first().unwrap();
+    let mut tail_docs = vec![];
+    for part in rest {
+        tail_docs.push(RcDoc::text(","));
+        tail_docs.push(RcDoc::line());
+        tail_docs.push(part.clone());
+    }
+
+    Some(RcDoc::group(RcDoc::concat([
+        RcDoc::text("("),
+        RcDoc::concat([
+            RcDoc::softline_(),
+            first.clone(),
+            RcDoc::concat(tail_docs),
+            RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()),
+        ])
+        .nest(4),
+        RcDoc::softline_(),
+        RcDoc::text(")"),
+    ])))
+}
+
+pub trait ParameterTrait {
+    fn mutate(&self) -> bool;
+    fn name(&self) -> Option<tolk_ast::Ident<'_>>;
+    fn typ(&self) -> Option<tolk_ast::Type<'_>>;
+    fn default(&self) -> Option<tolk_ast::Expression<'_>>;
+}
+
+impl<'tree> ParameterTrait for tolk_ast::Parameter<'tree> {
+    fn mutate(&self) -> bool {
+        self.mutate()
+    }
+    fn name(&self) -> Option<tolk_ast::Ident<'tree>> {
+        self.name()
+    }
+    fn typ(&self) -> Option<tolk_ast::Type<'tree>> {
+        self.typ()
+    }
+    fn default(&self) -> Option<tolk_ast::Expression<'tree>> {
+        self.default()
+    }
+}
+
+impl<'tree> ParameterTrait for tolk_ast::LambdaParameter<'tree> {
+    fn mutate(&self) -> bool {
+        self.mutate()
+    }
+    fn name(&self) -> Option<tolk_ast::Ident<'tree>> {
+        self.name()
+    }
+    fn typ(&self) -> Option<tolk_ast::Type<'tree>> {
+        self.typ()
+    }
+    fn default(&self) -> Option<tolk_ast::Expression<'tree>> {
+        None
+    }
+}
+
+pub fn print_parameter_declaration<'a, P>(ctx: &mut Context, param: &P) -> Option<RcDoc<'a>>
+where
+    P: ParameterTrait,
+{
+    let mut parts = vec![];
+    if param.mutate() {
+        parts.push(RcDoc::text("mutate "));
+    }
+    let name = param.name()?;
+    parts.push(exprs::print_ident(ctx, &name)?);
+
+    if let Some(typ) = param.typ() {
+        parts.push(RcDoc::text(": "));
+        parts.push(crate::types::print_type(ctx, &typ)?);
+    }
+
+    if let Some(default) = param.default() {
+        parts.push(RcDoc::text(" = "));
+        parts.push(exprs::print_expression(ctx, &default)?);
+    }
+
+    Some(RcDoc::concat(parts))
 }
 
 fn print_function_body<'a>(ctx: &mut Context, body: &FunctionBody) -> Option<RcDoc<'a>> {

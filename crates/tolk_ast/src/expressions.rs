@@ -617,10 +617,13 @@ impl<'t> From<Node<'t>> for LambdaExpression<'t> {
 
 impl<'tree> LambdaExpression<'tree> {
     pub fn parameters(&self) -> Vec<LambdaParameter<'tree>> {
-        let mut cursor = self.0.walk();
-        self.0
-            .children(&mut cursor)
-            .filter(|n| n.kind() == "lambda_parameter")
+        let Some(list) = self.0.child_by_field_name("parameters") else {
+            return vec![];
+        };
+
+        let mut cursor = list.walk();
+        list.children(&mut cursor)
+            .filter(|n| n.kind() == "parameter_declaration" || n.kind() == "lambda_parameter")
             .map(LambdaParameter)
             .collect()
     }

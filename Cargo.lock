@@ -3166,12 +3166,12 @@ checksum = "c4013970217383f67b18aef68f6fb2e8d409bc5755227092d32efb0422ba24b8"
 
 [[package]]
 name = "tree-sitter-tolk"
-version = "0.0.1"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f590befdbb2996f0db1f3aea327fe3899bf9018744497ae92d8c1dad8e6e09d"
+checksum = "23ae0cdf00f52be4b12efd2bebaa66b7bb1f94e67b8f35ad813ac1f2b7e73362"
 dependencies = [
  "cc",
- "tree-sitter",
+ "tree-sitter-language",
 ]
 
 [[package]]

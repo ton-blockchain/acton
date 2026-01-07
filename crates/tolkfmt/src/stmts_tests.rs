@@ -437,14 +437,12 @@ mod tests {
 
     #[test]
     fn test_try_catch_no_vars() {
-        // TODO
         check(
             "fun test() { try { risky(); } catch { return 0; } }",
             expect![[r#"
                 fun test() {
                     try {
-                        risky(
-                        );
+                        risky();
                     } catch {
                         return 0;
                     }
@@ -454,14 +452,12 @@ mod tests {
 
     #[test]
     fn test_try_catch_one_var() {
-        // TODO
         check(
             "fun test() { try { risky(); } catch (e) { return e; } }",
             expect![[r#"
                 fun test() {
                     try {
-                        risky(
-                        );
+                        risky();
                     } catch (e) {
                         return e;
                     }
@@ -471,14 +467,12 @@ mod tests {
 
     #[test]
     fn test_try_catch_two_vars() {
-        // TODO
         check(
             "fun test() { try { risky(); } catch (e, arg) { return e + arg; } }",
             expect![[r#"
                 fun test() {
                     try {
-                        risky(
-                        );
+                        risky();
                     } catch (e, arg) {
                         return e + arg;
                     }
@@ -549,13 +543,11 @@ mod tests {
 
     #[test]
     fn test_match_with_var_declaration() {
-        // TODO
         check(
             "fun test() { match (var x = getValue()) { 1 => return 10, else => return 0 } }",
             expect![[r#"
                 fun test() {
-                    match (var x = getValue(
-                    )) {
+                    match (var x = getValue()) {
                         1 => return 10,
                         else => return 0,
                     }
@@ -623,13 +615,11 @@ mod tests {
 
     #[test]
     fn test_function_call_expression() {
-        // TODO
         check(
             "fun test() { doSomething(); }",
             expect![[r#"
                 fun test() {
-                    doSomething(
-                    );
+                    doSomething();
                 }"#]],
         );
     }
@@ -787,7 +777,6 @@ mod tests {
 
     #[test]
     fn test_match_with_type_patterns() {
-        // TODO
         check(
             r#"fun test() {
                 match (getValue()) {
@@ -799,8 +788,7 @@ mod tests {
             }"#,
             expect![[r#"
                 fun test() {
-                    match (getValue(
-                    )) {
+                    match (getValue()) {
                         int => return 1,
                         string => return 2,
                         bool => return 3,
@@ -892,13 +880,14 @@ mod tests {
 
     #[test]
     fn test_line_breaking_function_call_small_width() {
-        // TODO
         check_with_width(
             "fun test() { very_long_function_name_that_should_break(arg1, arg2, arg3); }",
             expect![[r#"
                 fun test() {
                     very_long_function_name_that_should_break(
-                        arg1, arg2, arg3
+                        arg1,
+                        arg2,
+                        arg3
                     );
                 }"#]],
             30,
@@ -907,7 +896,6 @@ mod tests {
 
     #[test]
     fn test_line_breaking_match_expression_small_width() {
-        // TODO
         check_with_width(
             r#"fun test() {
                 match (very_long_expression_that_should_break) {
@@ -918,7 +906,9 @@ mod tests {
             }"#,
             expect![[r#"
                 fun test() {
-                    match (very_long_expression_that_should_break) {
+                    match (
+                        very_long_expression_that_should_break
+                    ) {
                         1 => return 10,
                         2 => return 20,
                         else => return 0,
@@ -930,7 +920,6 @@ mod tests {
 
     #[test]
     fn test_line_breaking_complex_expression_small_width() {
-        // TODO
         check_with_width(
             "fun test() { x = a + b + c + d + e + f + g; }",
             expect![[r#"
@@ -947,15 +936,16 @@ mod tests {
 
     #[test]
     fn test_line_breaking_nested_calls_small_width() {
-        // TODO
         check_with_width(
             "fun test() { result = outer_function(inner_function(arg1, arg2), another_arg); }",
             expect![[r#"
                 fun test() {
                     result = outer_function(
                         inner_function(
-                            arg1, arg2
-                        ), another_arg
+                            arg1,
+                            arg2
+                        ),
+                        another_arg
                     );
                 }"#]],
             30,
@@ -964,13 +954,14 @@ mod tests {
 
     #[test]
     fn test_line_breaking_tuple_small_width() {
-        // TODO
         check_with_width(
             "fun test() { var [a, b, c] = [value1, value2, value3]; }",
             expect![[r#"
                 fun test() {
                     var [a, b, c] = [
-                        value1, value2, value3
+                        value1,
+                        value2,
+                        value3
                     ];
                 }"#]],
             30,
@@ -979,13 +970,14 @@ mod tests {
 
     #[test]
     fn test_line_breaking_tensor_small_width() {
-        // TODO
         check_with_width(
             "fun test() { var (a, b, c) = (value1, value2, value3); }",
             expect![[r#"
                 fun test() {
                     var (a, b, c) = (
-                        value1, value2, value3
+                        value1,
+                        value2,
+                        value3
                     );
                 }"#]],
             30,
@@ -1005,11 +997,11 @@ mod tests {
             expect![[r#"
                 fun test() {
                     try {
-                        very_long_function_call_that_should_break(
-                        );
+                        very_long_function_call_that_should_break();
                     } catch (exception, code) {
                         handle_error(
-                            exception, code
+                            exception,
+                            code
                         );
                     }
                 }"#]],

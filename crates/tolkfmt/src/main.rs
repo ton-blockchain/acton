@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
-use tolk_ast::{Function, SourceFile};
+use tolk_ast::SourceFile;
 use tree_sitter::Node;
 
 mod common;
@@ -10,9 +10,12 @@ mod stmts;
 mod types;
 
 #[cfg(test)]
+mod exprs_tests;
+#[cfg(test)]
 mod stmts_tests;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 enum CommentKind {
     Inline,
     Continuation,
@@ -20,6 +23,7 @@ enum CommentKind {
     Trailing,
 }
 
+#[allow(dead_code)]
 struct Comment<'tree> {
     kind: CommentKind,
     node: Node<'tree>,
@@ -88,6 +92,7 @@ impl<'a> Iterator for TreeWalker<'a> {
 
 struct Context<'tree> {
     code: Rc<str>,
+    #[allow(dead_code)]
     comments: HashMap<Node<'tree>, Comment<'tree>>,
 }
 
