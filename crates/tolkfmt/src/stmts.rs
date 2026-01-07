@@ -397,27 +397,48 @@ fn print_tensor_tuple_lhs<'a>(
     open_quote: &'a str,
     close_quote: &'a str,
 ) -> Option<RcDoc<'a>> {
-    let mut parts = vec![];
-
-    for (i, var) in vars.iter().enumerate() {
-        if i > 0 {
-            parts.push(RcDoc::text(", "));
-        }
-        parts.push(print_var_declaration_lhs(ctx, var)?);
-    }
-
-    if parts.len() == 1 {
+    if vars.is_empty() {
         return Some(RcDoc::concat([
             RcDoc::text(open_quote),
-            parts[0].clone(),
             RcDoc::text(close_quote),
         ]));
     }
 
+    let mut docs = vec![RcDoc::line_()];
+    for (i, var) in vars.iter().enumerate() {
+        let node = var.raw_node();
+        let comments = ctx.comments.get(node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
+        docs.push(print_var_declaration_lhs(ctx, var)?);
+
+        let is_last = i == vars.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = vars.get(i + 1)
+            && common::empty_lines_between(ctx, node, next.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
+    }
+
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text(open_quote),
-        RcDoc::concat([RcDoc::line_(), RcDoc::concat(parts)]).nest(4),
-        RcDoc::line_(),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text(close_quote),
     ])))
 }

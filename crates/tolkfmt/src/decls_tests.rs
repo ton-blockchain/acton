@@ -97,6 +97,41 @@ mod tests {
     }
 
     #[test]
+    fn test_asm_comments() {
+        check(
+            "fun test() asm(a b -> 1)
+                // leading
+                \"INC\" // inline
+                // trailing
+                \"DEC\";",
+            expect![[r#"
+                fun test()
+                    asm(a b -> 1)
+                        // leading
+                        "INC" // inline
+                        // trailing
+                        "DEC""#]],
+        );
+    }
+
+    #[test]
+    fn test_annotation_comments() {
+        check(
+            "// leading list
+            @test // inline list
+            // trailing list
+            @deprecated
+            fun main() {}",
+            expect![[r#"
+                // leading list
+                @test // inline list
+                // trailing list
+                @deprecated
+                fun main() {}"#]],
+        );
+    }
+
+    #[test]
     fn test_tolk_required_version() {
         check("tolk 0.6.0", expect!["tolk 0.6.0"]);
     }

@@ -447,7 +447,7 @@ impl<'tree> TupleVarsDeclaration<'tree> {
         let mut cursor = self.0.walk();
         self.0
             .children(&mut cursor)
-            .filter(|n| !matches!(n.kind(), "[" | "]" | ","))
+            .filter(|n| n.is_named() && n.kind() != "comment")
             .map(VarDeclarationLhs::from)
             .collect()
     }
@@ -467,7 +467,7 @@ impl<'tree> TensorVarsDeclaration<'tree> {
         let mut cursor = self.0.walk();
         self.0
             .children(&mut cursor)
-            .filter(|n| !matches!(n.kind(), "(" | ")" | ","))
+            .filter(|n| n.is_named() && n.kind() != "comment")
             .map(VarDeclarationLhs::from)
             .collect()
     }

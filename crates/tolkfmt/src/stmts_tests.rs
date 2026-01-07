@@ -9,7 +9,7 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
@@ -93,6 +93,41 @@ mod tests {
                     } else if (x > 5) {
                         return 2;
                     }
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_destructuring_comments() {
+        check(
+            "fun main() {
+                val [
+                    // leading
+                    a, // inline
+                    b
+                    // trailing
+                ] = x;
+                val (
+                    // leading tensor
+                    c, // inline tensor
+                    d
+                    // trailing tensor
+                ) = y;
+            }",
+            expect![[r#"
+                fun main() {
+                    val [
+                        // leading
+                        a, // inline
+                        b,
+                        // trailing
+                    ] = x;
+                    val (
+                        // leading tensor
+                        c, // inline tensor
+                        d,
+                        // trailing tensor
+                    ) = y;
                 }"#]],
         );
     }

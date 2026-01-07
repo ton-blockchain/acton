@@ -625,13 +625,26 @@ where
 pub fn print_annotation_list<'a>(ctx: &Context, a: &AnnotationList) -> Option<RcDoc<'a>> {
     let annotations = a.annotations();
 
-    let mut parts = vec![];
-    for annotation in annotations {
-        parts.push(print_annotation(ctx, &annotation)?);
-        parts.push(RcDoc::hardline());
+    let mut docs = vec![];
+    for (i, annotation) in annotations.iter().enumerate() {
+        let node = &annotation.0;
+        let comments = ctx.comments.get(node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
+        docs.push(print_annotation(ctx, annotation)?);
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+        docs.push(RcDoc::hardline());
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = annotations.get(i + 1)
+            && common::empty_lines_between(ctx, node, &next.0) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
-    Some(RcDoc::concat(parts))
+    Some(RcDoc::concat(docs))
 }
 
 pub fn print_annotation<'a>(ctx: &Context, a: &Annotation) -> Option<RcDoc<'a>> {
@@ -782,10 +795,48 @@ pub fn print_asm_body<'a>(ctx: &Context, asm: &AsmBody) -> Option<RcDoc<'a>> {
     }
 
     let instructions = asm.instructions();
-    for inst in instructions {
-        parts.push(RcDoc::line());
-        parts.push(common::print_node_text(ctx, &inst.0)?);
+    let mut inst_docs = vec![];
+
+    for (i, inst) in instructions.iter().enumerate() {
+        let node = &inst.0;
+        let comments = ctx.comments.get(node);
+
+        if i == 0 {
+            inst_docs.push(RcDoc::line());
+        }
+
+        comments::print_leading_comments(ctx, &mut inst_docs, comments);
+
+        inst_docs.push(common::print_node_text(ctx, node)?);
+
+        comments::print_inline_comments(ctx, &mut inst_docs, comments);
+
+        let is_last = i == instructions.len() - 1;
+        if !is_last {
+            inst_docs.push(RcDoc::line());
+        }
+
+        if let Some(c) = comments
+            && c.iter()
+                .any(|c| matches!(c.kind, comments::CommentKind::Trailing))
+        {
+            inst_docs.push(RcDoc::hardline());
+            comments::print_trailing_comments(ctx, &mut inst_docs, comments);
+        }
+
+        if let Some(next) = instructions.get(i + 1)
+            && common::empty_lines_between(ctx, node, &next.0) > 1
+        {
+            inst_docs.push(RcDoc::hardline());
+        }
     }
 
-    Some(RcDoc::group(RcDoc::concat(parts)))
+    if inst_docs.is_empty() {
+        return Some(RcDoc::concat(parts));
+    }
+
+    Some(RcDoc::group(RcDoc::concat([
+        RcDoc::concat(parts),
+        RcDoc::concat(inst_docs).nest(4),
+    ])))
 }
