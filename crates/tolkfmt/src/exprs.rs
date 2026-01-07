@@ -220,13 +220,13 @@ pub fn print_argument_list<'a>(ctx: &Context, args: &[CallArgument]) -> Option<R
         return Some(RcDoc::text("()"));
     }
 
-    // Мы хотим выводить:
+    // We want to output:
     // ```
     // createMessage({
     //    ...
     // })
     // ```
-    // Таким образом, не перенося весь { ... } и не добавляя дополнительный отступ
+    // Thus, without breaking the entire { ... } and without adding extra indentation
     // TODO: better way?
     if args.len() == 1
         && let Some(single) = args.first()
@@ -264,7 +264,7 @@ pub fn print_argument_list<'a>(ctx: &Context, args: &[CallArgument]) -> Option<R
 
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
-        // Между аргументами может быть пустая строка которую мы хотим сохранить
+        // There can be an empty line between arguments that we want to preserve
         if let Some(next) = args.get(i + 1)
             && common::empty_lines_between(ctx, node, &next.0) > 1
         {
@@ -400,7 +400,7 @@ pub fn print_match_body<'a>(ctx: &Context, body: &MatchBody) -> Option<RcDoc<'a>
         arm_docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut arm_docs, comments);
 
-        // Между arms может быть пустая строка которую мы хотим сохранить
+        // There can be an empty line between arms that we want to preserve
         if let Some(next) = arms.get(i + 1)
             && common::empty_lines_between(ctx, &arm.0, &next.0) > 1
         {
@@ -487,7 +487,7 @@ pub fn print_object_literal_body<'a>(
         arg_docs.push(separator.clone());
         comments::print_trailing_comments(ctx, &mut arg_docs, comments);
 
-        // Между args может быть пустая строка которую мы хотим сохранить
+        // There can be an empty line between args that we want to preserve
         if let Some(next) = args.get(i + 1)
             && common::empty_lines_between(ctx, &arg.0, &next.0) > 1
         {
@@ -522,8 +522,8 @@ pub fn print_instance_argument<'a>(
         }
     }
 
-    // В многострочном литерале мы добавляем запятую к каждому элементу
-    // Но в однострочном варианте запятая у последнего элемента не нужна
+    // In multiline literals we add a comma to each element
+    // But in the single-line version, the comma is not needed for the last element
     parts.push(RcDoc::flat_alt(
         RcDoc::text(","),
         if is_last {

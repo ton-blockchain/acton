@@ -8,7 +8,7 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
     // tolk required version section
     let mut docs = vec![];
 
-    // В файле по идее может быть несколько версий Толка, но мы оставляем только одну
+    // In theory, a file can have multiple Tolk versions, but we keep only one
     let required_version = file
         .top_levels_iter()
         .filter_map(|decl| match decl {
@@ -17,7 +17,7 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
         })
         .next();
 
-    // Версия Толка всегда печатается в начале файла, до импортов
+    // Tolk version is always printed at the beginning of the file, before imports
     if let Some(required_version) = required_version {
         let doc = print_tolk_required_version(ctx, &required_version);
         if let Some(doc) = doc {
@@ -41,9 +41,9 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
         })
         .collect::<Vec<_>>();
 
-    // После опциональной версии Толка идут импорты.
-    // Импорты печатаются без пустых строк как остальные декларации, но как и стейтменты
-    // они могут быть разделены одной пустой строкой если так было в оригинальном коде
+    // After the optional Tolk version come imports.
+    // Imports are printed without empty lines like other declarations, but like statements
+    // they can be separated by one empty line if that's how it was in the original code
     for (i, import) in imports.iter().enumerate() {
         let comments = ctx.comments.get(&import.0);
         comments::print_leading_comments(ctx, &mut docs, comments);
@@ -99,7 +99,7 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
         docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
-        // Добавляем пустую строку между декларациями
+        // Add empty line between declarations
         if top_levels_iter.peek().is_some() {
             docs.push(RcDoc::hardline());
         }
@@ -281,7 +281,7 @@ pub fn print_struct_body<'a>(ctx: &Context, body: &StructBody) -> Option<RcDoc<'
         docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
-        // Между полями может быть пустая строка которую мы хотим сохранить
+        // There can be an empty line between fields that we want to preserve
         if let Some(next) = fields.get(i + 1)
             && common::empty_lines_between(ctx, &field.0, &next.0) > 1
         {
@@ -363,7 +363,7 @@ pub fn print_enum_body<'a>(ctx: &Context, body: &EnumBody) -> Option<RcDoc<'a>> 
         docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
-        // Между полями может быть пустая строка которую мы хотим сохранить
+        // There can be an empty line between fields that we want to preserve
         if let Some(next) = members.get(i + 1)
             && common::empty_lines_between(ctx, &member.0, &next.0) > 1
         {

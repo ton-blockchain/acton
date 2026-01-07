@@ -1,6 +1,7 @@
 use crate::{Context, comments, common, exprs};
 use pretty::RcDoc;
 use tolk_ast::*;
+
 pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Option<RcDoc<'a>> {
     let statements = block.statements();
     let statements = statements
@@ -11,17 +12,17 @@ pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Optio
         return Some(RcDoc::text("{}"));
     }
 
-    // При печати стейтментов мы должны учитывать что между ними могут быть пустые линии которые
-    // мы хотим нормализовать до одной пустой линии, а не убирать их полностью:
+    // When printing statements, we need to consider that there may be empty lines between them that
+    // we want to normalize to one empty line, not remove them completely:
     //
     // ```
     // let a = 100;
     //
     // let b = 200;
     // ```
-    // Должно оставаться как есть.
-    // Чтобы вставлять пустые линии, нам нужно знать были ли в оригинальном коде
-    // между двумя стейтментами пустые строки.
+    // Should remain as is.
+    // To insert empty lines, we need to know if there were empty lines in the original code
+    // between two statements.
 
     let mut docs = vec![RcDoc::hardline()];
 
@@ -41,10 +42,10 @@ pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Optio
         docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
-        // Если после стейтмента есть другой стейтмент, то есть вероятность, что нам нужна
-        // дополнительная пустая строка, чтобы оставить пустые строки по правилам.
+        // If there is another statement after this statement, there is a chance that we need
+        // an additional empty line to preserve empty lines according to the rules.
         //
-        // Если между двумя стейтментами больше одной пустой строки, то добавляем пустую строку.
+        // If there is more than one empty line between two statements, we add an empty line.
         if let Some(next_stmt) = statements.get(i + 1)
             && common::empty_lines_between(ctx, &node, &next_stmt.raw_node()) > 1
         {
