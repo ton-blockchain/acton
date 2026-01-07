@@ -2,7 +2,7 @@ use crate::{Context, common, stmts, types};
 use pretty::RcDoc;
 use tolk_ast::*;
 
-pub fn print_expression<'a>(ctx: &mut Context, expr: &Expression) -> Option<RcDoc<'a>> {
+pub fn print_expression<'a>(ctx: &Context, expr: &Expression) -> Option<RcDoc<'a>> {
     match expr {
         Expression::Assignment(assignment) => print_assignment(ctx, assignment),
         Expression::SetAssignment(set_assignment) => print_set_assignment(ctx, set_assignment),
@@ -32,7 +32,7 @@ pub fn print_expression<'a>(ctx: &mut Context, expr: &Expression) -> Option<RcDo
     }
 }
 
-pub fn print_assignment<'a>(ctx: &mut Context, assignment: &Assignment) -> Option<RcDoc<'a>> {
+pub fn print_assignment<'a>(ctx: &Context, assignment: &Assignment) -> Option<RcDoc<'a>> {
     let left = assignment.left()?;
     let right = assignment.right()?;
     let left_doc = print_expression(ctx, &left)?;
@@ -41,7 +41,7 @@ pub fn print_assignment<'a>(ctx: &mut Context, assignment: &Assignment) -> Optio
 }
 
 pub fn print_set_assignment<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     set_assignment: &SetAssignment,
 ) -> Option<RcDoc<'a>> {
     let left = set_assignment.left()?;
@@ -62,10 +62,7 @@ pub fn print_set_assignment<'a>(
     ]))
 }
 
-pub fn print_ternary_operator<'a>(
-    ctx: &mut Context,
-    ternary: &TernaryOperator,
-) -> Option<RcDoc<'a>> {
+pub fn print_ternary_operator<'a>(ctx: &Context, ternary: &TernaryOperator) -> Option<RcDoc<'a>> {
     let condition = ternary.condition()?;
     let consequence = ternary.consequence()?;
     let alternative = ternary.alternative()?;
@@ -89,7 +86,7 @@ pub fn print_ternary_operator<'a>(
     ))
 }
 
-pub fn print_binary_operator<'a>(ctx: &mut Context, binary: &BinaryOperator) -> Option<RcDoc<'a>> {
+pub fn print_binary_operator<'a>(ctx: &Context, binary: &BinaryOperator) -> Option<RcDoc<'a>> {
     let left = binary.left()?;
     let right = binary.right()?;
     let op = binary.operator_name(ctx.code.as_ref().as_ref()).to_string();
@@ -106,7 +103,7 @@ pub fn print_binary_operator<'a>(ctx: &mut Context, binary: &BinaryOperator) -> 
 }
 
 pub fn print_unary_operator<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     unary: &tolk_ast::UnaryOperator,
 ) -> Option<RcDoc<'a>> {
     let op = unary.operator_name(ctx.code.as_ref().as_ref()).to_string();
@@ -115,13 +112,13 @@ pub fn print_unary_operator<'a>(
     Some(RcDoc::concat([RcDoc::text(op), arg_doc]))
 }
 
-pub fn print_lazy_expression<'a>(ctx: &mut Context, lazy: &LazyExpression) -> Option<RcDoc<'a>> {
+pub fn print_lazy_expression<'a>(ctx: &Context, lazy: &LazyExpression) -> Option<RcDoc<'a>> {
     let expr = lazy.expr()?;
     let expr_doc = print_expression(ctx, &expr)?;
     Some(RcDoc::concat([RcDoc::text("lazy "), expr_doc]))
 }
 
-pub fn print_cast_as_operator<'a>(ctx: &mut Context, cast: &CastAsOperator) -> Option<RcDoc<'a>> {
+pub fn print_cast_as_operator<'a>(ctx: &Context, cast: &CastAsOperator) -> Option<RcDoc<'a>> {
     let expr = cast.expr()?;
     let typ = cast.casted_to()?;
     let expr_doc = print_expression(ctx, &expr)?;
@@ -129,10 +126,7 @@ pub fn print_cast_as_operator<'a>(ctx: &mut Context, cast: &CastAsOperator) -> O
     Some(RcDoc::concat([expr_doc, RcDoc::text(" as "), type_doc]))
 }
 
-pub fn print_is_type_operator<'a>(
-    ctx: &mut Context,
-    is_type: &IsTypeOperator,
-) -> Option<RcDoc<'a>> {
+pub fn print_is_type_operator<'a>(ctx: &Context, is_type: &IsTypeOperator) -> Option<RcDoc<'a>> {
     let expr = is_type.expr()?;
     let op = is_type
         .operator_name(ctx.code.as_ref().as_ref())
@@ -151,16 +145,13 @@ pub fn print_is_type_operator<'a>(
     ]))
 }
 
-pub fn print_not_null_operator<'a>(
-    ctx: &mut Context,
-    not_null: &NotNullOperator,
-) -> Option<RcDoc<'a>> {
+pub fn print_not_null_operator<'a>(ctx: &Context, not_null: &NotNullOperator) -> Option<RcDoc<'a>> {
     let inner = not_null.inner()?;
     let inner_doc = print_expression(ctx, &inner)?;
     Some(RcDoc::concat([inner_doc, RcDoc::text("!")]))
 }
 
-pub fn print_dot_access<'a>(ctx: &mut Context, dot: &DotAccess) -> Option<RcDoc<'a>> {
+pub fn print_dot_access<'a>(ctx: &Context, dot: &DotAccess) -> Option<RcDoc<'a>> {
     let obj = dot.obj()?;
     let field = dot.field()?;
     let obj_doc = print_expression(ctx, &obj)?;
@@ -190,7 +181,7 @@ pub fn print_dot_access<'a>(ctx: &mut Context, dot: &DotAccess) -> Option<RcDoc<
     }
 }
 
-pub fn print_function_call<'a>(ctx: &mut Context, call: &FunctionCall) -> Option<RcDoc<'a>> {
+pub fn print_function_call<'a>(ctx: &Context, call: &FunctionCall) -> Option<RcDoc<'a>> {
     let callee = call.callee()?;
     let callee_doc = print_expression(ctx, &callee)?;
     let args = call.arguments();
@@ -199,7 +190,7 @@ pub fn print_function_call<'a>(ctx: &mut Context, call: &FunctionCall) -> Option
     Some(RcDoc::concat([callee_doc, args_doc]))
 }
 
-pub fn print_argument_list<'a>(ctx: &mut Context, args: &[CallArgument]) -> Option<RcDoc<'a>> {
+pub fn print_argument_list<'a>(ctx: &Context, args: &[CallArgument]) -> Option<RcDoc<'a>> {
     if args.is_empty() {
         return Some(RcDoc::text("()"));
     }
@@ -238,7 +229,7 @@ pub fn print_argument_list<'a>(ctx: &mut Context, args: &[CallArgument]) -> Opti
     ])))
 }
 
-pub fn print_call_argument<'a>(ctx: &mut Context, arg: &CallArgument) -> Option<RcDoc<'a>> {
+pub fn print_call_argument<'a>(ctx: &Context, arg: &CallArgument) -> Option<RcDoc<'a>> {
     let mut parts = vec![];
     if arg.mutate() {
         parts.push(RcDoc::text("mutate "));
@@ -250,7 +241,7 @@ pub fn print_call_argument<'a>(ctx: &mut Context, arg: &CallArgument) -> Option<
 }
 
 pub fn print_generic_instantiation<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     instantiation: &GenericInstantiation,
 ) -> Option<RcDoc<'a>> {
     let expr = instantiation.expr()?;
@@ -275,7 +266,7 @@ pub fn print_generic_instantiation<'a>(
 }
 
 pub fn print_parenthesized_expression<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     paren: &ParenthesizedExpression,
 ) -> Option<RcDoc<'a>> {
     let inner = paren.inner()?;
@@ -288,7 +279,7 @@ pub fn print_parenthesized_expression<'a>(
 }
 
 pub fn print_match_expression<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     match_expr: &MatchExpression,
 ) -> Option<RcDoc<'a>> {
     let expr = match_expr.expr()?;
@@ -312,7 +303,7 @@ pub fn print_match_expression<'a>(
     ]))
 }
 
-pub fn print_match_body<'a>(ctx: &mut Context, body: &MatchBody) -> Option<RcDoc<'a>> {
+pub fn print_match_body<'a>(ctx: &Context, body: &MatchBody) -> Option<RcDoc<'a>> {
     let arms = body.arms();
     if arms.is_empty() {
         return Some(RcDoc::text("{}"));
@@ -342,7 +333,7 @@ pub fn print_match_body<'a>(ctx: &mut Context, body: &MatchBody) -> Option<RcDoc
     ]))
 }
 
-pub fn print_match_arm<'a>(ctx: &mut Context, arm: &MatchArm) -> Option<RcDoc<'a>> {
+pub fn print_match_arm<'a>(ctx: &Context, arm: &MatchArm) -> Option<RcDoc<'a>> {
     let pattern = arm.pattern();
     let body = arm.body()?;
 
@@ -371,7 +362,7 @@ pub fn print_match_arm<'a>(ctx: &mut Context, arm: &MatchArm) -> Option<RcDoc<'a
     ]))
 }
 
-pub fn print_object_literal<'a>(ctx: &mut Context, obj: &ObjectLiteral) -> Option<RcDoc<'a>> {
+pub fn print_object_literal<'a>(ctx: &Context, obj: &ObjectLiteral) -> Option<RcDoc<'a>> {
     let typ = obj.typ();
     let mut docs = vec![];
     if let Some(typ) = typ {
@@ -387,7 +378,7 @@ pub fn print_object_literal<'a>(ctx: &mut Context, obj: &ObjectLiteral) -> Optio
 }
 
 pub fn print_object_literal_body<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     args: &[InstanceArgument],
 ) -> Option<RcDoc<'a>> {
     if args.is_empty() {
@@ -427,7 +418,7 @@ pub fn print_object_literal_body<'a>(
 }
 
 pub fn print_instance_argument<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     arg: &InstanceArgument,
     is_last: bool,
 ) -> Option<RcDoc<'a>> {
@@ -460,10 +451,7 @@ pub fn print_instance_argument<'a>(
     Some(RcDoc::concat(parts))
 }
 
-pub fn print_tensor_expression<'a>(
-    ctx: &mut Context,
-    tensor: &TensorExpression,
-) -> Option<RcDoc<'a>> {
+pub fn print_tensor_expression<'a>(ctx: &Context, tensor: &TensorExpression) -> Option<RcDoc<'a>> {
     let elements = tensor.elements();
     if elements.is_empty() {
         return Some(RcDoc::text("()"));
@@ -472,7 +460,7 @@ pub fn print_tensor_expression<'a>(
     print_tuple_tensor(ctx, elements, "(", ")")
 }
 
-pub fn print_typed_tuple<'a>(ctx: &mut Context, tuple: &TypedTuple) -> Option<RcDoc<'a>> {
+pub fn print_typed_tuple<'a>(ctx: &Context, tuple: &TypedTuple) -> Option<RcDoc<'a>> {
     let elements = tuple.elements();
     if elements.is_empty() {
         return Some(RcDoc::text("[]"));
@@ -482,7 +470,7 @@ pub fn print_typed_tuple<'a>(ctx: &mut Context, tuple: &TypedTuple) -> Option<Rc
 }
 
 fn print_tuple_tensor<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     elements: Vec<Expression>,
     open_quote: &'a str,
     close_quote: &'a str,
@@ -521,10 +509,7 @@ fn print_tuple_tensor<'a>(
     ])))
 }
 
-pub fn print_lambda_expression<'a>(
-    ctx: &mut Context,
-    lambda: &LambdaExpression,
-) -> Option<RcDoc<'a>> {
+pub fn print_lambda_expression<'a>(ctx: &Context, lambda: &LambdaExpression) -> Option<RcDoc<'a>> {
     let params = lambda.parameters();
     let params_doc = crate::decls::print_parameter_list(ctx, &params)?;
 
@@ -540,26 +525,26 @@ pub fn print_lambda_expression<'a>(
     Some(RcDoc::concat(docs))
 }
 
-pub fn print_number_literal<'a>(ctx: &mut Context, lit: &NumberLiteral) -> Option<RcDoc<'a>> {
+pub fn print_number_literal<'a>(ctx: &Context, lit: &NumberLiteral) -> Option<RcDoc<'a>> {
     common::print_node_text(ctx, &lit.0)
 }
 
-pub fn print_string_literal<'a>(ctx: &mut Context, lit: &StringLiteral) -> Option<RcDoc<'a>> {
+pub fn print_string_literal<'a>(ctx: &Context, lit: &StringLiteral) -> Option<RcDoc<'a>> {
     common::print_node_text(ctx, &lit.0)
 }
 
-pub fn print_boolean_literal<'a>(ctx: &mut Context, lit: &BooleanLiteral) -> Option<RcDoc<'a>> {
+pub fn print_boolean_literal<'a>(ctx: &Context, lit: &BooleanLiteral) -> Option<RcDoc<'a>> {
     common::print_node_text(ctx, &lit.0)
 }
 
-pub fn print_null_literal<'a>(ctx: &mut Context, lit: &tolk_ast::NullLiteral) -> Option<RcDoc<'a>> {
+pub fn print_null_literal<'a>(ctx: &Context, lit: &tolk_ast::NullLiteral) -> Option<RcDoc<'a>> {
     common::print_node_text(ctx, &lit.0)
 }
 
-pub fn print_underscore<'a>(_ctx: &mut Context, _und: &Underscore) -> Option<RcDoc<'a>> {
+pub fn print_underscore<'a>(_ctx: &Context, _und: &Underscore) -> Option<RcDoc<'a>> {
     Some(RcDoc::text("_"))
 }
 
-pub fn print_ident<'a>(ctx: &mut Context, ident: &Ident) -> Option<RcDoc<'a>> {
+pub fn print_ident<'a>(ctx: &Context, ident: &Ident) -> Option<RcDoc<'a>> {
     common::print_node_text(ctx, &ident.0)
 }

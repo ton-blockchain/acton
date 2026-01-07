@@ -15,11 +15,11 @@ mod tests {
             tree: tree.clone(),
             source: code.into(),
         };
-        let mut ctx = Context {
+        let ctx = Context {
             code: code.into(),
             comments: HashMap::new(),
         };
-        let doc = decls::print_source_file(&mut ctx, &source_file).unwrap();
+        let doc = decls::print_source_file(&ctx, &source_file).unwrap();
         let mut out = Vec::new();
         doc.render(width, &mut out).unwrap();
         let res = String::from_utf8(out).unwrap();

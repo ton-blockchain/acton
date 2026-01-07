@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::{Context, decls};
+    use crate::{Context, comments, decls};
     use expect_test::{Expect, expect};
-    use std::collections::HashMap;
     use tolk_ast::SourceFile;
 
     fn check(code: &str, expect: Expect) {
@@ -17,11 +16,14 @@ mod tests {
             tree: tree.clone(),
             source: code.into(),
         };
-        let mut ctx = Context {
+
+        let comments_map = comments::collect_comments(source_file.tree.root_node());
+
+        let ctx = Context {
             code: code.into(),
-            comments: HashMap::new(),
+            comments: comments_map,
         };
-        let doc = decls::print_source_file(&mut ctx, &source_file).unwrap();
+        let doc = decls::print_source_file(&ctx, &source_file).unwrap();
         let mut out = Vec::new();
         doc.render(width, &mut out).unwrap();
         let res = String::from_utf8(out).unwrap();
@@ -1050,6 +1052,36 @@ mod tests {
                     }
                 }"#]],
             20,
+        );
+    }
+
+    // Comments tests
+
+    #[test]
+    fn test_comments_for_statements() {
+        check_with_width(
+            r#"
+                fun main() {
+                    // comment 1
+                    val a = 100; // comment 2
+
+                    // comment 3
+
+                    val b = 100;
+
+                    // comment 4
+                }"#,
+            expect![[r#"
+                fun main() {
+                    // comment 1
+                    val a = 100; // comment 2
+    
+                    // comment 3
+    
+                    val b = 100;
+                    // comment 4
+                }"#]],
+            30,
         );
     }
 }

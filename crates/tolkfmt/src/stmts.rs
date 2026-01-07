@@ -1,8 +1,9 @@
+use crate::comments::CommentKind::{Inline, Leading, LeadingWithEmptyLine, Trailing};
 use crate::{Context, common, exprs};
 use pretty::RcDoc;
 use tolk_ast::*;
 
-pub fn print_block_statement<'a>(ctx: &mut Context, block: &BlockStatement) -> Option<RcDoc<'a>> {
+pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Option<RcDoc<'a>> {
     let statements = block.statements();
     let statements = statements
         .iter()
@@ -27,13 +28,43 @@ pub fn print_block_statement<'a>(ctx: &mut Context, block: &BlockStatement) -> O
     let mut docs = vec![RcDoc::hardline()];
 
     for (i, stmt) in statements.iter().enumerate() {
+        let node = stmt.raw_node();
+        let comments = ctx.comments.get(&node);
+
+        if let Some(comments) = comments {
+            for comment in comments {
+                if matches!(comment.kind, Leading | LeadingWithEmptyLine) {
+                    docs.push(common::print_comment(ctx, comment));
+                    docs.push(RcDoc::hardline());
+                    if comment.kind == LeadingWithEmptyLine {
+                        docs.push(RcDoc::hardline());
+                    }
+                }
+            }
+        }
+
         let Some(doc) = print_statement(ctx, stmt) else {
             continue;
         };
 
         docs.push(doc);
-        if i < statements.len() - 1 {
-            docs.push(RcDoc::hardline());
+
+        if let Some(comments) = comments
+            && let Some(inline_comment) = comments.iter().find(|c| c.kind == Inline)
+        {
+            docs.push(RcDoc::space());
+            docs.push(common::print_comment(ctx, inline_comment));
+        }
+
+        docs.push(RcDoc::hardline());
+
+        if let Some(comments) = comments {
+            for comment in comments {
+                if comment.kind == Trailing {
+                    docs.push(common::print_comment(ctx, comment));
+                    docs.push(RcDoc::hardline());
+                }
+            }
         }
 
         // Если после стейтмента есть другой стейтмент, то есть вероятность, что нам нужна
@@ -41,7 +72,7 @@ pub fn print_block_statement<'a>(ctx: &mut Context, block: &BlockStatement) -> O
         //
         // Если между двумя стейтментами больше одной пустой строки, то добавляем пустую строку.
         if let Some(next_stmt) = statements.get(i + 1)
-            && common::empty_lines_between(&stmt.raw_node(), &next_stmt.raw_node()) > 1
+            && common::empty_lines_between(&node, &next_stmt.raw_node()) > 1
         {
             docs.push(RcDoc::hardline());
         }
@@ -50,13 +81,12 @@ pub fn print_block_statement<'a>(ctx: &mut Context, block: &BlockStatement) -> O
     let result = RcDoc::concat([
         RcDoc::text("{"),
         RcDoc::concat(docs).nest(4),
-        RcDoc::hardline(),
         RcDoc::text("}"),
     ]);
     Some(result)
 }
 
-fn print_statement<'a>(ctx: &mut Context, stmt: &Statement) -> Option<RcDoc<'a>> {
+fn print_statement<'a>(ctx: &Context, stmt: &Statement) -> Option<RcDoc<'a>> {
     match stmt {
         Statement::BlockStatement(block) => print_block_statement(ctx, block),
         Statement::IfStatement(if_stmt) => print_if_statement(ctx, if_stmt),
@@ -85,7 +115,7 @@ fn print_statement<'a>(ctx: &mut Context, stmt: &Statement) -> Option<RcDoc<'a>>
     }
 }
 
-fn print_if_statement<'a>(ctx: &mut Context, if_stmt: &IfStatement) -> Option<RcDoc<'a>> {
+fn print_if_statement<'a>(ctx: &Context, if_stmt: &IfStatement) -> Option<RcDoc<'a>> {
     let condition = if_stmt.condition()?;
     let body = if_stmt.body()?;
     let alternative = if_stmt.alternative();
@@ -118,7 +148,7 @@ fn print_if_statement<'a>(ctx: &mut Context, if_stmt: &IfStatement) -> Option<Rc
     Some(RcDoc::concat(docs))
 }
 
-fn print_while_statement<'a>(ctx: &mut Context, while_stmt: &WhileStatement) -> Option<RcDoc<'a>> {
+fn print_while_statement<'a>(ctx: &Context, while_stmt: &WhileStatement) -> Option<RcDoc<'a>> {
     let condition = while_stmt.condition()?;
     let body = while_stmt.body()?;
 
@@ -136,10 +166,7 @@ fn print_while_statement<'a>(ctx: &mut Context, while_stmt: &WhileStatement) -> 
     ]))
 }
 
-fn print_repeat_statement<'a>(
-    ctx: &mut Context,
-    repeat_stmt: &RepeatStatement,
-) -> Option<RcDoc<'a>> {
+fn print_repeat_statement<'a>(ctx: &Context, repeat_stmt: &RepeatStatement) -> Option<RcDoc<'a>> {
     let count = repeat_stmt.count()?;
     let body = repeat_stmt.body()?;
 
@@ -157,10 +184,7 @@ fn print_repeat_statement<'a>(
     ]))
 }
 
-fn print_do_while_statement<'a>(
-    ctx: &mut Context,
-    do_while: &DoWhileStatement,
-) -> Option<RcDoc<'a>> {
+fn print_do_while_statement<'a>(ctx: &Context, do_while: &DoWhileStatement) -> Option<RcDoc<'a>> {
     let condition = do_while.condition()?;
     let body = do_while.body()?;
 
@@ -180,7 +204,7 @@ fn print_do_while_statement<'a>(
 }
 
 pub(crate) fn print_return_statement<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     return_stmt: &ReturnStatement,
 ) -> Option<RcDoc<'a>> {
     let expr = return_stmt.expr();
@@ -206,7 +230,7 @@ pub(crate) fn print_return_statement<'a>(
 }
 
 pub(crate) fn print_throw_statement<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     throw_stmt: &ThrowStatement,
 ) -> Option<RcDoc<'a>> {
     let expr = throw_stmt.expression()?;
@@ -227,10 +251,7 @@ pub(crate) fn print_throw_statement<'a>(
     ]))
 }
 
-fn print_assert_statement<'a>(
-    ctx: &mut Context,
-    assert_stmt: &AssertStatement,
-) -> Option<RcDoc<'a>> {
+fn print_assert_statement<'a>(ctx: &Context, assert_stmt: &AssertStatement) -> Option<RcDoc<'a>> {
     let condition = assert_stmt.condition()?;
     let exc_no = assert_stmt.expression()?;
 
@@ -265,7 +286,7 @@ fn print_assert_statement<'a>(
 }
 
 fn print_try_catch_statement<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     try_catch: &TryCatchStatement,
 ) -> Option<RcDoc<'a>> {
     let body = try_catch.body()?;
@@ -282,7 +303,7 @@ fn print_try_catch_statement<'a>(
     ]))
 }
 
-fn print_catch_clause<'a>(ctx: &mut Context, catch: &CatchClause) -> Option<RcDoc<'a>> {
+fn print_catch_clause<'a>(ctx: &Context, catch: &CatchClause) -> Option<RcDoc<'a>> {
     let body = catch.body()?;
     let var1 = catch.catch_var1();
     let var2 = catch.catch_var2();
@@ -309,13 +330,13 @@ fn print_catch_clause<'a>(ctx: &mut Context, catch: &CatchClause) -> Option<RcDo
     Some(RcDoc::concat([vars_doc, body_doc]))
 }
 
-fn print_match_statement<'a>(ctx: &mut Context, match_stmt: &MatchStatement) -> Option<RcDoc<'a>> {
+fn print_match_statement<'a>(ctx: &Context, match_stmt: &MatchStatement) -> Option<RcDoc<'a>> {
     let expr = match_stmt.expression()?;
     exprs::print_match_expression(ctx, &expr)
 }
 
 fn print_expression_statement<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     expr_stmt: &ExpressionStatement,
 ) -> Option<RcDoc<'a>> {
     let expr = expr_stmt.expression()?;
@@ -324,7 +345,7 @@ fn print_expression_statement<'a>(
 }
 
 pub(crate) fn print_local_variables<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     locals: &LocalVarsDeclaration,
 ) -> Option<RcDoc<'a>> {
     let kind = locals.kind();
@@ -368,7 +389,7 @@ pub(crate) fn print_local_variables<'a>(
     Some(result)
 }
 
-fn print_var_declaration_lhs<'a>(ctx: &mut Context, lhs: &VarDeclarationLhs) -> Option<RcDoc<'a>> {
+fn print_var_declaration_lhs<'a>(ctx: &Context, lhs: &VarDeclarationLhs) -> Option<RcDoc<'a>> {
     match lhs {
         VarDeclarationLhs::TupleVarsDeclaration(tuple) => {
             let vars = tuple.vars();
@@ -397,7 +418,7 @@ fn print_var_declaration_lhs<'a>(ctx: &mut Context, lhs: &VarDeclarationLhs) -> 
 }
 
 fn print_tensor_tuple_lhs<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     vars: Vec<VarDeclarationLhs>,
     open_quote: &'a str,
     close_quote: &'a str,

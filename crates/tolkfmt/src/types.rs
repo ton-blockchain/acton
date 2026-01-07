@@ -2,7 +2,7 @@ use crate::{Context, common};
 use pretty::RcDoc;
 use tolk_ast::*;
 
-pub fn print_type<'a>(ctx: &mut Context, typ: &Type) -> Option<RcDoc<'a>> {
+pub fn print_type<'a>(ctx: &Context, typ: &Type) -> Option<RcDoc<'a>> {
     match typ {
         Type::TypeIdentifier(ident) => common::print_node_text(ctx, &ident.0),
         Type::TypeInstantiatedTs(inst) => print_type_instantiated_ts(ctx, inst),
@@ -17,7 +17,7 @@ pub fn print_type<'a>(ctx: &mut Context, typ: &Type) -> Option<RcDoc<'a>> {
     }
 }
 
-pub fn print_union_type<'a>(ctx: &mut Context, union: &UnionType) -> Option<RcDoc<'a>> {
+pub fn print_union_type<'a>(ctx: &Context, union: &UnionType) -> Option<RcDoc<'a>> {
     let mut parts = vec![];
     collect_union_parts(union, &mut parts);
 
@@ -57,16 +57,13 @@ fn collect_union_parts<'tree>(union: &UnionType<'tree>, parts: &mut Vec<Type<'tr
     }
 }
 
-pub fn print_nullable_type<'a>(ctx: &mut Context, nullable: &NullableType) -> Option<RcDoc<'a>> {
+pub fn print_nullable_type<'a>(ctx: &Context, nullable: &NullableType) -> Option<RcDoc<'a>> {
     let inner = nullable.inner()?;
     let inner_doc = print_type(ctx, &inner)?;
     Some(inner_doc.append(RcDoc::text("?")))
 }
 
-pub fn print_parenthesized_type<'a>(
-    ctx: &mut Context,
-    paren: &ParenthesizedType,
-) -> Option<RcDoc<'a>> {
+pub fn print_parenthesized_type<'a>(ctx: &Context, paren: &ParenthesizedType) -> Option<RcDoc<'a>> {
     let inner = paren.inner()?;
     let inner_doc = print_type(ctx, &inner)?;
     Some(RcDoc::concat([
@@ -76,18 +73,18 @@ pub fn print_parenthesized_type<'a>(
     ]))
 }
 
-pub fn print_tensor_type<'a>(ctx: &mut Context, tensor: &TensorType) -> Option<RcDoc<'a>> {
+pub fn print_tensor_type<'a>(ctx: &Context, tensor: &TensorType) -> Option<RcDoc<'a>> {
     let elements = tensor.element_types();
     print_tuple_tensor_type(ctx, elements, "(", ")")
 }
 
-pub fn print_tuple_type<'a>(ctx: &mut Context, tuple: &TupleType) -> Option<RcDoc<'a>> {
+pub fn print_tuple_type<'a>(ctx: &Context, tuple: &TupleType) -> Option<RcDoc<'a>> {
     let elements = tuple.element_types();
     print_tuple_tensor_type(ctx, elements, "[", "]")
 }
 
 fn print_tuple_tensor_type<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     elements: Vec<Type>,
     open_quote: &'a str,
     close_quote: &'a str,
@@ -126,7 +123,7 @@ fn print_tuple_tensor_type<'a>(
     ])))
 }
 
-pub fn print_fun_callable_type<'a>(ctx: &mut Context, fun: &FunCallableType) -> Option<RcDoc<'a>> {
+pub fn print_fun_callable_type<'a>(ctx: &Context, fun: &FunCallableType) -> Option<RcDoc<'a>> {
     let params = fun.param_types()?;
     let ret = fun.return_type()?;
 
@@ -137,7 +134,7 @@ pub fn print_fun_callable_type<'a>(ctx: &mut Context, fun: &FunCallableType) -> 
 }
 
 pub fn print_type_instantiated_ts<'a>(
-    ctx: &mut Context,
+    ctx: &Context,
     inst: &TypeInstantiatedTs,
 ) -> Option<RcDoc<'a>> {
     let name = inst.name()?;

@@ -1,8 +1,17 @@
 use crate::Context;
+use crate::comments::Comment;
 use pretty::RcDoc;
 use tree_sitter::Node;
 
-pub fn print_node_text<'a>(ctx: &mut Context, ident: &Node) -> Option<RcDoc<'a>> {
+pub fn print_comment<'a>(ctx: &Context, comment: &Comment) -> RcDoc<'a> {
+    let text = comment
+        .comment
+        .utf8_text(ctx.code.as_ref().as_ref())
+        .unwrap_or("");
+    RcDoc::text(text.to_owned())
+}
+
+pub fn print_node_text<'a>(ctx: &Context, ident: &Node) -> Option<RcDoc<'a>> {
     let text = ident.utf8_text(ctx.code.as_ref().as_ref()).ok()?.to_owned();
     Some(RcDoc::text(text))
 }
