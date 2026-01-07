@@ -1,0 +1,10 @@
+[package]
+name = "tolkfmt"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pretty = "0.12.5"
+tolk_parser = { path = "../tolk_parser" }
+tolk_ast = { path = "../tolk_ast" }
+tree-sitter = "0.25.10"

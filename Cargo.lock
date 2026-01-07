@@ -2940,6 +2940,7 @@ name = "tolkfmt"
 version = "0.1.0"
 dependencies = [
  "pretty",
+ "tolk_ast",
  "tolk_parser",
  "tree-sitter",
 ]
@@ -2949,6 +2950,7 @@ name = "tolkfmt2"
 version = "0.1.0"
 dependencies = [
  "pretty",
+ "tolk_ast",
  "tolk_parser",
  "tree-sitter",
 ]
