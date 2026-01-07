@@ -35,12 +35,6 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_type_instantiated_ts() {
-        // TODO: remove?
-        check("const x: Foo<> = 0;", expect!["const x: Foo<> = 0;"]);
-    }
-
-    #[test]
     fn test_single_type_instantiated_ts() {
         check("const x: Foo<int> = 0;", expect!["const x: Foo<int> = 0;"]);
     }

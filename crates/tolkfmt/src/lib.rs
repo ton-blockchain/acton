@@ -22,20 +22,25 @@ pub struct Context<'tree> {
 pub fn format_source(source: &str, width: usize) -> anyhow::Result<String> {
     let tree = tolk_parser::parser::parse(source)?;
     let source_file = SourceFile {
-        tree: tree.clone(),
+        tree,
         source: source.into(),
     };
 
-    let comments_map = collect_comments(source_file.tree.root_node());
+    let root_node = source_file.tree.root_node();
+    if root_node.has_error() {
+        anyhow::bail!("Cannot format code with syntax error");
+    }
+    let comments_map = collect_comments(root_node);
 
     let ctx = Context {
         code: source.into(),
         comments: comments_map,
     };
 
-    let doc = decls::print_source_file(&ctx, &source_file).ok_or_else(|| anyhow!("Failed to format source"))?;
+    let doc = decls::print_source_file(&ctx, &source_file)
+        .ok_or_else(|| anyhow!("Failed to format source"))?;
     let mut out = Vec::new();
     doc.render(width, &mut out)
         .map_err(|e| anyhow!("Failed to render: {}", e))?;
-    String::from_utf8(out).map_err(|e| anyhow!("Invalid UTF-8: {}", e).into())
+    String::from_utf8(out).map_err(|e| anyhow!("Invalid UTF-8: {}", e))
 }

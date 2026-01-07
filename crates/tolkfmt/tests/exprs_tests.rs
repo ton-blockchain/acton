@@ -590,20 +590,6 @@ line"""; }"#,
     }
 
     #[test]
-    fn test_underscore_literal() {
-        check(
-            "fun test() { x = _; match (x) { _ => return 1; } }",
-            expect![[r#"
-                fun test() {
-                    x = _;
-                    match (x) {
-                        _ => return 1,
-                    }
-                }"#]],
-        );
-    }
-
-    #[test]
     fn test_numeric_index() {
         check(
             "fun test() { x = a.0; y = b.1; z = c.42; }",
