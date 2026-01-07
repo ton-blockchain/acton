@@ -1,4 +1,4 @@
-use crate::{comments, common, exprs, Context};
+use crate::{Context, comments, common, exprs};
 use pretty::RcDoc;
 use tolk_ast::*;
 pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Option<RcDoc<'a>> {
@@ -46,7 +46,7 @@ pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Optio
         //
         // Если между двумя стейтментами больше одной пустой строки, то добавляем пустую строку.
         if let Some(next_stmt) = statements.get(i + 1)
-            && common::empty_lines_between(&node, &next_stmt.raw_node()) > 1
+            && common::empty_lines_between(ctx, &node, &next_stmt.raw_node()) > 1
         {
             docs.push(RcDoc::hardline());
         }

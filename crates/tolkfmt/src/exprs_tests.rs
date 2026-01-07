@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::{Context, decls};
+    use crate::{Context, comments, decls};
     use expect_test::{Expect, expect};
-    use std::collections::HashMap;
     use tolk_ast::SourceFile;
 
     fn check(code: &str, expect: Expect) {
@@ -10,21 +9,31 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
             tree: tree.clone(),
             source: code.into(),
         };
+
+        let comments_map = comments::collect_comments(source_file.tree.root_node());
+
         let ctx = Context {
             code: code.into(),
-            comments: HashMap::new(),
+            comments: comments_map,
         };
         let doc = decls::print_source_file(&ctx, &source_file).unwrap();
         let mut out = Vec::new();
         doc.render(width, &mut out).unwrap();
         let res = String::from_utf8(out).unwrap();
+
+        let res = res
+            .lines()
+            .map(|l| if l.trim().is_empty() { "" } else { l })
+            .collect::<Vec<_>>()
+            .join("\n");
+
         expect.assert_eq(&res);
     }
 
@@ -261,32 +270,31 @@ mod tests {
         );
     }
 
-    // TODO: стрипаются пробелы из-за чего тест не проходит
-    // #[test]
-    // fn test_object_literal_multiline_with_empty_lines() {
-    //     check(
-    //         r#"
-    //             fun test() {
-    //                 x = Point {
-    //                     x: 10,
-    //
-    //                     y: 20,
-    //
-    //                     z: 30,
-    //                 };
-    //             }"#,
-    //         expect![[r#"
-    //             fun test() {
-    //                 x = Point {
-    //                     x: 10,
-    //
-    //                     y: 20,
-    //
-    //                     z: 30,
-    //                 };
-    //             }"#]],
-    //     );
-    // }
+    #[test]
+    fn test_object_literal_multiline_with_empty_lines() {
+        check(
+            r#"
+                fun test() {
+                    x = Point {
+                        x: 10,
+
+                        y: 20,
+
+                        z: 30,
+                    };
+                }"#,
+            expect![[r#"
+                fun test() {
+                    x = Point {
+                        x: 10,
+
+                        y: 20,
+
+                        z: 30,
+                    };
+                }"#]],
+        );
+    }
 
     #[test]
     fn test_tensor_expression() {
@@ -671,32 +679,61 @@ line"""; }"#,
         );
     }
 
-    // // TODO: стрипаются пробелы из-за чего тест не проходит
-    // #[test]
-    // fn test_match_expression_with_empty_lines() {
-    //     check(
-    //         r#"
-    //             fun test() {
-    //                 x = match (value) {
-    //                     int => 1,
-    //
-    //                     string => 2,
-    //
-    //                     else => 0,
-    //                 };
-    //             }"#,
-    //         expect![[r#"
-    //             fun test() {
-    //                 x = match (value) {
-    //                 int => 1,
-    //
-    //                     string => 2,
-    //
-    //                     else => 0,
-    //                 };
-    //             }"#]],
-    //     );
-    // }
+    #[test]
+    fn test_match_expression_with_empty_lines() {
+        check(
+            r#"
+                fun test() {
+                    x = match (value) {
+                        int => 1,
+
+                        string => 2,
+
+                        else => 0,
+                    };
+                }"#,
+            expect![[r#"
+                fun test() {
+                    x = match (value) {
+                        int => 1,
+
+                        string => 2,
+
+                        else => 0,
+                    };
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_match_expression_with_comments() {
+        check(
+            r#"
+                fun test() {
+                    x = match (value) {
+                        // leading comment
+                        int => 1 // inline comment
+                        // leading comment 2
+                        string => 2, // inline comment 2
+                        // leading comment 3
+                        else => 0,
+                        // trailing comment 3
+                    };
+                }"#,
+            expect![[r#"
+                fun test() {
+                    x = match (value) {
+                        // leading comment
+                        int => 1, // inline comment
+                        // leading comment 2
+                        string => 2, // inline comment 2
+                        // leading comment 3
+                        else => 0,
+                        // trailing comment 3
+                    };
+                }"#]],
+        );
+    }
 
     #[test]
     fn test_match_expression_with_blocks() {
@@ -898,6 +935,34 @@ line"""; }"#,
                         enabled: true,
                         name,
                         value: 42,
+                    };
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_object_literal_mixe_with_comments() {
+        check(
+            r#"
+                fun test() {
+                    x = Config {
+                        // leading comment
+                        enabled: true, // inline comment
+                        // leading comment 2
+                        name, // inline comment
+                        value: 42,
+                        // trailing comment
+                    };
+                }"#,
+            expect![[r#"
+                fun test() {
+                    x = Config {
+                        // leading comment
+                        enabled: true, // inline comment
+                        // leading comment 2
+                        name, // inline comment
+                        value: 42,
+                        // trailing comment
                     };
                 }"#]],
         );

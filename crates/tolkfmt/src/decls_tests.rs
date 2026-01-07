@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::{Context, decls};
+    use crate::{Context, comments, decls};
     use expect_test::{Expect, expect};
-    use std::collections::HashMap;
     use tolk_ast::SourceFile;
 
     fn check(code: &str, expect: Expect) {
@@ -10,41 +9,44 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
             tree: tree.clone(),
             source: code.into(),
         };
+
+        let comments_map = comments::collect_comments(source_file.tree.root_node());
+
         let ctx = Context {
             code: code.into(),
-            comments: HashMap::new(),
+            comments: comments_map,
         };
         let doc = decls::print_source_file(&ctx, &source_file).unwrap();
         let mut out = Vec::new();
         doc.render(width, &mut out).unwrap();
         let res = String::from_utf8(out).unwrap();
+
+        let res = res
+            .lines()
+            .map(|l| if l.trim().is_empty() { "" } else { l })
+            .collect::<Vec<_>>()
+            .join("\n");
+
         expect.assert_eq(&res);
     }
 
     #[test]
     fn test_tolk_required_version() {
-        check(
-            "tolk 0.6.0",
-            expect![[r#"
-                tolk 0.6.0
-            "#]],
-        );
+        check("tolk 0.6.0", expect!["tolk 0.6.0"]);
     }
 
     #[test]
     fn test_import() {
         check(
             "import \"common.tolk\"",
-            expect![[r#"
-                import "common.tolk"
-            "#]],
+            expect![[r#"import "common.tolk""#]],
         );
     }
 
@@ -207,42 +209,62 @@ mod tests {
         );
     }
 
-    // TODO: стрипаются пробелы из-за чего тест не проходит
-    // #[test]
-    // fn test_struct_declaration_with_new_lines() {
-    //     check(
-    //         r#"struct Point {
-    //             x: int
-    //
-    //             y: int
-    //         }"#,
-    //         expect![[r#"
-    //             struct Point {
-    //                 x: int
-    //
-    //                 y: int
-    //             }"#]],
-    //     );
-    //     check(
-    //         r#"struct Point {
-    //             x: int
-    //
-    //             y: int
-    //
-    //             z: int
-    //             z1: int
-    //         }"#,
-    //         expect![[r#"
-    //             struct Point {
-    //                 x: int
-    //
-    //                 y: int
-    //
-    //                 z: int
-    //                 z1: int
-    //             }"#]],
-    //     );
-    // }
+    #[test]
+    fn test_struct_declaration_with_new_lines() {
+        check(
+            r#"struct Point {
+                x: int
+
+                y: int
+            }"#,
+            expect![[r#"
+                struct Point {
+                    x: int
+
+                    y: int
+                }"#]],
+        );
+        check(
+            r#"struct Point {
+                x: int
+
+                y: int
+
+                z: int
+                z1: int
+            }"#,
+            expect![[r#"
+                struct Point {
+                    x: int
+
+                    y: int
+
+                    z: int
+                    z1: int
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_struct_declaration_with_comments() {
+        check(
+            r#"struct Point {
+                // leadding comment
+                x: int // inline comment 1
+                y: int, // inline comment 2
+                z: int
+                // trailing comment
+            }"#,
+            expect![[r#"
+                struct Point {
+                    // leadding comment
+                    x: int // inline comment 1
+                    y: int // inline comment 2
+                    z: int
+                    // trailing comment
+                }"#]],
+        );
+    }
 
     #[test]
     fn test_struct_with_pack_prefix() {
@@ -336,46 +358,45 @@ mod tests {
         );
     }
 
-    // TODO: стрипаются пробелы из-за чего тест не проходит
-    // #[test]
-    // fn test_enum_declaration_with_new_lines() {
-    //     check(
-    //         r#"enum Color {
-    //             RED,
-    //
-    //             GREEN,
-    //
-    //             BLUE
-    //         }"#,
-    //         expect![[r#"
-    //             enum Color {
-    //                 RED
-    //
-    //                 GREEN
-    //
-    //                 BLUE
-    //             }"#]],
-    //     );
-    //     check(
-    //         r#"enum Color {
-    //             RED,
-    //
-    //             GREEN,
-    //
-    //             BLUE,
-    //             BLUE2,
-    //         }"#,
-    //         expect![[r#"
-    //             enum Color {
-    //                 RED
-    //
-    //                 GREEN
-    //
-    //                 BLUE
-    //                 BLUE2
-    //             }"#]],
-    //     );
-    // }
+    #[test]
+    fn test_enum_declaration_with_new_lines() {
+        check(
+            r#"enum Color {
+                RED,
+
+                GREEN,
+
+                BLUE
+            }"#,
+            expect![[r#"
+                enum Color {
+                    RED
+
+                    GREEN
+
+                    BLUE
+                }"#]],
+        );
+        check(
+            r#"enum Color {
+                RED,
+
+                GREEN,
+
+                BLUE,
+                BLUE2,
+            }"#,
+            expect![[r#"
+                enum Color {
+                    RED
+
+                    GREEN
+
+                    BLUE
+                    BLUE2
+                }"#]],
+        );
+    }
 
     #[test]
     fn test_enum_with_annotations() {
@@ -860,9 +881,7 @@ mod tests {
             r#"
                 tolk 1.0.1
                 tolk 1.0.0"#,
-            expect![[r#"
-                tolk 1.0.1
-            "#]],
+            expect!["tolk 1.0.1"],
         );
     }
 
@@ -875,8 +894,7 @@ mod tests {
             expect![[r#"
                 tolk 1.0.0
 
-                import "a"
-            "#]],
+                import "a""#]],
         );
     }
 

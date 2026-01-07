@@ -58,7 +58,7 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
         if let Some(next_import) = imports.get(i + 1)
-            && common::empty_lines_between(&import.0, &next_import.0) > 1
+            && common::empty_lines_between(ctx, &import.0, &next_import.0) > 1
         {
             docs.push(RcDoc::hardline());
         }
@@ -272,14 +272,18 @@ pub fn print_struct_body<'a>(ctx: &Context, body: &StructBody) -> Option<RcDoc<'
 
     let mut docs = vec![RcDoc::hardline()];
     for (i, field) in fields.iter().enumerate() {
+        let comments = ctx.comments.get(&field.0);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
         docs.push(print_struct_field_declaration(ctx, field)?);
-        if i != fields.len() - 1 {
-            docs.push(RcDoc::hardline());
-        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+        docs.push(RcDoc::hardline());
+        comments::print_trailing_comments(ctx, &mut docs, comments);
 
         // Между полями может быть пустая строка которую мы хотим сохранить
         if let Some(next) = fields.get(i + 1)
-            && common::empty_lines_between(&field.0, &next.0) > 1
+            && common::empty_lines_between(ctx, &field.0, &next.0) > 1
         {
             docs.push(RcDoc::hardline());
         }
@@ -288,7 +292,6 @@ pub fn print_struct_body<'a>(ctx: &Context, body: &StructBody) -> Option<RcDoc<'
     Some(RcDoc::concat([
         RcDoc::text("{"),
         RcDoc::concat(docs).nest(4),
-        RcDoc::hardline(),
         RcDoc::text("}"),
     ]))
 }
@@ -351,14 +354,18 @@ pub fn print_enum_body<'a>(ctx: &Context, body: &EnumBody) -> Option<RcDoc<'a>> 
 
     let mut docs = vec![RcDoc::hardline()];
     for (i, member) in members.iter().enumerate() {
+        let comments = ctx.comments.get(&member.0);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
         docs.push(print_enum_member_declaration(ctx, member)?);
-        if i != members.len() - 1 {
-            docs.push(RcDoc::hardline());
-        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+        docs.push(RcDoc::hardline());
+        comments::print_trailing_comments(ctx, &mut docs, comments);
 
         // Между полями может быть пустая строка которую мы хотим сохранить
         if let Some(next) = members.get(i + 1)
-            && common::empty_lines_between(&member.0, &next.0) > 1
+            && common::empty_lines_between(ctx, &member.0, &next.0) > 1
         {
             docs.push(RcDoc::hardline());
         }
@@ -367,7 +374,6 @@ pub fn print_enum_body<'a>(ctx: &Context, body: &EnumBody) -> Option<RcDoc<'a>> 
     Some(RcDoc::concat([
         RcDoc::text("{"),
         RcDoc::concat(docs).nest(4),
-        RcDoc::hardline(),
         RcDoc::text("}"),
     ]))
 }

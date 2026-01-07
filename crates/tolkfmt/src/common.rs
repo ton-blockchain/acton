@@ -1,5 +1,5 @@
 use crate::Context;
-use crate::comments::Comment;
+use crate::comments::{Comment, CommentKind};
 use pretty::RcDoc;
 use tree_sitter::Node;
 
@@ -16,7 +16,7 @@ pub fn print_node_text<'a>(ctx: &Context, ident: &Node) -> Option<RcDoc<'a>> {
     Some(RcDoc::text(text))
 }
 
-pub fn empty_lines_between(top: &Node, bottom: &Node) -> usize {
+pub fn empty_lines_between(ctx: &Context, top: &Node, bottom: &Node) -> usize {
     // [
     //
     // ] <- end   position of top
@@ -24,9 +24,24 @@ pub fn empty_lines_between(top: &Node, bottom: &Node) -> usize {
     //
     // )
 
-    let botton_line = bottom.start_position().row;
+    let botton_line = start_line(ctx, bottom);
     let top_line = top.end_position().row;
     botton_line.saturating_sub(top_line)
+}
+
+fn start_line(ctx: &Context, node: &Node) -> usize {
+    if let Some(comments) = ctx.comments.get(node) {
+        let leading = comments.iter().find(|c| c.kind == CommentKind::Leading);
+        if let Some(leading) = leading {
+            // there is some leading comment so return its line
+            return leading.comment.start_position().row;
+        }
+        // no leading comments so start line is start line of node itself
+        node.start_position().row
+    } else {
+        // no comments so start line is start line of node itself
+        node.start_position().row
+    }
 }
 
 pub fn print_sections(sections: Vec<Vec<RcDoc>>) -> RcDoc {

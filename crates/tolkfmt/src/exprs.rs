@@ -1,4 +1,4 @@
-use crate::{Context, common, stmts, types, comments};
+use crate::{Context, comments, common, stmts, types};
 use pretty::RcDoc;
 use tolk_ast::*;
 
@@ -317,16 +317,12 @@ pub fn print_match_body<'a>(ctx: &Context, body: &MatchBody) -> Option<RcDoc<'a>
         arm_docs.push(print_match_arm(ctx, arm)?);
 
         comments::print_inline_comments(ctx, &mut arm_docs, comments);
-
-        if i != arms.len() - 1 {
-            arm_docs.push(RcDoc::hardline());
-        }
-
+        arm_docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut arm_docs, comments);
 
         // Между arms может быть пустая строка которую мы хотим сохранить
         if let Some(next) = arms.get(i + 1)
-            && common::empty_lines_between(&arm.0, &next.0) > 1
+            && common::empty_lines_between(ctx, &arm.0, &next.0) > 1
         {
             arm_docs.push(RcDoc::hardline());
         }
@@ -335,7 +331,6 @@ pub fn print_match_body<'a>(ctx: &Context, body: &MatchBody) -> Option<RcDoc<'a>
     Some(RcDoc::concat([
         RcDoc::text("{"),
         RcDoc::concat(arm_docs).nest(4),
-        RcDoc::hardline(),
         RcDoc::text("}"),
     ]))
 }
@@ -409,16 +404,12 @@ pub fn print_object_literal_body<'a>(
         arg_docs.push(print_instance_argument(ctx, arg, is_last)?);
 
         comments::print_inline_comments(ctx, &mut arg_docs, comments);
-
-        if i != args.len() - 1 {
-            arg_docs.push(separator.clone());
-        }
-
+        arg_docs.push(separator.clone());
         comments::print_trailing_comments(ctx, &mut arg_docs, comments);
 
         // Между args может быть пустая строка которую мы хотим сохранить
         if let Some(next) = args.get(i + 1)
-            && common::empty_lines_between(&arg.0, &next.0) > 1
+            && common::empty_lines_between(ctx, &arg.0, &next.0) > 1
         {
             arg_docs.push(RcDoc::hardline());
         }
@@ -427,7 +418,6 @@ pub fn print_object_literal_body<'a>(
     Some(RcDoc::concat([
         RcDoc::text("{"),
         RcDoc::concat(arg_docs).nest(4),
-        separator,
         RcDoc::text("}"),
     ]))
 }
