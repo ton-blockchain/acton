@@ -38,6 +38,65 @@ mod tests {
     }
 
     #[test]
+    fn test_function_parameters_comments() {
+        check(
+            "fun test(
+                // leading
+                a: int, // inline
+                // trailing
+                b: slice
+            ) {}",
+            expect![[r#"
+                fun test(
+                    // leading
+                    a: int, // inline
+                    // trailing
+                    b: slice,
+                ) {}"#]],
+        );
+    }
+
+    #[test]
+    fn test_annotation_arguments_comments() {
+        check(
+            "@test(
+                // leading
+                1, // inline
+                2
+                // trailing
+            )
+            fun main() {}",
+            expect![[r#"
+                @test(
+                    // leading
+                    1, // inline
+                    2,
+                    // trailing
+                )
+                fun main() {}"#]],
+        );
+    }
+
+    #[test]
+    fn test_type_parameters_comments() {
+        check(
+            "struct Test<
+                // leading
+                T, // inline
+                U
+                // trailing
+            > {}",
+            expect![[r#"
+                struct Test<
+                    // leading
+                    T, // inline
+                    U,
+                    // trailing
+                > {}"#]],
+        );
+    }
+
+    #[test]
     fn test_tolk_required_version() {
         check("tolk 0.6.0", expect!["tolk 0.6.0"]);
     }

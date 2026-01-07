@@ -1,6 +1,5 @@
 use comments::Comment;
 use std::collections::{HashMap, VecDeque};
-use std::fs;
 use std::rc::Rc;
 use std::time::Instant;
 use tolk_ast::SourceFile;
@@ -90,20 +89,20 @@ struct Context<'tree> {
 fn main() {
     // let code = fs::read_to_string("/Users/petrmakhnev/emulator-rs/.jetton/tests/wallet.test.tolk")
     //     .unwrap();
-    let code = fs::read_to_string(
-        "/Users/petrmakhnev/emulator-rs/.jetton/contracts/jetton-wallet-contract.tolk",
-    )
-    .unwrap();
-    let code = code.as_str();
+    // let code = fs::read_to_string(
+    //     "/Users/petrmakhnev/emulator-rs/.jetton/contracts/jetton-wallet-contract.tolk",
+    // )
+    // .unwrap();
+    // let code = code.as_str();
 
-    // let code = "
-    // fun main() {
-    //     val restoreAmount = match (msg) {
-    //         InternalTransferStep => msg.jettonAmount, // aaa
-    //         BurnNotificationForMinter => msg.jettonAmount, // bbb
-    //     };
-    // }
-    // ";
+    let code = "
+    fun main() {
+        foo(
+            // first comment
+            a,
+        );
+    }
+    ";
     let tree = tolk_parser::parser::parse(code).unwrap();
 
     let root = tree.root_node();

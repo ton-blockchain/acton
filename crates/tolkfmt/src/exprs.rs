@@ -195,36 +195,42 @@ pub fn print_argument_list<'a>(ctx: &Context, args: &[CallArgument]) -> Option<R
         return Some(RcDoc::text("()"));
     }
 
-    let mut arg_docs = vec![];
-    for arg in args {
-        arg_docs.push(print_call_argument(ctx, arg)?);
-    }
+    let mut docs = vec![RcDoc::line_()];
+    for (i, arg) in args.iter().enumerate() {
+        let node = &arg.0;
+        let comments = ctx.comments.get(node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
 
-    if args.len() == 1
-        && let Some(single) = arg_docs.first()
-    {
-        return Some(RcDoc::concat([
-            RcDoc::text("("),
-            single.clone(),
-            RcDoc::text(")"),
-        ]));
-    }
+        docs.push(print_call_argument(ctx, arg)?);
 
-    let (first, rest) = arg_docs.split_first()?;
-    let mut tail_docs = vec![];
-    for part in rest {
-        tail_docs.push(RcDoc::text(","));
-        tail_docs.push(RcDoc::line());
-        tail_docs.push(part.clone());
-    }
+        let is_last = i == args.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
 
-    // Add trailing comma for multiline calls
-    tail_docs.push(RcDoc::text(",").flat_alt(RcDoc::nil()));
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        // Между аргументами может быть пустая строка которую мы хотим сохранить
+        if let Some(next) = args.get(i + 1)
+            && common::empty_lines_between(ctx, node, &next.0) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
+    }
 
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text("("),
-        RcDoc::concat([RcDoc::line_(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
-        RcDoc::line_(),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text(")"),
     ])))
 }
@@ -480,36 +486,48 @@ fn print_tuple_tensor<'a>(
     open_quote: &'a str,
     close_quote: &'a str,
 ) -> Option<RcDoc<'a>> {
-    let mut docs = vec![];
-    for el in elements.iter() {
-        docs.push(print_expression(ctx, el)?);
-    }
-
-    if docs.len() == 1
-        && let Some(single) = docs.first()
-    {
+    if elements.is_empty() {
         return Some(RcDoc::concat([
             RcDoc::text(open_quote),
-            single.clone(),
             RcDoc::text(close_quote),
         ]));
     }
 
-    let (first, rest) = docs.split_first()?;
-    let mut tail_docs = vec![];
-    for part in rest {
-        tail_docs.push(RcDoc::text(","));
-        tail_docs.push(RcDoc::line());
-        tail_docs.push(part.clone());
-    }
+    let mut docs = vec![RcDoc::line_()];
+    for (i, el) in elements.iter().enumerate() {
+        let node = el.raw_node();
+        let comments = ctx.comments.get(&node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
 
-    // Add trailing comma for multiline tuples/tensors
-    tail_docs.push(RcDoc::text(",").flat_alt(RcDoc::nil()));
+        docs.push(print_expression(ctx, el)?);
+
+        let is_last = i == elements.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = elements.get(i + 1)
+            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
+    }
 
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text(open_quote),
-        RcDoc::concat([RcDoc::line_(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
-        RcDoc::line_(),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text(close_quote),
     ])))
 }
@@ -551,5 +569,16 @@ pub fn print_underscore<'a>(_ctx: &Context, _und: &Underscore) -> Option<RcDoc<'
 }
 
 pub fn print_ident<'a>(ctx: &Context, ident: &Ident) -> Option<RcDoc<'a>> {
-    common::print_node_text(ctx, &ident.0)
+    let comments = ctx.comments.get(&ident.0);
+    if comments.is_none() {
+        // fast path for most of the identifier
+        return common::print_node_text(ctx, &ident.0);
+    }
+
+    let mut docs = vec![];
+
+    comments::print_leading_comments(ctx, &mut docs, comments);
+    docs.push(common::print_node_text(ctx, &ident.0)?);
+
+    Some(RcDoc::concat(docs))
 }

@@ -84,7 +84,7 @@ fn print_statement<'a>(ctx: &Context, stmt: &Statement) -> Option<RcDoc<'a>> {
             if node.text(ctx.code.as_ref().as_ref()) == ";" {
                 return Some(RcDoc::text(""));
             }
-            crate::common::print_node_text(ctx, &node.0)
+            common::print_node_text(ctx, &node.0)
         }
     }
 }

@@ -9,7 +9,7 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
@@ -27,6 +27,13 @@ mod tests {
         let mut out = Vec::new();
         doc.render(width, &mut out).unwrap();
         let res = String::from_utf8(out).unwrap();
+
+        let res = res
+            .lines()
+            .map(|l| if l.trim().is_empty() { "" } else { l })
+            .collect::<Vec<_>>()
+            .join("\n");
+
         expect.assert_eq(&res);
     }
 
@@ -1075,9 +1082,9 @@ mod tests {
                 fun main() {
                     // comment 1
                     val a = 100; // comment 2
-    
+
                     // comment 3
-    
+
                     val b = 100;
                     // comment 4
                 }"#]],

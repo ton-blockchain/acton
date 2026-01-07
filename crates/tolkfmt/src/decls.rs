@@ -216,7 +216,7 @@ pub fn print_type_alias_declaration<'a>(
     let underlying = t.underlying_type()?;
     let is_union = matches!(
         underlying,
-        TypeAliasUnderlyingType::Type(tolk_ast::Type::UnionType(_))
+        TypeAliasUnderlyingType::Type(Type::UnionType(_))
     );
 
     parts.push(RcDoc::text(" ="));
@@ -515,74 +515,85 @@ where
         return Some(RcDoc::text("()"));
     }
 
-    let mut parts = vec![];
-    for p in params {
-        parts.push(print_parameter_declaration(ctx, p)?);
-    }
+    let mut docs = vec![RcDoc::line_()];
+    for (i, p) in params.iter().enumerate() {
+        let node = p.raw_node();
+        let comments = ctx.comments.get(&node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
 
-    if parts.len() == 1 {
-        return Some(RcDoc::concat([
-            RcDoc::text("("),
-            parts.into_iter().next().unwrap(),
-            RcDoc::text(")"),
-        ]));
-    }
+        docs.push(print_parameter_declaration(ctx, p)?);
 
-    let (first, rest) = parts.split_first().unwrap();
-    let mut tail_docs = vec![];
-    for part in rest {
-        tail_docs.push(RcDoc::text(","));
-        tail_docs.push(RcDoc::line());
-        tail_docs.push(part.clone());
+        let is_last = i == params.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = params.get(i + 1)
+            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text("("),
-        RcDoc::concat([
-            RcDoc::softline_(),
-            first.clone(),
-            RcDoc::concat(tail_docs),
-            RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()),
-        ])
-        .nest(4),
-        RcDoc::softline_(),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text(")"),
     ])))
 }
 
 pub trait ParameterTrait {
+    fn raw_node(&self) -> tree_sitter::Node<'_>;
     fn mutate(&self) -> bool;
-    fn name(&self) -> Option<tolk_ast::Ident<'_>>;
-    fn typ(&self) -> Option<tolk_ast::Type<'_>>;
-    fn default(&self) -> Option<tolk_ast::Expression<'_>>;
+    fn name(&self) -> Option<Ident<'_>>;
+    fn typ(&self) -> Option<Type<'_>>;
+    fn default(&self) -> Option<Expression<'_>>;
 }
 
 impl<'tree> ParameterTrait for Parameter<'tree> {
+    fn raw_node(&self) -> tree_sitter::Node<'tree> {
+        self.0
+    }
     fn mutate(&self) -> bool {
         self.mutate()
     }
-    fn name(&self) -> Option<tolk_ast::Ident<'tree>> {
+    fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
-    fn typ(&self) -> Option<tolk_ast::Type<'tree>> {
+    fn typ(&self) -> Option<Type<'tree>> {
         self.typ()
     }
-    fn default(&self) -> Option<tolk_ast::Expression<'tree>> {
+    fn default(&self) -> Option<Expression<'tree>> {
         self.default()
     }
 }
 
-impl<'tree> ParameterTrait for tolk_ast::LambdaParameter<'tree> {
+impl<'tree> ParameterTrait for LambdaParameter<'tree> {
+    fn raw_node(&self) -> tree_sitter::Node<'tree> {
+        self.0
+    }
     fn mutate(&self) -> bool {
         self.mutate()
     }
-    fn name(&self) -> Option<tolk_ast::Ident<'tree>> {
+    fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
-    fn typ(&self) -> Option<tolk_ast::Type<'tree>> {
+    fn typ(&self) -> Option<Type<'tree>> {
         self.typ()
     }
-    fn default(&self) -> Option<tolk_ast::Expression<'tree>> {
+    fn default(&self) -> Option<Expression<'tree>> {
         None
     }
 }
@@ -640,32 +651,41 @@ pub fn print_annotation_arguments<'a>(ctx: &Context, a: &AnnotationArguments) ->
         return Some(RcDoc::text("()"));
     }
 
-    let mut parts = vec![];
-    for arg in args {
-        parts.push(exprs::print_expression(ctx, &arg)?);
-    }
+    let mut docs = vec![RcDoc::line_()];
+    for (i, arg) in args.iter().enumerate() {
+        let node = arg.raw_node();
+        let comments = ctx.comments.get(&node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
 
-    if parts.len() == 1
-        && let Some(single) = parts.first()
-    {
-        return Some(RcDoc::concat([
-            RcDoc::text("("),
-            single.clone(),
-            RcDoc::text(")"),
-        ]));
-    }
+        docs.push(exprs::print_expression(ctx, arg)?);
 
-    let (first, rest) = parts.split_first()?;
-    let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::text(", "));
-        tail_docs.push(doc.clone());
+        let is_last = i == args.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = args.get(i + 1)
+            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text("("),
-        RcDoc::concat([RcDoc::softline_(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
-        RcDoc::softline_(),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text(")"),
     ])))
 }
@@ -676,32 +696,41 @@ pub fn print_type_parameters<'a>(ctx: &Context, tp: &TypeParameters) -> Option<R
         return Some(RcDoc::text("<>"));
     }
 
-    let mut parts = vec![];
-    for p in parameters {
-        parts.push(print_type_parameter(ctx, &p)?);
-    }
+    let mut docs = vec![RcDoc::line_()];
+    for (i, p) in parameters.iter().enumerate() {
+        let node = &p.0;
+        let comments = ctx.comments.get(node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
 
-    if parts.len() == 1
-        && let Some(single) = parts.first()
-    {
-        return Some(RcDoc::concat([
-            RcDoc::text("<"),
-            single.clone(),
-            RcDoc::text(">"),
-        ]));
-    }
+        docs.push(print_type_parameter(ctx, p)?);
 
-    let (first, rest) = parts.split_first()?;
-    let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::text(", "));
-        tail_docs.push(doc.clone());
+        let is_last = i == parameters.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = parameters.get(i + 1)
+            && common::empty_lines_between(ctx, node, &next.0) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text("<"),
-        first.clone(),
-        RcDoc::concat(tail_docs),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text(">"),
     ])))
 }

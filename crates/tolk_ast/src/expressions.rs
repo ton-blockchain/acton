@@ -577,7 +577,7 @@ impl<'tree> TensorExpression<'tree> {
         let mut cursor = self.0.walk();
         self.0
             .children(&mut cursor)
-            .filter(|n| n.is_named())
+            .filter(|n| n.is_named() && n.kind() != "comment")
             .map(|n| n.into())
             .collect()
     }
@@ -588,7 +588,7 @@ impl<'tree> TypedTuple<'tree> {
         let mut cursor = self.0.walk();
         self.0
             .children(&mut cursor)
-            .filter(|n| n.is_named())
+            .filter(|n| n.is_named() && n.kind() != "comment")
             .map(|n| n.into())
             .collect()
     }

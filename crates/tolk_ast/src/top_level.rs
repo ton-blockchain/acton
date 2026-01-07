@@ -794,12 +794,12 @@ impl<'t> From<Node<'t>> for AnnotationArguments<'t> {
 }
 
 impl<'tree> AnnotationArguments<'tree> {
-    pub fn arguments(&self) -> Vec<crate::expressions::Expression<'tree>> {
+    pub fn arguments(&self) -> Vec<Expression<'tree>> {
         let mut cursor = self.0.walk();
         self.0
             .children(&mut cursor)
-            .filter(|n| !matches!(n.kind(), "(" | ")" | ","))
-            .map(crate::expressions::Expression::from)
+            .filter(|n| n.is_named() && n.kind() != "comment")
+            .map(Expression::from)
             .collect()
     }
 }

@@ -9,7 +9,7 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
@@ -354,6 +354,75 @@ mod tests {
                 fun test() {
                     x = a is int;
                     y = a !is int;
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_call_arguments_comments() {
+        check(
+            "fun main() {
+                foo(
+                    // leading
+                    a, // inline
+                    b
+                    // trailing
+                );
+            }",
+            expect![[r#"
+                fun main() {
+                    foo(
+                        // leading
+                        a, // inline
+                        b,
+                        // trailing
+                    );
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_tuple_comments() {
+        check(
+            "fun main() {
+                val x = [
+                    // leading
+                    1, // inline
+                    2
+                    // trailing
+                ];
+            }",
+            expect![[r#"
+                fun main() {
+                    val x = [
+                        // leading
+                        1, // inline
+                        2,
+                        // trailing
+                    ];
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_tensor_comments() {
+        check(
+            "fun main() {
+                val x = (
+                    // leading
+                    1, // inline
+                    2
+                    // trailing
+                );
+            }",
+            expect![[r#"
+                fun main() {
+                    val x = (
+                        // leading
+                        1, // inline
+                        2,
+                        // trailing
+                    );
                 }"#]],
         );
     }
@@ -1161,9 +1230,9 @@ line"""; }"#,
                         a + b,
                         c * d,
                     ).field.0
-                        .method(e
-                        ? f
-                        : g);
+                        .method(
+                        e ? f : g,
+                    );
                 }"#]],
             20,
         );
@@ -1186,11 +1255,13 @@ line"""; }"#,
             "fun test() { x = process(match (value) { int => value * 2, string => value.len(), else => 0 }); }",
             expect![[r#"
                 fun test() {
-                    x = process(match (value) {
-                        int => value * 2,
-                        string => value.len(),
-                        else => 0,
-                    });
+                    x = process(
+                        match (value) {
+                            int => value * 2,
+                            string => value.len(),
+                            else => 0,
+                        },
+                    );
                 }"#]],
         );
     }
