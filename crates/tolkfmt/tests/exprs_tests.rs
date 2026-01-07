@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::{Context, comments, decls};
     use expect_test::{Expect, expect};
-    use tolk_ast::SourceFile;
+    use tolkfmt::format_source;
 
     fn check(code: &str, expect: Expect) {
         check_with_width(code, expect, 80)
@@ -11,22 +10,7 @@ mod tests {
     fn check_with_width(code: &str, expect: Expect, width: usize) {
         // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
-        let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
-        let source_file = SourceFile {
-            tree: tree.clone(),
-            source: code.into(),
-        };
-
-        let comments_map = comments::collect_comments(source_file.tree.root_node());
-
-        let ctx = Context {
-            code: code.into(),
-            comments: comments_map,
-        };
-        let doc = decls::print_source_file(&ctx, &source_file).unwrap();
-        let mut out = Vec::new();
-        doc.render(width, &mut out).unwrap();
-        let res = String::from_utf8(out).unwrap();
+        let res = format_source(code, width).unwrap();
 
         let res = res
             .lines()

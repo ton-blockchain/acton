@@ -8,6 +8,7 @@ pretty = "0.12.5"
 tolk_parser = { path = "../tolk_parser" }
 tolk_ast = { path = "../tolk_ast" }
 tree-sitter = "0.25.10"
+anyhow = "1.0.100"
 
 [dev-dependencies]
 expect-test = "1.5.1"

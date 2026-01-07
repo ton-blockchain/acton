@@ -2955,6 +2955,7 @@ dependencies = [
 name = "tolkfmt"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "expect-test",
  "pretty",
  "tolk_ast",

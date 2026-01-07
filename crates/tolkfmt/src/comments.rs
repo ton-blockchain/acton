@@ -1,10 +1,59 @@
-use crate::{Context, TreeWalker, common};
+use crate::{Context, common};
 use pretty::RcDoc;
 use std::collections::HashMap;
 use tree_sitter::Node;
 
+struct TreeWalker<'a> {
+    cursor: tree_sitter::TreeCursor<'a>,
+    started: bool,
+    finished: bool,
+}
+
+impl<'a> TreeWalker<'a> {
+    fn new(node: Node<'a>) -> Self {
+        Self {
+            cursor: node.walk(),
+            started: false,
+            finished: false,
+        }
+    }
+}
+
+impl<'a> Iterator for TreeWalker<'a> {
+    type Item = Node<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.finished {
+            return None;
+        }
+
+        if !self.started {
+            self.started = true;
+            return Some(self.cursor.node());
+        }
+
+        if self.cursor.goto_first_child() {
+            return Some(self.cursor.node());
+        }
+
+        if self.cursor.goto_next_sibling() {
+            return Some(self.cursor.node());
+        }
+
+        loop {
+            if !self.cursor.goto_parent() {
+                self.finished = true;
+                return None;
+            }
+            if self.cursor.goto_next_sibling() {
+                return Some(self.cursor.node());
+            }
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub(crate) enum CommentKind {
+pub enum CommentKind {
     Inline,
     Leading,
     LeadingWithEmptyLine,
@@ -12,7 +61,7 @@ pub(crate) enum CommentKind {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct Comment<'tree> {
+pub struct Comment<'tree> {
     pub(crate) kind: CommentKind,
     pub(crate) comment: Node<'tree>,
 }
