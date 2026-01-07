@@ -1,10 +1,29 @@
-use crate::{Context, common};
+use crate::{Context, comments, common};
 use pretty::RcDoc;
 use tolk_ast::*;
 
 pub fn print_type<'a>(ctx: &Context, typ: &Type) -> Option<RcDoc<'a>> {
+    let node = typ.raw_node();
+    let comments = ctx.comments.get(&node);
+
+    if comments.is_none() {
+        return print_type_naked(ctx, typ);
+    }
+
+    let mut docs = vec![];
+    comments::print_leading_comments(ctx, &mut docs, comments);
+
+    let doc = print_type_naked(ctx, typ)?;
+    docs.push(doc);
+
+    comments::print_inline_comments(ctx, &mut docs, comments);
+
+    Some(RcDoc::concat(docs))
+}
+
+fn print_type_naked<'a>(ctx: &Context, typ: &Type) -> Option<RcDoc<'a>> {
     match typ {
-        Type::TypeIdentifier(ident) => common::print_node_text(ctx, &ident.0),
+        Type::TypeIdentifier(ident) => Some(common::print_node_text(ctx, &ident.0)?),
         Type::TypeInstantiatedTs(inst) => print_type_instantiated_ts(ctx, inst),
         Type::TensorType(tensor) => print_tensor_type(ctx, tensor),
         Type::TupleType(tuple) => print_tuple_type(ctx, tuple),
@@ -12,7 +31,7 @@ pub fn print_type<'a>(ctx: &Context, typ: &Type) -> Option<RcDoc<'a>> {
         Type::FunCallableType(fun) => print_fun_callable_type(ctx, fun),
         Type::NullableType(nullable) => print_nullable_type(ctx, nullable),
         Type::UnionType(union) => print_union_type(ctx, union),
-        Type::NullLiteral(null) => common::print_node_text(ctx, &null.0),
+        Type::NullLiteral(null) => Some(common::print_node_text(ctx, &null.0)?),
         Type::Unmapped(node) => common::print_node_text(ctx, &node.0),
     }
 }
@@ -93,32 +112,41 @@ fn print_tuple_tensor_type<'a>(
         return Some(RcDoc::text(format!("{}{}", open_quote, close_quote)));
     }
 
-    let mut docs = vec![];
-    for el in elements {
-        docs.push(print_type(ctx, &el)?);
-    }
+    let mut docs = vec![RcDoc::line_()];
+    for (i, el) in elements.iter().enumerate() {
+        let node = el.raw_node();
+        let comments = ctx.comments.get(&node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
 
-    if docs.len() == 1
-        && let Some(single) = docs.first()
-    {
-        return Some(RcDoc::concat([
-            RcDoc::text(open_quote),
-            single.clone(),
-            RcDoc::text(close_quote),
-        ]));
-    }
+        docs.push(print_type(ctx, el)?);
 
-    let (first, rest) = docs.split_first()?;
-    let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::text(", "));
-        tail_docs.push(doc.clone());
+        let is_last = i == elements.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = elements.get(i + 1)
+            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text(open_quote),
-        RcDoc::concat([RcDoc::softline_(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
-        RcDoc::softline_(),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text(close_quote),
     ])))
 }
@@ -142,38 +170,48 @@ pub fn print_type_instantiated_ts<'a>(
     let args = inst.arguments()?;
     let types = args.types();
 
-    let mut type_docs = vec![];
-    for typ in types {
-        type_docs.push(print_type(ctx, &typ)?);
-    }
-
-    if type_docs.is_empty() {
+    if types.is_empty() {
         return Some(name_doc.append(RcDoc::text("<>")));
     }
 
-    if type_docs.len() == 1
-        && let Some(single) = type_docs.first()
-    {
-        return Some(RcDoc::concat([
-            name_doc,
-            RcDoc::text("<"),
-            single.clone(),
-            RcDoc::text(">"),
-        ]));
+    let mut docs = vec![RcDoc::line_()];
+    for (i, typ) in types.iter().enumerate() {
+        let node = typ.raw_node();
+        let comments = ctx.comments.get(&node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
+        docs.push(print_type(ctx, typ)?);
+
+        let is_last = i == types.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+        }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = types.get(i + 1)
+            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
-    let (first, rest) = type_docs.split_first()?;
-    let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::text(", "));
-        tail_docs.push(doc.clone());
-    }
-
-    Some(RcDoc::group(RcDoc::concat([
+    Some(RcDoc::concat([
         name_doc,
-        RcDoc::text("<"),
-        RcDoc::concat([RcDoc::softline_(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
-        RcDoc::softline_(),
-        RcDoc::text(">"),
-    ])))
+        RcDoc::group(RcDoc::concat([
+            RcDoc::text("<"),
+            RcDoc::concat(docs).nest(4),
+            RcDoc::text(">"),
+        ])),
+    ]))
 }

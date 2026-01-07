@@ -184,7 +184,7 @@ pub fn print_inline_comments(
         return;
     };
 
-    if let Some(inline_comment) = comments.iter().find(|c| c.kind == CommentKind::Inline) {
+    for inline_comment in comments.iter().filter(|c| c.kind == CommentKind::Inline) {
         docs.push(RcDoc::space());
         docs.push(common::print_comment(ctx, inline_comment));
     }

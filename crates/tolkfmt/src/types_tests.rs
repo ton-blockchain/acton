@@ -65,7 +65,9 @@ mod tests {
             "const x: VeryLongTypeName<FirstType, SecondType, ThirdType> = 0;",
             expect![[r#"
                 const x: VeryLongTypeName<
-                    FirstType, SecondType, ThirdType
+                    FirstType,
+                    SecondType,
+                    ThirdType,
                 > = 0;"#]],
             40,
         );
@@ -101,7 +103,9 @@ mod tests {
             "const x: (FirstType, SecondType, ThirdType) = 0;",
             expect![[r#"
                 const x: (
-                    FirstType, SecondType, ThirdType
+                    FirstType,
+                    SecondType,
+                    ThirdType,
                 ) = 0;"#]],
             30,
         );
@@ -126,7 +130,9 @@ mod tests {
             "const x: [FirstType, SecondType, ThirdType] = 0;",
             expect![[r#"
                 const x: [
-                    FirstType, SecondType, ThirdType
+                    FirstType,
+                    SecondType,
+                    ThirdType,
                 ] = 0;"#]],
             30,
         );

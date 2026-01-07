@@ -1,8 +1,40 @@
 use crate::{Context, comments, common, stmts, types};
 use pretty::RcDoc;
 use tolk_ast::*;
+use tree_sitter::Node;
 
 pub fn print_expression<'a>(ctx: &Context, expr: &Expression) -> Option<RcDoc<'a>> {
+    // TODO: other literals as well
+    if let Expression::NumberLiteral(lit) = expr {
+        let kind = lit.0.parent()?.kind();
+        if kind == "tensor_expression"
+            || kind == "tuple_expression"
+            || kind == "typed_tuple"
+            || kind == "annotation_arguments"
+        {
+            return print_expression_naked(ctx, expr);
+        }
+    }
+
+    let node = expr.raw_node();
+    let comments = ctx.comments.get(&node);
+
+    if comments.is_none() {
+        return print_expression_naked(ctx, expr);
+    }
+
+    let mut docs = vec![];
+    comments::print_leading_comments(ctx, &mut docs, comments);
+
+    let doc = print_expression_naked(ctx, expr)?;
+    docs.push(doc);
+
+    comments::print_inline_comments(ctx, &mut docs, comments);
+
+    Some(RcDoc::concat(docs))
+}
+
+fn print_expression_naked<'a>(ctx: &Context, expr: &Expression) -> Option<RcDoc<'a>> {
     match expr {
         Expression::Assignment(assignment) => print_assignment(ctx, assignment),
         Expression::SetAssignment(set_assignment) => print_set_assignment(ctx, set_assignment),
@@ -22,12 +54,12 @@ pub fn print_expression<'a>(ctx: &Context, expr: &Expression) -> Option<RcDoc<'a
         Expression::TensorExpression(tensor) => print_tensor_expression(ctx, tensor),
         Expression::TypedTuple(tuple) => print_typed_tuple(ctx, tuple),
         Expression::LambdaExpression(lambda) => print_lambda_expression(ctx, lambda),
-        Expression::NumberLiteral(lit) => print_number_literal(ctx, lit),
-        Expression::StringLiteral(lit) => print_string_literal(ctx, lit),
-        Expression::BooleanLiteral(lit) => print_boolean_literal(ctx, lit),
-        Expression::NullLiteral(lit) => print_null_literal(ctx, lit),
-        Expression::Underscore(und) => print_underscore(ctx, und),
-        Expression::Ident(ident) => print_ident(ctx, ident),
+        Expression::NumberLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expression::StringLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expression::BooleanLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expression::NullLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expression::Underscore(und) => Some(common::print_node_text(ctx, &und.0)?),
+        Expression::Ident(ident) => Some(common::print_node_text(ctx, &ident.0)?),
         Expression::Unmapped(node) => common::print_node_text(ctx, &node.0),
     }
 }
@@ -102,10 +134,7 @@ pub fn print_binary_operator<'a>(ctx: &Context, binary: &BinaryOperator) -> Opti
     ])))
 }
 
-pub fn print_unary_operator<'a>(
-    ctx: &Context,
-    unary: &tolk_ast::UnaryOperator,
-) -> Option<RcDoc<'a>> {
+pub fn print_unary_operator<'a>(ctx: &Context, unary: &UnaryOperator) -> Option<RcDoc<'a>> {
     let op = unary.operator_name(ctx.code.as_ref().as_ref()).to_string();
     let arg = unary.argument()?;
     let arg_doc = print_expression(ctx, &arg)?;
@@ -155,9 +184,10 @@ pub fn print_dot_access<'a>(ctx: &Context, dot: &DotAccess) -> Option<RcDoc<'a>>
     let obj = dot.obj()?;
     let field = dot.field()?;
     let obj_doc = print_expression(ctx, &obj)?;
-    let field_text = match field {
-        DotAccessField::Ident(i) => i.text(ctx.code.as_ref().as_ref()).to_string(),
-        DotAccessField::NumericIndex(n) => n.value(ctx.code.as_ref().as_ref()).to_string(),
+
+    let field_doc = match field {
+        DotAccessField::Ident(i) => print_simple_node(ctx, &i.0)?,
+        DotAccessField::NumericIndex(n) => print_simple_node(ctx, &n.0)?,
     };
 
     let is_obj_literal = matches!(obj, Expression::ObjectLiteral(_));
@@ -166,17 +196,12 @@ pub fn print_dot_access<'a>(ctx: &Context, dot: &DotAccess) -> Option<RcDoc<'a>>
         Some(RcDoc::group(RcDoc::concat([
             obj_doc,
             RcDoc::text("."),
-            RcDoc::text(field_text),
+            field_doc,
         ])))
     } else {
         Some(RcDoc::group(RcDoc::concat([
             obj_doc,
-            RcDoc::concat([
-                RcDoc::softline_(),
-                RcDoc::text("."),
-                RcDoc::text(field_text),
-            ])
-            .nest(4),
+            RcDoc::concat([RcDoc::softline_(), RcDoc::text("."), field_doc]).nest(4),
         ])))
     }
 }
@@ -193,6 +218,25 @@ pub fn print_function_call<'a>(ctx: &Context, call: &FunctionCall) -> Option<RcD
 pub fn print_argument_list<'a>(ctx: &Context, args: &[CallArgument]) -> Option<RcDoc<'a>> {
     if args.is_empty() {
         return Some(RcDoc::text("()"));
+    }
+
+    // Мы хотим выводить:
+    // ```
+    // createMessage({
+    //    ...
+    // })
+    // ```
+    // Таким образом, не перенося весь { ... } и не добавляя дополнительный отступ
+    // TODO: better way?
+    if args.len() == 1
+        && let Some(single) = args.first()
+        && matches!(single.expr(), Some(Expression::ObjectLiteral(_)))
+    {
+        return Some(RcDoc::group(RcDoc::concat([
+            RcDoc::text("("),
+            print_call_argument(ctx, single)?,
+            RcDoc::text(")"),
+        ])));
     }
 
     let mut docs = vec![RcDoc::line_()];
@@ -255,19 +299,49 @@ pub fn print_generic_instantiation<'a>(
     let ts = instantiation.instantiation_ts()?;
     let types = ts.types();
 
-    let mut type_docs = vec![];
+    if types.is_empty() {
+        return Some(RcDoc::concat([expr_doc, RcDoc::text("<>")]));
+    }
+
+    let mut docs = vec![RcDoc::line_()];
     for (i, typ) in types.iter().enumerate() {
-        if i > 0 {
-            type_docs.push(RcDoc::text(", "));
+        let node = typ.raw_node();
+        let comments = ctx.comments.get(&node);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
+        docs.push(types::print_type(ctx, typ)?);
+
+        let is_last = i == types.len() - 1;
+        if !is_last {
+            docs.push(RcDoc::text(","));
+        } else {
+            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
         }
-        type_docs.push(types::print_type(ctx, typ)?);
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+
+        if is_last {
+            docs.push(RcDoc::line_());
+        } else {
+            docs.push(RcDoc::line());
+        }
+
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        if let Some(next) = types.get(i + 1)
+            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::concat([
         expr_doc,
-        RcDoc::text("<"),
-        RcDoc::concat(type_docs),
-        RcDoc::text(">"),
+        RcDoc::group(RcDoc::concat([
+            RcDoc::text("<"),
+            RcDoc::concat(docs).nest(4),
+            RcDoc::text(">"),
+        ])),
     ]))
 }
 
@@ -548,37 +622,22 @@ pub fn print_lambda_expression<'a>(ctx: &Context, lambda: &LambdaExpression) -> 
     Some(RcDoc::concat(docs))
 }
 
-pub fn print_number_literal<'a>(ctx: &Context, lit: &NumberLiteral) -> Option<RcDoc<'a>> {
-    common::print_node_text(ctx, &lit.0)
-}
-
-pub fn print_string_literal<'a>(ctx: &Context, lit: &StringLiteral) -> Option<RcDoc<'a>> {
-    common::print_node_text(ctx, &lit.0)
-}
-
-pub fn print_boolean_literal<'a>(ctx: &Context, lit: &BooleanLiteral) -> Option<RcDoc<'a>> {
-    common::print_node_text(ctx, &lit.0)
-}
-
-pub fn print_null_literal<'a>(ctx: &Context, lit: &tolk_ast::NullLiteral) -> Option<RcDoc<'a>> {
-    common::print_node_text(ctx, &lit.0)
-}
-
-pub fn print_underscore<'a>(_ctx: &Context, _und: &Underscore) -> Option<RcDoc<'a>> {
-    Some(RcDoc::text("_"))
-}
-
-pub fn print_ident<'a>(ctx: &Context, ident: &Ident) -> Option<RcDoc<'a>> {
-    let comments = ctx.comments.get(&ident.0);
+pub fn print_simple_node<'a>(ctx: &Context, node: &Node) -> Option<RcDoc<'a>> {
+    let comments = ctx.comments.get(node);
     if comments.is_none() {
         // fast path for most of the identifier
-        return common::print_node_text(ctx, &ident.0);
+        return common::print_node_text(ctx, node);
     }
 
     let mut docs = vec![];
 
     comments::print_leading_comments(ctx, &mut docs, comments);
-    docs.push(common::print_node_text(ctx, &ident.0)?);
+    docs.push(common::print_node_text(ctx, node)?);
+    comments::print_inline_comments(ctx, &mut docs, comments);
 
     Some(RcDoc::concat(docs))
+}
+
+pub fn print_ident<'a>(ctx: &Context, ident: &Ident) -> Option<RcDoc<'a>> {
+    print_simple_node(ctx, &ident.0)
 }
