@@ -26,7 +26,7 @@ pub fn print_decl<'a>(ctx: &mut Context, decl: &TopLevel) -> Option<RcDoc<'a>> {
         TopLevel::TolkRequiredVersion(_) => todo!(),
         TopLevel::Import(_) => todo!(),
         TopLevel::GlobalVarDeclaration(_) => todo!(),
-        TopLevel::ConstantDeclaration(_) => todo!(),
+        TopLevel::ConstantDeclaration(constant) => print_constant_declaration(ctx, constant),
         TopLevel::TypeAliasDeclaration(_) => todo!(),
         TopLevel::StructDeclaration(_) => todo!(),
         TopLevel::EnumDeclaration(_) => todo!(),
@@ -36,6 +36,31 @@ pub fn print_decl<'a>(ctx: &mut Context, decl: &TopLevel) -> Option<RcDoc<'a>> {
         TopLevel::EmptyStatement(_) => todo!(),
         TopLevel::Unmapped(_) => todo!(),
     }
+}
+
+pub fn print_constant_declaration<'a>(
+    ctx: &mut Context,
+    constant: &tolk_ast::ConstantDeclaration,
+) -> Option<RcDoc<'a>> {
+    let mut parts = vec![RcDoc::text("const ")];
+
+    if let Some(name) = constant.name() {
+        parts.push(exprs::print_ident(ctx, &name)?);
+    }
+
+    if let Some(typ) = constant.typ() {
+        parts.push(RcDoc::text(": "));
+        parts.push(crate::types::print_type(ctx, &typ)?);
+    }
+
+    if let Some(value) = constant.value() {
+        parts.push(RcDoc::text(" = "));
+        parts.push(exprs::print_expression(ctx, &value)?);
+    }
+
+    parts.push(RcDoc::text(";"));
+
+    Some(RcDoc::concat(parts))
 }
 
 pub fn print_function<'a>(ctx: &mut Context, func: &Function) -> Option<RcDoc<'a>> {
