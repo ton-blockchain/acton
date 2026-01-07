@@ -227,6 +227,9 @@ pub fn print_argument_list<'a>(ctx: &mut Context, args: &[CallArgument]) -> Opti
         tail_docs.push(part.clone());
     }
 
+    // Add trailing comma for multiline calls
+    tail_docs.push(RcDoc::text(",").flat_alt(RcDoc::nil()));
+
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text("("),
         RcDoc::concat([RcDoc::line_(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
@@ -506,6 +509,9 @@ fn print_tuple_tensor<'a>(
         tail_docs.push(RcDoc::line());
         tail_docs.push(part.clone());
     }
+
+    // Add trailing comma for multiline tuples/tensors
+    tail_docs.push(RcDoc::text(",").flat_alt(RcDoc::nil()));
 
     Some(RcDoc::group(RcDoc::concat([
         RcDoc::text(open_quote),

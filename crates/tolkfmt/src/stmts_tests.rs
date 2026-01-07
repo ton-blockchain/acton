@@ -931,7 +931,7 @@ mod tests {
                     very_long_function_name_that_should_break(
                         arg1,
                         arg2,
-                        arg3
+                        arg3,
                     );
                 }"#]],
             30,
@@ -987,9 +987,9 @@ mod tests {
                     result = outer_function(
                         inner_function(
                             arg1,
-                            arg2
+                            arg2,
                         ),
-                        another_arg
+                        another_arg,
                     );
                 }"#]],
             30,
@@ -1005,7 +1005,7 @@ mod tests {
                     var [a, b, c] = [
                         value1,
                         value2,
-                        value3
+                        value3,
                     ];
                 }"#]],
             30,
@@ -1021,7 +1021,7 @@ mod tests {
                     var (a, b, c) = (
                         value1,
                         value2,
-                        value3
+                        value3,
                     );
                 }"#]],
             30,
@@ -1045,7 +1045,7 @@ mod tests {
                     } catch (exception, code) {
                         handle_error(
                             exception,
-                            code
+                            code,
                         );
                     }
                 }"#]],

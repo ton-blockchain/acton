@@ -187,7 +187,6 @@ mod tests {
 
     #[test]
     fn test_function_call_breaking() {
-        // TODO
         check_with_width(
             "fun test() { foo(arg1, arg2, arg3, arg4); }",
             expect![[r#"
@@ -196,7 +195,7 @@ mod tests {
                         arg1,
                         arg2,
                         arg3,
-                        arg4
+                        arg4,
                     );
                 }"#]],
             20,
@@ -639,7 +638,7 @@ line"""; }"#,
                         argument_two,
                         argument_three,
                         argument_four,
-                        argument_five
+                        argument_five,
                     );
                 }"#]],
             50,
@@ -984,7 +983,6 @@ line"""; }"#,
 
     #[test]
     fn test_tensor_breaking() {
-        // TODO
         check_with_width(
             "fun test() { x = (very_long_expression_one, very_long_expression_two, very_long_expression_three); }",
             expect![[r#"
@@ -992,7 +990,7 @@ line"""; }"#,
                     x = (
                         very_long_expression_one,
                         very_long_expression_two,
-                        very_long_expression_three
+                        very_long_expression_three,
                     );
                 }"#]],
             40,
@@ -1027,7 +1025,6 @@ line"""; }"#,
 
     #[test]
     fn test_typed_tuples_breaking() {
-        // TODO
         check_with_width(
             "fun test() { x = [very_long_first_element, very_long_second_element, very_long_third_element]; }",
             expect![[r#"
@@ -1035,7 +1032,7 @@ line"""; }"#,
                     x = [
                         very_long_first_element,
                         very_long_second_element,
-                        very_long_third_element
+                        very_long_third_element,
                     ];
                 }"#]],
             40,
@@ -1097,7 +1094,7 @@ line"""; }"#,
                 fun test() {
                     x = func(
                         a + b,
-                        c * d
+                        c * d,
                     ).field.0
                         .method(e
                         ? f

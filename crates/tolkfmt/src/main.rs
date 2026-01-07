@@ -1,5 +1,7 @@
 use std::collections::{HashMap, VecDeque};
+use std::fs;
 use std::rc::Rc;
+use std::time::Instant;
 use tolk_ast::SourceFile;
 use tree_sitter::Node;
 
@@ -101,18 +103,28 @@ struct Context<'tree> {
 }
 
 fn main() {
-    let code = "
-    fun foo() {
-        val a = 100;
-    }
+    // let code = fs::read_to_string("/Users/petrmakhnev/emulator-rs/.jetton/tests/wallet.test.tolk")
+    //     .unwrap();
+    let code = fs::read_to_string(
+        "/Users/petrmakhnev/emulator-rs/.jetton/contracts/jetton-minter-contract.tolk",
+    )
+    .unwrap();
+    let code = code.as_str();
 
-    fun main() {
-        val a = true
-            ? 1 // if true
-            // comment 0
-            : 0; // if false
-    }
-    ";
+    // let code = "
+    // import \"a\"
+    // import \"b\"
+    //
+    // import \"c\"
+    //
+    // tolk 1.0.1
+    //
+    // fun main() {
+    //     val a = 100;
+    //
+    //     val b = 100;
+    // }
+    // ";
     let tree = tolk_parser::parser::parse(code).unwrap();
 
     let root = tree.root_node();
@@ -314,7 +326,9 @@ fn main() {
     };
     let doc = decls::print_source_file(&mut ctx, &source_file).unwrap();
 
-    let mut out = Vec::new();
-    doc.render(80, &mut out).unwrap();
+    let mut out = Vec::with_capacity(code.len());
+    let now = Instant::now();
+    doc.render(100, &mut out).unwrap();
     println!("{}", String::from_utf8(out).unwrap());
+    println!("tolkfmt took {:?}", now.elapsed());
 }
