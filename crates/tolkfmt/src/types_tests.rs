@@ -201,7 +201,7 @@ mod tests {
         check_with_width(
             "const x: FirstType | SecondType | ThirdType = 0;",
             expect![[r#"
-                const x: | FirstType
+                const x:     | FirstType
                     | SecondType
                     | ThirdType = 0;"#]],
             30,

@@ -32,7 +32,7 @@ pub fn print_union_type<'a>(ctx: &mut Context, union: &UnionType) -> Option<RcDo
     let (first, rest) = parts_docs.split_first()?;
 
     let first_doc = RcDoc::concat([
-        RcDoc::flat_alt(RcDoc::text("| "), RcDoc::nil()),
+        RcDoc::flat_alt(RcDoc::text("    | "), RcDoc::nil()),
         first.clone(),
     ]);
 

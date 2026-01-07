@@ -10,7 +10,7 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {

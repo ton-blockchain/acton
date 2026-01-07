@@ -10,7 +10,7 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let tree = tolk_parser::parser::parse(code).expect("Failed to parse");
         let source_file = SourceFile {
@@ -145,11 +145,15 @@ mod tests {
             expect![[r#"
                 type ComplexUnion = int | slice | bool;"#]],
         );
-        // TODO
-        check(
+        check_with_width(
             "type ComplexUnion = int | slice | bool | address;",
             expect![[r#"
-                type ComplexUnion = int | slice | bool | address;"#]],
+                type ComplexUnion =
+                    | int
+                    | slice
+                    | bool
+                    | address;"#]],
+            20,
         );
     }
 

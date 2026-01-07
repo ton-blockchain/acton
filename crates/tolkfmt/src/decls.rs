@@ -136,7 +136,7 @@ pub fn print_type_alias_declaration<'a>(
 
     parts.push(RcDoc::text(" ="));
     if is_union {
-        parts.push(RcDoc::flat_alt(RcDoc::nil(), RcDoc::space()));
+        parts.push(RcDoc::line());
     } else {
         parts.push(RcDoc::space());
     }
