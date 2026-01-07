@@ -1,11 +1,6 @@
-use crate::{Context, exprs};
+use crate::{Context, common, exprs};
 use pretty::RcDoc;
-use tolk_ast::{
-    AssertStatement, BlockStatement, CatchClause, DoWhileStatement, ExpressionStatement,
-    IfStatement, IfStatementAlternative, LocalVarsDeclaration, MatchStatement, RepeatStatement,
-    ReturnStatement, Statement, ThrowStatement, TryCatchStatement, VarDeclarationLhs,
-    WhileStatement,
-};
+use tolk_ast::*;
 
 pub fn print_block_statement<'a>(ctx: &mut Context, block: &BlockStatement) -> Option<RcDoc<'a>> {
     let statements = block.statements();
@@ -17,7 +12,19 @@ pub fn print_block_statement<'a>(ctx: &mut Context, block: &BlockStatement) -> O
         return Some(RcDoc::text("{}"));
     }
 
-    let mut docs = vec![];
+    // При печати стейтментов мы должны учитывать что между ними могут быть пустые линии которые
+    // мы хотим нормализовать до одной пустой линии, а не убирать их полностью:
+    //
+    // ```
+    // let a = 100;
+    //
+    // let b = 200;
+    // ```
+    // Должно оставаться как есть.
+    // Чтобы вставлять пустые линии, нам нужно знать были ли в оригинальном коде
+    // между двумя стейтментами пустые строки.
+
+    let mut docs = vec![RcDoc::hardline()];
 
     for (i, stmt) in statements.iter().enumerate() {
         let Some(doc) = print_statement(ctx, stmt) else {
@@ -28,11 +35,21 @@ pub fn print_block_statement<'a>(ctx: &mut Context, block: &BlockStatement) -> O
         if i < statements.len() - 1 {
             docs.push(RcDoc::hardline());
         }
+
+        // Если после стейтмента есть другой стейтмент, то есть вероятность, что нам нужна
+        // дополнительная пустая строка, чтобы оставить пустые строки по правилам.
+        //
+        // Если между двумя стейтментами больше одной пустой строки, то добавляем пустую строку.
+        if let Some(next_stmt) = statements.get(i + 1)
+            && common::empty_lines_between(&stmt.raw_node(), &next_stmt.raw_node()) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     let result = RcDoc::concat([
         RcDoc::text("{"),
-        RcDoc::concat([RcDoc::hardline(), RcDoc::concat(docs)]).nest(4),
+        RcDoc::concat(docs).nest(4),
         RcDoc::hardline(),
         RcDoc::text("}"),
     ]);

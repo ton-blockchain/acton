@@ -1,9 +1,6 @@
 use crate::{Context, common};
 use pretty::RcDoc;
-use tolk_ast::{
-    FunCallableType, NullableType, ParenthesizedType, TensorType, TupleType, Type,
-    TypeInstantiatedTs, UnionType,
-};
+use tolk_ast::*;
 
 pub fn print_type<'a>(ctx: &mut Context, typ: &Type) -> Option<RcDoc<'a>> {
     match typ {

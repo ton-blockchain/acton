@@ -1,13 +1,6 @@
 use crate::{Context, common, stmts, types};
 use pretty::RcDoc;
-use tolk_ast::{
-    Assignment, BinaryOperator, BooleanLiteral, CallArgument, CastAsOperator, DotAccess,
-    DotAccessField, Expression, FunctionCall, GenericInstantiation, Ident, InstanceArgument,
-    IsTypeOperator, LambdaExpression, LazyExpression, MatchArm, MatchArmBody, MatchBody, MatchExpr,
-    MatchExpression, MatchPattern, NotNullOperator, NumberLiteral, ObjectLiteral,
-    ParenthesizedExpression, SetAssignment, StringLiteral, TensorExpression, TernaryOperator,
-    TypedTuple, Underscore,
-};
+use tolk_ast::*;
 
 pub fn print_expression<'a>(ctx: &mut Context, expr: &Expression) -> Option<RcDoc<'a>> {
     match expr {
@@ -322,10 +315,20 @@ pub fn print_match_body<'a>(ctx: &mut Context, body: &MatchBody) -> Option<RcDoc
         return Some(RcDoc::text("{}"));
     }
 
-    let mut arm_docs = vec![];
-    for arm in arms {
-        arm_docs.push(RcDoc::hardline());
-        arm_docs.push(print_match_arm(ctx, &arm)?);
+    let mut arm_docs = vec![RcDoc::hardline()];
+    for (i, arm) in arms.iter().enumerate() {
+        arm_docs.push(print_match_arm(ctx, arm)?);
+
+        if i != arms.len() - 1 {
+            arm_docs.push(RcDoc::hardline());
+        }
+
+        // Между arms может быть пустая строка которую мы хотим сохранить
+        if let Some(next) = arms.get(i + 1)
+            && common::empty_lines_between(&arm.0, &next.0) > 1
+        {
+            arm_docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::concat([
@@ -388,30 +391,33 @@ pub fn print_object_literal_body<'a>(
         return Some(RcDoc::text("{}"));
     }
 
-    let mut arg_docs = vec![];
-    for (i, arg) in args.iter().enumerate() {
-        let is_last = i == args.len() - 1;
-        arg_docs.push(print_instance_argument(ctx, arg, is_last)?);
-    }
-
-    let is_multiline = arg_docs.len() > 2;
-    let (separator, open_sep) = if is_multiline {
-        (RcDoc::hardline(), RcDoc::hardline())
+    let is_multiline = args.len() > 2;
+    let separator = if is_multiline {
+        RcDoc::hardline()
     } else {
-        (RcDoc::line(), RcDoc::line())
+        RcDoc::line()
     };
 
-    let mut final_arg_docs = vec![];
-    for (i, doc) in arg_docs.into_iter().enumerate() {
-        if i > 0 {
-            final_arg_docs.push(separator.clone());
+    let mut arg_docs = vec![separator.clone()];
+    for (i, arg) in args.iter().enumerate() {
+        let is_last = i == (args.len() - 1);
+        arg_docs.push(print_instance_argument(ctx, arg, is_last)?);
+
+        if i != args.len() - 1 {
+            arg_docs.push(separator.clone());
         }
-        final_arg_docs.push(doc);
+
+        // Между args может быть пустая строка которую мы хотим сохранить
+        if let Some(next) = args.get(i + 1)
+            && common::empty_lines_between(&arg.0, &next.0) > 1
+        {
+            arg_docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::concat([
         RcDoc::text("{"),
-        RcDoc::concat([open_sep, RcDoc::concat(final_arg_docs)]).nest(4),
+        RcDoc::concat(arg_docs).nest(4),
         separator,
         RcDoc::text("}"),
     ]))
@@ -437,6 +443,8 @@ pub fn print_instance_argument<'a>(
         }
     }
 
+    // В многострочном литерале мы добавляем запятую к каждому элементу
+    // Но в однострочном варианте запятая у последнего элемента не нужна
     parts.push(RcDoc::flat_alt(
         RcDoc::text(","),
         if is_last {

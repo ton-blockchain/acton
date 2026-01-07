@@ -262,6 +262,33 @@ mod tests {
         );
     }
 
+    // TODO: стрипаются пробелы из-за чего тест не проходит
+    // #[test]
+    // fn test_object_literal_multiline_with_empty_lines() {
+    //     check(
+    //         r#"
+    //             fun test() {
+    //                 x = Point {
+    //                     x: 10,
+    //
+    //                     y: 20,
+    //
+    //                     z: 30,
+    //                 };
+    //             }"#,
+    //         expect![[r#"
+    //             fun test() {
+    //                 x = Point {
+    //                     x: 10,
+    //
+    //                     y: 20,
+    //
+    //                     z: 30,
+    //                 };
+    //             }"#]],
+    //     );
+    // }
+
     #[test]
     fn test_tensor_expression() {
         check(
@@ -644,6 +671,33 @@ line"""; }"#,
                 }"#]],
         );
     }
+
+    // // TODO: стрипаются пробелы из-за чего тест не проходит
+    // #[test]
+    // fn test_match_expression_with_empty_lines() {
+    //     check(
+    //         r#"
+    //             fun test() {
+    //                 x = match (value) {
+    //                     int => 1,
+    //
+    //                     string => 2,
+    //
+    //                     else => 0,
+    //                 };
+    //             }"#,
+    //         expect![[r#"
+    //             fun test() {
+    //                 x = match (value) {
+    //                 int => 1,
+    //
+    //                     string => 2,
+    //
+    //                     else => 0,
+    //                 };
+    //             }"#]],
+    //     );
+    // }
 
     #[test]
     fn test_match_expression_with_blocks() {

@@ -33,7 +33,8 @@ mod tests {
         check(
             "tolk 0.6.0",
             expect![[r#"
-                tolk 0.6.0"#]],
+                tolk 0.6.0
+            "#]],
         );
     }
 
@@ -42,7 +43,8 @@ mod tests {
         check(
             "import \"common.tolk\"",
             expect![[r#"
-                import "common.tolk""#]],
+                import "common.tolk"
+            "#]],
         );
     }
 
@@ -205,6 +207,43 @@ mod tests {
         );
     }
 
+    // TODO: стрипаются пробелы из-за чего тест не проходит
+    // #[test]
+    // fn test_struct_declaration_with_new_lines() {
+    //     check(
+    //         r#"struct Point {
+    //             x: int
+    //
+    //             y: int
+    //         }"#,
+    //         expect![[r#"
+    //             struct Point {
+    //                 x: int
+    //
+    //                 y: int
+    //             }"#]],
+    //     );
+    //     check(
+    //         r#"struct Point {
+    //             x: int
+    //
+    //             y: int
+    //
+    //             z: int
+    //             z1: int
+    //         }"#,
+    //         expect![[r#"
+    //             struct Point {
+    //                 x: int
+    //
+    //                 y: int
+    //
+    //                 z: int
+    //                 z1: int
+    //             }"#]],
+    //     );
+    // }
+
     #[test]
     fn test_struct_with_pack_prefix() {
         check(
@@ -282,20 +321,61 @@ mod tests {
             "enum Color { RED, GREEN, BLUE }",
             expect![[r#"
                 enum Color {
-                    RED,
-                    GREEN,
-                    BLUE,
+                    RED
+                    GREEN
+                    BLUE
                 }"#]],
         );
         check(
             "enum Status: int { OK = 0, ERROR = 1 }",
             expect![[r#"
                 enum Status: int {
-                    OK = 0,
-                    ERROR = 1,
+                    OK = 0
+                    ERROR = 1
                 }"#]],
         );
     }
+
+    // TODO: стрипаются пробелы из-за чего тест не проходит
+    // #[test]
+    // fn test_enum_declaration_with_new_lines() {
+    //     check(
+    //         r#"enum Color {
+    //             RED,
+    //
+    //             GREEN,
+    //
+    //             BLUE
+    //         }"#,
+    //         expect![[r#"
+    //             enum Color {
+    //                 RED
+    //
+    //                 GREEN
+    //
+    //                 BLUE
+    //             }"#]],
+    //     );
+    //     check(
+    //         r#"enum Color {
+    //             RED,
+    //
+    //             GREEN,
+    //
+    //             BLUE,
+    //             BLUE2,
+    //         }"#,
+    //         expect![[r#"
+    //             enum Color {
+    //                 RED
+    //
+    //                 GREEN
+    //
+    //                 BLUE
+    //                 BLUE2
+    //             }"#]],
+    //     );
+    // }
 
     #[test]
     fn test_enum_with_annotations() {
@@ -304,8 +384,8 @@ mod tests {
             expect![[r#"
                 @deprecated
                 enum OldEnum {
-                    A,
-                    B,
+                    A
+                    B
                 }"#]],
         );
     }
@@ -316,8 +396,8 @@ mod tests {
             "enum Status: uint8 { OK = 0, ERROR = 1 }",
             expect![[r#"
                 enum Status: uint8 {
-                    OK = 0,
-                    ERROR = 1,
+                    OK = 0
+                    ERROR = 1
                 }"#]],
         );
     }
@@ -328,10 +408,10 @@ mod tests {
             "enum Mixed { A, B = 1, C, D = 10 }",
             expect![[r#"
                 enum Mixed {
-                    A,
-                    B = 1,
-                    C,
-                    D = 10,
+                    A
+                    B = 1
+                    C
+                    D = 10
                 }"#]],
         );
     }
@@ -341,7 +421,9 @@ mod tests {
         check(
             "enum Single { ONLY }",
             expect![[r#"
-                enum Single { ONLY }"#]],
+                enum Single {
+                    ONLY
+                }"#]],
         );
     }
 
@@ -691,8 +773,7 @@ mod tests {
     fn test_empty_statement() {
         check(
             ";",
-            expect![[r#"
-                ;"#]],
+            expect![""],
         );
     }
 
@@ -747,33 +828,110 @@ mod tests {
 
     #[test]
     fn test_mixed_declarations() {
-        // TODO
         check(
             "tolk 0.6.0\nimport \"std\";global x: int;const y = 42;type T = int;struct S { f: T }enum E { A }fun f() {}fun int.m() {}get g() {}",
             expect![[r#"
-tolk 0.6.0
+                tolk 0.6.0
 
-import "std"
+                import "std"
 
-;
+                global x: int;
 
-global x: int;
+                const y = 42;
 
-const y = 42;
+                type T = int;
 
-type T = int;
+                struct S {
+                    f: T
+                }
 
-struct S {
-    f: T
-}
+                enum E {
+                    A
+                }
 
-enum E { A }
+                fun f() {}
 
-fun f() {}
+                fun int.m() {}
 
-fun int.m() {}
+                get fun g() {}"#]],
+        );
+    }
 
-get fun g() {}"#]],
+    #[test]
+    fn test_several_tolk_required_versions() {
+        check(
+            r#"
+                tolk 1.0.1
+                tolk 1.0.0"#,
+            expect![[r#"
+                tolk 1.0.1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn test_tolk_required_version_after_imports() {
+        check(
+            r#"
+                import "a"
+                tolk 1.0.0"#,
+            expect![[r#"
+                tolk 1.0.0
+
+                import "a"
+            "#]],
+        );
+    }
+
+    #[test]
+    fn test_tolk_required_version_after_decl() {
+        check(
+            r#"
+                fun foo() {}
+                tolk 1.0.0"#,
+            expect![[r#"
+                tolk 1.0.0
+
+                fun foo() {}"#]],
+        );
+    }
+
+    #[test]
+    fn test_imports() {
+        check(
+            r#"
+                import "a"
+                import "b"
+                import "c"
+                fun foo() {}"#,
+            expect![[r#"
+                import "a"
+                import "b"
+                import "c"
+
+                fun foo() {}"#]],
+        );
+    }
+
+    #[test]
+    fn test_imports_with_newlines() {
+        check(
+            r#"
+                import "a"
+
+                import "b"
+
+                import "c"
+    
+                fun foo() {}"#,
+            expect![[r#"
+                import "a"
+
+                import "b"
+
+                import "c"
+
+                fun foo() {}"#]],
         );
     }
 }

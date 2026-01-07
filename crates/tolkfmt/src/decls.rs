@@ -1,17 +1,82 @@
 use crate::{Context, common, exprs, stmts, types};
 use pretty::RcDoc;
-use tolk_ast::{
-    Annotation, AnnotationArguments, AnnotationList, AsmBody, ConstantDeclaration, EnumBody,
-    EnumDeclaration, EnumMemberDeclaration, Function, FunctionBody, GetMethodDeclaration,
-    GlobalVarDeclaration, Import, MethodDeclaration, MethodReceiver, Parameter, SourceFile,
-    StructBody, StructDeclaration, StructFieldDeclaration, TolkRequiredVersion, TopLevel,
-    TypeAliasDeclaration, TypeAliasUnderlyingType, TypeParameter, TypeParameters,
-};
+use tolk_ast::*;
 
 pub fn print_source_file<'a>(ctx: &mut Context, file: &SourceFile) -> Option<RcDoc<'a>> {
+    let mut sections = vec![];
+
+    // tolk required version section
     let mut docs = vec![];
 
-    let mut top_levels_iter = file.top_levels_iter().peekable();
+    // В файле по идее может быть несколько версий Толка, но мы оставляем только одну
+    let required_version = file
+        .top_levels_iter()
+        .filter_map(|decl| match decl {
+            TopLevel::TolkRequiredVersion(decl) => Some(decl),
+            _ => None,
+        })
+        .next();
+
+    // Версия Толка всегда печатается в начале файла, до импортов
+    if let Some(required_version) = required_version {
+        let doc = print_tolk_required_version(ctx, &required_version);
+        if let Some(doc) = doc {
+            docs.push(doc);
+            docs.push(RcDoc::hardline());
+        }
+    }
+
+    if !docs.is_empty() {
+        sections.push(docs);
+    }
+
+    // imports section
+    let mut docs = vec![];
+
+    let imports = file
+        .top_levels_iter()
+        .filter_map(|decl| match decl {
+            TopLevel::Import(decl) => Some(decl),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    // После опциональной версии Толка идут импорты.
+    // Импорты печатаются без пустых строк как остальные декларации, но как и стейтменты
+    // они могут быть разделены одной пустой строкой если так было в оригинальном коде
+    for (i, import) in imports.iter().enumerate() {
+        let Some(doc) = print_import(ctx, import) else {
+            continue;
+        };
+        docs.push(doc);
+        docs.push(RcDoc::hardline());
+
+        if let Some(next_import) = imports.get(i + 1)
+            && common::empty_lines_between(&import.0, &next_import.0) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
+    }
+
+    if !docs.is_empty() {
+        sections.push(docs);
+    }
+
+    // declarations section
+    let mut docs = vec![];
+
+    let mut top_levels_iter = file
+        .top_levels_iter()
+        .filter(|decl| {
+            !matches!(
+                decl,
+                TopLevel::TolkRequiredVersion(_)
+                    | TopLevel::Import(_)
+                    | TopLevel::EmptyStatement(_)
+            )
+        })
+        .peekable();
+
     while let Some(top_level) = top_levels_iter.next() {
         let Some(doc) = print_decl(ctx, &top_level) else {
             continue;
@@ -24,7 +89,11 @@ pub fn print_source_file<'a>(ctx: &mut Context, file: &SourceFile) -> Option<RcD
         }
     }
 
-    Some(RcDoc::concat(docs))
+    if !docs.is_empty() {
+        sections.push(docs);
+    }
+
+    Some(common::print_sections(sections))
 }
 
 pub fn print_decl<'a>(ctx: &mut Context, decl: &TopLevel) -> Option<RcDoc<'a>> {
@@ -185,21 +254,24 @@ pub fn print_struct_body<'a>(ctx: &mut Context, body: &StructBody) -> Option<RcD
         return Some(RcDoc::text("{}"));
     }
 
-    let mut parts = vec![];
-    for field in fields {
-        parts.push(print_struct_field_declaration(ctx, &field)?);
-    }
+    let mut docs = vec![RcDoc::hardline()];
+    for (i, field) in fields.iter().enumerate() {
+        docs.push(print_struct_field_declaration(ctx, field)?);
+        if i != fields.len() - 1 {
+            docs.push(RcDoc::hardline());
+        }
 
-    let (first, rest) = parts.split_first()?;
-    let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::hardline());
-        tail_docs.push(doc.clone());
+        // Между полями может быть пустая строка которую мы хотим сохранить
+        if let Some(next) = fields.get(i + 1)
+            && common::empty_lines_between(&field.0, &next.0) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::concat([
         RcDoc::text("{"),
-        RcDoc::concat([RcDoc::hardline(), first.clone(), RcDoc::concat(tail_docs)]).nest(4),
+        RcDoc::concat(docs).nest(4),
         RcDoc::hardline(),
         RcDoc::text("}"),
     ]))
@@ -261,41 +333,25 @@ pub fn print_enum_body<'a>(ctx: &mut Context, body: &EnumBody) -> Option<RcDoc<'
         return Some(RcDoc::text("{}"));
     }
 
-    let mut parts = vec![];
-    for member in members {
-        parts.push(print_enum_member_declaration(ctx, &member)?);
-    }
+    let mut docs = vec![RcDoc::hardline()];
+    for (i, member) in members.iter().enumerate() {
+        docs.push(print_enum_member_declaration(ctx, member)?);
+        if i != members.len() - 1 {
+            docs.push(RcDoc::hardline());
+        }
 
-    if parts.len() == 1
-        && let Some(single) = parts.first()
-    {
-        return Some(RcDoc::concat([
-            RcDoc::text("{"),
-            RcDoc::space(),
-            single.clone(),
-            RcDoc::space(),
-            RcDoc::text("}"),
-        ]));
-    }
-
-    let (first, rest) = parts.split_first()?;
-    let mut tail_docs = vec![];
-    for doc in rest {
-        tail_docs.push(RcDoc::text(","));
-        tail_docs.push(RcDoc::hardline());
-        tail_docs.push(doc.clone());
+        // Между полями может быть пустая строка которую мы хотим сохранить
+        if let Some(next) = members.get(i + 1)
+            && common::empty_lines_between(&member.0, &next.0) > 1
+        {
+            docs.push(RcDoc::hardline());
+        }
     }
 
     Some(RcDoc::concat([
         RcDoc::text("{"),
-        RcDoc::concat([
-            RcDoc::hardline(),
-            first.clone(),
-            RcDoc::concat(tail_docs),
-            RcDoc::text(","),
-            RcDoc::hardline(),
-        ])
-        .nest(4),
+        RcDoc::concat(docs).nest(4),
+        RcDoc::hardline(),
         RcDoc::text("}"),
     ]))
 }
