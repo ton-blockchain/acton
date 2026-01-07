@@ -1,8 +1,6 @@
-use crate::comments::CommentKind::{Inline, Leading, LeadingWithEmptyLine, Trailing};
-use crate::{Context, common, exprs};
+use crate::{comments, common, exprs, Context};
 use pretty::RcDoc;
 use tolk_ast::*;
-
 pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Option<RcDoc<'a>> {
     let statements = block.statements();
     let statements = statements
@@ -31,17 +29,7 @@ pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Optio
         let node = stmt.raw_node();
         let comments = ctx.comments.get(&node);
 
-        if let Some(comments) = comments {
-            for comment in comments {
-                if matches!(comment.kind, Leading | LeadingWithEmptyLine) {
-                    docs.push(common::print_comment(ctx, comment));
-                    docs.push(RcDoc::hardline());
-                    if comment.kind == LeadingWithEmptyLine {
-                        docs.push(RcDoc::hardline());
-                    }
-                }
-            }
-        }
+        comments::print_leading_comments(ctx, &mut docs, comments);
 
         let Some(doc) = print_statement(ctx, stmt) else {
             continue;
@@ -49,23 +37,9 @@ pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Optio
 
         docs.push(doc);
 
-        if let Some(comments) = comments
-            && let Some(inline_comment) = comments.iter().find(|c| c.kind == Inline)
-        {
-            docs.push(RcDoc::space());
-            docs.push(common::print_comment(ctx, inline_comment));
-        }
-
+        comments::print_inline_comments(ctx, &mut docs, comments);
         docs.push(RcDoc::hardline());
-
-        if let Some(comments) = comments {
-            for comment in comments {
-                if comment.kind == Trailing {
-                    docs.push(common::print_comment(ctx, comment));
-                    docs.push(RcDoc::hardline());
-                }
-            }
-        }
+        comments::print_trailing_comments(ctx, &mut docs, comments);
 
         // Если после стейтмента есть другой стейтмент, то есть вероятность, что нам нужна
         // дополнительная пустая строка, чтобы оставить пустые строки по правилам.

@@ -1,4 +1,4 @@
-use crate::{Context, common, exprs, stmts, types};
+use crate::{Context, comments, common, exprs, stmts, types};
 use pretty::RcDoc;
 use tolk_ast::*;
 
@@ -45,11 +45,17 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
     // Импорты печатаются без пустых строк как остальные декларации, но как и стейтменты
     // они могут быть разделены одной пустой строкой если так было в оригинальном коде
     for (i, import) in imports.iter().enumerate() {
+        let comments = ctx.comments.get(&import.0);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
         let Some(doc) = print_import(ctx, import) else {
             continue;
         };
         docs.push(doc);
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
         docs.push(RcDoc::hardline());
+        comments::print_trailing_comments(ctx, &mut docs, comments);
 
         if let Some(next_import) = imports.get(i + 1)
             && common::empty_lines_between(&import.0, &next_import.0) > 1
@@ -73,18 +79,28 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
                 TopLevel::TolkRequiredVersion(_)
                     | TopLevel::Import(_)
                     | TopLevel::EmptyStatement(_)
+                    | TopLevel::Unmapped(_)
             )
         })
         .peekable();
 
     while let Some(top_level) = top_levels_iter.next() {
+        let node = top_level.raw_node();
+        let comments = ctx.comments.get(&node);
+
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
         let Some(doc) = print_decl(ctx, &top_level) else {
             continue;
         };
         docs.push(doc);
 
+        comments::print_inline_comments(ctx, &mut docs, comments);
+        docs.push(RcDoc::hardline());
+        comments::print_trailing_comments(ctx, &mut docs, comments);
+
+        // Добавляем пустую строку между декларациями
         if top_levels_iter.peek().is_some() {
-            docs.push(RcDoc::hardline());
             docs.push(RcDoc::hardline());
         }
     }

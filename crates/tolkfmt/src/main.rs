@@ -91,21 +91,17 @@ fn main() {
     // let code = fs::read_to_string("/Users/petrmakhnev/emulator-rs/.jetton/tests/wallet.test.tolk")
     //     .unwrap();
     let code = fs::read_to_string(
-        "/Users/petrmakhnev/emulator-rs/.jetton/contracts/jetton-minter-contract.tolk",
+        "/Users/petrmakhnev/emulator-rs/.jetton/contracts/jetton-wallet-contract.tolk",
     )
     .unwrap();
     let code = code.as_str();
 
     // let code = "
     // fun main() {
-    //     // comment 1
-    //     val a = 100; // comment 2
-    //
-    //     // comment 3
-    //
-    //     val b = 100;
-    //
-    //     // comment 4
+    //     val restoreAmount = match (msg) {
+    //         InternalTransferStep => msg.jettonAmount, // aaa
+    //         BurnNotificationForMinter => msg.jettonAmount, // bbb
+    //     };
     // }
     // ";
     let tree = tolk_parser::parser::parse(code).unwrap();
@@ -156,19 +152,19 @@ fn main() {
         groups.push(current_group);
     }
 
-    // let comments_map = comments::collect_comments(root);
+    let comments_map = comments::collect_comments(root);
 
-    // for (_node, comments) in &comments_map {
-    //     for comment in comments {
-    //         println!(
-    //             "{} -- {:?} -> {} {}",
-    //             comment.comment.utf8_text(code.as_bytes()).unwrap(),
-    //             comment.kind,
-    //             comment.attach_to.utf8_text(code.as_bytes()).unwrap(),
-    //             comment.attach_to.id(),
-    //         );
-    //     }
-    // }
+    for (node, comments) in &comments_map {
+        for comment in comments {
+            println!(
+                "{} -- {:?} -> {} {}",
+                comment.comment.utf8_text(code.as_bytes()).unwrap(),
+                comment.kind,
+                node.utf8_text(code.as_bytes()).unwrap(),
+                node.id(),
+            );
+        }
+    }
 
     let now = Instant::now();
     let source_file = SourceFile {

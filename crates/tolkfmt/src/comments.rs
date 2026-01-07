@@ -1,4 +1,5 @@
-use crate::TreeWalker;
+use crate::{Context, TreeWalker, common};
+use pretty::RcDoc;
 use std::collections::HashMap;
 use tree_sitter::Node;
 
@@ -132,4 +133,59 @@ pub fn collect_comments(root: Node) -> HashMap<Node, Vec<Comment>> {
         }
     }
     comments_map
+}
+
+pub fn print_leading_comments(
+    ctx: &Context,
+    docs: &mut Vec<RcDoc>,
+    comments: Option<&Vec<Comment>>,
+) {
+    let Some(comments) = comments else {
+        return;
+    };
+
+    for comment in comments {
+        if matches!(
+            comment.kind,
+            CommentKind::Leading | CommentKind::LeadingWithEmptyLine
+        ) {
+            docs.push(common::print_comment(ctx, comment));
+            docs.push(RcDoc::hardline());
+            if comment.kind == CommentKind::LeadingWithEmptyLine {
+                docs.push(RcDoc::hardline());
+            }
+        }
+    }
+}
+
+pub fn print_trailing_comments(
+    ctx: &Context,
+    docs: &mut Vec<RcDoc>,
+    comments: Option<&Vec<Comment>>,
+) {
+    let Some(comments) = comments else {
+        return;
+    };
+
+    for comment in comments {
+        if comment.kind == CommentKind::Trailing {
+            docs.push(common::print_comment(ctx, comment));
+            docs.push(RcDoc::hardline());
+        }
+    }
+}
+
+pub fn print_inline_comments(
+    ctx: &Context,
+    docs: &mut Vec<RcDoc>,
+    comments: Option<&Vec<Comment>>,
+) {
+    let Some(comments) = comments else {
+        return;
+    };
+
+    if let Some(inline_comment) = comments.iter().find(|c| c.kind == CommentKind::Inline) {
+        docs.push(RcDoc::space());
+        docs.push(common::print_comment(ctx, inline_comment));
+    }
 }

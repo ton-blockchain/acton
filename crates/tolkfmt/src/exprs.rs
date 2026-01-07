@@ -1,4 +1,4 @@
-use crate::{Context, common, stmts, types};
+use crate::{Context, common, stmts, types, comments};
 use pretty::RcDoc;
 use tolk_ast::*;
 
@@ -311,11 +311,18 @@ pub fn print_match_body<'a>(ctx: &Context, body: &MatchBody) -> Option<RcDoc<'a>
 
     let mut arm_docs = vec![RcDoc::hardline()];
     for (i, arm) in arms.iter().enumerate() {
+        let comments = ctx.comments.get(&arm.0);
+        comments::print_leading_comments(ctx, &mut arm_docs, comments);
+
         arm_docs.push(print_match_arm(ctx, arm)?);
+
+        comments::print_inline_comments(ctx, &mut arm_docs, comments);
 
         if i != arms.len() - 1 {
             arm_docs.push(RcDoc::hardline());
         }
+
+        comments::print_trailing_comments(ctx, &mut arm_docs, comments);
 
         // Между arms может быть пустая строка которую мы хотим сохранить
         if let Some(next) = arms.get(i + 1)
@@ -394,12 +401,20 @@ pub fn print_object_literal_body<'a>(
 
     let mut arg_docs = vec![separator.clone()];
     for (i, arg) in args.iter().enumerate() {
+        let comments = ctx.comments.get(&arg.0);
+
+        comments::print_leading_comments(ctx, &mut arg_docs, comments);
+
         let is_last = i == (args.len() - 1);
         arg_docs.push(print_instance_argument(ctx, arg, is_last)?);
+
+        comments::print_inline_comments(ctx, &mut arg_docs, comments);
 
         if i != args.len() - 1 {
             arg_docs.push(separator.clone());
         }
+
+        comments::print_trailing_comments(ctx, &mut arg_docs, comments);
 
         // Между args может быть пустая строка которую мы хотим сохранить
         if let Some(next) = args.get(i + 1)
