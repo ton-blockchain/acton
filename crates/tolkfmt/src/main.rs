@@ -9,6 +9,9 @@ mod exprs;
 mod stmts;
 mod types;
 
+#[cfg(test)]
+mod stmts_tests;
+
 #[derive(Debug)]
 enum CommentKind {
     Inline,
