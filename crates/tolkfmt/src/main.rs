@@ -15,6 +15,8 @@ mod exprs_tests;
 mod stmts_tests;
 #[cfg(test)]
 mod types_tests;
+#[cfg(test)]
+mod decls_tests;
 
 #[derive(Debug)]
 #[allow(dead_code)]
