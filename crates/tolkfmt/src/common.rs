@@ -98,6 +98,9 @@ pub fn print_sections(sections: Vec<Vec<RcDoc>>) -> RcDoc {
         }
     }
 
+    // final new line
+    final_docs.push(RcDoc::hardline());
+
     RcDoc::concat(final_docs)
 }
 
