@@ -6,11 +6,18 @@ use axum::{
     response::{IntoResponse, Json},
     routing::get,
 };
+#[cfg(not(debug_assertions))]
+use include_dir::{Dir, include_dir};
 use owo_colors::OwoColorize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tower_http::cors::CorsLayer;
+#[cfg(debug_assertions)]
 use tower_http::services::ServeDir;
+
+// Static directory containing UI assets, embedded into the binary during release builds.
+#[cfg(not(debug_assertions))]
+static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/crates/acton-test-ui/dist");
 
 pub struct UiServerState {
     pub reports: Arc<Vec<TestReport>>,
@@ -53,19 +60,28 @@ pub async fn start_ui_server(
         trace_dir,
     });
 
-    // Path to the frontend dist directory
-    let dist_path = PathBuf::from("/Users/petrmakhnev/emulator-rs/crates/acton-test-ui/dist");
-
     let app = Router::new()
         .route("/api/reports", get(handle_api_reports))
         .route("/api/trace/{name}", get(handle_api_trace))
-        .route("/api/contract/{name}", get(handle_api_contract))
-        .fallback_service(
-            ServeDir::new(dist_path)
-                .fallback(ServeDir::new("crates/acton-test-ui/dist/index.html")),
+        .route("/api/contract/{name}", get(handle_api_contract));
+
+    // In debug mode, serve UI assets directly from the filesystem for faster development.
+    #[cfg(debug_assertions)]
+    let app = {
+        let dist_path = PathBuf::from(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/crates/acton-test-ui/dist"
+        ));
+        app.fallback_service(
+            ServeDir::new(&dist_path).fallback(ServeDir::new(dist_path.join("index.html"))),
         )
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+    };
+
+    // In release mode, serve UI assets embedded within the binary.
+    #[cfg(not(debug_assertions))]
+    let app = app.fallback(handle_embedded_ui);
+
+    let app = app.layer(CorsLayer::permissive()).with_state(state);
 
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
     let url = format!("http://127.0.0.1:{}", port);
@@ -78,6 +94,36 @@ pub async fn start_ui_server(
 
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// Handles requests for UI assets when they are embedded in the binary (release mode).
+#[cfg(not(debug_assertions))]
+async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches('/');
+    // default to index.html for root requests
+    let path = if path.is_empty() { "index.html" } else { path };
+
+    if let Some(file) = UI_DIR.get_file(path) {
+        // Map common file extensions to their respective MIME types.
+        let content_type = match path.split('.').last() {
+            Some("html") => "text/html",
+            Some("js") => "application/javascript",
+            Some("css") => "text/css",
+            Some("svg") => "image/svg+xml",
+            Some("png") => "image/png",
+            Some("json") => "application/json",
+            _ => "application/octet-stream",
+        };
+        return (([("content-type", content_type)]), file.contents()).into_response();
+    }
+
+    // fallback to index.html for SPA routing.
+    // this allows browser refreshes on sub-routes to work correctly
+    if let Some(index) = UI_DIR.get_file("index.html") {
+        return (([("content-type", "text/html")]), index.contents()).into_response();
+    }
+
+    StatusCode::NOT_FOUND.into_response()
 }
 
 async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
