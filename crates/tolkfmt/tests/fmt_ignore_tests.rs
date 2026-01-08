@@ -136,12 +136,12 @@ fn test_fmt_ignore_global_variable_declaration() {
 // fmt-ignore
 global   global_var   :   int;
 
-global other_var: int;",
+global other_var: int",
         expect![[r#"
 // fmt-ignore
 global   global_var   :   int;
 
-global other_var: int;"#]],
+global other_var: int"#]],
     );
 }
 
@@ -157,7 +157,7 @@ type OtherType = int   |   slice;",
 // fmt-ignore
 type   MyType   =   int   |   slice;
 
-type OtherType = int | slice;"#]],
+type OtherType = int | slice"#]],
     );
 }
 
@@ -544,6 +544,6 @@ type OtherType<T, U> = tuple<T, U>;
             // fmt-ignore
             type   MyType   <   T   ,   U   >   =   tuple   <   T   ,   U   >   ;
 
-            type OtherType<T, U> = tuple<T, U>;"#]],
+            type OtherType<T, U> = tuple<T, U>"#]],
     );
 }

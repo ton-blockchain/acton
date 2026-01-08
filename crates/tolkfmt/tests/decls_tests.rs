@@ -121,6 +121,18 @@ mod tests {
     }
 
     #[test]
+    fn test_tolk_required_version_with_comments() {
+        check(r#"
+        // comment 1
+        // comment 2
+        tolk 0.6.0
+        "#, expect![[r#"
+            // comment 1
+            // comment 2
+            tolk 0.6.0"#]]);
+    }
+
+    #[test]
     fn test_import() {
         check(
             "import \"common.tolk\"",
@@ -132,8 +144,7 @@ mod tests {
     fn test_global_var() {
         check(
             "global x: int;",
-            expect![[r#"
-                global x: int;"#]],
+            expect!["global x: int"],
         );
     }
 
@@ -144,7 +155,7 @@ mod tests {
             expect![[r#"
                 @deprecated
                 @custom(42)
-                global x: int;"#]],
+                global x: int"#]],
         );
     }
 
@@ -152,13 +163,11 @@ mod tests {
     fn test_constant_declaration() {
         check(
             "const x = 42;",
-            expect![[r#"
-                const x = 42;"#]],
+            expect!["const x = 42"],
         );
         check(
             "const x: int = 42;",
-            expect![[r#"
-                const x: int = 42;"#]],
+            expect!["const x: int = 42"],
         );
     }
 
@@ -168,7 +177,7 @@ mod tests {
             "@deprecated\nconst MAX_SIZE = 100;",
             expect![[r#"
                 @deprecated
-                const MAX_SIZE = 100;"#]],
+                const MAX_SIZE = 100"#]],
         );
     }
 
@@ -176,18 +185,15 @@ mod tests {
     fn test_constant_complex_expression() {
         check(
             "const PI = 3.14159;",
-            expect![[r#"
-                const PI = 3.14159;"#]],
+            expect!["const PI = 3.14159"],
         );
         check(
             "const MSG = \"hello world\";",
-            expect![[r#"
-                const MSG = "hello world";"#]],
+            expect![[r#"const MSG = "hello world""#]],
         );
         check(
             "const FLAG = true;",
-            expect![[r#"
-                const FLAG = true;"#]],
+            expect!["const FLAG = true"],
         );
     }
 
@@ -195,13 +201,11 @@ mod tests {
     fn test_type_alias() {
         check(
             "type MyInt = int;",
-            expect![[r#"
-                type MyInt = int;"#]],
+            expect!["type MyInt = int"],
         );
         check(
             "type MyMap<K, V> = map<K, V>;",
-            expect![[r#"
-                type MyMap<K, V> = map<K, V>;"#]],
+            expect!["type MyMap<K, V> = map<K, V>"],
         );
     }
 
@@ -211,7 +215,7 @@ mod tests {
             "@deprecated\ntype OldType = int;",
             expect![[r#"
                 @deprecated
-                type OldType = int;"#]],
+                type OldType = int"#]],
         );
     }
 
@@ -219,13 +223,11 @@ mod tests {
     fn test_type_alias_union_type() {
         check(
             "type Result = int | slice;",
-            expect![[r#"
-                type Result = int | slice;"#]],
+            expect!["type Result = int | slice"],
         );
         check(
             "type ComplexUnion = int | slice | bool;",
-            expect![[r#"
-                type ComplexUnion = int | slice | bool;"#]],
+            expect!["type ComplexUnion = int | slice | bool"],
         );
         check_with_width(
             "type ComplexUnion = int | slice | bool | address;",
@@ -234,7 +236,7 @@ mod tests {
                     | int
                     | slice
                     | bool
-                    | address;"#]],
+                    | address"#]],
             20,
         );
     }
@@ -243,8 +245,7 @@ mod tests {
     fn test_type_alias_builtin() {
         check(
             "type MyBuiltin = builtin;",
-            expect![[r#"
-                type MyBuiltin = builtin;"#]],
+            expect!["type MyBuiltin = builtin"],
         );
     }
 
@@ -252,18 +253,15 @@ mod tests {
     fn test_type_alias_complex_types() {
         check(
             "type OptionalInt = int?;",
-            expect![[r#"
-                type OptionalInt = int?;"#]],
+            expect!["type OptionalInt = int?"],
         );
         check(
             "type TupleType = [int, slice];",
-            expect![[r#"
-                type TupleType = [int, slice];"#]],
+            expect!["type TupleType = [int, slice]"],
         );
         check(
             "type TensorType = (int, slice, bool);",
-            expect![[r#"
-                type TensorType = (int, slice, bool);"#]],
+            expect!["type TensorType = (int, slice, bool)"],
         );
     }
 
@@ -399,6 +397,15 @@ mod tests {
             "struct Empty {}",
             expect![[r#"
                 struct Empty {}"#]],
+        );
+    }
+
+    #[test]
+    fn test_struct_without_body() {
+        check(
+            "struct Empty",
+            expect![[r#"
+                struct Empty"#]],
         );
     }
 
@@ -924,18 +931,15 @@ mod tests {
     fn test_semicolon_after_declaration() {
         check(
             "const x = 1;",
-            expect![[r#"
-                const x = 1;"#]],
+            expect!["const x = 1"],
         );
         check(
             "global y: int;",
-            expect![[r#"
-                global y: int;"#]],
+            expect!["global y: int"],
         );
         check(
             "type T = int;",
-            expect![[r#"
-                type T = int;"#]],
+            expect!["type T = int"],
         );
     }
 
@@ -943,8 +947,7 @@ mod tests {
     fn test_semicolon_optional() {
         check(
             "const x = 1",
-            expect![[r#"
-                const x = 1;"#]],
+            expect!["const x = 1"],
         );
     }
 
@@ -969,11 +972,11 @@ mod tests {
 
                 import "std"
 
-                global x: int;
+                global x: int
 
-                const y = 42;
+                const y = 42
 
-                type T = int;
+                type T = int
 
                 struct S {
                     f: T
@@ -1074,8 +1077,8 @@ mod tests {
                 const bar = 2
                 "#,
             expect![[r#"
-                const foo = 1;
-                const bar = 2;"#]],
+                const foo = 1
+                const bar = 2"#]],
         );
     }
 
@@ -1088,9 +1091,9 @@ mod tests {
                 const bar = 2
                 "#,
             expect![[r#"
-                const foo = 1;
+                const foo = 1
 
-                const bar = 2;"#]],
+                const bar = 2"#]],
         );
     }
 }

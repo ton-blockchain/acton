@@ -23,20 +23,20 @@ mod tests {
 
     #[test]
     fn test_type_identifier() {
-        check("const x: int = 0;", expect!["const x: int = 0;"]);
+        check("const x: int = 0;", expect!["const x: int = 0"]);
     }
 
     #[test]
     fn test_type_instantiated_ts() {
         check(
             "const x: map<int, slice> = 0;",
-            expect!["const x: map<int, slice> = 0;"],
+            expect!["const x: map<int, slice> = 0"],
         );
     }
 
     #[test]
     fn test_single_type_instantiated_ts() {
-        check("const x: Foo<int> = 0;", expect!["const x: Foo<int> = 0;"]);
+        check("const x: Foo<int> = 0;", expect!["const x: Foo<int> = 0"]);
     }
 
     #[test]
@@ -48,32 +48,32 @@ mod tests {
                     FirstType,
                     SecondType,
                     ThirdType,
-                > = 0;"#]],
+                > = 0"#]],
             40,
         );
     }
 
     #[test]
     fn test_nullable_type() {
-        check("const x: int? = 0;", expect!["const x: int? = 0;"]);
+        check("const x: int? = 0;", expect!["const x: int? = 0"]);
     }
 
     #[test]
     fn test_parenthesized_type() {
-        check("const x: (int) = 0;", expect!["const x: (int) = 0;"]);
+        check("const x: (int) = 0;", expect!["const x: (int) = 0"]);
     }
 
     #[test]
     fn test_tensor_type() {
         check(
             "const x: (int, slice) = 0;",
-            expect!["const x: (int, slice) = 0;"],
+            expect!["const x: (int, slice) = 0"],
         );
-        check("const x: () = ();", expect!["const x: () = ();"]);
+        check("const x: () = ();", expect!["const x: () = ()"]);
     }
     #[test]
     fn test_single_tensor_type() {
-        check("const x: (int) = 0;", expect!["const x: (int) = 0;"]);
+        check("const x: (int) = 0;", expect!["const x: (int) = 0"]);
     }
 
     #[test]
@@ -85,7 +85,7 @@ mod tests {
                     FirstType,
                     SecondType,
                     ThirdType,
-                ) = 0;"#]],
+                ) = 0"#]],
             30,
         );
     }
@@ -94,13 +94,13 @@ mod tests {
     fn test_tuple_type() {
         check(
             "const x: [int, slice] = 0;",
-            expect!["const x: [int, slice] = 0;"],
+            expect!["const x: [int, slice] = 0"],
         );
     }
 
     #[test]
     fn test_single_tuple_type() {
-        check("const x: [int] = 0;", expect!["const x: [int] = 0;"]);
+        check("const x: [int] = 0;", expect!["const x: [int] = 0"]);
     }
 
     #[test]
@@ -112,7 +112,7 @@ mod tests {
                     FirstType,
                     SecondType,
                     ThirdType,
-                ] = 0;"#]],
+                ] = 0"#]],
             30,
         );
     }
@@ -121,11 +121,11 @@ mod tests {
     fn test_fun_callable_type() {
         check(
             "const x: int -> slice = 0;",
-            expect!["const x: int -> slice = 0;"],
+            expect!["const x: int -> slice = 0"],
         );
         check(
             "const x: (int, int) -> int = 0;",
-            expect!["const x: (int, int) -> int = 0;"],
+            expect!["const x: (int, int) -> int = 0"],
         );
     }
 
@@ -133,7 +133,7 @@ mod tests {
     fn test_fun_callable_type_without_params() {
         check(
             "const x: () -> slice = 0;",
-            expect!["const x: () -> slice = 0;"],
+            expect!["const x: () -> slice = 0"],
         );
     }
 
@@ -141,11 +141,11 @@ mod tests {
     fn test_union_type() {
         check(
             "const x: int | slice = 0;",
-            expect!["const x: int | slice = 0;"],
+            expect!["const x: int | slice = 0"],
         );
         check(
             "const x: int | slice | cell = 0;",
-            expect!["const x: int | slice | cell = 0;"],
+            expect!["const x: int | slice | cell = 0"],
         );
     }
 
@@ -156,7 +156,7 @@ mod tests {
             expect![[r#"
                 const x: FirstType
                     | SecondType
-                    | ThirdType = 0;"#]],
+                    | ThirdType = 0"#]],
             30,
         );
     }
@@ -165,12 +165,12 @@ mod tests {
     fn test_nested_complex_types() {
         check(
             "const x: map<int, (slice | cell)?> = 0;",
-            expect!["const x: map<int, (slice | cell)?> = 0;"],
+            expect!["const x: map<int, (slice | cell)?> = 0"],
         );
     }
 
     #[test]
     fn test_null_literal_type() {
-        check("const x: null = null;", expect!["const x: null = null;"]);
+        check("const x: null = null;", expect!["const x: null = null"]);
     }
 }

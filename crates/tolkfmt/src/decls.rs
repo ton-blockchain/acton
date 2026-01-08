@@ -19,11 +19,17 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
 
     // Tolk version is always printed at the beginning of the file, before imports
     if let Some(required_version) = required_version {
+        let comments = ctx.comments.get(&required_version.0);
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
         let doc = print_tolk_required_version(ctx, &required_version);
         if let Some(doc) = doc {
             docs.push(doc);
-            docs.push(RcDoc::hardline());
         }
+
+        comments::print_inline_comments(ctx, &mut docs, comments);
+        docs.push(RcDoc::hardline());
+        comments::print_trailing_comments(ctx, &mut docs, comments);
     }
 
     if !docs.is_empty() {
@@ -177,7 +183,6 @@ pub fn print_global_var_declaration<'a>(
     parts.push(exprs::print_ident(ctx, &name)?);
     parts.push(RcDoc::text(": "));
     parts.push(types::print_type(ctx, &typ)?);
-    parts.push(RcDoc::text(";"));
 
     Some(RcDoc::concat(parts))
 }
@@ -208,8 +213,6 @@ pub fn print_constant_declaration<'a>(
         parts.push(RcDoc::text("= "));
         parts.push(exprs::print_expression(ctx, &value)?);
     }
-
-    parts.push(RcDoc::text(";"));
 
     Some(RcDoc::concat(parts))
 }
@@ -247,7 +250,6 @@ pub fn print_type_alias_declaration<'a>(
         TypeAliasUnderlyingType::Type(typ) => types::print_type(ctx, &typ)?,
         TypeAliasUnderlyingType::BuiltinSpecifier(_) => RcDoc::text("builtin"),
     });
-    parts.push(RcDoc::text(";"));
 
     Some(RcDoc::group(RcDoc::concat(parts)))
 }
@@ -273,9 +275,8 @@ pub fn print_struct_declaration<'a>(ctx: &Context, s: &StructDeclaration) -> Opt
         parts.push(print_type_parameters(ctx, &tp)?);
     }
 
-    parts.push(RcDoc::space());
-
     if let Some(body) = s.body() {
+        parts.push(RcDoc::space());
         parts.push(print_struct_body(ctx, &body)?);
     }
     Some(RcDoc::concat(parts))
