@@ -19,6 +19,12 @@ use tower_http::services::ServeDir;
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/crates/acton-test-ui/dist");
 
+#[cfg(target_os = "macos")]
+static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/open_chrome.applescript"
+));
+
 pub struct UiServerState {
     pub reports: Arc<Vec<TestReport>>,
     pub trace_dir: Option<String>,
@@ -87,13 +93,66 @@ pub async fn start_ui_server(
     let url = format!("http://127.0.0.1:{}", port);
     println!("     {} UI server at {}", "Starting".green().bold(), url);
 
-    // Open browser
-    if let Err(e) = opener::open(url) {
-        eprintln!("Warning: Failed to open browser: {}", e);
-    }
+    open_browser(&url);
 
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn open_browser(url: &str) {
+    #[cfg(target_os = "macos")]
+    {
+        let chromium_browsers = [
+            "Google Chrome",
+            "Arc",
+            "Brave Browser",
+            "Microsoft Edge",
+            "Vivaldi",
+        ];
+
+        for browser in chromium_browsers {
+            if is_process_running(browser) {
+                // Execute embedded AppleScript with arguments
+                let child = std::process::Command::new("osascript")
+                    .arg("-")
+                    .arg(url)
+                    .arg(browser)
+                    .stdin(std::process::Stdio::piped())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .ok();
+
+                if let Some(mut child) = child {
+                    use std::io::Write;
+                    if let Some(mut stdin) = child.stdin.take() {
+                        let _ = stdin.write_all(OPEN_CHROME_SCRIPT.as_bytes());
+                    }
+                    let status = child.wait().ok();
+                    if status.map(|s| s.success()).unwrap_or(false) {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    if let Err(e) = opener::open(url) {
+        eprintln!("Warning: Failed to open browser: {}", e);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn is_process_running(process_name: &str) -> bool {
+    let output = std::process::Command::new("ps").arg("-cax").output().ok();
+
+    if let Some(output) = output {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // We look for the exact process name in the list
+        stdout.lines().any(|line| line.contains(process_name))
+    } else {
+        false
+    }
 }
 
 /// Handles requests for UI assets when they are embedded in the binary (release mode).
