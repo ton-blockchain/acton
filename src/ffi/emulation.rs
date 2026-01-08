@@ -418,7 +418,7 @@ fn send_message_debug(
         )
         .expect("Cannot send response");
 
-    let msg_cell = Emulator::patch_src_addr(msg_cell.clone(), src_addr.clone())?;
+    let msg_cell = Emulator::patch_message(msg_cell.clone(), src_addr.clone())?;
     let prepare_result = step_executor
         .prepare_transaction(
             &Boc::encode_base64(msg_cell),

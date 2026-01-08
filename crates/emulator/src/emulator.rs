@@ -48,6 +48,7 @@
 
 use crate::world_state::WorldState;
 use anyhow::Context;
+use std::time::SystemTime;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{
     EmulationResult, Executor, RunTransactionArgs, RunTransactionResultError,
@@ -105,7 +106,7 @@ impl Emulator {
         libs: &Dict<HashBytes, LibDescr>,
         from: Option<IntAddr>,
     ) -> anyhow::Result<SendMessageResult> {
-        let msg_cell = Self::patch_src_addr(message, from)?;
+        let msg_cell = Self::patch_message(message, from)?;
         let msg_b64 = Boc::encode_base64(&msg_cell);
         let msg = msg_cell
             .parse::<Message>()
@@ -241,15 +242,25 @@ impl Emulator {
         Ok(results)
     }
 
-    /// Set custom `src` address if it is None.
-    pub fn patch_src_addr(message_cell: Cell, src_addr: Option<IntAddr>) -> anyhow::Result<Cell> {
+    pub fn patch_message(message_cell: Cell, src_addr: Option<IntAddr>) -> anyhow::Result<Cell> {
         let Some(from) = src_addr else {
             return Ok(message_cell);
         };
 
         if let Ok(mut message) = message_cell.parse::<RelaxedMessage>() {
             match &mut message.info {
-                RelaxedMsgInfo::Int(info) if info.src.is_none() => info.src = Some(from),
+                RelaxedMsgInfo::Int(info) => {
+                    // Set src address as Node does
+                    if info.src.is_none() {
+                        info.src = Some(from)
+                    }
+
+                    // Set create_at as Node does
+                    info.created_at = SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs() as u32;
+                }
                 _ => {}
             }
 
