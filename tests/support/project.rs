@@ -738,6 +738,11 @@ impl ActonCommand {
         self
     }
 
+    pub fn fmt(mut self) -> Self {
+        self.cmd = self.cmd.arg("fmt").current_dir(&self.project.path);
+        self
+    }
+
     /// Start disasm command with file input
     ///
     /// # Examples

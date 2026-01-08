@@ -2,14 +2,12 @@
 name = "acton"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.90.0"
 
 [workspace]
 members = ["crates/*"]
 
-# experimental projects
 exclude = [
-    "crates/txtracer-mcp",
-    "crates/txtracer-tui",
     "crates/acton-test-ui",
 ]
 
@@ -20,6 +18,7 @@ tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }
 ton-executor = { path = "crates/ton-executor" }
 tolk_parser = { path = "crates/tolk_parser" }
+tolk_ast = { path = "crates/tolk_ast" }
 tvmffi = { path = "crates/tvmffi" }
 vmlogs = { path = "crates/vmlogs" }
 tasm = { path = "crates/tasm" }
@@ -27,6 +26,7 @@ dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
 retrace = { path = "crates/retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
+tolkfmt = { path = "crates/tolkfmt" }
 
 # remote crates
 # base TON libraries
@@ -98,6 +98,9 @@ toml_edit = "0.24.0"
 tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "full"] }
 once_cell = "1.21.3"
 keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "linux-native"] }
+
+# acton fmt
+similar = { version = "2.7.0", features = ["inline"] }
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }

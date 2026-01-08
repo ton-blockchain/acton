@@ -8,3 +8,7 @@ license = "MIT"
 name = "My Contract"
 src = "contracts/my_contract.tolk"
 depends = []
+
+[fmt]
+width = 100
+ignore = []

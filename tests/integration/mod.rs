@@ -9,6 +9,7 @@ mod diff_tests;
 mod disasm_tests;
 mod fixture_tests;
 mod flags_tests;
+mod fmt_tests;
 mod incremental_tests;
 mod init_tests;
 mod library_tests;

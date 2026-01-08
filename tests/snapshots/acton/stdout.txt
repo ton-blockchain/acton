@@ -16,6 +16,7 @@ Commands:
   verify       Verify contract source code on verifier.ton.org
   retrace      Retrace a transaction by its hash
   library      Manage TON libraries
+  fmt          Format Tolk source files
   up           Manage Acton versions
   completions  Generate shell completions for selected shell
   help         Print this message or the help of the given subcommand(s)

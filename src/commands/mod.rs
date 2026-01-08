@@ -3,6 +3,7 @@ pub mod common;
 pub mod compile;
 pub mod disasm;
 pub mod docgen;
+pub mod fmt;
 pub mod init;
 pub mod internal;
 pub mod library;

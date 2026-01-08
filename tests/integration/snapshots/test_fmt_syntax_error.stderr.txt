@@ -1,0 +1,2 @@
+Error contracts/broken.tolk: Cannot format code with syntax error
+Error: Failed to format 1 files due to syntax errors

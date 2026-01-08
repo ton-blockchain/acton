@@ -3,6 +3,7 @@ use acton::commands::build::build_cmd;
 use acton::commands::compile::compile_cmd;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::docgen::docgen_cmd;
+use acton::commands::fmt::fmt_cmd;
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
@@ -497,6 +498,16 @@ enum Commands {
         command: LibraryCommand,
     },
     #[command(
+        about = "Format Tolk source files",
+        after_help = example_fmt_usage()
+    )]
+    Fmt {
+        #[arg(help = "Files or directories to format (defaults to current directory)")]
+        paths: Vec<String>,
+        #[arg(long, help = "Check if files are formatted without overwriting them")]
+        check: bool,
+    },
+    #[command(
         about = "Manage Acton versions",
         after_help = example_up_usage()
     )]
@@ -976,6 +987,20 @@ fn example_up_usage() -> StyledStr {
     )
 }
 
+fn example_fmt_usage() -> StyledStr {
+    format_examples(
+        &[
+            ("Format all Tolk files in the current project", "acton fmt"),
+            (
+                "Format specific files or directories",
+                "acton fmt contracts/ scripts/",
+            ),
+            ("Check if all files are formatted", "acton fmt --check"),
+        ],
+        "",
+    )
+}
+
 fn example_completions_usage() -> StyledStr {
     format_examples(
         &[
@@ -1276,6 +1301,7 @@ fn main() {
             }
             result
         }
+        Commands::Fmt { paths, check } => fmt_cmd(paths, check),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())

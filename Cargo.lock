@@ -63,6 +63,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "similar",
  "snapbox",
  "strip-ansi-escapes",
  "strsim",
@@ -70,8 +71,10 @@ dependencies = [
  "tasm",
  "tempfile",
  "tokio",
+ "tolk_ast",
  "tolk_parser",
  "tolkc",
+ "tolkfmt",
  "toml",
  "toml_edit",
  "ton-api",
@@ -756,6 +759,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dissimilar"
+version = "1.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8975ffdaa0ef3661bfe02dbdcc06c9f829dfafe6a3c474de366a8d5e44276921"
+
+[[package]]
 name = "document-features"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -829,6 +838,16 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "expect-test"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63af43ff4431e848fb47472a920f14fa71c24de13255a5692e93d4e90302acb0"
+dependencies = [
+ "dissimilar",
+ "once_cell",
 ]
 
 [[package]]
@@ -2809,6 +2828,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tolk_ast"
+version = "0.1.0"
+dependencies = [
+ "tolk_parser",
+ "tree-sitter",
+]
+
+[[package]]
 name = "tolk_parser"
 version = "0.1.0"
 dependencies = [
@@ -2828,10 +2855,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "tolkfmt2"
+name = "tolkfmt"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "expect-test",
  "pretty",
+ "tolk_ast",
  "tolk_parser",
  "tree-sitter",
 ]
@@ -3042,12 +3072,12 @@ checksum = "c4013970217383f67b18aef68f6fb2e8d409bc5755227092d32efb0422ba24b8"
 
 [[package]]
 name = "tree-sitter-tolk"
-version = "0.0.1"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f590befdbb2996f0db1f3aea327fe3899bf9018744497ae92d8c1dad8e6e09d"
+checksum = "23ae0cdf00f52be4b12efd2bebaa66b7bb1f94e67b8f35ad813ac1f2b7e73362"
 dependencies = [
  "cc",
- "tree-sitter",
+ "tree-sitter-language",
 ]
 
 [[package]]

@@ -1,9 +1,8 @@
 [package]
-name = "tolk_parser"
+name = "tolk_ast"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+tolk_parser = { path = "../tolk_parser" }
 tree-sitter = "0.25.10"
-tree-sitter-tolk = "0.0.2"
-anyhow = "1.0.100"
