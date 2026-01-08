@@ -838,7 +838,7 @@ impl<'tree> TypeParameter<'tree> {
         self.0.field("name")
     }
 
-    pub fn default(&self) -> Option<crate::types::Type<'tree>> {
+    pub fn default(&self) -> Option<Type<'tree>> {
         self.0.field("default")
     }
 }

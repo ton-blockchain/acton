@@ -216,10 +216,6 @@ pub fn print_function_call<'a>(ctx: &Context, call: &FunctionCall) -> Option<RcD
 }
 
 pub fn print_argument_list<'a>(ctx: &Context, args: &[CallArgument]) -> Option<RcDoc<'a>> {
-    if args.is_empty() {
-        return Some(RcDoc::text("()"));
-    }
-
     // We want to output:
     // ```
     // createMessage({
@@ -239,44 +235,13 @@ pub fn print_argument_list<'a>(ctx: &Context, args: &[CallArgument]) -> Option<R
         ])));
     }
 
-    let mut docs = vec![RcDoc::line_()];
-    for (i, arg) in args.iter().enumerate() {
-        let node = &arg.0;
-        let comments = ctx.comments.get(node);
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(print_call_argument(ctx, arg)?);
-
-        let is_last = i == args.len() - 1;
-        if !is_last {
-            docs.push(RcDoc::text(","));
-        } else {
-            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
-        }
-
-        comments::print_inline_comments(ctx, &mut docs, comments);
-
-        if is_last {
-            docs.push(RcDoc::line_());
-        } else {
-            docs.push(RcDoc::line());
-        }
-
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        // There can be an empty line between arguments that we want to preserve
-        if let Some(next) = args.get(i + 1)
-            && common::empty_lines_between(ctx, node, &next.0) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::group(RcDoc::concat([
-        RcDoc::text("("),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text(")"),
-    ])))
+    common::print_list(
+        ctx,
+        args,
+        print_call_argument,
+        |arg| arg.0,
+        common::ListOptions::default(),
+    )
 }
 
 pub fn print_call_argument<'a>(ctx: &Context, arg: &CallArgument) -> Option<RcDoc<'a>> {
@@ -299,50 +264,15 @@ pub fn print_generic_instantiation<'a>(
     let ts = instantiation.instantiation_ts()?;
     let types = ts.types();
 
-    if types.is_empty() {
-        return Some(RcDoc::concat([expr_doc, RcDoc::text("<>")]));
-    }
+    let types_doc = common::print_list(
+        ctx,
+        &types,
+        types::print_type,
+        Type::raw_node,
+        common::ListOptions::triangle_bracket_list(),
+    )?;
 
-    let mut docs = vec![RcDoc::line_()];
-    for (i, typ) in types.iter().enumerate() {
-        let node = typ.raw_node();
-        let comments = ctx.comments.get(&node);
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(types::print_type(ctx, typ)?);
-
-        let is_last = i == types.len() - 1;
-        if !is_last {
-            docs.push(RcDoc::text(","));
-        } else {
-            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
-        }
-
-        comments::print_inline_comments(ctx, &mut docs, comments);
-
-        if is_last {
-            docs.push(RcDoc::line_());
-        } else {
-            docs.push(RcDoc::line());
-        }
-
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        if let Some(next) = types.get(i + 1)
-            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::concat([
-        expr_doc,
-        RcDoc::group(RcDoc::concat([
-            RcDoc::text("<"),
-            RcDoc::concat(docs).nest(4),
-            RcDoc::text(">"),
-        ])),
-    ]))
+    Some(RcDoc::concat([expr_doc, types_doc]))
 }
 
 pub fn print_parenthesized_expression<'a>(
@@ -384,52 +314,18 @@ pub fn print_match_expression<'a>(
 }
 
 pub fn print_match_body<'a>(ctx: &Context, body: &MatchBody) -> Option<RcDoc<'a>> {
-    let arms = body.arms();
-    if arms.is_empty() {
-        return Some(RcDoc::text("{}"));
-    }
-
-    let mut arm_docs_with_info = Vec::with_capacity(arms.len());
-    let mut max_width = 0;
-
-    for arm in arms.iter() {
-        let doc = print_match_arm(ctx, arm)?;
-        let width = common::doc_width(&doc);
-
-        let comments = ctx.comments.get(&arm.0);
-        let has_inline =
-            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
-
-        if has_inline {
-            max_width = max_width.max(width);
-        }
-        arm_docs_with_info.push((doc, comments));
-    }
-
-    let mut docs = vec![RcDoc::hardline()];
-    for (i, (arm_doc, comments)) in arm_docs_with_info.into_iter().enumerate() {
-        let arm = &arms[i];
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(arm_doc);
-
-        comments::print_inline_comments_with_alignment(ctx, &mut docs, comments, max_width);
-        docs.push(RcDoc::hardline());
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        // There can be an empty line between arms that we want to preserve
-        if let Some(next) = arms.get(i + 1)
-            && common::empty_lines_between(ctx, &arm.0, &next.0) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::concat([
-        RcDoc::text("{"),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text("}"),
-    ]))
+    common::print_list(
+        ctx,
+        &body.arms(),
+        print_match_arm,
+        |arm| arm.0,
+        common::ListOptions {
+            brackets: (RcDoc::text("{"), RcDoc::text("}")),
+            separator: RcDoc::nil(), // handled by print_match_arm itself
+            multiline_threshold: 0,  // always break
+            ..Default::default()
+        },
+    )
 }
 
 pub fn print_match_arm<'a>(ctx: &Context, arm: &MatchArm) -> Option<RcDoc<'a>> {
@@ -480,76 +376,21 @@ pub fn print_object_literal_body<'a>(
     ctx: &Context,
     args: &[InstanceArgument],
 ) -> Option<RcDoc<'a>> {
-    if args.is_empty() {
-        return Some(RcDoc::text("{}"));
-    }
-
-    let has_comments = args
-        .iter()
-        .any(|arg| ctx.comments.get(&arg.0).is_some_and(|cs| !cs.is_empty()));
-
-    let is_multiline = args.len() > 2 || has_comments;
-    let separator = if is_multiline {
-        RcDoc::hardline()
-    } else {
-        RcDoc::line()
-    };
-
-    let mut arg_docs_with_info = Vec::with_capacity(args.len());
-    let mut max_width = 0;
-
-    for (i, arg) in args.iter().enumerate() {
-        let is_last = i == (args.len() - 1);
-        let doc = print_instance_argument(ctx, arg, is_last)?;
-        let width = common::doc_width(&doc);
-
-        let comments = ctx.comments.get(&arg.0);
-        let has_inline =
-            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
-
-        if has_inline && is_multiline {
-            max_width = max_width.max(width);
-        }
-        arg_docs_with_info.push((doc, comments));
-    }
-
-    let mut arg_docs = vec![separator.clone()];
-    for (i, (arg_doc, comments)) in arg_docs_with_info.into_iter().enumerate() {
-        let arg = &args[i];
-
-        comments::print_leading_comments(ctx, &mut arg_docs, comments);
-
-        arg_docs.push(arg_doc);
-
-        if is_multiline {
-            comments::print_inline_comments_with_alignment(ctx, &mut arg_docs, comments, max_width);
-        } else {
-            comments::print_inline_comments(ctx, &mut arg_docs, comments);
-        }
-
-        arg_docs.push(separator.clone());
-        comments::print_trailing_comments(ctx, &mut arg_docs, comments);
-
-        // There can be an empty line between args that we want to preserve
-        if let Some(next) = args.get(i + 1)
-            && common::empty_lines_between(ctx, &arg.0, &next.0) > 1
-        {
-            arg_docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::concat([
-        RcDoc::text("{"),
-        RcDoc::concat(arg_docs).nest(4),
-        RcDoc::text("}"),
-    ]))
+    common::print_list(
+        ctx,
+        args,
+        print_instance_argument,
+        |arg| arg.0,
+        common::ListOptions {
+            brackets: (RcDoc::text("{"), RcDoc::text("}")),
+            multiline_threshold: 2,
+            single_line_edge_space: true,
+            ..Default::default()
+        },
+    )
 }
 
-pub fn print_instance_argument<'a>(
-    ctx: &Context,
-    arg: &InstanceArgument,
-    is_last: bool,
-) -> Option<RcDoc<'a>> {
+pub fn print_instance_argument<'a>(ctx: &Context, arg: &InstanceArgument) -> Option<RcDoc<'a>> {
     let name = arg.name()?;
     let name_text = name.text(ctx.code.as_ref().as_ref()).to_string();
     let name_doc = print_ident(ctx, &name)?;
@@ -564,17 +405,6 @@ pub fn print_instance_argument<'a>(
             parts.push(val_doc);
         }
     }
-
-    // In multiline literals we add a comma to each element
-    // But in the single-line version, the comma is not needed for the last element
-    parts.push(RcDoc::flat_alt(
-        RcDoc::text(","),
-        if is_last {
-            RcDoc::nil()
-        } else {
-            RcDoc::text(",")
-        },
-    ));
 
     Some(RcDoc::concat(parts))
 }
@@ -603,55 +433,16 @@ fn print_tuple_tensor<'a>(
     open_quote: &'a str,
     close_quote: &'a str,
 ) -> Option<RcDoc<'a>> {
-    if elements.is_empty() {
-        return Some(RcDoc::concat([
-            RcDoc::text(open_quote),
-            RcDoc::text(close_quote),
-        ]));
-    }
-
-    let mut docs = vec![RcDoc::line_()];
-    for (i, el) in elements.iter().enumerate() {
-        let node = el.raw_node();
-        let comments = ctx.comments.get(&node);
-
-        if comments::has_fmt_ignore(ctx, comments) {
-            docs.push(common::print_original_node_text(ctx, &node));
-        } else {
-            comments::print_leading_comments(ctx, &mut docs, comments);
-
-            docs.push(print_expression(ctx, el)?);
-
-            let is_last = i == elements.len() - 1;
-            if !is_last {
-                docs.push(RcDoc::text(","));
-            } else {
-                docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
-            }
-
-            comments::print_inline_comments(ctx, &mut docs, comments);
-
-            if is_last {
-                docs.push(RcDoc::line_());
-            } else {
-                docs.push(RcDoc::line());
-            }
-
-            comments::print_trailing_comments(ctx, &mut docs, comments);
-        }
-
-        if let Some(next) = elements.get(i + 1)
-            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::group(RcDoc::concat([
-        RcDoc::text(open_quote),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text(close_quote),
-    ])))
+    common::print_list(
+        ctx,
+        &elements,
+        print_expression,
+        Expression::raw_node,
+        common::ListOptions {
+            brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
+            ..Default::default()
+        },
+    )
 }
 
 pub fn print_lambda_expression<'a>(ctx: &Context, lambda: &LambdaExpression) -> Option<RcDoc<'a>> {

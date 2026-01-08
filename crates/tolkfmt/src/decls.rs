@@ -283,53 +283,13 @@ pub fn print_struct_declaration<'a>(ctx: &Context, s: &StructDeclaration) -> Opt
 }
 
 pub fn print_struct_body<'a>(ctx: &Context, body: &StructBody) -> Option<RcDoc<'a>> {
-    let fields = body.fields();
-    if fields.is_empty() {
-        return Some(RcDoc::text("{}"));
-    }
-
-    let mut field_docs = Vec::with_capacity(fields.len());
-    let mut max_width = 0;
-
-    for field in fields.iter() {
-        let doc = print_struct_field_declaration(ctx, field)?;
-        let width = common::doc_width(&doc);
-
-        let comments = ctx.comments.get(&field.0);
-        let has_inline =
-            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
-
-        if has_inline {
-            max_width = max_width.max(width);
-        }
-        field_docs.push(doc);
-    }
-
-    let mut docs = vec![RcDoc::hardline()];
-    for (i, field_doc) in field_docs.into_iter().enumerate() {
-        let field = &fields[i];
-        let comments = ctx.comments.get(&field.0);
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(field_doc);
-
-        comments::print_inline_comments_with_alignment(ctx, &mut docs, comments, max_width);
-        docs.push(RcDoc::hardline());
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        // There can be an empty line between fields that we want to preserve
-        if let Some(next) = fields.get(i + 1)
-            && common::empty_lines_between(ctx, &field.0, &next.0) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::concat([
-        RcDoc::text("{"),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text("}"),
-    ]))
+    common::print_list(
+        ctx,
+        &body.fields(),
+        print_struct_field_declaration,
+        |f| f.0,
+        common::ListOptions::curly_bracket_body(),
+    )
 }
 
 pub fn print_struct_field_declaration<'a>(
@@ -383,53 +343,13 @@ pub fn print_enum_declaration<'a>(ctx: &Context, e: &EnumDeclaration) -> Option<
 }
 
 pub fn print_enum_body<'a>(ctx: &Context, body: &EnumBody) -> Option<RcDoc<'a>> {
-    let members = body.members();
-    if members.is_empty() {
-        return Some(RcDoc::text("{}"));
-    }
-
-    let mut member_docs = Vec::with_capacity(members.len());
-    let mut max_width = 0;
-
-    for member in members.iter() {
-        let doc = print_enum_member_declaration(ctx, member)?;
-        let width = common::doc_width(&doc);
-
-        let comments = ctx.comments.get(&member.0);
-        let has_inline =
-            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
-
-        if has_inline {
-            max_width = max_width.max(width);
-        }
-        member_docs.push(doc);
-    }
-
-    let mut docs = vec![RcDoc::hardline()];
-    for (i, member_doc) in member_docs.into_iter().enumerate() {
-        let member = &members[i];
-        let comments = ctx.comments.get(&member.0);
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(member_doc);
-
-        comments::print_inline_comments_with_alignment(ctx, &mut docs, comments, max_width);
-        docs.push(RcDoc::hardline());
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        // There can be an empty line between fields that we want to preserve
-        if let Some(next) = members.get(i + 1)
-            && common::empty_lines_between(ctx, &member.0, &next.0) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::concat([
-        RcDoc::text("{"),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text("}"),
-    ]))
+    common::print_list(
+        ctx,
+        &body.members(),
+        print_enum_member_declaration,
+        |m| m.0,
+        common::ListOptions::curly_bracket_body(),
+    )
 }
 
 pub fn print_enum_member_declaration<'a>(
@@ -561,100 +481,88 @@ pub fn print_method_receiver<'a>(ctx: &Context, r: &MethodReceiver) -> Option<Rc
     Some(RcDoc::concat([typ_doc, RcDoc::text(".")]))
 }
 
-pub fn print_parameter_list<'a, P>(ctx: &Context, params: &[P]) -> Option<RcDoc<'a>>
-where
-    P: ParameterTrait,
-{
-    if params.is_empty() {
-        return Some(RcDoc::text("()"));
-    }
-
-    let mut docs = vec![RcDoc::line_()];
-    for (i, p) in params.iter().enumerate() {
-        let node = p.raw_node();
-        let comments = ctx.comments.get(&node);
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(print_parameter_declaration(ctx, p)?);
-
-        let is_last = i == params.len() - 1;
-        if !is_last {
-            docs.push(RcDoc::text(","));
-        } else {
-            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
-        }
-
-        comments::print_inline_comments(ctx, &mut docs, comments);
-
-        if is_last {
-            docs.push(RcDoc::line_());
-        } else {
-            docs.push(RcDoc::line());
-        }
-
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        if let Some(next) = params.get(i + 1)
-            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::group(RcDoc::concat([
-        RcDoc::text("("),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text(")"),
-    ])))
-}
-
 pub trait ParameterTrait {
-    fn raw_node(&self) -> tree_sitter::Node<'_>;
+    fn raw_node<'tree>(&self) -> tree_sitter::Node<'tree>
+    where
+        Self: 'tree;
     fn mutate(&self) -> bool;
-    fn name(&self) -> Option<Ident<'_>>;
-    fn typ(&self) -> Option<Type<'_>>;
-    fn default(&self) -> Option<Expression<'_>>;
+    fn name<'tree>(&self) -> Option<Ident<'tree>>
+    where
+        Self: 'tree;
+    fn typ<'tree>(&self) -> Option<Type<'tree>>
+    where
+        Self: 'tree;
+    fn default<'tree>(&self) -> Option<Expression<'tree>>
+    where
+        Self: 'tree;
 }
 
 impl<'tree> ParameterTrait for Parameter<'tree> {
-    fn raw_node(&self) -> tree_sitter::Node<'tree> {
+    fn raw_node<'t>(&self) -> tree_sitter::Node<'t>
+    where
+        Self: 't,
+    {
         self.0
     }
     fn mutate(&self) -> bool {
         self.mutate()
     }
-    fn name(&self) -> Option<Ident<'tree>> {
+    fn name<'t>(&self) -> Option<Ident<'t>>
+    where
+        Self: 't,
+    {
         self.name()
     }
-    fn typ(&self) -> Option<Type<'tree>> {
+    fn typ<'t>(&self) -> Option<Type<'t>>
+    where
+        Self: 't,
+    {
         self.typ()
     }
-    fn default(&self) -> Option<Expression<'tree>> {
+    fn default<'t>(&self) -> Option<Expression<'t>>
+    where
+        Self: 't,
+    {
         self.default()
     }
 }
 
 impl<'tree> ParameterTrait for LambdaParameter<'tree> {
-    fn raw_node(&self) -> tree_sitter::Node<'tree> {
+    fn raw_node<'t>(&self) -> tree_sitter::Node<'t>
+    where
+        Self: 't,
+    {
         self.0
     }
     fn mutate(&self) -> bool {
         self.mutate()
     }
-    fn name(&self) -> Option<Ident<'tree>> {
+    fn name<'t>(&self) -> Option<Ident<'t>>
+    where
+        Self: 't,
+    {
         self.name()
     }
-    fn typ(&self) -> Option<Type<'tree>> {
+    fn typ<'t>(&self) -> Option<Type<'t>>
+    where
+        Self: 't,
+    {
         self.typ()
     }
-    fn default(&self) -> Option<Expression<'tree>> {
+    fn default<'t>(&self) -> Option<Expression<'t>>
+    where
+        Self: 't,
+    {
         None
     }
 }
 
-pub fn print_parameter_declaration<'a, P>(ctx: &Context, param: &P) -> Option<RcDoc<'a>>
+pub fn print_parameter_declaration<'a, 'tree, P>(
+    ctx: &Context<'tree>,
+    param: &P,
+) -> Option<RcDoc<'a>>
 where
-    P: ParameterTrait,
+    P: ParameterTrait + 'tree,
 {
     let mut parts = vec![];
     if param.mutate() {
@@ -674,6 +582,19 @@ where
     }
 
     Some(RcDoc::concat(parts))
+}
+
+pub fn print_parameter_list<'a, 'tree, P>(ctx: &Context<'tree>, params: &[P]) -> Option<RcDoc<'a>>
+where
+    P: ParameterTrait + 'tree,
+{
+    common::print_list(
+        ctx,
+        params,
+        print_parameter_declaration,
+        P::raw_node,
+        common::ListOptions::default(),
+    )
 }
 
 pub fn print_annotation_list<'a>(ctx: &Context, a: &AnnotationList) -> Option<RcDoc<'a>> {
@@ -713,93 +634,23 @@ pub fn print_annotation<'a>(ctx: &Context, a: &Annotation) -> Option<RcDoc<'a>> 
 }
 
 pub fn print_annotation_arguments<'a>(ctx: &Context, a: &AnnotationArguments) -> Option<RcDoc<'a>> {
-    let args = a.arguments();
-    if args.is_empty() {
-        return Some(RcDoc::text("()"));
-    }
-
-    let mut docs = vec![RcDoc::line_()];
-    for (i, arg) in args.iter().enumerate() {
-        let node = arg.raw_node();
-        let comments = ctx.comments.get(&node);
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(exprs::print_expression(ctx, arg)?);
-
-        let is_last = i == args.len() - 1;
-        if !is_last {
-            docs.push(RcDoc::text(","));
-        } else {
-            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
-        }
-
-        comments::print_inline_comments(ctx, &mut docs, comments);
-
-        if is_last {
-            docs.push(RcDoc::line_());
-        } else {
-            docs.push(RcDoc::line());
-        }
-
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        if let Some(next) = args.get(i + 1)
-            && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::group(RcDoc::concat([
-        RcDoc::text("("),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text(")"),
-    ])))
+    common::print_list(
+        ctx,
+        &a.arguments(),
+        exprs::print_expression,
+        Expression::raw_node,
+        common::ListOptions::default(),
+    )
 }
 
 pub fn print_type_parameters<'a>(ctx: &Context, tp: &TypeParameters) -> Option<RcDoc<'a>> {
-    let parameters = tp.parameters();
-    if parameters.is_empty() {
-        return Some(RcDoc::text("<>"));
-    }
-
-    let mut docs = vec![RcDoc::line_()];
-    for (i, p) in parameters.iter().enumerate() {
-        let node = &p.0;
-        let comments = ctx.comments.get(node);
-        comments::print_leading_comments(ctx, &mut docs, comments);
-
-        docs.push(print_type_parameter(ctx, p)?);
-
-        let is_last = i == parameters.len() - 1;
-        if !is_last {
-            docs.push(RcDoc::text(","));
-        } else {
-            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
-        }
-
-        comments::print_inline_comments(ctx, &mut docs, comments);
-
-        if is_last {
-            docs.push(RcDoc::line_());
-        } else {
-            docs.push(RcDoc::line());
-        }
-
-        comments::print_trailing_comments(ctx, &mut docs, comments);
-
-        if let Some(next) = parameters.get(i + 1)
-            && common::empty_lines_between(ctx, node, &next.0) > 1
-        {
-            docs.push(RcDoc::hardline());
-        }
-    }
-
-    Some(RcDoc::group(RcDoc::concat([
-        RcDoc::text("<"),
-        RcDoc::concat(docs).nest(4),
-        RcDoc::text(">"),
-    ])))
+    common::print_list(
+        ctx,
+        &tp.parameters(),
+        print_type_parameter,
+        |p| p.0,
+        common::ListOptions::triangle_bracket_list(),
+    )
 }
 
 pub fn print_type_parameter<'a>(ctx: &Context, tp: &TypeParameter) -> Option<RcDoc<'a>> {
