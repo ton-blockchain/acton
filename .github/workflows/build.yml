@@ -132,6 +132,7 @@ jobs:
         env:
           RUSTC_WRAPPER: sccache
         run: |
+          just build-ui
           cargo build --release --bin acton
 
       - name: Show sccache stats
@@ -266,6 +267,7 @@ jobs:
         env:
           RUSTC_WRAPPER: sccache
         run: |
+          just build-ui
           cargo build --release --bin acton
 
       - name: Show sccache stats
@@ -398,7 +400,9 @@ jobs:
         env:
           CC: gcc
           CXX: g++
-        run: cargo build --release --bin acton
+        run: |
+          just build-ui
+          cargo build --profile release-size --bin acton
 
       - name: Test acton binary
         run: |
