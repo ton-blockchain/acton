@@ -1,11 +1,10 @@
 use crate::Context;
-use crate::comments::{Comment, CommentKind};
+use crate::comments::CommentKind;
 use pretty::RcDoc;
 use tree_sitter::Node;
 
-pub fn print_comment<'a>(ctx: &Context, comment: &Comment) -> RcDoc<'a> {
+pub fn print_comment_node<'a>(ctx: &Context, comment: &Node) -> RcDoc<'a> {
     let text = comment
-        .comment
         .utf8_text(ctx.code.as_ref().as_ref())
         .unwrap_or("");
     RcDoc::text(text.to_owned())
@@ -31,10 +30,17 @@ pub fn empty_lines_between(ctx: &Context, top: &Node, bottom: &Node) -> usize {
 
 fn start_line(ctx: &Context, node: &Node) -> usize {
     if let Some(comments) = ctx.comments.get(node) {
-        let leading = comments.iter().find(|c| c.kind == CommentKind::Leading);
+        let leading = comments.iter().find(|c| {
+            matches!(
+                c.kind,
+                CommentKind::Leading | CommentKind::LeadingWithEmptyLine
+            )
+        });
         if let Some(leading) = leading {
             // there is some leading comment so return its line
-            return leading.comment.start_position().row;
+            if let Some(first_node) = leading.nodes.first() {
+                return first_node.start_position().row;
+            }
         }
         // no leading comments so start line is start line of node itself
         node.start_position().row

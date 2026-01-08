@@ -60,127 +60,153 @@ pub enum CommentKind {
     Trailing,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Comment<'tree> {
     pub(crate) kind: CommentKind,
-    pub(crate) comment: Node<'tree>,
+    /// A group of comments that follow each other and should be treated as one.
+    pub(crate) nodes: Vec<Node<'tree>>,
+}
+
+fn next_non_comment_sibling(node: Node) -> Option<Node> {
+    let mut cur = node.next_named_sibling();
+    while let Some(n) = cur {
+        if n.kind() != "comment" {
+            return Some(n);
+        }
+        cur = n.next_named_sibling();
+    }
+    None
+}
+
+fn prev_non_comment_sibling(node: Node) -> Option<Node> {
+    let mut cur = node.prev_named_sibling();
+    while let Some(n) = cur {
+        if n.kind() != "comment" {
+            return Some(n);
+        }
+        cur = n.prev_named_sibling();
+    }
+    None
 }
 
 pub fn collect_comments(root: Node) -> HashMap<Node, Vec<Comment>> {
     let mut comments_map: HashMap<Node, Vec<Comment>> = HashMap::new();
 
+    // First, we find a potential "owner" for each comment.
+    // A comment can be attached in several ways:
+    //
+    // In the same line (inline):
+    // ```
+    // a: 10 // comment here
+    // ```
+    //
+    // Above the definition (leading):
+    // ```
+    // // comment here
+    // a: 10
+    // ```
+    //
+    // After the definition (trailing):
+    // ```
+    // a: 10
+    // // comment here
+    // ```
+    let mut comments_with_owner = Vec::new();
     for comment in TreeWalker::new(root) {
         if comment.kind() != "comment" {
             continue;
         }
 
-        // A comment can be attached in several ways:
+        // We use "non-comment" versions of siblings to find the actual code node
+        // that this comment might belong to, skipping over other comments in a block.
         //
-        // In the same line (inline):
+        // Example for `next`:
         // ```
-        // a: 10 // comment here
-        // ```
-        //
-        // Above the definition (leading):
-        // ```
-        // // comment here
-        // a: 10
+        // // comment 1  <-- when processing this, next_non_comment is `val a`
+        // // comment 2
+        // val a = 10;
         // ```
         //
-        // After the definition (trailing):
+        // Example for `prev`:
         // ```
-        // a: 10
-        // // comment here
+        // val a = 10;
+        // // comment 1
+        // // comment 2  <-- when processing this, prev_non_comment is `val a`
         // ```
-        //
-        // But this option exists ONLY if this comment is not attached to another
-        // node as leading.
+        let next = next_non_comment_sibling(comment);
+        let prev = prev_non_comment_sibling(comment);
 
-        let prev_sibling = comment.prev_named_sibling();
-        let next_sibling = comment.next_named_sibling();
-
-        if let Some(prev_sibling) = prev_sibling {
+        if let Some(p) = prev
+            && p.end_position().row == comment.start_position().row
+        {
             // If the comment is on the same line as the previous node,
-            // we always consider this comment as inline relative to
-            // that node
-            if prev_sibling.end_position().row == comment.start_position().row {
-                // on the same line
-                let entry = comments_map.entry(prev_sibling).or_default();
-                entry.push(Comment {
-                    kind: CommentKind::Inline,
-                    comment,
-                });
-                continue;
-            }
-        }
-
-        // If there is a node after the comment, the comment can be
-        // attached to that node.
-        if let Some(next_sibling) = next_sibling {
-            // if the comment is directly before nodes, we consider them connected
-            if next_sibling.start_position().row == comment.end_position().row + 1 {
-                comments_map.entry(next_sibling).or_default().push(Comment {
-                    kind: CommentKind::Leading,
-                    comment,
-                });
-                continue;
-            }
-        }
-
-        // otherwise we consider it trailing for the previous node
-        if let Some(prev_sibling) = prev_sibling {
-            // If another comment comes before this comment, it could be
-            // either a group or different groups of comments:
-            //
-            // ```
-            // a: 10, // comment
-            // // comment 2
-            // b: 20,
-            // ```
-            //
-            // In this example, we can consider the two comments as one group,
-            // or as two separate ones. And this is a complex issue because the user
-            // might have wanted to write something like:
-            //
-            // ```
-            // a: 10, // comment
-            //        // comment 2
-            // b: 20,
-            // ```
-            //
-            // But might not have wanted to, so linking these two comments is
-            // a non-trivial task. Perhaps we can look at the comment's position relative to
-            // the next node and if the comment is significantly offset, consider that comments
-            // are meant to be kept together.
-            if prev_sibling.kind() == "comment" {
-                // If comments follow each other, for now we consider them as one group
-                // if prev_sibling.end_position().row + 1 == comment.start_position().row {
-                //     comments_map.entry(prev_sibling).or_default().push(Comment {
-                //         kind: CommentKind::Continuation,
-                //         comment,
-                //         attach_to: prev_sibling,
-                //     });
-                //
-                //     continue;
-                // }
-            } else {
-                comments_map.entry(prev_sibling).or_default().push(Comment {
-                    kind: CommentKind::Trailing,
-                    comment,
-                });
-                continue;
-            }
-        }
-
-        if let Some(next_sibling) = next_sibling {
-            // if there is no previous node, we have no choice but to
-            // consider the node as leading even if they don't follow each other.
-            comments_map.entry(next_sibling).or_default().push(Comment {
-                kind: CommentKind::LeadingWithEmptyLine,
-                comment,
-            });
+            // we always consider this comment as inline relative to that node
+            comments_with_owner.push((comment, p, CommentKind::Inline));
+        } else if let Some(n) = next {
+            // If there is a node after the comment, we prefer to attach it
+            // as leading to that node.
+            comments_with_owner.push((comment, n, CommentKind::Leading));
+        } else if let Some(p) = prev {
+            // Otherwise, we consider it trailing for the previous node
+            comments_with_owner.push((comment, p, CommentKind::Trailing));
         }
     }
+
+    if comments_with_owner.is_empty() {
+        return comments_map;
+    }
+
+    // Now we group comments that follow each other and have the same owner/kind.
+    // This allows us to handle blocks of comments as a single entity.
+    let mut i = 0;
+    while i < comments_with_owner.len() {
+        let (comment, owner, initial_kind) = comments_with_owner[i];
+        let mut group_nodes = vec![comment];
+
+        let mut j = i + 1;
+        while j < comments_with_owner.len() {
+            let (next_comment, next_owner, next_initial_kind) = comments_with_owner[j];
+
+            // We group comments if they have the same owner, same attachment kind,
+            // and follow each other on consecutive lines (or the same line).
+            let is_consecutive = group_nodes.last().is_some_and(|last| {
+                next_comment.start_position().row == last.end_position().row + 1
+                    || next_comment.start_position().row == last.end_position().row
+            });
+
+            if next_owner == owner && next_initial_kind == initial_kind && is_consecutive {
+                group_nodes.push(next_comment);
+                j += 1;
+            } else {
+                break;
+            }
+        }
+
+        // For leading comments, we distinguish between comments directly before
+        // the node and comments separated by an empty line.
+        let final_kind = match initial_kind {
+            CommentKind::Leading => {
+                let last_comment_row = group_nodes
+                    .last()
+                    .map(|n| n.end_position().row)
+                    .unwrap_or(0);
+                if owner.start_position().row == last_comment_row + 1 {
+                    CommentKind::Leading
+                } else {
+                    CommentKind::LeadingWithEmptyLine
+                }
+            }
+            k => k,
+        };
+
+        comments_map.entry(owner).or_default().push(Comment {
+            kind: final_kind,
+            nodes: group_nodes,
+        });
+
+        i = j;
+    }
+
     comments_map
 }
 
@@ -198,8 +224,10 @@ pub fn print_leading_comments(
             comment.kind,
             CommentKind::Leading | CommentKind::LeadingWithEmptyLine
         ) {
-            docs.push(common::print_comment(ctx, comment));
-            docs.push(RcDoc::hardline());
+            for node in &comment.nodes {
+                docs.push(common::print_comment_node(ctx, node));
+                docs.push(RcDoc::hardline());
+            }
             if comment.kind == CommentKind::LeadingWithEmptyLine {
                 docs.push(RcDoc::hardline());
             }
@@ -218,8 +246,10 @@ pub fn print_trailing_comments(
 
     for comment in comments {
         if comment.kind == CommentKind::Trailing {
-            docs.push(common::print_comment(ctx, comment));
-            docs.push(RcDoc::hardline());
+            for node in &comment.nodes {
+                docs.push(common::print_comment_node(ctx, node));
+                docs.push(RcDoc::hardline());
+            }
         }
     }
 }
@@ -233,8 +263,10 @@ pub fn print_inline_comments(
         return;
     };
 
-    for inline_comment in comments.iter().filter(|c| c.kind == CommentKind::Inline) {
-        docs.push(RcDoc::space());
-        docs.push(common::print_comment(ctx, inline_comment));
+    for comment in comments.iter().filter(|c| c.kind == CommentKind::Inline) {
+        for node in &comment.nodes {
+            docs.push(RcDoc::space());
+            docs.push(common::print_comment_node(ctx, node));
+        }
     }
 }

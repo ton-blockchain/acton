@@ -10,7 +10,7 @@ mod tests {
     fn check_with_width(code: &str, expect: Expect, width: usize) {
         // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
-        let res = format_source(code, width).unwrap();
+        let res = format_source(code, width).expect("Failed to format source");
 
         let res = res
             .lines()
