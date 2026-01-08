@@ -1,5 +1,5 @@
 use crate::commands::test::{Pos, TestDescriptor};
-use crate::context::{BuildCache, KnownAddresses, to_cell};
+use crate::context::{BuildCache, Emulations, KnownAddresses, to_cell};
 use abi::ContractAbi;
 use emulator::emulator::SendMessageResult;
 use serde::{Deserialize, Serialize};
@@ -50,12 +50,13 @@ pub fn dump_test_transactions(
     test: &TestDescriptor,
     build_cache: &BuildCache,
     known_addresses: &KnownAddresses,
-    txs: &[Vec<SendMessageResult>],
+    txs: &Emulations,
     output_dir: &str,
 ) -> anyhow::Result<()> {
     let mut known_contracts = BTreeMap::new();
 
     let traces = txs
+        .messages
         .iter()
         .map(|txs| {
             let transactions = txs

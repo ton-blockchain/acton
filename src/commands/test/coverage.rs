@@ -1,4 +1,4 @@
-use crate::context::{BuildCache, Emulations};
+use crate::context::{BuildCache, EmulationsState};
 use crate::vmtrace::build_vm_trace;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use emulator::emulator::SendMessageResult;
@@ -24,9 +24,9 @@ pub struct FileCoverage {
     pub executable_line_numbers: BTreeSet<i64>, // all executable line numbers
 }
 
-pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Coverage {
-    let all_results = emulations.results.iter().flatten();
-    let successful_results = all_results.filter_map(|result| match result {
+pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) -> Coverage {
+    let all_messages = emulations.messages();
+    let successful_messages = all_messages.filter_map(|result| match result {
         SendMessageResult::Success(result) => Some(result),
         SendMessageResult::Error(_) => None,
     });
@@ -36,13 +36,13 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
 
     let mut whole_trace = vec![];
 
-    for result in successful_results {
-        let Some(build_result) = build_cache.result_for_code(&result.code) else {
+    for message in successful_messages {
+        let Some(build_result) = build_cache.result_for_code(&message.code) else {
             continue;
         };
 
         let source_map = build_result.1.source_map;
-        let logs = &result.vm_log;
+        let logs = &message.vm_log;
 
         let mut trace = build_vm_trace(logs, &source_map);
         whole_trace.append(&mut trace);
@@ -55,7 +55,7 @@ pub fn collect_coverage(emulations: &Emulations, build_cache: &BuildCache) -> Co
         build_executable_lines_per_file(&mut whole_executable_lines_per_file, source_map);
     }
 
-    for get_result in &emulations.get_results {
+    for get_result in emulations.get_methods() {
         let Ok(code) = Boc::decode_base64(&get_result.code) else {
             continue;
         };

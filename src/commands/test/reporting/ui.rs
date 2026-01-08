@@ -35,7 +35,10 @@ impl UiReporter {
 
 impl TestReporter for UiReporter {
     fn on_test_finished(&mut self, test: &TestReport) -> anyhow::Result<()> {
-        self.reports.lock().unwrap().push(test.clone());
+        self.reports
+            .lock()
+            .expect("cannot lock mutex")
+            .push(test.clone());
         Ok(())
     }
 }

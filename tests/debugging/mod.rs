@@ -1,8 +1,8 @@
 use abi::{ContractAbi, contract_abi};
 use acton::config::ActonConfig;
 use acton::context::{
-    AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, Emulations, Env,
-    IoContext, KnownAddresses,
+    AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, EmulationsState,
+    Env, IoContext, KnownAddresses,
 };
 use acton::debugger::any_executor::AnyExecutor;
 use acton::debugger::debug_context::DebugContext;
@@ -217,7 +217,7 @@ fn execute_script(
         FileBuildCache::dummy().expect("Failed to create file cache for script execution");
     let mut known_addresses = KnownAddresses::new();
     let mut known_code_cell = HashMap::new();
-    let mut emulations = Emulations::new();
+    let mut emulations = EmulationsState::new();
 
     let mut assert_failure = None;
     let mut expected_exit_code = None;
@@ -235,10 +235,11 @@ fn execute_script(
             explorer: None,
             fork_net: None,
             api_key: None,
+            running_id: "script".to_owned(),
         },
         io: IoContext {
-            stdout_buffer: "".to_string(),
-            stderr_buffer: "".to_string(),
+            stdout_buffer: "".to_owned(),
+            stderr_buffer: "".to_owned(),
             capture_output: true,
         },
         asserts: AssertsContext {

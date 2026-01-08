@@ -1,11 +1,11 @@
 use crate::commands::common::error_fmt;
-use abi::contract_abi;
 use crate::config::Explorer;
 use crate::context::{Context, KnownAddress, Wallet, to_cell};
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
 use crate::ffi::assert::process_txs_and_search_params;
 use crate::formatter::FormatterContext;
+use abi::contract_abi;
 use anyhow::Context as AnyhowContext;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
@@ -270,7 +270,9 @@ fn send_message_impl(
         .filter_map(emulation_to_send_result)
         .collect::<Vec<_>>();
 
-    ctx.chain.emulations.results.push(emulations);
+    ctx.chain
+        .emulations
+        .save_message(&ctx.env.running_id, emulations);
     stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
     Ok(())
 }
@@ -605,10 +607,10 @@ fn send_single_message_impl(
         return Ok(());
     };
 
-    ctx.chain
-        .emulations
-        .results
-        .push(vec![SendMessageResult::Success(emulation)]);
+    ctx.chain.emulations.save_message(
+        &ctx.env.running_id,
+        vec![SendMessageResult::Success(emulation)],
+    );
 
     stack.push(send_result);
     Ok(())
@@ -914,7 +916,9 @@ fn run_get_method_impl(
 
     match result {
         GetMethodResult::Success(result) => {
-            ctx.chain.emulations.get_results.push(result.clone());
+            ctx.chain
+                .emulations
+                .save_get_method(&ctx.env.running_id, result.clone());
 
             let cell =
                 ArcCell::from_boc_b64(&result.stack).context("Failed to decode stack BoC")?;

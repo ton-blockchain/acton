@@ -1,4 +1,6 @@
-use crate::context::{BuildCache, Emulations, KnownAddresses, TransactionGenericAssertFailure};
+use crate::context::{
+    BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
+};
 use crate::exit_codes::get_exit_code_info;
 use crate::retrace;
 use crate::retrace::{ExecutedAction, InstalledActions};
@@ -61,7 +63,7 @@ pub struct FormatterContext {
     pub contract_abi: ContractAbi,
     pub accounts: HashMap<String, ShardAccount>,
     pub build_cache: BuildCache,
-    pub emulations: Emulations,
+    pub emulations: EmulationsState,
     pub known_addresses: KnownAddresses,
     pub known_code_cells: HashMap<String, String>,
     pub backtrace: Option<String>,
@@ -76,7 +78,7 @@ impl FormatterContext {
             contract_abi: ContractAbi::default(),
             accounts: HashMap::new(),
             build_cache: BuildCache::new(),
-            emulations: Emulations::new(),
+            emulations: EmulationsState::new(),
             known_addresses: KnownAddresses::new(),
             known_code_cells: HashMap::new(),
             backtrace: None,

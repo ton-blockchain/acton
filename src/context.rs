@@ -236,31 +236,80 @@ impl KnownAddresses {
 
 #[derive(Clone, Debug)]
 pub struct Emulations {
-    pub results: Vec<Vec<SendMessageResult>>,
-    pub get_results: Vec<GetMethodResultSuccess>,
+    pub name: String,
+    pub messages: Vec<Vec<SendMessageResult>>,
+    pub get_methods: Vec<GetMethodResultSuccess>,
 }
 
-impl Default for Emulations {
+#[derive(Clone, Debug)]
+pub struct EmulationsState {
+    pub results: HashMap<String, Emulations>,
+}
+
+impl Default for EmulationsState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Emulations {
+impl EmulationsState {
     pub fn new() -> Self {
         Self {
-            results: vec![],
-            get_results: vec![],
+            results: HashMap::new(),
         }
+    }
+
+    pub fn results_of(&self, id: &str) -> Option<&Emulations> {
+        self.results.get(id)
+    }
+
+    pub fn messages(&self) -> impl Iterator<Item = &SendMessageResult> {
+        self.results
+            .values()
+            .flat_map(|res| &res.messages)
+            .flatten()
+    }
+
+    pub fn get_methods(&self) -> impl Iterator<Item = &GetMethodResultSuccess> {
+        self.results.values().flat_map(|res| &res.get_methods)
+    }
+
+    pub fn save_message(&mut self, env_name: &str, message: Vec<SendMessageResult>) {
+        self.results
+            .entry(env_name.to_owned())
+            .or_insert_with(|| Emulations {
+                name: env_name.to_owned(),
+                messages: vec![],
+                get_methods: vec![],
+            })
+            .messages
+            .push(message);
+    }
+
+    pub fn save_get_method(&mut self, env_name: &str, get_method: GetMethodResultSuccess) {
+        self.results
+            .entry(env_name.to_owned())
+            .or_insert_with(|| Emulations {
+                name: env_name.to_owned(),
+                messages: vec![],
+                get_methods: vec![],
+            })
+            .get_methods
+            .push(get_method);
     }
 
     pub fn find_tx_by_lt(&self, lt: u64) -> Option<&SendMessageResultSuccess> {
         self.results
-            .iter()
-            .flatten()
-            .flat_map(|res| match res {
-                SendMessageResult::Success(res) => Some(res),
-                SendMessageResult::Error(_) => None,
+            .values()
+            .flat_map(|result| {
+                result
+                    .messages
+                    .iter()
+                    .flatten()
+                    .filter_map(|res| match res {
+                        SendMessageResult::Success(res) => Some(res),
+                        SendMessageResult::Error(_) => None,
+                    })
             })
             .find(|res| res.transaction.lt == lt)
     }
@@ -313,6 +362,7 @@ pub struct Env<'a> {
     pub explorer: Option<Explorer>,
     pub fork_net: Option<String>,
     pub api_key: Option<String>,
+    pub running_id: String,
 }
 
 pub struct Context<'a> {
@@ -342,7 +392,7 @@ pub struct AssertsContext<'a> {
 pub struct ChainContext<'a> {
     pub world_state: &'a mut WorldState,
     pub emulator: &'a mut Emulator,
-    pub emulations: &'a mut Emulations,
+    pub emulations: &'a mut EmulationsState,
 }
 
 pub struct BuildContext<'a> {

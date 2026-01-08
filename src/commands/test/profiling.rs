@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn collect_profile(runner: &TestRunner, abi: &ContractAbi) -> anyhow::Result<()> {
     let mut gas_per_opcode = HashMap::new();
 
-    for result in runner.emulations.results.iter().flatten() {
+    for result in runner.emulations.messages() {
         let SendMessageResult::Success(result) = result else {
             continue;
         };

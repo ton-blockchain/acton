@@ -17,7 +17,7 @@ use crate::commands::test::reporting::{
 use crate::config::{ActonConfig, ContractDependency, DependencyKind, Network};
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
-    Emulations, Env, IoContext, KnownAddresses,
+    EmulationsState, Env, IoContext, KnownAddresses,
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::dap::DapTransport;
@@ -151,7 +151,7 @@ pub struct TestRunner<'a> {
     file_build_cache: &'a mut FileBuildCache,
     known_addresses: KnownAddresses,
     known_code_cells: HashMap<String, String>,
-    emulations: Emulations,
+    emulations: EmulationsState,
     transport: DapTransport,
     reporter_manager: &'a mut ReporterManager,
     mutation_overrides: BTreeMap<String, ArcCell>,
@@ -224,7 +224,7 @@ impl<'a> TestRunner<'a> {
             file_build_cache: cache,
             known_addresses: KnownAddresses::new(),
             known_code_cells: HashMap::new(),
-            emulations: Emulations::new(),
+            emulations: EmulationsState::new(),
             transport,
             reporter_manager,
             mutation_overrides,
@@ -345,6 +345,7 @@ impl<'a> TestRunner<'a> {
                 explorer: None,
                 api_key: self.config.api_key.clone(),
                 fork_net: self.config.fork_net.as_ref().map(|n| n.to_string()),
+                running_id: test.name.clone(),
             },
             io: IoContext {
                 stdout_buffer: "".to_owned(),
@@ -396,12 +397,14 @@ impl<'a> TestRunner<'a> {
 
                 let get_result = executor.finish(&params.code)?;
 
-                if let Some(trace_dir) = &self.config.save_test_trace {
+                if let Some(trace_dir) = &self.config.save_test_trace
+                    && let Some(emulations) = ctx.chain.emulations.results_of(&test.name)
+                {
                     trace::dump_test_transactions(
                         test,
                         ctx.build.build_cache,
                         ctx.build.known_addresses,
-                        &ctx.chain.emulations.results,
+                        emulations,
                         trace_dir,
                     )?;
                 }
@@ -420,12 +423,14 @@ impl<'a> TestRunner<'a> {
                 let stack = serialize_tuple(&Tuple::empty())?.to_boc_b64(false)?;
                 let get_result = executor.run_get_method(&stack, &params, None)?;
 
-                if let Some(trace_dir) = &self.config.save_test_trace {
+                if let Some(trace_dir) = &self.config.save_test_trace
+                    && let Some(emulations) = ctx.chain.emulations.results_of(&test.name)
+                {
                     trace::dump_test_transactions(
                         test,
                         ctx.build.build_cache,
                         ctx.build.known_addresses,
-                        &ctx.chain.emulations.results,
+                        emulations,
                         trace_dir,
                     )?;
                 }
@@ -591,9 +596,9 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     global_reporter.finalize()?;
 
     if config.ui
-        && let Some(reports_arc) = reports_for_ui
+        && let Some(reports) = reports_for_ui
     {
-        let reports = reports_arc.lock().unwrap().clone();
+        let reports = reports.lock().expect("cannot lock mutex").clone();
         let trace_dir = config.save_test_trace.clone();
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -992,7 +997,7 @@ fn run_file_tests(
         if runner.config.coverage {
             // For coverage, we need to process test logs as well, so register it here
             if let GetMethodResult::Success(get_result) = get_result {
-                runner.emulations.get_results.push(get_result);
+                runner.emulations.save_get_method(&test.name, get_result);
                 // TODO: remove this memoize somehow
                 let content = fs::read_to_string(file_path).unwrap_or_default();
                 runner.build_cache.memoize(

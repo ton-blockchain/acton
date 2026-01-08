@@ -1083,7 +1083,13 @@ fn main() {
                 fork_net,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                 fork_block_number,
-                save_test_trace,
+                save_test_trace.or_else(|| {
+                    if ui {
+                        Some(".acton/traces".to_owned())
+                    } else {
+                        None
+                    }
+                }),
                 mutate,
                 mutate_overrides,
                 mutate_contract,

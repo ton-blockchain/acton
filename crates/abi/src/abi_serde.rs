@@ -262,6 +262,7 @@ mod tests {
             storage: None,
             entry_point: None,
             external_entry_point: None,
+            exit_codes: vec![],
         };
 
         let result = decode(&mut slice, &abi.types, &abi_type).expect("decode failed");
