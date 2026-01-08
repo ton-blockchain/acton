@@ -389,28 +389,45 @@ pub fn print_match_body<'a>(ctx: &Context, body: &MatchBody) -> Option<RcDoc<'a>
         return Some(RcDoc::text("{}"));
     }
 
-    let mut arm_docs = vec![RcDoc::hardline()];
-    for (i, arm) in arms.iter().enumerate() {
+    let mut arm_docs_with_info = Vec::with_capacity(arms.len());
+    let mut max_width = 0;
+
+    for arm in arms.iter() {
+        let doc = print_match_arm(ctx, arm)?;
+        let width = common::doc_width(&doc);
+
         let comments = ctx.comments.get(&arm.0);
-        comments::print_leading_comments(ctx, &mut arm_docs, comments);
+        let has_inline =
+            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
 
-        arm_docs.push(print_match_arm(ctx, arm)?);
+        if has_inline {
+            max_width = max_width.max(width);
+        }
+        arm_docs_with_info.push((doc, comments));
+    }
 
-        comments::print_inline_comments(ctx, &mut arm_docs, comments);
-        arm_docs.push(RcDoc::hardline());
-        comments::print_trailing_comments(ctx, &mut arm_docs, comments);
+    let mut docs = vec![RcDoc::hardline()];
+    for (i, (arm_doc, comments)) in arm_docs_with_info.into_iter().enumerate() {
+        let arm = &arms[i];
+        comments::print_leading_comments(ctx, &mut docs, comments);
+
+        docs.push(arm_doc);
+
+        comments::print_inline_comments_with_alignment(ctx, &mut docs, comments, max_width);
+        docs.push(RcDoc::hardline());
+        comments::print_trailing_comments(ctx, &mut docs, comments);
 
         // There can be an empty line between arms that we want to preserve
         if let Some(next) = arms.get(i + 1)
             && common::empty_lines_between(ctx, &arm.0, &next.0) > 1
         {
-            arm_docs.push(RcDoc::hardline());
+            docs.push(RcDoc::hardline());
         }
     }
 
     Some(RcDoc::concat([
         RcDoc::text("{"),
-        RcDoc::concat(arm_docs).nest(4),
+        RcDoc::concat(docs).nest(4),
         RcDoc::text("}"),
     ]))
 }
@@ -467,23 +484,51 @@ pub fn print_object_literal_body<'a>(
         return Some(RcDoc::text("{}"));
     }
 
-    let is_multiline = args.len() > 2;
+    let has_comments = args.iter().any(|arg| {
+        ctx.comments
+            .get(&arg.0)
+            .is_some_and(|cs| !cs.is_empty())
+    });
+
+    let is_multiline = args.len() > 2 || has_comments;
     let separator = if is_multiline {
         RcDoc::hardline()
     } else {
         RcDoc::line()
     };
 
-    let mut arg_docs = vec![separator.clone()];
+    let mut arg_docs_with_info = Vec::with_capacity(args.len());
+    let mut max_width = 0;
+
     for (i, arg) in args.iter().enumerate() {
+        let is_last = i == (args.len() - 1);
+        let doc = print_instance_argument(ctx, arg, is_last)?;
+        let width = common::doc_width(&doc);
+
         let comments = ctx.comments.get(&arg.0);
+        let has_inline =
+            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
+
+        if has_inline && is_multiline {
+            max_width = max_width.max(width);
+        }
+        arg_docs_with_info.push((doc, comments));
+    }
+
+    let mut arg_docs = vec![separator.clone()];
+    for (i, (arg_doc, comments)) in arg_docs_with_info.into_iter().enumerate() {
+        let arg = &args[i];
 
         comments::print_leading_comments(ctx, &mut arg_docs, comments);
 
-        let is_last = i == (args.len() - 1);
-        arg_docs.push(print_instance_argument(ctx, arg, is_last)?);
+        arg_docs.push(arg_doc);
 
-        comments::print_inline_comments(ctx, &mut arg_docs, comments);
+        if is_multiline {
+            comments::print_inline_comments_with_alignment(ctx, &mut arg_docs, comments, max_width);
+        } else {
+            comments::print_inline_comments(ctx, &mut arg_docs, comments);
+        }
+
         arg_docs.push(separator.clone());
         comments::print_trailing_comments(ctx, &mut arg_docs, comments);
 

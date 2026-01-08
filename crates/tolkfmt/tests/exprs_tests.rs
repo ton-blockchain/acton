@@ -795,7 +795,7 @@ line"""; }"#,
                 fun test() {
                     x = match (value) {
                         // leading comment
-                        int => 1, // inline comment
+                        int => 1,    // inline comment
                         // leading comment 2
                         string => 2, // inline comment 2
                         // leading comment 3
@@ -803,6 +803,46 @@ line"""; }"#,
                         // trailing comment 3
                     };
                 }"#]],
+        );
+    }
+
+    #[test]
+    fn test_object_literal_with_comments_alignment() {
+        check_with_width(
+            r#"fun test() {
+    x = MyStruct {
+        field1: 1, // comment 1
+        longField2: 2, // comment 2
+    };
+}"#,
+            expect![[r#"
+                fun test() {
+                    x = MyStruct {
+                        field1: 1,     // comment 1
+                        longField2: 2, // comment 2
+                    };
+                }"#]],
+            100,
+        );
+    }
+
+    #[test]
+    fn test_match_expression_with_comments_alignment() {
+        check_with_width(
+            r#"fun test() {
+    val restoreAmount = match (msg) {
+        InternalTransferStep => msg.jettonAmount, // safe to fetch jettonAmount, because
+        BurnNotificationForMinter => msg.jettonAmount, // it's in the beginning of a message
+    };
+}"#,
+            expect![[r#"
+                fun test() {
+                    val restoreAmount = match (msg) {
+                        InternalTransferStep => msg.jettonAmount,      // safe to fetch jettonAmount, because
+                        BurnNotificationForMinter => msg.jettonAmount, // it's in the beginning of a message
+                    };
+                }"#]],
+            100,
         );
     }
 
@@ -1031,7 +1071,7 @@ line"""; }"#,
                         // leading comment
                         enabled: true, // inline comment
                         // leading comment 2
-                        name, // inline comment
+                        name,          // inline comment
                         value: 42,
                         // trailing comment
                     };
