@@ -46,6 +46,7 @@ impl TestReporter for UiReporter {
 pub async fn start_ui_server(
     reports: Vec<TestReport>,
     trace_dir: Option<String>,
+    port: u16,
 ) -> anyhow::Result<()> {
     let state = Arc::new(UiServerState {
         reports: Arc::new(reports),
@@ -66,8 +67,8 @@ pub async fn start_ui_server(
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
-    let url = "http://127.0.0.1:3000";
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
+    let url = format!("http://127.0.0.1:{}", port);
     println!("     {} UI server at {}", "Starting".green().bold(), url);
 
     // Open browser

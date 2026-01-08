@@ -131,6 +131,7 @@ pub struct TestConfig {
     pub disable_rules: Vec<String>,
     pub fail_fast: bool,
     pub ui: bool,
+    pub ui_port: u16,
 }
 
 #[derive(Debug)]
@@ -603,7 +604,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        rt.block_on(async { start_ui_server(reports, trace_dir).await })?;
+        rt.block_on(async { start_ui_server(reports, trace_dir, config.ui_port).await })?;
     }
 
     if let Some(filter) = &config.filter

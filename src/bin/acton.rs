@@ -254,6 +254,14 @@ enum Commands {
             help_heading = "Reporting"
         )]
         ui: bool,
+        #[arg(
+            long,
+            help = "UI server port",
+            default_value = "12344",
+            help_heading = "Reporting",
+            value_name = "PORT"
+        )]
+        ui_port: u16,
     },
     #[command(
         about = "Generate wrapper and optionally stub test file for a contract",
@@ -1063,6 +1071,7 @@ fn main() {
             fail_fast,
             fork_block_number,
             ui,
+            ui_port,
         } => {
             let config = create_test_config(
                 filter,
@@ -1096,6 +1105,7 @@ fn main() {
                 disable_rule,
                 Some(fail_fast),
                 ui,
+                ui_port,
             );
 
             if mutate {
@@ -1406,6 +1416,7 @@ fn create_test_config(
     disable_rules: Vec<String>,
     fail_fast: Option<bool>,
     ui: bool,
+    ui_port: u16,
 ) -> TestConfig {
     let acton_config = ActonConfig::load().ok();
 
@@ -1446,6 +1457,7 @@ fn create_test_config(
             disable_rules,
             fail_fast,
             ui,
+            Some(ui_port),
         );
     }
 
@@ -1475,5 +1487,6 @@ fn create_test_config(
         disable_rules,
         fail_fast: fail_fast.unwrap_or(false),
         ui,
+        ui_port,
     }
 }
