@@ -47,8 +47,29 @@ pub fn print_union_type<'a>(ctx: &Context, union: &UnionType) -> Option<RcDoc<'a
 
     let (first, rest) = parts_docs.split_first()?;
 
+    let in_type_alias = union.0.parent().is_some_and(|p| {
+        let kind = p.kind();
+        kind == "type_alias_declaration"
+    });
+
+    // we add `|` only for
+    // ```
+    // type Foo =
+    //     | Bar
+    //     | Baz
+    //     | Boo
+    // ```
+    //
+    // but
+    // ```
+    // dest: int
+    //     | slice
+    //     | address
+    // ```
+    let multiline_prefix = if in_type_alias { "    | " } else { "" };
+
     let first_doc = RcDoc::concat([
-        RcDoc::flat_alt(RcDoc::text("    | "), RcDoc::nil()),
+        RcDoc::flat_alt(RcDoc::text(multiline_prefix), RcDoc::nil()),
         first.clone(),
     ]);
 

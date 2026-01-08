@@ -60,7 +60,6 @@ mod tests {
 
     #[test]
     fn test_parenthesized_type() {
-        // TODO: unwrap?
         check("const x: (int) = 0;", expect!["const x: (int) = 0;"]);
     }
 
@@ -152,11 +151,10 @@ mod tests {
 
     #[test]
     fn test_union_type_breaking() {
-        // TODO:
         check_with_width(
             "const x: FirstType | SecondType | ThirdType = 0;",
             expect![[r#"
-                const x:     | FirstType
+                const x: FirstType
                     | SecondType
                     | ThirdType = 0;"#]],
             30,
