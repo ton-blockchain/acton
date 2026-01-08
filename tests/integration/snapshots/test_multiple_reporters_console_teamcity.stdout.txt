@@ -10,10 +10,10 @@
 ##teamcity[testingStarted]
  > tests/counter.test.tolk (2 tests)
 ##teamcity[testSuiteStarted name='counter.test.tolk' nodeId='suite_counter.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/counter.test.tolk']
-##teamcity[testStarted name='test-should-increase-counter' nodeId='test_test-should-increase-counter' parentNodeId='suite_counter.test.tolk' locationHint='tolk_qn://./tests/counter.test.tolk:test-should-increase-counter']
+##teamcity[testStarted name='test-should-increase-counter' nodeId='test_test-should-increase-counter' parentNodeId='suite_counter.test.tolk' locationHint='tolk_qn://[ROOT]/tests/counter.test.tolk:test-should-increase-counter']
   ✓ should-increase-counter [TIME]
 ##teamcity[testFinished name='test-should-increase-counter' nodeId='test_test-should-increase-counter' [DURATION] parentNodeId='suite_counter.test.tolk']
-##teamcity[testStarted name='test-should-reset-counter' nodeId='test_test-should-reset-counter' parentNodeId='suite_counter.test.tolk' locationHint='tolk_qn://./tests/counter.test.tolk:test-should-reset-counter']
+##teamcity[testStarted name='test-should-reset-counter' nodeId='test_test-should-reset-counter' parentNodeId='suite_counter.test.tolk' locationHint='tolk_qn://[ROOT]/tests/counter.test.tolk:test-should-reset-counter']
   ✓ should-reset-counter [TIME]
 ##teamcity[testFinished name='test-should-reset-counter' nodeId='test_test-should-reset-counter' [DURATION] parentNodeId='suite_counter.test.tolk']
 ##teamcity[testSuiteFinished name='counter.test.tolk' nodeId='suite_counter.test.tolk']

@@ -248,20 +248,17 @@ impl Emulator {
         };
 
         if let Ok(mut message) = message_cell.parse::<RelaxedMessage>() {
-            match &mut message.info {
-                RelaxedMsgInfo::Int(info) => {
-                    // Set src address as Node does
-                    if info.src.is_none() {
-                        info.src = Some(from)
-                    }
-
-                    // Set create_at as Node does
-                    info.created_at = SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs() as u32;
+            if let RelaxedMsgInfo::Int(info) = &mut message.info {
+                // Set src address as Node does
+                if info.src.is_none() {
+                    info.src = Some(from)
                 }
-                _ => {}
+
+                // Set create_at as Node does
+                info.created_at = SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs() as u32;
             }
 
             // For some reason this set to wrong value

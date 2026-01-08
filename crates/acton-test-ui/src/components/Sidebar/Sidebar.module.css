@@ -166,6 +166,10 @@
   color: var(--color-failed);
 }
 
+.testFailed .testName {
+  color: var(--color-failed);
+}
+
 .suiteToggle {
   display: flex;
   align-items: center;

@@ -174,11 +174,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const isSelected =
                       selectedTest?.name === report.name &&
                       selectedTest?.suite_name === report.suite_name
+                    const isFailed = report.status === TestStatus.Failed
                     return (
                       <button
                         key={`${report.name}-${idx}`}
                         type="button"
-                        className={`${styles.testItem} ${isSelected ? styles.selected : ""}`}
+                        className={`${styles.testItem} ${isSelected ? styles.selected : ""} ${isFailed ? styles.testFailed : ""}`}
                         onClick={() => onSelectTest(report)}
                       >
                         <span className={styles.testStatusIcon}>
