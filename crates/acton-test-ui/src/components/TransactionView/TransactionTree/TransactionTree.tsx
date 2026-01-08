@@ -16,6 +16,7 @@ import { TransactionDetails } from "../TransactionDetails/TransactionDetails"
 import { SmartTooltip } from "./SmartTooltip"
 import styles from "./TransactionTree.module.css"
 import { useTooltip } from "./useTooltip"
+import {BackendContractInfo} from "../../../types";
 
 interface TransactionTooltipData {
   readonly fromAddress: string
@@ -35,6 +36,7 @@ interface TransactionTooltipData {
 interface TransactionTreeProps {
   readonly transactions: TransactionInfo[]
   readonly contracts: Map<string, ContractData>
+  readonly allContracts: readonly BackendContractInfo[]
 }
 
 function TransactionTooltipContent({ data }: { data: TransactionTooltipData }): React.JSX.Element {
@@ -89,6 +91,7 @@ function TransactionTooltipContent({ data }: { data: TransactionTooltipData }): 
 export function TransactionTree({
   transactions,
   contracts,
+  allContracts,
 }: TransactionTreeProps): React.JSX.Element {
   const {
     tooltip,
@@ -213,7 +216,7 @@ export function TransactionTree({
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
       let typeAbi = targetContract?.abi?.messages.find((it) => it.opcode === opcode)
       if (typeAbi === undefined) {
-        for (const contract of [...contracts.values()]) {
+        for (const contract of allContracts) {
           typeAbi = contract.abi?.messages.find((it) => it.opcode === opcode)
         }
       }
@@ -549,7 +552,7 @@ export function TransactionTree({
 
       {selectedTransaction && (
         <div className={styles.transactionDetails}>
-          <TransactionDetails tx={selectedTransaction} contracts={contracts} />
+          <TransactionDetails tx={selectedTransaction} contracts={contracts} allContracts={allContracts} />
         </div>
       )}
     </div>

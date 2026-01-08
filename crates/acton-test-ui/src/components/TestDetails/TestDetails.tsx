@@ -74,6 +74,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
     return map
   }, [parsedTransactions, trace, backendContracts])
 
+  const allContracts = [...Object.values(backendContracts)]
+
   if (!test) return null
 
   const renderLogs = () => {
@@ -87,7 +89,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
       }
       return (
         <div className={styles.treeWrapper}>
-          <TransactionTree transactions={parsedTransactions} contracts={contracts} />
+          <TransactionTree transactions={parsedTransactions} contracts={contracts} allContracts={allContracts}/>
         </div>
       )
     }

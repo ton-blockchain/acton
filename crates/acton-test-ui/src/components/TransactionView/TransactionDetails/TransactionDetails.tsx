@@ -11,13 +11,15 @@ import { SendModeViewer } from "../SendModeViewer/SendModeViewer"
 import { ActionsSummary } from "./ActionsSummary"
 
 import styles from "./TransactionDetails.module.css"
+import {BackendContractInfo} from "../../../types";
 
 export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
+  readonly allContracts: readonly BackendContractInfo[]
 }
 
-export function TransactionDetails({ tx, contracts }: TransactionDetailsProps): React.JSX.Element {
+export function TransactionDetails({ tx, contracts, allContracts }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
 
   const description = tx.transaction.description
@@ -49,7 +51,7 @@ export function TransactionDetails({ tx, contracts }: TransactionDetailsProps): 
   const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
   let typeAbi = targetContract?.abi?.messages.find((it) => it.opcode === opcode)
   if (typeAbi === undefined) {
-    for (const contract of [...contracts.values()]) {
+    for (const contract of allContracts) {
       typeAbi = contract.abi?.messages.find((it) => it.opcode === opcode)
     }
   }

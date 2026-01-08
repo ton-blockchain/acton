@@ -37,9 +37,19 @@ export interface Trace {
   readonly wallets: Record<string, string>
 }
 
+export interface AbiMessage {
+  readonly name: string
+  readonly opcode: number | undefined
+}
+
+export interface Abi {
+  readonly messages: AbiMessage[]
+  readonly exitCodes?: Record<number, string>
+}
+
 export interface BackendContractInfo {
   readonly name: string
   readonly code_boc64: string
   readonly source_map: unknown
-  readonly abi?: unknown
+  readonly abi?: Abi
 }

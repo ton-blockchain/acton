@@ -1,4 +1,5 @@
 import type { Address, Cell, OutAction, Transaction } from "@ton/core"
+import {Abi} from "./index";
 
 export interface TransactionInfo {
   readonly lt: string
@@ -13,16 +14,6 @@ export interface TransactionInfo {
   readonly shardAccountAfter: string
   parent: TransactionInfo | undefined
   children: readonly TransactionInfo[]
-}
-
-export interface AbiMessage {
-  readonly name: string
-  readonly opcode: number | undefined
-}
-
-export interface Abi {
-  readonly messages: AbiMessage[]
-  readonly exitCodes?: Record<number, string>
 }
 
 export interface ContractData {

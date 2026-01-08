@@ -53,8 +53,6 @@ pub fn dump_test_transactions(
     txs: &Emulations,
     output_dir: &str,
 ) -> anyhow::Result<()> {
-    let mut known_contracts = BTreeMap::new();
-
     let traces = txs
         .messages
         .iter()
@@ -74,10 +72,6 @@ pub fn dump_test_transactions(
                         source_map: info.source_map.clone(),
                         abi: info.abi.clone(),
                     });
-
-                    if let Some(contract_info) = &contract_info {
-                        known_contracts.insert(contract_info.name.clone(), contract_info.clone());
-                    }
 
                     Some(TransactionInfo {
                         lt: tx.transaction.lt.to_string(),
@@ -110,6 +104,18 @@ pub fn dump_test_transactions(
                 known.name.clone(),
             );
         }
+    }
+
+    let mut known_contracts = BTreeMap::new();
+    for result in build_cache.built.values() {
+        let info = ContractInfo {
+            abi: result.abi.clone(),
+            name: result.name.clone(),
+            code_boc64: result.code_boc64.clone(),
+            source_map: result.source_map.clone(),
+        };
+
+        known_contracts.insert(result.name.clone(), info);
     }
 
     let test_info = TestTrace {
