@@ -5,6 +5,7 @@ use owo_colors::OwoColorize;
 use similar::{ChangeTag, TextDiff};
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 use walkdir::WalkDir;
 
 pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
@@ -15,6 +16,9 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
     let ignore_patterns = fmt_settings.and_then(|s| s.ignore.as_ref());
 
     let mut ignore_builder = GlobSetBuilder::new();
+    ignore_builder.add(Glob::from_str("**/.git/**")?);
+    ignore_builder.add(Glob::from_str("**/node_modules/**")?);
+    ignore_builder.add(Glob::from_str("**/target/**")?);
     if let Some(ignores) = ignore_patterns {
         for pattern in ignores {
             ignore_builder.add(Glob::new(pattern)?);
@@ -36,9 +40,20 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
                 files_to_format.push(path);
             }
         } else if path.is_dir() {
-            for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+            let iter = WalkDir::new(&path)
+                .into_iter()
+                .filter_entry(|entry| {
+                    if !entry.file_type().is_dir() {
+                        return true;
+                    }
+                    let p = entry.path();
+                    !ignore_set.is_match(p)
+                })
+                .filter_map(|e| e.ok());
+
+            for entry in iter {
                 let path = entry.path();
-                if path.is_file() && path.extension().is_some_and(|ext| ext == "tolk") {
+                if path.extension().is_some_and(|ext| ext == "tolk") && path.is_file() {
                     let relative_path = path.strip_prefix("./").unwrap_or(path);
 
                     if !ignore_set.is_match(relative_path) {
