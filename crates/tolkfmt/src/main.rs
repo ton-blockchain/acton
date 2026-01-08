@@ -10,10 +10,10 @@ fn main() {
     // let code = code.as_str();
 
     let code = "
-// first comment
-    // second comment
     fun foo() {
 
+// first comment
+    // second comment
 }
     ";
 

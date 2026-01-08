@@ -110,3 +110,41 @@ fn test_trailing_comment_grouping() {
             }"#]],
     );
 }
+
+#[test]
+fn test_comments_inline_empty_function() {
+    check(
+        "
+            fun main() {
+                // comment 1
+                // comment 2
+            }
+            ",
+        expect![[r#"
+            fun main() {
+                // comment 1
+                // comment 2
+            }"#]],
+    );
+}
+
+#[test]
+fn test_comments_inline_empty_block_statement() {
+    check(
+        "
+            fun main() {
+                {
+                    // comment 1
+                    // comment 2
+                }
+            }
+            ",
+        expect![[r#"
+            fun main() {
+                {
+                    // comment 1
+                    // comment 2
+                }
+            }"#]],
+    );
+}

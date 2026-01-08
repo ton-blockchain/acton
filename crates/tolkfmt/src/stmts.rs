@@ -1,14 +1,40 @@
+use crate::common::print_comment_node;
 use crate::{Context, comments, common, exprs};
 use pretty::RcDoc;
 use tolk_ast::*;
 
 pub fn print_block_statement<'a>(ctx: &Context, block: &BlockStatement) -> Option<RcDoc<'a>> {
-    let statements = block.statements();
-    let statements = statements
+    let raw_statements = block.statements();
+    let statements = raw_statements
         .iter()
         .filter(|stmt| !matches!(stmt, Statement::Unmapped(_) | Statement::EmptyStatement(_)))
         .collect::<Vec<_>>();
     if statements.is_empty() {
+        let mut lonely_comments = raw_statements
+            .iter()
+            .filter(|stmt| stmt.raw_node().kind() == "comment")
+            .peekable();
+        if lonely_comments.peek().is_some() {
+            // There are some comments in empty block statement like:
+            //
+            // {
+            //     // comment here
+            // }
+            let mut docs = vec![RcDoc::hardline()];
+
+            for comment in lonely_comments {
+                docs.push(print_comment_node(ctx, &comment.raw_node()));
+                docs.push(RcDoc::hardline());
+            }
+
+            let result = RcDoc::concat([
+                RcDoc::text("{"),
+                RcDoc::concat(docs).nest(4),
+                RcDoc::text("}"),
+            ]);
+            return Some(result);
+        }
+
         return Some(RcDoc::text("{}"));
     }
 
