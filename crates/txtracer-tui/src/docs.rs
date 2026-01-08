@@ -1,0 +1,33 @@
+pub fn get_instruction_doc(opcode: &str) -> String {
+    match opcode {
+        "SETCP" => "Set current code pointer to a specific value.",
+        "DICTPUSHCONST" => "Push a constant dictionary onto the stack.",
+        "DROP" => "Drop the top element from the stack.",
+        "INMSG_BOUNCED" => "Check if the inbound message is bounced.",
+        "THROWIF_SHORT" => "Throw an exception if the condition is true.",
+        "PUSHCTR" => "Push a control register onto the stack.",
+        "GASCONSUMED" => "Push the amount of gas consumed so far.",
+        "OVER" => "Duplicate the second element from the top of the stack.",
+        "PUSHPOW2" => "Push a power of 2 onto the stack.",
+        "CDATASIZE" => "Get the size of data in a cell.",
+        "XCHG2" => "Exchange the top two elements with a third element.",
+        "SUB" => "Subtract the top element from the second element.",
+        "PUSHINT_4" => "Push a 4-bit integer.",
+        "GETGASFEESIMPLE" => "Calculate gas fees for a simple transaction.",
+        "XCHG_0I" => "Exchange the top element with the i-th element.",
+        "PUSHINT_8" => "Push an 8-bit integer.",
+        "GETSTORAGEFEE" => "Calculate storage fees.",
+        "ADD" => "Add the top two elements of the stack.",
+        "RAWRESERVE" => "Reserve a specific amount of funds.",
+        "INMSG_SRC" => "Get the source address of the inbound message.",
+        "NEWC" => "Create a new builder.",
+        "STSLICECONST" => "Store a slice constant into the builder.",
+        "STSTDADDR" => "Store a standard address into the builder.",
+        "STUR" => "Store an unsigned integer with variable bit length.",
+        "ENDC" => "End cell construction.",
+        "SENDRAWMSG" => "Send a raw message.",
+        "SETLIBCODE" => "Set the library code.",
+        _ => "No documentation available for this instruction.",
+    }
+    .to_string()
+}
