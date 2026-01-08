@@ -128,6 +128,9 @@ jobs:
         id: detect-arch
         run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
       - name: Build acton binary
         env:
           RUSTC_WRAPPER: sccache
@@ -263,6 +266,9 @@ jobs:
         id: detect-arch
         run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
       - name: Build acton binary
         env:
           RUSTC_WRAPPER: sccache
@@ -395,6 +401,9 @@ jobs:
       - name: Detect architecture
         id: detect-arch
         run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
 
       - name: Build acton binary
         env:
