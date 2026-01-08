@@ -1,5 +1,5 @@
+use expect_test::{Expect, expect};
 use tolkfmt::format_source;
-use expect_test::{expect, Expect};
 
 fn check(code: &str, expect: Expect) {
     check_with_width(code, expect, 80)

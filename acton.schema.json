@@ -131,6 +131,25 @@
         }
       }
     },
+    "fmt": {
+      "type": "object",
+      "description": "Settings for the Tolk code formatter",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "description": "Maximum line width for formatting",
+          "minimum": 1,
+          "default": 100
+        },
+        "ignore": {
+          "type": "array",
+          "description": "Glob patterns to ignore from formatting",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "contracts": {
       "type": "object",
       "description": "Definition of contracts in the project",

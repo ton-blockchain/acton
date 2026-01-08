@@ -122,14 +122,17 @@ mod tests {
 
     #[test]
     fn test_tolk_required_version_with_comments() {
-        check(r#"
+        check(
+            r#"
         // comment 1
         // comment 2
         tolk 0.6.0
-        "#, expect![[r#"
+        "#,
+            expect![[r#"
             // comment 1
             // comment 2
-            tolk 0.6.0"#]]);
+            tolk 0.6.0"#]],
+        );
     }
 
     #[test]
@@ -142,10 +145,7 @@ mod tests {
 
     #[test]
     fn test_global_var() {
-        check(
-            "global x: int;",
-            expect!["global x: int"],
-        );
+        check("global x: int;", expect!["global x: int"]);
     }
 
     #[test]
@@ -161,14 +161,8 @@ mod tests {
 
     #[test]
     fn test_constant_declaration() {
-        check(
-            "const x = 42;",
-            expect!["const x = 42"],
-        );
-        check(
-            "const x: int = 42;",
-            expect!["const x: int = 42"],
-        );
+        check("const x = 42;", expect!["const x = 42"]);
+        check("const x: int = 42;", expect!["const x: int = 42"]);
     }
 
     #[test]
@@ -183,26 +177,17 @@ mod tests {
 
     #[test]
     fn test_constant_complex_expression() {
-        check(
-            "const PI = 3.14159;",
-            expect!["const PI = 3.14159"],
-        );
+        check("const PI = 3.14159;", expect!["const PI = 3.14159"]);
         check(
             "const MSG = \"hello world\";",
             expect![[r#"const MSG = "hello world""#]],
         );
-        check(
-            "const FLAG = true;",
-            expect!["const FLAG = true"],
-        );
+        check("const FLAG = true;", expect!["const FLAG = true"]);
     }
 
     #[test]
     fn test_type_alias() {
-        check(
-            "type MyInt = int;",
-            expect!["type MyInt = int"],
-        );
+        check("type MyInt = int;", expect!["type MyInt = int"]);
         check(
             "type MyMap<K, V> = map<K, V>;",
             expect!["type MyMap<K, V> = map<K, V>"],
@@ -929,26 +914,14 @@ mod tests {
 
     #[test]
     fn test_semicolon_after_declaration() {
-        check(
-            "const x = 1;",
-            expect!["const x = 1"],
-        );
-        check(
-            "global y: int;",
-            expect!["global y: int"],
-        );
-        check(
-            "type T = int;",
-            expect!["type T = int"],
-        );
+        check("const x = 1;", expect!["const x = 1"]);
+        check("global y: int;", expect!["global y: int"]);
+        check("type T = int;", expect!["type T = int"]);
     }
 
     #[test]
     fn test_semicolon_optional() {
-        check(
-            "const x = 1",
-            expect!["const x = 1"],
-        );
+        check("const x = 1", expect!["const x = 1"]);
     }
 
     #[test]

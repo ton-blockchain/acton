@@ -1,0 +1,3 @@
+Formatted contracts/simple1.tolk
+
+Done: 1 files formatted

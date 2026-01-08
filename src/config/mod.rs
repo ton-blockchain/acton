@@ -56,6 +56,7 @@ pub struct ActonConfig {
     pub package: PackageConfig,
     pub contracts: Option<ContractsConfig>,
     pub test: Option<TestSettings>,
+    pub fmt: Option<FmtSettings>,
     pub scripts: Option<BTreeMap<String, String>>,
     #[serde(skip)] // we build wallets manually
     pub wallets: Option<WalletsConfig>,
@@ -118,6 +119,13 @@ pub struct TestSettings {
     pub fail_fast: Option<bool>,
     #[serde(flatten)]
     pub metadata: BTreeMap<String, toml::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct FmtSettings {
+    pub width: Option<usize>,
+    pub ignore: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -191,6 +199,10 @@ impl Default for ActonConfig {
             },
             test: None,
             contracts: None,
+            fmt: Some(FmtSettings {
+                width: Some(100),
+                ignore: Some(vec![]),
+            }),
             wallets: None,
             libraries: None,
             scripts: None,

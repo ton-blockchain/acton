@@ -1,0 +1,9 @@
+Diff in contracts/simple.tolk:
+-
+-fun onInternalMessage(in:InMessage){
+-val x=1;
++fun onInternalMessage(in: InMessage) {
++    val x = 1;
+     val y = 2;
+ }
+

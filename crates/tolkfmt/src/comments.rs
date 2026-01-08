@@ -272,7 +272,10 @@ pub fn print_inline_comments_with_alignment(
         return;
     };
 
-    let mut inline_comments = comments.iter().filter(|c| c.kind == CommentKind::Inline).peekable();
+    let mut inline_comments = comments
+        .iter()
+        .filter(|c| c.kind == CommentKind::Inline)
+        .peekable();
     if inline_comments.peek().is_none() {
         return;
     }
