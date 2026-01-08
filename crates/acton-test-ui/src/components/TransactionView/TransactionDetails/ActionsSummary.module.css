@@ -168,15 +168,3 @@
   color: var(--color-failed);
   font-size: 0.875rem;
 }
-
-.codeBlock {
-  background-color: #1e1e1e;
-  color: #d4d4d4;
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  max-width: 100%;
-  overflow-x: auto;
-  margin: 0;
-  font-family: var(--font-mono);
-}

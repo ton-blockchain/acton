@@ -110,3 +110,79 @@ export function computeSendMode(tx: TransactionInfo): number | undefined {
   }
   return undefined
 }
+
+export const RESERVE_MODE_CONSTANTS = {
+  0: {
+    name: "ReserveExact",
+    description: "Reserves exactly the specified amount of nanoToncoin.",
+  },
+  1: {
+    name: "ReserveAllExcept",
+    description: "Reserves all but the specified amount of nanoToncoin.",
+  },
+  2: {
+    name: "ReserveAtMost",
+    description: "Reserves at most the specified amount of nanoToncoin.",
+  },
+  4: {
+    name: "ReserveAddOriginalBalance",
+    description:
+      "Increases the amount by the original balance of the current account (before the compute phase), including all extra currencies.",
+  },
+  8: {
+    name: "ReserveInvertSign",
+    description: "Negates the amount value before performing the reservation.",
+  },
+  16: {
+    name: "ReserveBounceIfActionFail",
+    description: "Bounces the transaction if the reservation fails.",
+  },
+} as const
+
+export interface ReserveModeInfo {
+  readonly name: string
+  readonly value: number
+  readonly description: string
+}
+
+/**
+ * Parse reserve mode number into an array of constants
+ */
+export function parseReserveMode(mode: number): ReserveModeInfo[] {
+  const flags: ReserveModeInfo[] = []
+
+  // Check base modes (mutually exclusive)
+  if ((mode & 3) === 0) {
+    flags.push({
+      name: RESERVE_MODE_CONSTANTS[0].name,
+      value: 0,
+      description: RESERVE_MODE_CONSTANTS[0].description,
+    })
+  } else if ((mode & 3) === 1) {
+    flags.push({
+      name: RESERVE_MODE_CONSTANTS[1].name,
+      value: 1,
+      description: RESERVE_MODE_CONSTANTS[1].description,
+    })
+  } else if ((mode & 3) === 2) {
+    flags.push({
+      name: RESERVE_MODE_CONSTANTS[2].name,
+      value: 2,
+      description: RESERVE_MODE_CONSTANTS[2].description,
+    })
+  }
+
+  // Check optional flags
+  for (const [value, constant] of Object.entries(RESERVE_MODE_CONSTANTS)) {
+    const flagValue = Number.parseInt(value, 10)
+    if (flagValue >= 4 && mode & flagValue) {
+      flags.push({
+        name: constant.name,
+        value: flagValue,
+        description: constant.description,
+      })
+    }
+  }
+
+  return flags
+}

@@ -34,8 +34,9 @@ pub struct TestExecutionContext {
 pub struct TestReport {
     pub name: String,
     pub suite_name: String,
-    #[serde(skip)]
     pub file_path: String,
+    pub row: usize,
+    pub column: usize,
     #[serde(skip)]
     pub duration: Duration,
     #[serde(skip)]

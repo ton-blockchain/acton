@@ -3,6 +3,7 @@ import type React from "react"
 import { useState } from "react"
 import type { ContractData } from "../../../types/transaction"
 import { formatCurrency } from "../../../utils/format"
+import { DataBlock } from "../../common/DataBlock/DataBlock"
 import { ContractChip } from "../ContractChip/ContractChip"
 import { ReserveModeViewer } from "../ReserveModeViewer/ReserveModeViewer"
 import { SendModeViewer } from "../SendModeViewer/SendModeViewer"
@@ -152,7 +153,7 @@ const renderActionDetails = (
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Body:</span>
               <div className={styles.detailValue}>
-                <pre className={styles.codeBlock}>{msg.body.toBoc().toString("hex")}</pre>
+                <DataBlock data={msg.body.toBoc().toString("hex")} />
               </div>
             </div>
           </div>
@@ -169,7 +170,7 @@ const renderActionDetails = (
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>New Code Hash:</span>
               <span className={styles.detailValue}>
-                <pre className={styles.codeBlock}>{action.newCode.toBoc().toString("hex")}</pre>
+                <DataBlock data={action.newCode.toBoc().toString("hex")} />
               </span>
             </div>
           </div>

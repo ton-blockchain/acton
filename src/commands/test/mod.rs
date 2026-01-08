@@ -870,7 +870,9 @@ fn run_file_tests(
         let mut test_report = TestReport {
             name: test.name.clone(),
             suite_name: suite_name.clone(),
-            file_path: file_path.to_string(),
+            file_path: abs_file_path.to_string_lossy().to_string(),
+            row: test.pos.row,
+            column: test.pos.column,
             duration: Duration::default(),
             gas_limit: test.gas_limit,
             status: TestStatus::Passed,

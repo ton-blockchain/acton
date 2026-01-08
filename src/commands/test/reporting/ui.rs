@@ -53,7 +53,7 @@ pub async fn start_ui_server(
     });
 
     // Path to the frontend dist directory
-    let dist_path = PathBuf::from("crates/acton-test-ui/dist");
+    let dist_path = PathBuf::from("/Users/petrmakhnev/emulator-rs/crates/acton-test-ui/dist");
 
     let app = Router::new()
         .route("/api/reports", get(handle_api_reports))

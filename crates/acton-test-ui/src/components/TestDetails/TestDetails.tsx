@@ -1,11 +1,15 @@
 import { Address } from "@ton/core"
 import type React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { FiCheck, FiCircle, FiCode, FiMinus, FiX } from "react-icons/fi"
+import { SiIntellijidea, SiRust, SiWebstorm } from "react-icons/si"
+import { VscCode } from "react-icons/vsc"
 import { useContracts } from "../../hooks/useContracts"
-import type { TestReport, Trace } from "../../types"
+import { type TestReport, TestStatus, type Trace } from "../../types"
 import type { ContractData } from "../../types/transaction"
 import { formatAddress } from "../../utils/format"
 import { processTransactions } from "../../utils/transaction"
+import { DataBlock } from "../common/DataBlock/DataBlock"
 import { TransactionTree } from "../TransactionView/TransactionTree/TransactionTree"
 import styles from "./TestDetails.module.css"
 
@@ -14,18 +18,59 @@ interface TestDetailsProps {
   readonly trace: Trace | null
 }
 
+interface IDEConfig {
+  readonly name: string
+  readonly icon: React.ReactNode
+  readonly getUrl: (test: TestReport) => string
+}
+
 export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
-  const [activeTab, setActiveTab] = useState<"vm" | "executor" | "transactions">("transactions")
-  const [selectedTraceIndex, setSelectedTraceIndex] = useState<number>(0)
+  const [activeTab, setActiveTab] = useState<"vm" | "executor" | "transactions">(() => {
+    const saved = localStorage.getItem("activeTab")
+    return (saved as "vm" | "executor" | "transactions") || "transactions"
+  })
+  const [selectedTraceIndex, setSelectedTraceIndex] = useState<number>(() => {
+    const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
+    return saved ? Number.parseInt(saved, 10) : 0
+  })
+  const [isIDESelectorOpen, setIsIDESelectorOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const contractNames = useMemo(() => trace?.contracts ?? [], [trace])
   const { contracts: backendContracts } = useContracts(contractNames)
 
   useEffect(() => {
-    if (trace) {
-      setSelectedTraceIndex(0)
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsIDESelectorOpen(false)
+      }
     }
-  }, [trace])
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  useEffect(() => {
+    if (trace) {
+      const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
+      const index = saved ? Number.parseInt(saved, 10) : 0
+      // Ensure the saved index is valid for the current trace
+      if (index < trace.traces.length) {
+        setSelectedTraceIndex(index)
+      } else {
+        setSelectedTraceIndex(0)
+      }
+    }
+  }, [trace, test.suite_name, test.name])
+
+  const handleSelectTraceIndex = (index: number) => {
+    setSelectedTraceIndex(index)
+    localStorage.setItem(`selectedTraceIndex:${test.suite_name}::${test.name}`, index.toString())
+  }
+
+  const handleTabChange = (tab: "vm" | "executor" | "transactions") => {
+    setActiveTab(tab)
+    localStorage.setItem("activeTab", tab)
+  }
 
   const parsedTransactions = useMemo(() => {
     if (!trace || !trace.traces[selectedTraceIndex]) return []
@@ -36,6 +81,45 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
       return []
     }
   }, [trace, selectedTraceIndex])
+
+  const ides: IDEConfig[] = [
+    {
+      name: "Cursor",
+      icon: <VscCode />,
+      getUrl: (t) => `cursor://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+    },
+    {
+      name: "Windsurf",
+      icon: <VscCode />,
+      getUrl: (t) => `windsurf://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+    },
+    {
+      name: "VS Code",
+      icon: <VscCode />,
+      getUrl: (t) => `vscode://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+    },
+    {
+      name: "VSCodium",
+      icon: <VscCode />,
+      getUrl: (t) => `vscodium://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+    },
+    {
+      name: "WebStorm",
+      icon: <SiWebstorm />,
+      getUrl: (t) => `webstorm://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+    },
+    {
+      name: "RustRover",
+      icon: <SiRust />,
+      getUrl: (t) =>
+        `rustrover://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+    },
+    {
+      name: "IntelliJ",
+      icon: <SiIntellijidea />,
+      getUrl: (t) => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+    },
+  ]
 
   const contracts = useMemo(() => {
     const map = new Map<string, ContractData>()
@@ -78,6 +162,21 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
 
   if (!test) return null
 
+  const getStatusIcon = (status: TestStatus) => {
+    switch (status) {
+      case TestStatus.Passed:
+        return <FiCheck className={styles.passedIcon} />
+      case TestStatus.Failed:
+        return <FiX className={styles.failedIcon} />
+      case TestStatus.Skipped:
+        return <FiCircle className={styles.skippedIcon} />
+      case TestStatus.Todo:
+        return <FiMinus className={styles.todoIcon} />
+      default:
+        return null
+    }
+  }
+
   const renderLogs = () => {
     if (!trace) return <div className={styles.empty}>No trace data available</div>
     const currentTraceList = trace.traces[selectedTraceIndex]
@@ -89,7 +188,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
       }
       return (
         <div className={styles.treeWrapper}>
-          <TransactionTree transactions={parsedTransactions} contracts={contracts} allContracts={allContracts}/>
+          <TransactionTree
+            transactions={parsedTransactions}
+            contracts={contracts}
+            allContracts={allContracts}
+          />
         </div>
       )
     }
@@ -107,7 +210,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
                 <span className={styles.txDest}>Dest: {tx.dest_contract_info}</span>
               )}
             </div>
-            <pre className={styles.logContent}>{content}</pre>
+            <DataBlock data={content} />
           </div>
         )
       })
@@ -128,15 +231,42 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
     <div className={styles.details}>
       <div className={styles.header}>
         <div className={styles.titleInfo}>
+          <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>
           <span className={styles.suiteName}>{test.suite_name} / </span>
           <span className={styles.testName}>{test.name}</span>
+
+          <div className={styles.ideSelectorContainer} ref={dropdownRef}>
+            <button
+              type="button"
+              className={`${styles.ideTrigger} ${isIDESelectorOpen ? styles.active : ""}`}
+              onClick={() => setIsIDESelectorOpen(!isIDESelectorOpen)}
+              title="Open in IDE"
+            >
+              <FiCode />
+            </button>
+
+            {isIDESelectorOpen && (
+              <div className={styles.ideDropdown}>
+                {ides.map((ide) => (
+                  <a
+                    key={ide.name}
+                    href={ide.getUrl(test)}
+                    className={styles.ideItem}
+                    onClick={() => setIsIDESelectorOpen(false)}
+                  >
+                    <span className={styles.ideIcon}>{ide.icon}</span>
+                    <span className={styles.ideName}>{ide.name}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-        <div className={`${styles.status} ${styles[test.status.toLowerCase()]}`}>{test.status}</div>
       </div>
 
       {test.message && (
         <div className={styles.errorMessage}>
-          <pre>{test.message}</pre>
+          <DataBlock data={test.message} />
         </div>
       )}
 
@@ -144,21 +274,21 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
         <button
           type="button"
           className={`${styles.tab} ${activeTab === "transactions" ? styles.activeTab : ""}`}
-          onClick={() => setActiveTab("transactions")}
+          onClick={() => handleTabChange("transactions")}
         >
           Transactions
         </button>
         <button
           type="button"
           className={`${styles.tab} ${activeTab === "vm" ? styles.activeTab : ""}`}
-          onClick={() => setActiveTab("vm")}
+          onClick={() => handleTabChange("vm")}
         >
           VM Log
         </button>
         <button
           type="button"
           className={`${styles.tab} ${activeTab === "executor" ? styles.activeTab : ""}`}
-          onClick={() => setActiveTab("executor")}
+          onClick={() => handleTabChange("executor")}
         >
           Executor Logs
         </button>
@@ -171,7 +301,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace }) => {
               key={`${trace.name}-${index}`}
               type="button"
               className={`${styles.traceTab} ${selectedTraceIndex === index ? styles.activeTraceTab : ""}`}
-              onClick={() => setSelectedTraceIndex(index)}
+              onClick={() => handleSelectTraceIndex(index)}
             >
               Trace #{index + 1}
             </button>

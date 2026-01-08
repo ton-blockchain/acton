@@ -9,6 +9,7 @@ import {
   Tree,
   type TreeLinkDatum,
 } from "react-d3-tree"
+import type { BackendContractInfo } from "../../../types"
 import type { ContractData, TransactionInfo } from "../../../types/transaction"
 import { formatCurrency } from "../../../utils/format"
 import { getTransactionOpcode } from "../../../utils/transaction"
@@ -16,7 +17,6 @@ import { TransactionDetails } from "../TransactionDetails/TransactionDetails"
 import { SmartTooltip } from "./SmartTooltip"
 import styles from "./TransactionTree.module.css"
 import { useTooltip } from "./useTooltip"
-import {BackendContractInfo} from "../../../types";
 
 interface TransactionTooltipData {
   readonly fromAddress: string
@@ -552,7 +552,11 @@ export function TransactionTree({
 
       {selectedTransaction && (
         <div className={styles.transactionDetails}>
-          <TransactionDetails tx={selectedTransaction} contracts={contracts} allContracts={allContracts} />
+          <TransactionDetails
+            tx={selectedTransaction}
+            contracts={contracts}
+            allContracts={allContracts}
+          />
         </div>
       )}
     </div>

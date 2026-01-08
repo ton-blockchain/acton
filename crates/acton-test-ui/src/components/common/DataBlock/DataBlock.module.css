@@ -1,0 +1,14 @@
+.container {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  word-break: break-all;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow-x: auto;
+}

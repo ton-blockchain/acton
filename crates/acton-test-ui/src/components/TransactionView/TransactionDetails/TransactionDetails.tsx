@@ -1,5 +1,6 @@
 import React, { type JSX, useState } from "react"
 import { FiChevronDown, FiChevronUp } from "react-icons/fi"
+import type { BackendContractInfo } from "../../../types"
 import type { ContractData, TransactionInfo } from "../../../types/transaction"
 import { formatCurrency, formatNumber } from "../../../utils/format"
 import { computeSendMode, getTransactionOpcode } from "../../../utils/transaction"
@@ -7,11 +8,8 @@ import { ContractChip } from "../ContractChip/ContractChip"
 import { ExitCodeChip } from "../ExitCodeChip/ExitCodeChip"
 import { OpcodeChip } from "../OpcodeChip/OpcodeChip"
 import { SendModeViewer } from "../SendModeViewer/SendModeViewer"
-
 import { ActionsSummary } from "./ActionsSummary"
-
 import styles from "./TransactionDetails.module.css"
-import {BackendContractInfo} from "../../../types";
 
 export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
@@ -19,7 +17,11 @@ export interface TransactionDetailsProps {
   readonly allContracts: readonly BackendContractInfo[]
 }
 
-export function TransactionDetails({ tx, contracts, allContracts }: TransactionDetailsProps): React.JSX.Element {
+export function TransactionDetails({
+  tx,
+  contracts,
+  allContracts,
+}: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
 
   const description = tx.transaction.description

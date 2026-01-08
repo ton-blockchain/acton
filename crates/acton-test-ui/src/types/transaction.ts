@@ -1,5 +1,5 @@
 import type { Address, Cell, OutAction, Transaction } from "@ton/core"
-import {Abi} from "./index";
+import type { Abi } from "./index"
 
 export interface TransactionInfo {
   readonly lt: string

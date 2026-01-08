@@ -8,6 +8,9 @@ export enum TestStatus {
 export interface TestReport {
   readonly name: string
   readonly suite_name: string
+  readonly file_path: string
+  readonly row: number
+  readonly column: number
   readonly status: TestStatus
   readonly message?: string
   readonly trace_path?: string

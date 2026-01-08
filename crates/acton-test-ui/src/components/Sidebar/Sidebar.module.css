@@ -1,23 +1,135 @@
 .sidebar {
-  width: 320px;
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   background-color: var(--card-bg);
   height: 100vh;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .header {
   padding: 16px;
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collapseButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.collapseButton:hover {
+  background-color: white;
+  color: var(--color-todo);
+  border-color: var(--color-todo);
 }
 
 .title {
   font-weight: 700;
   font-size: 1.1rem;
-  margin-bottom: 12px;
   color: var(--text-primary);
+}
+
+.searchContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 8px 8px 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  outline: none;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.searchInput:focus {
+  border-color: var(--link-color);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.filterButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-color);
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
+}
+
+.filterButton:hover {
+  border-color: var(--text-secondary);
+}
+
+.filterButton.activeFilter {
+  border-color: currentColor;
+  background-color: white;
+}
+
+.filterButton.passed.activeFilter {
+  background-color: var(--color-passed-bg);
+  color: var(--color-passed-text);
+  border-color: var(--color-passed);
+}
+
+.filterButton.failed.activeFilter {
+  background-color: var(--color-failed-bg);
+  color: var(--color-failed-text);
+  border-color: var(--color-failed);
+}
+
+.filterButton.skipped.activeFilter {
+  background-color: var(--color-skipped-bg);
+  color: var(--color-skipped-text);
+  border-color: var(--color-skipped);
+}
+
+.filterButton.todo.activeFilter {
+  background-color: var(--color-todo-bg);
+  color: var(--color-todo-text);
+  border-color: var(--color-todo);
 }
 
 .content {
@@ -27,15 +139,59 @@
 }
 
 .suite {
-  margin-top: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
 }
 
 .suiteHeader {
-  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-secondary);
+  transition: background-color 0.2s;
+  gap: 8px;
+}
+
+.suiteHeader:hover {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+.suiteFailed .suiteName {
+  color: var(--color-failed);
+}
+
+.suiteToggle {
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+.suiteIcon {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.suiteName {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suiteCount {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  background-color: var(--bg-color);
+  border-radius: 10px;
+  color: var(--text-muted);
 }
 
 .testList {
@@ -46,7 +202,7 @@
 .testItem {
   display: flex;
   align-items: center;
-  padding: 6px 16px 6px 24px;
+  padding: 6px 16px 6px 44px;
   border: none;
   background: none;
   cursor: pointer;
@@ -55,6 +211,7 @@
   font-size: 0.9rem;
   color: var(--text-primary);
   width: 100%;
+  transition: background-color 0.2s;
 }
 
 .testItem:hover {
@@ -64,10 +221,27 @@
 .testItem.selected {
   background-color: var(--color-todo-bg);
   color: var(--color-todo-text);
+  position: relative;
+}
+
+.testItem.selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--color-todo);
+}
+
+.testStatusIcon {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+  font-size: 0.85rem;
 }
 
 .testName {
-  margin-left: 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
