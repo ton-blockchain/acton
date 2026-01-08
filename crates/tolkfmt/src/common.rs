@@ -1,13 +1,46 @@
-use crate::Context;
 use crate::comments::CommentKind;
+use crate::{Context, comments};
 use pretty::RcDoc;
 use tree_sitter::Node;
 
 pub fn print_comment_node<'a>(ctx: &Context, comment: &Node) -> RcDoc<'a> {
-    let text = comment
-        .utf8_text(ctx.code.as_ref().as_ref())
-        .unwrap_or("");
+    let text = comment.utf8_text(ctx.code.as_ref().as_ref()).unwrap_or("");
     RcDoc::text(text.to_owned())
+}
+
+pub fn print_original_node_text<'a>(ctx: &Context, node: &Node) -> RcDoc<'a> {
+    let mut docs = vec![];
+    let comments = ctx.comments.get(node);
+
+    comments::print_leading_comments(ctx, &mut docs, comments);
+
+    let text = node.utf8_text(ctx.code.as_ref().as_ref()).unwrap_or("");
+    let mut text = text.to_owned();
+
+    // semicolon is not a part of some nodes in the CST, so we need to add it manually if missing
+    let need_semicolon = matches!(
+        node.kind(),
+        "local_vars_declaration"
+            | "return_statement"
+            | "do_while_statement"
+            | "break_statement"
+            | "continue_statement"
+            | "throw_statement"
+            | "assert_statement"
+            | "expression_statement"
+    );
+
+    if need_semicolon && !text.ends_with(';') {
+        text.push(';');
+    }
+
+    docs.push(RcDoc::text(text));
+
+    comments::print_inline_comments(ctx, &mut docs, comments);
+    docs.push(RcDoc::hardline());
+    comments::print_trailing_comments(ctx, &mut docs, comments);
+
+    RcDoc::concat(docs)
 }
 
 pub fn print_node_text<'a>(ctx: &Context, ident: &Node) -> Option<RcDoc<'a>> {

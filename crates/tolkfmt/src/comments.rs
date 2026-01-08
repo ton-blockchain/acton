@@ -270,3 +270,17 @@ pub fn print_inline_comments(
         }
     }
 }
+
+pub fn has_fmt_ignore(ctx: &Context, comments: Option<&Vec<Comment>>) -> bool {
+    let Some(comments) = comments else {
+        return false;
+    };
+
+    comments.iter().any(|c| {
+        c.kind == CommentKind::Leading
+            && c.nodes.iter().any(|n| {
+                let text = n.utf8_text(ctx.code.as_ref().as_bytes()).unwrap_or("");
+                text.trim() == "// fmt-ignore"
+            })
+    })
+}

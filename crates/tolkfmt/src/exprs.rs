@@ -571,26 +571,31 @@ fn print_tuple_tensor<'a>(
     for (i, el) in elements.iter().enumerate() {
         let node = el.raw_node();
         let comments = ctx.comments.get(&node);
-        comments::print_leading_comments(ctx, &mut docs, comments);
 
-        docs.push(print_expression(ctx, el)?);
-
-        let is_last = i == elements.len() - 1;
-        if !is_last {
-            docs.push(RcDoc::text(","));
+        if comments::has_fmt_ignore(ctx, comments) {
+            docs.push(common::print_original_node_text(ctx, &node));
         } else {
-            docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+            comments::print_leading_comments(ctx, &mut docs, comments);
+
+            docs.push(print_expression(ctx, el)?);
+
+            let is_last = i == elements.len() - 1;
+            if !is_last {
+                docs.push(RcDoc::text(","));
+            } else {
+                docs.push(RcDoc::flat_alt(RcDoc::text(","), RcDoc::nil()));
+            }
+
+            comments::print_inline_comments(ctx, &mut docs, comments);
+
+            if is_last {
+                docs.push(RcDoc::line_());
+            } else {
+                docs.push(RcDoc::line());
+            }
+
+            comments::print_trailing_comments(ctx, &mut docs, comments);
         }
-
-        comments::print_inline_comments(ctx, &mut docs, comments);
-
-        if is_last {
-            docs.push(RcDoc::line_());
-        } else {
-            docs.push(RcDoc::line());
-        }
-
-        comments::print_trailing_comments(ctx, &mut docs, comments);
 
         if let Some(next) = elements.get(i + 1)
             && common::empty_lines_between(ctx, &node, &next.raw_node()) > 1

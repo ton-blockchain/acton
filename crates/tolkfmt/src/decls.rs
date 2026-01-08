@@ -88,16 +88,20 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
         let node = top_level.raw_node();
         let comments = ctx.comments.get(&node);
 
-        comments::print_leading_comments(ctx, &mut docs, comments);
+        if comments::has_fmt_ignore(ctx, comments) {
+            docs.push(common::print_original_node_text(ctx, &node));
+        } else {
+            comments::print_leading_comments(ctx, &mut docs, comments);
 
-        let Some(doc) = print_decl(ctx, &top_level) else {
-            continue;
-        };
-        docs.push(doc);
+            let Some(doc) = print_decl(ctx, &top_level) else {
+                continue;
+            };
+            docs.push(doc);
 
-        comments::print_inline_comments(ctx, &mut docs, comments);
-        docs.push(RcDoc::hardline());
-        comments::print_trailing_comments(ctx, &mut docs, comments);
+            comments::print_inline_comments(ctx, &mut docs, comments);
+            docs.push(RcDoc::hardline());
+            comments::print_trailing_comments(ctx, &mut docs, comments);
+        }
 
         // Add empty line between declarations
         if top_levels_iter.peek().is_some() {
