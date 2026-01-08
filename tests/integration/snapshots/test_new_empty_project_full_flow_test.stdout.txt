@@ -4,7 +4,7 @@
 
  TEST  [ROOT]/foobar
 
- > tests/counter.test.tolk (1 test)
+ > tests/contract.test.tolk (1 test)
   ✓ something important [TIME]
 
  ✓ 1 passed in 1 file

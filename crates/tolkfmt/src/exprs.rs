@@ -484,11 +484,9 @@ pub fn print_object_literal_body<'a>(
         return Some(RcDoc::text("{}"));
     }
 
-    let has_comments = args.iter().any(|arg| {
-        ctx.comments
-            .get(&arg.0)
-            .is_some_and(|cs| !cs.is_empty())
-    });
+    let has_comments = args
+        .iter()
+        .any(|arg| ctx.comments.get(&arg.0).is_some_and(|cs| !cs.is_empty()));
 
     let is_multiline = args.len() > 2 || has_comments;
     let separator = if is_multiline {
