@@ -8,7 +8,7 @@ mod tests {
     }
 
     fn check_with_width(code: &str, expect: Expect, width: usize) {
-        unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+        // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
 
         let res = format_source(code, width).unwrap();
 
@@ -536,6 +536,44 @@ mod tests {
     }
 
     #[test]
+    fn test_enum_comments_alignment() {
+        check(
+            r#"enum BounceMode {
+                NoBounce               // a message will just disappear on error
+                Only256BitsOfBody      // `in.bouncedBody` will be "0xFFFFFFFF" and the first 256 bits of outgoing body (most cheap)
+                RichBounce             // `in.bouncedBody` will be struct RichBounceBody (most expensive, but allows accessing all data sent)
+                RichBounceOnlyRootCell // `in.bouncedBody` will be struct RichBounceBody without refs in `originalBody`
+            }"#,
+            expect![[r#"
+                enum BounceMode {
+                    NoBounce               // a message will just disappear on error
+                    Only256BitsOfBody      // `in.bouncedBody` will be "0xFFFFFFFF" and the first 256 bits of outgoing body (most cheap)
+                    RichBounce             // `in.bouncedBody` will be struct RichBounceBody (most expensive, but allows accessing all data sent)
+                    RichBounceOnlyRootCell // `in.bouncedBody` will be struct RichBounceBody without refs in `originalBody`
+                }"#]],
+        );
+    }
+
+    #[test]
+    fn test_struct_comments_alignment() {
+        check(
+            r#"struct Config {
+                enabled: bool        // enable feature
+                timeout: int         // timeout in seconds
+                host: slice          // server host
+                port: int            // server port number
+            }"#,
+            expect![[r#"
+                struct Config {
+                    enabled: bool // enable feature
+                    timeout: int  // timeout in seconds
+                    host: slice   // server host
+                    port: int     // server port number
+                }"#]],
+        );
+    }
+
+    #[test]
     fn test_function_with_annotations() {
         check(
             "@pure\nfun foo() {}",
@@ -1025,6 +1063,34 @@ mod tests {
                 import "c"
 
                 fun foo() {}"#]],
+        );
+    }
+
+    #[test]
+    fn test_constants_without_newlines() {
+        check(
+            r#"
+                const foo = 1
+                const bar = 2
+                "#,
+            expect![[r#"
+                const foo = 1;
+                const bar = 2;"#]],
+        );
+    }
+
+    #[test]
+    fn test_constants_with_newlines() {
+        check(
+            r#"
+                const foo = 1
+            
+                const bar = 2
+                "#,
+            expect![[r#"
+                const foo = 1;
+
+                const bar = 2;"#]],
         );
     }
 }

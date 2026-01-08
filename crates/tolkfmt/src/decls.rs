@@ -103,9 +103,22 @@ pub fn print_source_file<'a>(ctx: &Context, file: &SourceFile) -> Option<RcDoc<'
             comments::print_trailing_comments(ctx, &mut docs, comments);
         }
 
-        // Add empty line between declarations
-        if top_levels_iter.peek().is_some() {
-            docs.push(RcDoc::hardline());
+        // Add empty line between declarations if needed
+        let next_decl = top_levels_iter.peek();
+        if let Some(next_decl) = next_decl {
+            let top_level_node = top_level.raw_node();
+            let next_top_level_node = next_decl.raw_node();
+
+            if next_top_level_node.kind() == top_level_node.kind()
+                && next_top_level_node.kind() == "constant_declaration"
+            {
+                // don't add new line between constants if not requested
+                if common::empty_lines_between(ctx, &top_level_node, &next_top_level_node) > 1 {
+                    docs.push(RcDoc::hardline());
+                }
+            } else {
+                docs.push(RcDoc::hardline());
+            }
         }
     }
 
@@ -274,14 +287,32 @@ pub fn print_struct_body<'a>(ctx: &Context, body: &StructBody) -> Option<RcDoc<'
         return Some(RcDoc::text("{}"));
     }
 
+    let mut field_docs = Vec::with_capacity(fields.len());
+    let mut max_width = 0;
+
+    for field in fields.iter() {
+        let doc = print_struct_field_declaration(ctx, field)?;
+        let width = common::doc_width(&doc);
+
+        let comments = ctx.comments.get(&field.0);
+        let has_inline =
+            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
+
+        if has_inline {
+            max_width = max_width.max(width);
+        }
+        field_docs.push(doc);
+    }
+
     let mut docs = vec![RcDoc::hardline()];
-    for (i, field) in fields.iter().enumerate() {
+    for (i, field_doc) in field_docs.into_iter().enumerate() {
+        let field = &fields[i];
         let comments = ctx.comments.get(&field.0);
         comments::print_leading_comments(ctx, &mut docs, comments);
 
-        docs.push(print_struct_field_declaration(ctx, field)?);
+        docs.push(field_doc);
 
-        comments::print_inline_comments(ctx, &mut docs, comments);
+        comments::print_inline_comments_with_alignment(ctx, &mut docs, comments, max_width);
         docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
@@ -356,14 +387,32 @@ pub fn print_enum_body<'a>(ctx: &Context, body: &EnumBody) -> Option<RcDoc<'a>> 
         return Some(RcDoc::text("{}"));
     }
 
+    let mut member_docs = Vec::with_capacity(members.len());
+    let mut max_width = 0;
+
+    for member in members.iter() {
+        let doc = print_enum_member_declaration(ctx, member)?;
+        let width = common::doc_width(&doc);
+
+        let comments = ctx.comments.get(&member.0);
+        let has_inline =
+            comments.is_some_and(|cs| cs.iter().any(|c| c.kind == comments::CommentKind::Inline));
+
+        if has_inline {
+            max_width = max_width.max(width);
+        }
+        member_docs.push(doc);
+    }
+
     let mut docs = vec![RcDoc::hardline()];
-    for (i, member) in members.iter().enumerate() {
+    for (i, member_doc) in member_docs.into_iter().enumerate() {
+        let member = &members[i];
         let comments = ctx.comments.get(&member.0);
         comments::print_leading_comments(ctx, &mut docs, comments);
 
-        docs.push(print_enum_member_declaration(ctx, member)?);
+        docs.push(member_doc);
 
-        comments::print_inline_comments(ctx, &mut docs, comments);
+        comments::print_inline_comments_with_alignment(ctx, &mut docs, comments, max_width);
         docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut docs, comments);
 

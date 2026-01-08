@@ -259,11 +259,38 @@ pub fn print_inline_comments(
     docs: &mut Vec<RcDoc>,
     comments: Option<&Vec<Comment>>,
 ) {
+    print_inline_comments_with_alignment(ctx, docs, comments, 0);
+}
+
+pub fn print_inline_comments_with_alignment(
+    ctx: &Context,
+    docs: &mut Vec<RcDoc>,
+    comments: Option<&Vec<Comment>>,
+    target_width: usize,
+) {
     let Some(comments) = comments else {
         return;
     };
 
-    for comment in comments.iter().filter(|c| c.kind == CommentKind::Inline) {
+    let mut inline_comments = comments.iter().filter(|c| c.kind == CommentKind::Inline).peekable();
+    if inline_comments.peek().is_none() {
+        return;
+    }
+
+    if target_width > 0 {
+        docs.push(RcDoc::nesting(move |indent| {
+            RcDoc::column(move |col| {
+                let current_width = col.saturating_sub(indent);
+                if target_width > current_width {
+                    RcDoc::text(" ".repeat(target_width - current_width))
+                } else {
+                    RcDoc::nil()
+                }
+            })
+        }));
+    }
+
+    for comment in inline_comments {
         for node in &comment.nodes {
             docs.push(RcDoc::space());
             docs.push(common::print_comment_node(ctx, node));

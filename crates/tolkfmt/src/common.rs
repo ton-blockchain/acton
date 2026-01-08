@@ -100,3 +100,42 @@ pub fn print_sections(sections: Vec<Vec<RcDoc>>) -> RcDoc {
 
     RcDoc::concat(final_docs)
 }
+
+pub fn doc_width(doc: &RcDoc) -> usize {
+    struct MeasureWriter {
+        last_line_len: usize,
+    }
+
+    impl pretty::Render for MeasureWriter {
+        type Error = std::fmt::Error;
+
+        fn write_str(&mut self, s: &str) -> Result<usize, Self::Error> {
+            for c in s.chars() {
+                if c == '\n' {
+                    self.last_line_len = 0;
+                } else {
+                    self.last_line_len += 1;
+                }
+            }
+            Ok(s.len())
+        }
+
+        fn fail_doc(&self) -> Self::Error {
+            std::fmt::Error
+        }
+    }
+
+    impl<'a, A> pretty::RenderAnnotated<'a, A> for MeasureWriter {
+        fn push_annotation(&mut self, _: &'a A) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn pop_annotation(&mut self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+    }
+
+    let mut writer = MeasureWriter { last_line_len: 0 };
+    doc.render_raw(usize::MAX, &mut writer).ok();
+    writer.last_line_len
+}
