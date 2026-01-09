@@ -2,7 +2,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--hover-bg);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 0.85rem;

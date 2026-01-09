@@ -9,7 +9,22 @@ export const App: React.FC = () => {
   const [reports, setReports] = useState<TestReport[]>([])
   const [selectedTest, setSelectedTest] = useState<TestReport | null>(null)
   const [currentTrace, setCurrentTrace] = useState<Trace | null>(null)
+  const [theme, setTheme] = useState(() => {
+    return (
+      localStorage.getItem("theme") ||
+      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+    )
+  })
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark-theme", theme === "dark")
+    localStorage.setItem("theme", theme)
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"))
+  }, [])
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem("sidebarWidth")
     return saved ? Number.parseInt(saved, 10) : 350
@@ -116,6 +131,8 @@ export const App: React.FC = () => {
           onSelectTest={handleSelectTest}
           width={sidebarWidth}
           onCollapse={toggleSidebar}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
       )}
 

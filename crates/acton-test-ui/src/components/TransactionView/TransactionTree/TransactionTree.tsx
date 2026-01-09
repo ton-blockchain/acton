@@ -285,7 +285,7 @@ export function TransactionTree({
       },
       children: [],
     }
-  }, [rootTransactions, contracts, selectedTransaction])
+  }, [rootTransactions, contracts, selectedTransaction, allContracts])
 
   const renderCustomNodeElement = ({ nodeDatum }: CustomNodeElementProps): React.JSX.Element => {
     if (nodeDatum.attributes?.isRoot === "true") {

@@ -14,7 +14,7 @@
   justify-content: space-between;
   align-items: center;
   min-height: 36px;
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: var(--divider-color);
 }
 
 .titleInfo {
@@ -63,8 +63,8 @@
 .ideTrigger:hover,
 .ideTrigger.active {
   color: var(--color-todo);
-  background-color: rgba(0, 0, 0, 0.05);
-  border-color: rgba(0, 0, 0, 0.1);
+  background-color: var(--hover-bg);
+  border-color: var(--border-color);
 }
 
 .ideDropdown {
@@ -134,7 +134,7 @@
   display: flex;
   padding: 8px 16px;
   gap: 8px;
-  background-color: rgba(0, 0, 0, 0.01);
+  background-color: var(--divider-color);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -226,7 +226,7 @@
 }
 
 .txDest {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--hover-bg);
   padding: 2px 8px;
   border-radius: 4px;
   font-weight: normal;

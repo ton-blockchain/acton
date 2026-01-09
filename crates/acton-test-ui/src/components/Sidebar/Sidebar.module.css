@@ -22,6 +22,33 @@
   align-items: center;
 }
 
+.headerButtons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.themeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.themeButton:hover {
+  background-color: var(--card-bg);
+  color: var(--color-todo);
+  border-color: var(--color-todo);
+}
+
 .collapseButton {
   display: flex;
   align-items: center;
@@ -38,7 +65,7 @@
 }
 
 .collapseButton:hover {
-  background-color: white;
+  background-color: var(--card-bg);
   color: var(--color-todo);
   border-color: var(--color-todo);
 }
@@ -105,7 +132,7 @@
 
 .filterButton.activeFilter {
   border-color: currentColor;
-  background-color: white;
+  background-color: var(--card-bg);
 }
 
 .filterButton.passed.activeFilter {
@@ -139,7 +166,7 @@
 }
 
 .suite {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--divider-color);
 }
 
 .suiteHeader {
@@ -159,7 +186,7 @@
 }
 
 .suiteHeader:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: var(--hover-bg);
 }
 
 .suiteFailed .suiteName {
@@ -219,7 +246,7 @@
 }
 
 .testItem:hover {
-  background-color: rgba(0, 0, 0, 0.04);
+  background-color: var(--hover-bg);
 }
 
 .testItem.selected {

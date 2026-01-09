@@ -7,7 +7,9 @@ import {
   FiChevronRight,
   FiCircle,
   FiMinus,
+  FiMoon,
   FiSearch,
+  FiSun,
   FiX,
 } from "react-icons/fi"
 import { type TestReport, TestStatus } from "../../types"
@@ -20,6 +22,8 @@ interface SidebarProps {
   readonly onSelectTest: (test: TestReport) => void
   readonly width?: number
   readonly onCollapse?: () => void
+  readonly theme?: string
+  readonly onToggleTheme?: () => void
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -28,6 +32,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTest,
   width,
   onCollapse,
+  theme,
+  onToggleTheme,
 }) => {
   const [searchQuery, setSearchQuery] = useState("")
   const [collapsedSuites, setCollapsedSuites] = useState<Set<string>>(new Set())
@@ -103,16 +109,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.title}>Acton Tests</div>
-          {onCollapse && (
-            <button
-              type="button"
-              onClick={onCollapse}
-              className={styles.collapseButton}
-              title="Collapse sidebar"
-            >
-              <FiChevronLeft />
-            </button>
-          )}
+          <div className={styles.headerButtons}>
+            {onToggleTheme && (
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                className={styles.themeButton}
+                title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+              >
+                {theme === "light" ? <FiMoon /> : <FiSun />}
+              </button>
+            )}
+            {onCollapse && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                className={styles.collapseButton}
+                title="Collapse sidebar"
+              >
+                <FiChevronLeft />
+              </button>
+            )}
+          </div>
         </div>
         <Summary reports={reports} />
 

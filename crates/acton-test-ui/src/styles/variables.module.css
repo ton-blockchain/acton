@@ -25,9 +25,43 @@
   --border-color: #eeeeee;
   --shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
 
+  --hover-bg: rgba(0, 0, 0, 0.04);
+  --divider-color: rgba(0, 0, 0, 0.03);
+
   --font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Fira Code", "Source Code Pro", Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+:root.dark-theme {
+  --bg-color: #121212;
+  --card-bg: #1e1e1e;
+  --text-primary: #e1e1e1;
+  --text-secondary: #a0a0a0;
+  --text-muted: #707070;
+
+  --color-passed: #30d158;
+  --color-passed-bg: #1c3e26;
+  --color-passed-text: #7cd996;
+
+  --color-failed: #ff453a;
+  --color-failed-bg: #4d1a16;
+  --color-failed-text: #ff8f87;
+
+  --color-skipped: #ffd60a;
+  --color-skipped-bg: #4d3800;
+  --color-skipped-text: #ffe580;
+
+  --color-todo: #0a84ff;
+  --color-todo-bg: #003366;
+  --color-todo-text: #66b3ff;
+
+  --link-color: #0a84ff;
+  --border-color: #333333;
+  --shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+
+  --hover-bg: rgba(255, 255, 255, 0.06);
+  --divider-color: rgba(255, 255, 255, 0.04);
 }
 
 .variables {
