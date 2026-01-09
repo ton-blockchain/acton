@@ -74,6 +74,9 @@
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .searchContainer {

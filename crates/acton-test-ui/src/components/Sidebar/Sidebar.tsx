@@ -13,6 +13,7 @@ import {
   FiX,
 } from "react-icons/fi"
 import { type TestReport, TestStatus } from "../../types"
+import { AppIcon } from "../common/AppIcon"
 import { Summary } from "../Summary/Summary"
 import styles from "./Sidebar.module.css"
 
@@ -108,7 +109,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className={styles.sidebar} style={width ? { width: `${width}px` } : undefined}>
       <div className={styles.header}>
         <div className={styles.headerTop}>
-          <div className={styles.title}>Acton Tests</div>
+          <div className={styles.title}>
+            <AppIcon theme={theme ?? "light"} />
+            Acton Tests
+          </div>
           <div className={styles.headerButtons}>
             {onToggleTheme && (
               <button
