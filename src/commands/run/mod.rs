@@ -25,9 +25,9 @@ pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
     println!("{}", full_command.bold());
 
     #[cfg(target_os = "windows")]
-    let (shell, flag) = ("cmd", "/C");
+    let (shell, flag) = ("cmd", "/c");
     #[cfg(not(target_os = "windows"))]
-    let (shell, flag) = ("sh", "-c");
+    let (shell, flag) = ("/bin/sh", "-c");
 
     let status = Command::new(shell)
         .arg(flag)
@@ -35,16 +35,22 @@ pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
-        .status()
-        .map_err(|e| anyhow!("Failed to execute script '{}': {}", script_name, e))?;
+        .spawn();
 
-    if !status.success() {
-        if let Some(code) = status.code() {
-            std::process::exit(code);
-        } else {
-            return Err(anyhow!("Script '{}' terminated by signal", script_name));
+    match status {
+        Ok(child) => {
+            let output = child.wait_with_output()?;
+            let status = output.status;
+            if status.success() {
+                return Ok(());
+            }
+
+            if let Some(code) = status.code() {
+                std::process::exit(code);
+            } else {
+                Err(anyhow!("Script '{}' terminated by signal", script_name))
+            }
         }
+        Err(e) => Err(anyhow!("Failed to execute script '{}': {}", script_name, e)),
     }
-
-    Ok(())
 }
