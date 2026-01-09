@@ -1,6 +1,7 @@
 use crate::debugger::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
 use abi::ContractAbi;
+use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use emulator::world_state::WorldState;
@@ -430,7 +431,7 @@ impl<'a> Env<'a> {
         Some(found.1.clone())
     }
 
-    pub fn find_wallet(&self, name: &str) -> Option<&acton_config::config::WalletConfig> {
+    pub fn find_wallet(&self, name: &str) -> Option<&config::WalletConfig> {
         self.wallets?.wallets.get(name)
     }
 }

@@ -1,6 +1,7 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
 use crate::wallets::open_wallets;
+use acton_config::config;
 use acton_config::config::{ActonConfig, global_libraries_path};
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Local};
@@ -476,7 +477,7 @@ pub fn topup_cmd(
         wallet
             .wallet
             .address
-            .to_base64_url_flags(true, lib.network == acton_config::config::Network::Testnet)
+            .to_base64_url_flags(true, lib.network == config::Network::Testnet)
             .dimmed()
     );
 
