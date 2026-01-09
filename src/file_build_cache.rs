@@ -1,5 +1,5 @@
-use crate::config::ActonConfig;
 use abi;
+use acton_config::config::ActonConfig;
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
 use log::debug;

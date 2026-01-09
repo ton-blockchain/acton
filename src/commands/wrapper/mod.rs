@@ -1,6 +1,6 @@
 use crate::commands::common::error_fmt;
-use crate::config::ActonConfig;
 use abi::{ContractAbi, TypeAbi};
+use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use owo_colors::OwoColorize;
 use std::collections::HashSet;

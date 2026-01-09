@@ -13,6 +13,7 @@ exclude = [
 
 [dependencies]
 # local creates
+acton-config = { path = "crates/acton-config" }
 abi = { path = "crates/abi" }
 tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }

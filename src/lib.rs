@@ -1,5 +1,4 @@
 pub mod commands;
-pub mod config;
 pub mod context;
 pub mod debugger;
 pub mod exit_codes;

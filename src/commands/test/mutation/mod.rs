@@ -1,7 +1,7 @@
 use crate::commands::common::error_fmt;
 use crate::commands::test::TestConfig;
 use crate::commands::test::mutation::rules::{MutationEdit, MutationMatcher, MutationRule, rules};
-use crate::config::ActonConfig;
+use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use owo_colors::OwoColorize;
 use serde_json::Value;

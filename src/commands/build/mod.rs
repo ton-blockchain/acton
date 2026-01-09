@@ -1,7 +1,7 @@
 use crate::commands::common::error_fmt;
-use crate::config::{ActonConfig, ContractConfig, ContractDependency, DependencyKind};
 use crate::file_build_cache::FileBuildCache;
 use crate::stdlib;
+use acton_config::config::{ActonConfig, ContractConfig, ContractDependency, DependencyKind};
 use anyhow::anyhow;
 use log::debug;
 use owo_colors::OwoColorize;

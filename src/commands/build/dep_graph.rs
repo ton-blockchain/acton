@@ -1,4 +1,4 @@
-use crate::config::{ContractConfig, DependencyKind};
+use acton_config::config::{ContractConfig, DependencyKind};
 use anyhow::anyhow;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};

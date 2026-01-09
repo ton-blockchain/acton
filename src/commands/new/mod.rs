@@ -1,6 +1,6 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
-use crate::config::{ActonConfig, ContractConfig, ContractsConfig, TestSettings};
 use crate::stdlib;
+use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig, TestSettings};
 use inquire::{Select, Text};
 use owo_colors::OwoColorize;
 use std::collections::BTreeMap;

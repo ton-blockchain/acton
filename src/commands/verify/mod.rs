@@ -1,6 +1,6 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
-use crate::config::ActonConfig;
 use crate::wallets::open_wallets;
+use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
 use base64::Engine;
 use num_bigint::BigUint;

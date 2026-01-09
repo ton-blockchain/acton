@@ -1,6 +1,7 @@
 use crate::commands::common::{create_symlink, error_fmt, select_wallet};
-use crate::config::{ActonConfig, WalletsFile, global_wallets_path};
-use crate::{config, wallets};
+use crate::wallets;
+use acton_config::config;
+use acton_config::config::{ActonConfig, WalletsFile, global_wallets_path};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use inquire::{Confirm, Select, Text};

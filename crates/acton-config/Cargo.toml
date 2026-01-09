@@ -1,0 +1,10 @@
+[package]
+name = "acton-config"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.100"
+serde = { version = "1.0.228", features = ["derive"] }
+clap = "4.5.54"
+toml = "0.9.11+spec-1.1.0"

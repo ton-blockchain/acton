@@ -1,4 +1,4 @@
-use crate::commands::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
+use crate::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

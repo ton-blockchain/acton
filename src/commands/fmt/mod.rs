@@ -1,4 +1,4 @@
-use crate::config::ActonConfig;
+use acton_config::config::ActonConfig;
 use anyhow::{Context, Result};
 use globset::{Glob, GlobSetBuilder};
 use owo_colors::OwoColorize;

@@ -1,5 +1,4 @@
 use crate::commands::common::error_fmt;
-use crate::config::{ActonConfig, Explorer};
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
     EmulationsState, Env, IoContext, KnownAddresses,
@@ -11,6 +10,7 @@ use crate::formatter::FormatterContext;
 use crate::wallets;
 use crate::{ffi, stdlib};
 use abi::{ContractAbi, contract_abi};
+use acton_config::config::{ActonConfig, Explorer};
 use anyhow::anyhow;
 use emulator::emulator::Emulator;
 use emulator::world_state::{

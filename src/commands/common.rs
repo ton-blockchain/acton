@@ -1,10 +1,10 @@
-use crate::config::{ActonConfig, global_libraries_path, global_wallets_path};
+use acton_config::config::{ActonConfig, global_libraries_path, global_wallets_path};
 use anyhow::{Context, anyhow};
 use inquire::Select;
 use std::path::Path;
 
 pub mod error_fmt {
-    use crate::config::ActonConfig;
+    use acton_config::config::ActonConfig;
     use owo_colors::OwoColorize;
     use std::path::Path;
 

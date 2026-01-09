@@ -11,14 +11,13 @@ use acton::commands::new::new_cmd;
 use acton::commands::retrace::retrace_cmd;
 use acton::commands::run::run_cmd;
 use acton::commands::script::script_cmd;
-use acton::commands::test::{
-    BacktraceMode, CoverageFormat, ReportFormat, TestConfig, mutation, test_cmd,
-};
+use acton::commands::test::{mutation, test_cmd};
 use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
 use acton::commands::wallet::{WalletCommand, wallet_cmd};
 use acton::commands::wrapper::wrapper_cmd;
-use acton::config::{ActonConfig, Explorer, Network};
+use acton_config::config::{ActonConfig, Explorer, Network};
+use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use clap::builder::styling::Style;
 use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory};
