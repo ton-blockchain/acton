@@ -1,14 +1,15 @@
 use crate::context::{BuildCache, EmulationsState};
-use crate::vmtrace::{HighLevelTrace, HighLevelTraceStep};
+use crate::vmtrace::{HighLevelTrace, HighLevelTraceStep, HighLevelTraceStepMapped};
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use owo_colors::OwoColorize;
-use retrace::trace::Trace;
+use retrace::trace::{Trace, TraceStep};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 use ton_source_map::{EntryContextDescription, SourceMap};
 use tycho_types::boc::Boc;
+use vmlogs::parser::{VmStack, VmStackValue};
 
 #[derive(Debug, Clone)]
 pub struct Coverage {
@@ -22,6 +23,7 @@ pub struct FileCoverage {
     pub line_hits: BTreeMap<i64, u64>, // line number -> hit count
     pub executable_lines_count: usize,
     pub executable_lines: BTreeSet<i64>, // all executable line numbers
+    pub branch_hits: HashMap<i64, BranchHits>,
 }
 
 pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) -> Coverage {
@@ -46,7 +48,8 @@ pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) 
     let executable_lines_per_file = build_executable_lines_per_files(&data);
     // Having high-level traces, we can traverse them and collect which specific source code
     // lines were executed. This will give us information about covered lines.
-    let line_hits_per_file = collect_executed_lines_per_files(&traces);
+    let result = collect_executed_lines_per_files(&traces);
+    let (line_hits_per_file, branch_hits_per_file) = (result.lines, result.branches);
 
     // Now having all this information, we can trivially determine how many executable
     // lines are in a file, how many of them were actually executed, thereby collecting the coverage we need.
@@ -55,6 +58,7 @@ pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) 
     for (file, executable_lines) in executable_lines_per_file {
         let executable_lines_count = executable_lines.len();
         let line_hits = line_hits_per_file.get(&file).cloned().unwrap_or_default();
+        let branch_hits = branch_hits_per_file.get(&file).cloned().unwrap_or_default();
 
         let mut covered_lines_count = 0;
 
@@ -73,6 +77,7 @@ pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) 
             covered_lines_count,
             line_hits,
             executable_lines,
+            branch_hits,
         })
     }
 
@@ -127,17 +132,42 @@ fn build_high_level_traces(data: &Vec<SourceMapAndLogs>) -> Vec<HighLevelTrace> 
         .collect::<Vec<_>>()
 }
 
-/// Collects all source code lines that were executed in all execution traces
-/// that we collected in [`collect_source_data`].
-fn collect_executed_lines_per_files(
-    traces: &Vec<HighLevelTrace>,
-) -> HashMap<String, BTreeMap<i64, u64>> {
+#[derive(Debug, Clone, Default)]
+pub struct BranchHits {
+    pub if_true: u64,
+    pub if_false: u64,
+}
+
+pub struct ExecutedLinesForFile {
+    pub lines: HashMap<String, BTreeMap<i64, u64>>,
+    pub branches: HashMap<String, HashMap<i64, BranchHits>>,
+}
+
+/// Collects all source code lines and branches that were executed in all execution traces
+/// that was collected in [`collect_source_data`].
+fn collect_executed_lines_per_files(traces: &Vec<HighLevelTrace>) -> ExecutedLinesForFile {
     let mut line_hits_per_file: HashMap<String, BTreeMap<i64, u64>> = HashMap::new();
+    let mut branch_hits_per_file: HashMap<String, HashMap<i64, BranchHits>> = HashMap::new();
 
     for trace in traces {
         for step in &trace.steps {
             match step {
                 HighLevelTraceStep::Mapped(step) => {
+                    #[allow(clippy::collapsible_if)]
+                    if let TraceStep::Execute { instr, stack, .. } = &step.inner {
+                        // `assert (foo) throw 10` generates `THROW*` instruction, and we want to
+                        // collect which branches are covered.
+                        // TODO: for now we don't have precise mapping for any branch instructions
+                        //       like IF, IFJMP, IFNOT and other, for them we need to wait new source maps
+                        //       in Tolk compiler.
+                        if instr.contains("THROWANYIFNOT")
+                            || instr.contains("THROWIFNOT")
+                            || instr.contains("THROWIFNOT_SHORT")
+                        {
+                            process_throw_instruction(&mut branch_hits_per_file, step, stack);
+                        }
+                    }
+
                     for loc in &step.locs {
                         let file = &loc.loc.file;
                         let line = loc.loc.line;
@@ -150,7 +180,37 @@ fn collect_executed_lines_per_files(
             }
         }
     }
-    line_hits_per_file
+
+    ExecutedLinesForFile {
+        lines: line_hits_per_file,
+        branches: branch_hits_per_file,
+    }
+}
+
+fn process_throw_instruction(
+    branch_hits_per_file: &mut HashMap<String, HashMap<i64, BranchHits>>,
+    step: &HighLevelTraceStepMapped,
+    stack: &str,
+) {
+    let elements = VmStack::new(stack).parsed();
+
+    if let [.., VmStackValue::Integer(value)] = &elements[..] {
+        let taken = value == &"0";
+
+        for loc in &step.locs {
+            let file = &loc.loc.file;
+            let line = loc.loc.line;
+            let entry = branch_hits_per_file.entry(file.clone()).or_default();
+
+            let entry = entry.entry(line).or_default();
+
+            if taken {
+                entry.if_true += 1;
+            } else {
+                entry.if_false += 1;
+            }
+        }
+    }
 }
 
 fn build_executable_lines_per_files(
@@ -373,6 +433,14 @@ pub fn generate_lcov_file(coverage: &Coverage, output_path: &str) -> Result<(), 
 
         // LH: lines hit (covered lines)
         lcov_content.push_str(&format!("LH:{}\n", file_coverage.covered_lines_count));
+
+        if !file_coverage.branch_hits.is_empty() {
+            for (idx, (line, info)) in file_coverage.branch_hits.iter().enumerate() {
+                let line = line + 1;
+                lcov_content.push_str(&format!("BRDA:{line},{idx},0,{}\n", info.if_true));
+                lcov_content.push_str(&format!("BRDA:{line},{idx},1,{}\n", info.if_false));
+            }
+        }
 
         lcov_content.push_str("end_of_record\n");
     }
