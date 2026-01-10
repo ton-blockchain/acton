@@ -25,32 +25,31 @@ pub struct FileCoverage {
 }
 
 pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) -> Coverage {
-    // Для построения coverage нам нужны две вещи, карты исходников и логи виртуальной машины.
+    // To build coverage we need two things: source maps and virtual machine logs.
     //
-    // Первое обеспечивает нам необходимую информацию о том какие строки в исходном коде являются
-    // исполняемыми и для которых можно собрать покрытие, а также информацию о том как конкретные
-    // локации в биткоде соотносятся со строками исходного кода.
+    // The first provides us with the necessary information about which lines in the source code are
+    // executable and can be covered, as well as information about how specific locations in bytecode
+    // relate to source code lines.
     //
-    // Второе обеспечивает нам трассу исполнения по которой мы можем выяснить какие инструкции
-    // были исполнены во время исполнения тестов. Благодаря картам исходников мы можем соотнести
-    // инструкцию, которая была выполнена, исходному коду который ее породил. И так как инструкция
-    // оказалась в трассе исполнения, мы можем сказать что те строки исходного кода были исполнены,
-    // а значит покрыты тестом.
+    // The second provides us with an execution trace from which we can determine which instructions
+    // were executed during test execution. Thanks to source maps, we can correlate the executed
+    // instruction with the source code that generated it. And since the instruction appeared in the
+    // execution trace, we can say that those source code lines were executed and thus covered by tests.
     let data = collect_source_data(emulations, build_cache);
-    // Когда у нас есть нужные компоненты мы можем построить высокоуровневую трассу исполнения
-    // которая содержит все шаги исполнения отраженные на исходном коде.
+    // When we have the necessary components, we can build a high-level execution trace
+    // that contains all execution steps reflected on the source code.
     let traces = build_high_level_traces(&data);
-    // Не все строки кода в исходном коде могут быть исполнены, например, определение структуры
-    // или комментарии. Мы собираем исполняемые строки файлов используя тот факт, что карта исходников
-    // содержит отображение каждой исполняемой строки на инструкции в биткоде, что означает что мы
-    // можем собрать мапу по файлам которая укажет является ли конкретная строка исполняемой.
+    // Not all lines of code in source code can be executed, for example, struct definitions
+    // or comments. We collect executable file lines using the fact that the source map
+    // contains a mapping of each executable line to bytecode instructions, which means we
+    // can build a per-file mapping that indicates whether a specific line is executable.
     let executable_lines_per_file = build_executable_lines_per_files(&data);
-    // Имея высокоуровневые трейсы мы можем обойти их и собрать какие конкретно строки исходного
-    // кода были выполнены. Это даст нам информацию о покрытых строках.
+    // Having high-level traces, we can traverse them and collect which specific source code
+    // lines were executed. This will give us information about covered lines.
     let line_hits_per_file = collect_executed_lines_per_files(&traces);
 
-    // Теперь имея всю эту информацию мы можем тривиально выяснить сколько в файле исполняемых
-    // строк, сколько их них было фактически исполнено, тем самым собирая нужное нам покрытие.
+    // Now having all this information, we can trivially determine how many executable
+    // lines are in a file, how many of them were actually executed, thereby collecting the coverage we need.
     let mut files: Vec<FileCoverage> = vec![];
 
     for (file, executable_lines) in executable_lines_per_file {
@@ -85,7 +84,7 @@ struct SourceMapAndLogs<'a> {
     logs: &'a String,
 }
 
-/// Собирает все карты исходников и логи которые затем будут использоваться для подсчета покрытия.
+/// Collects all source maps and logs that will then be used for coverage calculation.
 fn collect_source_data<'a>(
     emulations: &'a EmulationsState,
     build_cache: &'a BuildCache,
@@ -118,7 +117,7 @@ fn collect_source_data<'a>(
     data
 }
 
-/// Строит трассы исполнения по исходному коду.
+/// Builds execution traces by source code.
 fn build_high_level_traces(data: &Vec<SourceMapAndLogs>) -> Vec<HighLevelTrace> {
     data.iter()
         .map(|SourceMapAndLogs { source_map, logs }| {
@@ -128,8 +127,8 @@ fn build_high_level_traces(data: &Vec<SourceMapAndLogs>) -> Vec<HighLevelTrace> 
         .collect::<Vec<_>>()
 }
 
-/// Собирает все строки исходного кода которые были исполнены во всех трассах исполнения,
-/// что мы собрали в [`collect_source_data`].
+/// Collects all source code lines that were executed in all execution traces
+/// that we collected in [`collect_source_data`].
 fn collect_executed_lines_per_files(
     traces: &Vec<HighLevelTrace>,
 ) -> HashMap<String, BTreeMap<i64, u64>> {
@@ -227,16 +226,16 @@ pub fn merge_coverages(coverages: &Vec<Coverage>) -> Coverage {
         for file_coverage in &coverage.files {
             let file = &file_coverage.file;
             if let Some(existing) = merged_files.get_mut(file) {
-                // Если в одном покрытии строки были покрыты как: 1, 1, 0, 1,
-                //                                а в другом как: 1, 1, 1, 0,
-                //                    то мы получим в результате: 2, 2, 1, 1.
+                // If in one coverage the lines were covered as: 1, 1, 0, 1,
+                //                            and in another as: 1, 1, 1, 0,
+                //                        then we get as result: 2, 2, 1, 1.
                 for (&line, &hits) in &file_coverage.line_hits {
                     *existing.line_hits.entry(line).or_insert(0) += hits;
                 }
 
-                // Если по какой-то причине между покрытиями у конкретного файла другое количество
-                // исполняемых строк, то добавляем все исполняемые строки из второго покрытия, чтобы
-                // в результате исполняемые строки были объединением всех исполняемых строк.
+                // If for some reason between coverages a specific file has a different number
+                // of executable lines, then we add all executable lines from the second coverage, so that
+                // the executable lines in the result are the union of all executable lines.
                 if file_coverage.executable_lines_count != existing.executable_lines_count {
                     for line in &file_coverage.executable_lines {
                         existing.executable_lines.insert(*line);

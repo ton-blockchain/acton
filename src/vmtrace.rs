@@ -157,15 +157,10 @@ impl HighLevelTrace {
     pub fn new(trace: Trace, source_map: &SourceMap) -> HighLevelTrace {
         let steps = trace.steps.iter().map(|step| {
             match step {
-                retrace::trace::TraceStep::Execute {
-                    hash,
-                    offset,
-                    instr,
-                    ..
-                } => {
+                retrace::trace::TraceStep::Execute { hash, offset, .. } => {
                     let Some(marks) = source_map.debug_marks.get(hash) else {
-                        // Если у нас нет информации для текущей ячейки, то мы считаем
-                        // все шаги в ней незамапленными.
+                        // If we don't have information for the current cell, then we consider
+                        // all steps in it unmapped.
                         return HighLevelTraceStep::Unmapped(HighLevelTraceStepUnmapped {
                             inner: step.clone(),
                         });
@@ -189,17 +184,14 @@ impl HighLevelTrace {
                         });
                     }
 
-                    // Если мы не нашли ни одной high-level локации, что довольно подозрительно,
-                    // так как мы нашли debug mark, считаем что данная инструкция не имеет прямого
-                    // кода на языке высокого уровня.
                     HighLevelTraceStep::Unmapped(HighLevelTraceStepUnmapped {
                         inner: step.clone(),
                     })
                 }
                 _ => {
-                    // Другие виды шагов нас не интересуют, но могут быть полезны, поэтому
-                    // оставляем их незамапленными.
-                    // TODO: специальный вид шага для exception с локацией где он был выброшен?
+                    // Other types of steps don't interest us, but they might be useful, so
+                    // we leave them unmapped.
+                    // TODO: special step type for exception with location where it was thrown?
                     HighLevelTraceStep::Unmapped(HighLevelTraceStepUnmapped {
                         inner: step.clone(),
                     })
