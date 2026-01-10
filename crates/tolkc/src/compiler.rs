@@ -211,7 +211,6 @@ impl Compiler {
                     code_boc64: result.code_boc64,
                     code_hash_hex: result.code_hash_hex,
                     source_map: result.source_map.map(|source_map| SourceMap {
-                        path: path.to_path_buf(),
                         high_level: source_map,
                         debug_marks,
                     }),

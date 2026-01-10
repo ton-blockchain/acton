@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
@@ -12,8 +12,6 @@ pub struct OffsetAndId(pub u16, pub i32);
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SourceMap {
-    /// The path to the root file that was compiled and for which this source map was created.
-    pub path: PathBuf,
     pub high_level: HighLevelSourceMap,
     pub debug_marks: HashMap<String, Vec<OffsetAndId>>,
 }
