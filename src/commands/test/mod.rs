@@ -1,8 +1,7 @@
 use crate::commands::build::build_cmd;
 use crate::commands::common::error_fmt;
 use crate::commands::test::coverage::{
-    Coverage, collect_coverage, generate_lcov_file, generate_text_file, merge_coverages,
-    print_coverage_summary,
+    collect_coverage, generate_lcov_file, generate_text_file, print_coverage_summary,
 };
 use crate::commands::test::instrumentation::inject_locations_into_expect_calls;
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
@@ -276,7 +275,7 @@ impl<'a> TestRunner<'a> {
 
         if self.config.coverage {
             // for coverage, we need at least locations to map to actual source code
-            return ExecutorVerbosity::FullLocation;
+            return ExecutorVerbosity::FullLocationStackVerbose;
         }
 
         ExecutorVerbosity::Full
@@ -514,26 +513,23 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let mut total_failed = 0;
     let mut total_skipped = 0;
     let mut total_todo = 0;
-    let mut coverages = vec![];
+
+    let mut runner = TestRunner::new(
+        acton_config.clone(),
+        config.clone(),
+        &mut file_cache,
+        &mut global_reporter,
+        build_overrides_for_mutations(config)?,
+    );
 
     for (index, file) in test_files.iter().enumerate() {
-        let result = run_tests_for_file(
-            file,
-            &acton_config,
-            config,
-            &mut file_cache,
-            &mut global_reporter,
-        );
+        let result = run_tests_for_file(&mut runner, file);
         match result {
             Ok(stats) => {
                 total_passed += stats.passed;
                 total_failed += stats.failed;
                 total_skipped += stats.skipped;
                 total_todo += stats.todo;
-
-                if let Some(coverage) = stats.coverage {
-                    coverages.push(coverage);
-                }
 
                 if index + 1 < test_files.len()
                     && config.report_formats.contains(&ReportFormat::Console)
@@ -559,22 +555,21 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         passed: total_passed,
         failed: total_failed,
         skipped: total_skipped,
-        ignored: 0,
         todo: total_todo,
         duration: Duration::default(),
     };
-    global_reporter.on_testing_finished(&global_stats)?;
+    runner.reporter_manager.on_testing_finished(&global_stats)?;
 
-    if !coverages.is_empty() {
-        let merged_coverage = merge_coverages(&coverages);
-        print_coverage_summary(&merged_coverage);
+    if config.coverage {
+        let coverage = collect_coverage(&runner.emulations, &runner.build_cache);
+        print_coverage_summary(&coverage);
 
         if let Some(format_type) = &config.coverage_format {
             println!();
             match format_type {
                 CoverageFormat::Lcov => {
                     let lcov_path = config.coverage_file.as_deref().unwrap_or("lcov.info");
-                    if let Err(err) = generate_lcov_file(&merged_coverage, lcov_path) {
+                    if let Err(err) = generate_lcov_file(&coverage, lcov_path) {
                         eprintln!("Warning: Failed to generate LCOV file '{lcov_path}': {err}");
                     } else {
                         println!("LCOV file saved in {lcov_path}");
@@ -582,7 +577,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                 }
                 CoverageFormat::Text => {
                     let text_path = config.coverage_file.as_deref().unwrap_or("coverage.txt");
-                    if let Err(err) = generate_text_file(&merged_coverage, text_path) {
+                    if let Err(err) = generate_text_file(&coverage, text_path) {
                         eprintln!(
                             "Warning: Failed to generate text coverage file '{text_path}': {err}"
                         );
@@ -624,6 +619,23 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         process::exit(1)
     }
     Ok(())
+}
+
+fn build_overrides_for_mutations(
+    config: &TestConfig,
+) -> anyhow::Result<BTreeMap<String, Arc<Cell>>> {
+    let mut mutation_overrides = BTreeMap::new();
+
+    if let Some((name, code_b64)) = config
+        .mutate_overrides
+        .as_ref()
+        .unwrap_or(&"".to_owned())
+        .split_once(":")
+    {
+        let code_cell = ArcCell::from_boc_b64(code_b64)?;
+        mutation_overrides.insert(name.to_owned(), code_cell);
+    }
+    Ok(mutation_overrides)
 }
 
 pub fn find_test_files_recursively(
@@ -721,7 +733,6 @@ struct TestStats {
     failed: usize,
     skipped: usize,
     todo: usize,
-    coverage: Option<Coverage>,
 }
 
 fn compile_test_file(
@@ -756,13 +767,7 @@ fn compile_test_file(
     Ok(compilation_result)
 }
 
-fn run_tests_for_file(
-    file: &str,
-    acton_config: &ActonConfig,
-    config: &TestConfig,
-    file_cache: &mut FileBuildCache,
-    reporter_manager: &mut ReporterManager,
-) -> anyhow::Result<TestStats> {
+fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<TestStats> {
     let content = match fs::read_to_string(file) {
         Ok(content) => content,
         Err(err) => {
@@ -779,10 +784,12 @@ fn run_tests_for_file(
 
     fs::write(&tmp_test_filename, executable_code)?;
 
+    let config = &runner.config;
     let need_debug_info =
         config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
     let now = Instant::now();
-    let compilation_result = compile_test_file(file_cache, &tmp_test_filename, need_debug_info)?;
+    let compilation_result =
+        compile_test_file(runner.file_build_cache, &tmp_test_filename, need_debug_info)?;
     debug!("Test file '{file}' compilation time: {:?}", now.elapsed());
 
     match compilation_result {
@@ -790,28 +797,8 @@ fn run_tests_for_file(
             let _ = fs::remove_file(&tmp_test_filename);
 
             let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
-
-            let mut mutation_overrides = BTreeMap::new();
-
-            if let Some((first, second)) = config
-                .mutate_overrides
-                .as_ref()
-                .unwrap_or(&"".to_owned())
-                .split_once(":")
-            {
-                let code_cell = ArcCell::from_boc_b64(second)?;
-                mutation_overrides.insert(first.to_owned(), code_cell);
-            }
-
-            let mut runner = TestRunner::new(
-                acton_config.clone(),
-                config.clone(),
-                file_cache,
-                reporter_manager,
-                mutation_overrides,
-            );
             let stats = run_file_tests(
-                &mut runner,
+                runner,
                 file,
                 tests,
                 &code_cell,
@@ -998,7 +985,8 @@ fn run_file_tests(
         runner.reporter_manager.on_test_finished(&test_report)?;
 
         if runner.config.coverage {
-            // For coverage, we need to process test logs as well, so register it here
+            // For coverage, we need to process test logs as well for unit tests coverage,
+            // so register it here manually
             if let GetMethodResult::Success(get_result) = get_result {
                 runner.emulations.save_get_method(&test.name, get_result);
                 // TODO: remove this memoize somehow
@@ -1025,7 +1013,6 @@ fn run_file_tests(
         passed,
         failed,
         skipped,
-        ignored: 0,
         todo,
         duration: Duration::default(), // TODO: track suite duration
     };
@@ -1046,18 +1033,11 @@ fn run_file_tests(
         };
     }
 
-    let coverage = if runner.config.coverage {
-        Some(collect_coverage(&runner.emulations, &runner.build_cache))
-    } else {
-        None
-    };
-
     Ok(TestStats {
         passed,
         failed,
         skipped,
         todo,
-        coverage,
     })
 }
 

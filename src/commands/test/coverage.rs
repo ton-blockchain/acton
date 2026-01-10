@@ -1,8 +1,8 @@
 use crate::context::{BuildCache, EmulationsState};
-use crate::vmtrace::build_vm_trace;
+use crate::vmtrace::{HighLevelTrace, HighLevelTraceStep};
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
-use emulator::emulator::SendMessageResult;
 use owo_colors::OwoColorize;
+use retrace::trace::Trace;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
@@ -18,25 +18,80 @@ pub struct Coverage {
 #[derive(Debug, Clone)]
 pub struct FileCoverage {
     pub file: String,
-    pub executable_lines: i64,
-    pub covered_lines: i64,
+    pub covered_lines_count: usize,
     pub line_hits: BTreeMap<i64, u64>, // line number -> hit count
-    pub executable_line_numbers: BTreeSet<i64>, // all executable line numbers
+    pub executable_lines_count: usize,
+    pub executable_lines: BTreeSet<i64>, // all executable line numbers
 }
 
 pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) -> Coverage {
-    let all_messages = emulations.messages();
-    let successful_messages = all_messages.filter_map(|result| match result {
-        SendMessageResult::Success(result) => Some(result),
-        SendMessageResult::Error(_) => None,
-    });
+    // Для построения coverage нам нужны две вещи, карты исходников и логи виртуальной машины.
+    //
+    // Первое обеспечивает нам необходимую информацию о том какие строки в исходном коде являются
+    // исполняемыми и для которых можно собрать покрытие, а также информацию о том как конкретные
+    // локации в биткоде соотносятся со строками исходного кода.
+    //
+    // Второе обеспечивает нам трассу исполнения по которой мы можем выяснить какие инструкции
+    // были исполнены во время исполнения тестов. Благодаря картам исходников мы можем соотнести
+    // инструкцию, которая была выполнена, исходному коду который ее породил. И так как инструкция
+    // оказалась в трассе исполнения, мы можем сказать что те строки исходного кода были исполнены,
+    // а значит покрыты тестом.
+    let data = collect_source_data(emulations, build_cache);
+    // Когда у нас есть нужные компоненты мы можем построить высокоуровневую трассу исполнения
+    // которая содержит все шаги исполнения отраженные на исходном коде.
+    let traces = build_high_level_traces(&data);
+    // Не все строки кода в исходном коде могут быть исполнены, например, определение структуры
+    // или комментарии. Мы собираем исполняемые строки файлов используя тот факт, что карта исходников
+    // содержит отображение каждой исполняемой строки на инструкции в биткоде, что означает что мы
+    // можем собрать мапу по файлам которая укажет является ли конкретная строка исполняемой.
+    let executable_lines_per_file = build_executable_lines_per_files(&data);
+    // Имея высокоуровневые трейсы мы можем обойти их и собрать какие конкретно строки исходного
+    // кода были выполнены. Это даст нам информацию о покрытых строках.
+    let line_hits_per_file = collect_executed_lines_per_files(&traces);
 
-    let mut seen_source_maps = HashSet::new();
-    let mut whole_executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
+    // Теперь имея всю эту информацию мы можем тривиально выяснить сколько в файле исполняемых
+    // строк, сколько их них было фактически исполнено, тем самым собирая нужное нам покрытие.
+    let mut files: Vec<FileCoverage> = vec![];
 
-    let mut whole_trace = vec![];
+    for (file, executable_lines) in executable_lines_per_file {
+        let executable_lines_count = executable_lines.len();
+        let line_hits = line_hits_per_file.get(&file).cloned().unwrap_or_default();
 
-    for message in successful_messages {
+        let mut covered_lines_count = 0;
+
+        for line in &executable_lines {
+            let Some(line_hits) = line_hits.get(line) else {
+                continue;
+            };
+            if line_hits > &0 {
+                covered_lines_count += 1
+            }
+        }
+
+        files.push(FileCoverage {
+            file: file.clone(),
+            executable_lines_count,
+            covered_lines_count,
+            line_hits,
+            executable_lines,
+        })
+    }
+
+    Coverage { files }
+}
+
+struct SourceMapAndLogs<'a> {
+    source_map: SourceMap,
+    logs: &'a String,
+}
+
+/// Собирает все карты исходников и логи которые затем будут использоваться для подсчета покрытия.
+fn collect_source_data<'a>(
+    emulations: &'a EmulationsState,
+    build_cache: &'a BuildCache,
+) -> Vec<SourceMapAndLogs<'a>> {
+    let mut data: Vec<SourceMapAndLogs> = vec![];
+    for message in emulations.messages() {
         let Some(build_result) = build_cache.result_for_code(&message.code) else {
             continue;
         };
@@ -44,15 +99,7 @@ pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) 
         let source_map = build_result.1.source_map;
         let logs = &message.vm_log;
 
-        let mut trace = build_vm_trace(logs, &source_map);
-        whole_trace.append(&mut trace);
-
-        // Optimization: don't process same source map several times
-        if !seen_source_maps.insert(source_map.hash()) {
-            continue;
-        }
-
-        build_executable_lines_per_file(&mut whole_executable_lines_per_file, source_map);
+        data.push(SourceMapAndLogs { source_map, logs })
     }
 
     for get_result in emulations.get_methods() {
@@ -66,101 +113,113 @@ pub fn collect_coverage(emulations: &EmulationsState, build_cache: &BuildCache) 
         let source_map = build_result.1.source_map;
         let logs = &get_result.vm_log;
 
-        let mut trace = build_vm_trace(logs, &source_map);
-        whole_trace.append(&mut trace);
+        data.push(SourceMapAndLogs { source_map, logs })
+    }
+    data
+}
 
-        // Optimization: don't process same source map several times
+/// Строит трассы исполнения по исходному коду.
+fn build_high_level_traces(data: &Vec<SourceMapAndLogs>) -> Vec<HighLevelTrace> {
+    data.iter()
+        .map(|SourceMapAndLogs { source_map, logs }| {
+            let trace = Trace::new(logs, Some(1_000_000));
+            HighLevelTrace::new(trace, source_map)
+        })
+        .collect::<Vec<_>>()
+}
+
+/// Собирает все строки исходного кода которые были исполнены во всех трассах исполнения,
+/// что мы собрали в [`collect_source_data`].
+fn collect_executed_lines_per_files(
+    traces: &Vec<HighLevelTrace>,
+) -> HashMap<String, BTreeMap<i64, u64>> {
+    let mut line_hits_per_file: HashMap<String, BTreeMap<i64, u64>> = HashMap::new();
+
+    for trace in traces {
+        for step in &trace.steps {
+            match step {
+                HighLevelTraceStep::Mapped(step) => {
+                    for loc in &step.locs {
+                        let file = &loc.loc.file;
+                        let line = loc.loc.line;
+                        let entry = line_hits_per_file.entry(file.clone()).or_default();
+
+                        *entry.entry(line).or_insert(0) += 1;
+                    }
+                }
+                HighLevelTraceStep::Unmapped(_) => {}
+            }
+        }
+    }
+    line_hits_per_file
+}
+
+fn build_executable_lines_per_files(
+    data: &Vec<SourceMapAndLogs>,
+) -> HashMap<String, BTreeSet<i64>> {
+    let mut seen_source_maps = HashSet::new();
+    let mut executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
+
+    for SourceMapAndLogs { source_map, .. } in data {
         if !seen_source_maps.insert(source_map.hash()) {
             continue;
         }
 
-        build_executable_lines_per_file(&mut whole_executable_lines_per_file, source_map);
+        build_executable_lines_per_file(&mut executable_lines_per_file, source_map);
     }
 
-    let mut coverages: Vec<FileCoverage> = vec![];
-
-    let mut line_hits_per_file: HashMap<String, BTreeMap<i64, u64>> = HashMap::new();
-
-    for loc in &whole_trace {
-        let file = &loc.loc.file;
-        let line = loc.loc.line;
-        let entry = line_hits_per_file.entry(file.clone()).or_default();
-        *entry.entry(line).or_insert(0) += 1;
-    }
-
-    for (file, lines) in whole_executable_lines_per_file {
-        let executable_lines = lines.len() as i64;
-        let Some(line_hits) = line_hits_per_file.get(&file) else {
-            continue;
-        };
-        let mut covered_lines = 0;
-
-        for line in &lines {
-            let line_hits = line_hits.get(line);
-            if let Some(line_hits) = line_hits
-                && *line_hits > 0
-            {
-                covered_lines += 1
-            }
-        }
-
-        let line_hits = line_hits_per_file.get(&file).cloned().unwrap_or_default();
-
-        coverages.push(FileCoverage {
-            file: file.clone(),
-            executable_lines,
-            covered_lines,
-            line_hits,
-            executable_line_numbers: lines,
-        })
-    }
-
-    Coverage { files: coverages }
+    executable_lines_per_file
 }
 
 fn build_executable_lines_per_file(
-    whole_executable_lines_per_file: &mut HashMap<String, BTreeSet<i64>>,
-    source_map: SourceMap,
+    executable_lines_per_file: &mut HashMap<String, BTreeSet<i64>>,
+    source_map: &SourceMap,
 ) {
-    let mut executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
-    let source_maps_locations = source_map.high_level.locations;
+    let mut local_executable_lines_per_file: HashMap<String, BTreeSet<i64>> = HashMap::new();
+    let source_maps_locations = &source_map.high_level.locations;
     let executable_locations = source_maps_locations;
+
     for loc in executable_locations {
-        if loc.loc.file.contains("@stdlib/")
-            || loc.loc.file.is_empty()
-            || loc.loc.file.contains("/lib/")
-            || loc.loc.file.contains("/.acton/")
-            || loc.loc.file.contains(".test.tolk")
+        let file = &loc.loc.file;
+
+        // ignore stdlib and test files completely
+        // we also don't need to collect executable lines for Acton stdlib
+        if file.contains("@stdlib/")
+            || file.is_empty()
+            || file.contains("/lib/")
+            || file.contains("/.acton/")
+            || file.contains(".test.tolk")
         {
             continue;
         }
 
-        let file = loc.loc.file.clone();
-        if whole_executable_lines_per_file.contains_key(&file) {
+        let file = file.clone();
+        if executable_lines_per_file.contains_key(&file) {
             // we already have executable lines for this file
             continue;
         }
 
-        if let EntryContextDescription::Basic { ast_kind } = loc.context.description
+        if let EntryContextDescription::Basic { ast_kind } = &loc.context.description
             && ast_kind == "ast_block_statement"
         {
             // skip block statements
             continue;
         }
 
-        let entry = executable_lines_per_file.entry(file).or_default();
+        let entry = local_executable_lines_per_file.entry(file).or_default();
         entry.insert(loc.loc.line);
     }
 
-    for (path, locs) in &executable_lines_per_file {
-        if whole_executable_lines_per_file.contains_key(path) {
+    for (path, locs) in &local_executable_lines_per_file {
+        if executable_lines_per_file.contains_key(path) {
             // we already have executable lines for this file
             continue;
         }
-        whole_executable_lines_per_file.insert(path.clone(), locs.clone());
+        executable_lines_per_file.insert(path.clone(), locs.clone());
     }
 }
 
+#[allow(dead_code)] // maybe for command like coverage merge
 pub fn merge_coverages(coverages: &Vec<Coverage>) -> Coverage {
     let mut merged_files: HashMap<String, FileCoverage> = HashMap::new();
 
@@ -168,16 +227,23 @@ pub fn merge_coverages(coverages: &Vec<Coverage>) -> Coverage {
         for file_coverage in &coverage.files {
             let file = &file_coverage.file;
             if let Some(existing) = merged_files.get_mut(file) {
+                // Если в одном покрытии строки были покрыты как: 1, 1, 0, 1,
+                //                                а в другом как: 1, 1, 1, 0,
+                //                    то мы получим в результате: 2, 2, 1, 1.
                 for (&line, &hits) in &file_coverage.line_hits {
                     *existing.line_hits.entry(line).or_insert(0) += hits;
                 }
-                if file_coverage.executable_lines != existing.executable_lines {
-                    for line in &file_coverage.executable_line_numbers {
-                        existing.executable_line_numbers.insert(*line);
+
+                // Если по какой-то причине между покрытиями у конкретного файла другое количество
+                // исполняемых строк, то добавляем все исполняемые строки из второго покрытия, чтобы
+                // в результате исполняемые строки были объединением всех исполняемых строк.
+                if file_coverage.executable_lines_count != existing.executable_lines_count {
+                    for line in &file_coverage.executable_lines {
+                        existing.executable_lines.insert(*line);
                     }
-                    existing.executable_lines = existing.executable_line_numbers.len() as i64;
+                    existing.executable_lines_count = existing.executable_lines.len();
                 }
-                existing.covered_lines = existing.line_hits.len() as i64;
+                existing.covered_lines_count = existing.line_hits.len();
             } else {
                 merged_files.insert(file.clone(), file_coverage.clone());
             }
@@ -203,12 +269,12 @@ pub fn print_coverage_summary(coverage: &Coverage) {
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec!["File", "Covered Lines", "Total Lines", "% Lines"]);
 
-    let mut total_executable_lines = 0i64;
-    let mut total_covered_lines = 0i64;
+    let mut total_executable_lines = 0usize;
+    let mut total_covered_lines = 0usize;
 
     for file_coverage in &coverage.files {
-        total_executable_lines += file_coverage.executable_lines;
-        total_covered_lines += file_coverage.covered_lines;
+        total_executable_lines += file_coverage.executable_lines_count;
+        total_covered_lines += file_coverage.covered_lines_count;
     }
 
     if total_executable_lines > 0 {
@@ -237,8 +303,10 @@ pub fn print_coverage_summary(coverage: &Coverage) {
         .files
         .iter()
         .map(|file_coverage| {
-            let percentage = if file_coverage.executable_lines > 0 {
-                file_coverage.covered_lines as f64 / file_coverage.executable_lines as f64 * 100.0
+            let percentage = if file_coverage.executable_lines_count > 0 {
+                file_coverage.covered_lines_count as f64
+                    / file_coverage.executable_lines_count as f64
+                    * 100.0
             } else {
                 0.0
             };
@@ -266,10 +334,10 @@ pub fn print_coverage_summary(coverage: &Coverage) {
             TableCell::new(relative_path)
                 .set_alignment(CellAlignment::Left)
                 .fg(percentage_color),
-            TableCell::new(file_coverage.covered_lines.to_string())
+            TableCell::new(file_coverage.covered_lines_count.to_string())
                 .set_alignment(CellAlignment::Right)
                 .fg(covered_color),
-            TableCell::new(file_coverage.executable_lines.to_string())
+            TableCell::new(file_coverage.executable_lines_count.to_string())
                 .set_alignment(CellAlignment::Right),
             TableCell::new(format!("{percentage:.1}%"))
                 .set_alignment(CellAlignment::Right)
@@ -292,7 +360,7 @@ pub fn generate_lcov_file(coverage: &Coverage, output_path: &str) -> Result<(), 
         lcov_content.push_str(&format!("SF:{}\n", file_coverage.file));
 
         // DA: line data (line number, execution count)
-        for &line_number in &file_coverage.executable_line_numbers {
+        for &line_number in &file_coverage.executable_lines {
             let hit_count = file_coverage
                 .line_hits
                 .get(&line_number)
@@ -302,10 +370,10 @@ pub fn generate_lcov_file(coverage: &Coverage, output_path: &str) -> Result<(), 
         }
 
         // LF: lines found (total executable lines)
-        lcov_content.push_str(&format!("LF:{}\n", file_coverage.executable_lines));
+        lcov_content.push_str(&format!("LF:{}\n", file_coverage.executable_lines_count));
 
         // LH: lines hit (covered lines)
-        lcov_content.push_str(&format!("LH:{}\n", file_coverage.covered_lines));
+        lcov_content.push_str(&format!("LH:{}\n", file_coverage.covered_lines_count));
 
         lcov_content.push_str("end_of_record\n");
     }
@@ -321,8 +389,12 @@ pub fn generate_text_file(coverage: &Coverage, output_path: &str) -> Result<(), 
 fn generate_text_report(coverage: &Coverage) -> String {
     let mut result = String::new();
 
-    let total_lines: i64 = coverage.files.iter().map(|f| f.executable_lines).sum();
-    let covered_lines: i64 = coverage.files.iter().map(|f| f.covered_lines).sum();
+    let total_lines: usize = coverage
+        .files
+        .iter()
+        .map(|f| f.executable_lines_count)
+        .sum();
+    let covered_lines: usize = coverage.files.iter().map(|f| f.covered_lines_count).sum();
     let coverage_percentage = if total_lines > 0 {
         (covered_lines as f64 / total_lines as f64) * 100.0
     } else {
@@ -366,9 +438,7 @@ fn generate_text_report(coverage: &Coverage) -> String {
                 let line_number_padded =
                     format!("{:>width$}", line_number, width = max_line_number_width);
 
-                let is_executable = file_coverage
-                    .executable_line_numbers
-                    .contains(&(line_idx as i64));
+                let is_executable = file_coverage.executable_lines.contains(&(line_idx as i64));
 
                 if is_executable {
                     let hits = file_coverage
@@ -396,11 +466,11 @@ fn generate_text_report(coverage: &Coverage) -> String {
             result.push_str("  (Could not read source file)\n");
             result.push_str(&format!(
                 "  Executable lines: {}\n",
-                file_coverage.executable_lines
+                file_coverage.executable_lines_count
             ));
             result.push_str(&format!(
                 "  Covered lines: {}\n",
-                file_coverage.covered_lines
+                file_coverage.covered_lines_count
             ));
         }
 

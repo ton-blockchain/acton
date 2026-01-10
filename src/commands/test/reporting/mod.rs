@@ -61,7 +61,6 @@ pub enum TestStatus {
     Passed,
     Failed,
     Skipped,
-    Ignored,
     Todo,
 }
 
@@ -71,7 +70,6 @@ pub struct TestSuiteStats {
     pub passed: usize,
     pub failed: usize,
     pub skipped: usize,
-    pub ignored: usize,
     pub todo: usize,
     pub duration: Duration,
 }
@@ -85,7 +83,6 @@ impl TestSuiteStats {
             TestStatus::Passed => self.passed += 1,
             TestStatus::Failed => self.failed += 1,
             TestStatus::Skipped => self.skipped += 1,
-            TestStatus::Ignored => self.ignored += 1,
             TestStatus::Todo => self.todo += 1,
         }
     }

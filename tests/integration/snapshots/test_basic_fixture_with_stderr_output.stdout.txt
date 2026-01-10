@@ -1,4 +1,3 @@
-  Installing standard library v0.1.0
    Compiling contracts
    Compiling Counter
     Finished in [TIME]

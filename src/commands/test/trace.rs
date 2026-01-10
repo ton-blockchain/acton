@@ -1,7 +1,6 @@
 use crate::commands::test::{Pos, TestDescriptor};
 use crate::context::{BuildCache, Emulations, KnownAddresses, to_cell};
 use abi::ContractAbi;
-use emulator::emulator::SendMessageResult;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -60,10 +59,6 @@ pub fn dump_test_transactions(
             let transactions = txs
                 .iter()
                 .flat_map(|tx| {
-                    let SendMessageResult::Success(tx) = tx else {
-                        return None;
-                    };
-
                     let build = build_cache.result_for_code(&tx.code);
 
                     let contract_info = build.map(|(_, info)| ContractInfo {

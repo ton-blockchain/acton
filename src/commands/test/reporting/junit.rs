@@ -63,7 +63,7 @@ impl JUnitReporter {
                 }
                 status
             }
-            TestStatus::Skipped | TestStatus::Ignored => {
+            TestStatus::Skipped => {
                 let mut status = TestCaseStatus::skipped();
                 let message = test.details.as_deref().unwrap_or("Test skipped");
                 status.set_message(message);

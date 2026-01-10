@@ -1076,9 +1076,9 @@ fn get_locations(executor: &AnyExecutor, source_map: &SourceMap) -> Option<Vec<D
     )
 }
 
-fn get_code_pos(executor: &AnyExecutor) -> Option<(String, i32)> {
+fn get_code_pos(executor: &AnyExecutor) -> Option<(String, u16)> {
     let pos = executor.get_code_pos();
     let (hash, offset) = pos.split_once(":")?;
-    let offset = offset.parse::<i32>().ok()?;
+    let offset = offset.parse::<u16>().ok()?;
     Some((hash.to_string(), offset))
 }

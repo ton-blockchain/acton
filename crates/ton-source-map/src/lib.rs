@@ -1,20 +1,25 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
 use tycho_types::prelude::DynCell;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct OffsetAndId(pub u16, pub i32);
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SourceMap {
+    /// The path to the root file that was compiled and for which this source map was created.
+    pub path: PathBuf,
     pub high_level: HighLevelSourceMap,
-    pub debug_marks: HashMap<String, Vec<(i32, i32)>>,
+    pub debug_marks: HashMap<String, Vec<OffsetAndId>>,
 }
 
 impl SourceMap {
-    pub fn hash(&self) -> String {
+    pub fn hash(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.high_level.version.hash(&mut hasher);
         self.high_level.language.hash(&mut hasher);
@@ -24,7 +29,7 @@ impl SourceMap {
             loc.loc.line.hash(&mut hasher);
             loc.loc.column.hash(&mut hasher);
         }
-        format!("{:x}", hasher.finish())
+        hasher.finish()
     }
 }
 
@@ -96,12 +101,12 @@ impl SourceLocation {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BytecodeLocation {
     pub hash: String,
-    pub offset: i32,
+    pub offset: u16,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct DebugLocation {
-    pub idx: i64,
+    pub idx: i32,
     pub loc: SourceLocation,
     pub variables: Vec<Variable>,
     pub context: EntryContext,
@@ -225,7 +230,7 @@ fn dyn_cell_to_cell(cell: &DynCell) -> Cell {
     Boc::decode(Boc::encode(cell)).unwrap()
 }
 
-fn get_real_code_hashes(code: &Cell) -> HashMap<String, (String, i32)> {
+fn get_real_code_hashes(code: &Cell) -> HashMap<String, (String, u16)> {
     let mut dict_c = code.as_slice().unwrap();
     let dict_cell = dyn_cell_to_cell(dict_c.load_reference().unwrap());
     let mut dict_slice = dict_cell.as_slice().unwrap();
@@ -250,7 +255,7 @@ fn get_real_code_hashes(code: &Cell) -> HashMap<String, (String, i32)> {
             v.repr_hash().to_string().to_uppercase(),
             (
                 final_slice.repr_hash().to_string().to_uppercase(),
-                final_slice.bit_len() as i32 - original_slice.size_bits() as i32,
+                (final_slice.bit_len() as i32 - original_slice.size_bits() as i32) as u16,
             ),
         );
     }
@@ -259,28 +264,31 @@ fn get_real_code_hashes(code: &Cell) -> HashMap<String, (String, i32)> {
 }
 
 pub fn parse_marks_dict(
-    marks_boc64: &String,
-    code_boc64: &String,
-) -> HashMap<String, Vec<(i32, i32)>> {
-    let code_cell = Boc::decode_base64(code_boc64).unwrap();
+    marks_boc64: &str,
+    code_boc64: &str,
+) -> anyhow::Result<HashMap<String, Vec<OffsetAndId>>> {
+    let code_cell = Boc::decode_base64(code_boc64)?;
 
     let real_code_hashes = get_real_code_hashes(&code_cell);
 
-    let debug_marks_cell = Boc::decode_base64(marks_boc64).unwrap();
+    let debug_marks_cell = Boc::decode_base64(marks_boc64)?;
 
     let dict = RawDict::<256>::from(Some(debug_marks_cell));
-    let mut marks = HashMap::<String, Vec<(i32, i32)>>::new();
+    let mut marks = HashMap::<String, Vec<OffsetAndId>>::new();
 
-    dict.iter().for_each(|kv| {
-        let kv = kv.unwrap();
-        let hash = kv.0.as_data_slice().load_biguint(256).unwrap();
+    for kv in dict.iter() {
+        let Ok(kv) = kv else { continue };
+        let Ok(hash) = kv.0.as_data_slice().load_biguint(256) else {
+            continue;
+        };
+
         let mut hash = format!("{:x}", hash).to_uppercase();
         if hash.len() < 64 {
             hash = "0".repeat(64 - hash.len()) + hash.as_str()
         }
 
         let mut slice = kv.1;
-        let is_normal = slice.load_bit().unwrap();
+        let is_normal = slice.load_bit().unwrap_or(false);
 
         let final_hash = if is_normal {
             hash.clone()
@@ -290,34 +298,38 @@ pub fn parse_marks_dict(
             hash.clone() // TODO: or return?
         };
 
-        let dict_inner = Dict::<u32, CellSlice>::load_from(&mut slice).unwrap();
+        let dict_inner = Dict::<u32, CellSlice>::load_from(&mut slice)?;
 
-        dict_inner.iter().for_each(|kv| {
-            let mut kv = kv.unwrap();
+        for kv in dict_inner.iter() {
+            let Ok(mut kv) = kv else { continue };
             let debug_id = kv.0;
-            let mut ref_ = kv.1.load_reference().unwrap().as_slice().unwrap();
+            let mut ref_ = kv.1.load_reference()?.as_slice()?;
             let dict_marks_inner =
-                RawDict::<10>::load_from_root_ext(&mut ref_, Cell::empty_context()).unwrap();
+                RawDict::<10>::load_from_root_ext(&mut ref_, Cell::empty_context())?;
 
-            dict_marks_inner.iter().for_each(|kv| {
-                let kv = kv.unwrap();
-                let offset = kv.0.as_data_slice().load_uint(10).unwrap();
+            for kv in dict_marks_inner.iter() {
+                let Ok(kv) = kv else { continue };
+                let offset = kv.0.as_data_slice().load_uint(10)? as u16;
 
-                let adjusted_offset = offset as i32
+                let adjusted_offset = offset
                     + (if is_normal {
-                        0
+                        0u16
                     } else {
                         real_code_hashes.get(&hash).map(|r| r.1).unwrap_or(0)
                     });
 
                 let old_value = marks.get_mut(&final_hash);
                 if let Some(old_value) = old_value {
-                    old_value.push((adjusted_offset, debug_id as i32))
+                    old_value.push(OffsetAndId(adjusted_offset, debug_id as i32))
                 } else {
-                    marks.insert(final_hash.clone(), vec![(adjusted_offset, debug_id as i32)]);
+                    marks.insert(
+                        final_hash.clone(),
+                        vec![OffsetAndId(adjusted_offset, debug_id as i32)],
+                    );
                 }
-            });
-        });
-    });
-    marks
+            }
+        }
+    }
+
+    Ok(marks)
 }

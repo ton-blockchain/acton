@@ -78,7 +78,7 @@ fn find_backtrace(
     stack.iter().map(|loc| (**loc).clone()).collect::<Vec<_>>()
 }
 
-pub fn find_source_loc(source_map: &SourceMap, hash: &str, offset: i32) -> Option<SourceLocation> {
+pub fn find_source_loc(source_map: &SourceMap, hash: &str, offset: u16) -> Option<SourceLocation> {
     if source_map.high_level.locations.is_empty() {
         // `--backtrace full` is not enabled
         return None;

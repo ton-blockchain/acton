@@ -237,7 +237,7 @@ impl KnownAddresses {
 #[derive(Clone, Debug)]
 pub struct Emulations {
     pub name: String,
-    pub messages: Vec<Vec<SendMessageResult>>,
+    pub messages: Vec<Vec<SendMessageResultSuccess>>,
     pub get_methods: Vec<GetMethodResultSuccess>,
 }
 
@@ -263,7 +263,7 @@ impl EmulationsState {
         self.results.get(id)
     }
 
-    pub fn messages(&self) -> impl Iterator<Item = &SendMessageResult> {
+    pub fn messages(&self) -> impl Iterator<Item = &SendMessageResultSuccess> {
         self.results
             .values()
             .flat_map(|res| &res.messages)
@@ -283,7 +283,16 @@ impl EmulationsState {
                 get_methods: vec![],
             })
             .messages
-            .push(message);
+            .push(
+                message
+                    .iter()
+                    .filter_map(|m| match m {
+                        SendMessageResult::Success(m) => Some(m),
+                        SendMessageResult::Error(_) => None,
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            );
     }
 
     pub fn save_get_method(&mut self, env_name: &str, get_method: GetMethodResultSuccess) {
@@ -301,16 +310,7 @@ impl EmulationsState {
     pub fn find_tx_by_lt(&self, lt: u64) -> Option<&SendMessageResultSuccess> {
         self.results
             .values()
-            .flat_map(|result| {
-                result
-                    .messages
-                    .iter()
-                    .flatten()
-                    .filter_map(|res| match res {
-                        SendMessageResult::Success(res) => Some(res),
-                        SendMessageResult::Error(_) => None,
-                    })
-            })
+            .flat_map(|result| result.messages.iter().flatten())
             .find(|res| res.transaction.lt == lt)
     }
 

@@ -817,7 +817,7 @@ impl FormatterContext {
                         };
 
                         (
-                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset as i32),
+                            self.find_source_loc(tx, &message.loc_hash, message.loc_offset),
                             formated,
                         )
                     } else {
@@ -841,7 +841,7 @@ impl FormatterContext {
                     let reserve_action = installed_actions.find_reserve(*mode, reserve);
 
                     let loc = if let Some(action) = reserve_action {
-                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset as i32)
+                        self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
                     } else {
                         None
                     };
@@ -910,7 +910,7 @@ impl FormatterContext {
         &self,
         tx: &Transaction,
         loc_hash: &str,
-        loc_offset: i32,
+        loc_offset: u16,
     ) -> Option<SourceLocation> {
         let in_msg = tx.load_in_msg().ok()??;
         if let MsgInfo::Int(info) = &in_msg.info {

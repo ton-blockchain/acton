@@ -1,6 +1,6 @@
 use crate::types::{ArgValue, Instruction};
 use std::fs;
-use ton_source_map::{SourceLocation, SourceMap};
+use ton_source_map::{OffsetAndId, SourceLocation, SourceMap};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 
@@ -69,7 +69,7 @@ impl Instruction {
         if let Some(source_map) = &opts.source_map
             && let Some(off) = offset
             && let Some(locations) =
-                get_source_locations(source_map, instr.source_cell.as_ref(), off as i32)
+                get_source_locations(source_map, instr.source_cell.as_ref(), off)
             && !locations.is_empty()
         {
             let source_contexts: Vec<String> = locations
@@ -95,16 +95,16 @@ impl Instruction {
 fn get_source_locations<'a>(
     source_map: &'a SourceMap,
     cell: Option<&Cell>,
-    offset: i32,
+    offset: u16,
 ) -> Option<Vec<&'a SourceLocation>> {
     if let Some(cell) = cell {
         let hash = cell.repr_hash().to_string().to_uppercase();
         if let Some(marks) = source_map.debug_marks.get(&hash) {
-            let debug_ids: Vec<i64> = marks
+            let debug_ids: Vec<i32> = marks
                 .iter()
-                .filter_map(|(mark_offset, debug_id)| {
-                    if *mark_offset == offset {
-                        Some(*debug_id as i64)
+                .filter_map(|OffsetAndId(mark_offset, debug_id)| {
+                    if mark_offset == &offset {
+                        Some(*debug_id)
                     } else {
                         None
                     }

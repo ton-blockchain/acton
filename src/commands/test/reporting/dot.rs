@@ -22,7 +22,6 @@ impl DotReporter {
             TestStatus::Failed => 'x',
             TestStatus::Skipped => '○',
             TestStatus::Todo => '□',
-            TestStatus::Ignored => '○',
         }
     }
 
@@ -33,7 +32,6 @@ impl DotReporter {
             TestStatus::Failed => char.to_string().red().to_string(),
             TestStatus::Skipped => char.to_string().yellow().to_string(),
             TestStatus::Todo => char.to_string().purple().to_string(),
-            TestStatus::Ignored => char.to_string().dimmed().to_string(),
         }
     }
 

@@ -454,14 +454,6 @@ impl TestReporter for ConsoleReporter {
                         "]".dimmed()
                     );
                 }
-                TestStatus::Ignored => {
-                    println!(
-                        "  {} {} {}",
-                        "○".dimmed(),
-                        beautified_name,
-                        "ignored".dimmed()
-                    );
-                }
                 _ => {}
             }
         }

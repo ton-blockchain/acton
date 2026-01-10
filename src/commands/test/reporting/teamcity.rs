@@ -180,7 +180,7 @@ impl TestReporter for TeamCityReporter {
                     );
                 }
             }
-            TestStatus::Skipped | TestStatus::Ignored | TestStatus::Todo => {
+            TestStatus::Skipped | TestStatus::Todo => {
                 println!(
                     "##teamcity[testIgnored name='{test_name}' nodeId='test_{test_name}' duration='{duration_ms}']"
                 );

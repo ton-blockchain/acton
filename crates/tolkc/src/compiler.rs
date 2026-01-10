@@ -202,6 +202,7 @@ impl Compiler {
             Ok(CompilerInternalResult::Success(result)) => {
                 let debug_marks = if with_debug_info {
                     parse_marks_dict(&result.debug_mark_base64, &result.code_boc64)
+                        .unwrap_or_default()
                 } else {
                     HashMap::new()
                 };
@@ -210,6 +211,7 @@ impl Compiler {
                     code_boc64: result.code_boc64,
                     code_hash_hex: result.code_hash_hex,
                     source_map: result.source_map.map(|source_map| SourceMap {
+                        path: path.to_path_buf(),
                         high_level: source_map,
                         debug_marks,
                     }),

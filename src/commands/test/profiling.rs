@@ -2,7 +2,6 @@ use crate::commands::test::TestRunner;
 use abi::ContractAbi;
 use chrono;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
-use emulator::emulator::SendMessageResult;
 use num_bigint::BigInt;
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
@@ -13,9 +12,6 @@ pub fn collect_profile(runner: &TestRunner, abi: &ContractAbi) -> anyhow::Result
     let mut gas_per_opcode = HashMap::new();
 
     for result in runner.emulations.messages() {
-        let SendMessageResult::Success(result) = result else {
-            continue;
-        };
         let Some(opcode) = result.opcode() else {
             continue;
         };
