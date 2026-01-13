@@ -350,7 +350,7 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
 
     code.push_str(&format!("struct {} {{\n", contract));
     code.push_str("    address: address\n");
-    code.push_str("    init: ContractState? = null\n");
+    code.push_str("    stateInit: ContractState? = null\n");
     code.push_str("}\n\n");
 
     if model.abi.storage.is_some() {
@@ -404,16 +404,20 @@ fn generate_from_storage(
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     code.push_str(&format!(
-        "fun {contract_name}.fromStorage(storage: {storage_name}) {{\n",
+        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null) {{\n",
     ));
-    code.push_str("    val init = ContractState {\n");
+    code.push_str("    val stateInit = ContractState {\n");
     code.push_str(&format!(
         "        code: build(\"{contract_build_name}\"),\n",
     ));
     code.push_str("        data: storage.toCell(),\n");
     code.push_str("    };\n");
-    code.push_str("    val address = AutoDeployAddress { stateInit: init }.calculateAddress();\n");
-    code.push_str(&format!("    return {contract_name} {{ address, init }}\n",));
+    code.push_str("    val address = toShard == null\n");
+    code.push_str("        ? AutoDeployAddress { stateInit }.calculateAddress()\n");
+    code.push_str("        : AutoDeployAddress { stateInit, toShard }.calculateAddress();\n");
+    code.push_str(&format!(
+        "    return {contract_name} {{ address, stateInit }}\n",
+    ));
     code.push_str("}\n");
 
     code
@@ -436,17 +440,22 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
     let mut code = String::new();
 
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
-    code.push_str(&format!("fun {}.fromStorage() {{\n", contract_name));
-    code.push_str("    val init = ContractState {\n");
+    code.push_str(&format!(
+        "fun {}.fromStorage(toShard: AddressShardingOptions? = null) {{\n",
+        contract_name
+    ));
+    code.push_str("    val stateInit = ContractState {\n");
     code.push_str(&format!(
         "        code: build(\"{}\"),\n",
         contract_build_name
     ));
     code.push_str("        data: createEmptyCell(),\n");
     code.push_str("    };\n");
-    code.push_str("    val address = AutoDeployAddress { stateInit: init }.calculateAddress();\n");
+    code.push_str("    val address = toShard == null\n");
+    code.push_str("        ? AutoDeployAddress { stateInit }.calculateAddress()\n");
+    code.push_str("        : AutoDeployAddress { stateInit, toShard }.calculateAddress();\n");
     code.push_str(&format!(
-        "    return {} {{ address, init }}\n",
+        "    return {} {{ address, stateInit }}\n",
         contract_name
     ));
     code.push_str("}\n");
@@ -461,14 +470,14 @@ fn generate_deploy(contract_name: &str) -> String {
     code.push_str(&format!(
         "fun {contract_name}.deploy(self, from: address, config: SendParams = {{}}): SendResultList {{\n",
     ));
-    code.push_str("    if (self.init == null) {\n");
+    code.push_str("    if (self.stateInit == null) {\n");
     code.push_str("        Assert.fail(\"Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment\");\n");
     code.push_str("    }\n");
     code.push_str("    val msg = createMessage({\n");
     code.push_str("        bounce: config.bounce,\n");
     code.push_str("        value: config.value,\n");
     code.push_str("        dest: {\n");
-    code.push_str("            stateInit: self.init,\n");
+    code.push_str("            stateInit: self.stateInit,\n");
     code.push_str("        },\n");
     code.push_str("    });\n");
     code.push_str("    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
