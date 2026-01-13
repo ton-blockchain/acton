@@ -10,7 +10,7 @@ dependencies = [
  "crc",
  "num-bigint",
  "serde",
- "tolk_parser",
+ "tolk-parser",
  "tree-sitter",
  "tycho-types",
 ]
@@ -73,7 +73,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tolk-ast",
- "tolk_parser",
+ "tolk-parser",
  "tolkc",
  "tolkfmt",
  "toml",
@@ -2838,12 +2838,12 @@ dependencies = [
 name = "tolk-ast"
 version = "0.1.0"
 dependencies = [
- "tolk_parser",
+ "tolk-parser",
  "tree-sitter",
 ]
 
 [[package]]
-name = "tolk_parser"
+name = "tolk-parser"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2869,7 +2869,7 @@ dependencies = [
  "expect-test",
  "pretty",
  "tolk-ast",
- "tolk_parser",
+ "tolk-parser",
  "tree-sitter",
 ]
 

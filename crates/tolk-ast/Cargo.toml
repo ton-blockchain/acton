@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tolk_parser = { path = "../tolk_parser" }
+tolk-parser = { path = "../tolk-parser" }
 tree-sitter = "0.25.10"

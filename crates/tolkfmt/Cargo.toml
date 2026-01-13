@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 pretty = "0.12.5"
-tolk_parser = { path = "../tolk_parser" }
 tolk-ast = { path = "../tolk-ast" }
+tolk-parser = { path = "../tolk-parser" }
 tree-sitter = "0.25.10"
 anyhow = "1.0.100"
 
