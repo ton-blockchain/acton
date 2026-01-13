@@ -124,6 +124,8 @@ pub enum WalletCommand {
         name: Option<String>,
         #[arg(long, help = "Faucet URL", default_value = "http://localhost:3001")]
         faucet_url: String,
+        #[arg(long, help = "Output result as JSON")]
+        json: bool,
     },
 }
 
@@ -152,11 +154,15 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             json,
         } => list_wallets(balance, api_key, json),
         WalletCommand::Get { name } => get_mnemonic(name),
-        WalletCommand::Airdrop { name, faucet_url } => airdrop_wallet(name, faucet_url),
+        WalletCommand::Airdrop {
+            name,
+            faucet_url,
+            json,
+        } => airdrop_wallet(name, faucet_url, json),
     }
 }
 
-fn airdrop_wallet(name: Option<String>, faucet_url: String) -> anyhow::Result<()> {
+fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
 
     let name = select_wallet(name, &config)?;
@@ -167,19 +173,23 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String) -> anyhow::Result<()
 
     let address = get_wallet_address(wallet)?;
 
-    println!(
-        "{} Requesting airdrop for wallet {} {}",
-        "→".blue().bold(),
-        name.cyan().bold(),
-        address
-    );
+    if !json {
+        println!(
+            "{} Requesting airdrop for wallet {} {}",
+            "→".blue().bold(),
+            name.cyan().bold(),
+            address
+        );
+    }
 
     let client = reqwest::blocking::Client::new();
 
     // Faucet for testnet TON uses Proof-of-Work so we need to solve it to get coins
 
     // 1. Get challenge
-    println!("{} Fetching PoW challenge...", "→".blue().bold());
+    if !json {
+        println!("{} Fetching PoW challenge...", "→".blue().bold());
+    }
     let challenge_res = client
         .get(format!("{}/challenge", faucet_url))
         .send()
@@ -200,15 +210,19 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String) -> anyhow::Result<()
         .context("No difficulty in response")? as u32;
 
     // 2. Solve challenge
-    println!(
-        "{} Solving challenge (difficulty: {} bits)...",
-        "→".blue().bold(),
-        difficulty
-    );
+    if !json {
+        println!(
+            "{} Solving challenge (difficulty: {} bits)...",
+            "→".blue().bold(),
+            difficulty
+        );
+    }
     let start = std::time::Instant::now();
     let nonce = solve_challenge(challenge, difficulty);
     let duration = start.elapsed();
-    println!("{} Challenge solved in {:?}", "✓".green(), duration);
+    if !json {
+        println!("{} Challenge solved in {:?}", "✓".green(), duration);
+    }
 
     // 3. Send claim
     let response = client
@@ -223,19 +237,46 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String) -> anyhow::Result<()
 
     if response.status().is_success() {
         let res: serde_json::Value = response.json().context("Failed to parse faucet response")?;
-        if let Some(msg) = res.get("message").and_then(|m| m.as_str()) {
+        if json {
+            println!(
+                "{}",
+                serde_json::to_string(&serde_json::json!({
+                    "success": true,
+                    "message": res.get("message").and_then(|m| m.as_str()).unwrap_or("Success")
+                }))?
+            );
+        } else if let Some(msg) = res.get("message").and_then(|m| m.as_str()) {
             println!("{} {}", "✓".green(), msg);
         } else {
             println!("{} Success", "✓".green());
         }
     } else {
         let status = response.status();
-        let res: serde_json::Value = response.json().unwrap_or_default();
-        let error_msg = res
-            .get("error")
-            .and_then(|e| e.as_str())
-            .unwrap_or("Unknown error");
-        anyhow::bail!("Faucet returned error {}: {}", status, error_msg);
+        let error_msg = if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            "Too many requests from your IP. Only 2 requests per 24 hours are allowed. Please try again later.".to_string()
+        } else {
+            let body_text = response.text().unwrap_or_default();
+            if let Ok(res) = serde_json::from_str::<serde_json::Value>(&body_text) {
+                res.get("error")
+                    .and_then(|e| e.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| body_text.clone())
+            } else {
+                body_text.clone()
+            }
+        };
+
+        if json {
+            println!(
+                "{}",
+                serde_json::to_string(&serde_json::json!({
+                    "success": false,
+                    "error": format!("Faucet returned error {}: {}", status, error_msg)
+                }))?
+            );
+        } else {
+            anyhow::bail!("Faucet returned error {}: {}", status, error_msg);
+        }
     }
 
     Ok(())
@@ -260,6 +301,7 @@ fn solve_challenge(challenge: &str, difficulty: u32) -> u64 {
         if zero_bits >= difficulty {
             return nonce;
         }
+
         nonce += 1;
     }
 }
