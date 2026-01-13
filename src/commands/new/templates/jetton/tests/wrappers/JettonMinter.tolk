@@ -60,21 +60,21 @@ fun JettonMinter.sendDeploy(self, from: address, params: SendParams) {
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
-fun JettonMinter.sendMint(self, from: address, recipient: address, jetton_amount: int, forward_ton_amount: int, total_ton_amount: int) {
+fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount: int, forwardTonAmount: int, totalTonAmount: int) {
     val msg = createMessage({
         bounce: false,
-        value: total_ton_amount + ton("0.015"),
+        value: totalTonAmount + ton("0.015"),
         dest: self.address,
         body: MintNewJettons {
             queryId: 0,
             mintRecipient: recipient,
-            tonAmount: total_ton_amount,
+            tonAmount: totalTonAmount,
             internalTransferMsg: InternalTransferStep {
                 queryId: 0,
-                jettonAmount: jetton_amount,
+                jettonAmount: jettonAmount,
                 transferInitiator: null,
                 sendExcessesTo: self.address,
-                forwardTonAmount: forward_ton_amount,
+                forwardTonAmount: forwardTonAmount,
                 forwardPayload: createEmptySlice(),
             }.toCell(),
         },
@@ -82,14 +82,14 @@ fun JettonMinter.sendMint(self, from: address, recipient: address, jetton_amount
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
-fun JettonMinter.sendChangeAdmin(self, from: address, new_owner: address) {
+fun JettonMinter.sendChangeAdmin(self, from: address, newOwner: address) {
     val msg = createMessage({
         bounce: false,
         value: ton("0.05"),
         dest: self.address,
         body: ChangeMinterAdmin {
             queryId: 0,
-            newAdminAddress: new_owner,
+            newAdminAddress: newOwner,
         },
     });
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)

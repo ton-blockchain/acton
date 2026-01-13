@@ -67,40 +67,40 @@ fun envOr<T>(name: slice, default: T): T {
 }
 
 fun int.__env(name: slice): int? {
-    return ffi.env_int(name);
+    return ffi.envInt(name);
 }
 
 fun bool.__env(name: slice): bool? {
-    return ffi.env_bool(name);
+    return ffi.envBool(name);
 }
 
 fun slice.__env(name: slice): slice? {
-    return ffi.env_slice(name);
+    return ffi.envSlice(name);
 }
 
 fun address.__env(name: slice): address? {
-    return ffi.env_address(name);
+    return ffi.envAddress(name);
 }
 
 fun cell.__env(name: slice): cell? {
-    return ffi.env_cell(name);
+    return ffi.envCell(name);
 }
 
 fun T.__env(name: slice): T? {
     Assert.fail(format1("env() supports only int, bool, slice, address and cell types, but got ", T.typeName()));
 }
 
-fun ffi.env_int(name: slice): int?
+fun ffi.envInt(name: slice): int?
     asm "50 EXTCALL"
 
-fun ffi.env_bool(name: slice): bool?
+fun ffi.envBool(name: slice): bool?
     asm "51 EXTCALL"
 
-fun ffi.env_slice(name: slice): slice?
+fun ffi.envSlice(name: slice): slice?
     asm "52 EXTCALL"
 
-fun ffi.env_address(name: slice): address?
+fun ffi.envAddress(name: slice): address?
     asm "53 EXTCALL"
 
-fun ffi.env_cell(name: slice): cell?
+fun ffi.envCell(name: slice): cell?
     asm "54 EXTCALL"

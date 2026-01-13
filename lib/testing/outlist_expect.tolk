@@ -27,7 +27,7 @@ import "../types/message"
 import "../types/out_actions"
 
 /// Expect the out action list to be non empty.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -38,7 +38,7 @@ fun Expectation<OutActionList>.toBeNonEmpty(self) {
 }
 
 /// Expect the out action list to be empty.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -49,15 +49,15 @@ fun Expectation<OutActionList>.toBeEmpty(self) {
 }
 
 /// Expect the out action at the given index to be a send message.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
 /// expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 /// ```
-/// 
+///
 /// Note that you should provide the message type as a generic parameter.
-/// 
+///
 /// If the action is not a send message, the test will fail.
 fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
     val action = self.value.at(index);
@@ -70,11 +70,11 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 val msg = action.loadGenericMessage();
                 val opcode = msg.loadOpcode();
                 if (opcode == null) {
-                    expect_impl.fail_to_find_out_msg<Msg>(e, self.location);
+                    expectImpl.failToFindOutMsg<Msg>(e, self.location);
                     return;
                 }
 
-                val opcode_type_name = ffi.type_name_by_opcode(opcode);
+                val opcodeTypeName = ffi.typeNameByOpcode(opcode);
 
                 Assert.fail(
                     format4(
@@ -82,13 +82,13 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                         Msg.typeName(),
                         Msg.getDeclaredPackPrefix(),
                         opcode,
-                        opcode_type_name == null ? "" : format1(" ({})", opcode_type_name),
+                        opcodeTypeName == null ? "" : format1(" ({})", opcodeTypeName),
                     ),
                     self.location
                 );
                 return;
             }
-            expect_impl.fail_to_find_out_msg<Msg>(e, self.location);
+            expectImpl.failToFindOutMsg<Msg>(e, self.location);
         }
         return;
     }
@@ -99,14 +99,14 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
     );
 }
 
-struct expect_impl
+struct expectImpl
 
-fun expect_impl.fail_to_find_out_msg<Msg>(exit_code: int, location: slice) {
+fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: slice) {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
             Msg.typeName(),
-            exit_code
+            exitCode
         ),
         location
     );

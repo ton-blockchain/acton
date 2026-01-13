@@ -52,9 +52,9 @@ struct ExtOutMsgInfo {
     /// Optional external destination address.
     dst: address
     /// Logical time when the message was created.
-    created_lt: int64
+    createdLt: int64
     /// Unix timestamp when the message was created.
-    created_at: uint32
+    createdAt: uint32
 }
 
 /// Represents a list of child transactions IDs (LT) for single send result.
@@ -114,21 +114,21 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
     } catch (e) {
         if (e == 63) {
             // prefix mismatch
-            val cell_generic = self.get<cell>(index) as Cell<MessageRelaxedGeneric>;
-            val msg = cell_generic.load();
+            val cellGeneric = self.get<cell>(index) as Cell<MessageRelaxedGeneric>;
+            val msg = cellGeneric.load();
 
             val opcode = msg.loadOpcode();
             if (opcode == null) {
                 throw e;
             }
 
-            val opcode_type_name = ffi.type_name_by_opcode(opcode);
+            val opcodeTypeName = ffi.typeNameByOpcode(opcode);
 
             Assert.fail(format4(
                 "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
                 Msg.typeName(),
                 Msg.getDeclaredPackPrefix(),
-                opcode_type_name == null ? "" : opcode_type_name,
+                opcodeTypeName == null ? "" : opcodeTypeName,
                 opcode
             ));
         }
@@ -143,23 +143,23 @@ struct SendResult {
     tx: Cell<Transaction>
     /// List of child transactions IDs.
     /// This transactions are directly produced by this transaction.
-    child_txs: ChildTxsIds
+    childTxs: ChildTxsIds
     /// Parent transaction LT that produced this transaction or null if this transaction is the root one.
-    parent_lt: int?
+    parentLt: int?
     /// Raw cell with encoded out actions.
     /// Use [SendResult.allOutActions] to load all actions.
-    out_actions: Cell<OutList>
+    outActions: Cell<OutList>
     /// All out messages produced by this transaction.
-    out_messages: OutMessages
+    outMessages: OutMessages
     /// Amount of gas used by this transaction.
-    gas_used: int
+    gasUsed: int
     /// All external outgoing messages produced by this transaction.
     externals: ExtOutList
 }
 
 /// Returns all out actions produced by this transaction as a list.
 fun SendResult.allOutActions(self): OutActionList {
-    return vm.parseOutActions(self.out_actions);
+    return vm.parseOutActions(self.outActions);
 }
 
 /// Represents a list of send results obtained from [net.send] method.
@@ -216,13 +216,13 @@ fun SendResultList.wait(
 
     val res = self.at(0);
     val tx = res.tx.load();
-    val in_msg_cell = tx.messages.load().in_msg.unwrap();
-    val in_msg = in_msg_cell.load();
-    var body = in_msg.body;
+    val inMsgCell = tx.messages.load().inMsg.unwrap();
+    val inMsg = inMsgCell.load();
+    var body = inMsg.body;
     body.skipBits(1); // skip Either bit
-    val body_hash = body.hash();
-    val body_hash_slice = beginCell().storeUint(body_hash, 256).toSlice();
-    return net.waitForTransaction(in_msg.info.dest, body_hash_slice, quiet, attempts, sleepDuration)
+    val bodyHash = body.hash();
+    val bodyHashSlice = beginCell().storeUint(bodyHash, 256).toSlice();
+    return net.waitForTransaction(inMsg.info.dest, bodyHashSlice, quiet, attempts, sleepDuration)
 }
 
 /// Represents a set of parameters to search for a transaction in the transaction list.
@@ -232,7 +232,7 @@ struct SearchParams {
     /// Source address of the transaction.
     from: address? = null
     /// Exit code of the transaction.
-    exit_code: int32? = null
+    exitCode: int32? = null
     /// Whether the transaction is succesfull (both compute and action phase).
     success: bool? = null,
     /// Whether the compute phase of transaction was aborted and transaction was reverted.
@@ -248,9 +248,9 @@ struct SearchParams {
     /// Opcode of the in message.
     opcode: uint32? = null
     /// Action exit code of the transaction.
-    action_exit_code: int32? = null
+    actionExitCode: int32? = null
     /// Whether the compute phase was skipped.
-    compute_phase_skipped: bool? = null
+    computePhaseSkipped: bool? = null
     /// Body of the in message (compared by hash).
     body: cell? = null
 }
@@ -314,14 +314,14 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
     self,
     params: ExternalOutSearchParams = {}
 ): Maybe<Message<TBody, ExternalOutMessageInfo>> {
-    var transactionIndex = 0;
-    while (transactionIndex < self.size()) {
-        val externals = self.at(transactionIndex).externals;
+    var transactionIdx = 0;
+    while (transactionIdx < self.size()) {
+        val externals = self.at(transactionIdx).externals;
 
-        var externalIndex = 0;
-        while (externalIndex < externals.size()) {
+        var externalIdx = 0;
+        while (externalIdx < externals.size()) {
             val externalOut = externals
-                .get<Cell<Message<RemainingBitsAndRefs, ExternalOutMessageInfo>>>(externalIndex)
+                .get<Cell<Message<RemainingBitsAndRefs, ExternalOutMessageInfo>>>(externalIdx)
                 .load();
 
             if (externalOut.matches<TBody>(params)) {
@@ -336,10 +336,10 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
                 );
             }
 
-            externalIndex += 1;
+            externalIdx += 1;
         }
 
-        transactionIndex += 1;
+        transactionIdx += 1;
     }
 
     return Maybe<Message<TBody, ExternalOutMessageInfo>>.none();
@@ -360,8 +360,8 @@ fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {})
     if (tx == null) {
         return Maybe<Transaction>.none();
     }
-    val tx_cell = tx as Cell<Transaction>;
-    return Maybe<Transaction>.some(tx_cell.load());
+    val txCell = tx as Cell<Transaction>;
+    return Maybe<Transaction>.some(txCell.load());
 }
 
 /// Send a message from a specified address with specified mode.
@@ -380,19 +380,19 @@ fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {})
 /// ```
 ///
 /// Returns a list of send results representing all transactions produced by this send call.
-/// 
+///
 /// See [net.sendSingle] if you need to send a single message without out message processing.
 fun net.send(from: address, message: OutMessage, mode: int): SendResultList {
     return ffi.sendMessageFrom(message.messageCell, from.toCell(), mode)!;
 }
 
 /// Send a single message from a specified address.
-/// 
+///
 /// In contrast to [net.send], this method doesn't process out messages, but returns
 /// a single send result with this out messages.
-/// 
+///
 /// This method is useful for bounce testing where you want to simulate a bounced message.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val bounced_msg = createMessage({
@@ -401,10 +401,10 @@ fun net.send(from: address, message: OutMessage, mode: int): SendResultList {
 ///     dest: deployer_jetton_wallet.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
-/// 
+///
 /// net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
 /// ```
-/// 
+///
 /// See [net.send] if you need to send a message and process out messages.
 fun net.sendSingle(from: address, message: OutMessage): SendResult {
     val res = ffi.sendSingleMessage(message.messageCell, from.toCell())!;
@@ -412,7 +412,7 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val msg = createMessage({
@@ -422,9 +422,9 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
 /// });
 /// val bouncedMsg = msg.bounced();
 /// ```
-/// 
+///
 /// This is useful for testing single messages with [net.sendSingle] method.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val bounced_msg = createMessage({
@@ -433,7 +433,7 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
 ///     dest: deployer_jetton_wallet.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
-/// 
+///
 /// net.sendSingle(not_deployer_jetton_wallet.address, bounced_msg);
 /// ```
 fun OutMessage.bounced(self): OutMessage {
@@ -511,12 +511,12 @@ struct Wallet {
 /// ```
 fun net.wallet(name: slice): Wallet {
     if (ffi.isBroadcasting()) {
-        val address_cell = ffi.getWalletByName(name);
-        if (address_cell == null) {
+        val addressCell = ffi.getWalletByName(name);
+        if (addressCell == null) {
             Assert.failWalletNotFound(name);
             throw 1;
         }
-        val address = address_cell.beginParse().loadAddress();
+        val address = addressCell.beginParse().loadAddress();
         return Wallet { address }
     }
 
@@ -631,8 +631,8 @@ fun net.disableBroadcast(): void {
 ///
 /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
 fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
-    val method_id = (crc16(name) & 0xffff) | 0x10000;
-    return impl.runGetMethodById(addr, method_id, name, args)
+    val methodId = (crc16(name) & 0xffff) | 0x10000;
+    return impl.runGetMethodById(addr, methodId, name, args)
 }
 
 /// Run a get method of a contract by its ID.
@@ -659,7 +659,7 @@ fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? 
 ///     if (!net.isDeployed(self.address)) {
 ///         return 0 // return 0 if contract is not deployed
 ///     }
-///     
+///
 ///     // and if deployed, actually run get method
 ///     val result: JettonWalletDataReply = net.runGetMethod(self.address, "get_wallet_data");
 ///     return result.jettonBalance
@@ -765,7 +765,7 @@ fun net.registerCodeCell(code: cell, name: slice) {
     ffi.registerCodeCell(code, name);
 }
 
-/// Returns current account state for address or null if no information available or 
+/// Returns current account state for address or null if no information available or
 /// contract is not deployed.
 ///
 /// The account state includes balance, storage information, and other account data,
@@ -785,8 +785,8 @@ fun net.getAccountState(addr: address): AccountInfo? {
     if (cell == null) {
         return null;
     }
-    val typed_cell = cell as Cell<AccountInfo>;
-    return typed_cell.load()
+    val typedCell = cell as Cell<AccountInfo>;
+    return typedCell.load()
 }
 
 /// Returns storage fee for address for specified amount of seconds.
@@ -805,8 +805,8 @@ fun net.getAccountStorageFee(addr: address, seconds: int) {
     if (state == null) {
         return null;
     }
-    val used_storage = state.storage_stat.used;
-    return calculateStorageFee(BASECHAIN, seconds, used_storage.bits, used_storage.cells);
+    val usedStorage = state.storageStat.used;
+    return calculateStorageFee(BASECHAIN, seconds, usedStorage.bits, usedStorage.cells);
 }
 
 /// Load library from the real blockchain by hash.
@@ -873,7 +873,7 @@ fun net.topUp(to: address, amount: coins) {
 /// Get the balance of an address.
 ///
 /// Returns 0 if the address is not deployed.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val balance = net.balance(address);
@@ -911,8 +911,8 @@ fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: slice
         throw CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE;
     }
 
-    val args_to_send = args == null ? createEmptyTuple() : args.toTuple();
-    val res = ffi.runGetMethod(addr.toCell(), code, id, name, Ret.typeName(), args_to_send);
+    val argsToSend = args == null ? createEmptyTuple() : args.toTuple();
+    val res = ffi.runGetMethod(addr.toCell(), code, id, name, Ret.typeName(), argsToSend);
     if (res == null) {
         // actual error will be processed by test framework, just halt execution
         throw 0
@@ -934,7 +934,7 @@ fun __treasuryCode(): cell asm """
 
 fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): SendResultList? asm "9 EXTCALL"
 fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
-fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: slice, return_type: slice, args: tuple): tuple? asm "8 EXTCALL"
+fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: slice, returnType: slice, args: tuple): tuple? asm "8 EXTCALL"
 fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
 fun ffi.registerAddress(address: cell, name: slice): void asm "15 EXTCALL"

@@ -71,8 +71,8 @@ get fun `test-format-struct-with-nested-double-int`() {
 }
 
 get fun `test-format-struct-with-very-nested-`() {
-    val expected_type = fs.readFile("lib/testdata/nested_type_fmt.txt");
-    expect(format1("{}", VeryNested {})).toEqual(expected_type);
+    val expectedType = fs.readFile("lib/testdata/nested_type_fmt.txt");
+    expect(format1("{}", VeryNested {})).toEqual(expectedType);
 }
 
 get fun `test-format-message`() {
@@ -87,9 +87,9 @@ get fun `test-format-message`() {
     val first = result.at(0);
     val tx = first.tx.load();
 
-    val in_msg = tx.messages.load().in_msg;
-    if (in_msg is Value<Cell<MessageRelaxedGeneric>>) {
-        val expected_type = fs.readFile("lib/testdata/message_type_fmt.txt");
-        expect(format1("{}", in_msg.value.load())).toEqual(expected_type);
+    val inMsg = tx.messages.load().inMsg;
+    if (inMsg is Value<Cell<MessageRelaxedGeneric>>) {
+        val expectedType = fs.readFile("lib/testdata/message_type_fmt.txt");
+        expect(format1("{}", inMsg.value.load())).toEqual(expectedType);
     }
 }

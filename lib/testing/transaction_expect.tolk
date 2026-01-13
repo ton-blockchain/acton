@@ -35,11 +35,11 @@ import "../ffi/ffi"
 import "../types/transaction"
 
 /// Expect the transaction list to have a successful deploy transaction.
-/// 
+///
 /// Transaction is considered as "deploy" if previous status was "NonExisting" and end status was "Active".
-/// 
+///
 /// Example:
-/// 
+///
 /// ```tolk
 /// expect(txs).toHaveSuccessfulDeploy({
 ///     to: counter.address,
@@ -63,10 +63,10 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params
 }
 
 /// Expect the transaction list to have a successful transaction.
-/// 
-/// Transaction is considered as "successful" if exit code is 0, but exit code 
-/// can be overridden by the `exit_code` parameter.
-/// 
+///
+/// Transaction is considered as "successful" if exit code is 0, but exit code
+/// can be overridden by the `exitCode` parameter.
+///
 /// Example:
 /// ```tolk
 /// expect(txs).toHaveSuccessfulTx({
@@ -77,8 +77,8 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params
 fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: SearchParams = {}) {
     params.opcode = Msg.getDeclaredPackPrefix();
     params.success = true;
-    if (params.exit_code == null) {
-        params.exit_code = 0;
+    if (params.exitCode == null) {
+        params.exitCode = 0;
     }
 
     val tx = ffi.findTransactionByParams(self.value, params.toTuple());
@@ -118,7 +118,7 @@ fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams
 }
 
 /// Expect the transaction list to NOT have a transaction with specified parameters.
-/// 
+///
 /// Example:
 /// ```tolk
 /// expect(txs).toNotHaveTx({
@@ -142,7 +142,7 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchPar
 }
 
 /// Expect the transaction list to have a **bounced** transaction.
-/// 
+///
 /// Example:
 /// ```tolk
 /// expect(txs).toHaveBouncedTx({
@@ -166,9 +166,9 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: Searc
     }
 }
 
-/// Expect the transaction list to have a **failed** transaction. 
+/// Expect the transaction list to have a **failed** transaction.
 /// Exit code in parameters must be set to non zero value.
-/// 
+///
 /// Example:
 /// ```tolk
 /// expect(txs).toHaveFailedTx({
@@ -180,11 +180,11 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: Searc
 fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: SearchParams = {}) {
     params.opcode = Msg.getDeclaredPackPrefix();
     params.success = false;
-    if (params.exit_code == null) {
-        Assert.fail("expect(<actual>).toHaveFailedTx(params) must have not null exit_code parameter in params");
+    if (params.exitCode == null) {
+        Assert.fail("expect(<actual>).toHaveFailedTx(params) must have not null exitCode parameter in params");
     }
-    if (params.exit_code == 0) {
-        Assert.fail("expect(<actual>).toHaveFailedTx(params) must have non zero exit_code parameter in params");
+    if (params.exitCode == 0) {
+        Assert.fail("expect(<actual>).toHaveFailedTx(params) must have non zero exitCode parameter in params");
     }
 
     val tx = ffi.findTransactionByParams(self.value, params.toTuple());
@@ -200,7 +200,7 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: Search
 }
 
 /// Expect all transactions in the list to be successful.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
@@ -225,7 +225,7 @@ fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
 }
 
 /// Expect the transaction to emit an external message of given type.
-/// 
+///
 /// Example:
 /// ```tolk
 /// expect(txs).toEmitExternalMessage<IncreaseCounter>();
@@ -260,15 +260,15 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
 }
 
 /// Expect the transaction to consume less than the expected amount of gas.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val result = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
 /// expect(result.at(0)).toConsumeLessThan(1000);
 /// ```
 fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {
-    ffi.assert_comparison(
-        self.value.gas_used,
+    ffi.assertComparison(
+        self.value.gasUsed,
         amount,
         "<",
         "expect(<actual>).toConsumeLessThan(<expected>)",

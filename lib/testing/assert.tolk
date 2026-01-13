@@ -52,7 +52,7 @@ struct Assert
 /// with automatic location tracking.
 fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
     if (
-    !ffi.assert_bin(
+    !ffi.assertBin(
         "==",
         left.typeNameOfObject(),
         left.toTuple(),
@@ -76,7 +76,7 @@ fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: sli
 /// with automatic location tracking.
 fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
     if (
-    !ffi.assert_bin(
+    !ffi.assertBin(
         "!=",
         left.typeNameOfObject(),
         left.toTuple(),
@@ -96,12 +96,12 @@ fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: 
 /// Optional location can be provided to specify the location of the failure to
 /// be printed in the error message.
 fun Assert.fail(message: slice = "", location: slice = ""): never {
-    ffi.assert_fail(message, location);
+    ffi.assertFail(message, location);
     throw ASSERTION_FAILED;
 }
 
 /// Asserts that the function without arguments consumes less than the expected amount of gas.
-/// 
+///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
@@ -110,7 +110,7 @@ fun Assert.fail(message: slice = "", location: slice = ""): never {
 ///     }, 100);
 /// }
 /// ```
-/// 
+///
 /// If you need to pass arguments to the function, you can use the `consumesLessThan1`,
 /// `consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
 /// but accept arguments.
@@ -118,12 +118,12 @@ fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
     val start = getGasConsumedAtTheMoment();
     val result = fn();
     val end = getGasConsumedAtTheMoment();
-    ffi.assert_consumed_less(start, end, expected);
+    ffi.assertConsumedLess(start, end, expected);
     return result;
 }
 
 /// Asserts that the function with single argument consumes less than the expected amount of gas.
-/// 
+///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
@@ -131,7 +131,7 @@ fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
 ///         // do something that consumes gas
 ///     }, 100, 100);
 /// //     ^^^  ^^^ this argument will be passed to the function as the second argument
-/// //     | 
+/// //     |
 /// //     this argument will be passed to the function as the first argument
 /// }
 /// ```
@@ -139,12 +139,12 @@ fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected:
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1);
     val end = getGasConsumedAtTheMoment();
-    ffi.assert_consumed_less(start, end, expected);
+    ffi.assertConsumedLess(start, end, expected);
     return result;
 }
 
 /// Asserts that the function with two arguments consumes less than the expected amount of gas.
-/// 
+///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
@@ -152,7 +152,7 @@ fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected:
 ///         // do something that consumes gas
 ///     }, 100, 100, 100);
 /// //     ^^^  ^^^  ^^^ this argument will be passed to the function as the third argument
-/// //     |    |  
+/// //     |    |
 /// //     |    this argument will be passed to the function as the second argument
 /// //     |
 /// //     this argument will be passed to the function as the first argument
@@ -167,12 +167,12 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2);
     val end = getGasConsumedAtTheMoment();
-    ffi.assert_consumed_less(start, end, expected);
+    ffi.assertConsumedLess(start, end, expected);
     return result;
 }
 
 /// Asserts that the function with three arguments consumes less than the expected amount of gas.
-/// 
+///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
@@ -182,7 +182,7 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
 /// //     ^^^  ^^^  ^^^  ^^^ this argument will be passed to the function as the fourth argument
 /// //     |    |    |
 /// //     |    |    this argument will be passed to the function as the third argument
-/// //     |    |  
+/// //     |    |
 /// //     |    this argument will be passed to the function as the second argument
 /// //     |
 /// //     this argument will be passed to the function as the first argument
@@ -198,18 +198,18 @@ fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2, arg3);
     val end = getGasConsumedAtTheMoment();
-    ffi.assert_consumed_less(start, end, expected);
+    ffi.assertConsumedLess(start, end, expected);
     return result;
 }
 
 /// Fails the test with wallet not found error.
-/// 
+///
 /// This function is used internally by the framework when a wallet is not found.
 /// It provides detailed information about available wallets and instructions on how to add them.
-/// 
+///
 /// NOT FOR PUBLIC USE.
-fun Assert.failWalletNotFound(wallet_name: slice, location: slice = ""): never {
-    ffi.fail_wallet_not_found(wallet_name, location);
+fun Assert.failWalletNotFound(walletName: slice, location: slice = ""): never {
+    ffi.failWalletNotFound(walletName, location);
     throw ASSERTION_FAILED;
 }
 
@@ -223,7 +223,7 @@ fun Assert.failWalletNotFound(wallet_name: slice, location: slice = ""): never {
 /// with automatic location tracking.
 fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: slice = "", location: slice = "") {
     if (
-        !ffi.assert_decimal(
+        !ffi.assertDecimal(
             location,
             message,
             decimals,
@@ -236,9 +236,9 @@ fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: slice = ""
 }
 
 /// Internal function to assert that the function consumed less than the expected amount of gas.
-/// 
+///
 /// NOT FOR PUBLIC USE.
-fun ffi.assert_consumed_less(start: int, end: int, expected: int) {
+fun ffi.assertConsumedLess(start: int, end: int, expected: int) {
     val consumed = end - start - 26; // 26 gas cost of GASCONSUMED
     if (consumed > expected) {
         Assert.fail(format2("Gas consumption was expected to be less than or equal to {}, but {} was consumed", expected, consumed))
@@ -248,11 +248,11 @@ fun ffi.assert_consumed_less(start: int, end: int, expected: int) {
 /// Internal function to assert two values are equal or not equal.
 ///
 /// NOT FOR PUBLIC USE.
-fun ffi.assert_bin<V1, V2>(
+fun ffi.assertBin<V1, V2>(
     op: slice,
-    left_name: slice,
+    leftName: slice,
     left: V1,
-    right_name: slice,
+    rightName: slice,
     right: V2,
     message: slice = "",
     location: slice = "",
@@ -262,18 +262,18 @@ fun ffi.assert_bin<V1, V2>(
 /// Internal function to fail the test with the given message and location.
 ///
 /// NOT FOR PUBLIC USE.
-fun ffi.assert_fail(message: slice = "", location: slice = ""): bool
+fun ffi.assertFail(message: slice = "", location: slice = ""): bool
     asm "100 EXTCALL"
 
 /// Internal function to fail when wallet is not found.
-/// 
+///
 /// NOT FOR PUBLIC USE.
-fun ffi.fail_wallet_not_found(wallet_name: slice, location: slice = ""): bool
+fun ffi.failWalletNotFound(walletName: slice, location: slice = ""): bool
     asm "105 EXTCALL"
 
-fun ffi.assert_decimal<T>(location: slice, message: slice, decimals: int, right: T, left: T): bool
+fun ffi.assertDecimal<T>(location: slice, message: slice, decimals: int, right: T, left: T): bool
     asm "106 EXTCALL"
 
-fun ffi.type_name_by_opcode(id: int): slice?
+fun ffi.typeNameByOpcode(id: int): slice?
     asm "14 EXTCALL"
 

@@ -38,17 +38,17 @@ struct (0x0ec3c86d) OutActionSendMessage {
     /// Mode of the send message. See `SEND_MODE_*` constants.
     mode: uint8
     /// Message to send.
-    /// 
+    ///
     /// To load the actual message, use [OutActionSendMessage.loadMessage] method.
-    out_msg: cell
+    outMsg: cell
 }
 
 /// Loads the message from the out message cell.
-/// 
+///
 /// Note that you should provide the message type as a generic parameter.
-/// 
+///
 /// If you want to access the body of the message, use [OutActionSendMessage.loadBody] method.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -60,13 +60,13 @@ struct (0x0ec3c86d) OutActionSendMessage {
 /// }
 /// ```
 fun OutActionSendMessage.loadMessage<Msg>(self): MessageRelaxed<Msg> {
-    return (self.out_msg as Cell<MessageRelaxed<Msg>>).load({ assertEndAfterReading: false });
+    return (self.outMsg as Cell<MessageRelaxed<Msg>>).load({ assertEndAfterReading: false });
 }
 
 /// Loads the body of the message.
-/// 
+///
 /// Note that you should provide the message type as a generic parameter.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -83,7 +83,7 @@ fun OutActionSendMessage.loadBody<Msg>(self): Msg {
 /// Loads the generic message from the out message cell.
 /// Unlike [OutActionSendMessage.loadMessage], this method does not require type of the message to load.
 /// Instead it loads the message with body as a slice. Use this method if don't know the type of the message.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -95,14 +95,14 @@ fun OutActionSendMessage.loadBody<Msg>(self): Msg {
 /// }
 /// ```
 fun OutActionSendMessage.loadGenericMessage(self): MessageRelaxedGeneric {
-    return (self.out_msg as Cell<MessageRelaxedGeneric>).load({ assertEndAfterReading: false });
+    return (self.outMsg as Cell<MessageRelaxedGeneric>).load({ assertEndAfterReading: false });
 }
 
 /// Represents set code action.
 struct (0xad4de08e) OutActionSetCode {
     prev: Cell<OutList>
     /// New code to set.
-    new_code: cell
+    newCode: cell
 }
 
 /// Represents reserve currency action.
@@ -126,7 +126,7 @@ struct (0x26fa1dd4) OutActionChangeLibrary {
 /// Represents library reference as a hash.
 struct (0b0) LibRefHash {
     /// Hash of the library.
-    lib_hash: bits256
+    libHash: bits256
 }
 
 /// Represents library reference as a cell reference.
@@ -164,14 +164,14 @@ fun OutAction.kind(self): slice {
 }
 
 /// Represents a list of out actions.
-/// 
+///
 /// To get the out actions, use [vm.outActions] method.
 type OutActionList = tuple
 
 /// Returns the out action at the given index.
-/// 
+///
 /// NOTE: this list is reversed, so the last action is at index 0.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -179,14 +179,14 @@ type OutActionList = tuple
 /// println(action.kind());
 /// ```
 fun OutActionList.at(self, i: int): OutAction {
-    val raw_action = self.get<tuple>(i);
-    return OutAction.fromTuple(raw_action);
+    val rawAction = self.get<tuple>(i);
+    return OutAction.fromTuple(rawAction);
 }
 
 /// Returns the send message action at the given index.
-/// 
+///
 /// If the action is not a send message, returns null.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -204,11 +204,11 @@ fun OutActionList.getSendMessageAt(self, i: int): OutActionSendMessage? {
 }
 
 /// Returns the body of the send message at the given index.
-/// 
+///
 /// Note that you should provide the message type as a generic parameter.
-/// 
+///
 /// If the action is not a send message, returns null.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -220,7 +220,7 @@ fun OutActionList.getSendMessageAt(self, i: int): OutActionSendMessage? {
 fun OutActionList.getSendMessageBodyAt<Msg>(self, i: int): Msg? {
     val action = self.at(i);
     if (action is OutActionSendMessage) {
-        val msg = (action.out_msg as Cell<MessageRelaxed<Msg>>).load({
+        val msg = (action.outMsg as Cell<MessageRelaxed<Msg>>).load({
             assertEndAfterReading: false,
         });
 
@@ -245,7 +245,7 @@ fun OutMessage.outActions(self, mode: int): OutActionList {
 }
 
 /// Returns the out actions from the control register C5 at that moment.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.outActions();
@@ -256,7 +256,7 @@ fun vm.outActions(): OutActionList {
 }
 
 /// Parses the out actions from the raw cell (like C5 register).
-/// 
+///
 /// Example:
 /// ```tolk
 /// val out_actions = vm.parseOutActions(vm.getC5());
@@ -342,7 +342,7 @@ fun OutActionChangeLibrary.toTuple(self) {
     tuple.push(self.mode);
     if (self.libref is LibRefHash) {
         tuple.push(0);
-        tuple.push(self.libref.lib_hash);
+        tuple.push(self.libref.libHash);
     } else {
         tuple.push(1);
         tuple.push(self.libref.library);

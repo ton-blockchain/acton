@@ -74,7 +74,7 @@ fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null) {
 
 /// Register a new library for current test.
 fun vm.registerLibrary(cell: cell) {
-    ffi.register_library(cell)
+    ffi.registerLibrary(cell)
 }
 
 /// Convert a slice with string representation of address to an address type.
@@ -88,10 +88,10 @@ fun vm.convertAddress(addr: slice): address {
     return cell.beginParse() as address
 }
 
-fun vm.cellFromHex(cell_hex: slice): cell {
-    return ffi.cellFromHex(cell_hex)
+fun vm.cellFromHex(cellHex: slice): cell {
+    return ffi.cellFromHex(cellHex)
 }
 
-fun ffi.register_library(cell: cell): void asm "18 EXTCALL"
+fun ffi.registerLibrary(cell: cell): void asm "18 EXTCALL"
 fun ffi.convertAddress(addr: slice): cell asm "19 EXTCALL"
-fun ffi.cellFromHex(cell_hex: slice): cell asm "20 EXTCALL"
+fun ffi.cellFromHex(cellHex: slice): cell asm "20 EXTCALL"

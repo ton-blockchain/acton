@@ -24,7 +24,7 @@ import "fmt"
 import "ffi/ffi"
 
 /// Prints the given value to the standard output.
-/// 
+///
 /// Example:
 /// ```tolk
 /// println(10);
@@ -54,7 +54,7 @@ fun println1<T>(fmt: slice, value: T): void {
 }
 
 /// Prints the given slice string to the standard error output.
-/// 
+///
 /// Example:
 /// ```tolk
 /// eprintln("Something went wrong");
@@ -63,7 +63,7 @@ fun eprintln(str: slice): void {
     ffi.eprintln(str);
 }
 
-fun ffi.println(type_name: slice, str: tuple): void
+fun ffi.println(typeName: slice, str: tuple): void
     asm "1 EXTCALL"
 fun ffi.eprintln(str: slice): void
     asm "2 EXTCALL"

@@ -59,7 +59,7 @@ fun Maybe<X>.unwrap(self): X {
 /// val maybeValue = Maybe<slice>.none();
 /// val name = maybeValue.unwrap_or("default"); // Returns "default"
 /// ```
-fun Maybe<X>.unwrap_or(self, default: X): X {
+fun Maybe<X>.unwrapOr(self, default: X): X {
     if (self is None) {
         return default
     }

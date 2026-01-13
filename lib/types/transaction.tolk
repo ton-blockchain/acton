@@ -14,9 +14,9 @@
 /// // Inspect account status change
 /// val description = tx.description.load();
 /// if (description is TransOrd) {
-///     val compute = description.compute_ph;
+///     val compute = description.computePh;
 ///     if (compute is TrComputeVm) {
-///         println1("VM exit code: {}", compute.exit_code);
+///         println1("VM exit code: {}", compute.exitCode);
 ///     }
 /// }
 /// ```
@@ -35,42 +35,42 @@ type AccountStatus = Uninitialized | Frozen | Active | NonExisting
 
 /// Represents depth and balance information for split accounts.
 struct DepthBalanceInfo {
-    split_depth: uint8, // #<= 30
+    splitDepth: uint8, // #<= 30
     balance: CurrencyCollection
 }
 
 /// Represents a transaction in the TON blockchain.
 struct (0b0111) Transaction {
     /// Account address as 256-bit hash.
-    account_addr: bits256,
+    accountAddr: bits256,
     /// Logical time of the transaction.
     lt: uint64,
     /// Hash of the previous transaction.
-    prev_trans_hash: bits256,
+    prevTransHash: bits256,
     /// Logical time of the previous transaction.
-    prev_trans_lt: uint64,
+    prevTransLt: uint64,
     /// Current time (Unix timestamp).
     now: uint32,
     /// Number of outgoing messages.
-    outmsg_cnt: uint15,
+    outmsgCnt: uint15,
     /// Account status before transaction.
-    orig_status: AccountStatus,
+    origStatus: AccountStatus,
     /// Account status after transaction.
-    end_status: AccountStatus,
+    endStatus: AccountStatus,
     /// In and out messages.
     messages: Cell<TransactionMessages>,
     /// Total fees collected.
-    total_fees: CurrencyCollection,
+    totalFees: CurrencyCollection,
     /// State update information.
-    state_update: Cell<HashUpdate<Account>>,
+    stateUpdate: Cell<HashUpdate<Account>>,
     /// Transaction description.
     description: Cell<TransactionDescr>
 }
 
 /// Loads the in message body of the transaction with given type.
-/// 
+///
 /// Note that if message type mismatch, loading will fail with exit code 63.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val result = net.send(address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
@@ -79,25 +79,25 @@ struct (0b0111) Transaction {
 /// println(body.increaseBy);
 /// ```
 fun Transaction.loadBody<Msg>(self) {
-    val in_msg_cell = self.messages.load().in_msg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
-    val in_msg = in_msg_cell.load();
-    return in_msg.loadBody()
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
+    val inMsg = inMsgCell.load();
+    return inMsg.loadBody()
 }
 
 /// Loads the in message of the transaction with given type.
 ///
 /// Note that if message type mismatch, loading will fail with exit code 63.
 fun Transaction.loadInMsg<Msg>(self) {
-    val in_msg_cell = self.messages.load().in_msg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
-    return in_msg_cell.load()
+    val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
+    return inMsgCell.load()
 }
 
 /// Returns consumed gas for transaction.
 fun Transaction.getUsedGas(self) {
     val description = self.description.load();
     if (description is TransOrd) {
-        if (description.compute_ph is TrComputeVm) {
-            return description.compute_ph.data.load().gas_used as int
+        if (description.computePh is TrComputeVm) {
+            return description.computePh.data.load().gasUsed as int
         } else {
             Assert.fail("Cannot get used gas for transaction with skipped compute phase")
         }
@@ -114,16 +114,16 @@ fun Transaction.getActionFee(self): Maybe<coins> {
         if (action is None) {
             return None{}
         }
-        val action_ph = action.value.load();
-        return action_ph.total_action_fees
+        val actionPh = action.value.load();
+        return actionPh.totalActionFees
     }
     if (descr is TransTickTock) {
         val action = descr.action;
         if (action is None) {
             return None{}
         }
-        val action_ph = action.value.load();
-        return action_ph.total_action_fees
+        val actionPh = action.value.load();
+        return actionPh.totalActionFees
     }
     return None{}
 }
@@ -134,27 +134,27 @@ fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN) {
         beginCell()
             .storeUint(0b100, 3)
             .storeInt(workchain, 8)
-            .storeSlice(self.account_addr as slice)
+            .storeSlice(self.accountAddr as slice)
     );
 }
 
 struct TransactionMessages {
     /// In message.
-    in_msg: Maybe<Cell<MessageRelaxedGeneric>>,
+    inMsg: Maybe<Cell<MessageRelaxedGeneric>>,
     /// Out messages.
-    out_msgs: map<uint15, Cell<MessageRelaxedGeneric>>
+    outMsgs: map<uint15, Cell<MessageRelaxedGeneric>>
 }
 
 /// Represents merkle update for proof-of-work.
 struct (0b0100) MerkleUpdate<X> {
     /// Old hash.
-    old_hash: bits256,
+    oldHash: bits256,
     /// New hash.
-    new_hash: bits256,
+    newHash: bits256,
     /// Old depth.
-    old_depth: uint16,
+    oldDepth: uint16,
     /// New depth.
-    new_depth: uint16,
+    newDepth: uint16,
     /// Old value.
     old: X,
     /// New value.
@@ -164,19 +164,19 @@ struct (0b0100) MerkleUpdate<X> {
 /// Represents simple hash update.
 struct (0b01110010) HashUpdate<X> {
     /// Old hash.
-    old_hash: bits256,
+    oldHash: bits256,
     /// New hash.
-    new_hash: bits256
+    newHash: bits256
 }
 
 /// Represents merkle proof.
 struct (0b0011) MerkleProof<X> {
     /// Virtual hash.
-    virtual_hash: bits256,
+    virtualHash: bits256,
     /// Depth.
     depth: uint16,
     /// Virtual root.
-    virtual_root: X
+    virtualRoot: X
 }
 
 /// Union type for hash updates.
@@ -185,11 +185,11 @@ type HashUpdateType<X> = MerkleUpdate<X> | HashUpdate<X> | MerkleProof<X>
 /// Represents storage phase of transaction processing.
 struct TrStoragePhase {
     /// Storage fees collected.
-    storage_fees_collected: coins,
+    storageFeesCollected: coins,
     /// Storage fees due (if any).
-    storage_fees_due: Maybe<coins>,
+    storageFeesDue: Maybe<coins>,
     /// Account status change.
-    status_change: AccStatusChange
+    statusChange: AccStatusChange
 }
 
 /// Represents account status changes.
@@ -203,7 +203,7 @@ type AccStatusChange = AccUnchanged | AccFrozen | AccDeleted
 /// Represents credit phase of transaction processing.
 struct TrCreditPhase {
     /// Due fees collected (if any).
-    due_fees_collected: Maybe<coins>,
+    dueFeesCollected: Maybe<coins>,
     /// Credit amount.
     credit: CurrencyCollection
 }
@@ -214,22 +214,22 @@ struct (0b0) TrComputeSkipped {
 }
 struct (0b1) TrComputeVm {
     success: bool,
-    msg_state_used: bool,
-    account_activated: bool,
-    gas_fees: coins,
+    msgStateUsed: bool,
+    accountActivated: bool,
+    gasFees: coins,
     data: Cell<TrComputeVmRef>
 }
 
 struct TrComputeVmRef {
-    gas_used: VarUint7,
-    gas_limit: VarUint7,
-    gas_credit: Maybe<VarUint3>,
+    gasUsed: VarUint7,
+    gasLimit: VarUint7,
+    gasCredit: Maybe<VarUint3>,
     mode: int8,
-    exit_code: int32,
-    exit_arg: Maybe<int32>,
-    vm_steps: uint32,
-    vm_init_state_hash: bits256,
-    vm_final_state_hash: bits256
+    exitCode: int32,
+    exitArg: Maybe<int32>,
+    vmSteps: uint32,
+    vmInitStateHash: bits256,
+    vmFinalStateHash: bits256
 }
 
 /// Union type for compute phases.
@@ -248,30 +248,30 @@ type ComputeSkipReason = CSkipNoState | CSkipBadState | CSkipNoGas | CSkipSuspen
 struct TrActionPhase {
     success: bool,
     valid: bool,
-    no_funds: bool,
-    status_change: AccStatusChange,
-    total_fwd_fees: Maybe<coins>,
-    total_action_fees: Maybe<coins>,
-    result_code: int32,
-    result_arg: Maybe<int32>,
-    tot_actions: uint16,
-    spec_actions: uint16,
-    skipped_actions: uint16,
-    msgs_created: uint16,
-    action_list_hash: bits256,
-    tot_msg_size: StorageUsed
+    noFunds: bool,
+    statusChange: AccStatusChange,
+    totalFwdFees: Maybe<coins>,
+    totalActionFees: Maybe<coins>,
+    resultCode: int32,
+    resultArg: Maybe<int32>,
+    totActions: uint16,
+    specActions: uint16,
+    skippedActions: uint16,
+    msgsCreated: uint16,
+    actionListHash: bits256,
+    totMsgSize: StorageUsed
 }
 
 /// Represents bounce phase of transaction processing.
 struct (0b00) TrBounceNegfunds
 struct (0b01) TrBounceNofunds {
-    msg_size: StorageUsed,
-    req_fwd_fees: coins
+    msgSize: StorageUsed,
+    reqFwdFees: coins
 }
 struct (0b1) TrBounceOk {
-    msg_size: StorageUsed,
-    msg_fees: coins,
-    fwd_fees: coins
+    msgSize: StorageUsed,
+    msgFees: coins,
+    fwdFees: coins
 }
 
 /// Union type for bounce phases.
@@ -280,10 +280,10 @@ type TrBouncePhase = TrBounceNegfunds | TrBounceNofunds | TrBounceOk
 /// Represents ordinary transaction description.
 @overflow1023_policy("suppress")
 struct (0b0000) TransOrd {
-    credit_first: bool,
-    storage_ph: Maybe<TrStoragePhase>,
-    credit_ph: Maybe<TrCreditPhase>,
-    compute_ph: TrComputePhase,
+    creditFirst: bool,
+    storagePh: Maybe<TrStoragePhase>,
+    creditPh: Maybe<TrCreditPhase>,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     bounce: Maybe<TrBouncePhase>,
@@ -292,15 +292,15 @@ struct (0b0000) TransOrd {
 
 /// Represents storage transaction description.
 struct (0b0001) TransStorage {
-    storage_ph: TrStoragePhase
+    storagePh: TrStoragePhase
 }
 
 /// Represents tick-tock transaction description.
 @overflow1023_policy("suppress")
 struct (0b001) TransTickTock {
-    is_tock: bool,
-    storage_ph: TrStoragePhase,
-    compute_ph: TrComputePhase,
+    isTock: bool,
+    storagePh: TrStoragePhase,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     destroyed: bool
@@ -308,18 +308,18 @@ struct (0b001) TransTickTock {
 
 /// Represents split-merge information.
 struct SplitMergeInfo {
-    cur_shard_pfx_len: uint8, // ## 6
-    acc_split_depth: uint8,   // ## 6
-    this_addr: bits256,
-    sibling_addr: bits256
+    curShardPfxLen: uint8, // ## 6
+    accSplitDepth: uint8,   // ## 6
+    thisAddr: bits256,
+    siblingAddr: bits256
 }
 
 /// Represents split prepare transaction description.
 @overflow1023_policy("suppress")
 struct (0b0100) TransSplitPrepare {
-    split_info: SplitMergeInfo,
-    storage_ph: Maybe<TrStoragePhase>,
-    compute_ph: TrComputePhase,
+    splitInfo: SplitMergeInfo,
+    storagePh: Maybe<TrStoragePhase>,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     destroyed: bool
@@ -327,26 +327,26 @@ struct (0b0100) TransSplitPrepare {
 
 /// Represents split install transaction description.
 struct (0b0101) TransSplitInstall {
-    split_info: SplitMergeInfo,
-    prepare_transaction: Cell<Transaction>,
+    splitInfo: SplitMergeInfo,
+    prepareTransaction: Cell<Transaction>,
     installed: bool
 }
 
 /// Represents merge prepare transaction description.
 struct (0b0110) TransMergePrepare {
-    split_info: SplitMergeInfo,
-    storage_ph: TrStoragePhase,
+    splitInfo: SplitMergeInfo,
+    storagePh: TrStoragePhase,
     aborted: bool
 }
 
 /// Represents merge install transaction description.
 @overflow1023_policy("suppress")
 struct (0b0111) TransMergeInstall {
-    split_info: SplitMergeInfo,
-    prepare_transaction: Cell<Transaction>,
-    storage_ph: Maybe<TrStoragePhase>,
-    credit_ph: Maybe<TrCreditPhase>,
-    compute_ph: TrComputePhase,
+    splitInfo: SplitMergeInfo,
+    prepareTransaction: Cell<Transaction>,
+    storagePh: Maybe<TrStoragePhase>,
+    creditPh: Maybe<TrCreditPhase>,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     destroyed: bool
@@ -393,7 +393,7 @@ struct StorageUsed {
 /// Represents storage extra information.
 struct (0b000) StorageExtraNone
 struct (0b001) StorageExtraDict {
-    dict_hash: uint256
+    dictHash: uint256
 }
 
 /// Union type for storage extra information.
@@ -404,11 +404,11 @@ struct StorageInfo {
     /// Storage used.
     used: StorageUsed,
     /// Storage extra information.
-    storage_extra: StorageExtraInfo,
+    storageExtra: StorageExtraInfo,
     /// Last paid time.
-    last_paid: uint32,
+    lastPaid: uint32,
     /// Due payment (optional).
-    due_payment: Maybe<coins>
+    duePayment: Maybe<coins>
 }
 
 /// Represents account.
@@ -417,7 +417,7 @@ struct (0b1) AccountInfo {
     /// Account address.
     addr: address,
     /// Storage statistics.
-    storage_stat: StorageInfo,
+    storageStat: StorageInfo,
     /// Account storage.
     storage: AccountStorage
 }
@@ -428,7 +428,7 @@ type Account = AccountNone | AccountInfo
 /// Represents account storage.
 struct AccountStorage {
     /// Last transaction logical time.
-    last_trans_lt: uint64,
+    lastTransLt: uint64,
     /// Account balance.
     balance: CurrencyCollection,
     /// Account state.

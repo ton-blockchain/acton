@@ -34,7 +34,7 @@ get fun `test unknown message`() {
 
     // non-empty message
     val res = contract.sendAny(deployer.address, beginCell().storeInt(0x999, 32).endCell());
-    expect(res).toHaveFailedTx({ from: deployer.address, to: contract.address, exit_code: 0xFFFF });
+    expect(res).toHaveFailedTx({ from: deployer.address, to: contract.address, exitCode: 0xFFFF });
 
     // empty message
     val res2 = contract.sendAny(deployer.address, createEmptyCell());
@@ -47,12 +47,12 @@ fun setupTest() {
     // Create a treasury account for deployment (typically the owner)
     val deployer = net.treasury("deployer");
     // Create another treasury account for testing interactions from other users
-    val not_deployer = net.treasury("not_deployer");
+    val notDeployer = net.treasury("not_deployer");
 
     // Initialize and deploy the contract with default values
     val contract = Counter.fromStorage({ id: 0, counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
-    return (contract, deployer, not_deployer)
+    return (contract, deployer, notDeployer)
 }
