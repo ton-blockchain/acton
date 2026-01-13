@@ -93,11 +93,27 @@ impl TonApiClient {
 
     /// Get account state from TonCenter
     pub fn get_account_state(&self, address: &str) -> anyhow::Result<AccountState> {
-        let url = format!(
-            "{}/api/v3/accountStates?address={}",
-            self.network.toncenter_url(),
-            urlencoding::encode(address)
-        );
+        let accounts = self.get_account_states(vec![address])?;
+        accounts
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("Account not found"))
+    }
+
+    /// Get multiple account states from TonCenter
+    pub fn get_account_states(&self, addresses: Vec<&str>) -> anyhow::Result<Vec<AccountState>> {
+        if addresses.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut url = format!("{}/api/v3/accountStates?", self.network.toncenter_url());
+        for (i, address) in addresses.iter().enumerate() {
+            if i > 0 {
+                url.push('&');
+            }
+            url.push_str("address=");
+            url.push_str(&urlencoding::encode(address));
+        }
 
         let response = self
             .build_request(&url)
@@ -120,11 +136,7 @@ impl TonApiClient {
             .json()
             .context("Failed to parse TonCenter response")?;
 
-        if data.accounts.is_empty() {
-            return Err(anyhow!("Account not found"));
-        }
-
-        Ok(data.accounts[0].clone())
+        Ok(data.accounts)
     }
 
     /// Get contract BOC from TonCenter (tries mainnet first, then testnet)
@@ -442,6 +454,8 @@ impl TonApiClient {
 
 #[derive(Deserialize, Clone)]
 pub struct AccountState {
+    pub address: String,
+    pub balance: Option<String>,
     pub code_boc: Option<String>,
     pub status: String,
 }

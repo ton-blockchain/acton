@@ -8,12 +8,14 @@ use inquire::{Confirm, Select, Text};
 use log::error;
 use owo_colors::OwoColorize;
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use toml_edit::{DocumentMut, Item, Table, value};
 use ton_api::{Network, TonApiClient};
+use tonlib_core::TonAddress;
 use tonlib_core::wallet::mnemonic::Mnemonic;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tonlib_core::wallet::wallet_version::WalletVersion;
@@ -362,37 +364,57 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
     }
 
     let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
-    let have_api_key = api_key.is_some();
     let client = TonApiClient::new(Network::Testnet, api_key)?;
 
     if !json {
         println!("Available wallets:");
     }
 
+    let mut wallets_data = Vec::new();
     for (name, wallet_config) in wallets {
-        let is_global = global_wallets.contains(name);
-        let mut balance_info = String::new();
-        let mut balance_val = None;
-
         let Ok(address) = get_wallet_address(wallet_config) else {
             error!("cannot get wallet address for {name}"); // very unlikely
             continue;
         };
+        wallets_data.push((name, wallet_config, address));
+    }
+
+    let mut balances = HashMap::new();
+    if balance {
+        let addresses: Vec<&str> = wallets_data
+            .iter()
+            .map(|(_, _, addr)| addr.as_str())
+            .collect();
+        match client.get_account_states(addresses) {
+            Ok(states) => {
+                for state in states {
+                    if let Some(b) = state.balance
+                        && let Ok(b_int) = b.parse::<i128>()
+                        && let Ok(address) = TonAddress::from_str(&state.address)
+                    {
+                        balances.insert(address.to_base64_url_flags(false, true), b_int);
+                    }
+                }
+            }
+            Err(e) => {
+                error!("failed to fetch balances: {e}");
+            }
+        }
+    }
+
+    for (name, wallet_config, address) in wallets_data {
+        let is_global = global_wallets.contains(name);
+        let mut balance_info = String::new();
+        let mut balance_val = None;
 
         if balance {
-            match client.get_address_balance(&address) {
-                Ok(b) => {
-                    let balance_ton = b.to_string().parse::<f64>().unwrap_or(0.0) / 1_000_000_000.0;
-                    balance_val = Some(balance_ton);
-                    balance_info = format!(" — {}", format!("{:.4} TON", balance_ton).green());
-                }
-                Err(e) => {
-                    balance_info = format!(" — {}", format!("error: {}", e).red());
-                }
-            };
-
-            if !have_api_key {
-                std::thread::sleep(std::time::Duration::from_secs(1));
+            if let Some(b) = balances.get(&address) {
+                let balance_ton = *b as f64 / 1_000_000_000.0;
+                balance_val = Some(*b);
+                balance_info = format!("— {}", format!("{:.4} TON", balance_ton).green());
+            } else {
+                balance_val = Some(0.into());
+                balance_info = format!("— {}", "0 TON".dimmed());
             }
         }
 
@@ -436,7 +458,8 @@ fn get_wallet_address(wallet: &config::WalletConfig) -> anyhow::Result<String> {
     if let Some(expected) = &wallet.expected
         && let Some(addr) = &expected.address_testnet
     {
-        return Ok(addr.clone());
+        let addr = TonAddress::from_str(addr)?;
+        return Ok(addr.to_base64_url_flags(false, true));
     }
 
     let mnemonic_str = wallets::load_mnemonic(wallet)?;
