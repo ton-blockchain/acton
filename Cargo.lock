@@ -72,7 +72,7 @@ dependencies = [
  "tasm",
  "tempfile",
  "tokio",
- "tolk_ast",
+ "tolk-ast",
  "tolk_parser",
  "tolkc",
  "tolkfmt",
@@ -875,10 +875,6 @@ checksum = "4316185f709b23713e41e3195f90edef7fb00c3ed4adc79769cf09cc762a3b29"
 dependencies = [
  "log",
 ]
-
-[[package]]
-name = "ffi-test"
-version = "0.1.0"
 
 [[package]]
 name = "fiat-crypto"
@@ -2839,7 +2835,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tolk_ast"
+name = "tolk-ast"
 version = "0.1.0"
 dependencies = [
  "tolk_parser",
@@ -2872,7 +2868,7 @@ dependencies = [
  "anyhow",
  "expect-test",
  "pretty",
- "tolk_ast",
+ "tolk-ast",
  "tolk_parser",
  "tree-sitter",
 ]
