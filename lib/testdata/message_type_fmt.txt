@@ -1,6 +1,6 @@
-MessageRelaxedGeneric {
+"MessageRelaxedGeneric {
     info: IntMsgInfoRelaxed {
-        ihr_disabled: true,
+        ihrDisabled: true,
         bounce: false,
         bounced: false,
         src: kQAKIOo5BYX6HLXvPp8Ct55dApFwnI0qWrx55yyF/aI9Kyw0,
@@ -9,10 +9,10 @@ MessageRelaxedGeneric {
             grams: 1999900000,
             other: null
         },
-        extra_flags: 0,
-        fwd_fee: 0,
-        created_lt: 0,
-        created_at: 0
+        extraFlags: 0,
+        fwdFee: 0,
+        createdLt: 0,
+        createdAt: 1768293199
     },
     init: null,
     body: null

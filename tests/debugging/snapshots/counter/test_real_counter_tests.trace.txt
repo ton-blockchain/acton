@@ -60,8 +60,8 @@ Step 5 (step_over):
     632| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
     633| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    634|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    635|     return impl.runGetMethodById(addr, method_id, name, args)
+    634|     val methodId = (crc16(name) & 0xffff) | 0x10000;
+    635|     return impl.runGetMethodById(addr, methodId, name, args)
     636| }
   Variables:
     '313 = currentCounter
@@ -76,8 +76,8 @@ Step 6 (step_over):
     632| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
     633| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    634|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    635|     return impl.runGetMethodById(addr, method_id, name, args)
+    634|     val methodId = (crc16(name) & 0xffff) | 0x10000;
+    635|     return impl.runGetMethodById(addr, methodId, name, args)
     636| }
   Variables:
     '314 = null

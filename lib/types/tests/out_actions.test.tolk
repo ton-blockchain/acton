@@ -60,6 +60,6 @@ get fun `test-out-actions`() {
     val fourth_action = out_actions.at(3);
     expect(fourth_action.kind()).toEqual("set-code");
     if (fourth_action is OutActionSetCode) {
-        expect(fourth_action.new_code).toEqual(new_code);
+        expect(fourth_action.newCode).toEqual(new_code);
     }
 }

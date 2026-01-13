@@ -53,7 +53,7 @@ get fun `test minter admin should be able to mint jettons`() {
     expect(mint_result).toHaveSuccessfulTx({ from: minter.address, to: wallet.address });
 
     // excesses
-    expect(mint_result).toHaveTx({ from: wallet.address, to: minter.address, exit_code: 65535 });
+    expect(mint_result).toHaveTx({ from: wallet.address, to: minter.address, exitCode: 65535 });
 
     // check state
     expect(wallet.getJettonBalance()).toEqual(initial_jetton_balance);

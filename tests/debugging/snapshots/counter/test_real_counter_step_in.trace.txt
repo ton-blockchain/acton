@@ -349,7 +349,7 @@ Step 23 (step_over):
     233|     from: address? = null
                               ^^^^
     234|     /// Exit code of the transaction.
-    235|     exit_code: int32? = null
+    235|     exitCode: int32? = null
     236|     /// Whether the transaction is succesfull (both compute and action phase).
   Variables:
     '272 = empty slice
@@ -366,7 +366,7 @@ Step 24 (step_over):
     233|     from: address? = null
                               ^^^^
     234|     /// Exit code of the transaction.
-    235|     exit_code: int32? = null
+    235|     exitCode: int32? = null
     236|     /// Whether the transaction is succesfull (both compute and action phase).
   Variables:
     '277 = null
@@ -381,8 +381,8 @@ Step 25 (step_over):
     232|     /// Source address of the transaction.
     233|     from: address? = null
     234|     /// Exit code of the transaction.
-    235|     exit_code: int32? = null
-                                 ^^^^
+    235|     exitCode: int32? = null
+                                ^^^^
     236|     /// Whether the transaction is succesfull (both compute and action phase).
     237|     success: bool? = null,
     238|     /// Whether the compute phase of transaction was aborted and transaction was reverted.
@@ -399,8 +399,8 @@ Step 26 (step_over):
     232|     /// Source address of the transaction.
     233|     from: address? = null
     234|     /// Exit code of the transaction.
-    235|     exit_code: int32? = null
-                                 ^^^^
+    235|     exitCode: int32? = null
+                                ^^^^
     236|     /// Whether the transaction is succesfull (both compute and action phase).
     237|     success: bool? = null,
     238|     /// Whether the compute phase of transaction was aborted and transaction was reverted.
@@ -416,7 +416,7 @@ Step 27 (step_over):
   Bytecode position: 4F7B002592C76A81BE6EF1EFD83A3168D4FED770F5AC7065B2316E0FEF52DA12:952
   Code:
     234|     /// Exit code of the transaction.
-    235|     exit_code: int32? = null
+    235|     exitCode: int32? = null
     236|     /// Whether the transaction is succesfull (both compute and action phase).
     237|     success: bool? = null,
                               ^^^^
@@ -435,7 +435,7 @@ Step 28 (step_over):
   Bytecode position: 4F7B002592C76A81BE6EF1EFD83A3168D4FED770F5AC7065B2316E0FEF52DA12:952
   Code:
     234|     /// Exit code of the transaction.
-    235|     exit_code: int32? = null
+    235|     exitCode: int32? = null
     236|     /// Whether the transaction is succesfull (both compute and action phase).
     237|     success: bool? = null,
                               ^^^^
@@ -622,7 +622,7 @@ Step 37 (step_over):
     249|     opcode: uint32? = null
                                ^^^^
     250|     /// Action [EXIT_STATUS] of the transaction.
-    251|     action_exit_code: int32? = null
+    251|     actionExitCode: int32? = null
     252|     /// Whether the compute phase was skipped.
   Variables:
     '283 = null
@@ -644,7 +644,7 @@ Step 38 (step_over):
     249|     opcode: uint32? = null
                                ^^^^
     250|     /// Action [EXIT_STATUS] of the transaction.
-    251|     action_exit_code: int32? = null
+    251|     actionExitCode: int32? = null
     252|     /// Whether the compute phase was skipped.
   Variables:
     '283 = null
@@ -663,10 +663,10 @@ Step 39 (step_over):
     248|     /// Opcode of the in message.
     249|     opcode: uint32? = null
     250|     /// Action [EXIT_STATUS] of the transaction.
-    251|     action_exit_code: int32? = null
-                                        ^^^^
+    251|     actionExitCode: int32? = null
+                                      ^^^^
     252|     /// Whether the compute phase was skipped.
-    253|     compute_phase_skipped: bool? = null
+    253|     computePhaseSkipped: bool? = null
     254|     /// Body of the in message (compared by hash).
   Variables:
     '283 = null
@@ -685,10 +685,10 @@ Step 40 (step_over):
     248|     /// Opcode of the in message.
     249|     opcode: uint32? = null
     250|     /// Action [EXIT_STATUS] of the transaction.
-    251|     action_exit_code: int32? = null
-                                        ^^^^
+    251|     actionExitCode: int32? = null
+                                      ^^^^
     252|     /// Whether the compute phase was skipped.
-    253|     compute_phase_skipped: bool? = null
+    253|     computePhaseSkipped: bool? = null
     254|     /// Body of the in message (compared by hash).
   Variables:
     '285 = null
@@ -706,10 +706,10 @@ Step 41 (step_over):
   Bytecode position: 4F7B002592C76A81BE6EF1EFD83A3168D4FED770F5AC7065B2316E0FEF52DA12:984
   Code:
     250|     /// Action [EXIT_STATUS] of the transaction.
-    251|     action_exit_code: int32? = null
+    251|     actionExitCode: int32? = null
     252|     /// Whether the compute phase was skipped.
-    253|     compute_phase_skipped: bool? = null
-                                            ^^^^
+    253|     computePhaseSkipped: bool? = null
+                                          ^^^^
     254|     /// Body of the in message (compared by hash).
     255|     body: cell? = null
     256| }
@@ -729,10 +729,10 @@ Step 42 (step_over):
   Bytecode position: 4F7B002592C76A81BE6EF1EFD83A3168D4FED770F5AC7065B2316E0FEF52DA12:992
   Code:
     250|     /// Action [EXIT_STATUS] of the transaction.
-    251|     action_exit_code: int32? = null
+    251|     actionExitCode: int32? = null
     252|     /// Whether the compute phase was skipped.
-    253|     compute_phase_skipped: bool? = null
-                                            ^^^^
+    253|     computePhaseSkipped: bool? = null
+                                          ^^^^
     254|     /// Body of the in message (compared by hash).
     255|     body: cell? = null
     256| }
@@ -753,7 +753,7 @@ Step 43 (step_over):
   Bytecode position: 4F7B002592C76A81BE6EF1EFD83A3168D4FED770F5AC7065B2316E0FEF52DA12:992
   Code:
     252|     /// Whether the compute phase was skipped.
-    253|     compute_phase_skipped: bool? = null
+    253|     computePhaseSkipped: bool? = null
     254|     /// Body of the in message (compared by hash).
     255|     body: cell? = null
                            ^^^^
@@ -777,7 +777,7 @@ Step 44 (step_over):
   Bytecode position: 4F7B002592C76A81BE6EF1EFD83A3168D4FED770F5AC7065B2316E0FEF52DA12:1000
   Code:
     252|     /// Whether the compute phase was skipped.
-    253|     compute_phase_skipped: bool? = null
+    253|     computePhaseSkipped: bool? = null
     254|     /// Body of the in message (compared by hash).
     255|     body: cell? = null
                            ^^^^
@@ -891,8 +891,8 @@ Step 50 (step_over):
     632| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
     633| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    634|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    635|     return impl.runGetMethodById(addr, method_id, name, args)
+    634|     val methodId = (crc16(name) & 0xffff) | 0x10000;
+    635|     return impl.runGetMethodById(addr, methodId, name, args)
     636| }
   Variables:
     '313 = currentCounter
@@ -907,8 +907,8 @@ Step 51 (step_over):
     632| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
     633| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    634|     val method_id = (crc16(name) & 0xffff) | 0x10000;
-    635|     return impl.runGetMethodById(addr, method_id, name, args)
+    634|     val methodId = (crc16(name) & 0xffff) | 0x10000;
+    635|     return impl.runGetMethodById(addr, methodId, name, args)
     636| }
   Variables:
     '314 = null
