@@ -885,6 +885,10 @@ fn example_wallet_usage() -> StyledStr {
                 "List all configured wallets with balances",
                 "acton wallet list -b",
             ),
+            (
+                "Request testnet TONs from faucet",
+                "acton wallet airdrop my-wallet",
+            ),
         ],
         "https://i582.github.io/acton/docs/commands/wallet",
     )

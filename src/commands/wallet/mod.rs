@@ -7,6 +7,7 @@ use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
 use log::error;
 use owo_colors::OwoColorize;
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -117,6 +118,13 @@ pub enum WalletCommand {
         #[arg(help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
     },
+    #[command(about = "Request testnet TONs from faucet")]
+    Airdrop {
+        #[arg(help = "Name of the wallet (prompts if not provided)")]
+        name: Option<String>,
+        #[arg(long, help = "Faucet URL", default_value = "http://localhost:3001")]
+        faucet_url: String,
+    },
 }
 
 pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
@@ -144,6 +152,115 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             json,
         } => list_wallets(balance, api_key, json),
         WalletCommand::Get { name } => get_mnemonic(name),
+        WalletCommand::Airdrop { name, faucet_url } => airdrop_wallet(name, faucet_url),
+    }
+}
+
+fn airdrop_wallet(name: Option<String>, faucet_url: String) -> anyhow::Result<()> {
+    let config = ActonConfig::load()?;
+
+    let name = select_wallet(name, &config)?;
+
+    let wallet = config
+        .get_wallet(&name)
+        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
+
+    let address = get_wallet_address(wallet)?;
+
+    println!(
+        "{} Requesting airdrop for wallet {} {}",
+        "→".blue().bold(),
+        name.cyan().bold(),
+        address
+    );
+
+    let client = reqwest::blocking::Client::new();
+
+    // Faucet for testnet TON uses Proof-of-Work so we need to solve it to get coins
+
+    // 1. Get challenge
+    println!("{} Fetching PoW challenge...", "→".blue().bold());
+    let challenge_res = client
+        .get(format!("{}/challenge", faucet_url))
+        .send()
+        .context("Failed to get challenge from faucet")?;
+
+    if !challenge_res.status().is_success() {
+        anyhow::bail!("Failed to get challenge: status {}", challenge_res.status());
+    }
+
+    let challenge_data: serde_json::Value = challenge_res
+        .json()
+        .context("Failed to parse challenge response")?;
+    let challenge = challenge_data["challenge"]
+        .as_str()
+        .context("No challenge in response")?;
+    let difficulty = challenge_data["difficulty"]
+        .as_u64()
+        .context("No difficulty in response")? as u32;
+
+    // 2. Solve challenge
+    println!(
+        "{} Solving challenge (difficulty: {} bits)...",
+        "→".blue().bold(),
+        difficulty
+    );
+    let start = std::time::Instant::now();
+    let nonce = solve_challenge(challenge, difficulty);
+    let duration = start.elapsed();
+    println!("{} Challenge solved in {:?}", "✓".green(), duration);
+
+    // 3. Send claim
+    let response = client
+        .post(format!("{}/claim", faucet_url))
+        .json(&serde_json::json!({
+            "address": address,
+            "challenge": challenge,
+            "nonce": nonce
+        }))
+        .send()
+        .context("Failed to send request to faucet")?;
+
+    if response.status().is_success() {
+        let res: serde_json::Value = response.json().context("Failed to parse faucet response")?;
+        if let Some(msg) = res.get("message").and_then(|m| m.as_str()) {
+            println!("{} {}", "✓".green(), msg);
+        } else {
+            println!("{} Success", "✓".green());
+        }
+    } else {
+        let status = response.status();
+        let res: serde_json::Value = response.json().unwrap_or_default();
+        let error_msg = res
+            .get("error")
+            .and_then(|e| e.as_str())
+            .unwrap_or("Unknown error");
+        anyhow::bail!("Faucet returned error {}: {}", status, error_msg);
+    }
+
+    Ok(())
+}
+
+fn solve_challenge(challenge: &str, difficulty: u32) -> u64 {
+    let mut nonce: u64 = 0;
+    loop {
+        let mut hasher = Sha256::new();
+        hasher.update(challenge.as_bytes());
+        hasher.update(nonce.to_be_bytes());
+        let result = hasher.finalize();
+
+        let mut zero_bits = 0;
+        for &byte in result.iter() {
+            let leading_zeros = byte.leading_zeros();
+            zero_bits += leading_zeros;
+            if leading_zeros < 8 {
+                break;
+            }
+        }
+        if zero_bits >= difficulty {
+            return nonce;
+        }
+        nonce += 1;
     }
 }
 
