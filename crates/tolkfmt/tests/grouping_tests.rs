@@ -1,23 +1,7 @@
-use expect_test::{Expect, expect};
-use tolkfmt::format_source;
+mod tests;
 
-fn check(code: &str, expect: Expect) {
-    check_with_width(code, expect, 80)
-}
-
-fn check_with_width(code: &str, expect: Expect, width: usize) {
-    // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
-
-    let res = format_source(code, width).unwrap();
-
-    let res = res
-        .lines()
-        .map(|l| if l.trim().is_empty() { "" } else { l })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    expect.assert_eq(&res);
-}
+use crate::tests::check;
+use expect_test::expect;
 
 #[test]
 fn test_comment_grouping_for_declarations() {
