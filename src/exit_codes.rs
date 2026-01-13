@@ -8,7 +8,7 @@ pub struct ExitCodeInfo {
     pub phase: &'static str,
 }
 
-pub static EXIT_CODE_DESCRIPTIONS: Lazy<HashMap<i64, ExitCodeInfo>> = Lazy::new(|| {
+pub static EXIT_CODE_DESCRIPTIONS: Lazy<HashMap<i32, ExitCodeInfo>> = Lazy::new(|| {
     let mut map = HashMap::new();
 
     map.insert(
@@ -141,7 +141,7 @@ pub static EXIT_CODE_DESCRIPTIONS: Lazy<HashMap<i64, ExitCodeInfo>> = Lazy::new(
         -14,
         ExitCodeInfo {
             name: "Out of Gas (Negative)",
-            description: "Same as 13. Negative, so that it cannot be faked",
+            description: "Out of gas error. Negative, so that it cannot be faked",
             phase: "Compute phase",
         },
     );
@@ -280,6 +280,6 @@ pub static EXIT_CODE_DESCRIPTIONS: Lazy<HashMap<i64, ExitCodeInfo>> = Lazy::new(
     map
 });
 
-pub fn get_exit_code_info(code: i64) -> Option<&'static ExitCodeInfo> {
+pub fn find(code: i32) -> Option<&'static ExitCodeInfo> {
     EXIT_CODE_DESCRIPTIONS.get(&code)
 }

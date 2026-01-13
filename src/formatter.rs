@@ -1,9 +1,8 @@
 use crate::context::{
     BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
 };
-use crate::exit_codes::get_exit_code_info;
-use crate::retrace;
 use crate::retrace::{ExecutedAction, InstalledActions};
+use crate::{exit_codes, retrace};
 use abi::{ContractAbi, TypeAbi};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -22,22 +21,6 @@ use tycho_types::models::{
     ReserveCurrencyFlags, SendMsgFlags, ShardAccount, Transaction, TxInfo,
 };
 use tycho_types::num::Tokens;
-
-/// Calculate visible length of a string (excluding ANSI escape codes)
-fn visible_len(s: &str) -> usize {
-    let mut len = 0;
-    let mut in_escape = false;
-    for ch in s.chars() {
-        if ch == '\x1b' {
-            in_escape = true;
-        } else if in_escape && ch == 'm' {
-            in_escape = false;
-        } else if !in_escape {
-            len += 1;
-        }
-    }
-    len
-}
 
 #[derive(Debug, Clone)]
 struct SendResult {
@@ -583,7 +566,7 @@ impl FormatterContext {
                         .red()
                         .to_string();
 
-                    if let Some(info) = get_exit_code_info(compute.exit_code as i64) {
+                    if let Some(info) = exit_codes::find(compute.exit_code) {
                         extra_infos.push(format!(
                             "Compute phase failed: {}",
                             info.description.to_string().yellow()
@@ -682,7 +665,7 @@ impl FormatterContext {
 
                     extra_infos.push("Action phase failed".to_string());
 
-                    if let Some(info) = get_exit_code_info(action.result_code as i64) {
+                    if let Some(info) = exit_codes::find(action.result_code) {
                         extra_infos.push(format!(
                             "Description: {}",
                             info.description.to_string().yellow()
@@ -1684,7 +1667,7 @@ impl FormatterContext {
     }
 
     pub fn format_exit_code(code: i32) -> String {
-        if let Some(info) = get_exit_code_info(code as i64) {
+        if let Some(info) = exit_codes::find(code) {
             return info.name.to_owned();
         }
 
@@ -1700,4 +1683,20 @@ impl FormatterContext {
             AccountState::Frozen(_) => None,
         }
     }
+}
+
+/// Calculate visible length of a string (excluding ANSI escape codes)
+fn visible_len(s: &str) -> usize {
+    let mut len = 0;
+    let mut in_escape = false;
+    for ch in s.chars() {
+        if ch == '\x1b' {
+            in_escape = true;
+        } else if in_escape && ch == 'm' {
+            in_escape = false;
+        } else if !in_escape {
+            len += 1;
+        }
+    }
+    len
 }

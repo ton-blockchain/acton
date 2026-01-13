@@ -1,15 +1,15 @@
-use super::{TestReport, TestReporter, TestStatus, TestSuiteStats};
+use super::{TestExecutionContext, TestReport, TestReporter, TestStatus, TestSuiteStats};
 use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
 use crate::{exit_codes, retrace};
 use owo_colors::OwoColorize;
 use std::path::Path;
-use ton_executor::get::GetMethodResult;
-use ton_source_map::SourceLocation;
+use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
+use ton_source_map::{DebugLocation, SourceLocation};
 
-const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i64 = 678;
-const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i64 = 679;
+const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
+const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
 
 #[derive(Debug, Clone)]
 pub struct ConsoleConfig {
@@ -167,7 +167,30 @@ impl TestReporter for ConsoleReporter {
                 time_value.green(),
                 time_unit.green().dimmed()
             );
-        } else if test.status == TestStatus::Failed {
+        }
+
+        if test.status == TestStatus::Skipped {
+            println!(
+                "  {} {} {}",
+                "○".dimmed(),
+                beautified_name,
+                "skipped".dimmed()
+            );
+        }
+
+        if test.status == TestStatus::Todo {
+            let description = test.details.as_deref().unwrap_or("TODO");
+            println!(
+                "  {} {} {}{}{}",
+                "□".purple().bold(),
+                beautified_name,
+                "[".dimmed(),
+                description.dimmed(),
+                "]".dimmed()
+            );
+        }
+
+        if test.status == TestStatus::Failed {
             println!(
                 "  {} {} {}{}",
                 "✗".red(),
@@ -178,12 +201,6 @@ impl TestReporter for ConsoleReporter {
 
             let Some(exec) = &test.execution else {
                 anyhow::bail!("Test execution context is missing for failed test")
-            };
-
-            let gas_limit_exceeded = if let Some(limit) = test.gas_limit {
-                exec.gas_used > limit
-            } else {
-                false
             };
 
             let formatter = FormatterContext {
@@ -201,260 +218,11 @@ impl TestReporter for ConsoleReporter {
 
             match &exec.get_result {
                 GetMethodResult::Success(result) => {
-                    let exit_code = result.vm_exit_code as i64;
-
-                    let exit_code_info =
-                        retrace::find_exception_info(&result.vm_log, &test.source_map);
-
-                    if gas_limit_exceeded {
-                        println!(
-                            "    {} Gas limit exceeded: used {}, limit {}",
-                            "└─".dimmed(),
-                            exec.gas_used.to_string().red(),
-                            test.gas_limit.unwrap_or(0).to_string().green()
-                        );
-                    } else if let Some(ref assert_failure) = exec.assert_failure {
-                        if let Some(message) = &assert_failure.message() {
-                            if !message.is_empty() {
-                                let highlighted_message =
-                                    FormatterContext::highlight_actual_expected(message);
-                                println!(
-                                    "    {} {} {}",
-                                    "└─".dimmed(),
-                                    "Error:".bright_red(),
-                                    highlighted_message
-                                );
-                            } else {
-                                println!("    {}", "└─".dimmed());
-                            }
-                        } else {
-                            println!("    {}", "└─".dimmed());
-                        }
-
-                        if let AssertFailure::Bin(assert_failure) = &assert_failure
-                            && assert_failure.operator == "=="
-                        {
-                            let diff_output = formatter.format_tuple_diff(
-                                &assert_failure.left,
-                                &assert_failure.right,
-                                &assert_failure.left_type,
-                                &assert_failure.right_type,
-                            );
-
-                            for line in diff_output.lines() {
-                                println!("        {line}");
-                            }
-                        }
-
-                        if let AssertFailure::Bin(assert_failure) = &assert_failure
-                            && assert_failure.operator == "!="
-                        {
-                            println!("       Values are equal but expected to be different:");
-                            let value = formatter.format_tuple_value(
-                                &assert_failure.left,
-                                &assert_failure.left_type,
-                                8,
-                            );
-                            println!("         {}", value.dimmed());
-                        }
-
-                        if let AssertFailure::Bin(assert_failure) = &assert_failure
-                            && assert_failure.is_ord()
-                        {
-                            let left = formatter.format_tuple_value(
-                                &assert_failure.left,
-                                &assert_failure.left_type,
-                                8,
-                            );
-
-                            let right = formatter.format_tuple_value(
-                                &assert_failure.right,
-                                &assert_failure.right_type,
-                                8,
-                            );
-
-                            println!("        Actual:   {}", left.red());
-                            println!("        Expected: {}", right.green());
-                        }
-
-                        if let AssertFailure::TransactionNotFound(assert_failure) = &assert_failure
-                        {
-                            let params = formatter
-                                .format_search_transaction_parameters(assert_failure, &test.abi);
-
-                            let diff_output = format!(
-                                "{}\nCannot find transaction from {} to {}\nwith:\n{}",
-                                formatter.format(&assert_failure.txs),
-                                formatter.format_address(
-                                    &assert_failure.txs,
-                                    &assert_failure.params.from
-                                ),
-                                formatter
-                                    .format_address(&assert_failure.txs, &assert_failure.params.to),
-                                params.join("\n"),
-                            );
-
-                            for line in diff_output.lines() {
-                                println!("        {line}");
-                            }
-                        }
-
-                        if let AssertFailure::TransactionIsFound(assert_failure) = &assert_failure {
-                            let params = formatter
-                                .format_search_transaction_parameters(assert_failure, &test.abi);
-
-                            let from_to = if assert_failure.params.from.is_none()
-                                && assert_failure.params.to.is_none()
-                            {
-                                "".to_owned()
-                            } else {
-                                format!(
-                                    " from {} to {}",
-                                    formatter.format_address(
-                                        &assert_failure.txs,
-                                        &assert_failure.params.from
-                                    ),
-                                    formatter.format_address(
-                                        &assert_failure.txs,
-                                        &assert_failure.params.to,
-                                    ),
-                                )
-                            };
-
-                            let diff_output = format!(
-                                "{}\nUnexpected transaction{}\n{}{}",
-                                formatter.format(&assert_failure.txs),
-                                from_to,
-                                if !params.is_empty() { "with:\n" } else { "" },
-                                params.join("\n"),
-                            );
-
-                            for line in diff_output.lines() {
-                                println!("        {line}");
-                            }
-                        }
-
-                        if let Some(location) = &assert_failure.location()
-                            && !location.is_empty()
-                        {
-                            println!("      {} at {}", "└─".dimmed(), location.dimmed());
-                        }
-                    } else if exec.expected_exit_code != 0 {
-                        println!(
-                            "    {} Expected exit_code={}, got={}",
-                            "└─".dimmed(),
-                            exec.expected_exit_code.to_string().green(),
-                            exit_code.to_string().bright_red()
-                        );
-                    } else {
-                        println!(
-                            "    {} exit_code={}",
-                            "└─".dimmed(),
-                            exit_code.to_string().yellow()
-                        );
-
-                        if let Some(info) = &exit_code_info {
-                            if let Some(loc) = &info.loc {
-                                println!(
-                                    "      {} at {}",
-                                    "├─".dimmed(),
-                                    format!(
-                                        "{}:{}:{}",
-                                        SourceLocation::normalize_path(&loc.file),
-                                        loc.line + 1,
-                                        loc.column + 2
-                                    )
-                                    .dimmed(),
-                                );
-                                if !info.backtrace.is_empty() {
-                                    let max_function_name_len = info
-                                        .backtrace
-                                        .iter()
-                                        .filter_map(|loc| loc.context.event_function.as_ref())
-                                        .map(|name| name.len() + 2)
-                                        .max()
-                                        .unwrap_or(0);
-
-                                    let backtrace_lines =
-                                        info.backtrace.iter().rev().filter_map(|loc| {
-                                            loc.context.event_function.as_ref().map(|func_name| {
-                                                let location = format!(
-                                                    "{}:{}:{}",
-                                                    SourceLocation::normalize_path(&loc.loc.file),
-                                                    loc.loc.line + 1,
-                                                    loc.loc.column + 2
-                                                );
-                                                format!(
-                                                    "{:<width$} at {}",
-                                                    func_name.green(),
-                                                    location.dimmed(),
-                                                    width = max_function_name_len
-                                                )
-                                            })
-                                        });
-
-                                    for line in backtrace_lines {
-                                        println!("      {}     {}", "│".dimmed(), line);
-                                    }
-                                }
-                            } else if test.backtrace.is_none() {
-                                println!(
-                                    "      {} Re-run with {} to get more information",
-                                    "├─".dimmed(),
-                                    "--backtrace full".yellow()
-                                );
-                            }
-                            if !info.description.is_empty() {
-                                println!("      {} {}", "├─".dimmed(), info.description.dimmed());
-                            }
-                        }
-
-                        if let Some(info) = exit_codes::get_exit_code_info(exit_code) {
-                            if exit_code_info.is_none() {
-                                // Don't show duplicate info
-                                println!("      {} {}", "├─".dimmed(), info.description.dimmed());
-                            }
-                            println!("      {} Phase: {}", "└─".dimmed(), info.phase.dimmed());
-                        } else if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {
-                            println!(
-                                "      {} Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
-                                "└─".dimmed(),
-                                "--fork-net".yellow(),
-                            );
-                        } else if exit_code == CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE {
-                            println!(
-                                "      {} Cannot run method of contract without code",
-                                "└─".dimmed()
-                            );
-                        }
-                    }
+                    process_test_fail(test, exec, formatter, result);
                 }
                 GetMethodResult::Error(error) => {
                     println!("    {} {}", "└─".dimmed(), error.error.yellow());
                 }
-            }
-        } else {
-            match test.status {
-                TestStatus::Skipped => {
-                    println!(
-                        "  {} {} {}",
-                        "○".dimmed(),
-                        beautified_name,
-                        "skipped".dimmed()
-                    );
-                }
-                TestStatus::Todo => {
-                    let description = test.details.as_deref().unwrap_or("TODO");
-                    println!(
-                        "  {} {} {}{}{}",
-                        "□".purple().bold(),
-                        beautified_name,
-                        "[".dimmed(),
-                        description.dimmed(),
-                        "]".dimmed()
-                    );
-                }
-                _ => {}
             }
         }
 
@@ -478,4 +246,230 @@ impl TestReporter for ConsoleReporter {
 
         Ok(())
     }
+}
+
+fn process_test_fail(
+    test: &TestReport,
+    exec: &TestExecutionContext,
+    fmt: FormatterContext,
+    result: &GetMethodResultSuccess,
+) {
+    if test.gas_limit.is_some_and(|limit| exec.gas_used > limit) {
+        println!(
+            "    {} Gas limit exceeded: used {}, limit {}",
+            "└─".dimmed(),
+            exec.gas_used.to_string().bright_red(),
+            test.gas_limit.unwrap_or(0).to_string().green()
+        );
+        // since the gas limit is exceeded, other possible faults are of no concern
+        return;
+    }
+
+    if let Some(assert_failure) = &exec.assert_failure {
+        process_assert_failure(assert_failure, test, &fmt);
+        // since assertions set the exit code to 567, we don't want to process exit codes
+        return;
+    }
+
+    if exec.expected_exit_code != 0 {
+        println!(
+            "    {} Expected exit_code={}, got={}",
+            "└─".dimmed(),
+            exec.expected_exit_code.to_string().green(),
+            result.vm_exit_code.to_string().bright_red()
+        );
+    }
+
+    if exec.expected_exit_code == 0 {
+        process_nonzero_exit_code(test, result, result.vm_exit_code);
+    }
+}
+
+fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext) {
+    if let Some(message) = &failure.message() {
+        if !message.is_empty() {
+            let highlighted_message = FormatterContext::highlight_actual_expected(message);
+            println!(
+                "    {} {} {}",
+                "└─".dimmed(),
+                "Error:".bright_red(),
+                highlighted_message
+            );
+        } else {
+            println!("    {}", "└─".dimmed());
+        }
+    } else {
+        println!("    {}", "└─".dimmed());
+    }
+
+    if let AssertFailure::Bin(failure) = &failure
+        && failure.operator == "=="
+    {
+        let diff_output = fmt.format_tuple_diff(
+            &failure.left,
+            &failure.right,
+            &failure.left_type,
+            &failure.right_type,
+        );
+
+        for line in diff_output.lines() {
+            println!("        {line}");
+        }
+    }
+
+    if let AssertFailure::Bin(failure) = &failure
+        && failure.operator == "!="
+    {
+        let value = fmt.format_tuple_value(&failure.left, &failure.left_type, 8);
+        println!("       Values are equal but expected to be different:");
+        println!("         {}", value.dimmed());
+    }
+
+    if let AssertFailure::Bin(failure) = &failure
+        && failure.is_ord()
+    {
+        let left = fmt.format_tuple_value(&failure.left, &failure.left_type, 8);
+        let right = fmt.format_tuple_value(&failure.right, &failure.right_type, 8);
+
+        println!("        Actual:   {}", left.red());
+        println!("        Expected: {}", right.green());
+    }
+
+    if let AssertFailure::TransactionNotFound(failure) = &failure {
+        let params = fmt.format_search_transaction_parameters(failure, &test.abi);
+        let tx_tree = fmt.format(&failure.txs);
+
+        let diff_output = format!(
+            "{tx_tree}\nCannot find transaction from {} to {}\nwith:\n{}",
+            fmt.format_address(&failure.txs, &failure.params.from),
+            fmt.format_address(&failure.txs, &failure.params.to),
+            params.join("\n"),
+        );
+
+        for line in diff_output.lines() {
+            println!("        {line}");
+        }
+    }
+
+    if let AssertFailure::TransactionIsFound(failure) = &failure {
+        let params = fmt.format_search_transaction_parameters(failure, &test.abi);
+        let tx_tree = fmt.format(&failure.txs);
+
+        let from_to = if failure.params.from.is_none() && failure.params.to.is_none() {
+            ""
+        } else {
+            &format!(
+                " from {} to {}",
+                fmt.format_address(&failure.txs, &failure.params.from),
+                fmt.format_address(&failure.txs, &failure.params.to),
+            )
+        };
+
+        let diff_output = format!(
+            "{tx_tree}\nUnexpected transaction{from_to}\n{}{}",
+            if !params.is_empty() { "with:\n" } else { "" },
+            params.join("\n"),
+        );
+
+        for line in diff_output.lines() {
+            println!("        {line}");
+        }
+    }
+
+    if let Some(location) = &failure.location()
+        && !location.is_empty()
+    {
+        println!("      {} at {}", "└─".dimmed(), location.dimmed());
+    }
+}
+
+fn process_nonzero_exit_code(test: &TestReport, result: &GetMethodResultSuccess, exit_code: i32) {
+    println!(
+        "    {} exit_code={}",
+        "└─".dimmed(),
+        exit_code.to_string().yellow()
+    );
+
+    let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.source_map);
+
+    if let Some(info) = &exit_code_info {
+        if let Some(loc) = &info.loc {
+            println!(
+                "      {} at {}",
+                "├─".dimmed(),
+                format!(
+                    "{}:{}:{}",
+                    SourceLocation::normalize_path(&loc.file),
+                    loc.line + 1,
+                    loc.column + 2
+                )
+                .dimmed(),
+            );
+
+            let backtrace_lines = format_backtrace(&info.backtrace);
+            for line in backtrace_lines {
+                println!("      {}     {}", "│".dimmed(), line);
+            }
+        } else if test.backtrace.is_none() {
+            println!(
+                "      {} Re-run with {} to get more information",
+                "├─".dimmed(),
+                "--backtrace full".yellow()
+            );
+        }
+
+        if !info.description.is_empty() {
+            println!("      {} {}", "├─".dimmed(), info.description.dimmed());
+        }
+    }
+
+    if let Some(info) = exit_codes::find(exit_code) {
+        if exit_code_info.is_none() {
+            // Don't show duplicate info
+            println!("      {} {}", "├─".dimmed(), info.description.dimmed());
+        }
+        println!("      {} Phase: {}", "└─".dimmed(), info.phase.dimmed());
+    }
+
+    // Special throw exit codes
+    if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {
+        println!(
+            "      {} Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
+            "└─".dimmed(),
+            "--fork-net".yellow(),
+        );
+    } else if exit_code == CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE {
+        println!(
+            "      {} Cannot run method of contract without code",
+            "└─".dimmed()
+        );
+    }
+}
+
+fn format_backtrace(backtrace: &[DebugLocation]) -> Vec<String> {
+    let max_function_name_len = backtrace
+        .iter()
+        .filter_map(|loc| loc.context.event_function.as_ref())
+        .map(|name| name.len() + 2)
+        .max()
+        .unwrap_or(0);
+
+    let backtrace_lines = backtrace.iter().rev().filter_map(|loc| {
+        let func_name = loc.context.event_function.as_ref()?;
+
+        let location = format!(
+            "{}:{}:{}",
+            SourceLocation::normalize_path(&loc.loc.file),
+            loc.loc.line + 1,
+            loc.loc.column + 2
+        );
+        Some(format!(
+            "{:<width$} at {}",
+            func_name.green(),
+            location.dimmed(),
+            width = max_function_name_len
+        ))
+    });
+
+    backtrace_lines.collect()
 }
