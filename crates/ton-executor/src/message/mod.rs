@@ -240,6 +240,15 @@ impl Executor {
 
         Ok(())
     }
+
+    pub fn set_config(&self, config_b64: &str) -> anyhow::Result<bool> {
+        let config_cstr = CString::new(config_b64).context("config contains null bytes")?;
+
+        let result =
+            unsafe { transaction_emulator_set_config(self.inner.as_ptr(), config_cstr.as_ptr()) };
+
+        Ok(result)
+    }
 }
 
 impl Drop for Executor {
@@ -284,4 +293,9 @@ unsafe extern "C" {
         ctx: *mut c_void,
         callback: ExtMethodCallback<c_void>,
     ) -> *const c_char;
+
+    pub(crate) fn transaction_emulator_set_config(
+        transaction_emulator: *mut c_void,
+        config_boc: *const c_char,
+    ) -> bool;
 }

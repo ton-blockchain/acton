@@ -1,5 +1,8 @@
 #![cfg(test)]
 
+use anyhow::Ok;
+
+use crate::DEFAULT_CONFIG;
 use crate::common::ExecutorVerbosity;
 use crate::message::Executor;
 use crate::message::types::RunTransactionArgs;
@@ -135,6 +138,22 @@ fn test_executor_with_ext_method() -> anyhow::Result<()> {
 
     println!("{result:?}");
     assert!(result.is_ok());
+    Ok(())
+}
+
+#[test]
+fn test_executor_set_config() -> anyhow::Result<()> {
+    let exec = Executor::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
+
+    let config_base64 = DEFAULT_CONFIG;
+
+    let correct_result = exec.set_config(config_base64);
+    assert!(correct_result.is_ok_and(std::convert::identity));
+
+    let bad_config = DEFAULT_CONFIG.to_string() + "invalid_part";
+    let bad_config_result = exec.set_config(&bad_config);
+    assert!(bad_config_result.is_ok_and(|x| !x));
+
     Ok(())
 }
 
