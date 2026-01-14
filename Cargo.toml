@@ -123,7 +123,7 @@ unused_qualifications = "warn"
 [workspace.lints.clippy]
 #pedantic = { level = "warn", priority = -1 }
 #nursery = { level = "warn", priority = -1 }
-#perf = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
 
 use_self = "allow"
 redundant_pub_crate = "allow"
