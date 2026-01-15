@@ -887,6 +887,15 @@ fun net.balance(of: address): coins {
     return state.storage.balance.grams
 }
 
+fun net.setConfig(config: Config) {
+    //
+}
+
+fun net.getConfig() {
+    return Config {};
+}
+
+
 /// Calculate the CRC16 checksum of a slice.
 ///
 /// Example:
