@@ -222,7 +222,8 @@ fn execute_script(
     let config_b64: Option<&str> = None;
 
     let mut emulator = Emulator::new(verbosity, config_b64)?;
-    let mut world_state = WorldState::new(AccountsState::Local(LocalAccountsState::new()), config_b64);
+    let mut world_state =
+        WorldState::new(AccountsState::Local(LocalAccountsState::new()), config_b64);
     let mut build_cache = BuildCache::new();
     let mut file_build_cache =
         FileBuildCache::dummy().expect("Failed to create file cache for script execution");

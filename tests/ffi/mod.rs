@@ -36,7 +36,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
             .assert_passed(1);
     }
 
-     #[test]
+    #[test]
     fn test_bad_config() {
         ProjectBuilder::new("simple")
             .contract("simple", SIMPLE_CONTRACT)

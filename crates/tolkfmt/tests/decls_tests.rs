@@ -1032,7 +1032,7 @@ fn test_imports_with_newlines() {
                 import "b"
 
                 import "c"
-    
+
                 fun foo() {}"#,
         expect![[r#"
                 import "a"
@@ -1063,7 +1063,7 @@ fn test_constants_with_newlines() {
     check(
         r"
                 const foo = 1
-            
+
                 const bar = 2
                 ",
         expect![[r"
