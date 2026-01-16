@@ -31,12 +31,19 @@ struct (0xcc) StoragePrices {
     masterchainCellPrice: uint64
 }
 
-fun Config.setStoragePrices(mutate self, prices: StoragePrices) {
-    self.set(STORAGE_PRICES_INDEX, prices.toCell());
+type StoragePricesDict = map<uint32, StoragePrices>
+
+fun Config.setStoragePrices(mutate self, prices: StoragePricesDict) {
+    val pricesDict = prices.toCell();
+    val pricesRef = pricesDict.beginParse().loadRef();
+
+    self.set(STORAGE_PRICES_INDEX, pricesRef);
 }
 
 fun Config.getStoragePrices(self) {
-    return StoragePrices.fromCell(self.get(STORAGE_PRICES_INDEX).loadValue());
+    val rawDict = self.get(STORAGE_PRICES_INDEX).loadValue();
+
+    return StoragePricesDict.fromCell(beginCell().storeBool(true).storeRef(rawDict).endCell());
 }
 
 struct (0xdd) GasPricesSimple {

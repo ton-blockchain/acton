@@ -243,8 +243,9 @@ impl<'a> TestRunner<'a> {
             extra_currencies: HashMap::new(),
             prev_blocks_info: None,
         };
+        let config_b64: Option<&str> = None;
 
-        let mut emulator = Emulator::new(verbosity, None)?;
+        let mut emulator = Emulator::new(verbosity, config_b64)?;
         let state = match &self.config.fork_net {
             Some(net) => AccountsState::Remote(RemoteAccountState::new(
                 net.to_string(),
@@ -254,7 +255,7 @@ impl<'a> TestRunner<'a> {
             )),
             None => AccountsState::Local(LocalAccountsState::new()),
         };
-        let mut world_state = WorldState::new(state);
+        let mut world_state = WorldState::new(state, config_b64);
 
         // Register all ref dependency to correct work
         for cell in self.ref_contracts.values() {

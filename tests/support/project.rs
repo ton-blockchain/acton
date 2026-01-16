@@ -229,6 +229,51 @@ impl ProjectBuilder {
         self
     }
 
+    /// Load a test file from disk
+    ///
+    /// # Examples
+    /// ```
+    /// .test_file_from_path("test", "tests/ffi/get_config.tolk")
+    /// ```
+    pub(crate) fn test_file_from_path(mut self, name: &str, path: &str) -> Self {
+        let code = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("Failed to read test file from {}: {}", path, e));
+        self.tests.push((name.to_string(), code));
+        self
+    }
+
+    /// Load a contract from a `.tolk` file
+    ///
+    /// # Examples
+    /// ```
+    /// .contract_from_path("simple", "contracts/simple.tolk")
+    /// ```
+    pub(crate) fn contract_from_path(mut self, name: &str, path: &str) -> Self {
+        let code = fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("Failed to read contract file from {}: {}", path, e));
+        self.contracts.push(ContractDef {
+            name: name.to_string(),
+            code: ContractSource::Tolk(code),
+            depends: Vec::new(),
+            output: None,
+            dir: None,
+        });
+        self
+    }
+
+    /// Load a custom file from disk
+    ///
+    /// # Examples
+    /// ```
+    /// .file_from_path("lib/math", "lib/math.tolk")
+    /// ```
+    pub(crate) fn file_from_path(mut self, dest_path: &str, src_path: &str) -> Self {
+        let code = fs::read_to_string(src_path)
+            .unwrap_or_else(|e| panic!("Failed to read file from {}: {}", src_path, e));
+        self.files.push((dest_path.to_string(), code));
+        self
+    }
+
     /// Add a script file
     ///
     /// # Examples

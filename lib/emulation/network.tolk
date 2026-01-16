@@ -30,6 +30,7 @@ import "../types/message"
 import "../types/out_actions"
 import "../types/transaction"
 import "../vm/vm"
+import "config"
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
@@ -887,12 +888,13 @@ fun net.balance(of: address): coins {
     return state.storage.balance.grams
 }
 
-fun net.setConfig(config: Config) {
-    //
+fun net.setConfig(config: Config): bool {
+    return ffi.setConfig(config.toLowLevelDict());
 }
 
-fun net.getConfig() {
-    return Config {};
+
+fun net.getConfig(): Config {
+    return createMapFromLowLevelDict(ffi.getConfig());
 }
 
 
@@ -960,3 +962,5 @@ fun ffi.enableBroadcast(): void asm "26 EXTCALL"
 fun ffi.disableBroadcast(): void asm "27 EXTCALL"
 fun ffi.setNow(now: int): void asm "28 EXTCALL"
 fun ffi.getNow(): int asm "29 EXTCALL"
+fun ffi.getConfig(): dict asm "31 EXTCALL"
+fun ffi.setConfig(config: dict): bool asm "32 EXTCALL"

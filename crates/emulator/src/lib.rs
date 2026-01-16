@@ -54,6 +54,7 @@ pub mod emulator;
 pub mod extensions;
 pub mod remote;
 pub mod world_state;
+mod tests;
 
 pub use crate::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 pub use crate::world_state::{AccountsState, LocalAccountsState, RemoteAccountState, WorldState};

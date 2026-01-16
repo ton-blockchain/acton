@@ -4,3 +4,5 @@ mod common;
 mod debugging;
 #[cfg(test)]
 mod support;
+#[cfg(test)]
+mod ffi;

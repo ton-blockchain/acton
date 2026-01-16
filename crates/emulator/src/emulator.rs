@@ -286,6 +286,38 @@ impl Emulator {
         Some(code)
     }
 
+    /// Sets the global blockchain configuration.
+    ///
+    /// Updates both the executor and the world state.
+    ///
+    /// Returns `Ok(true)` if the configuration was successfully updated,
+    /// `Ok(false)` if the executor rejected the new configuration,
+    /// or an error if the operation failed.
+    pub fn set_config(&self, state: &mut WorldState, config: Cell) -> anyhow::Result<bool> {
+        let config_boc = Boc::encode_base64(&config);
+
+        match self.executor.set_config(&config_boc) {
+            Ok(res) => match res {
+                true => {
+                    let mut config_slice = config
+                        .as_slice()
+                        .ok()
+                        .context("Failed to parse config cell to slice")?;
+                    let config_dict = Dict::<u32, Cell>::load_from_root_ext(
+                        &mut config_slice,
+                        Cell::empty_context(),
+                    )
+                    .context("Failed to load config dict from cell")?;
+
+                    state.set_config(config_dict);
+                    Ok(true)
+                }
+                false => Ok(false),
+            },
+            Err(e) => Err(e),
+        }
+    }
+
     /// Resolves the code cell for a message and its destination account.
     ///
     /// It first tries to get the code from the account itself. If the account is

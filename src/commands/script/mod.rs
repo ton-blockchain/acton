@@ -189,7 +189,9 @@ fn execute_script(
         prev_blocks_info: None,
     };
 
-    let mut emulator = Emulator::new(verbosity, None)?;
+    let config_b64: Option<&str> = None;
+
+    let mut emulator = Emulator::new(verbosity, config_b64)?;
     let resolver = match &fork_net {
         Some(net) => AccountsState::Remote(RemoteAccountState::new(
             net.clone(),
@@ -199,7 +201,7 @@ fn execute_script(
         )),
         None => AccountsState::Local(LocalAccountsState::new()),
     };
-    let mut world_state = WorldState::new(resolver);
+    let mut world_state = WorldState::new(resolver, config_b64);
     let mut build_cache = BuildCache::new();
     let mut file_build_cache = FileBuildCache::new(None)?;
     let mut known_addresses = KnownAddresses::new();

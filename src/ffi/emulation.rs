@@ -1324,6 +1324,39 @@ const fn enable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) -> anyhow:
     Ok(())
 }
 
+extension!(get_config in (Context) using get_config_impl);
+fn get_config_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
+    let config = ctx.chain.world_state.get_config();
+    let config_cell = config.root().as_ref().expect("Config has no root");
+    let arc = ArcCell::from_boc_b64(&Boc::encode_base64(config_cell))
+        .map_err(|e| anyhow::anyhow!("Failed to decode config base64 from world state: {e}"))?;
+
+    stack.push(TupleItem::Cell(arc));
+    Ok(())
+}
+
+extension!(set_config in (Context) with (config: ArcCell) using set_config_impl);
+fn set_config_impl(ctx: &mut Context, stack: &mut Tuple, config: ArcCell) -> anyhow::Result<()> {
+    let config_boc = config.to_boc(false)?;
+    let config_cell = Boc::decode(config_boc)?;
+
+    let result = ctx
+        .chain
+        .emulator
+        .set_config(&mut ctx.chain.world_state, config_cell);
+
+    match result {
+        Ok(res) => {
+            stack.push_bool(res);
+        }
+        Err(_) => {
+            stack.push_bool(false);
+        }
+    }
+
+    Ok(())
+}
+
 extension!(disable_broadcast in (Context) using disable_broadcast_impl);
 const fn disable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) -> anyhow::Result<()> {
     ctx.is_broadcasting = false;
@@ -1369,5 +1402,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         28 => set_now,
         29 => get_now,
         30 => send_single_message,
+        31 => get_config,
+        32 => set_config,
     });
 }
