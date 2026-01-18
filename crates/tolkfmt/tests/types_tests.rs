@@ -1,6 +1,6 @@
 mod common;
 
-use crate::common::{check_with_width_without_trees, check, check_with_width};
+use crate::common::{check, check_with_width, check_with_width_without_trees};
 use expect_test::expect;
 
 #[test]

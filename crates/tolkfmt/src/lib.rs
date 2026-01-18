@@ -8,7 +8,6 @@ pub mod types;
 use anyhow::anyhow;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tolk_ast::SourceFile;
 use tree_sitter::Node;
 
 pub use comments::{Comment, CommentKind, collect_comments};
@@ -20,16 +19,11 @@ pub struct Context<'tree> {
 }
 
 pub fn format_source(source: &str, width: usize) -> anyhow::Result<String> {
-    let tree = tolk_parser::parser::parse(source)?;
-    let source_file = SourceFile {
-        tree,
-        source: source.into(),
-    };
-
-    let root_node = source_file.tree.root_node();
-    if root_node.has_error() {
+    let source_file = tolk_syntax::parse(source)?;
+    if source_file.has_errors() {
         anyhow::bail!("Cannot format code with syntax error");
     }
+    let root_node = source_file.tree.root_node();
     let comments_map = collect_comments(root_node);
 
     let ctx = Context {

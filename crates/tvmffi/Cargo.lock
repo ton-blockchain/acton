@@ -9,7 +9,7 @@ dependencies = [
  "anyhow",
  "crc",
  "num-bigint",
- "tolk_parser",
+ "tolk_syntax",
  "tree-sitter",
 ]
 
@@ -665,7 +665,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tolk_parser"
+name = "tolk_syntax"
 version = "0.1.0"
 dependencies = [
  "anyhow",

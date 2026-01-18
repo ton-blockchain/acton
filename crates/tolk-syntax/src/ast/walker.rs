@@ -1,29 +1,25 @@
-use crate::expressions::{
-    Assignment, BinaryOperator, BooleanLiteral, CallArgument, CastAsOperator, DotAccess,
-    Expression, FunctionCall, GenericInstantiation, Ident, InstanceArgument, IsTypeOperator,
-    LambdaExpression, LambdaParameter, LazyExpression, MatchArm, MatchArmBody, MatchBody,
-    MatchExpr, MatchExpression, MatchPattern, NotNullOperator, NullLiteral, NumberLiteral,
-    NumericIndex, ObjectLiteral, ParenthesizedExpression, SetAssignment, StringLiteral,
-    TensorExpression, TernaryOperator, TypedTuple, UnaryOperator, Underscore,
+use crate::ast::expressions::{
+    AsCast, Assign, Bin, BoolLit, Call, CallArgument, DotAccess, DotAccessField, Expr, Ident,
+    InstanceArg, Instantiation, IsType, Lambda, LambdaParameter, Lazy, Match, MatchArm,
+    MatchArmBody, MatchBody, MatchPattern, NotNull, NullLit, NumberLit, NumericIndex, ObjectLit,
+    Paren, SetAssign, StringLit, Tensor, TensorVars, Ternary, Tuple, TupleVars, Unary, Underscore,
+    VarDecl, VarDeclLhs, VarDeclPattern,
 };
-use crate::node::SourceFile;
-use crate::statements::{
-    AssertStatement, BlockStatement, BreakStatement, CatchClause, ContinueStatement,
-    DoWhileStatement, ExpressionStatement, IfStatement, IfStatementAlternative,
-    LocalVarsDeclaration, MatchStatement, RepeatStatement, ReturnStatement, Statement,
-    TensorVarsDeclaration, ThrowStatement, TryCatchStatement, TupleVarsDeclaration, VarDeclaration,
-    VarDeclarationLhs, WhileStatement,
+use crate::ast::node::SourceFile;
+use crate::ast::statements::{
+    Assert, Block, Break, CatchClause, Continue, DoWhile, ExprStmt, If, IfAlt, MatchStmt, Repeat,
+    Return, Stmt, Throw, TryCatch, While,
 };
-use crate::top_level::{
-    Annotation, AnnotationArguments, AnnotationList, AsmBody, ConstantDeclaration, EmptyStatement,
-    EnumBody, EnumDeclaration, EnumMemberDeclaration, Function, FunctionBody, GetMethodDeclaration,
-    GlobalVarDeclaration, Import, MethodDeclaration, MethodReceiver, Parameter, StructBody,
-    StructDeclaration, StructFieldDeclaration, TolkRequiredVersion, TopLevel, TypeAliasDeclaration,
+use crate::ast::top_level::{
+    Annotation, AnnotationArgs, AnnotationList, AsmBody, Constant, EmptyStmt, Enum, EnumBody,
+    EnumMember, Func, FuncBody, GetMethod, GlobalVar, Import, Method, MethodReceiver, Parameter,
+    Struct, StructBody, StructField, TolkRequiredVersion, TopLevel, TypeAlias,
     TypeAliasUnderlyingType, TypeParameter, TypeParameters,
 };
-use crate::types::{
+use crate::ast::traits::{FunctionLike, HasAnnotations, HasGenericParams, HasName};
+use crate::ast::types::{
     FunCallableType, InstantiationTList, NullableType, ParenthesizedType, TensorType, TupleType,
-    Type, TypeIdentifier, TypeInstantiatedTs, UnionType,
+    Type, TypeIdent, TypeInstantiatedTs, UnionType,
 };
 use tree_sitter::Node;
 
@@ -38,21 +34,21 @@ pub trait Walker<'tree> {
         self.walk_top_level(top_level)
     }
 
-    fn visit_statement(&mut self, statement: &Statement<'tree>) -> Self::Result {
-        self.walk_statement(statement)
+    fn visit_stmt(&mut self, stmt: &Stmt<'tree>) -> Self::Result {
+        self.walk_stmt(stmt)
     }
 
-    fn visit_expression(&mut self, expression: &Expression<'tree>) -> Self::Result {
-        self.walk_expression(expression)
+    fn visit_expr(&mut self, expr: &Expr<'tree>) -> Self::Result {
+        self.walk_expr(expr)
     }
 
     fn visit_type(&mut self, typ: &Type<'tree>) -> Self::Result {
         self.walk_type(typ)
     }
 
-    fn walk_source_file(&mut self, source_file: &'tree SourceFile) -> Self::Result {
-        for top_level in &source_file.top_levels() {
-            self.visit_top_level(top_level);
+    fn walk_source_file(&mut self, file: &'tree SourceFile) -> Self::Result {
+        for top_level in file.top_levels() {
+            self.visit_top_level(&top_level);
         }
         self.default_result()
     }
@@ -61,73 +57,73 @@ pub trait Walker<'tree> {
         match top_level {
             TopLevel::TolkRequiredVersion(node) => self.walk_tolk_required_version(node),
             TopLevel::Import(node) => self.walk_import(node),
-            TopLevel::GlobalVarDeclaration(node) => self.walk_global_var_declaration(node),
-            TopLevel::ConstantDeclaration(node) => self.walk_constant_declaration(node),
-            TopLevel::TypeAliasDeclaration(node) => self.walk_type_alias_declaration(node),
-            TopLevel::StructDeclaration(node) => self.walk_struct_declaration(node),
-            TopLevel::EnumDeclaration(node) => self.walk_enum_declaration(node),
-            TopLevel::Function(node) => self.walk_function(node),
-            TopLevel::MethodDeclaration(node) => self.walk_method_declaration(node),
-            TopLevel::GetMethodDeclaration(node) => self.walk_get_method_declaration(node),
-            TopLevel::EmptyStatement(node) => self.walk_empty_statement(node),
+            TopLevel::GlobalVar(node) => self.walk_global_var(node),
+            TopLevel::Constant(node) => self.walk_constant(node),
+            TopLevel::TypeAlias(node) => self.walk_type_alias(node),
+            TopLevel::Struct(node) => self.walk_struct(node),
+            TopLevel::Enum(node) => self.walk_enum(node),
+            TopLevel::Func(node) => self.walk_func(node),
+            TopLevel::Method(node) => self.walk_method(node),
+            TopLevel::GetMethod(node) => self.walk_get_method(node),
+            TopLevel::EmptyStmt(node) => self.walk_empty_stmt(node),
             TopLevel::Unmapped(_) => self.default_result(),
         }
     }
 
-    fn walk_statement(&mut self, statement: &Statement<'tree>) -> Self::Result {
-        match statement {
-            Statement::BlockStatement(node) => self.walk_block_statement(node),
-            Statement::IfStatement(node) => self.walk_if_statement(node),
-            Statement::WhileStatement(node) => self.walk_while_statement(node),
-            Statement::RepeatStatement(node) => self.walk_repeat_statement(node),
-            Statement::TryCatchStatement(node) => self.walk_try_catch_statement(node),
-            Statement::ReturnStatement(node) => self.walk_return_statement(node),
-            Statement::LocalVarsDeclaration(node) => self.walk_local_vars_declaration(node),
-            Statement::DoWhileStatement(node) => self.walk_do_while_statement(node),
-            Statement::BreakStatement(node) => self.walk_break_statement(node),
-            Statement::ContinueStatement(node) => self.walk_continue_statement(node),
-            Statement::ThrowStatement(node) => self.walk_throw_statement(node),
-            Statement::AssertStatement(node) => self.walk_assert_statement(node),
-            Statement::MatchStatement(node) => self.walk_match_statement(node),
-            Statement::EmptyStatement(node) => self.walk_empty_statement(node),
-            Statement::ExpressionStatement(node) => self.walk_expression_statement(node),
-            Statement::Unmapped(_) => self.default_result(),
+    fn walk_stmt(&mut self, stmt: &Stmt<'tree>) -> Self::Result {
+        match stmt {
+            Stmt::Block(node) => self.walk_block(node),
+            Stmt::If(node) => self.walk_if(node),
+            Stmt::While(node) => self.walk_while(node),
+            Stmt::Repeat(node) => self.walk_repeat(node),
+            Stmt::TryCatch(node) => self.walk_try_catch(node),
+            Stmt::Return(node) => self.walk_return(node),
+            Stmt::DoWhile(node) => self.walk_do_while(node),
+            Stmt::Break(node) => self.walk_break(node),
+            Stmt::Continue(node) => self.walk_continue(node),
+            Stmt::Throw(node) => self.walk_throw(node),
+            Stmt::Assert(node) => self.walk_assert(node),
+            Stmt::Match(node) => self.walk_match_stmt(node),
+            Stmt::EmptyStmt(node) => self.walk_empty_stmt(node),
+            Stmt::ExprStmt(node) => self.walk_expr_stmt(node),
+            Stmt::Unmapped(_) => self.default_result(),
         }
     }
 
-    fn walk_expression(&mut self, expression: &Expression<'tree>) -> Self::Result {
-        match expression {
-            Expression::Assignment(node) => self.walk_assignment(node),
-            Expression::SetAssignment(node) => self.walk_set_assignment(node),
-            Expression::TernaryOperator(node) => self.walk_ternary_operator(node),
-            Expression::BinaryOperator(node) => self.walk_binary_operator(node),
-            Expression::UnaryOperator(node) => self.walk_unary_operator(node),
-            Expression::LazyExpression(node) => self.walk_lazy_expression(node),
-            Expression::CastAsOperator(node) => self.walk_cast_as_operator(node),
-            Expression::IsTypeOperator(node) => self.walk_is_type_operator(node),
-            Expression::NotNullOperator(node) => self.walk_not_null_operator(node),
-            Expression::DotAccess(node) => self.walk_dot_access(node),
-            Expression::FunctionCall(node) => self.walk_function_call(node),
-            Expression::GenericInstantiation(node) => self.walk_generic_instantiation(node),
-            Expression::ParenthesizedExpression(node) => self.walk_parenthesized_expression(node),
-            Expression::MatchExpression(node) => self.walk_match_expression(node),
-            Expression::ObjectLiteral(node) => self.walk_object_literal(node),
-            Expression::TensorExpression(node) => self.walk_tensor_expression(node),
-            Expression::TypedTuple(node) => self.walk_typed_tuple(node),
-            Expression::LambdaExpression(node) => self.walk_lambda_expression(node),
-            Expression::NumberLiteral(node) => self.walk_number_literal(node),
-            Expression::StringLiteral(node) => self.walk_string_literal(node),
-            Expression::BooleanLiteral(node) => self.walk_boolean_literal(node),
-            Expression::NullLiteral(node) => self.walk_null_literal(node),
-            Expression::Underscore(node) => self.walk_underscore(node),
-            Expression::Ident(node) => self.walk_ident(node),
-            Expression::Unmapped(_) => self.default_result(),
+    fn walk_expr(&mut self, expr: &Expr<'tree>) -> Self::Result {
+        match expr {
+            Expr::VarDeclLhs(node) => self.walk_var_decl_lhs(node),
+            Expr::Assign(node) => self.walk_assign(node),
+            Expr::SetAssign(node) => self.walk_set_assign(node),
+            Expr::Ternary(node) => self.walk_ternary(node),
+            Expr::Bin(node) => self.walk_binary(node),
+            Expr::Unary(node) => self.walk_unary(node),
+            Expr::Lazy(node) => self.walk_lazy(node),
+            Expr::AsCast(node) => self.walk_as_cast(node),
+            Expr::IsType(node) => self.walk_is_type(node),
+            Expr::NotNull(node) => self.walk_not_null(node),
+            Expr::DotAccess(node) => self.walk_dot_access(node),
+            Expr::Call(node) => self.walk_call(node),
+            Expr::Instantiation(node) => self.walk_instantiation(node),
+            Expr::Paren(node) => self.walk_paren(node),
+            Expr::Match(node) => self.walk_match(node),
+            Expr::ObjectLit(node) => self.walk_object_lit(node),
+            Expr::Tensor(node) => self.walk_tensor(node),
+            Expr::Tuple(node) => self.walk_tuple(node),
+            Expr::Lambda(node) => self.walk_lambda(node),
+            Expr::NumberLit(node) => self.walk_number_lit(node),
+            Expr::StringLit(node) => self.walk_string_lit(node),
+            Expr::BoolLit(node) => self.walk_boolean_lit(node),
+            Expr::NullLit(node) => self.walk_null_lit(node),
+            Expr::Ident(node) => self.walk_ident(node),
+            Expr::Underscore(node) => self.walk_underscore(node),
+            Expr::Unmapped(_) => self.default_result(),
         }
     }
 
     fn walk_type(&mut self, typ: &Type<'tree>) -> Self::Result {
         match typ {
-            Type::TypeIdentifier(node) => self.walk_type_identifier(node),
+            Type::TypeIdent(node) => self.walk_type_ident(node),
             Type::TypeInstantiatedTs(node) => self.walk_type_instantiated_ts(node),
             Type::TensorType(node) => self.walk_tensor_type(node),
             Type::TupleType(node) => self.walk_tuple_type(node),
@@ -135,20 +131,26 @@ pub trait Walker<'tree> {
             Type::FunCallableType(node) => self.walk_fun_callable_type(node),
             Type::NullableType(node) => self.walk_nullable_type(node),
             Type::UnionType(node) => self.walk_union_type(node),
-            Type::NullLiteral(node) => self.walk_null_literal_type(node),
+            Type::NullLit(node) => self.walk_null_lit_type(node),
             Type::Unmapped(_) => self.default_result(),
         }
     }
 
-    fn walk_tolk_required_version(&mut self, _node: &TolkRequiredVersion<'tree>) -> Self::Result {
+    fn walk_tolk_required_version(&mut self, node: &TolkRequiredVersion<'tree>) -> Self::Result {
+        if let Some(value) = node.value() {
+            self.walk_string_lit(&value);
+        }
         self.default_result()
     }
 
-    fn walk_import(&mut self, _node: &Import<'tree>) -> Self::Result {
+    fn walk_import(&mut self, node: &Import<'tree>) -> Self::Result {
+        if let Some(path) = node.path() {
+            self.walk_string_lit(&path);
+        }
         self.default_result()
     }
 
-    fn walk_global_var_declaration(&mut self, node: &GlobalVarDeclaration<'tree>) -> Self::Result {
+    fn walk_global_var(&mut self, node: &GlobalVar<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -161,7 +163,7 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_constant_declaration(&mut self, node: &ConstantDeclaration<'tree>) -> Self::Result {
+    fn walk_constant(&mut self, node: &Constant<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -172,12 +174,12 @@ pub trait Walker<'tree> {
             self.visit_type(&typ);
         }
         if let Some(value) = node.value() {
-            self.visit_expression(&value);
+            self.visit_expr(&value);
         }
         self.default_result()
     }
 
-    fn walk_type_alias_declaration(&mut self, node: &TypeAliasDeclaration<'tree>) -> Self::Result {
+    fn walk_type_alias(&mut self, node: &TypeAlias<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -193,9 +195,12 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_struct_declaration(&mut self, node: &StructDeclaration<'tree>) -> Self::Result {
+    fn walk_struct(&mut self, node: &Struct<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
+        }
+        if let Some(pack_prefix) = node.pack_prefix() {
+            self.walk_number_lit(&pack_prefix);
         }
         if let Some(name) = node.name() {
             self.walk_ident(&name);
@@ -209,7 +214,7 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_enum_declaration(&mut self, node: &EnumDeclaration<'tree>) -> Self::Result {
+    fn walk_enum(&mut self, node: &Enum<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -225,7 +230,7 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_function(&mut self, node: &Function<'tree>) -> Self::Result {
+    fn walk_func(&mut self, node: &Func<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -247,7 +252,7 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_method_declaration(&mut self, node: &MethodDeclaration<'tree>) -> Self::Result {
+    fn walk_method(&mut self, node: &Method<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -260,7 +265,7 @@ pub trait Walker<'tree> {
         if let Some(name) = node.name() {
             self.walk_ident(&name);
         }
-        for param in node.parameters("", false) {
+        for param in node.parameters() {
             self.walk_parameter(&param);
         }
         if let Some(return_type) = node.return_type() {
@@ -272,7 +277,7 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_get_method_declaration(&mut self, node: &GetMethodDeclaration<'tree>) -> Self::Result {
+    fn walk_get_method(&mut self, node: &GetMethod<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -291,60 +296,60 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_empty_statement(&mut self, _node: &EmptyStatement<'tree>) -> Self::Result {
+    fn walk_empty_stmt(&mut self, _node: &EmptyStmt<'tree>) -> Self::Result {
         self.default_result()
     }
 
-    fn walk_block_statement(&mut self, node: &BlockStatement<'tree>) -> Self::Result {
-        for stmt in node.statements() {
-            self.visit_statement(&stmt);
+    fn walk_block(&mut self, node: &Block<'tree>) -> Self::Result {
+        for stmt in node.stmts() {
+            self.visit_stmt(&stmt);
         }
         self.default_result()
     }
 
-    fn walk_if_statement(&mut self, node: &IfStatement<'tree>) -> Self::Result {
+    fn walk_if(&mut self, node: &If<'tree>) -> Self::Result {
         if let Some(condition) = node.condition() {
-            self.visit_expression(&condition);
+            self.visit_expr(&condition);
         }
         if let Some(body) = node.body() {
-            self.walk_block_statement(&body);
+            self.walk_block(&body);
         }
         if let Some(alternative) = node.alternative() {
             match alternative {
-                IfStatementAlternative::IfStatement(if_stmt) => {
-                    self.walk_if_statement(&if_stmt);
+                IfAlt::If(if_stmt) => {
+                    self.walk_if(&if_stmt);
                 }
-                IfStatementAlternative::BlockStatement(block) => {
-                    self.walk_block_statement(&block);
+                IfAlt::Block(block) => {
+                    self.walk_block(&block);
                 }
             }
         }
         self.default_result()
     }
 
-    fn walk_while_statement(&mut self, node: &WhileStatement<'tree>) -> Self::Result {
+    fn walk_while(&mut self, node: &While<'tree>) -> Self::Result {
         if let Some(condition) = node.condition() {
-            self.visit_expression(&condition);
+            self.visit_expr(&condition);
         }
         if let Some(body) = node.body() {
-            self.walk_block_statement(&body);
+            self.walk_block(&body);
         }
         self.default_result()
     }
 
-    fn walk_repeat_statement(&mut self, node: &RepeatStatement<'tree>) -> Self::Result {
+    fn walk_repeat(&mut self, node: &Repeat<'tree>) -> Self::Result {
         if let Some(count) = node.count() {
-            self.visit_expression(&count);
+            self.visit_expr(&count);
         }
         if let Some(body) = node.body() {
-            self.walk_block_statement(&body);
+            self.walk_block(&body);
         }
         self.default_result()
     }
 
-    fn walk_try_catch_statement(&mut self, node: &TryCatchStatement<'tree>) -> Self::Result {
+    fn walk_try_catch(&mut self, node: &TryCatch<'tree>) -> Self::Result {
         if let Some(try_body) = node.body() {
-            self.walk_block_statement(&try_body);
+            self.walk_block(&try_body);
         }
         if let Some(catch) = node.catch() {
             self.walk_catch_clause(&catch);
@@ -352,129 +357,122 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_return_statement(&mut self, node: &ReturnStatement<'tree>) -> Self::Result {
+    fn walk_return(&mut self, node: &Return<'tree>) -> Self::Result {
         if let Some(body) = node.expr() {
-            self.visit_expression(&body);
+            self.visit_expr(&body);
         }
         self.default_result()
     }
 
-    fn walk_local_vars_declaration(&mut self, node: &LocalVarsDeclaration<'tree>) -> Self::Result {
-        if let Some(lhs) = node.lhs() {
-            self.walk_var_declaration_lhs(&lhs);
-        }
-        if let Some(assigned_val) = node.assigned_val() {
-            self.visit_expression(&assigned_val);
-        }
-        self.default_result()
-    }
-
-    fn walk_do_while_statement(&mut self, node: &DoWhileStatement<'tree>) -> Self::Result {
+    fn walk_do_while(&mut self, node: &DoWhile<'tree>) -> Self::Result {
         if let Some(body) = node.body() {
-            self.walk_block_statement(&body);
+            self.walk_block(&body);
         }
         if let Some(condition) = node.condition() {
-            self.visit_expression(&condition);
+            self.visit_expr(&condition);
         }
         self.default_result()
     }
 
-    fn walk_break_statement(&mut self, _node: &BreakStatement<'tree>) -> Self::Result {
+    fn walk_break(&mut self, _node: &Break<'tree>) -> Self::Result {
         self.default_result()
     }
 
-    fn walk_continue_statement(&mut self, _node: &ContinueStatement<'tree>) -> Self::Result {
+    fn walk_continue(&mut self, _node: &Continue<'tree>) -> Self::Result {
         self.default_result()
     }
 
-    fn walk_throw_statement(&mut self, node: &ThrowStatement<'tree>) -> Self::Result {
-        if let Some(expression) = node.expression() {
-            self.visit_expression(&expression);
+    fn walk_throw(&mut self, node: &Throw<'tree>) -> Self::Result {
+        if let Some(expr) = node.expr() {
+            self.visit_expr(&expr);
         }
         self.default_result()
     }
 
-    fn walk_assert_statement(&mut self, node: &AssertStatement<'tree>) -> Self::Result {
+    fn walk_assert(&mut self, node: &Assert<'tree>) -> Self::Result {
         if let Some(condition) = node.condition() {
-            self.visit_expression(&condition);
+            self.visit_expr(&condition);
         }
-        if let Some(expression) = node.expression() {
-            self.visit_expression(&expression);
-        }
-        self.default_result()
-    }
-
-    fn walk_match_statement(&mut self, node: &MatchStatement<'tree>) -> Self::Result {
-        self.walk_match_expression(&MatchExpression(node.0))
-    }
-
-    fn walk_expression_statement(&mut self, node: &ExpressionStatement<'tree>) -> Self::Result {
-        if let Some(expr) = node.expression() {
-            self.visit_expression(&expr);
+        if let Some(expr) = node.expr() {
+            self.visit_expr(&expr);
         }
         self.default_result()
     }
 
-    fn walk_assignment(&mut self, node: &Assignment<'tree>) -> Self::Result {
+    fn walk_match_stmt(&mut self, node: &MatchStmt<'tree>) -> Self::Result {
+        if let Some(expr) = node.expr() {
+            self.walk_match(&expr);
+        }
+        self.default_result()
+    }
+
+    fn walk_expr_stmt(&mut self, node: &ExprStmt<'tree>) -> Self::Result {
+        if let Some(expr) = node.expr() {
+            self.visit_expr(&expr);
+        }
+        self.default_result()
+    }
+
+    fn walk_assign(&mut self, node: &Assign<'tree>) -> Self::Result {
         if let Some(left) = node.left() {
-            self.visit_expression(&left);
+            self.visit_expr(&left);
         }
         if let Some(right) = node.right() {
-            self.visit_expression(&right);
+            self.visit_expr(&right);
         }
         self.default_result()
     }
 
-    fn walk_set_assignment(&mut self, node: &SetAssignment<'tree>) -> Self::Result {
+    fn walk_set_assign(&mut self, node: &SetAssign<'tree>) -> Self::Result {
         if let Some(left) = node.left() {
-            self.visit_expression(&left);
+            self.visit_expr(&left);
         }
         if let Some(right) = node.right() {
-            self.visit_expression(&right);
+            self.visit_expr(&right);
         }
         self.default_result()
     }
 
-    fn walk_ternary_operator(&mut self, node: &TernaryOperator<'tree>) -> Self::Result {
+    fn walk_ternary(&mut self, node: &Ternary<'tree>) -> Self::Result {
         if let Some(condition) = node.condition() {
-            self.visit_expression(&condition);
+            self.visit_expr(&condition);
         }
         if let Some(consequence) = node.consequence() {
-            self.visit_expression(&consequence);
+            self.visit_expr(&consequence);
         }
         if let Some(alternative) = node.alternative() {
-            self.visit_expression(&alternative);
+            self.visit_expr(&alternative);
         }
         self.default_result()
     }
 
-    fn walk_binary_operator(&mut self, node: &BinaryOperator<'tree>) -> Self::Result {
+    fn walk_binary(&mut self, node: &Bin<'tree>) -> Self::Result {
         if let Some(left) = node.left() {
-            self.visit_expression(&left);
+            self.visit_expr(&left);
         }
         if let Some(right) = node.right() {
-            self.visit_expression(&right);
+            self.visit_expr(&right);
         }
         self.default_result()
     }
 
-    fn walk_unary_operator(&mut self, node: &UnaryOperator<'tree>) -> Self::Result {
+    fn walk_unary(&mut self, node: &Unary<'tree>) -> Self::Result {
         if let Some(argument) = node.argument() {
-            self.visit_expression(&argument);
+            self.visit_expr(&argument);
         }
         self.default_result()
     }
 
-    fn walk_lazy_expression(&mut self, node: &LazyExpression<'tree>) -> Self::Result {
+    fn walk_lazy(&mut self, node: &Lazy<'tree>) -> Self::Result {
         if let Some(argument) = node.expr() {
-            self.visit_expression(&argument);
+            self.visit_expr(&argument);
         }
         self.default_result()
     }
 
-    fn walk_cast_as_operator(&mut self, node: &CastAsOperator<'tree>) -> Self::Result {
+    fn walk_as_cast(&mut self, node: &AsCast<'tree>) -> Self::Result {
         if let Some(expr) = node.expr() {
-            self.visit_expression(&expr);
+            self.visit_expr(&expr);
         }
         if let Some(casted_to) = node.casted_to() {
             self.visit_type(&casted_to);
@@ -482,9 +480,9 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_is_type_operator(&mut self, node: &IsTypeOperator<'tree>) -> Self::Result {
+    fn walk_is_type(&mut self, node: &IsType<'tree>) -> Self::Result {
         if let Some(expr) = node.expr() {
-            self.visit_expression(&expr);
+            self.visit_expr(&expr);
         }
         if let Some(rhs_type) = node.rhs_type() {
             self.visit_type(&rhs_type);
@@ -492,23 +490,33 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_not_null_operator(&mut self, node: &NotNullOperator<'tree>) -> Self::Result {
+    fn walk_not_null(&mut self, node: &NotNull<'tree>) -> Self::Result {
         if let Some(inner) = node.inner() {
-            self.visit_expression(&inner);
+            self.visit_expr(&inner);
         }
         self.default_result()
     }
 
     fn walk_dot_access(&mut self, node: &DotAccess<'tree>) -> Self::Result {
         if let Some(obj) = node.obj() {
-            self.visit_expression(&obj);
+            self.visit_expr(&obj);
+        }
+        if let Some(field) = node.field() {
+            match field {
+                DotAccessField::Ident(ident) => {
+                    self.walk_ident(&ident);
+                }
+                DotAccessField::NumericIndex(index) => {
+                    self.walk_numeric_index(&index);
+                }
+            }
         }
         self.default_result()
     }
 
-    fn walk_function_call(&mut self, node: &FunctionCall<'tree>) -> Self::Result {
+    fn walk_call(&mut self, node: &Call<'tree>) -> Self::Result {
         if let Some(callee) = node.callee() {
-            self.visit_expression(&callee);
+            self.visit_expr(&callee);
         }
         for arg in node.arguments() {
             self.walk_call_argument(&arg);
@@ -516,9 +524,9 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_generic_instantiation(&mut self, node: &GenericInstantiation<'tree>) -> Self::Result {
+    fn walk_instantiation(&mut self, node: &Instantiation<'tree>) -> Self::Result {
         if let Some(expr) = node.expr() {
-            self.visit_expression(&expr);
+            self.visit_expr(&expr);
         }
         if let Some(instantiation_ts) = node.instantiation_ts() {
             self.walk_instantiation_t_list(&instantiation_ts);
@@ -526,22 +534,16 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_parenthesized_expression(
-        &mut self,
-        node: &ParenthesizedExpression<'tree>,
-    ) -> Self::Result {
+    fn walk_paren(&mut self, node: &Paren<'tree>) -> Self::Result {
         if let Some(inner) = node.inner() {
-            self.visit_expression(&inner);
+            self.visit_expr(&inner);
         }
         self.default_result()
     }
 
-    fn walk_match_expression(&mut self, node: &MatchExpression<'tree>) -> Self::Result {
+    fn walk_match(&mut self, node: &Match<'tree>) -> Self::Result {
         if let Some(expr) = node.expr() {
-            match expr {
-                MatchExpr::Expression(ref e) => self.visit_expression(e),
-                MatchExpr::LocalVarsDeclaration(ref lvd) => self.walk_local_vars_declaration(lvd),
-            };
+            self.visit_expr(&expr);
         }
         if let Some(body) = node.body() {
             self.walk_match_body(&body);
@@ -549,31 +551,31 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_object_literal(&mut self, node: &ObjectLiteral<'tree>) -> Self::Result {
+    fn walk_object_lit(&mut self, node: &ObjectLit<'tree>) -> Self::Result {
         if let Some(object_type) = node.typ() {
             self.visit_type(&object_type);
         }
         for arg in node.arguments() {
-            self.walk_instance_argument(&arg);
+            self.walk_instance_arg(&arg);
         }
         self.default_result()
     }
 
-    fn walk_tensor_expression(&mut self, node: &TensorExpression<'tree>) -> Self::Result {
+    fn walk_tensor(&mut self, node: &Tensor<'tree>) -> Self::Result {
         for element in node.elements() {
-            self.walk_expression(&element);
+            self.walk_expr(&element);
         }
         self.default_result()
     }
 
-    fn walk_typed_tuple(&mut self, node: &TypedTuple<'tree>) -> Self::Result {
+    fn walk_tuple(&mut self, node: &Tuple<'tree>) -> Self::Result {
         for element in node.elements() {
-            self.walk_expression(&element);
+            self.walk_expr(&element);
         }
         self.default_result()
     }
 
-    fn walk_lambda_expression(&mut self, node: &LambdaExpression<'tree>) -> Self::Result {
+    fn walk_lambda(&mut self, node: &Lambda<'tree>) -> Self::Result {
         for param in node.parameters() {
             self.walk_lambda_parameter(&param);
         }
@@ -581,7 +583,7 @@ pub trait Walker<'tree> {
             self.visit_type(&return_type);
         }
         if let Some(body) = node.body() {
-            self.walk_block_statement(&body);
+            self.walk_block(&body);
         }
         self.default_result()
     }
@@ -596,19 +598,19 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_number_literal(&mut self, _node: &NumberLiteral<'tree>) -> Self::Result {
+    fn walk_number_lit(&mut self, _node: &NumberLit<'tree>) -> Self::Result {
         self.default_result()
     }
 
-    fn walk_string_literal(&mut self, _node: &StringLiteral<'tree>) -> Self::Result {
+    fn walk_string_lit(&mut self, _node: &StringLit<'tree>) -> Self::Result {
         self.default_result()
     }
 
-    fn walk_boolean_literal(&mut self, _node: &BooleanLiteral<'tree>) -> Self::Result {
+    fn walk_boolean_lit(&mut self, _node: &BoolLit<'tree>) -> Self::Result {
         self.default_result()
     }
 
-    fn walk_null_literal(&mut self, _node: &NullLiteral<'tree>) -> Self::Result {
+    fn walk_null_lit(&mut self, _node: &NullLit<'tree>) -> Self::Result {
         self.default_result()
     }
 
@@ -624,11 +626,14 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_type_identifier(&mut self, _node: &TypeIdentifier<'tree>) -> Self::Result {
+    fn walk_type_ident(&mut self, _node: &TypeIdent<'tree>) -> Self::Result {
         self.default_result()
     }
 
     fn walk_type_instantiated_ts(&mut self, node: &TypeInstantiatedTs<'tree>) -> Self::Result {
+        if let Some(name) = node.name() {
+            self.walk_type_ident(&name);
+        }
         if let Some(arguments) = node.arguments() {
             self.walk_instantiation_t_list(&arguments);
         }
@@ -636,15 +641,15 @@ pub trait Walker<'tree> {
     }
 
     fn walk_tensor_type(&mut self, node: &TensorType<'tree>) -> Self::Result {
-        for element_type in node.element_types() {
-            self.visit_type(&element_type);
+        for element in node.elements() {
+            self.visit_type(&element);
         }
         self.default_result()
     }
 
     fn walk_tuple_type(&mut self, node: &TupleType<'tree>) -> Self::Result {
-        for element_type in node.element_types() {
-            self.visit_type(&element_type);
+        for element in node.elements() {
+            self.visit_type(&element);
         }
         self.default_result()
     }
@@ -683,8 +688,8 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_null_literal_type(&mut self, node: &NullLiteral<'tree>) -> Self::Result {
-        self.walk_null_literal(node)
+    fn walk_null_lit_type(&mut self, node: &NullLit<'tree>) -> Self::Result {
+        self.walk_null_lit(node)
     }
 
     fn walk_annotation_list(&mut self, node: &AnnotationList<'tree>) -> Self::Result {
@@ -695,15 +700,18 @@ pub trait Walker<'tree> {
     }
 
     fn walk_annotation(&mut self, node: &Annotation<'tree>) -> Self::Result {
-        if let Some(arguments) = node.arguments() {
-            self.walk_annotation_arguments(&arguments);
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        if let Some(args) = node.args() {
+            self.walk_annotation_args(&args);
         }
         self.default_result()
     }
 
-    fn walk_annotation_arguments(&mut self, node: &AnnotationArguments<'tree>) -> Self::Result {
-        for arg in node.arguments() {
-            self.visit_expression(&arg);
+    fn walk_annotation_args(&mut self, node: &AnnotationArgs<'tree>) -> Self::Result {
+        for arg in node.args() {
+            self.visit_expr(&arg);
         }
         self.default_result()
     }
@@ -716,6 +724,9 @@ pub trait Walker<'tree> {
     }
 
     fn walk_type_parameter(&mut self, node: &TypeParameter<'tree>) -> Self::Result {
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
         if let Some(default) = node.default() {
             self.visit_type(&default);
         }
@@ -730,16 +741,16 @@ pub trait Walker<'tree> {
             self.visit_type(&typ);
         }
         if let Some(default) = node.default() {
-            self.visit_expression(&default);
+            self.visit_expr(&default);
         }
         self.default_result()
     }
 
-    fn walk_function_body(&mut self, body: &FunctionBody<'tree>) -> Self::Result {
+    fn walk_function_body(&mut self, body: &FuncBody<'tree>) -> Self::Result {
         match body {
-            FunctionBody::BlockStatement(block) => self.walk_block_statement(block),
-            FunctionBody::AsmBody(asm) => self.walk_asm_body(asm),
-            FunctionBody::BuiltinSpecifier(_) | FunctionBody::Unmapped(_) => self.default_result(),
+            FuncBody::Block(block) => self.walk_block(block),
+            FuncBody::AsmBody(asm) => self.walk_asm_body(asm),
+            FuncBody::BuiltinSpecifier(_) | FuncBody::Unmapped(_) => self.default_result(),
         }
     }
 
@@ -755,37 +766,37 @@ pub trait Walker<'tree> {
 
     fn walk_struct_body(&mut self, node: &StructBody<'tree>) -> Self::Result {
         for field in node.fields() {
-            self.walk_struct_field_declaration(&field);
+            self.walk_struct_field(&field);
         }
         self.default_result()
     }
 
-    fn walk_struct_field_declaration(
-        &mut self,
-        node: &StructFieldDeclaration<'tree>,
-    ) -> Self::Result {
+    fn walk_struct_field(&mut self, node: &StructField<'tree>) -> Self::Result {
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
         if let Some(typ) = node.typ() {
             self.visit_type(&typ);
         }
         if let Some(default) = node.default() {
-            self.visit_expression(&default);
+            self.visit_expr(&default);
         }
         self.default_result()
     }
 
     fn walk_enum_body(&mut self, node: &EnumBody<'tree>) -> Self::Result {
         for member in node.members() {
-            self.walk_enum_member_declaration(&member);
+            self.walk_enum_member(&member);
         }
         self.default_result()
     }
 
-    fn walk_enum_member_declaration(
-        &mut self,
-        node: &EnumMemberDeclaration<'tree>,
-    ) -> Self::Result {
+    fn walk_enum_member(&mut self, node: &EnumMember<'tree>) -> Self::Result {
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
         if let Some(default) = node.default() {
-            self.visit_expression(&default);
+            self.visit_expr(&default);
         }
         self.default_result()
     }
@@ -799,41 +810,41 @@ pub trait Walker<'tree> {
 
     fn walk_catch_clause(&mut self, node: &CatchClause<'tree>) -> Self::Result {
         if let Some(body) = node.body() {
-            self.walk_block_statement(&body);
+            self.walk_block(&body);
         }
         self.default_result()
     }
 
-    fn walk_var_declaration_lhs(&mut self, lhs: &VarDeclarationLhs<'tree>) -> Self::Result {
-        match lhs {
-            VarDeclarationLhs::TupleVarsDeclaration(tuple) => {
-                self.walk_tuple_vars_declaration(tuple)
-            }
-            VarDeclarationLhs::TensorVarsDeclaration(tensor) => {
-                self.walk_tensor_vars_declaration(tensor)
-            }
-            VarDeclarationLhs::VarDeclaration(var) => self.walk_var_declaration(var),
+    fn walk_var_decl_lhs(&mut self, node: &VarDeclLhs<'tree>) -> Self::Result {
+        if let Some(pattern) = node.pattern() {
+            self.walk_var_decl_pattern(&pattern);
+        }
+        self.default_result()
+    }
+
+    fn walk_var_decl_pattern(&mut self, pattern: &VarDeclPattern<'tree>) -> Self::Result {
+        match pattern {
+            VarDeclPattern::TupleVars(tuple) => self.walk_tuple_vars(tuple),
+            VarDeclPattern::TensorVars(tensor) => self.walk_tensor_vars(tensor),
+            VarDeclPattern::VarDecl(var) => self.walk_var_declaration(var),
         }
     }
 
-    fn walk_tuple_vars_declaration(&mut self, node: &TupleVarsDeclaration<'tree>) -> Self::Result {
+    fn walk_tuple_vars(&mut self, node: &TupleVars<'tree>) -> Self::Result {
         for var in node.vars() {
-            self.walk_var_declaration_lhs(&var);
+            self.walk_var_decl_pattern(&var);
         }
         self.default_result()
     }
 
-    fn walk_tensor_vars_declaration(
-        &mut self,
-        node: &TensorVarsDeclaration<'tree>,
-    ) -> Self::Result {
+    fn walk_tensor_vars(&mut self, node: &TensorVars<'tree>) -> Self::Result {
         for var in node.vars() {
-            self.walk_var_declaration_lhs(&var);
+            self.walk_var_decl_pattern(&var);
         }
         self.default_result()
     }
 
-    fn walk_var_declaration(&mut self, node: &VarDeclaration<'tree>) -> Self::Result {
+    fn walk_var_declaration(&mut self, node: &VarDecl<'tree>) -> Self::Result {
         if let Some(name) = node.name() {
             self.walk_ident(&name);
         }
@@ -853,16 +864,16 @@ pub trait Walker<'tree> {
     fn walk_match_arm(&mut self, node: &MatchArm<'tree>) -> Self::Result {
         match node.pattern() {
             MatchPattern::Type(pattern) => self.walk_type(&pattern),
-            MatchPattern::Expression(pattern) => self.walk_expression(&pattern),
+            MatchPattern::Expr(expr) => self.walk_expr(&expr),
             MatchPattern::Else => self.default_result(),
         };
 
         if let Some(body) = node.body() {
             match body {
-                MatchArmBody::BlockStatement(ref block) => self.walk_block_statement(block),
-                MatchArmBody::ReturnStatement(ref ret) => self.walk_return_statement(ret),
-                MatchArmBody::ThrowStatement(ref throw) => self.walk_throw_statement(throw),
-                MatchArmBody::Expression(ref expr) => self.visit_expression(expr),
+                MatchArmBody::Block(ref block) => self.walk_block(block),
+                MatchArmBody::Return(ref ret) => self.walk_return(ret),
+                MatchArmBody::Throw(ref throw) => self.walk_throw(throw),
+                MatchArmBody::Expr(ref expr) => self.visit_expr(expr),
             };
         }
         self.default_result()
@@ -870,7 +881,7 @@ pub trait Walker<'tree> {
 
     fn walk_call_argument(&mut self, node: &CallArgument<'tree>) -> Self::Result {
         if let Some(expr) = node.expr() {
-            self.visit_expression(&expr);
+            self.visit_expr(&expr);
         }
         self.default_result()
     }
@@ -882,14 +893,23 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_instance_argument(&mut self, node: &InstanceArgument<'tree>) -> Self::Result {
+    fn walk_instance_arg(&mut self, node: &InstanceArg<'tree>) -> Self::Result {
         if let Some(value) = node.value() {
-            self.visit_expression(&value);
+            self.visit_expr(&value);
         }
         self.default_result()
     }
 
-    fn walk_asm_body(&mut self, _node: &AsmBody<'tree>) -> Self::Result {
+    fn walk_asm_body(&mut self, node: &AsmBody<'tree>) -> Self::Result {
+        for param in node.params() {
+            self.walk_ident(&param);
+        }
+        for num in node.return_values() {
+            self.walk_number_lit(&num);
+        }
+        for string in node.instructions() {
+            self.walk_string_lit(&string);
+        }
         self.default_result()
     }
 
@@ -904,7 +924,7 @@ pub fn walk_ast<'tree, W: Walker<'tree>>(
 }
 
 #[must_use]
-pub fn parent_of_type<'a>(node: &'a Node<'a>, target_kind: &str) -> Option<Node<'a>> {
+pub fn find_parent_by_kind<'a>(node: &'a Node<'a>, target_kind: &str) -> Option<Node<'a>> {
     let mut current = node.parent();
     while let Some(parent) = current {
         if parent.kind() == target_kind {

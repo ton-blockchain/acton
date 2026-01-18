@@ -149,7 +149,7 @@ fn discover_contracts() -> BTreeMap<String, ContractConfig> {
             Err(_) => continue,
         };
 
-        let tree = match tolk_parser::parser::parse(&content) {
+        let tree = match tolk_syntax::parse(&content) {
             Ok(tree) => tree,
             Err(_) => continue,
         };

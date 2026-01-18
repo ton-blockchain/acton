@@ -1,5 +1,5 @@
+#![cfg(test)]
 use expect_test::Expect;
-use tolk_ast::SourceFile;
 use tolkfmt::format_source;
 
 #[allow(dead_code)]
@@ -41,29 +41,19 @@ fn equal_format_code(expect: Expect, code: &str) {
 }
 
 fn equal_trees(old_code: &str, new_code: &str, check_trees: bool) {
-    let old_tree = parse_tolk_code(old_code).unwrap_or("<error>".to_string());
-    let new_tree = parse_tolk_code(new_code).unwrap_or("<error>".to_string());
+    let old_tree = parse_tolk_code(old_code).unwrap_or_else(|_| "<error>".to_owned());
+    let new_tree = parse_tolk_code(new_code).unwrap_or_else(|_| "<error>".to_owned());
 
     if check_trees {
         assert_eq!(old_tree, new_tree);
-    } else {
-        if old_tree == new_tree {
-            assert!(
-                false,
-                "Checks for identical trees are ignored, even though the trees are identical",
-            )
-        }
+    } else if old_tree == new_tree {
+        panic!("Checks for identical trees are ignored, even though the trees are identical",)
     }
 }
 
 fn parse_tolk_code(source: &str) -> anyhow::Result<String> {
-    let tree = tolk_parser::parser::parse(source)?;
-    let source_file = SourceFile {
-        tree,
-        source: source.into(),
-    };
-
-    let root_node = source_file.tree.root_node();
+    let source_file = tolk_syntax::parse(source)?;
+    let root_node = source_file.root_node();
     if root_node.has_error() {
         anyhow::bail!("Cannot format code with syntax error");
     }

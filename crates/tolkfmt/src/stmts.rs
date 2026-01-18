@@ -1,54 +1,51 @@
 use crate::{Context, common, exprs};
 use pretty::RcDoc;
-use tolk_ast::{
-    AssertStatement, BlockStatement, CatchClause, DoWhileStatement, ExpressionStatement,
-    IfStatement, IfStatementAlternative, LocalVarsDeclaration, MatchStatement, RepeatStatement,
-    ReturnStatement, Statement, ThrowStatement, TryCatchStatement, VarDeclarationLhs,
-    WhileStatement,
+use tolk_syntax::{
+    Assert, Block, CatchClause, DoWhile, ExprStmt, If, IfAlt, MatchStmt, Repeat, Return, Stmt,
+    Throw, TryCatch, While,
 };
 
 #[must_use]
-pub fn print_block_statement<'a>(ctx: &Context<'_>, block: &BlockStatement) -> Option<RcDoc<'a>> {
-    let raw_statements = block.statements();
-    let statements = raw_statements
-        .iter()
-        .filter(|stmt| !matches!(stmt, Statement::Unmapped(_) | Statement::EmptyStatement(_)))
+pub fn print_block_statement<'a>(ctx: &Context<'_>, block: &Block) -> Option<RcDoc<'a>> {
+    let statements = block
+        .stmts()
+        .filter(|stmt| !matches!(stmt, Stmt::Unmapped(_) | Stmt::EmptyStmt(_)))
         .collect::<Vec<_>>();
 
     common::print_list(
         ctx,
         &statements,
         |ctx, stmt| print_statement(ctx, stmt),
-        |stmt| stmt.raw_node(),
+        |stmt| stmt.syntax(),
         |_| {
-            raw_statements
+            block
+                .statements_including_comments()
                 .iter()
-                .filter(|stmt| stmt.raw_node().kind() == "comment")
-                .map(Statement::raw_node)
+                .filter(|stmt| stmt.syntax().kind() == "comment")
+                .map(Stmt::syntax)
                 .collect()
         },
         common::ListOptions::curly_bracket_body(),
     )
 }
 
-fn print_statement<'a>(ctx: &Context<'_>, stmt: &Statement) -> Option<RcDoc<'a>> {
+fn print_statement<'a>(ctx: &Context<'_>, stmt: &Stmt) -> Option<RcDoc<'a>> {
     match stmt {
-        Statement::BlockStatement(block) => print_block_statement(ctx, block),
-        Statement::IfStatement(if_stmt) => print_if_statement(ctx, if_stmt),
-        Statement::WhileStatement(while_stmt) => print_while_statement(ctx, while_stmt),
-        Statement::RepeatStatement(repeat_stmt) => print_repeat_statement(ctx, repeat_stmt),
-        Statement::TryCatchStatement(try_catch) => print_try_catch_statement(ctx, try_catch),
-        Statement::ReturnStatement(return_stmt) => print_return_statement(ctx, return_stmt),
-        Statement::LocalVarsDeclaration(locals) => print_local_variables(ctx, locals),
-        Statement::DoWhileStatement(do_while) => print_do_while_statement(ctx, do_while),
-        Statement::BreakStatement(_) => Some(RcDoc::text("break;")),
-        Statement::ContinueStatement(_) => Some(RcDoc::text("continue;")),
-        Statement::ThrowStatement(throw_stmt) => print_throw_statement(ctx, throw_stmt),
-        Statement::AssertStatement(assert_stmt) => print_assert_statement(ctx, assert_stmt),
-        Statement::MatchStatement(match_stmt) => print_match_statement(ctx, match_stmt),
-        Statement::EmptyStatement(_) => Some(RcDoc::nil()),
-        Statement::ExpressionStatement(expr_stmt) => print_expression_statement(ctx, expr_stmt),
-        Statement::Unmapped(node) => {
+        Stmt::Block(block) => print_block_statement(ctx, block),
+        Stmt::If(if_stmt) => print_if_statement(ctx, if_stmt),
+        Stmt::While(while_stmt) => print_while_statement(ctx, while_stmt),
+        Stmt::Repeat(repeat_stmt) => print_repeat_statement(ctx, repeat_stmt),
+        Stmt::TryCatch(try_catch) => print_try_catch_statement(ctx, try_catch),
+        Stmt::Return(return_stmt) => print_return_statement(ctx, return_stmt),
+        Stmt::DoWhile(do_while) => print_do_while_statement(ctx, do_while),
+        Stmt::Break(_) => Some(RcDoc::text("break;")),
+        Stmt::Continue(_) => Some(RcDoc::text("continue;")),
+        Stmt::Throw(throw_stmt) => print_throw_statement(ctx, throw_stmt),
+        Stmt::Assert(assert_stmt) => print_assert_statement(ctx, assert_stmt),
+        Stmt::Match(match_stmt) => print_match_statement(ctx, match_stmt),
+        Stmt::EmptyStmt(_) => Some(RcDoc::nil()),
+        Stmt::ExprStmt(expr_stmt) => print_expression_statement(ctx, expr_stmt),
+        Stmt::Unmapped(node) => {
             if node.0.kind() == "comment" {
                 return Some(RcDoc::text(""));
             }
@@ -60,7 +57,7 @@ fn print_statement<'a>(ctx: &Context<'_>, stmt: &Statement) -> Option<RcDoc<'a>>
     }
 }
 
-fn print_if_statement<'a>(ctx: &Context<'_>, if_stmt: &IfStatement) -> Option<RcDoc<'a>> {
+fn print_if_statement<'a>(ctx: &Context<'_>, if_stmt: &If) -> Option<RcDoc<'a>> {
     let condition = if_stmt.condition()?;
     let body = if_stmt.body()?;
     let alternative = if_stmt.alternative();
@@ -81,10 +78,10 @@ fn print_if_statement<'a>(ctx: &Context<'_>, if_stmt: &IfStatement) -> Option<Rc
     if let Some(alternative) = alternative {
         docs.push(RcDoc::text(" else "));
         match alternative {
-            IfStatementAlternative::IfStatement(next_if) => {
+            IfAlt::If(next_if) => {
                 docs.push(print_if_statement(ctx, &next_if)?);
             }
-            IfStatementAlternative::BlockStatement(block) => {
+            IfAlt::Block(block) => {
                 docs.push(print_block_statement(ctx, &block)?);
             }
         }
@@ -93,7 +90,7 @@ fn print_if_statement<'a>(ctx: &Context<'_>, if_stmt: &IfStatement) -> Option<Rc
     Some(RcDoc::concat(docs))
 }
 
-fn print_while_statement<'a>(ctx: &Context<'_>, while_stmt: &WhileStatement) -> Option<RcDoc<'a>> {
+fn print_while_statement<'a>(ctx: &Context<'_>, while_stmt: &While) -> Option<RcDoc<'a>> {
     let condition = while_stmt.condition()?;
     let body = while_stmt.body()?;
 
@@ -111,10 +108,7 @@ fn print_while_statement<'a>(ctx: &Context<'_>, while_stmt: &WhileStatement) -> 
     ]))
 }
 
-fn print_repeat_statement<'a>(
-    ctx: &Context<'_>,
-    repeat_stmt: &RepeatStatement,
-) -> Option<RcDoc<'a>> {
+fn print_repeat_statement<'a>(ctx: &Context<'_>, repeat_stmt: &Repeat) -> Option<RcDoc<'a>> {
     let count = repeat_stmt.count()?;
     let body = repeat_stmt.body()?;
 
@@ -132,10 +126,7 @@ fn print_repeat_statement<'a>(
     ]))
 }
 
-fn print_do_while_statement<'a>(
-    ctx: &Context<'_>,
-    do_while: &DoWhileStatement,
-) -> Option<RcDoc<'a>> {
+fn print_do_while_statement<'a>(ctx: &Context<'_>, do_while: &DoWhile) -> Option<RcDoc<'a>> {
     let condition = do_while.condition()?;
     let body = do_while.body()?;
 
@@ -154,10 +145,7 @@ fn print_do_while_statement<'a>(
     ]))
 }
 
-pub(crate) fn print_return_statement<'a>(
-    ctx: &Context,
-    return_stmt: &ReturnStatement,
-) -> Option<RcDoc<'a>> {
+pub(crate) fn print_return_statement<'a>(ctx: &Context, return_stmt: &Return) -> Option<RcDoc<'a>> {
     let expr = return_stmt.expr();
 
     // 10 => return 10,
@@ -179,11 +167,8 @@ pub(crate) fn print_return_statement<'a>(
     }
 }
 
-pub(crate) fn print_throw_statement<'a>(
-    ctx: &Context,
-    throw_stmt: &ThrowStatement,
-) -> Option<RcDoc<'a>> {
-    let expr = throw_stmt.expression()?;
+pub(crate) fn print_throw_statement<'a>(ctx: &Context, throw_stmt: &Throw) -> Option<RcDoc<'a>> {
+    let expr = throw_stmt.expr()?;
 
     // 10 => throw 10,
     let in_match_arm = throw_stmt
@@ -200,12 +185,9 @@ pub(crate) fn print_throw_statement<'a>(
     ]))
 }
 
-fn print_assert_statement<'a>(
-    ctx: &Context<'_>,
-    assert_stmt: &AssertStatement,
-) -> Option<RcDoc<'a>> {
+fn print_assert_statement<'a>(ctx: &Context<'_>, assert_stmt: &Assert) -> Option<RcDoc<'a>> {
     let condition = assert_stmt.condition()?;
-    let exc_no = assert_stmt.expression()?;
+    let exc_no = assert_stmt.expr()?;
 
     let condition_doc = exprs::print_expression(ctx, &condition)?;
     let exc_no_doc = exprs::print_expression(ctx, &exc_no)?;
@@ -237,10 +219,7 @@ fn print_assert_statement<'a>(
     }
 }
 
-fn print_try_catch_statement<'a>(
-    ctx: &Context,
-    try_catch: &TryCatchStatement,
-) -> Option<RcDoc<'a>> {
+fn print_try_catch_statement<'a>(ctx: &Context, try_catch: &TryCatch) -> Option<RcDoc<'a>> {
     let body = try_catch.body()?;
     let catch = try_catch.catch()?;
 
@@ -282,107 +261,13 @@ fn print_catch_clause<'a>(ctx: &Context<'_>, catch: &CatchClause) -> Option<RcDo
     Some(RcDoc::concat([vars_doc, body_doc]))
 }
 
-fn print_match_statement<'a>(ctx: &Context<'_>, match_stmt: &MatchStatement) -> Option<RcDoc<'a>> {
-    let expr = match_stmt.expression()?;
+fn print_match_statement<'a>(ctx: &Context<'_>, match_stmt: &MatchStmt) -> Option<RcDoc<'a>> {
+    let expr = match_stmt.expr()?;
     exprs::print_match_expression(ctx, &expr)
 }
 
-fn print_expression_statement<'a>(
-    ctx: &Context,
-    expr_stmt: &ExpressionStatement,
-) -> Option<RcDoc<'a>> {
-    let expr = expr_stmt.expression()?;
+fn print_expression_statement<'a>(ctx: &Context, expr_stmt: &ExprStmt) -> Option<RcDoc<'a>> {
+    let expr = expr_stmt.expr()?;
     let expr_doc = exprs::print_expression(ctx, &expr)?;
     Some(RcDoc::concat([expr_doc, RcDoc::text(";")]))
-}
-
-pub(crate) fn print_local_variables<'a>(
-    ctx: &Context,
-    locals: &LocalVarsDeclaration,
-) -> Option<RcDoc<'a>> {
-    let kind = locals.kind();
-    let lhs = locals.lhs()?;
-    let assigned_val = locals.assigned_val();
-
-    let lhs_doc = print_var_declaration_lhs(ctx, &lhs)?;
-
-    // Check if parent is match_expression like:
-    // match (val a = 100) { ... }
-    let is_match_expression = locals
-        .0
-        .parent()
-        .is_some_and(|p| p.kind() == "match_expression");
-
-    if let Some(assigned_val) = assigned_val {
-        let assigned_val_doc = exprs::print_expression(ctx, &assigned_val)?;
-
-        let result = RcDoc::concat([
-            RcDoc::text(kind.as_str()),
-            RcDoc::space(),
-            lhs_doc,
-            RcDoc::text(" = "),
-            assigned_val_doc,
-            if is_match_expression {
-                RcDoc::nil()
-            } else {
-                RcDoc::text(";")
-            },
-        ]);
-        return Some(result);
-    }
-
-    let result = RcDoc::concat([
-        RcDoc::text(kind.as_str()),
-        RcDoc::space(),
-        lhs_doc,
-        RcDoc::text(";"),
-    ]);
-    Some(result)
-}
-
-fn print_var_declaration_lhs<'a>(ctx: &Context<'_>, lhs: &VarDeclarationLhs) -> Option<RcDoc<'a>> {
-    match lhs {
-        VarDeclarationLhs::TupleVarsDeclaration(tuple) => {
-            let vars = tuple.vars();
-            print_tensor_tuple_lhs(ctx, &vars, "[", "]")
-        }
-        VarDeclarationLhs::TensorVarsDeclaration(tensor) => {
-            let vars = tensor.vars();
-            print_tensor_tuple_lhs(ctx, &vars, "(", ")")
-        }
-        VarDeclarationLhs::VarDeclaration(var) => {
-            let name = var.name()?;
-            let typ = var.typ();
-            let is_redefinition = var.is_redefinition();
-
-            let name_doc = exprs::print_ident(ctx, &name)?;
-            if is_redefinition {
-                Some(RcDoc::concat([name_doc, RcDoc::text(" redef")]))
-            } else if let Some(typ) = typ {
-                let type_doc = crate::types::print_type(ctx, &typ)?;
-                Some(RcDoc::concat([name_doc, RcDoc::text(": "), type_doc]))
-            } else {
-                Some(name_doc)
-            }
-        }
-    }
-}
-
-fn print_tensor_tuple_lhs<'a>(
-    ctx: &Context,
-    vars: &[VarDeclarationLhs],
-    open_quote: &'a str,
-    close_quote: &'a str,
-) -> Option<RcDoc<'a>> {
-    common::print_list(
-        ctx,
-        vars,
-        print_var_declaration_lhs,
-        |v| *v.raw_node(),
-        |_| vec![],
-        common::ListOptions {
-            brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
-            ..Default::default()
-        },
-    )
 }

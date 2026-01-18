@@ -180,7 +180,7 @@ pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> anyhow::R
         Err(e) => anyhow::bail!("Failed to read file '{file_path}': {e}"),
     };
 
-    let tree = match tolk_parser::parser::parse(&content) {
+    let tree = match tolk_syntax::parse(&content) {
         Ok(tree) => tree,
         Err(e) => anyhow::bail!("Failed to parse file '{file_path}': {e:?}"),
     };
@@ -205,7 +205,7 @@ pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> anyhow::R
 pub fn contract_abi(content: &str, file_path: &str) -> ContractAbi {
     let contract_name = get_contract_name_from_file_path(file_path);
 
-    let Ok(tree) = tolk_parser::parser::parse(content) else {
+    let Ok(tree) = tolk_syntax::parse(content) else {
         return ContractAbi::default();
     };
     let root_node = tree.root_node();
@@ -245,7 +245,7 @@ pub fn contract_abi(content: &str, file_path: &str) -> ContractAbi {
 
 #[must_use]
 pub fn extract_handled_messages(content: &str, file_path: &str) -> Vec<String> {
-    let Ok(tree) = tolk_parser::parser::parse(content) else {
+    let Ok(tree) = tolk_syntax::parse(content) else {
         return Vec::new();
     };
 
@@ -328,13 +328,13 @@ fn collect_imported_files(
     let mut files = Vec::new();
     let mut processed = HashSet::new();
 
-    let Ok(tree) = tolk_parser::parser::parse(content) else {
+    let Ok(parsed_file) = tolk_syntax::parse(content) else {
         return vec![];
     };
     files.push(FileInfo {
         path: file_path.to_string(),
         content: content.to_string(),
-        tree,
+        tree: parsed_file.tree,
     });
     processed.insert(file_path.to_string());
 
@@ -380,8 +380,8 @@ fn collect_imported_files_recursive(
             continue;
         };
 
-        if let Ok(tree) = tolk_parser::parser::parse(&import_content) {
-            let root_node = tree.root_node();
+        if let Ok(parsed_file) = tolk_syntax::parse(&import_content) {
+            let root_node = parsed_file.root_node();
 
             collect_imported_files_recursive(
                 &root_node,
@@ -394,7 +394,7 @@ fn collect_imported_files_recursive(
             files.push(FileInfo {
                 path: resolved.clone(),
                 content: import_content,
-                tree,
+                tree: parsed_file.tree,
             });
             processed.insert(resolved);
         }

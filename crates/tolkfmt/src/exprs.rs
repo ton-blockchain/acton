@@ -1,12 +1,12 @@
 use crate::{Context, comments, common, stmts, types};
 use pretty::RcDoc;
-use tolk_ast::*;
+use tolk_syntax::*;
 use tree_sitter::Node;
 
 #[must_use]
-pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expression) -> Option<RcDoc<'a>> {
+pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>> {
     // TODO: other literals as well
-    if let Expression::NumberLiteral(lit) = expr {
+    if let Expr::NumberLit(lit) = expr {
         let kind = lit.0.parent()?.kind();
         if kind == "tensor_expression"
             || kind == "tuple_expression"
@@ -17,7 +17,7 @@ pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expression) -> Option<RcDo
         }
     }
 
-    let node = expr.raw_node();
+    let node = expr.syntax();
     let comments = ctx.comments.get(&node);
 
     if comments.is_none() {
@@ -35,38 +35,102 @@ pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expression) -> Option<RcDo
     Some(RcDoc::concat(docs))
 }
 
-fn print_expression_naked<'a>(ctx: &Context<'_>, expr: &Expression) -> Option<RcDoc<'a>> {
+fn print_expression_naked<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>> {
     match expr {
-        Expression::Assignment(assignment) => print_assignment(ctx, assignment),
-        Expression::SetAssignment(set_assignment) => print_set_assignment(ctx, set_assignment),
-        Expression::TernaryOperator(ternary) => print_ternary_operator(ctx, ternary),
-        Expression::BinaryOperator(binary) => print_binary_operator(ctx, binary),
-        Expression::UnaryOperator(unary) => print_unary_operator(ctx, unary),
-        Expression::LazyExpression(lazy) => print_lazy_expression(ctx, lazy),
-        Expression::CastAsOperator(cast) => print_cast_as_operator(ctx, cast),
-        Expression::IsTypeOperator(is_type) => print_is_type_operator(ctx, is_type),
-        Expression::NotNullOperator(not_null) => print_not_null_operator(ctx, not_null),
-        Expression::DotAccess(dot) => print_dot_access(ctx, dot),
-        Expression::FunctionCall(call) => print_function_call(ctx, call),
-        Expression::GenericInstantiation(r#gen) => print_generic_instantiation(ctx, r#gen),
-        Expression::ParenthesizedExpression(paren) => print_parenthesized_expression(ctx, paren),
-        Expression::MatchExpression(match_expr) => print_match_expression(ctx, match_expr),
-        Expression::ObjectLiteral(obj) => print_object_literal(ctx, obj),
-        Expression::TensorExpression(tensor) => print_tensor_expression(ctx, tensor),
-        Expression::TypedTuple(tuple) => print_typed_tuple(ctx, tuple),
-        Expression::LambdaExpression(lambda) => print_lambda_expression(ctx, lambda),
-        Expression::NumberLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
-        Expression::StringLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
-        Expression::BooleanLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
-        Expression::NullLiteral(lit) => Some(common::print_node_text(ctx, &lit.0)?),
-        Expression::Underscore(und) => Some(common::print_node_text(ctx, &und.0)?),
-        Expression::Ident(ident) => Some(common::print_node_text(ctx, &ident.0)?),
-        Expression::Unmapped(node) => common::print_node_text(ctx, &node.0),
+        Expr::VarDeclLhs(node) => print_var_declaration_lhs(ctx, node),
+        Expr::Assign(assignment) => print_assignment(ctx, assignment),
+        Expr::SetAssign(set_assignment) => print_set_assignment(ctx, set_assignment),
+        Expr::Ternary(ternary) => print_ternary_operator(ctx, ternary),
+        Expr::Bin(binary) => print_binary_operator(ctx, binary),
+        Expr::Unary(unary) => print_unary_operator(ctx, unary),
+        Expr::Lazy(lazy) => print_lazy_expression(ctx, lazy),
+        Expr::AsCast(cast) => print_cast_as_operator(ctx, cast),
+        Expr::IsType(is_type) => print_is_type_operator(ctx, is_type),
+        Expr::NotNull(not_null) => print_not_null_operator(ctx, not_null),
+        Expr::DotAccess(dot) => print_dot_access(ctx, dot),
+        Expr::Call(call) => print_function_call(ctx, call),
+        Expr::Instantiation(r#gen) => print_generic_instantiation(ctx, r#gen),
+        Expr::Paren(paren) => print_parenthesized_expression(ctx, paren),
+        Expr::Match(match_expr) => print_match_expression(ctx, match_expr),
+        Expr::ObjectLit(obj) => print_object_literal(ctx, obj),
+        Expr::Tensor(tensor) => print_tensor_expression(ctx, tensor),
+        Expr::Tuple(tuple) => print_typed_tuple(ctx, tuple),
+        Expr::Lambda(lambda) => print_lambda_expression(ctx, lambda),
+        Expr::NumberLit(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expr::StringLit(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expr::BoolLit(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expr::NullLit(lit) => Some(common::print_node_text(ctx, &lit.0)?),
+        Expr::Underscore(und) => Some(common::print_node_text(ctx, &und.0)?),
+        Expr::Ident(ident) => Some(common::print_node_text(ctx, &ident.0)?),
+        Expr::Unmapped(node) => common::print_node_text(ctx, &node.0),
     }
 }
 
 #[must_use]
-pub fn print_assignment<'a>(ctx: &Context<'_>, assignment: &Assignment) -> Option<RcDoc<'a>> {
+pub fn print_var_declaration_lhs<'a>(ctx: &Context<'_>, node: &VarDeclLhs) -> Option<RcDoc<'a>> {
+    let kind = node.kind();
+    let pattern = node.pattern()?;
+    let pattern_doc = print_var_declaration_pattern(ctx, &pattern)?;
+
+    Some(RcDoc::concat([
+        RcDoc::text(kind.as_str()),
+        RcDoc::space(),
+        pattern_doc,
+    ]))
+}
+
+fn print_var_declaration_pattern<'a>(
+    ctx: &Context<'_>,
+    pattern: &VarDeclPattern,
+) -> Option<RcDoc<'a>> {
+    match pattern {
+        VarDeclPattern::TupleVars(tuple) => {
+            let vars: Vec<_> = tuple.vars().collect();
+            print_tensor_tuple_pattern(ctx, &vars, "[", "]")
+        }
+        VarDeclPattern::TensorVars(tensor) => {
+            let vars: Vec<_> = tensor.vars().collect();
+            print_tensor_tuple_pattern(ctx, &vars, "(", ")")
+        }
+        VarDeclPattern::VarDecl(var) => {
+            let name = var.name()?;
+            let typ = var.typ();
+            let is_redefinition = var.is_redefinition();
+
+            let name_doc = print_ident(ctx, &name)?;
+            if is_redefinition {
+                Some(RcDoc::concat([name_doc, RcDoc::text(" redef")]))
+            } else if let Some(typ) = typ {
+                let type_doc = types::print_type(ctx, &typ)?;
+                Some(RcDoc::concat([name_doc, RcDoc::text(": "), type_doc]))
+            } else {
+                Some(name_doc)
+            }
+        }
+    }
+}
+
+fn print_tensor_tuple_pattern<'a>(
+    ctx: &Context,
+    vars: &[VarDeclPattern],
+    open_quote: &'a str,
+    close_quote: &'a str,
+) -> Option<RcDoc<'a>> {
+    common::print_list(
+        ctx,
+        vars,
+        print_var_declaration_pattern,
+        |v| v.syntax(),
+        |_| vec![],
+        common::ListOptions {
+            brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
+            ..Default::default()
+        },
+    )
+}
+
+#[must_use]
+pub fn print_assignment<'a>(ctx: &Context<'_>, assignment: &Assign) -> Option<RcDoc<'a>> {
     let left = assignment.left()?;
     let right = assignment.right()?;
     let left_doc = print_expression(ctx, &left)?;
@@ -75,10 +139,7 @@ pub fn print_assignment<'a>(ctx: &Context<'_>, assignment: &Assignment) -> Optio
 }
 
 #[must_use]
-pub fn print_set_assignment<'a>(
-    ctx: &Context,
-    set_assignment: &SetAssignment,
-) -> Option<RcDoc<'a>> {
+pub fn print_set_assignment<'a>(ctx: &Context, set_assignment: &SetAssign) -> Option<RcDoc<'a>> {
     let left = set_assignment.left()?;
     let right = set_assignment.right()?;
     let op = set_assignment
@@ -98,10 +159,7 @@ pub fn print_set_assignment<'a>(
 }
 
 #[must_use]
-pub fn print_ternary_operator<'a>(
-    ctx: &Context<'_>,
-    ternary: &TernaryOperator,
-) -> Option<RcDoc<'a>> {
+pub fn print_ternary_operator<'a>(ctx: &Context<'_>, ternary: &Ternary) -> Option<RcDoc<'a>> {
     let condition = ternary.condition()?;
     let consequence = ternary.consequence()?;
     let alternative = ternary.alternative()?;
@@ -126,7 +184,7 @@ pub fn print_ternary_operator<'a>(
 }
 
 #[must_use]
-pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &BinaryOperator) -> Option<RcDoc<'a>> {
+pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &Bin) -> Option<RcDoc<'a>> {
     let left = binary.left()?;
     let right = binary.right()?;
     let op = binary.operator_name(ctx.code.as_ref().as_ref()).to_string();
@@ -143,7 +201,7 @@ pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &BinaryOperator) -> 
 }
 
 #[must_use]
-pub fn print_unary_operator<'a>(ctx: &Context<'_>, unary: &UnaryOperator) -> Option<RcDoc<'a>> {
+pub fn print_unary_operator<'a>(ctx: &Context<'_>, unary: &Unary) -> Option<RcDoc<'a>> {
     let op = unary.operator_name(ctx.code.as_ref().as_ref()).to_string();
     let arg = unary.argument()?;
     let arg_doc = print_expression(ctx, &arg)?;
@@ -151,14 +209,14 @@ pub fn print_unary_operator<'a>(ctx: &Context<'_>, unary: &UnaryOperator) -> Opt
 }
 
 #[must_use]
-pub fn print_lazy_expression<'a>(ctx: &Context<'_>, lazy: &LazyExpression) -> Option<RcDoc<'a>> {
+pub fn print_lazy_expression<'a>(ctx: &Context<'_>, lazy: &Lazy) -> Option<RcDoc<'a>> {
     let expr = lazy.expr()?;
     let expr_doc = print_expression(ctx, &expr)?;
     Some(RcDoc::concat([RcDoc::text("lazy "), expr_doc]))
 }
 
 #[must_use]
-pub fn print_cast_as_operator<'a>(ctx: &Context<'_>, cast: &CastAsOperator) -> Option<RcDoc<'a>> {
+pub fn print_cast_as_operator<'a>(ctx: &Context<'_>, cast: &AsCast) -> Option<RcDoc<'a>> {
     let expr = cast.expr()?;
     let typ = cast.casted_to()?;
     let expr_doc = print_expression(ctx, &expr)?;
@@ -167,10 +225,7 @@ pub fn print_cast_as_operator<'a>(ctx: &Context<'_>, cast: &CastAsOperator) -> O
 }
 
 #[must_use]
-pub fn print_is_type_operator<'a>(
-    ctx: &Context<'_>,
-    is_type: &IsTypeOperator,
-) -> Option<RcDoc<'a>> {
+pub fn print_is_type_operator<'a>(ctx: &Context<'_>, is_type: &IsType) -> Option<RcDoc<'a>> {
     let expr = is_type.expr()?;
     let op = is_type
         .operator_name(ctx.code.as_ref().as_ref())
@@ -190,10 +245,7 @@ pub fn print_is_type_operator<'a>(
 }
 
 #[must_use]
-pub fn print_not_null_operator<'a>(
-    ctx: &Context<'_>,
-    not_null: &NotNullOperator,
-) -> Option<RcDoc<'a>> {
+pub fn print_not_null_operator<'a>(ctx: &Context<'_>, not_null: &NotNull) -> Option<RcDoc<'a>> {
     let inner = not_null.inner()?;
     let inner_doc = print_expression(ctx, &inner)?;
     Some(RcDoc::concat([inner_doc, RcDoc::text("!")]))
@@ -210,7 +262,7 @@ pub fn print_dot_access<'a>(ctx: &Context<'_>, dot: &DotAccess) -> Option<RcDoc<
         DotAccessField::NumericIndex(n) => print_simple_node(ctx, &n.0)?,
     };
 
-    let is_obj_literal = matches!(obj, Expression::ObjectLiteral(_));
+    let is_obj_literal = matches!(obj, Expr::ObjectLit(_));
 
     if is_obj_literal {
         Some(RcDoc::group(RcDoc::concat([
@@ -227,10 +279,10 @@ pub fn print_dot_access<'a>(ctx: &Context<'_>, dot: &DotAccess) -> Option<RcDoc<
 }
 
 #[must_use]
-pub fn print_function_call<'a>(ctx: &Context<'_>, call: &FunctionCall) -> Option<RcDoc<'a>> {
+pub fn print_function_call<'a>(ctx: &Context<'_>, call: &Call) -> Option<RcDoc<'a>> {
     let callee = call.callee()?;
     let callee_doc = print_expression(ctx, &callee)?;
-    let args = call.arguments();
+    let args: Vec<_> = call.arguments().collect();
     let args_doc = print_argument_list(ctx, &args)?;
 
     Some(RcDoc::concat([callee_doc, args_doc]))
@@ -247,7 +299,7 @@ pub fn print_argument_list<'a>(ctx: &Context<'_>, args: &[CallArgument]) -> Opti
     // TODO: better way?
     if args.len() == 1
         && let Some(single) = args.first()
-        && matches!(single.expr(), Some(Expression::ObjectLiteral(_)))
+        && matches!(single.expr(), Some(Expr::ObjectLit(_)))
     {
         return Some(RcDoc::group(RcDoc::concat([
             RcDoc::text("("),
@@ -280,18 +332,18 @@ pub fn print_call_argument<'a>(ctx: &Context<'_>, arg: &CallArgument) -> Option<
 
 pub fn print_generic_instantiation<'a>(
     ctx: &Context,
-    instantiation: &GenericInstantiation,
+    instantiation: &Instantiation,
 ) -> Option<RcDoc<'a>> {
     let expr = instantiation.expr()?;
     let expr_doc = print_expression(ctx, &expr)?;
     let ts = instantiation.instantiation_ts()?;
-    let types = ts.types();
+    let types: Vec<_> = ts.types().collect();
 
     let types_doc = common::print_list(
         ctx,
         &types,
         types::print_type,
-        Type::raw_node,
+        Type::syntax,
         |_| vec![],
         common::ListOptions::triangle_bracket_list(),
     )?;
@@ -300,10 +352,7 @@ pub fn print_generic_instantiation<'a>(
 }
 
 #[must_use]
-pub fn print_parenthesized_expression<'a>(
-    ctx: &Context,
-    paren: &ParenthesizedExpression,
-) -> Option<RcDoc<'a>> {
+pub fn print_parenthesized_expression<'a>(ctx: &Context, paren: &Paren) -> Option<RcDoc<'a>> {
     let inner = paren.inner()?;
     let inner_doc = print_expression(ctx, &inner)?;
     Some(RcDoc::concat([
@@ -314,18 +363,11 @@ pub fn print_parenthesized_expression<'a>(
 }
 
 #[must_use]
-pub fn print_match_expression<'a>(
-    ctx: &Context,
-    match_expr: &MatchExpression,
-) -> Option<RcDoc<'a>> {
+pub fn print_match_expression<'a>(ctx: &Context, match_expr: &Match) -> Option<RcDoc<'a>> {
     let expr = match_expr.expr()?;
     let body = match_expr.body()?;
 
-    let expr_doc = match expr {
-        MatchExpr::Expression(e) => print_expression(ctx, &e)?,
-        MatchExpr::LocalVarsDeclaration(l) => stmts::print_local_variables(ctx, &l)?,
-    };
-
+    let expr_doc = print_expression(ctx, &expr)?;
     let body_doc = print_match_body(ctx, &body)?;
 
     Some(RcDoc::concat([
@@ -340,9 +382,10 @@ pub fn print_match_expression<'a>(
 }
 
 pub fn print_match_body<'a>(ctx: &Context<'_>, body: &MatchBody) -> Option<RcDoc<'a>> {
+    let arms: Vec<_> = body.arms().collect();
     common::print_list(
         ctx,
-        &body.arms(),
+        &arms,
         print_match_arm,
         |arm| arm.0,
         |_| vec![],
@@ -362,15 +405,15 @@ pub fn print_match_arm<'a>(ctx: &Context<'_>, arm: &MatchArm) -> Option<RcDoc<'a
 
     let pattern_doc = match pattern {
         MatchPattern::Type(t) => types::print_type(ctx, &t)?,
-        MatchPattern::Expression(e) => print_expression(ctx, &e)?,
+        MatchPattern::Expr(e) => print_expression(ctx, &e)?,
         MatchPattern::Else => RcDoc::text("else"),
     };
 
     let (body_doc, is_block) = match body {
-        MatchArmBody::BlockStatement(b) => (stmts::print_block_statement(ctx, &b)?, true),
-        MatchArmBody::ReturnStatement(r) => (stmts::print_return_statement(ctx, &r)?, false),
-        MatchArmBody::ThrowStatement(t) => (stmts::print_throw_statement(ctx, &t)?, false),
-        MatchArmBody::Expression(e) => (print_expression(ctx, &e)?, false),
+        MatchArmBody::Block(b) => (stmts::print_block_statement(ctx, &b)?, true),
+        MatchArmBody::Return(r) => (stmts::print_return_statement(ctx, &r)?, false),
+        MatchArmBody::Throw(t) => (stmts::print_throw_statement(ctx, &t)?, false),
+        MatchArmBody::Expr(e) => (print_expression(ctx, &e)?, false),
     };
 
     Some(RcDoc::concat([
@@ -386,7 +429,7 @@ pub fn print_match_arm<'a>(ctx: &Context<'_>, arm: &MatchArm) -> Option<RcDoc<'a
 }
 
 #[must_use]
-pub fn print_object_literal<'a>(ctx: &Context<'_>, obj: &ObjectLiteral) -> Option<RcDoc<'a>> {
+pub fn print_object_literal<'a>(ctx: &Context<'_>, obj: &ObjectLit) -> Option<RcDoc<'a>> {
     let typ = obj.typ();
     let mut docs = vec![];
     if let Some(typ) = typ {
@@ -394,17 +437,14 @@ pub fn print_object_literal<'a>(ctx: &Context<'_>, obj: &ObjectLiteral) -> Optio
         docs.push(RcDoc::space());
     }
 
-    let args = obj.arguments();
+    let args: Vec<_> = obj.arguments().collect();
     let args_doc = print_object_literal_body(ctx, &args)?;
     docs.push(args_doc);
 
     Some(RcDoc::group(RcDoc::concat(docs)))
 }
 
-pub fn print_object_literal_body<'a>(
-    ctx: &Context,
-    args: &[InstanceArgument],
-) -> Option<RcDoc<'a>> {
+pub fn print_object_literal_body<'a>(ctx: &Context, args: &[InstanceArg]) -> Option<RcDoc<'a>> {
     common::print_list(
         ctx,
         args,
@@ -421,7 +461,7 @@ pub fn print_object_literal_body<'a>(
 }
 
 #[must_use]
-pub fn print_instance_argument<'a>(ctx: &Context<'_>, arg: &InstanceArgument) -> Option<RcDoc<'a>> {
+pub fn print_instance_argument<'a>(ctx: &Context<'_>, arg: &InstanceArg) -> Option<RcDoc<'a>> {
     let name = arg.name()?;
     let name_text = name.text(ctx.code.as_ref().as_ref()).to_string();
     let name_doc = print_ident(ctx, &name)?;
@@ -441,11 +481,8 @@ pub fn print_instance_argument<'a>(ctx: &Context<'_>, arg: &InstanceArgument) ->
 }
 
 #[must_use]
-pub fn print_tensor_expression<'a>(
-    ctx: &Context<'_>,
-    tensor: &TensorExpression,
-) -> Option<RcDoc<'a>> {
-    let elements = tensor.elements();
+pub fn print_tensor_expression<'a>(ctx: &Context<'_>, tensor: &Tensor) -> Option<RcDoc<'a>> {
+    let elements: Vec<_> = tensor.elements().collect();
     if elements.is_empty() {
         return Some(RcDoc::text("()"));
     }
@@ -454,8 +491,8 @@ pub fn print_tensor_expression<'a>(
 }
 
 #[must_use]
-pub fn print_typed_tuple<'a>(ctx: &Context<'_>, tuple: &TypedTuple) -> Option<RcDoc<'a>> {
-    let elements = tuple.elements();
+pub fn print_typed_tuple<'a>(ctx: &Context<'_>, tuple: &Tuple) -> Option<RcDoc<'a>> {
+    let elements: Vec<_> = tuple.elements().collect();
     if elements.is_empty() {
         return Some(RcDoc::text("[]"));
     }
@@ -465,7 +502,7 @@ pub fn print_typed_tuple<'a>(ctx: &Context<'_>, tuple: &TypedTuple) -> Option<Rc
 
 fn print_tuple_tensor<'a>(
     ctx: &Context,
-    elements: &[Expression],
+    elements: &[Expr],
     open_quote: &'a str,
     close_quote: &'a str,
 ) -> Option<RcDoc<'a>> {
@@ -473,7 +510,7 @@ fn print_tuple_tensor<'a>(
         ctx,
         elements,
         print_expression,
-        Expression::raw_node,
+        Expr::syntax,
         |_| vec![],
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
@@ -483,11 +520,8 @@ fn print_tuple_tensor<'a>(
 }
 
 #[must_use]
-pub fn print_lambda_expression<'a>(
-    ctx: &Context<'_>,
-    lambda: &LambdaExpression,
-) -> Option<RcDoc<'a>> {
-    let params = lambda.parameters();
+pub fn print_lambda_expression<'a>(ctx: &Context<'_>, lambda: &Lambda) -> Option<RcDoc<'a>> {
+    let params: Vec<_> = lambda.parameters().collect();
     let params_doc = crate::decls::print_parameter_list(ctx, &params)?;
 
     let mut docs = vec![RcDoc::text("fun"), params_doc];

@@ -10,7 +10,7 @@ dependencies = [
  "crc",
  "num-bigint",
  "serde",
- "tolk-parser",
+ "tolk-syntax",
  "tree-sitter",
  "tycho-types",
 ]
@@ -72,8 +72,7 @@ dependencies = [
  "tasm",
  "tempfile",
  "tokio",
- "tolk-ast",
- "tolk-parser",
+ "tolk-syntax",
  "tolkc",
  "tolkfmt",
  "toml",
@@ -875,6 +874,10 @@ checksum = "4316185f709b23713e41e3195f90edef7fb00c3ed4adc79769cf09cc762a3b29"
 dependencies = [
  "log",
 ]
+
+[[package]]
+name = "ffi-test"
+version = "0.1.0"
 
 [[package]]
 name = "fiat-crypto"
@@ -2835,14 +2838,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tolk-ast"
-version = "0.1.0"
-dependencies = [
- "tree-sitter",
-]
-
-[[package]]
-name = "tolk-parser"
+name = "tolk-syntax"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2867,8 +2863,7 @@ dependencies = [
  "anyhow",
  "expect-test",
  "pretty",
- "tolk-ast",
- "tolk-parser",
+ "tolk-syntax",
  "tree-sitter",
 ]
 
@@ -3079,9 +3074,9 @@ checksum = "c4013970217383f67b18aef68f6fb2e8d409bc5755227092d32efb0422ba24b8"
 
 [[package]]
 name = "tree-sitter-tolk"
-version = "0.0.2"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ae0cdf00f52be4b12efd2bebaa66b7bb1f94e67b8f35ad813ac1f2b7e73362"
+checksum = "f6b4108256c10ce5e7bc0edb220848696d614d94ebebbc93d342322c84cfb258"
 dependencies = [
  "cc",
  "tree-sitter-language",

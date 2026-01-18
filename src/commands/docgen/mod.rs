@@ -3,7 +3,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tolk_parser::parser::parse;
+use tolk_syntax::parse;
 use tree_sitter::Node;
 
 pub fn docgen_cmd(output: Option<String>) -> Result<()> {
