@@ -8,6 +8,7 @@ use crate::file_index::OptionalSyntaxNodeSpanExt;
 use crate::file_index::{FileId, FileIndex, Span, Symbol};
 use dashmap::DashMap;
 use log::debug;
+use smol_str::SmolStr;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -158,13 +159,13 @@ impl FileDb {
     }
 
     /// Retrieves the text content corresponding to a span in a file.
-    pub fn text(&self, file_id: FileId, span: Span) -> Option<String> {
+    pub fn text(&self, file_id: FileId, span: Span) -> Option<SmolStr> {
         let file = self.files_by_id.get(&file_id)?;
-        Some(file.source.source.get(span.start()..span.end())?.to_owned())
+        Some(file.source.source.get(span.start()..span.end())?.into())
     }
 
     /// Retrieves the text content of an AST node.
-    pub fn text_of<'a, Node: AstNode<'a>>(&self, file_id: FileId, node: &Node) -> Option<String> {
+    pub fn text_of<'a, Node: AstNode<'a>>(&self, file_id: FileId, node: &Node) -> Option<SmolStr> {
         self.text(file_id, node.span())
     }
 

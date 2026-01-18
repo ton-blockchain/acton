@@ -1,16 +1,11 @@
 [package]
-name = "tolk-resolver"
+name = "tolk-ty"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 tolk-syntax = { path = "../tolk-syntax" }
+tolk-resolver = { path = "../tolk-resolver" }
 tree-sitter = "0.25.10"
-anyhow = "1.0.100"
-dashmap = "7.0.0-rc2"
 log = "0.4.29"
 smol_str = "0.3.5"
-
-[dev-dependencies]
-expect-test = "1.5.0"
-tempfile = "3.10.1"

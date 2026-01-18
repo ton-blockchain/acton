@@ -3,6 +3,7 @@
 //! This module defines the core metadata extracted from a source file,
 //! such as declarations, imports, and source spans.
 
+use crate::resolve_index::LocalDefId;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::path::PathBuf;
@@ -52,6 +53,17 @@ impl Span {
             return Self::DUMMY;
         };
         Self::from_syntax(node)
+    }
+
+    /// Creates a span from local definition ID and its length.
+    ///
+    /// `LocalDefId.local` represents byte offset, so we need a length
+    /// to build a span.
+    pub fn from_def_id(id: LocalDefId, length: u32) -> Self {
+        Self {
+            start: id.local,
+            end: id.local + length,
+        }
     }
 
     /// Checks if the given byte offset is within this span.
