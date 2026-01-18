@@ -1,11 +1,11 @@
 [package]
-name = "tolk-parser"
+name = "tolk-syntax"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 tree-sitter = "0.25.10"
-tree-sitter-tolk = "0.0.2"
+tree-sitter-tolk = "0.0.5"
 anyhow = "1.0.100"
 
 [lints]

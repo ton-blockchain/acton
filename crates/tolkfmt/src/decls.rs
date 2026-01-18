@@ -1,12 +1,11 @@
 use crate::{Context, comments, common, exprs, stmts, types};
 use pretty::RcDoc;
-use tolk_ast::{
-    Annotation, AnnotationArguments, AnnotationList, AsmBody, ConstantDeclaration, EnumBody,
-    EnumDeclaration, EnumMemberDeclaration, Expression, Function, FunctionBody,
-    GetMethodDeclaration, GlobalVarDeclaration, Ident, Import, LambdaParameter, MethodDeclaration,
-    MethodReceiver, Parameter, SourceFile, StructBody, StructDeclaration, StructFieldDeclaration,
-    TolkRequiredVersion, TopLevel, Type, TypeAliasDeclaration, TypeAliasUnderlyingType,
-    TypeParameter, TypeParameters,
+use tolk_syntax::{
+    Annotation, AnnotationArgs, AnnotationList, AsmBody, AstNode, Constant, Enum, EnumBody,
+    EnumMember, Expr, Func, FuncBody, FunctionLike, GetMethod, GlobalVar, HasAnnotations,
+    HasGenericParams, HasName, Ident, Import, LambdaParameter, Method, MethodReceiver, Parameter,
+    SourceFile, Struct, StructBody, StructField, TolkRequiredVersion, TopLevel, Type, TypeAlias,
+    TypeAliasUnderlyingType, TypeParameter, TypeParameters,
 };
 
 #[must_use]
@@ -17,7 +16,7 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
     let mut docs = vec![];
 
     // In theory, a file can have multiple Tolk versions, but we keep only one
-    let required_version = file.top_levels_iter().find_map(|decl| match decl {
+    let required_version = file.top_levels().find_map(|decl| match decl {
         TopLevel::TolkRequiredVersion(decl) => Some(decl),
         _ => None,
     });
@@ -45,7 +44,7 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
     let mut docs = vec![];
 
     let imports = file
-        .top_levels_iter()
+        .top_levels()
         .filter_map(|decl| match decl {
             TopLevel::Import(decl) => Some(decl),
             _ => None,
@@ -83,20 +82,20 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
     let mut docs = vec![];
 
     let mut top_levels_iter = file
-        .top_levels_iter()
+        .top_levels()
         .filter(|decl| {
             !matches!(
                 decl,
                 TopLevel::TolkRequiredVersion(_)
                     | TopLevel::Import(_)
-                    | TopLevel::EmptyStatement(_)
+                    | TopLevel::EmptyStmt(_)
                     | TopLevel::Unmapped(_)
             )
         })
         .peekable();
 
     while let Some(top_level) = top_levels_iter.next() {
-        let node = top_level.raw_node();
+        let node = top_level.syntax();
         let comments = ctx.comments.get(&node);
 
         if comments::has_fmt_ignore(ctx, comments) {
@@ -117,8 +116,8 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
         // Add empty line between declarations if needed
         let next_decl = top_levels_iter.peek();
         if let Some(next_decl) = next_decl {
-            let top_level_node = top_level.raw_node();
-            let next_top_level_node = next_decl.raw_node();
+            let top_level_node = top_level.syntax();
+            let next_top_level_node = next_decl.syntax();
 
             if next_top_level_node.kind() == top_level_node.kind()
                 && next_top_level_node.kind() == "constant_declaration"
@@ -145,15 +144,15 @@ pub fn print_decl<'a>(ctx: &Context<'_>, decl: &TopLevel) -> Option<RcDoc<'a>> {
     match decl {
         TopLevel::TolkRequiredVersion(v) => print_tolk_required_version(ctx, v),
         TopLevel::Import(i) => print_import(ctx, i),
-        TopLevel::GlobalVarDeclaration(g) => print_global_var_declaration(ctx, g),
-        TopLevel::ConstantDeclaration(constant) => print_constant_declaration(ctx, constant),
-        TopLevel::TypeAliasDeclaration(t) => print_type_alias_declaration(ctx, t),
-        TopLevel::StructDeclaration(s) => print_struct_declaration(ctx, s),
-        TopLevel::EnumDeclaration(e) => print_enum_declaration(ctx, e),
-        TopLevel::Function(func) => print_function(ctx, func),
-        TopLevel::MethodDeclaration(m) => print_method_declaration(ctx, m),
-        TopLevel::GetMethodDeclaration(g) => print_get_method_declaration(ctx, g),
-        TopLevel::EmptyStatement(_) => Some(RcDoc::text(";")),
+        TopLevel::GlobalVar(g) => print_global_var_declaration(ctx, g),
+        TopLevel::Constant(constant) => print_constant_declaration(ctx, constant),
+        TopLevel::TypeAlias(t) => print_type_alias_declaration(ctx, t),
+        TopLevel::Struct(s) => print_struct_declaration(ctx, s),
+        TopLevel::Enum(e) => print_enum_declaration(ctx, e),
+        TopLevel::Func(func) => print_function(ctx, func),
+        TopLevel::Method(m) => print_method_declaration(ctx, m),
+        TopLevel::GetMethod(g) => print_get_method_declaration(ctx, g),
+        TopLevel::EmptyStmt(_) => Some(RcDoc::text(";")),
         TopLevel::Unmapped(node) => common::print_node_text(ctx, &node.0),
     }
 }
@@ -176,10 +175,7 @@ pub fn print_import<'a>(ctx: &Context<'_>, i: &Import) -> Option<RcDoc<'a>> {
 }
 
 #[must_use]
-pub fn print_global_var_declaration<'a>(
-    ctx: &Context,
-    g: &GlobalVarDeclaration,
-) -> Option<RcDoc<'a>> {
+pub fn print_global_var_declaration<'a>(ctx: &Context, g: &GlobalVar) -> Option<RcDoc<'a>> {
     let name = g.name()?;
     let typ = g.typ()?;
 
@@ -197,10 +193,7 @@ pub fn print_global_var_declaration<'a>(
 }
 
 #[must_use]
-pub fn print_constant_declaration<'a>(
-    ctx: &Context,
-    constant: &ConstantDeclaration,
-) -> Option<RcDoc<'a>> {
+pub fn print_constant_declaration<'a>(ctx: &Context, constant: &Constant) -> Option<RcDoc<'a>> {
     let name = constant.name()?;
 
     let mut parts = vec![];
@@ -227,10 +220,7 @@ pub fn print_constant_declaration<'a>(
 }
 
 #[must_use]
-pub fn print_type_alias_declaration<'a>(
-    ctx: &Context,
-    t: &TypeAliasDeclaration,
-) -> Option<RcDoc<'a>> {
+pub fn print_type_alias_declaration<'a>(ctx: &Context, t: &TypeAlias) -> Option<RcDoc<'a>> {
     let name = t.name()?;
 
     let mut parts = vec![];
@@ -265,7 +255,7 @@ pub fn print_type_alias_declaration<'a>(
 }
 
 #[must_use]
-pub fn print_struct_declaration<'a>(ctx: &Context<'_>, s: &StructDeclaration) -> Option<RcDoc<'a>> {
+pub fn print_struct_declaration<'a>(ctx: &Context<'_>, s: &Struct) -> Option<RcDoc<'a>> {
     let name = s.name()?;
 
     let mut parts = vec![];
@@ -294,9 +284,10 @@ pub fn print_struct_declaration<'a>(ctx: &Context<'_>, s: &StructDeclaration) ->
 }
 
 pub fn print_struct_body<'a>(ctx: &Context<'_>, body: &StructBody) -> Option<RcDoc<'a>> {
+    let fields: Vec<_> = body.fields().collect();
     common::print_list(
         ctx,
-        &body.fields(),
+        &fields,
         print_struct_field_declaration,
         |f| f.0,
         |_| vec![],
@@ -305,10 +296,7 @@ pub fn print_struct_body<'a>(ctx: &Context<'_>, body: &StructBody) -> Option<RcD
 }
 
 #[must_use]
-pub fn print_struct_field_declaration<'a>(
-    ctx: &Context,
-    f: &StructFieldDeclaration,
-) -> Option<RcDoc<'a>> {
+pub fn print_struct_field_declaration<'a>(ctx: &Context, f: &StructField) -> Option<RcDoc<'a>> {
     let name = f.name()?;
     let typ = f.typ()?;
 
@@ -333,7 +321,7 @@ pub fn print_struct_field_declaration<'a>(
 }
 
 #[must_use]
-pub fn print_enum_declaration<'a>(ctx: &Context<'_>, e: &EnumDeclaration) -> Option<RcDoc<'a>> {
+pub fn print_enum_declaration<'a>(ctx: &Context<'_>, e: &Enum) -> Option<RcDoc<'a>> {
     let name = e.name()?;
 
     let mut parts = vec![];
@@ -357,9 +345,10 @@ pub fn print_enum_declaration<'a>(ctx: &Context<'_>, e: &EnumDeclaration) -> Opt
 }
 
 pub fn print_enum_body<'a>(ctx: &Context<'_>, body: &EnumBody) -> Option<RcDoc<'a>> {
+    let members: Vec<_> = body.members().collect();
     common::print_list(
         ctx,
-        &body.members(),
+        &members,
         print_enum_member_declaration,
         |m| m.0,
         |_| vec![],
@@ -368,10 +357,7 @@ pub fn print_enum_body<'a>(ctx: &Context<'_>, body: &EnumBody) -> Option<RcDoc<'
 }
 
 #[must_use]
-pub fn print_enum_member_declaration<'a>(
-    ctx: &Context,
-    m: &EnumMemberDeclaration,
-) -> Option<RcDoc<'a>> {
+pub fn print_enum_member_declaration<'a>(ctx: &Context, m: &EnumMember) -> Option<RcDoc<'a>> {
     let mut parts = vec![];
     let name = m.name()?;
     parts.push(exprs::print_ident(ctx, &name)?);
@@ -383,9 +369,9 @@ pub fn print_enum_member_declaration<'a>(
 }
 
 #[must_use]
-pub fn print_function<'a>(ctx: &Context<'_>, func: &Function) -> Option<RcDoc<'a>> {
+pub fn print_function<'a>(ctx: &Context<'_>, func: &Func) -> Option<RcDoc<'a>> {
     let name = func.name()?;
-    let parameters = func.parameters();
+    let parameters: Vec<_> = func.parameters().collect();
     let body = func.body()?;
 
     let mut parts = vec![];
@@ -407,7 +393,7 @@ pub fn print_function<'a>(ctx: &Context<'_>, func: &Function) -> Option<RcDoc<'a
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FunctionBody::BlockStatement(_));
+    let is_special = !matches!(body, FuncBody::Block(_));
     if is_special {
         parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     } else {
@@ -419,9 +405,11 @@ pub fn print_function<'a>(ctx: &Context<'_>, func: &Function) -> Option<RcDoc<'a
 }
 
 #[must_use]
-pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &MethodDeclaration) -> Option<RcDoc<'a>> {
+pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &Method) -> Option<RcDoc<'a>> {
     let name = m.name()?;
-    let parameters = m.parameters(ctx.code.as_ref().as_ref(), false);
+    let parameters: Vec<_> = m
+        .parameters_ext(ctx.code.as_ref().as_ref(), false)
+        .collect();
     let body = m.body()?;
 
     let mut parts = vec![];
@@ -448,7 +436,7 @@ pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &MethodDeclaration) ->
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FunctionBody::BlockStatement(_));
+    let is_special = !matches!(body, FuncBody::Block(_));
     if is_special {
         parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     } else {
@@ -460,12 +448,9 @@ pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &MethodDeclaration) ->
 }
 
 #[must_use]
-pub fn print_get_method_declaration<'a>(
-    ctx: &Context,
-    g: &GetMethodDeclaration,
-) -> Option<RcDoc<'a>> {
+pub fn print_get_method_declaration<'a>(ctx: &Context, g: &GetMethod) -> Option<RcDoc<'a>> {
     let name = g.name()?;
-    let parameters = g.parameters();
+    let parameters: Vec<_> = g.parameters().collect();
     let body = g.body()?;
 
     let mut parts = vec![];
@@ -483,7 +468,7 @@ pub fn print_get_method_declaration<'a>(
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FunctionBody::BlockStatement(_));
+    let is_special = !matches!(body, FuncBody::Block(_));
     if is_special {
         parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     } else {
@@ -502,7 +487,7 @@ pub fn print_method_receiver<'a>(ctx: &Context<'_>, r: &MethodReceiver) -> Optio
 }
 
 pub trait ParameterTrait {
-    fn raw_node<'tree>(&self) -> tree_sitter::Node<'tree>
+    fn syntax<'tree>(&self) -> tree_sitter::Node<'tree>
     where
         Self: 'tree;
     fn mutate(&self) -> bool;
@@ -512,13 +497,13 @@ pub trait ParameterTrait {
     fn typ<'tree>(&self) -> Option<Type<'tree>>
     where
         Self: 'tree;
-    fn default<'tree>(&self) -> Option<Expression<'tree>>
+    fn default<'tree>(&self) -> Option<Expr<'tree>>
     where
         Self: 'tree;
 }
 
 impl ParameterTrait for Parameter<'_> {
-    fn raw_node<'t>(&self) -> tree_sitter::Node<'t>
+    fn syntax<'t>(&self) -> tree_sitter::Node<'t>
     where
         Self: 't,
     {
@@ -531,7 +516,7 @@ impl ParameterTrait for Parameter<'_> {
     where
         Self: 't,
     {
-        self.name()
+        self.0.field("name")
     }
     fn typ<'t>(&self) -> Option<Type<'t>>
     where
@@ -539,7 +524,7 @@ impl ParameterTrait for Parameter<'_> {
     {
         self.typ()
     }
-    fn default<'t>(&self) -> Option<Expression<'t>>
+    fn default<'t>(&self) -> Option<Expr<'t>>
     where
         Self: 't,
     {
@@ -548,7 +533,7 @@ impl ParameterTrait for Parameter<'_> {
 }
 
 impl ParameterTrait for LambdaParameter<'_> {
-    fn raw_node<'t>(&self) -> tree_sitter::Node<'t>
+    fn syntax<'t>(&self) -> tree_sitter::Node<'t>
     where
         Self: 't,
     {
@@ -561,7 +546,7 @@ impl ParameterTrait for LambdaParameter<'_> {
     where
         Self: 't,
     {
-        self.name()
+        self.0.field("name")
     }
     fn typ<'t>(&self) -> Option<Type<'t>>
     where
@@ -569,7 +554,7 @@ impl ParameterTrait for LambdaParameter<'_> {
     {
         self.typ()
     }
-    fn default<'t>(&self) -> Option<Expression<'t>>
+    fn default<'t>(&self) -> Option<Expr<'t>>
     where
         Self: 't,
     {
@@ -612,7 +597,7 @@ where
         ctx,
         params,
         print_parameter_declaration,
-        P::raw_node,
+        P::syntax,
         |_| vec![],
         common::ListOptions::default(),
     )
@@ -620,7 +605,7 @@ where
 
 #[must_use]
 pub fn print_annotation_list<'a>(ctx: &Context<'_>, a: &AnnotationList) -> Option<RcDoc<'a>> {
-    let annotations = a.annotations();
+    let annotations: Vec<_> = a.annotations().collect();
 
     let mut docs = vec![];
     for (i, annotation) in annotations.iter().enumerate() {
@@ -650,30 +635,29 @@ pub fn print_annotation<'a>(ctx: &Context<'_>, a: &Annotation) -> Option<RcDoc<'
     if let Some(name) = a.name() {
         parts.push(exprs::print_ident(ctx, &name)?);
     }
-    if let Some(args) = a.arguments() {
+    if let Some(args) = a.args() {
         parts.push(print_annotation_arguments(ctx, &args)?);
     }
     Some(RcDoc::concat(parts))
 }
 
-pub fn print_annotation_arguments<'a>(
-    ctx: &Context<'_>,
-    a: &AnnotationArguments,
-) -> Option<RcDoc<'a>> {
+pub fn print_annotation_arguments<'a>(ctx: &Context<'_>, a: &AnnotationArgs) -> Option<RcDoc<'a>> {
+    let arguments: Vec<_> = a.args().collect();
     common::print_list(
         ctx,
-        &a.arguments(),
+        &arguments,
         exprs::print_expression,
-        Expression::raw_node,
+        Expr::syntax,
         |_| vec![],
         common::ListOptions::default(),
     )
 }
 
 pub fn print_type_parameters<'a>(ctx: &Context<'_>, tp: &TypeParameters) -> Option<RcDoc<'a>> {
+    let parameters: Vec<_> = tp.parameters().collect();
     common::print_list(
         ctx,
-        &tp.parameters(),
+        &parameters,
         print_type_parameter,
         |p| p.0,
         |_| vec![],
@@ -693,12 +677,12 @@ pub fn print_type_parameter<'a>(ctx: &Context<'_>, tp: &TypeParameter) -> Option
     Some(RcDoc::concat(parts))
 }
 
-fn print_function_body<'a>(ctx: &Context<'_>, body: &FunctionBody) -> Option<RcDoc<'a>> {
+fn print_function_body<'a>(ctx: &Context<'_>, body: &FuncBody) -> Option<RcDoc<'a>> {
     match body {
-        FunctionBody::BlockStatement(block) => stmts::print_block_statement(ctx, block),
-        FunctionBody::AsmBody(asm) => print_asm_body(ctx, asm),
-        FunctionBody::BuiltinSpecifier(_) => Some(RcDoc::text("builtin")),
-        FunctionBody::Unmapped(node) => common::print_node_text(ctx, &node.0),
+        FuncBody::Block(block) => stmts::print_block_statement(ctx, block),
+        FuncBody::AsmBody(asm) => print_asm_body(ctx, asm),
+        FuncBody::BuiltinSpecifier(_) => Some(RcDoc::text("builtin")),
+        FuncBody::Unmapped(node) => common::print_node_text(ctx, &node.0),
     }
 }
 
@@ -706,8 +690,8 @@ fn print_function_body<'a>(ctx: &Context<'_>, body: &FunctionBody) -> Option<RcD
 pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>> {
     let mut parts = vec![RcDoc::text("asm")];
 
-    let params = asm.params();
-    let returns = asm.return_values();
+    let params: Vec<_> = asm.params().collect();
+    let returns: Vec<_> = asm.return_values().collect();
 
     if !params.is_empty() || !returns.is_empty() {
         parts.push(RcDoc::text("("));
@@ -729,7 +713,7 @@ pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>>
         parts.push(RcDoc::text(")"));
     }
 
-    let instructions = asm.instructions();
+    let instructions: Vec<_> = asm.instructions().collect();
     let mut inst_docs = vec![];
 
     for (i, inst) in instructions.iter().enumerate() {

@@ -1,7 +1,7 @@
 use tree_sitter::Node;
 
 pub(super) fn inject_locations_into_expect_calls(content: &str, file_path: &str) -> String {
-    let Ok(tree) = tolk_parser::parser::parse(content) else {
+    let Ok(tree) = tolk_syntax::parse(content) else {
         return String::new();
     };
     let root_node = tree.root_node();
