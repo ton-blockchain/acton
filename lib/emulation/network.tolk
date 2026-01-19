@@ -17,9 +17,9 @@
 /// val balance = net.balance(contract.address);
 /// val seqno = net.runGetMethod<int>(contract.address, "seqno");
 /// ```
-
 import "@stdlib/common"
 import "@stdlib/gas-payments"
+import "config"
 import "../build/build"
 import "../ffi/ffi"
 import "../fmt"
@@ -30,7 +30,6 @@ import "../types/message"
 import "../types/out_actions"
 import "../types/transaction"
 import "../vm/vm"
-import "config"
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
@@ -199,20 +198,15 @@ fun SendResultList.at(self, index: int): SendResult {
 /// val result = net.send(wallet.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
 /// val success = result.wait(true, 30, 3000); // quiet mode, 30 attempts, 3 seconds delay
 /// ```
-fun SendResultList.wait(
-    self,
-    quiet: bool = false,
-    attempts: int = 20,
-    sleepDuration: int = 2000,
-): bool {
+fun SendResultList.wait(self, quiet: bool = false, attempts: int = 20, sleepDuration: int = 2000): bool {
     if (!net.isBroadcasting()) {
         // in emulation mode we don't need to wait for anything
-        return true
+        return true;
     }
 
     if (self.size() == 0) {
         // unexpected
-        return false
+        return false;
     }
 
     val res = self.at(0);
@@ -223,7 +217,7 @@ fun SendResultList.wait(
     body.skipBits(1); // skip Either bit
     val bodyHash = body.hash();
     val bodyHashSlice = beginCell().storeUint(bodyHash, 256).toSlice();
-    return net.waitForTransaction(inMsg.info.dest, bodyHashSlice, quiet, attempts, sleepDuration)
+    return net.waitForTransaction(inMsg.info.dest, bodyHashSlice, quiet, attempts, sleepDuration);
 }
 
 /// Represents a set of parameters to search for a transaction in the transaction list.
@@ -235,9 +229,9 @@ struct SearchParams {
     /// Exit code of the transaction.
     exitCode: int32? = null
     /// Whether the transaction is succesfull (both compute and action phase).
-    success: bool? = null,
+    success: bool? = null
     /// Whether the compute phase of transaction was aborted and transaction was reverted.
-    aborted: bool? = null,
+    aborted: bool? = null
     /// Whether the transaction is a deploy transaction.
     ///
     /// Deploy transaction is a transaction that changes the `from` account status from "NonExisting" to "Active".
@@ -265,7 +259,7 @@ struct ExternalOutSearchParams {
 
 fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>(
     self,
-    params: ExternalOutSearchParams = {}
+    params: ExternalOutSearchParams = {},
 ): bool {
     if (params.from != null && self.info.src != params.from) {
         return false;
@@ -311,30 +305,22 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>
 /// ```
 ///
 /// If the message is not found, returns None.
-fun SendResultList.findExternalOutMessage<TBody = never>(
-    self,
-    params: ExternalOutSearchParams = {}
-): Maybe<Message<TBody, ExternalOutMessageInfo>> {
+fun SendResultList.findExternalOutMessage<TBody = never>(self, params: ExternalOutSearchParams = {}): Maybe<Message<TBody, ExternalOutMessageInfo>> {
     var transactionIdx = 0;
     while (transactionIdx < self.size()) {
         val externals = self.at(transactionIdx).externals;
 
         var externalIdx = 0;
         while (externalIdx < externals.size()) {
-            val externalOut = externals
-                .get<Cell<Message<RemainingBitsAndRefs, ExternalOutMessageInfo>>>(externalIdx)
+            val externalOut = externals.get<Cell<Message<RemainingBitsAndRefs, ExternalOutMessageInfo>>>(externalIdx)
                 .load();
 
             if (externalOut.matches<TBody>(params)) {
-                return Maybe<Message<TBody, ExternalOutMessageInfo>>.some(
-                    Message{
-                        info: externalOut.info,
-                        init: externalOut.init,
-                        body: EitherLeft{
-                            value: TBody.fromSlice(externalOut.loadBody()),
-                        },
-                    },
-                );
+                return Maybe<Message<TBody, ExternalOutMessageInfo>>.some(Message {
+                    info: externalOut.info,
+                    init: externalOut.init,
+                    body: EitherLeft { value: TBody.fromSlice(externalOut.loadBody()) },
+                });
             }
 
             externalIdx += 1;
@@ -409,7 +395,7 @@ fun net.send(from: address, message: OutMessage, mode: int): SendResultList {
 /// See [net.send] if you need to send a message and process out messages.
 fun net.sendSingle(from: address, message: OutMessage): SendResult {
     val res = ffi.sendSingleMessage(message.messageCell, from.toCell())!;
-    return SendResult.fromTuple(res)
+    return SendResult.fromTuple(res);
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
@@ -518,12 +504,10 @@ fun net.wallet(name: slice): Wallet {
             throw 1;
         }
         val address = addressCell.beginParse().loadAddress();
-        return Wallet { address }
+        return Wallet { address };
     }
 
-    return Wallet {
-        address: net.treasury(name).address,
-    }
+    return Wallet { address: net.treasury(name).address };
 }
 
 /// Check if the script is running in broadcasting mode.
@@ -541,7 +525,7 @@ fun net.wallet(name: slice): Wallet {
 /// }
 /// ```
 fun net.isBroadcasting(): bool {
-    return ffi.isBroadcasting()
+    return ffi.isBroadcasting();
 }
 
 /// Enable broadcasting mode.
@@ -633,7 +617,7 @@ fun net.disableBroadcast(): void {
 /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
 fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
     val methodId = (crc16(name) & 0xffff) | 0x10000;
-    return impl.runGetMethodById(addr, methodId, name, args)
+    return impl.runGetMethodById(addr, methodId, name, args);
 }
 
 /// Run a get method of a contract by its ID.
@@ -647,7 +631,7 @@ fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? 
 ///
 /// See [net.runGetMethod] for more information.
 fun net.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, args: Args? = null): Ret {
-    return impl.runGetMethodById(addr, id, "", args)
+    return impl.runGetMethodById(addr, id, "", args);
 }
 
 /// Check if a contract with a specified address is deployed.
@@ -787,7 +771,7 @@ fun net.getAccountState(addr: address): AccountInfo? {
         return null;
     }
     val typedCell = cell as Cell<AccountInfo>;
-    return typedCell.load()
+    return typedCell.load();
 }
 
 /// Returns storage fee for address for specified amount of seconds.
@@ -814,7 +798,7 @@ fun net.getAccountStorageFee(addr: address, seconds: int) {
 ///
 /// Returns null if library is not found.
 fun net.loadLibrary(hash: slice): cell? {
-    return ffi.loadLibrary(hash)
+    return ffi.loadLibrary(hash);
 }
 
 /// Load library from the real blockchain by hash and register it in current blockchain.
@@ -823,10 +807,10 @@ fun net.loadLibrary(hash: slice): cell? {
 fun net.fetchAndRegisterLibrary(hash: slice): bool {
     val cell = net.loadLibrary(hash);
     if (cell == null) {
-        return false
+        return false;
     }
     vm.registerLibrary(cell);
-    return true
+    return true;
 }
 
 /// Set the current Unix timestamp for time forwarding emulation.
@@ -885,18 +869,71 @@ fun net.balance(of: address): coins {
     if (state == null) {
         return 0;
     }
-    return state.storage.balance.grams
+    return state.storage.balance.grams;
 }
 
+/// Sets the blockchain configuration.
+///
+/// This function updates the entire blockchain configuration with a new configuration dict.
+/// The configuration is validated before being applied. If validation fails, the function
+/// returns false and the configuration is not updated.
+///
+/// For detailed information about blockchain configuration parameters, see the
+/// [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
+///
+/// Parameters:
+/// - `config`: The new [Config] map containing configuration parameters (indices 0-90)
+///
+/// Returns: `true` if the configuration was successfully updated, `false` if validation failed.
+///
+/// Example:
+/// ```tolk
+/// var config = net.getConfig();
+/// val storagePrices = config.getStoragePrices();
+/// var pricesDict = storagePrices;
+/// pricesDict.setInitial(StoragePrices {
+///     initialUnixTime: 0,
+///     bitPrice: 1,
+///     cellPrice: 1000,
+///     masterchainBitPrice: 1,
+///     masterchainCellPrice: 1000
+/// });
+/// config.setStoragePrices(pricesDict);
+/// val success = net.setConfig(config);
+/// if (success) {
+///     println("Configuration updated successfully");
+/// }
+/// ```
 fun net.setConfig(config: Config): bool {
     return ffi.setConfig(config.toLowLevelDict());
 }
 
-
+/// Retrieves the current blockchain configuration.
+///
+/// Returns a map of all blockchain configuration parameters indexed from 0-90.
+/// The configuration includes gas prices, storage costs, validator settings, and other
+/// network parameters. Use specialized getter functions like [Config.getGasPrices],
+/// [Config.getStoragePrices], or [Config.getGlobalVersion] to access specific parameters.
+///
+/// For detailed information about blockchain configuration parameters, see the
+/// [TON Blockchain Configuration Reference](https://docs.ton.org/foundations/config).
+///
+/// Returns: A [Config] map containing all current blockchain configuration parameters.
+///
+/// Example:
+/// ```tolk
+/// val config = net.getConfig();
+///
+/// // Access specific configuration
+/// val gasPrice = config.getGasPrices(BASECHAIN);
+/// val storagePrices = config.getStoragePrices();
+/// val globalVersion = config.getGlobalVersion();
+///
+/// println(format1("Network version: {}", globalVersion.version));
+/// ```
 fun net.getConfig(): Config {
     return createMapFromLowLevelDict(ffi.getConfig());
 }
-
 
 /// Calculate the CRC16 checksum of a slice.
 ///
@@ -904,7 +941,8 @@ fun net.getConfig(): Config {
 /// ```tolk
 /// val crc = crc16("hello");
 /// ```
-fun crc16(data: slice): int asm "13 EXTCALL"
+fun crc16(data: slice): int
+    asm "13 EXTCALL"
 
 fun tuple.fromTuple(data: tuple): tuple {
     return data;
@@ -912,7 +950,12 @@ fun tuple.fromTuple(data: tuple): tuple {
 
 struct impl
 
-fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: slice, args: Args? = null): Ret {
+fun impl.runGetMethodById<Ret, Args = tuple>(
+    addr: address,
+    id: int,
+    name: slice,
+    args: Args? = null,
+): Ret {
     if (!net.isDeployed(addr)) {
         throw CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT;
     }
@@ -926,41 +969,75 @@ fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: slice
     val res = ffi.runGetMethod(addr.toCell(), code, id, name, Ret.typeName(), argsToSend);
     if (res == null) {
         // actual error will be processed by test framework, just halt execution
-        throw 0
+        throw 0;
     }
     try {
         return Ret.fromTuple(res);
     } catch (e) {
         if (e == 7) {
-            Assert.fail(format3("Get method '{}' returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.", name, res, Ret.typeName()))
+            Assert.fail(format3(
+                "Get method '{}' returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.",
+                name,
+                res,
+                Ret.typeName()
+            ));
         }
 
-        throw e
+        throw e;
     }
 }
 
-fun __treasuryCode(): cell asm """
+fun __treasuryCode(): cell
+    asm
+    """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
-fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): SendResultList? asm "9 EXTCALL"
-fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
-fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: slice, returnType: slice, args: tuple): tuple? asm "8 EXTCALL"
-fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
-fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
-fun ffi.registerAddress(address: cell, name: slice): void asm "15 EXTCALL"
-fun ffi.registerCodeCell(cell: cell, name: slice): void asm "16 EXTCALL"
-fun ffi.findTransactionByParams(txs: tuple, params: tuple): cell? asm "10 EXTCALL"
-fun ffi.failToFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "103 EXTCALL"
-fun ffi.failToNotFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "104 EXTCALL"
-fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
-fun ffi.loadLibrary(hash: slice): cell? asm "21 EXTCALL"
-fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
-fun ffi.getWalletByName(name: slice): cell? asm "24 EXTCALL"
-fun ffi.waitForTransaction(addr: cell, messageBodyHash: cell, quiet: bool, attempts: int, sleepDuration: int): bool asm "25 EXTCALL"
-fun ffi.enableBroadcast(): void asm "26 EXTCALL"
-fun ffi.disableBroadcast(): void asm "27 EXTCALL"
-fun ffi.setNow(now: int): void asm "28 EXTCALL"
-fun ffi.getNow(): int asm "29 EXTCALL"
-fun ffi.getConfig(): dict asm "31 EXTCALL"
-fun ffi.setConfig(config: dict): bool asm "32 EXTCALL"
+fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): SendResultList?
+    asm "9 EXTCALL"
+fun ffi.sendSingleMessage(msg: cell, from: cell): tuple?
+    asm "30 EXTCALL"
+fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: slice, returnType: slice, args: tuple): tuple?
+    asm "8 EXTCALL"
+fun ffi.isDeployed(addr: cell): bool
+    asm "11 EXTCALL"
+fun ffi.getDeployedCode(addr: cell): cell?
+    asm "12 EXTCALL"
+fun ffi.registerAddress(address: cell, name: slice): void
+    asm "15 EXTCALL"
+fun ffi.registerCodeCell(cell: cell, name: slice): void
+    asm "16 EXTCALL"
+fun ffi.findTransactionByParams(txs: tuple, params: tuple): cell?
+    asm "10 EXTCALL"
+fun ffi.failToFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple?
+    asm "103 EXTCALL"
+fun ffi.failToNotFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple?
+    asm "104 EXTCALL"
+fun ffi.getAccountState(addr: cell): cell?
+    asm "17 EXTCALL"
+fun ffi.loadLibrary(hash: slice): cell?
+    asm "21 EXTCALL"
+fun ffi.isBroadcasting(): bool
+    asm "23 EXTCALL"
+fun ffi.getWalletByName(name: slice): cell?
+    asm "24 EXTCALL"
+fun ffi.waitForTransaction(
+    addr: cell,
+    messageBodyHash: cell,
+    quiet: bool,
+    attempts: int,
+    sleepDuration: int,
+): bool
+    asm "25 EXTCALL"
+fun ffi.enableBroadcast(): void
+    asm "26 EXTCALL"
+fun ffi.disableBroadcast(): void
+    asm "27 EXTCALL"
+fun ffi.setNow(now: int): void
+    asm "28 EXTCALL"
+fun ffi.getNow(): int
+    asm "29 EXTCALL"
+fun ffi.getConfig(): dict
+    asm "31 EXTCALL"
+fun ffi.setConfig(config: dict): bool
+    asm "32 EXTCALL"
