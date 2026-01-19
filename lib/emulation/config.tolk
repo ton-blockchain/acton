@@ -20,12 +20,13 @@
 ///     freezeDueLimit: 1000000000,
 ///     deleteDueLimit: 5000000000
 /// };
-/// config.setGasPrices(gasPrice, isMasterchain: true);
+/// config.setGasPrices(simplePrices, MASTERCHAIN);
 ///
 /// // Access storage prices
 /// val storagePrices = config.getStoragePrices();
-/// println(format1("Bit price: {}", storagePrices));
+/// println1("Bit price: {}", storagePrices);
 /// ```
+///
 /// Type representing the blockchain configuration.
 ///
 /// The configuration is a key-value map where keys are parameter indices (0-255)
@@ -41,7 +42,7 @@ type Config = map<uint32, cell>
 /// [Config.setGasPrices], [Config.setStoragePrices], or [Config.setGlobalVersion].
 ///
 /// Parameters:
-/// - `index`: The configuration parameter index (typically 0-255)
+/// - `index`: The configuration parameter index (typically 0-90)
 /// - `data`: The serialized cell containing the parameter value
 ///
 /// Example:
@@ -59,7 +60,7 @@ fun Config.setParamRaw(mutate self, index: uint32, data: cell) {
 /// [Config.getGasPrices], [Config.getStoragePrices], or [Config.getGlobalVersion].
 ///
 /// Parameters:
-/// - `index`: The configuration parameter index (typically 0-255)
+/// - `index`: The configuration parameter index (typically 0-90)
 ///
 /// Returns: The raw cell containing the serialized parameter value.
 ///
@@ -81,8 +82,6 @@ const GLOBAL_VERSION_INDEX = 8
 ///
 /// This struct contains the current network version and a set of capability flags
 /// that indicate which features are supported by the network.
-///
-/// Encoded with TL-B type tag `0xc4`.
 struct (0xc4) GlobalVersion {
     /// The current network version number.
     version: uint32
@@ -138,8 +137,6 @@ const STORAGE_PRICES_INDEX = 18
 /// This struct defines the pricing for data storage in both the masterchain and regular workchains.
 /// Prices are given per 65536 seconds of storage. Storage fees are calculated based on the number
 /// of bits and cells used to represent contract code and data.
-///
-/// Encoded with TL-B type tag `0xcc`.
 struct (0xcc) StoragePrices {
     /// Unix timestamp indicating when these prices became effective.
     initialUnixTime: uint32
@@ -159,6 +156,54 @@ struct (0xcc) StoragePrices {
 /// The dictionary is indexed by Unix timestamp values.
 type StoragePricesDict = map<uint32, StoragePrices>
 
+/// Configuration parameter index for the initial storage price (timestamp 0).
+///
+/// This index refers to the storage price entry at index 0, which represents the initial
+/// storage price configuration that applies from the beginning of time.
+const INITIAL_UNIXTIME_STORAGE_INDEX = 0
+
+/// Retrieves the initial storage price configuration from the dictionary.
+///
+/// Gets the storage price entry at index 0, which contains the initial pricing that
+/// applies from the beginning of time until the first timestamp-indexed price update.
+///
+/// Returns: [StoragePrices] configuration containing the initial storage price parameters.
+///
+/// Example:
+/// ```tolk
+/// val storagePrices = config.getStoragePrices();
+/// val initialPrices = storagePrices.getInitial();
+/// println(format1("Initial bit price: {}", initialPrices.bitPrice));
+/// ```
+fun StoragePricesDict.getInitial(self) {
+    return self.get(INITIAL_UNIXTIME_STORAGE_INDEX).loadValue();
+}
+
+/// Sets the initial storage price configuration in the dictionary.
+///
+/// Updates the storage price entry at index 0 with new pricing parameters.
+/// This affects the base storage price that applies from the beginning of time.
+///
+/// Parameters:
+/// - `prices`: The new [StoragePrices] configuration to set as the initial entry
+///
+/// Example:
+/// ```tolk
+/// var storagePrices = config.getStoragePrices();
+/// val newInitialPrices = StoragePrices {
+///     initialUnixTime: 0,
+///     bitPrice: 1,
+///     cellPrice: 1000,
+///     masterchainBitPrice: 1,
+///     masterchainCellPrice: 1000
+/// };
+/// storagePrices.setInitial(newInitialPrices);
+/// config.setStoragePrices(storagePrices);
+/// ```
+fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices) {
+    self.set(INITIAL_UNIXTIME_STORAGE_INDEX, prices);
+}
+
 /// Sets the storage price configuration (Param 18).
 ///
 /// Storage prices are organized as a dictionary mapping timestamps to price structures,
@@ -170,7 +215,7 @@ type StoragePricesDict = map<uint32, StoragePrices>
 ///
 /// Example:
 /// ```tolk
-/// var pricesDict = StoragePricesDict.fromMap(newMap<uint32, StoragePrices>());
+/// var pricesDict = StoragePricesDict.fromMap(createEmptyMap<uint32, StoragePrices>());
 /// pricesDict.set(1000000, StoragePrices {
 ///     initialUnixTime: 1000000,
 ///     bitPrice: 1,
@@ -197,7 +242,7 @@ fun Config.setStoragePrices(mutate self, prices: StoragePricesDict) {
 /// Example:
 /// ```tolk
 /// val storagePrices = config.getStoragePrices();
-/// val prices = storagePrices.at(1000000);
+/// val prices = storagePrices.get(1000000);
 /// println(format3("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
 ///     prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice));
 /// ```
@@ -207,29 +252,9 @@ fun Config.getStoragePrices(self) {
     return StoragePricesDict.fromCell(beginCell().storeBool(true).storeRef(rawDict).endCell());
 }
 
-/// Gas price configuration for simple (non-extended) gas schemes (Param 20/21 variant).
-///
-/// This variant of gas prices is used when special gas limits are not needed.
-/// Encoded with TL-B type tag `0xdd`.
-struct (0xdd) GasPricesSimple {
-    /// Price of 65536 gas units in nanotons.
-    gasPrice: uint64
-    /// Maximum amount of gas that can be consumed per transaction.
-    gasLimit: uint64
-    /// Gas credit provided to process external messages, in gas units.
-    gasCredit: uint64
-    /// Maximum amount of gas that can be consumed within a single block.
-    blockGasLimit: uint64
-    /// Accumulated storage fee limit (in nanotons) above which contracts are frozen.
-    freezeDueLimit: uint64
-    /// Accumulated storage fee limit (in nanotons) above which contracts are deleted.
-    deleteDueLimit: uint64
-}
-
 /// Gas price configuration for extended gas schemes (Param 20/21 variant).
 ///
 /// This variant includes a special gas limit for system contracts.
-/// Encoded with TL-B type tag `0xde`.
 struct (0xde) GasPricesExtended {
     /// Price of 65536 gas units in nanotons.
     gasPrice: uint64
@@ -247,27 +272,18 @@ struct (0xde) GasPricesExtended {
     deleteDueLimit: uint64
 }
 
-/// Union type representing either simple or extended gas price configurations.
-type GasPricesLimited = GasPricesSimple | GasPricesExtended
-
 /// Gas price configuration with flat pricing prefix.
 ///
 /// This allows for two-tiered pricing where a flat fee and price are applied first,
 /// followed by the standard pricing structure.
-/// Encoded with TL-B type tag `0xd1`.
-struct (0xd1) GasPricesPrefix {
+struct (0xd1) GasPrices {
     /// Initial gas amount provided at flat price before standard pricing applies.
     flatGasLimit: uint64
     /// Flat price applied to the initial [GasPricesPrefix.flatGasLimit] amount of gas.
     flatGasPrice: uint64
     /// Additional gas pricing configuration applied after the flat pricing.
-    suffix: GasPricesLimited
+    other: GasPricesExtended
 }
-
-/// Union type representing all possible gas price configurations.
-///
-/// Gas prices can be either simple/extended (without flat prefix) or prefixed (with flat pricing).
-type GasPrices = GasPricesLimited | GasPricesPrefix
 
 /// Configuration parameter index for masterchain gas prices (Param 20).
 const MASTERCHAIN_GAS_PRICES_INDEX = 20
@@ -283,22 +299,9 @@ const BASECHAIN_GAS_PRICES_INDEX = 21
 ///
 /// Parameters:
 /// - `prices`: Gas price configuration struct
-/// - `isMasterchain`: If `true`, sets masterchain gas prices (Param 20); if `false`, sets basechain prices (Param 21)
-///
-/// Example:
-/// ```tolk
-/// val simplePrices = GasPricesSimple {
-///     gasPrice: 1000,
-///     gasLimit: 1000000,
-///     gasCredit: 10000,
-///     blockGasLimit: 10000000,
-///     freezeDueLimit: 1000000000,
-///     deleteDueLimit: 5000000000
-/// };
-/// config.setGasPrices(simplePrices, isMasterchain: false);
-/// ```
-fun Config.setGasPrices(mutate self, prices: GasPrices, isMasterchain: bool) {
-    val index = isMasterchain ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
+/// - `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
+fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int) {
+    val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
     self.set(index, prices.toCell());
 }
 
@@ -307,17 +310,17 @@ fun Config.setGasPrices(mutate self, prices: GasPrices, isMasterchain: bool) {
 /// Returns the gas price configuration that determines transaction execution costs.
 ///
 /// Parameters:
-/// - `isMasterchain`: If `true`, retrieves masterchain gas prices (Param 20); if `false`, retrieves basechain prices (Param 21)
+/// - `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
 ///
 /// Returns: [GasPrices] configuration union containing the gas pricing parameters.
 ///
 /// Example:
 /// ```tolk
-/// val gasPrices = config.getGasPrices(isMasterchain: false);
-/// println(format1("Gas limit: {}", gasPrices));
+/// val gasPrices = config.getGasPrices(BASECHAIN);
+/// println(format1("Gas limit basechain: {}", gasPrices));
 /// ```
-fun Config.getGasPrices(self, isMasterchain: bool) {
-    val index = isMasterchain ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
+fun Config.getGasPrices(self, chainType: int) {
+    val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
     return GasPrices.fromCell(self.get(index).loadValue());
 }
 
@@ -325,8 +328,6 @@ fun Config.getGasPrices(self, isMasterchain: bool) {
 ///
 /// This struct defines the costs associated with forwarding messages between accounts and shards
 /// in the TON Blockchain. Message routing uses these prices to calculate fees for message delivery.
-///
-/// Encoded with TL-B type tag `0xea`.
 struct (0xea) MsgForwardPrices {
     /// Base price for forwarding a message, independent of its size, in nanotons.
     lumpPrice: uint64
@@ -355,7 +356,7 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 ///
 /// Parameters:
 /// - `prices`: Message forwarding price configuration
-/// - `isMasterchain`: If `true`, sets masterchain message prices (Param 24); if `false`, sets basechain prices (Param 25)
+/// - `chainType`: If `MASTERCHAIN`, sets masterchain message prices (Param 24); if `BASECHAIN`, sets basechain prices (Param 25)
 ///
 /// Example:
 /// ```tolk
@@ -367,10 +368,10 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 ///     firstFrac: 21845,
 ///     nextFrac: 21845
 /// };
-/// config.setMsgForwardPrices(msgPrices, isMasterchain: false);
+/// config.setMsgForwardPrices(msgPrices, MASTERCHAIN);
 /// ```
-fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, isMasterchain: bool) {
-    val index = isMasterchain
+fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int) {
+    val index = chainType == MASTERCHAIN
         ? MASTERCHAIN_MSG_FORWARD_PRICES_INDEX
         : BASECHAIN_MSG_FORWARD_PRICES_INDEX;
 
@@ -382,18 +383,18 @@ fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, isMasterch
 /// Returns the message forwarding prices that determine message routing costs.
 ///
 /// Parameters:
-/// - `isMasterchain`: If `true`, retrieves masterchain message prices (Param 24); if `false`, retrieves basechain prices (Param 25)
+/// - `chainType`: If `MASTERCHAIN`, sets masterchain message prices (Param 24); if `BASECHAIN`, sets basechain prices (Param 25)
 ///
 /// Returns: [MsgForwardPrices] configuration containing message forwarding price parameters.
 ///
 /// Example:
 /// ```tolk
-/// val msgPrices = config.getMsgForwardPrices(isMasterchain: false);
+/// val msgPrices = config.getMsgForwardPrices(BASECHAIN);
 /// println(format3("Lump price: {}, Bit price: {}, Cell price: {}",
 ///     msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice));
 /// ```
-fun Config.getMsgForwardPrices(self, isMasterchain: bool) {
-    val index = isMasterchain
+fun Config.getMsgForwardPrices(self, chainType: int) {
+    val index = chainType == MASTERCHAIN
         ? MASTERCHAIN_MSG_FORWARD_PRICES_INDEX
         : BASECHAIN_MSG_FORWARD_PRICES_INDEX;
 
@@ -410,7 +411,6 @@ const PRECOMPILED_CONTRACTS_CONFIG_INDEX = 45
 /// Precompiled smart contract configuration.
 ///
 /// Specifies the gas usage for a precompiled contract.
-/// Encoded with TL-B type tag `0xb0`.
 struct (0xb0) PrecompiledSmartContract {
     /// Fixed gas consumption for executing this precompiled contract.
     gasUsage: uint64
@@ -420,7 +420,6 @@ struct (0xb0) PrecompiledSmartContract {
 ///
 /// Contains a dictionary mapping contract addresses to their gas usage specifications.
 /// Precompiled contracts are optimized implementations of common operations provided by the system.
-/// Encoded with TL-B type tag `0xc0`.
 struct (0xc0) PrecompiledContractsConfig {
     /// Dictionary mapping 256-bit contract addresses to their gas usage configurations.
     list: map<uint256, PrecompiledSmartContract>
@@ -437,10 +436,10 @@ struct (0xc0) PrecompiledContractsConfig {
 ///
 /// Example:
 /// ```tolk
-/// var contractsList = newMap<uint256, PrecompiledSmartContract>();
+/// var contractsList = createEmptyMap<uint256, PrecompiledSmartContract>();
 /// contractsList.set(0x123456, PrecompiledSmartContract { gasUsage: 1000 });
 /// val precompiledConfig = PrecompiledContractsConfig {
-///     list: PrecompiledContractsDict.fromMap(contractsList)
+///     list: contractsList
 /// };
 /// config.setPrecompiledContractsConfig(precompiledConfig);
 /// ```

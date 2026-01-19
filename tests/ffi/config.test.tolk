@@ -12,11 +12,11 @@ get fun `test set config`() {
     var config = net.getConfig();
 
     var storagePricesBefore = config.getStoragePrices();
-    var baseStorage = storagePricesBefore.get(0).loadValue();
+    var baseStorage = storagePricesBefore.getInitial();
     baseStorage.bitPrice += 10;
 
     val savedPrice = baseStorage.bitPrice;
-    storagePricesBefore.set(0, baseStorage);
+    storagePricesBefore.setInitial(baseStorage);
     config.setStoragePrices(storagePricesBefore);
 
     val result = net.setConfig(config);
@@ -24,7 +24,7 @@ get fun `test set config`() {
 
     val updatedConfig = net.getConfig();
     var pricesAfter = updatedConfig.getStoragePrices();
-    var actual = pricesAfter.get(0).loadValue();
+    var actual = pricesAfter.getInitial();
 
     expect(savedPrice).toEqual(actual.bitPrice);
 }

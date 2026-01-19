@@ -1327,9 +1327,12 @@ const fn enable_broadcast_impl(ctx: &mut Context, _stack: &mut Tuple) -> anyhow:
 extension!(get_config in (Context) using get_config_impl);
 fn get_config_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     let config = ctx.chain.world_state.get_config();
-    let config_cell = config.root().as_ref().expect("Config has no root");
-    let arc = ArcCell::from_boc_b64(&Boc::encode_base64(config_cell))
-        .map_err(|e| anyhow::anyhow!("Failed to decode config base64 from world state: {e}"))?;
+    let config_cell = config
+        .root()
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Config has no root cell"))?;
+    let arc = ArcCell::from_boc(&Boc::encode(config_cell))
+        .map_err(|e| anyhow::anyhow!("Failed to encode config from world state: {e}"))?;
 
     stack.push(TupleItem::Cell(arc));
     Ok(())
