@@ -201,7 +201,7 @@ fn execute_script(
         )),
         None => AccountsState::Local(LocalAccountsState::new()),
     };
-    let mut world_state = WorldState::new(resolver, config_b64);
+    let mut world_state = WorldState::new(resolver, config_b64)?;
     let mut build_cache = BuildCache::new();
     let mut file_build_cache = FileBuildCache::new(None)?;
     let mut known_addresses = KnownAddresses::new();

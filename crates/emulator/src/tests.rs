@@ -9,7 +9,7 @@ fn test_get_config() -> anyhow::Result<()> {
     let state = WorldState::new(
         crate::AccountsState::Local(crate::LocalAccountsState::new()),
         None,
-    );
+    )?;
 
     let config = state.get_config();
     let version = config.get(8).expect("No version").expect("Has value");

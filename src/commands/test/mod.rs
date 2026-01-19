@@ -255,7 +255,7 @@ impl<'a> TestRunner<'a> {
             )),
             None => AccountsState::Local(LocalAccountsState::new()),
         };
-        let mut world_state = WorldState::new(state, config_b64);
+        let mut world_state = WorldState::new(state, config_b64)?;
 
         // Register all ref dependency to correct work
         for cell in self.ref_contracts.values() {

@@ -273,7 +273,7 @@ impl RemoteAccountState {
 /// ```
 /// use emulator::world_state::{WorldState, AccountsState, LocalAccountsState};
 ///
-/// let mut world_state = WorldState::new(AccountsState::Local(LocalAccountsState::new()));
+/// let mut world_state = WorldState::new(AccountsState::Local(LocalAccountsState::new()), None).expect("Failed to create world state");
 /// assert_eq!(world_state.get_now(), 0);
 /// world_state.set_now(1000);
 /// assert_eq!(world_state.get_now(), 1000);
@@ -294,20 +294,23 @@ pub struct WorldState {
 impl WorldState {
     /// Creates a new `WorldState` instance with the given initial state.
     #[must_use]
-    pub fn new(accounts_state: AccountsState, config_b64: Option<&str>) -> Self {
+    pub fn new(accounts_state: AccountsState, config_b64: Option<&str>) -> anyhow::Result<Self> {
         let config_str = config_b64.unwrap_or(DEFAULT_CONFIG);
-        let config = boc::Boc::decode_base64(config_str).ok().and_then(|cell| {
-            let mut slice = cell.as_slice().ok()?;
-            tycho_types::dict::Dict::load_from_root_ext(&mut slice, Cell::empty_context()).ok()
-        });
+        let config = boc::Boc::decode_base64(config_str)
+            .ok()
+            .and_then(|cell| {
+                let mut slice = cell.as_slice().ok()?;
+                tycho_types::dict::Dict::load_from_root_ext(&mut slice, Cell::empty_context()).ok()
+            })
+            .ok_or_else(|| anyhow::anyhow!("corrupted config for world state"))?;
 
-        Self {
+        Ok(Self {
             accounts_state,
             current_lt: 0,
             current_now: 0,
             libraries: vec![],
-            config: config.expect("corrupted config for world state"),
-        }
+            config,
+        })
     }
 
     /// Returns a reference to the map of accounts currently in the world state.

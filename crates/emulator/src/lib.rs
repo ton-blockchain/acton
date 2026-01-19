@@ -35,7 +35,7 @@
 //! #
 //! # fn example(msg: Cell) -> anyhow::Result<()> {
 //! // 1. Setup the state
-//! let mut state = WorldState::new(AccountsState::Local(LocalAccountsState::new()));
+//! let mut state = WorldState::new(AccountsState::Local(LocalAccountsState::new()), None)?;
 //!
 //! // 2. Create the emulator
 //! let emulator = Emulator::new(ExecutorVerbosity::Short, None)?;
