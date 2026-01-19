@@ -1,38 +1,63 @@
+#![cfg(test)]
 use expect_test::Expect;
+use tolkfmt::format_source;
 
-pub(crate) fn check(input: &str, expected: Expect) {
-    check_with_width(input, expected, 80);
+#[allow(dead_code)]
+pub(crate) fn check(code: &str, expect: Expect) {
+    check_with_width(code, expect, 80)
 }
 
-pub(crate) fn check_with_width(input: &str, expected: Expect, width: usize) {
-    let input = dedent(input);
-    let actual = tolkfmt::format_source(&input, width).expect("formatting failed");
-    expected.assert_eq(&actual);
+#[allow(dead_code)]
+pub(crate) fn check_with_width(code: &str, expect: Expect, width: usize) {
+    check_code(code, expect, width, true)
 }
 
-fn dedent(input: &str) -> String {
-    let lines: Vec<&str> = input.lines().collect();
+#[allow(dead_code)]
+pub(crate) fn check_without_trees(code: &str, expect: Expect) {
+    check_with_width_without_trees(code, expect, 80)
+}
 
-    // Find the minimum indentation (excluding empty lines)
-    let min_indent = lines
-        .iter()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| line.len() - line.trim_start().len())
-        .min()
-        .unwrap_or(0);
+#[allow(dead_code)]
+pub(crate) fn check_with_width_without_trees(code: &str, expect: Expect, width: usize) {
+    check_code(code, expect, width, false)
+}
 
-    // Remove the common indentation
-    lines
-        .iter()
-        .map(|line| {
-            if line.trim().is_empty() {
-                ""
-            } else {
-                &line[min_indent..]
-            }
-        })
+fn check_code(code: &str, expect: Expect, width: usize, check_trees: bool) {
+    // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
+    let res = format_source(code, width).unwrap();
+
+    equal_format_code(expect, &res);
+    equal_trees(code, &res, check_trees);
+}
+
+fn equal_format_code(expect: Expect, code: &str) {
+    let res = code
+        .lines()
+        .map(|l| if l.trim().is_empty() { "" } else { l })
         .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_string()
+        .join("\n");
+
+    expect.assert_eq(&res);
+}
+
+fn equal_trees(old_code: &str, new_code: &str, check_trees: bool) {
+    let old_tree = parse_tolk_code(old_code).unwrap_or_else(|_| "<error>".to_owned());
+    let new_tree = parse_tolk_code(new_code).unwrap_or_else(|_| "<error>".to_owned());
+
+    if check_trees {
+        assert_eq!(old_tree, new_tree);
+    } else if old_tree == new_tree {
+        panic!("Checks for identical trees are ignored, even though the trees are identical",)
+    }
+}
+
+fn parse_tolk_code(source: &str) -> anyhow::Result<String> {
+    let source_file = tolk_syntax::parse(source)?;
+    let root_node = source_file.root_node();
+    if root_node.has_error() {
+        anyhow::bail!("Cannot format code with syntax error");
+    }
+
+    let root_sexp = root_node.to_sexp().replace(" (empty_statement)", "");
+    Ok(root_sexp)
 }

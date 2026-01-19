@@ -1003,7 +1003,7 @@ pub struct TestDescriptor {
 }
 
 fn find_all_test(file_path: &str, content: &str) -> Vec<TestDescriptor> {
-    let Ok(tree) = tolk_parser::parser::parse(content) else {
+    let Ok(tree) = tolk_syntax::parse(content) else {
         return vec![];
     };
     let root_node = tree.root_node();

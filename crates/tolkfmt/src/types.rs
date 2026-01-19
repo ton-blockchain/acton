@@ -1,13 +1,13 @@
 use crate::{Context, comments, common};
 use pretty::RcDoc;
-use tolk_ast::{
+use tolk_syntax::{
     FunCallableType, NullableType, ParenthesizedType, TensorType, TupleType, Type,
     TypeInstantiatedTs, UnionType,
 };
 
 #[must_use]
 pub fn print_type<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
-    let node = typ.raw_node();
+    let node = typ.syntax();
     let comments = ctx.comments.get(&node);
 
     if comments.is_none() {
@@ -27,7 +27,7 @@ pub fn print_type<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
 
 fn print_type_naked<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
     match typ {
-        Type::TypeIdentifier(ident) => Some(common::print_node_text(ctx, &ident.0)?),
+        Type::TypeIdent(ident) => Some(common::print_node_text(ctx, &ident.0)?),
         Type::TypeInstantiatedTs(inst) => print_type_instantiated_ts(ctx, inst),
         Type::TensorType(tensor) => print_tensor_type(ctx, tensor),
         Type::TupleType(tuple) => print_tuple_type(ctx, tuple),
@@ -35,7 +35,7 @@ fn print_type_naked<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
         Type::FunCallableType(fun) => print_fun_callable_type(ctx, fun),
         Type::NullableType(nullable) => print_nullable_type(ctx, nullable),
         Type::UnionType(union) => print_union_type(ctx, union),
-        Type::NullLiteral(null) => Some(common::print_node_text(ctx, &null.0)?),
+        Type::NullLit(null) => Some(common::print_node_text(ctx, &null.0)?),
         Type::Unmapped(node) => common::print_node_text(ctx, &node.0),
     }
 }
@@ -125,13 +125,13 @@ pub fn print_parenthesized_type<'a>(
 
 #[must_use]
 pub fn print_tensor_type<'a>(ctx: &Context<'_>, tensor: &TensorType) -> Option<RcDoc<'a>> {
-    let elements = tensor.element_types();
+    let elements: Vec<_> = tensor.elements().collect();
     print_tuple_tensor_type(ctx, &elements, "(", ")")
 }
 
 #[must_use]
 pub fn print_tuple_type<'a>(ctx: &Context<'_>, tuple: &TupleType) -> Option<RcDoc<'a>> {
-    let elements = tuple.element_types();
+    let elements: Vec<_> = tuple.elements().collect();
     print_tuple_tensor_type(ctx, &elements, "[", "]")
 }
 
@@ -145,7 +145,7 @@ fn print_tuple_tensor_type<'a>(
         ctx,
         elements,
         print_type,
-        Type::raw_node,
+        Type::syntax,
         |_| vec![],
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
@@ -172,13 +172,13 @@ pub fn print_type_instantiated_ts<'a>(
     let name = inst.name()?;
     let name_doc = common::print_node_text(ctx, &name.0)?;
     let args = inst.arguments()?;
-    let types = args.types();
+    let types: Vec<_> = args.types().collect();
 
     let types_doc = common::print_list(
         ctx,
         &types,
         print_type,
-        Type::raw_node,
+        Type::syntax,
         |_| vec![],
         common::ListOptions::triangle_bracket_list(),
     )?;

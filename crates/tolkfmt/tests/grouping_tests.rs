@@ -18,7 +18,7 @@ fn test_comment_grouping_for_declarations() {
             fun bar() {}
             // comment 4
             ",
-        expect![[r"
+        expect![[r#"
             /// doc comment
             /// with text
             fun main() {}
@@ -28,7 +28,7 @@ fn test_comment_grouping_for_declarations() {
             /// comment 1
             /// comment 2
             fun bar() {}
-            // comment 4"]],
+            // comment 4"#]],
     );
 }
 
@@ -47,7 +47,7 @@ fn test_comment_grouping_for_statements() {
                 val b = 200;
             }
             ",
-        expect![[r"
+        expect![[r#"
             fun main() {
                 // comment 1
                 // comment 2
@@ -57,7 +57,7 @@ fn test_comment_grouping_for_statements() {
                 // comment 4
 
                 val b = 200;
-            }"]],
+            }"#]],
     );
 }
 
@@ -69,10 +69,10 @@ fn test_inline_comment_grouping() {
                 val a = 100; /* comment 1 *//* comment 2 */
             }
             ",
-        expect![[r"
+        expect![[r#"
             fun main() {
                 val a = 100; /* comment 1 */ /* comment 2 */
-            }"]],
+            }"#]],
     );
 }
 
@@ -86,12 +86,12 @@ fn test_trailing_comment_grouping() {
                 // comment 2
             }
             ",
-        expect![[r"
+        expect![[r#"
             fun main() {
                 val a = 100;
                 // comment 1
                 // comment 2
-            }"]],
+            }"#]],
     );
 }
 
@@ -104,11 +104,11 @@ fn test_comments_inline_empty_function() {
                 // comment 2
             }
             ",
-        expect![[r"
+        expect![[r#"
             fun main() {
                 // comment 1
                 // comment 2
-            }"]],
+            }"#]],
     );
 }
 
@@ -123,12 +123,12 @@ fn test_comments_inline_empty_block_statement() {
                 }
             }
             ",
-        expect![[r"
+        expect![[r#"
             fun main() {
                 {
                     // comment 1
                     // comment 2
                 }
-            }"]],
+            }"#]],
     );
 }

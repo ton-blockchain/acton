@@ -171,7 +171,7 @@ fn collect_mutations<'a>(
     for rule in rules {
         match &rule.matcher {
             MutationMatcher::Query { query, capture } => {
-                let query = Query::new(&tolk_parser::parser::language(), query).map_err(|e| {
+                let query = Query::new(&tolk_syntax::language(), query).map_err(|e| {
                     anyhow!("Failed to create query for rule {}: {:?}", rule.name, e)
                 })?;
 
@@ -251,7 +251,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             anyhow::bail!("Error reading file '{}': {err}", contract.src)
         }
     };
-    let main_tree = tolk_parser::parser::parse(&main_content)?;
+    let main_tree = tolk_syntax::parse(&main_content)?;
     let main_path = PathBuf::from(&contract.src);
     let main_path = fs::canonicalize(&main_path).unwrap_or(main_path);
 
@@ -265,7 +265,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         path: main_path,
         relative_path: main_relative_path,
         content: main_content,
-        tree: main_tree,
+        tree: main_tree.tree,
     });
 
     let dependencies = abi::get_file_dependencies(&contract.src, true)?;
@@ -284,13 +284,13 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         let relative_path = dep_path.strip_prefix(&project_root)?.to_path_buf();
         let content = fs::read_to_string(&dep_path)
             .map_err(|e| anyhow!("Error reading dependency {}: {}", dep_path.display(), e))?;
-        let tree = tolk_parser::parser::parse(&content)?;
+        let file = tolk_syntax::parse(&content)?;
 
         sources.push(MutationSource {
             path: dep_path,
             relative_path,
             content,
-            tree,
+            tree: file.tree,
         });
     }
 

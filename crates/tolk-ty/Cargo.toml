@@ -1,0 +1,12 @@
+[package]
+name = "tolk-ty"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tolk-syntax = { path = "../tolk-syntax" }
+tolk-resolver = { path = "../tolk-resolver" }
+tree-sitter = "0.25.10"
+log = "0.4.29"
+smol_str = "0.3.5"
+rustc-hash = "2.1.1"

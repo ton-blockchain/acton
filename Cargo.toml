@@ -18,8 +18,9 @@ abi = { path = "crates/abi" }
 tolkc = { path = "crates/tolkc" }
 emulator = { path = "crates/emulator" }
 ton-executor = { path = "crates/ton-executor" }
-tolk-parser = { path = "crates/tolk-parser" }
-tolk-ast = { path = "crates/tolk-ast" }
+tolk-syntax = { path = "crates/tolk-syntax" }
+tolk-resolver = { path = "crates/tolk-resolver" }
+tolk-ty = { path = "crates/tolk-ty" }
 tvmffi = { path = "crates/tvmffi" }
 vmlogs = { path = "crates/vmlogs" }
 tasm = { path = "crates/tasm" }
