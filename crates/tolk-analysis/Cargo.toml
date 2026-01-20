@@ -1,5 +1,5 @@
 [package]
-name = "tolk-linter"
+name = "tolk-analysis"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,12 +7,11 @@ edition = "2024"
 tolk-syntax = { path = "../tolk-syntax" }
 tolk-resolver = { path = "../tolk-resolver" }
 tolk-ty = { path = "../tolk-ty" }
-tolk-analysis = { path = "../tolk-analysis" }
 tolk-macros = { path = "../tolk-macros" }
 tree-sitter = "0.25.10"
 serde = { version = "1.0.228", features = ["derive"] }
-thiserror = "2.0.18"
-log = "0.4.29"
+rustc-hash = "2.1.1"
+bitflags = "2.9.4"
 
-[features]
-profile_rules = []
+[lints]
+workspace = true

@@ -50,6 +50,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
     let file = checker.file_db.get_by_id(file_id)?;
     let resolved_index = checker.resolve_index_for(file_id)?;
     let root = file.source().tree.root_node();
+    let use_facts = checker.use_facts(file_id)?;
 
     for local in &resolved_index.locals {
         if local.name.starts_with("_") {
@@ -65,7 +66,11 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
             continue;
         }
 
-        if resolved_index.local_usages_of(local.id).next().is_some() {
+        let Some(facts) = use_facts.per_local.get(&local.id) else {
+            continue;
+        };
+
+        if !facts.flags.is_empty() {
             // local is used somewhere
             continue;
         }

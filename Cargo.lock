@@ -2921,11 +2921,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tolk-analysis"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "rustc-hash",
+ "serde",
+ "tolk-macros",
+ "tolk-resolver",
+ "tolk-syntax",
+ "tolk-ty",
+ "tree-sitter",
+]
+
+[[package]]
 name = "tolk-linter"
 version = "0.1.0"
 dependencies = [
+ "log",
  "serde",
  "thiserror 2.0.18",
+ "tolk-analysis",
  "tolk-macros",
  "tolk-resolver",
  "tolk-syntax",

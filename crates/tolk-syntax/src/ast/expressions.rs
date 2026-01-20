@@ -457,6 +457,16 @@ impl<'tree> Call<'tree> {
     }
 
     #[must_use]
+    pub fn callee_identifier(&self) -> Option<Node<'tree>> {
+        let callee = self.callee()?;
+        match callee {
+            Expr::DotAccess(dot_access) => Some(dot_access.field()?.syntax()),
+            Expr::Ident(ident) => Some(ident.syntax()),
+            _ => None,
+        }
+    }
+
+    #[must_use]
     pub fn arguments(&self) -> AstChildren<'tree, CallArgument<'tree>> {
         self.0
             .field::<ArgumentList<'_>>("arguments")

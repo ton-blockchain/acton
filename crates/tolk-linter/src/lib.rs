@@ -6,6 +6,7 @@ use rules::diagnostic::Diagnostic;
 pub use rules::*;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
@@ -21,11 +22,13 @@ mod rules;
 
 #[cfg(feature = "profile_rules")]
 pub use profiling::Profiler;
+use tolk_analysis::{AnalysisDb, FileUseFacts};
 
 pub struct Checker<'a> {
     pub file_db: &'a FileDb,
     pub type_db: &'a mut TypeDb<'a>,
     pub body_types: &'a HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    pub analysis_db: AnalysisDb,
     pub diagnostics: Vec<Diagnostic>,
 
     #[cfg(feature = "profile_rules")]
@@ -42,6 +45,7 @@ impl<'a> Checker<'a> {
             file_db,
             type_db,
             body_types,
+            analysis_db: AnalysisDb::new(),
             diagnostics: Vec::new(),
             #[cfg(feature = "profile_rules")]
             profiler: Profiler::default(),
@@ -56,7 +60,17 @@ impl<'a> Checker<'a> {
             .cloned()
     }
 
+    pub fn use_facts(&mut self, file_id: FileId) -> Option<Arc<FileUseFacts>> {
+        let now = Instant::now();
+        let res = self
+            .analysis_db
+            .use_facts(self.type_db, self.body_types, file_id);
+        log::debug!("Use facts for {file_id} took {:?}", now.elapsed());
+        res
+    }
+
     pub fn process_file(&mut self, file: &SourceFile, file_id: FileId) {
+        self.use_facts(file_id);
         let resolve_index = self.resolve_index_for(file_id);
         let mut walker = CheckerWalker {
             checker: self,
