@@ -248,6 +248,16 @@ impl FileDb {
         left.text_matches(&source, right_text)
     }
 
+    pub fn text_contains<'a, Node: AstNode<'a>>(
+        &self,
+        file_id: FileId,
+        node: &Node,
+        ch: u8,
+    ) -> Option<usize> {
+        let file = self.files_by_id.get(&file_id)?;
+        node.text_contains(&file.source.source, ch)
+    }
+
     /// Returns an iterator over all processed files.
     pub fn iter(&self) -> impl Iterator<Item = Arc<FileInfo>> + '_ {
         self.files.iter().map(|entry| entry.value().clone())

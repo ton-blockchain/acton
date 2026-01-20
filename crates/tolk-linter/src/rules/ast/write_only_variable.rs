@@ -74,6 +74,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
                 tags: vec![],
             }],
             fixes: vec![],
+            help: None,
         };
 
         let mut diagnostic = diagnostic;

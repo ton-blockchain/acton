@@ -99,6 +99,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
                 tags: vec![],
             }],
             fixes,
+            help: None,
         };
         checker.diagnostics.push(diagnostic);
     }

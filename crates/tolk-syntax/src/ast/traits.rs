@@ -2,6 +2,7 @@ use crate::ast::expressions::Ident;
 use crate::ast::node::AstChildren;
 use crate::ast::top_level::{AnnotationList, TypeParameters};
 use crate::ast::{FuncBody, Parameter, Type};
+use memchr::memchr;
 use std::ffi::CStr;
 use std::fmt;
 use tree_sitter::ffi::ts_node_type;
@@ -143,6 +144,15 @@ pub trait AstNode<'tree>: TryFromNode<'tree> + Clone {
     fn text_length(&self) -> usize {
         let syntax = self.syntax();
         syntax.end_byte() - syntax.start_byte()
+    }
+
+    /// Returns position of first occurrence of `ch` or None.
+    fn text_contains(&self, source: &str, ch: u8) -> Option<usize> {
+        let syntax = self.syntax();
+        let start = syntax.start_byte();
+        let end = syntax.end_byte();
+        let slice = &source.as_bytes()[start..end];
+        memchr(ch, slice)
     }
 }
 

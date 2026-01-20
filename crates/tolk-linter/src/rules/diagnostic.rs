@@ -26,6 +26,7 @@ pub struct Diagnostic {
     pub message: String,
     pub annotations: Vec<Annotation>,
     pub fixes: Vec<Fix>,
+    pub help: Option<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

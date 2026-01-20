@@ -152,6 +152,8 @@ pub struct Symbol {
     pub doc_span: Option<Span>,
     /// If this symbol is deprecated.
     pub is_deprecated: bool,
+    /// If this symbol is marked as `@pure`.
+    pub is_pure: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -315,6 +317,7 @@ impl FileIndex {
             let body_span = decl.span();
             let doc_span = None; // TODO: future work
             let is_deprecated = Self::is_deprecated(content, decl);
+            let is_pure = Self::is_pure(content, decl);
 
             match decl {
                 tolk_syntax::TopLevel::GlobalVar(_) => decls.push(Symbol {
@@ -326,6 +329,7 @@ impl FileIndex {
                     body_span,
                     doc_span,
                     is_deprecated,
+                    is_pure,
                 }),
                 tolk_syntax::TopLevel::Constant(_) => decls.push(Symbol {
                     id,
@@ -336,6 +340,7 @@ impl FileIndex {
                     body_span,
                     doc_span,
                     is_deprecated,
+                    is_pure,
                 }),
                 tolk_syntax::TopLevel::TypeAlias(decl) => decls.push(Symbol {
                     id,
@@ -351,6 +356,7 @@ impl FileIndex {
                     body_span,
                     doc_span,
                     is_deprecated,
+                    is_pure,
                 }),
                 tolk_syntax::TopLevel::Struct(decl) => {
                     let struct_name = name.clone();
@@ -373,6 +379,7 @@ impl FileIndex {
                                 body_span,
                                 doc_span,
                                 is_deprecated: false,
+                                is_pure: false,
                             })
                         })
                         .collect();
@@ -388,6 +395,7 @@ impl FileIndex {
                         body_span,
                         doc_span,
                         is_deprecated,
+                        is_pure,
                     })
                 }
                 tolk_syntax::TopLevel::Enum(decl) => {
@@ -411,6 +419,7 @@ impl FileIndex {
                                 body_span,
                                 doc_span,
                                 is_deprecated: false,
+                                is_pure: false,
                             })
                         })
                         .collect();
@@ -423,6 +432,7 @@ impl FileIndex {
                         body_span,
                         doc_span,
                         is_deprecated,
+                        is_pure,
                     })
                 }
                 tolk_syntax::TopLevel::Func(func) => {
@@ -444,6 +454,7 @@ impl FileIndex {
                         body_span,
                         doc_span,
                         is_deprecated,
+                        is_pure,
                     })
                 }
                 tolk_syntax::TopLevel::Method(func) => {
@@ -489,6 +500,7 @@ impl FileIndex {
                         body_span,
                         doc_span,
                         is_deprecated,
+                        is_pure,
                     })
                 }
                 tolk_syntax::TopLevel::GetMethod(func) => {
@@ -510,6 +522,7 @@ impl FileIndex {
                         body_span,
                         doc_span,
                         is_deprecated,
+                        is_pure,
                     })
                 }
                 tolk_syntax::TopLevel::Import(import) => {
@@ -553,6 +566,15 @@ impl FileIndex {
             a.annotations().any(|a| {
                 a.name()
                     .is_some_and(|name| name.text_matches(content, "deprecated"))
+            })
+        })
+    }
+
+    fn is_pure<'a, Node: HasAnnotations<'a>>(content: &str, node: Node) -> bool {
+        node.annotations().iter().any(|a| {
+            a.annotations().any(|a| {
+                a.name()
+                    .is_some_and(|name| name.text_matches(content, "pure"))
             })
         })
     }

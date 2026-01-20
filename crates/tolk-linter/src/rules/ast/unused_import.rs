@@ -85,6 +85,7 @@ fn fire_diagnostic(checker: &mut Checker, span: tolk_resolver::file_index::Span,
             tags: vec![DiagnosticTag::Unnecessary],
         }],
         fixes: vec![],
+        help: None,
     };
     checker.diagnostics.push(diagnostic);
 }

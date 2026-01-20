@@ -7,6 +7,7 @@ edition = "2024"
 tree-sitter = "0.25.10"
 tree-sitter-tolk = "0.0.5"
 anyhow = "1.0.100"
+memchr = "2.7.6"
 
 [lints]
 workspace = true

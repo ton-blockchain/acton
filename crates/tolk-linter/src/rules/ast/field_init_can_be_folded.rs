@@ -82,6 +82,7 @@ pub fn check_struct_literal(
                     }],
                     applicability: Applicability::Auto,
                 }],
+                help: None,
             };
             checker.diagnostics.push(diagnostic);
         }

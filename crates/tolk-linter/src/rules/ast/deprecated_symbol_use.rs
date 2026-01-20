@@ -70,6 +70,7 @@ pub fn check_resolved_reference(
             tags: vec![],
         }],
         fixes: vec![],
+        help: Some("deprecated symbols may be removed in future versions".to_string()),
     };
     checker.diagnostics.push(diagnostic);
 

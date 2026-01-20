@@ -2980,6 +2980,7 @@ name = "tolk-syntax"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "memchr",
  "tree-sitter",
  "tree-sitter-tolk",
 ]

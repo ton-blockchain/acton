@@ -1,7 +1,7 @@
 use crate::ast::deprecated_symbol_use;
 use crate::rules::ast::{
-    field_init_can_be_folded, mutable_variable_can_be_immutable, unused_import, unused_variable,
-    write_only_variable,
+    field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,
+    unused_import, unused_variable, write_only_variable,
 };
 use rules::diagnostic::Diagnostic;
 pub use rules::*;
@@ -11,7 +11,7 @@ use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, Resolved};
-use tolk_syntax::{Ident, ObjectLit, SourceFile, TypeIdent, Walker, walk_ast};
+use tolk_syntax::{ExprStmt, Ident, ObjectLit, SourceFile, TypeIdent, Walker, walk_ast};
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
 use tree_sitter::Node;
@@ -150,6 +150,18 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
             self.visit_top_level(&top_level);
         }
         self.default_result()
+    }
+
+    fn walk_expr_stmt(&mut self, node: &ExprStmt<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::PureFunctionCallUnused,
+            pure_function_call_unused::check_expr_stmt(self.checker, self.file_id, node)
+        );
+
+        if let Some(expr) = node.expr() {
+            self.visit_expr(&expr);
+        }
     }
 
     fn walk_object_lit(&mut self, node: &ObjectLit<'file>) -> Self::Result {

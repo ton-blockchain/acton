@@ -202,6 +202,7 @@ fn check_file(
                 tags: vec![],
             }],
             fixes: vec![],
+            help: None,
         };
         all_diagnostics.push(diagnostic);
     }
@@ -374,6 +375,10 @@ fn emit_diagnostics(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Res
         let mut cs_diag = Diagnostic::new(severity).with_message(&diag.message);
         if let Some(code) = &diag.code {
             cs_diag = cs_diag.with_code(code);
+        }
+
+        if let Some(help) = &diag.help {
+            cs_diag = cs_diag.with_notes(vec![help.clone()]);
         }
 
         let mut labels = vec![];

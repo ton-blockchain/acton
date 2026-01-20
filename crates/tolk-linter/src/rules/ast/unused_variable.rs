@@ -1,4 +1,6 @@
-use crate::rules::diagnostic::{Annotation, Applicability, Diagnostic, Edit, Fix, Severity};
+use crate::rules::diagnostic::{
+    Annotation, Applicability, Diagnostic, DiagnosticTag, Edit, Fix, Severity,
+};
 use crate::rules::violation::Violation;
 use crate::rules::violation::ViolationMetadata;
 use crate::{Checker, FixAvailability};
@@ -128,9 +130,10 @@ fn fire_diagnostic(
             span: local.def_span,
             message: Some(format!("unused variable `{name}`",)),
             is_primary: true,
-            tags: vec![],
+            tags: vec![DiagnosticTag::Unnecessary],
         }],
         fixes,
+        help: None,
     };
     checker.diagnostics.push(diagnostic);
 }
