@@ -1,3 +1,5 @@
+extern crate core;
+
 use crate::ast::deprecated_symbol_use;
 use crate::rules::ast::{
     field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,
@@ -11,7 +13,7 @@ use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, Resolved};
-use tolk_syntax::{ExprStmt, Ident, ObjectLit, SourceFile, TypeIdent, Walker, walk_ast};
+use tolk_syntax::{ExprStmt, Ident, InstanceArg, SourceFile, TypeIdent, Walker, walk_ast};
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
 use tree_sitter::Node;
@@ -164,27 +166,24 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         }
     }
 
-    fn walk_object_lit(&mut self, node: &ObjectLit<'file>) -> Self::Result {
-        run_rule!(
-            self.checker,
-            Rule::FieldInitCanBeFolded,
-            field_init_can_be_folded::check_struct_literal(self.checker, self.file_id, node)
-        );
-
-        if let Some(object_type) = node.typ() {
-            self.visit_type(&object_type);
-        }
-        for arg in node.arguments() {
-            self.walk_instance_arg(&arg);
-        }
-    }
-
     fn walk_ident(&mut self, node: &Ident<'file>) -> Self::Result {
         self.resolve_ident_and_run_inspections(&node.0)
     }
 
     fn walk_type_ident(&mut self, node: &TypeIdent<'file>) -> Self::Result {
         self.resolve_ident_and_run_inspections(&node.0)
+    }
+
+    fn walk_instance_arg(&mut self, node: &InstanceArg<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::FieldInitCanBeFolded,
+            field_init_can_be_folded::check_instance_arg(self.checker, self.file_id, node)
+        );
+
+        if let Some(value) = node.value() {
+            self.visit_expr(&value);
+        }
     }
 
     fn default_result(&self) -> Self::Result {}
