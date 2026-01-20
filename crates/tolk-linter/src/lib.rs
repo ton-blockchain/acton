@@ -1,6 +1,6 @@
 use crate::ast::deprecated_symbol_use;
 use crate::rules::ast::{
-    field_init_can_be_folded, mutable_variable_can_be_immutable, unused_variable,
+    field_init_can_be_folded, mutable_variable_can_be_immutable, unused_import, unused_variable,
     write_only_variable,
 };
 use rules::diagnostic::Diagnostic;
@@ -129,6 +129,11 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
             self.checker,
             Rule::MutableVariableCanBeImmutable,
             mutable_variable_can_be_immutable::check_file(self.checker, self.file_id)
+        );
+        run_rule!(
+            self.checker,
+            Rule::UnusedImport,
+            unused_import::check_file(self.checker, self.file_id)
         );
         run_rule!(
             self.checker,

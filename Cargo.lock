@@ -2939,6 +2939,7 @@ name = "tolk-linter"
 version = "0.1.0"
 dependencies = [
  "log",
+ "rustc-hash",
  "serde",
  "thiserror 2.0.18",
  "tolk-analysis",

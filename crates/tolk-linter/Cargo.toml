@@ -13,6 +13,7 @@ tree-sitter = "0.25.10"
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
 log = "0.4.29"
+rustc-hash = "2.1.1"
 
 [features]
 profile_rules = []
