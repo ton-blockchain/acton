@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tolk_resolver::resolve_index::LocalDefId;
-use tolk_resolver::{AstNodeSpanExt, FileId, Resolved, SymbolId, SymbolKind};
+use tolk_resolver::{AstNodeSpanExt, FileId, Resolved, Span, SymbolId, SymbolKind};
 use tolk_syntax::{Assign, Call, CallArgument, DotAccess, SetAssign, TryFromNode};
 use tolk_ty::{InferenceResult, TypeDb};
 
@@ -20,6 +20,7 @@ pub struct FileUseFacts {
 
 pub struct LocalUseFacts {
     pub flags: UseFlags,
+    pub first_write_span: Option<Span>,
 }
 
 pub struct AnalysisDb {
@@ -54,10 +55,10 @@ impl AnalysisDb {
         let root = file.source().tree.root_node();
         let inference = body_types.get(&file_id)?;
 
-        let mut per_local_flags: FxHashMap<LocalDefId, UseFlags> = resolved_index
+        let mut per_local_facts: FxHashMap<LocalDefId, (UseFlags, Option<Span>)> = resolved_index
             .locals
             .iter()
-            .map(|l| (l.id, UseFlags::empty()))
+            .map(|l| (l.id, (UseFlags::empty(), None)))
             .collect();
 
         for usage in &resolved_index.uses {
@@ -65,11 +66,11 @@ impl AnalysisDb {
                 continue;
             };
 
-            let Some(facts) = per_local_flags.get_mut(&local_id) else {
+            let Some((flags, first_write_span)) = per_local_facts.get_mut(&local_id) else {
                 continue;
             };
 
-            if facts.contains(UseFlags::READ) && facts.contains(UseFlags::WRITE) {
+            if flags.contains(UseFlags::READ) && flags.contains(UseFlags::WRITE) {
                 continue;
             }
 
@@ -85,19 +86,28 @@ impl AnalysisDb {
             while let Some(node) = current {
                 if let Ok(assign) = Assign::try_from_node(node) {
                     if assign.is_lhs(&usage_node) {
-                        facts.insert(UseFlags::WRITE);
+                        flags.insert(UseFlags::WRITE);
+                        if first_write_span.is_none() {
+                            *first_write_span = Some(usage.span);
+                        }
                         is_write = true;
                     }
                     break;
                 } else if let Ok(assign) = SetAssign::try_from_node(node) {
                     if assign.is_lhs(&usage_node) {
-                        facts.insert(UseFlags::READ | UseFlags::WRITE);
+                        flags.insert(UseFlags::READ | UseFlags::WRITE);
+                        if first_write_span.is_none() {
+                            *first_write_span = Some(usage.span);
+                        }
                         is_write = true;
                     }
                     break;
                 } else if let Ok(argument) = CallArgument::try_from_node(node) {
                     if argument.mutate() {
-                        facts.insert(UseFlags::WRITE | UseFlags::MUTATE);
+                        flags.insert(UseFlags::WRITE | UseFlags::MUTATE);
+                        if first_write_span.is_none() {
+                            *first_write_span = Some(usage.span);
+                        }
                         is_write = true;
                         break;
                     }
@@ -118,12 +128,18 @@ impl AnalysisDb {
                             && let SymbolKind::Method { is_mutable, .. } = resolved.kind
                             && is_mutable
                         {
-                            facts.insert(UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE);
+                            flags.insert(UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE);
+                            if first_write_span.is_none() {
+                                *first_write_span = Some(usage.span);
+                            }
                             is_write = true;
                         }
                     } else {
                         // we cannot resolve this method call, assume it mutates to avoid false positives
-                        facts.insert(UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE);
+                        flags.insert(UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE);
+                        if first_write_span.is_none() {
+                            *first_write_span = Some(usage.span);
+                        }
                         is_write = true;
                     }
                     break;
@@ -134,13 +150,21 @@ impl AnalysisDb {
 
             if !is_write {
                 // if this usage is not mutation then it is read
-                facts.insert(UseFlags::READ);
+                flags.insert(UseFlags::READ);
             }
         }
 
-        let use_facts = per_local_flags
+        let use_facts = per_local_facts
             .into_iter()
-            .map(|(id, flags)| (id, LocalUseFacts { flags }))
+            .map(|(id, (flags, first_write_span))| {
+                (
+                    id,
+                    LocalUseFacts {
+                        flags,
+                        first_write_span,
+                    },
+                )
+            })
             .collect();
 
         let facts = Arc::new(FileUseFacts {

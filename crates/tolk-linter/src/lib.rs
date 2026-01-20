@@ -1,6 +1,7 @@
 use crate::ast::deprecated_symbol_use;
 use crate::rules::ast::{
     field_init_can_be_folded, mutable_variable_can_be_immutable, unused_variable,
+    write_only_variable,
 };
 use rules::diagnostic::Diagnostic;
 pub use rules::*;
@@ -138,6 +139,11 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
             self.checker,
             Rule::UnusedVariable,
             unused_variable::check_file(self.checker, self.file_id)
+        );
+        run_rule!(
+            self.checker,
+            Rule::WriteOnlyVariable,
+            write_only_variable::check_file(self.checker, self.file_id)
         );
 
         for top_level in source_file.top_levels() {

@@ -1,6 +1,6 @@
 use crate::ast::{
     deprecated_symbol_use, field_init_can_be_folded, mutable_variable_can_be_immutable,
-    unused_variable,
+    unused_variable, write_only_variable,
 };
 use serde::Serialize;
 use std::fmt::Display;
@@ -55,6 +55,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E002") => unused_variable::UnusedVariable,
         (Tolk, "E003") => mutable_variable_can_be_immutable::MutableVariableCanBeImmutable,
         (Tolk, "E004") => deprecated_symbol_use::DeprecatedSymbolUse,
+        (Tolk, "E005") => write_only_variable::WriteOnlyVariable,
         _ => return None,
     })
 }
