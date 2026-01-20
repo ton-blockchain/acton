@@ -450,7 +450,7 @@ fun __createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateI
 fun net.sendExternal<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null) {
     val msg = __createExternalMessage(dest, body, stateInit, src);
     // from and mode fields do not affect anything in case of an ExtIn message
-    return ffi.sendMessageFrom(msg.toCell(), address("UQBAmIBdInKmGzdTUMay9fqq8nyCZ9jnUh_yBFEE_cfediVD").toCell(), SEND_MODE_PAY_FEES_SEPARATELY)!;
+    return ffi.sendMessageFrom(msg.toCell(), address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell(), SEND_MODE_PAY_FEES_SEPARATELY)!;
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
