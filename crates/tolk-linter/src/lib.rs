@@ -7,7 +7,6 @@ use rules::diagnostic::Diagnostic;
 pub use rules::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
@@ -62,12 +61,8 @@ impl<'a> Checker<'a> {
     }
 
     pub fn use_facts(&mut self, file_id: FileId) -> Option<Arc<FileUseFacts>> {
-        let now = Instant::now();
-        let res = self
-            .analysis_db
-            .use_facts(self.type_db, self.body_types, file_id);
-        log::debug!("Use facts for {file_id} took {:?}", now.elapsed());
-        res
+        self.analysis_db
+            .use_facts(self.type_db, self.body_types, file_id)
     }
 
     pub fn process_file(&mut self, file: &SourceFile, file_id: FileId) {
