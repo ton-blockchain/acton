@@ -1,25 +1,18 @@
-use std::env;
-use std::path::Path;
+#[path = "../../build/ton_native.rs"]
+mod ton_native;
 
 fn main() {
-    let workspace_root = Path::new(
-        &env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env variable not set"),
-    )
-    .join("..")
-    .join("..");
-    let objc_dir = workspace_root.join("objs");
+    ton_native::emit_rerun_directives();
+    let artifacts = ton_native::ensure_native_libs();
 
-    println!("cargo:rustc-link-search=native={}", objc_dir.display());
-    println!(
-        "cargo:rerun-if-changed={}/libemulator.a",
-        objc_dir.display()
-    );
+    println!("cargo:rustc-link-search=native={}", artifacts.lib_dir().display());
     println!("cargo:rustc-link-lib=static=emulator");
 
     #[cfg(target_os = "macos")]
     {
         println!("cargo:rustc-link-lib=dylib=c++");
         println!("cargo:rustc-link-lib=dylib=c++abi");
+        println!("cargo:rustc-link-lib=z");
     }
 
     #[cfg(target_os = "linux")]

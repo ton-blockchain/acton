@@ -7,19 +7,13 @@ Rust.
 
 ## Building
 
-Clone TON monorepo fork:
+Ensure the TON C++ sources are available in `./ton-acton` and build prerequisites
+are installed (cmake, ninja, a C++ toolchain, llvm-objcopy/objcopy, plus system
+libs like libsodium/openssl/zlib). The build uses the same requirements as the
+native scripts in `ton-acton/assembly/native`.
 
-```
-git clone https://github.com/i582/ton/tree/pmakhnev/acton
-```
-
-Build and copy artifacts to `./objs`:
-
-```
-sh assembly/native/build-macos-static.sh -a && mkdir ../acton/objs && cp ./artifacts/libemulator.a ./artifacts/libtolk.a ../acton/objs
-```
-
-Run Rust compilation:
+Run Rust compilation (this also builds the required C++ libraries). Debug builds
+use `CMAKE_BUILD_TYPE=Debug` so native objects include debug symbols.
 
 ```
 cargo build
@@ -29,6 +23,12 @@ In release mode:
 
 ```
 cargo build --release
+```
+
+To force a rebuild of the native libraries:
+
+```
+ACTON_NATIVE_FORCE_REBUILD=1 cargo build
 ```
 
 ## Run
