@@ -1,6 +1,6 @@
-use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Applicability, Diagnostic, Edit, Fix, Severity};
 use crate::rules::violation::Violation;
+use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_index::FileId;
@@ -38,6 +38,8 @@ use tolk_syntax::{Assign, Call, CallArgument, DotAccess, SetAssign, VarDeclLhs, 
 pub struct MutableVariableCanBeImmutable;
 
 impl Violation for MutableVariableCanBeImmutable {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     fn message(&self) -> String {
         "variable can be immutable".to_string()
     }

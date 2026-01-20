@@ -1,6 +1,6 @@
-use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Applicability, Diagnostic, Edit, Fix, Severity};
 use crate::rules::violation::Violation;
+use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_index::FileId;
@@ -36,6 +36,8 @@ use tolk_syntax::{Expr, HasName, ObjectLit};
 pub struct FieldInitCanBeFolded;
 
 impl Violation for FieldInitCanBeFolded {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     fn message(&self) -> String {
         "field initialization can be folded".to_string()
     }

@@ -1,7 +1,58 @@
-pub enum Rule {
-    FieldInitCanBeFolded,
-    UnusedVariable,
-    MutableVariableCanBeImmutable,
+use crate::ast::{field_init_can_be_folded, mutable_variable_can_be_immutable, unused_variable};
+use serde::Serialize;
+use std::fmt::Display;
+
+#[derive(Debug, Copy, Clone, Serialize)]
+pub enum FixAvailability {
+    Sometimes,
+    Always,
+    None,
+}
+
+impl Display for FixAvailability {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FixAvailability::Sometimes => write!(f, "Fix is sometimes available."),
+            FixAvailability::Always => write!(f, "Fix is always available."),
+            FixAvailability::None => write!(f, "Fix is not available."),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromCodeError {
+    #[error("unknown rule code")]
+    Unknown,
+}
+
+#[derive(Debug, Copy, Clone, Serialize, PartialEq, Eq, Hash)]
+pub enum Linter {
+    Tolk,
+}
+
+#[derive(Debug, Copy, Clone, Serialize, PartialEq, Eq, Hash)]
+#[serde(tag = "status", content = "since", rename_all = "snake_case")]
+pub enum RuleGroup {
+    /// The rule is stable since the provided version.
+    Stable { since: &'static str },
+    /// The rule is in preview since the provided version.
+    Preview { since: &'static str },
+    /// The rule is deprecated since the provided version.
+    Deprecated { since: &'static str },
+    /// The rule was removed in the provided version.
+    Removed { since: &'static str },
+}
+
+#[tolk_macros::map_codes]
+pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
+    use Linter::*;
+
+    Some(match (linter, code) {
+        (Tolk, "E001") => field_init_can_be_folded::FieldInitCanBeFolded,
+        (Tolk, "E002") => unused_variable::UnusedVariable,
+        (Tolk, "E003") => mutable_variable_can_be_immutable::MutableVariableCanBeImmutable,
+        _ => return None,
+    })
 }
 
 pub trait ViolationMetadata {
@@ -12,6 +63,9 @@ pub trait ViolationMetadata {
     /// why it's bad, and what users should do instead.
     fn explain() -> Option<&'static str>;
 
+    /// Returns the rule group for this violation.
+    fn group() -> RuleGroup;
+
     /// Returns the file where the violation is declared.
     fn file() -> &'static str;
 
@@ -20,6 +74,8 @@ pub trait ViolationMetadata {
 }
 
 pub trait Violation: ViolationMetadata + Sized {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     /// The message used to describe the violation.
     fn message(&self) -> String;
 }

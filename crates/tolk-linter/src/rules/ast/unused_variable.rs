@@ -1,6 +1,6 @@
-use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Applicability, Diagnostic, Edit, Fix, Severity};
 use crate::rules::violation::Violation;
+use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::file_index::{FileId, Span};
 use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
@@ -38,6 +38,8 @@ use tolk_syntax::{HasName, Ident, LambdaParameter, Parameter, TryFromNode, VarDe
 pub struct UnusedVariable;
 
 impl Violation for UnusedVariable {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     fn message(&self) -> String {
         "variable is unused".to_string()
     }

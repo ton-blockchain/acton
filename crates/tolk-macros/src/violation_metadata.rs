@@ -1,3 +1,5 @@
+// Code from Ruff project (https://github.com/astral-sh/ruff)
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
@@ -5,7 +7,7 @@ use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
 
-    let Some(_group) = get_rule_status(&input.attrs)? else {
+    let Some(group) = get_rule_status(&input.attrs)? else {
         return Err(Error::new_spanned(
             input,
             "Missing required rule group metadata",
@@ -26,6 +28,10 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
 
             fn explain() -> Option<&'static str> {
                 Some(#docs)
+            }
+
+            fn group() -> crate::rules::violation::RuleGroup {
+                crate::rules::violation::#group
             }
 
             fn file() -> &'static str {

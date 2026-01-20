@@ -2085,7 +2085,7 @@ dependencies = [
  "newtype-uuid",
  "quick-xml",
  "strip-ansi-escapes",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "uuid",
 ]
 
@@ -2771,11 +2771,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.17",
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -2791,9 +2791,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2829,7 +2829,7 @@ dependencies = [
  "digest",
  "sha2",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tl-proto-proc",
 ]
 
@@ -2856,7 +2856,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "rustc-hash",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2924,6 +2924,8 @@ dependencies = [
 name = "tolk-linter"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "thiserror 2.0.18",
  "tolk-macros",
  "tolk-resolver",
  "tolk-syntax",
@@ -3104,7 +3106,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3226,7 +3228,7 @@ dependencies = [
  "anyhow",
  "num-bigint",
  "num-traits",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tonlib-core",
  "tycho-types",
 ]
@@ -3261,7 +3263,7 @@ dependencies = [
  "serde",
  "sha2",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tl-proto",
  "tycho-crypto",
  "tycho-types-proc",
@@ -3408,7 +3410,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "vmlogs"
 version = "0.1.0"
 dependencies = [
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "winnow",
 ]
 
