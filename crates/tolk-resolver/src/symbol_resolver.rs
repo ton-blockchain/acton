@@ -13,7 +13,9 @@ use crate::resolve_index::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
-use tolk_syntax::{AstNode, FunctionLike, HasGenericParams, HasName, VarKind, Walker, ast};
+use tolk_syntax::{
+    AstNode, FuncBody, FunctionLike, HasGenericParams, HasName, InstanceArg, VarKind, Walker, ast,
+};
 use tree_sitter::Node;
 
 /// Represents the global environment visible from a specific file.
@@ -204,6 +206,11 @@ impl<'a> SymbolResolver<'a> {
             current = scope.parent;
         }
 
+        if use_kind == NameUseKind::LocalValue {
+            // don't resolve local values in global symbols
+            return None;
+        }
+
         let empty_candidates = vec![];
         let candidates = self.env.visible.get(&name).unwrap_or(&empty_candidates);
 
@@ -329,16 +336,19 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
     fn walk_func(&mut self, node: &ast::Func<'tree>) -> Self::Result {
         self.enter_scope();
 
+        let body = node.body();
+        let is_common = matches!(body, Some(FuncBody::Block(_)));
+
         if let Some(params) = node.type_parameters() {
             self.walk_type_parameters(&params);
         }
         for param in node.parameters() {
-            self.walk_parameter(&param);
+            self.walk_parameter(&param, is_common);
         }
         if let Some(return_type) = node.return_type() {
             self.walk_type(&return_type);
         }
-        if let Some(body) = node.body() {
+        if let Some(body) = body {
             self.walk_function_body(&body);
         }
 
@@ -348,6 +358,9 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
     fn walk_method(&mut self, node: &ast::Method<'tree>) -> Self::Result {
         self.enter_scope();
 
+        let body = node.body();
+        let is_common = matches!(body, Some(FuncBody::Block(_)));
+
         if let Some(receiver) = node.receiver() {
             self.walk_method_receiver(&receiver);
         }
@@ -355,12 +368,12 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
             self.walk_type_parameters(&params);
         }
         for param in node.parameters() {
-            self.walk_parameter(&param);
+            self.walk_parameter(&param, is_common);
         }
         if let Some(return_type) = node.return_type() {
             self.walk_type(&return_type);
         }
-        if let Some(body) = node.body() {
+        if let Some(body) = body {
             self.walk_function_body(&body);
         }
 
@@ -370,16 +383,19 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
     fn walk_get_method(&mut self, node: &ast::GetMethod<'tree>) -> Self::Result {
         self.enter_scope();
 
+        let body = node.body();
+        let is_common = matches!(body, Some(FuncBody::Block(_)));
+
         if let Some(params) = node.type_parameters() {
             self.walk_type_parameters(&params);
         }
         for param in node.parameters() {
-            self.walk_parameter(&param);
+            self.walk_parameter(&param, is_common);
         }
         if let Some(return_type) = node.return_type() {
             self.walk_type(&return_type);
         }
-        if let Some(body) = node.body() {
+        if let Some(body) = body {
             self.walk_function_body(&body);
         }
 
@@ -451,6 +467,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 name_str,
                 LocalDefKind::Param {
                     is_mutable: node.mutate(),
+                    in_asm_or_builtin: false, // lambda cannot be assembly or builtin
                 },
             );
         }
@@ -479,7 +496,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
         }
     }
 
-    fn walk_parameter(&mut self, node: &ast::Parameter<'tree>) -> Self::Result {
+    fn walk_parameter(&mut self, node: &ast::Parameter<'tree>, in_common: bool) -> Self::Result {
         if let Some(name) = node.name() {
             let name_str = name.text(self.file_content()).to_string();
             self.check_redeclaration(&name_str, "parameter_declaration");
@@ -488,6 +505,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 name_str,
                 LocalDefKind::Param {
                     is_mutable: node.mutate(),
+                    in_asm_or_builtin: !in_common,
                 },
             );
         }
@@ -553,6 +571,19 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 ast::MatchArmBody::Expr(ref expr) => self.visit_expr(expr),
             };
         }
+    }
+
+    fn walk_instance_arg(&mut self, node: &InstanceArg<'tree>) -> Self::Result {
+        // in `Foo { foo }` we need to resolve `foo` as local variable
+        // if there is some value like `{ foo: bar }` we don't need to process field name
+        if let Some(value) = node.value() {
+            self.visit_expr(&value);
+            return;
+        }
+
+        let Some(name) = node.name() else { return };
+        // so we have `{ foo }` now
+        self.resolve_symbol(&name.syntax(), NameUseKind::LocalValue);
     }
 
     fn default_result(&self) -> Self::Result {}

@@ -1,0 +1,10 @@
+[package]
+name = "tolk-linter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tolk-syntax = { path = "../tolk-syntax" }
+tolk-resolver = { path = "../tolk-resolver" }
+tolk-ty = { path = "../tolk-ty" }
+tree-sitter = "0.25.10"

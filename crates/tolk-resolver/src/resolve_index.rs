@@ -26,6 +26,8 @@ pub struct NameUse {
 pub enum NameUseKind {
     /// Usage in a value context (e.g., variable access, function call).
     Value,
+    /// Usage in a value context but only for local variables and parameters.
+    LocalValue,
     /// Usage in a type context (e.g., type annotation, struct field type).
     Type,
     /// Ambiguous usage where it could be either (e.g., in match patterns).
@@ -79,6 +81,7 @@ pub enum LocalDefKind {
     Param {
         /// Whether the parameter is declared as mutable.
         is_mutable: bool,
+        in_asm_or_builtin: bool,
     },
     /// A local variable.
     Var {

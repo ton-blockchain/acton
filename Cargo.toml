@@ -21,6 +21,7 @@ ton-executor = { path = "crates/ton-executor" }
 tolk-syntax = { path = "crates/tolk-syntax" }
 tolk-resolver = { path = "crates/tolk-resolver" }
 tolk-ty = { path = "crates/tolk-ty" }
+tolk-linter = { path = "crates/tolk-linter" }
 tvmffi = { path = "crates/tvmffi" }
 vmlogs = { path = "crates/vmlogs" }
 tasm = { path = "crates/tasm" }
@@ -103,6 +104,9 @@ keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "li
 
 # acton fmt
 similar = { version = "2.7.0", features = ["inline"] }
+
+# actin check
+codespan-reporting = "0.11.1"
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }

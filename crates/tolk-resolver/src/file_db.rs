@@ -3,7 +3,7 @@
 //! This module provides the `FileDb` struct which manages reading, parsing,
 //! and indexing files. It also handles file ID allocation and caching.
 
-use crate::file_index::{FileId, FileIndex, Span, Symbol};
+use crate::file_index::{FileId, FileIndex, FileSource, Span, Symbol};
 use crate::{AstNodeSpanExt, SymbolId};
 use dashmap::DashMap;
 use log::debug;
@@ -41,6 +41,21 @@ impl FileInfo {
         &self.source
     }
 
+    /// Checks if passed file resides in Tolk standard library.
+    pub fn is_stdlib_file(&self) -> bool {
+        self.index.source_kind == FileSource::Stdlib
+    }
+
+    /// Checks if passed file resides in Acton standard library.
+    pub fn is_acton_file(&self) -> bool {
+        self.index.source_kind == FileSource::Acton
+    }
+
+    /// Checks if passed file resides in workspace, not in Tolk stdlib or Acton files.
+    pub fn is_workspace_file(&self) -> bool {
+        self.index.source_kind == FileSource::Workspace
+    }
+
     /// Returns the source text associated with a tree-sitter node.
     pub fn text(&self, node: &Node) -> Result<&str, Utf8Error> {
         node.utf8_text(self.source.source.as_ref().as_ref())
@@ -69,6 +84,10 @@ pub struct FileDb {
     files_by_id: DashMap<FileId, Arc<FileInfo>>,
     /// Cache for canonicalized paths to avoid repeated I/O.
     canonicalize_cache: DashMap<PathBuf, PathBuf>,
+    /// Path to Tolk standard library.
+    stdlib_path: PathBuf,
+    /// Path to Acton standard library.
+    acton_stdlib_path: Option<PathBuf>,
     next_id: AtomicU32,
 }
 
@@ -78,21 +97,21 @@ impl Debug for FileDb {
     }
 }
 
-impl Default for FileDb {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl FileDb {
     /// Creates a new, empty `FileDb`.
-    pub fn new() -> Self {
+    pub fn new(stdlib_path: PathBuf, acton_stdlib_path: Option<PathBuf>) -> Self {
         FileDb {
             files: DashMap::new(),
             files_by_id: DashMap::new(),
             canonicalize_cache: DashMap::new(),
             next_id: AtomicU32::new(0),
+            stdlib_path,
+            acton_stdlib_path,
         }
+    }
+
+    pub fn stdlib_path(&self) -> &Path {
+        self.stdlib_path.as_path()
     }
 
     /// Reads and processes a file from the disk.
@@ -123,9 +142,14 @@ impl FileDb {
         let existing = self.files.get(&path);
         let file_id = existing.map(|e| e.id).unwrap_or_else(|| self.alloc_id());
 
+        let source_kind = match (&self.stdlib_path, &self.acton_stdlib_path) {
+            (stdlib_path, _) if path.starts_with(stdlib_path) => FileSource::Stdlib,
+            (_, Some(acton_path)) if path.starts_with(acton_path) => FileSource::Acton,
+            _ => FileSource::Workspace,
+        };
         let info = Arc::new(FileInfo {
             id: file_id,
-            index: Arc::new(FileIndex::build(file_id, path.clone(), &file)),
+            index: Arc::new(FileIndex::build(file_id, path.clone(), &file, source_kind)),
             source: file,
         });
 
@@ -133,6 +157,26 @@ impl FileDb {
         self.files.insert(path, info.clone());
         self.files_by_id.insert(file_id, info.clone());
         Ok(info)
+    }
+
+    /// Checks if passed file resides in Tolk standard library.
+    pub fn is_stdlib_file(&self, file_id: FileId) -> bool {
+        let Some(info) = self.files_by_id.get(&file_id) else {
+            return false;
+        };
+        info.index.path.starts_with(&self.stdlib_path)
+    }
+
+    /// Checks if passed file resides in Acton standard library.
+    pub fn is_acton_file(&self, file_id: FileId) -> bool {
+        let Some(info) = self.files_by_id.get(&file_id) else {
+            return false;
+        };
+        let Some(acton_stdlib_path) = &self.acton_stdlib_path else {
+            return false;
+        };
+
+        info.index.path.starts_with(acton_stdlib_path)
     }
 
     /// Resolves a path to its `FileInfo` if it has already been processed.

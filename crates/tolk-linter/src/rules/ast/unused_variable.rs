@@ -1,0 +1,107 @@
+use crate::Checker;
+use crate::rules::diagnostic::{Annotation, Applicability, Diagnostic, Edit, Fix, Severity};
+use crate::rules::violation::{Rule, Violation, ViolationMetadata};
+use tolk_resolver::file_index::{FileId, Span};
+use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
+use tolk_syntax::{HasName, Ident, LambdaParameter, Parameter, TryFromNode, VarDecl};
+
+pub struct UnusedVariable;
+
+impl ViolationMetadata for UnusedVariable {
+    fn rule() -> Rule {
+        Rule::UnusedVariable
+    }
+
+    fn explain() -> Option<&'static str> {
+        Some("Unused variable")
+    }
+}
+
+impl Violation for UnusedVariable {
+    fn message(&self) -> String {
+        "variable is unused".to_string()
+    }
+}
+
+pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
+    let file = checker.file_db.get_by_id(file_id)?;
+    let resolved_index = checker.resolve_index_for(file_id)?;
+    let root = file.source().tree.root_node();
+
+    for local in &resolved_index.locals {
+        if local.name.starts_with("_") {
+            // fast path, no need to find usages
+            continue;
+        }
+        if let LocalDefKind::Param {
+            in_asm_or_builtin: true,
+            ..
+        } = local.kind
+        {
+            // parameters of assembly or builtin functions is always implicitly used
+            continue;
+        }
+
+        if resolved_index.local_usages_of(local.id).next().is_some() {
+            // local is used somewhere
+            continue;
+        }
+
+        // no usage found
+        fire_diagnostic(checker, root, local, file_id);
+    }
+
+    Some(())
+}
+
+#[cold]
+fn fire_diagnostic(
+    checker: &mut Checker,
+    root: tree_sitter::Node,
+    local: &LocalDef,
+    file_id: FileId,
+) {
+    let name = local.name.clone();
+    let mut fixes = vec![];
+
+    // Try to find the identifier to suggest prefixing it with _
+    if let Some(node) = root.descendant_for_byte_range(local.def_span.start(), local.def_span.end())
+    {
+        let ident = if let Ok(ident) = Ident::try_from_node(node) {
+            Some(ident)
+        } else if let Ok(v) = VarDecl::try_from_node(node) {
+            v.name()
+        } else if let Ok(p) = Parameter::try_from_node(node) {
+            p.name()
+        } else if let Ok(lp) = LambdaParameter::try_from_node(node) {
+            lp.name()
+        } else {
+            None
+        };
+
+        if let Some(ident) = ident {
+            fixes.push(Fix {
+                message: format!("prefix with underscore: `_{}`", name),
+                edits: vec![Edit {
+                    span: Span::from_syntax(&ident.0),
+                    replacement: format!("_{}", name),
+                }],
+                applicability: Applicability::Auto,
+            });
+        }
+    }
+
+    let diagnostic = Diagnostic {
+        file_id,
+        severity: Severity::Warning,
+        message: UnusedVariable.message(),
+        annotations: vec![Annotation {
+            span: local.def_span,
+            message: Some(format!("unused variable `{name}`",)),
+            is_primary: true,
+            tags: vec![],
+        }],
+        fixes,
+    };
+    checker.diagnostics.push(diagnostic);
+}

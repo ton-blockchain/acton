@@ -230,6 +230,13 @@ pub struct Import {
 /// Unique identifier for a file in the project.
 pub type FileId = u32;
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum FileSource {
+    Stdlib,
+    Acton,
+    Workspace,
+}
+
 /// A processed index of a single Tolk source file.
 #[derive(Debug, Clone)]
 pub struct FileIndex {
@@ -237,6 +244,8 @@ pub struct FileIndex {
     pub id: FileId,
     /// Absolute path to the file.
     pub path: PathBuf,
+    /// Where file is located.
+    pub source_kind: FileSource,
     /// List of files imported by this file.
     pub imports: Vec<Import>,
     /// List of top-level declarations in this file.
@@ -251,7 +260,12 @@ impl FileIndex {
     /// # Panics
     ///
     /// Panics in debug builds if the path is not absolute.
-    pub fn build(file_id: FileId, path: PathBuf, file: &ast::SourceFile) -> FileIndex {
+    pub fn build(
+        file_id: FileId,
+        path: PathBuf,
+        file: &ast::SourceFile,
+        source_kind: FileSource,
+    ) -> FileIndex {
         debug_assert!(path.is_absolute()); // for stable ID
 
         let mut decls = vec![];
@@ -486,6 +500,7 @@ impl FileIndex {
         FileIndex {
             id: file_id,
             path,
+            source_kind,
             imports,
             decls,
             symbol_id_to_decl_index,

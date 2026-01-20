@@ -22,14 +22,14 @@
 //!
 //! fn analyze_tolk_contract() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Initialize the file database and process source files
-//!     let file_db = FileDb::new();
+//!     let stdlib_path = PathBuf::from("path/to/tolk-stdlib");
+//!     let file_db = FileDb::new(stdlib_path.clone(), None);
 //!
 //!     // Add your Tolk source files to the database
 //!     let root_path = PathBuf::from("contracts/my_contract.tolk");
 //!     let file_info = file_db.process(&root_path)?;
 //!
 //!     // Build the project index with optional stdlib
-//!     let stdlib_path = PathBuf::from("path/to/tolk-stdlib");
 //!     let mut index = ProjectIndex::builder(&file_db, root_path)
 //!         .with_stdlib(stdlib_path)
 //!         .build()?;

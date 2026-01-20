@@ -242,7 +242,7 @@ pub trait Walker<'tree> {
             self.walk_ident(&name);
         }
         for param in node.parameters() {
-            self.walk_parameter(&param);
+            self.walk_parameter(&param, false);
         }
         if let Some(return_type) = node.return_type() {
             self.visit_type(&return_type);
@@ -267,7 +267,7 @@ pub trait Walker<'tree> {
             self.walk_ident(&name);
         }
         for param in node.parameters() {
-            self.walk_parameter(&param);
+            self.walk_parameter(&param, false);
         }
         if let Some(return_type) = node.return_type() {
             self.visit_type(&return_type);
@@ -286,7 +286,7 @@ pub trait Walker<'tree> {
             self.walk_ident(&name);
         }
         for param in node.parameters() {
-            self.walk_parameter(&param);
+            self.walk_parameter(&param, false);
         }
         if let Some(return_type) = node.return_type() {
             self.visit_type(&return_type);
@@ -734,7 +734,7 @@ pub trait Walker<'tree> {
         self.default_result()
     }
 
-    fn walk_parameter(&mut self, node: &Parameter<'tree>) -> Self::Result {
+    fn walk_parameter(&mut self, node: &Parameter<'tree>, _in_common: bool) -> Self::Result {
         if let Some(name) = node.name() {
             self.walk_ident(&name);
         }

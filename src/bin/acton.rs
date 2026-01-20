@@ -1,5 +1,6 @@
 use acton::commands;
 use acton::commands::build::build_cmd;
+use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::docgen::docgen_cmd;
@@ -475,6 +476,13 @@ enum Commands {
         dry_run: bool,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
+    },
+    #[command(about = "Check Tolk files in the project for errors")]
+    Check {
+        #[arg(long, help = "Automatically apply available fixes")]
+        fix: bool,
+        #[arg(long, help = "Output results as JSON")]
+        json: bool,
     },
     #[command(
         about = "Retrace a transaction by its hash",
@@ -1305,6 +1313,7 @@ fn main() {
                 yes,
             ),
         },
+        Commands::Check { fix, json } => check_cmd(fix, json),
         Commands::Up {
             version,
             canary,

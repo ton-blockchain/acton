@@ -3,6 +3,7 @@ mod tests {
     use crate::file_db::FileDb;
     use crate::resolve_index::Resolved;
     use expect_test::{Expect, expect};
+    use std::path::PathBuf;
 
     #[test]
     fn test_local_var() {
@@ -1296,9 +1297,10 @@ mod tests {
 
             let target_abs_path = target_abs_path.expect("Target file not found in project files");
 
-            let file_db = FileDb::new();
-            let stdlib_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../crates/tolkc/assets/tolk-stdlib")
+            let stdlib_path = PathBuf::from("../../crates/tolkc/assets/tolk-stdlib");
+            let file_db = FileDb::new(stdlib_path.clone(), None);
+            let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(stdlib_path)
                 .canonicalize()
                 .unwrap();
 

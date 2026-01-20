@@ -1,4 +1,5 @@
 pub mod build;
+pub mod check;
 pub mod common;
 pub mod compile;
 pub mod disasm;
