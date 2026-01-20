@@ -6,9 +6,9 @@ use tolk_macros::ViolationMetadata;
 use tolk_resolver::file_index::{FileId, Symbol};
 use tolk_resolver::resolve_index::Resolved;
 use tolk_resolver::{AstNodeSpanExt, NameUse, SymbolKind};
-use tolk_syntax::AstNode;
 use tolk_syntax::ast::expressions::{Call, Expr};
 use tolk_syntax::ast::statements::ExprStmt;
+use tolk_ty::InferenceResult;
 
 /// ### What it does
 /// Checks for calls to `@pure` functions where the result is not used.
@@ -37,7 +37,12 @@ impl Violation for PureFunctionCallUnused {
     }
 }
 
-pub fn check_expr_stmt(checker: &mut Checker, file_id: FileId, node: &ExprStmt) -> Option<()> {
+pub fn check_expr_stmt(
+    checker: &mut Checker,
+    file_id: FileId,
+    node: &ExprStmt,
+    current_inference: Option<&InferenceResult>,
+) -> Option<()> {
     let Expr::Call(call) = node.expr()? else {
         return None;
     };
@@ -52,14 +57,10 @@ pub fn check_expr_stmt(checker: &mut Checker, file_id: FileId, node: &ExprStmt) 
         return None;
     }
 
-    // Try to resolve as method call
-    let file = checker.file_db.get_by_id(file_id)?;
-    let decl = file.find_symbol_at(node.syntax().start_byte())?;
-
-    let inference = checker.body_types.get(&file_id)?;
-    let inference = inference.get(&decl.id)?;
-
-    if let Some(name_use) = inference.resolve(callee_ident.span()) {
+    // Try to resolve as method call using current inference result
+    if let Some(inference) = current_inference
+        && let Some(name_use) = inference.resolve(callee_ident.span())
+    {
         check_symbol(checker, file_id, &call, name_use);
     }
 

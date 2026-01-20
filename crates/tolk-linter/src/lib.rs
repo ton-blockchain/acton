@@ -13,7 +13,9 @@ use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, Resolved};
-use tolk_syntax::{ExprStmt, Ident, InstanceArg, SourceFile, TypeIdent, Walker, walk_ast};
+use tolk_syntax::{
+    ExprStmt, Ident, InstanceArg, SourceFile, TopLevel, TypeIdent, Walker, walk_ast,
+};
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
 use tree_sitter::Node;
@@ -74,6 +76,7 @@ impl<'a> Checker<'a> {
             checker: self,
             file_id,
             resolve_index,
+            current_inference: None,
         };
 
         walk_ast(&mut walker, file);
@@ -121,10 +124,27 @@ struct CheckerWalker<'a, 'b> {
     checker: &'a mut Checker<'b>,
     file_id: FileId,
     resolve_index: Option<Arc<FileResolveIndex>>,
+    current_inference: Option<&'b InferenceResult>,
 }
 
 impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
     type Result = ();
+
+    fn visit_top_level(&mut self, top_level: &TopLevel<'file>) -> Self::Result {
+        let prev_inference = self.current_inference;
+
+        if let Some(file_info) = self.checker.file_db.get_by_id(self.file_id)
+            && let Some(symbol) = file_info.find_declaration(top_level)
+            && let Some(file_body_types) = self.checker.body_types.get(&self.file_id)
+            && let Some(inference) = file_body_types.get(&symbol.id)
+        {
+            self.current_inference = Some(inference);
+        }
+
+        self.walk_top_level(top_level);
+
+        self.current_inference = prev_inference;
+    }
 
     fn walk_source_file(&mut self, source_file: &'file SourceFile) -> Self::Result {
         run_rule!(
@@ -158,7 +178,12 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         run_rule!(
             self.checker,
             Rule::PureFunctionCallUnused,
-            pure_function_call_unused::check_expr_stmt(self.checker, self.file_id, node)
+            pure_function_call_unused::check_expr_stmt(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
         );
 
         if let Some(expr) = node.expr() {
