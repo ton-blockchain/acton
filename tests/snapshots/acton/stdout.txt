@@ -14,6 +14,7 @@ Commands:
   compile      Compile a Tolk file
   disasm       Disassemble TVM bitcode to human-readable TASM
   verify       Verify contract source code on verifier.ton.org
+  check        Check Tolk files in the project for errors
   retrace      Retrace a transaction by its hash
   library      Manage TON libraries
   fmt          Format Tolk source files
