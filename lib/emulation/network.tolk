@@ -411,6 +411,48 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
     return SendResult.fromTuple(res)
 }
 
+/// Creates an External-in message
+/// Body is always packed into the Either Right (in the refference)
+/// If StateInit is present it is also packed in the Either Right (in the refference)
+/// Full TL-b scheme of the message is
+/// ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
+///   import_fee:Grams = CommonMsgInfo;
+/// message$_ {X:Type} info:CommonMsgInfo
+///   init:(Maybe (Either StateInit ^StateInit))
+///   body:(Either X ^X) = Message X;
+///
+fun __createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateInit?, src: any_address?) {
+    val init = stateInit != null
+        ? Maybe<Either<StateInit, Cell<StateInit>>>.some(Either<StateInit, Cell<StateInit>>.right(stateInit.toCell()))
+        : Maybe<Either<StateInit, Cell<StateInit>>>.none();
+
+    // A little hack because Tolk does not support arbitrary function calls as default parameters
+    if(src == null) {
+        src = createAddressNone();
+    }
+    // Tolk does not have ext_address type, so ext_address = any_address \ int_address
+    assert (!src.isInternal()) throw 7;
+
+    return Message<TBody, ExternalInMessageInfo> {
+        info: ExternalInMessageInfo {
+            src: src,
+            dest: dest,
+            // It is better to fairly calculate the import fee right here or in acton
+            importFee: ton("0.1"),
+        },
+        init: init,
+        body: Either<TBody, Cell<TBody>>.right(body.toCell())
+    };
+}
+
+/// Sends external incoming message to the spefied destination address.
+/// Read more about External incomming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
+fun net.sendExternal<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null) {
+    val msg = __createExternalMessage(dest, body, stateInit, src);
+    // from and mode fields do not affect anything in case of an ExtIn message
+    return ffi.sendMessageFrom(msg.toCell(), address("UQBAmIBdInKmGzdTUMay9fqq8nyCZ9jnUh_yBFEE_cfediVD").toCell(), SEND_MODE_PAY_FEES_SEPARATELY)!;
+}
+
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
 ///
 /// Example:
