@@ -798,7 +798,6 @@ fn run_get_method_impl(
     address: ArcCell,
 ) -> anyhow::Result<()> {
     let args = args.unwrap_empty().unwrap_tuple();
-    let world_state = &mut ctx.chain.world_state;
     let address_boc = address
         .to_boc_hex(false)
         .context("Failed to encode address to BOC hex")?;
@@ -811,6 +810,7 @@ fn run_get_method_impl(
     let dest_address =
         TonAddress::from_msg_address(address_std).context("Failed to create TonAddress")?;
 
+    let world_state = &mut ctx.chain.world_state;
     let shard_account = world_state.get_account(&dst_addr_str);
     let state = shard_account
         .account
@@ -825,10 +825,14 @@ fn run_get_method_impl(
         Cell::default()
     };
 
+    // drop mut world_state borrow
+    let _ = world_state;
+
     let libs = ctx
         .chain
         .build_libs_with_hash_owner(&HashBytes::from_slice(address_hash.as_slice()));
     let libs_root = libs.into_root();
+    let world_state = &mut ctx.chain.world_state;
 
     let method_id = id.to_i32().unwrap_or(0);
 
@@ -851,13 +855,21 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
+    let config_b64 = world_state
+        .get_config()
+        .root()
+        .clone()
+        .map(Boc::encode_base64)
+        .expect("Config has no root");
+
     let result = if ctx.debug.is_enabled() {
         let args = serialize_tuple(&args)
             .map(|t| t.to_boc_b64(false))
             .context("Cannot serialize tuple")?
             .context("Cannot serialize tuple")?;
-        let step_executor =
-            StepGetExecutor::new(&args, &params, None).context("Cannot create get executor")?;
+
+        let step_executor = StepGetExecutor::new(&args, &params, Some(&config_b64))
+            .context("Cannot create get executor")?;
 
         let source_map = ctx
             .build
@@ -911,7 +923,7 @@ fn run_get_method_impl(
             .context("Cannot serialize tuple")?
             .context("Cannot serialize tuple")?;
         executor
-            .run_get_method(&args, &params, None)
+            .run_get_method(&args, &params, Some(&config_b64))
             .context("Cannot run get method")?
     };
 
@@ -1342,6 +1354,8 @@ extension!(set_config in (Context) with (config: ArcCell) using set_config_impl)
 fn set_config_impl(ctx: &mut Context, stack: &mut Tuple, config: ArcCell) -> anyhow::Result<()> {
     let config_boc = config.to_boc(false)?;
     let config_cell = Boc::decode(config_boc)?;
+
+    // ctx.chain.
 
     let result = ctx
         .chain

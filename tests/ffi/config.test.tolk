@@ -1,6 +1,8 @@
+import "../../lib/build/build"
 import "../../lib/emulation/config"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
+import "../../lib/testing/transaction_expect"
 
 get fun `test get config`() {
     val config = net.getConfig();
@@ -36,4 +38,36 @@ get fun `test bad config`() {
 
     val result = net.setConfig(config);
     expect(result).toBeFalse();
+}
+
+get fun `test get executor config`() {
+    val simpleCode = build("simple");
+    val getAddress = AutoDeployAddress {
+        stateInit: { code: simpleCode, data: beginCell().endCell() },
+    };
+
+    val deployMsg = createMessage({
+        dest: getAddress,
+        bounce: false,
+        value: ton("1"),
+    });
+
+    val deployer = net.treasury("deployer");
+    val res = net.send(deployer.address, deployMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+
+    expect(res).toHaveSuccessfulDeploy({ from: deployer.address, to: getAddress.calculateAddress() });
+
+    val firstRes = net.runGetMethod(getAddress.calculateAddress(), "getParam") as int;
+
+    var config = net.getConfig();
+
+    var storagePricesBefore = config.getGasPrices(BASECHAIN);
+    storagePricesBefore.flatGasPrice += 100;
+    config.setGasPrices(storagePricesBefore, BASECHAIN);
+
+    val result = net.setConfig(config);
+    expect(result).toBeTrue();
+
+    val secondRes = net.runGetMethod(getAddress.calculateAddress(), "getParam") as int;
+    expect(firstRes).toNotEqual(secondRes);
 }

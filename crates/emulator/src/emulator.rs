@@ -296,6 +296,8 @@ impl Emulator {
     pub fn set_config(&self, state: &mut WorldState, config: Cell) -> anyhow::Result<bool> {
         let config_boc = Boc::encode_base64(&config);
 
+        // let get_executor_result = self.
+
         match self.executor.set_config(&config_boc) {
             Ok(res) => match res {
                 true => {
