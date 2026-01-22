@@ -53,6 +53,10 @@ fun vm.setConfigParam<T>(value: T, index: int) {
 
 const CONFIG_ROOT_INDEX = 9
 
+/// Set the blockchain configuration root dictionary.
+///
+/// This function allows you to override the configuration root dictionary (parameter 9) in the VM state.
+/// The config root is a dictionary containing blockchain configuration parameters.
 fun vm.setConfigRootDict(root: dict) {
     var c7 = vm.getC7();
     var params: tuple = c7.get(0);
@@ -64,6 +68,10 @@ fun vm.setConfigRootDict(root: dict) {
 
 const CONFIG_UNPACKED_INDEX = 14
 
+/// Set the unpacked configuration parameters tuple.
+///
+/// This function allows you to override the unpacked configuration parameters (parameter 14) in the VM state.
+/// The unpacked config contains a tuple of configuration values extracted from the config dictionary.
 fun vm.setConfigUnpacked(values: tuple) {
     var c7 = vm.getC7();
     var params: tuple = c7.get(0);
@@ -73,6 +81,15 @@ fun vm.setConfigUnpacked(values: tuple) {
     vm.setC7(c7);
 }
 
+/// Get the unpacked configuration parameters tuple.
+///
+/// Retrieves the unpacked configuration parameters (parameter 14) from the current VM state.
+/// Returns a tuple of configuration values.
+///
+/// Example:
+/// ```tolk
+/// val unpacked = vm.getConfigUnpacked();
+/// ```
 fun vm.getConfigUnpacked() {
     var c7 = vm.getC7();
     var params: tuple = c7.get(0);
