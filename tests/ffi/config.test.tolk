@@ -3,6 +3,7 @@ import "../../lib/emulation/config"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
+import "../../lib/vm/vm"
 
 get fun `test get config`() {
     val config = net.getConfig();
@@ -70,4 +71,32 @@ get fun `test get executor config`() {
 
     val secondRes = net.runGetMethod(getAddress.calculateAddress(), "getParam") as int;
     expect(firstRes).toNotEqual(secondRes);
+}
+
+fun calculateForwardFeeLocal(workchain: int8, bits: int, cells: int): coins
+    asm(cells bits workchain) "GETFORWARDFEE"
+
+get fun `test current config`() {
+    val gas = 100;
+    val before = calculateForwardFeeLocal(BASECHAIN, gas, gas);
+
+    val priceBefore = ((vm.getC7().get(0) as tuple).get(9) as Config).getMsgForwardPrices(BASECHAIN)
+        .lumpPrice;
+    var config = net.getConfig();
+
+    var storagePricesBefore = config.getMsgForwardPrices(BASECHAIN);
+
+    storagePricesBefore.lumpPrice += 2000;
+
+    config.setMsgForwardPrices(storagePricesBefore, BASECHAIN);
+    val result = net.setConfig(config);
+    expect(result).toBeTrue();
+
+    val priceAfter = ((vm.getC7().get(0) as tuple).get(9) as Config).getMsgForwardPrices(BASECHAIN)
+        .lumpPrice;
+    expect(priceBefore).toNotEqual(priceAfter);
+
+    val after = calculateForwardFeeLocal(BASECHAIN, gas, gas);
+
+    expect(before).toNotEqual(after);
 }

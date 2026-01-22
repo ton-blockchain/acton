@@ -905,7 +905,33 @@ fun net.balance(of: address): coins {
 /// }
 /// ```
 fun net.setConfig(config: Config): bool {
-    return ffi.setConfig(config.toLowLevelDict());
+    val root = config.toLowLevelDict();
+    val result = ffi.setConfig(root);
+
+    if (result) {
+        vm.setConfigRootDict(root);
+
+        var unpacked = vm.getConfigUnpacked();
+
+        val storagePrices = config.getStoragePrices().getInitial();
+        unpacked.set(storagePrices.toCell().beginParse(), 0);
+
+        val masterchainGasPrices = config.getGasPrices(MASTERCHAIN);
+        unpacked.set(masterchainGasPrices.toCell().beginParse(), 2);
+
+        val basechainGasPrices = config.getGasPrices(BASECHAIN);
+        unpacked.set(basechainGasPrices.toCell().beginParse(), 3);
+
+        val masterchainFwd = config.getMsgForwardPrices(MASTERCHAIN);
+        unpacked.set(masterchainFwd.toCell().beginParse(), 4);
+
+        val basechainFwd = config.getMsgForwardPrices(BASECHAIN);
+        unpacked.set(basechainFwd.toCell().beginParse(), 5);
+
+        vm.setConfigUnpacked(unpacked);
+    }
+
+    return result;
 }
 
 /// Retrieves the current blockchain configuration.

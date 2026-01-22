@@ -14,7 +14,6 @@
 /// // Inspect actions manually
 /// val rawActions = vm.getC5();
 /// ```
-
 import "../ffi/ffi"
 
 /// Holds the methods to change the VM state.
@@ -22,19 +21,19 @@ struct vm
 
 /// Read control register C7.
 fun vm.getC7(): tuple
-    asm "c7 PUSHCTR";
+    asm "c7 PUSHCTR"
 
 /// Write a new value to control register C7.
 fun vm.setC7(c7: tuple): void
-    asm "c7 POPCTR";
+    asm "c7 POPCTR"
 
 /// Read control register C5.
 fun vm.getC5(): cell
-    asm "c5 PUSHCTR";
+    asm "c5 PUSHCTR"
 
 /// Write a new value to control register C5.
 fun vm.setC5(cell: cell): void
-    asm "c5 POPCTR";
+    asm "c5 POPCTR"
 
 /// Generic helper to get a single config parameter.
 fun vm.getConfigParam<T>(index: int): T {
@@ -50,6 +49,35 @@ fun vm.setConfigParam<T>(value: T, index: int) {
     params.set(value, index);
     c7.set(params, 0);
     vm.setC7(c7);
+}
+
+const CONFIG_ROOT_INDEX = 9
+
+fun vm.setConfigRootDict(root: dict) {
+    var c7 = vm.getC7();
+    var params: tuple = c7.get(0);
+
+    params.set(root, CONFIG_ROOT_INDEX);
+    c7.set(params, 0);
+    vm.setC7(c7);
+}
+
+const CONFIG_UNPACKED_INDEX = 14
+
+fun vm.setConfigUnpacked(values: tuple) {
+    var c7 = vm.getC7();
+    var params: tuple = c7.get(0);
+
+    params.set(values, CONFIG_UNPACKED_INDEX);
+    c7.set(params, 0);
+    vm.setC7(c7);
+}
+
+fun vm.getConfigUnpacked() {
+    var c7 = vm.getC7();
+    var params: tuple = c7.get(0);
+
+    return params.get(CONFIG_UNPACKED_INDEX) as tuple;
 }
 
 /// Override `blockchain.now()` for deterministic testing.
@@ -74,7 +102,7 @@ fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null) {
 
 /// Register a new library for current test.
 fun vm.registerLibrary(cell: cell) {
-    ffi.registerLibrary(cell)
+    ffi.registerLibrary(cell);
 }
 
 /// Convert a slice with string representation of address to an address type.
@@ -85,13 +113,16 @@ fun vm.registerLibrary(cell: cell) {
 /// ```
 fun vm.convertAddress(addr: slice): address {
     val cell = ffi.convertAddress(addr);
-    return cell.beginParse() as address
+    return cell.beginParse() as address;
 }
 
 fun vm.cellFromHex(cellHex: slice): cell {
-    return ffi.cellFromHex(cellHex)
+    return ffi.cellFromHex(cellHex);
 }
 
-fun ffi.registerLibrary(cell: cell): void asm "18 EXTCALL"
-fun ffi.convertAddress(addr: slice): cell asm "19 EXTCALL"
-fun ffi.cellFromHex(cellHex: slice): cell asm "20 EXTCALL"
+fun ffi.registerLibrary(cell: cell): void
+    asm "18 EXTCALL"
+fun ffi.convertAddress(addr: slice): cell
+    asm "19 EXTCALL"
+fun ffi.cellFromHex(cellHex: slice): cell
+    asm "20 EXTCALL"

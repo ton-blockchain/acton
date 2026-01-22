@@ -68,4 +68,18 @@ get fun getParam() {
             .success()
             .assert_passed(1);
     }
+
+    #[test]
+    fn test_current_config() {
+        ProjectBuilder::new("simple")
+            .contract("simple", SIMPLE_CONTRACT)
+            .test_file_from_path("test", "tests/ffi/config.test.tolk")
+            .build()
+            .acton()
+            .test()
+            .filter("test current config")
+            .run()
+            .success()
+            .assert_passed(1);
+    }
 }
