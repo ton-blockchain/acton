@@ -798,6 +798,7 @@ fn run_get_method_impl(
     address: ArcCell,
 ) -> anyhow::Result<()> {
     let args = args.unwrap_empty().unwrap_tuple();
+    let world_state = &mut ctx.chain.world_state;
     let address_boc = address
         .to_boc_hex(false)
         .context("Failed to encode address to BOC hex")?;
@@ -810,7 +811,6 @@ fn run_get_method_impl(
     let dest_address =
         TonAddress::from_msg_address(address_std).context("Failed to create TonAddress")?;
 
-    let world_state = &mut ctx.chain.world_state;
     let shard_account = world_state.get_account(&dst_addr_str);
     let state = shard_account
         .account
@@ -824,9 +824,6 @@ fn run_get_method_impl(
     } else {
         Cell::default()
     };
-
-    // drop mut world_state borrow
-    let _ = world_state;
 
     let libs = ctx
         .chain
@@ -1354,8 +1351,6 @@ extension!(set_config in (Context) with (config: ArcCell) using set_config_impl)
 fn set_config_impl(ctx: &mut Context, stack: &mut Tuple, config: ArcCell) -> anyhow::Result<()> {
     let config_boc = config.to_boc(false)?;
     let config_cell = Boc::decode(config_boc)?;
-
-    // ctx.chain.
 
     let result = ctx
         .chain
