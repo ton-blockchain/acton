@@ -299,10 +299,10 @@ impl WorldState {
         let config = boc::Boc::decode_base64(config_str)
             .ok()
             .and_then(|cell| {
-                let mut slice = cell.as_slice().ok()?;
+                let mut slice = cell.as_slice_allow_exotic();
                 tycho_types::dict::Dict::load_from_root_ext(&mut slice, Cell::empty_context()).ok()
             })
-            .ok_or_else(|| anyhow::anyhow!("corrupted config for world state"))?;
+            .ok_or_else(|| anyhow::anyhow!("Corrupted blockchain config for world state"))?;
 
         Ok(Self {
             accounts_state,

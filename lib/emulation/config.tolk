@@ -173,7 +173,7 @@ const INITIAL_UNIXTIME_STORAGE_INDEX = 0
 /// ```tolk
 /// val storagePrices = config.getStoragePrices();
 /// val initialPrices = storagePrices.getInitial();
-/// println(format1("Initial bit price: {}", initialPrices.bitPrice));
+/// println1("Initial bit price: {}", initialPrices.bitPrice);
 /// ```
 fun StoragePricesDict.getInitial(self) {
     return self.get(INITIAL_UNIXTIME_STORAGE_INDEX).loadValue();
@@ -317,7 +317,7 @@ fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int) {
 /// Example:
 /// ```tolk
 /// val gasPrices = config.getGasPrices(BASECHAIN);
-/// println(format1("Gas limit basechain: {}", gasPrices));
+/// println1("Gas limit basechain: {}", gasPrices);
 /// ```
 fun Config.getGasPrices(self, chainType: int) {
     val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;

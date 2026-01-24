@@ -1,7 +1,4 @@
 #![cfg(test)]
-
-use anyhow::Ok;
-
 use crate::DEFAULT_CONFIG;
 use crate::common::ExecutorVerbosity;
 use crate::message::Executor;

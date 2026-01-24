@@ -296,15 +296,11 @@ impl Emulator {
     pub fn set_config(&self, state: &mut WorldState, config: Cell) -> anyhow::Result<bool> {
         let config_boc = Boc::encode_base64(&config);
 
-        // let get_executor_result = self.
-
         match self.executor.set_config(&config_boc) {
             Ok(res) => match res {
                 true => {
-                    let mut config_slice = config
-                        .as_slice()
-                        .ok()
-                        .context("Failed to parse config cell to slice")?;
+                    let mut config_slice = config.as_slice_allow_exotic();
+
                     let config_dict = Dict::<u32, Cell>::load_from_root_ext(
                         &mut config_slice,
                         Cell::empty_context(),

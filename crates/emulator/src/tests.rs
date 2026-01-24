@@ -1,7 +1,4 @@
 #![cfg(test)]
-
-use anyhow::Ok;
-
 use crate::WorldState;
 
 #[test]
