@@ -290,6 +290,9 @@ fn check_file(
         checker.process_file(info.source(), info.id());
     }
 
+    // Run project-wide checks (requires full call graph)
+    checker.check_project();
+
     checker.apply_suppressions();
     log::debug!("Run diagnostics in {:?}", now.elapsed());
 

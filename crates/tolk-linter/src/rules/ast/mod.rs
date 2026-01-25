@@ -1,5 +1,6 @@
 pub mod deprecated_symbol_use;
 pub mod field_init_can_be_folded;
+pub mod missing_on_bounce_handler;
 pub mod mutable_variable_can_be_immutable;
 pub mod pure_function_call_unused;
 pub mod unused_import;

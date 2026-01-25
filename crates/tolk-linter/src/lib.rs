@@ -2,8 +2,8 @@ extern crate core;
 
 use crate::ast::deprecated_symbol_use;
 use crate::rules::ast::{
-    field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,
-    unused_import, unused_variable, write_only_variable,
+    field_init_can_be_folded, missing_on_bounce_handler, mutable_variable_can_be_immutable,
+    pure_function_call_unused, unused_import, unused_variable, write_only_variable,
 };
 use rules::diagnostic::Diagnostic;
 pub use rules::*;
@@ -186,6 +186,25 @@ impl<'a> Checker<'a> {
             .use_facts(self.type_db, self.body_types, file_id)
     }
 
+    /// Builds call graph for a file.
+    pub fn build_call_graph(&mut self, file_id: FileId) {
+        self.analysis_db
+            .build_call_graph_for_file(self.type_db, self.body_types, file_id);
+    }
+
+    /// Returns call edges from a given caller function.
+    pub fn calls_from(&self, caller: SymbolId) -> Option<&Vec<tolk_analysis::CallEdge>> {
+        self.analysis_db.calls_from(caller)
+    }
+
+    /// Runs project-wide checks that require the full call graph.
+    /// Call this after all files have been processed.
+    pub fn check_project(&mut self) {
+        if self.should_run(Rule::MissingOnBounceHandler) {
+            missing_on_bounce_handler::check_project(self);
+        }
+    }
+
     pub fn apply_suppressions(&mut self) {
         self.diagnostics.retain(|diag| {
             let Some(file_suppressions) = self.file_suppressions.get(&diag.file_id) else {
@@ -226,6 +245,7 @@ impl<'a> Checker<'a> {
     pub fn process_file(&mut self, file: &SourceFile, file_id: FileId) {
         self.scan_for_suppressions(file_id, file.source.as_ref());
         self.use_facts(file_id);
+        self.build_call_graph(file_id);
         let resolve_index = self.resolve_index_for(file_id);
         let mut walker = CheckerWalker {
             checker: self,
