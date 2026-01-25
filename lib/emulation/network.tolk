@@ -29,6 +29,7 @@ import "../types/message"
 import "../types/out_actions"
 import "../types/transaction"
 import "../vm/vm"
+import "config"
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT = 678
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679

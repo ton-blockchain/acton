@@ -425,6 +425,13 @@ struct (0xc0) PrecompiledContractsConfig {
     list: map<uint256, PrecompiledSmartContract>
 }
 
+/// Adds new entry to precompiled gas contract list
+fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64) {
+    return self.list.addIfNotExists(hash, {
+        gasUsage: gasForComputePhase,
+    });
+}
+
 /// Sets the precompiled contracts configuration (Param 45).
 ///
 /// Updates the list of precompiled smart contracts and their associated gas costs.
