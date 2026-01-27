@@ -57,12 +57,15 @@ pub fn infer(
             walker.infer_enum(v, symbol_id);
         }
         TopLevel::Func(fun) => {
+            walker.ctx.caller_function = Some(symbol_id);
             walker.infer_function_base(fun, symbol_id);
         }
         TopLevel::Method(method) => {
+            walker.ctx.caller_function = Some(symbol_id);
             walker.infer_method(method, symbol_id);
         }
         TopLevel::GetMethod(method) => {
+            walker.ctx.caller_function = Some(symbol_id);
             walker.infer_function_base(method, symbol_id);
         }
         TopLevel::Import(_)

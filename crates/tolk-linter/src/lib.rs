@@ -7,16 +7,14 @@ use crate::rules::ast::{
 };
 use rules::diagnostic::Diagnostic;
 pub use rules::*;
-use rustc_hash::FxHashMap;
-use std::collections::HashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, Resolved};
-use tolk_syntax::{
-    Expr, ExprStmt, Ident, InstanceArg, SourceFile, TopLevel, TypeIdent, Walker, walk_ast,
-};
+use tolk_syntax::{Expr, ExprStmt, Ident, InstanceArg, SourceFile, TopLevel, TypeIdent, Walker, walk_ast, Call, HasName};
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
 use tree_sitter::Node;
@@ -28,6 +26,9 @@ mod rules;
 #[cfg(feature = "profile_rules")]
 pub use profiling::Profiler;
 use tolk_analysis::{AnalysisDb, FileUseFacts};
+use crate::ast::no_bounce_handler::NoBounceHandler;
+use crate::ast::pure_function_call_unused::PureFunctionCallUnused;
+use crate::diagnostic::{Annotation, Severity};
 
 pub struct Checker<'a> {
     pub file_db: &'a FileDb,
@@ -232,6 +233,7 @@ impl<'a> Checker<'a> {
             file_id,
             resolve_index,
             current_inference: None,
+            current_decl: None,
         };
 
         walk_ast(&mut walker, file);
@@ -286,6 +288,7 @@ struct CheckerWalker<'a, 'b> {
     file_id: FileId,
     resolve_index: Option<Arc<FileResolveIndex>>,
     current_inference: Option<&'b InferenceResult>,
+    current_decl: Option<SymbolId>,
 }
 
 impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
@@ -293,18 +296,24 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
 
     fn visit_top_level(&mut self, top_level: &TopLevel<'file>) -> Self::Result {
         let prev_inference = self.current_inference;
+        let prev_decl = self.current_decl;
 
         if let Some(file_info) = self.checker.file_db.get_by_id(self.file_id)
             && let Some(symbol) = file_info.find_declaration(top_level)
-            && let Some(file_body_types) = self.checker.body_types.get(&self.file_id)
-            && let Some(inference) = file_body_types.get(&symbol.id)
         {
-            self.current_inference = Some(inference);
+            self.current_decl = Some(symbol.id);
+
+            if let Some(file_body_types) = self.checker.body_types.get(&self.file_id)
+                && let Some(inference) = file_body_types.get(&symbol.id)
+            {
+                self.current_inference = Some(inference);
+            }
         }
 
         self.walk_top_level(top_level);
 
         self.current_inference = prev_inference;
+        self.current_decl = prev_decl;
     }
 
     fn walk_source_file(&mut self, source_file: &'file SourceFile) -> Self::Result {
@@ -370,6 +379,108 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
 
         if let Some(value) = node.value() {
             self.visit_expr(&value);
+        }
+    }
+
+    fn walk_call(&mut self, node: &Call<'file>) -> Self::Result {
+        let Some(name_node) = node.callee_identifier() else {
+            return;
+        };
+        let Some(func_name) = self.checker.file_db.text_of(self.file_id, &name_node) else {
+            return;
+        };
+        if func_name != "createMessage" {
+            return;
+        };
+        let Some(arg) = node.arguments().first() else {
+            return;
+        };
+        let Some(Expr::ObjectLit(literal)) = arg.expr() else {
+            return;
+        };
+        let Some(bounce_arg) = literal.arguments().find(|arg| {
+            let Some(name) = arg.name() else {
+                return false;
+            };
+            self.checker.file_db.text_of(self.file_id, &name) == Some("bounce".into())
+        }) else { return; };
+        let Some(Expr::DotAccess(dot_access)) = bounce_arg.value() else {
+            return;
+        };
+
+        let Some(Expr::Ident(enum_value)) = dot_access.obj() else {
+            return;
+        };
+
+        let Some(enum_value) = self.checker.file_db.text_of(self.file_id, &enum_value) else {
+            return;
+        };
+
+        if enum_value == "NoBounce" {
+            return;
+        }
+
+        println!("====Call graph ====");
+        let Some(current_decl) = self.current_decl else {
+            return;
+        };
+        println!("Current decl: {:?}", current_decl);
+        self.checker.type_db.call_graph.get(&current_decl).iter().for_each(|call| println!("{:?}", call));
+
+        self.checker.type_db.inverted_call_graph.get(&current_decl).iter().for_each(|call| println!("{:?}", call));
+
+        // BFS up the inverted call graph to find all onInternalMessage callers
+        let mut visited = FxHashSet::default();
+        let mut queue = VecDeque::new();
+        queue.push_back(current_decl);
+        visited.insert(current_decl);
+
+        let mut on_internal_message_ids: Vec<SymbolId> = Vec::new();
+
+        while let Some(sym_id) = queue.pop_front() {
+            let Some(callers) = self.checker.type_db.inverted_call_graph.get(&sym_id) else {
+                continue;
+            };
+            for &caller_id in callers {
+                if !visited.insert(caller_id) {
+                    continue;
+                }
+                if let Some(symbol) = self.checker.type_db.project_index.resolve_symbol(caller_id) {
+                    if &*symbol.name == "onInternalMessage" {
+                        on_internal_message_ids.push(caller_id);
+                    }
+                }
+                queue.push_back(caller_id);
+            }
+        }
+
+        // For each onInternalMessage, find the onBouncedMessage in the same file
+        for &on_internal_id in &on_internal_message_ids {
+            let mut have_found_bounce = false;
+            let file_id = on_internal_id.file_id;
+            if let Some(file_index) = self.checker.type_db.project_index.get_file_index(file_id) {
+                if let Some(_) = file_index.decls.iter().find(|d| &*d.name == "onBouncedMessage") {
+                    have_found_bounce = true;
+                }
+            }
+            if !have_found_bounce {
+                let diagnostic = Diagnostic {
+                    file_id: self.file_id,
+                    severity: Severity::Error,
+                    name: NoBounceHandler::rule().name(),
+                    code: NoBounceHandler::code().map(|c| c.to_string()),
+                    message: NoBounceHandler.message(),
+                    annotations: vec![Annotation {
+                        span: bounce_arg.span(),
+                        message: Some("AHAHAH BOUNCE FOUND".to_string()),
+                        is_primary: true,
+                        tags: vec![],
+                    }],
+                    fixes: vec![],
+                    help: Some("Go fuck yourself".to_string()),
+                };
+                self.checker.emit_diagnostic(NoBounceHandler::rule(), diagnostic);
+            }
         }
     }
 

@@ -56,7 +56,9 @@ pub struct TypeDb<'a> {
     pub top_level_types: FxHashMap<SymbolId, TyId>,
     /// Stores all receiver types for methods by their [`SymbolId`].
     pub receiver_types: FxHashMap<SymbolId, TyId>,
-
+    /// Stores call graph
+    pub call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
+    pub inverted_call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
     /// Caches types by the AST node ID that represents a [`Type`].
     type_lower_cache: FxHashMap<usize, TyId>,
     /// Keeps track of definitions that have already been processed or are currently
@@ -77,6 +79,8 @@ impl<'a> TypeDb<'a> {
             intrn: type_interner,
             file_db,
             project_index,
+            inverted_call_graph: FxHashMap::default(),
+            call_graph: FxHashMap::default(),
             type_lower_cache: FxHashMap::default(),
             top_level_types: FxHashMap::default(),
             receiver_types: FxHashMap::default(),

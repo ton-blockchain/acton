@@ -1498,7 +1498,10 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
 
         // from now, we know which function we call
         let fun_ref = fun_ref.expect("unreachable");
-
+        if let Some(parent_function) = self.ctx.caller_function {
+            self.ctx.type_db.call_graph.entry(parent_function).or_default().insert(fun_ref);
+            self.ctx.type_db.inverted_call_graph.entry(fun_ref).or_default().insert(parent_function);
+        }
         // so, we have a call `f(args)` or `obj.f(args)`, f is fun_ref (function / method) (code / asm / builtin)
         // we're going to iterate over passed arguments, and (if generic) infer substitutedTs
         // at first, check argument count

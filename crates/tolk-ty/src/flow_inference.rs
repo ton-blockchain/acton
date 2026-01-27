@@ -285,6 +285,7 @@ pub struct InferenceContext<'db, 'a> {
     pub return_types: Vec<TyId>,
     pub inferred_return_type: Option<TyId>,
     pub decl_start: u32,
+    pub caller_function: Option<SymbolId>,
     pub call_stack: VecDeque<SymbolId>,
     pub computed_methods: FxHashMap<MethodKey, Option<MethodCallCandidate>>,
 }
@@ -305,6 +306,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
             return_types: Vec::new(),
             inferred_return_type: None,
             decl_start: 0,
+            caller_function: None,
             call_stack,
             computed_methods: FxHashMap::default(),
         }
