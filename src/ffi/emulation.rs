@@ -1355,7 +1355,7 @@ fn set_config_impl(ctx: &mut Context, stack: &mut Tuple, config: ArcCell) -> any
     let result = ctx
         .chain
         .emulator
-        .set_config(&mut ctx.chain.world_state, config_cell);
+        .set_config(ctx.chain.world_state, config_cell);
 
     match result {
         Ok(res) => {

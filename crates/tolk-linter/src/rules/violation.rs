@@ -1,6 +1,7 @@
 use crate::ast::{
     deprecated_symbol_use, field_init_can_be_folded, mutable_variable_can_be_immutable,
-    pure_function_call_unused, unused_import, unused_variable, write_only_variable, no_bounce_handler,
+    no_bounce_handler, pure_function_call_unused, unused_import, unused_variable,
+    write_only_variable,
 };
 use serde::Serialize;
 use std::fmt::Display;

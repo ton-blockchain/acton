@@ -293,7 +293,6 @@ pub struct WorldState {
 
 impl WorldState {
     /// Creates a new `WorldState` instance with the given initial state.
-    #[must_use]
     pub fn new(accounts_state: AccountsState, config_b64: Option<&str>) -> anyhow::Result<Self> {
         let config_str = config_b64.unwrap_or(DEFAULT_CONFIG);
         let config = boc::Boc::decode_base64(config_str)
