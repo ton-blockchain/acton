@@ -118,9 +118,9 @@ fn run_script_file(
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content, file_path);
 
+    let acton_config = ActonConfig::load();
     let mut compiler = tolkc::Compiler::new(2);
-    let acton_config = ActonConfig::load().ok();
-    if let Some(config) = &acton_config {
+    if let Ok(config) = &acton_config {
         compiler = compiler.with_mappings(&config.mappings);
     }
 

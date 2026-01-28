@@ -822,12 +822,10 @@ fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<ArcCell> {
     let mut tmp_file = File::create(&tmp_file_path)?;
     tmp_file.write_all(content.as_bytes())?;
 
+    let acton_config = ActonConfig::load();
     let mut compiler = tolkc::Compiler::new(2);
-    let acton_config = ActonConfig::load().ok();
-    if let Some(config) = &acton_config
-        && let Some(mappings) = &config.mappings
-    {
-        compiler.mappings = mappings.clone().into_iter().collect();
+    if let Ok(config) = &acton_config {
+        compiler = compiler.with_mappings(&config.mappings);
     }
 
     let compilation_result = compiler.compile(tmp_file_path.as_ref(), true);

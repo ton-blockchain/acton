@@ -1439,9 +1439,9 @@ fn create_test_config(
     ui: bool,
     ui_port: u16,
 ) -> TestConfig {
-    let acton_config = ActonConfig::load().ok();
+    let acton_config = ActonConfig::load();
 
-    if let Some(acton_config) = acton_config
+    if let Ok(acton_config) = acton_config
         && let Some(test_settings) = &acton_config.test
     {
         return test_settings.to_test_config(
