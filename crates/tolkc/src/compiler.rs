@@ -3,9 +3,8 @@ use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::ffi::{CStr, CString, c_char};
+use std::ffi::{CStr, CString, c_char, c_int};
 use std::fs::{canonicalize, read_to_string};
-use std::io::Error;
 use std::path::{Path, PathBuf};
 use ton_source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
 
@@ -38,6 +37,22 @@ pub fn compile(path: &Path, debug: bool) -> CompilerResult {
 #[must_use]
 pub fn compile_fast(path: &Path, debug: bool) -> CompilerResult {
     Compiler::new(0).compile(path, debug)
+}
+
+#[repr(u32)]
+enum FsReadCallbackKind {
+    Realpath = 0,
+    ReadFile = 1,
+}
+
+impl From<c_int> for FsReadCallbackKind {
+    fn from(value: c_int) -> Self {
+        if value == 0 {
+            return FsReadCallbackKind::Realpath;
+        }
+
+        FsReadCallbackKind::ReadFile
+    }
 }
 
 /// Simple wrapper over C++ implemented Tolk compiler.
@@ -115,24 +130,56 @@ impl Compiler {
                 dest_contents: *mut *mut c_char,
                 dest_error: *mut *mut c_char,
             ) {
-                fn realpath(path: PathBuf) -> Result<String, Error> {
+                fn realpath(path: PathBuf) -> Result<String, String> {
                     let path_str = path.to_string_lossy();
                     if path.is_absolute() {
-                        let abs_path = canonicalize(&path)?;
-                        return Ok(abs_path.to_string_lossy().into_owned());
+                        return canonicalize(&path)
+                            .map(|p| p.to_string_lossy().into_owned())
+                            .map_err(|e| e.to_string());
                     }
 
-                    if path_str.starts_with('@') {
-                        // Mapped paths (system or custom) are handled in read_callback kind=1
+                    if path_str.starts_with("@stdlib/") || path_str.starts_with("@fiftlib/") {
                         return Ok(path_str.into_owned());
                     }
 
-                    let abs_path = canonicalize(path)?;
-                    Ok(abs_path.to_string_lossy().into_owned())
+                    if path_str.starts_with('@') {
+                        let mut resolved = None;
+                        CURRENT_MAPPINGS.with(|mappings| {
+                            let mappings = mappings.borrow();
+                            let mut keys = mappings.keys().collect::<Vec<_>>();
+                            keys.sort_by_key(|k| std::cmp::Reverse(k.len()));
+
+                            for prefix in keys {
+                                if path_str.starts_with(&format!("{prefix}/")) {
+                                    let target = &mappings[prefix];
+                                    let suffix = &path_str[prefix.len()..];
+                                    let cur_mapped_path = Path::new(target).join(suffix.trim_start_matches('/'));
+
+                                    resolved = Some(
+                                        canonicalize(cur_mapped_path)
+                                            .map(|p| p.to_string_lossy().into_owned())
+                                            .map_err(|e| e.to_string()),
+                                    );
+                                    break;
+                                }
+                            }
+                        });
+
+                        if let Some(res) = resolved {
+                            return res;
+                        }
+
+                        let prefix = path_str.split('/').next().unwrap_or(&path_str);
+                        return Err(format!("Unknown path mapping '{prefix}'"));
+                    }
+
+                    canonicalize(path)
+                        .map(|p| p.to_string_lossy().into_owned())
+                        .map_err(|e| e.to_string())
                 }
 
-                match kind {
-                    0 => {
+                match FsReadCallbackKind::from(kind) {
+                    FsReadCallbackKind::Realpath => {
                         let mut relative_path = String::new();
                         // SAFETY: `data_ptr` is valid not-null pointer
                         let relative_path_raw = unsafe {
@@ -156,7 +203,7 @@ impl Compiler {
                         let abs_path = match result {
                             Ok(abs_path) => abs_path,
                             Err(err) => {
-                                let raw_str = CString::new(err.to_string())
+                                let raw_str = CString::new(err)
                                     .expect("Failed to create C string");
                                 // SAFETY: `dest_error` is valid not-null pointer
                                 unsafe {
@@ -171,7 +218,7 @@ impl Compiler {
                         // SAFETY: `dest_contents` is valid not-null pointer
                         unsafe { *dest_contents = raw_str.into_raw() }
                     }
-                    1 => {
+                    FsReadCallbackKind::ReadFile => {
                         // SAFETY: `data_ptr` is valid not-null pointer
                         let file_path = unsafe {
                             CStr::from_ptr(data_ptr)
@@ -179,79 +226,33 @@ impl Compiler {
                                 .expect("Invalid UTF-8 in file path")
                         };
 
-                        let content = if file_path.starts_with('@') {
-                            if let Some(filename) = file_path.strip_prefix("@stdlib/") {
-                                if let Some(content) =
-                                    read_stdlib_file(filename).map(ToString::to_string)
-                                {
-                                    content
-                                } else {
-                                    let raw_str = CString::new(format!(
-                                        "Standard library file not found: {filename}"
-                                    ))
-                                    .expect("Failed to create C string");
-                                    // SAFETY: `dest_error` is valid not-null pointer
-                                    unsafe { *dest_error = raw_str.into_raw() };
-                                    return;
-                                }
-                            } else if let Some(filename) = file_path.strip_prefix("@fiftlib/") {
-                                if let Some(content) =
-                                    read_fift_stdlib_file(filename).map(ToString::to_string)
-                                {
-                                    content
-                                } else {
-                                    let raw_str = CString::new(format!(
-                                        "Fift standard library file not found: {filename}"
-                                    ))
-                                    .expect("Failed to create C string");
-                                    // SAFETY: `dest_error` is valid not-null pointer
-                                    unsafe { *dest_error = raw_str.into_raw() };
-                                    return;
-                                }
+                        let content = if let Some(filename) = file_path.strip_prefix("@stdlib/") {
+                            if let Some(content) =
+                                read_stdlib_file(filename).map(ToString::to_string)
+                            {
+                                content
                             } else {
-                                let mut mapped_res = None;
-                                let mut mapped_path = None;
-                                CURRENT_MAPPINGS.with(|mappings| {
-                                    let mappings = mappings.borrow();
-                                    let mut keys = mappings.keys().collect::<Vec<_>>();
-                                    keys.sort_by_key(|k| std::cmp::Reverse(k.len()));
-
-                                    for prefix in keys {
-                                        if file_path.starts_with(&format!("{prefix}/")) {
-                                            let target = &mappings[prefix];
-                                            let suffix = &file_path[prefix.len()..];
-                                            let cur_mapped_path = Path::new(target)
-                                                .join(suffix.trim_start_matches('/'));
-                                            mapped_res = Some(read_to_string(&cur_mapped_path));
-                                            mapped_path = Some(cur_mapped_path);
-                                            break;
-                                        }
-                                    }
-                                });
-
-                                if let Some(res) = mapped_res {
-                                    match res {
-                                        Ok(content) => content,
-                                        Err(error) => {
-                                            let raw_str = CString::new(format!(
-                                                "Failed to read file {file_path} mapped to {}: {error}",
-                                                mapped_path.unwrap_or_else(|| "unknown".into()).display())
-                                            )
-                                            .expect("Failed to create C string");
-                                            // SAFETY: `dest_error` is valid not-null pointer
-                                            unsafe { *dest_error = raw_str.into_raw() };
-                                            return;
-                                        }
-                                    }
-                                } else {
-                                    let prefix = file_path.split('/').next().unwrap_or(file_path);
-                                    let raw_str =
-                                        CString::new(format!("Unknown path mapping '{prefix}'"))
-                                            .expect("Failed to create C string");
-                                    // SAFETY: `dest_error` is valid not-null pointer
-                                    unsafe { *dest_error = raw_str.into_raw() };
-                                    return;
-                                }
+                                let raw_str = CString::new(format!(
+                                    "Standard library file not found: {filename}"
+                                ))
+                                .expect("Failed to create C string");
+                                // SAFETY: `dest_error` is valid not-null pointer
+                                unsafe { *dest_error = raw_str.into_raw() };
+                                return;
+                            }
+                        } else if let Some(filename) = file_path.strip_prefix("@fiftlib/") {
+                            if let Some(content) =
+                                read_fift_stdlib_file(filename).map(ToString::to_string)
+                            {
+                                content
+                            } else {
+                                let raw_str = CString::new(format!(
+                                    "Fift standard library file not found: {filename}"
+                                ))
+                                .expect("Failed to create C string");
+                                // SAFETY: `dest_error` is valid not-null pointer
+                                unsafe { *dest_error = raw_str.into_raw() };
+                                return;
                             }
                         } else {
                             match read_to_string(file_path) {
@@ -271,7 +272,6 @@ impl Compiler {
                         // SAFETY: `dest_contents` is valid not-null pointer
                         unsafe { *dest_contents = raw_str.into_raw() }
                     }
-                    _ => {}
                 }
             }
 

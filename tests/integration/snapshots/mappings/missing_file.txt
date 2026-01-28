@@ -1,4 +1,4 @@
-Error: [ROOT]/contracts/main[LINE]: error: Failed to import: Failed to read file @core/math.tolk mapped to ./libs/core/math.tolk: [NOT_FOUND]
+Error: [ROOT]/contracts/main[LINE]: error: Failed to import: [NOT_FOUND]
    2 |             import "@core/math"
      |                    ^^^^^^^^^^^^
 
