@@ -374,7 +374,7 @@ jobs:
       - name: Init submodules for build
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
-          git submodule update --init --recursive
+          cd ton-repo && git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
