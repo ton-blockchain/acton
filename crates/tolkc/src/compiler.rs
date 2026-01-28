@@ -153,7 +153,8 @@ impl Compiler {
                                 if path_str.starts_with(&format!("{prefix}/")) {
                                     let target = &mappings[prefix];
                                     let suffix = &path_str[prefix.len()..];
-                                    let cur_mapped_path = Path::new(target).join(suffix.trim_start_matches('/'));
+                                    let cur_mapped_path =
+                                        Path::new(target).join(suffix.trim_start_matches('/'));
 
                                     resolved = Some(
                                         canonicalize(cur_mapped_path)
@@ -203,8 +204,7 @@ impl Compiler {
                         let abs_path = match result {
                             Ok(abs_path) => abs_path,
                             Err(err) => {
-                                let raw_str = CString::new(err)
-                                    .expect("Failed to create C string");
+                                let raw_str = CString::new(err).expect("Failed to create C string");
                                 // SAFETY: `dest_error` is valid not-null pointer
                                 unsafe {
                                     *dest_error = raw_str.into_raw();
@@ -232,9 +232,9 @@ impl Compiler {
                             {
                                 content
                             } else {
-                                let raw_str = CString::new(format!(
-                                    "Standard library file not found: {filename}"
-                                ))
+                                let raw_str = CString::new(
+                                    "Cannot read standard library file, file not found",
+                                )
                                 .expect("Failed to create C string");
                                 // SAFETY: `dest_error` is valid not-null pointer
                                 unsafe { *dest_error = raw_str.into_raw() };
@@ -246,9 +246,9 @@ impl Compiler {
                             {
                                 content
                             } else {
-                                let raw_str = CString::new(format!(
-                                    "Fift standard library file not found: {filename}"
-                                ))
+                                let raw_str = CString::new(
+                                    "Cannot read Fift standard library file, file not found",
+                                )
                                 .expect("Failed to create C string");
                                 // SAFETY: `dest_error` is valid not-null pointer
                                 unsafe { *dest_error = raw_str.into_raw() };
