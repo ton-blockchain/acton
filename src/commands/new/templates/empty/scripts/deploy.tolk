@@ -1,6 +1,6 @@
-import "../.acton/io"
-import "../.acton/emulation/network"
-import "../.acton/build/build"
+import "@acton/io"
+import "@acton/emulation/network"
+import "@acton/build/build"
 
 fun main() {
     val deployer = net.wallet("deployer");

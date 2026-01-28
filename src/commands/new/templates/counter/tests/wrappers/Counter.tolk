@@ -1,8 +1,8 @@
-import "../../.acton/build/build"
-import "../../.acton/emulation/network"
-import "../../.acton/testing/expect"
-import "../../.acton/types/message"
-import "../../contracts/types"
+import "@acton/build/build"
+import "@acton/emulation/network"
+import "@acton/testing/expect"
+import "@acton/types/message"
+import "@contracts/types"
 
 struct Counter {
     address: address

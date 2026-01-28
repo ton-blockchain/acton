@@ -208,6 +208,13 @@ pub fn new_cmd(
     );
     config.scripts = Some(scripts);
 
+    let mut mappings = BTreeMap::new();
+    mappings.insert("acton".to_owned(), ".acton".to_owned());
+    mappings.insert("contracts".to_owned(), "contracts".to_owned());
+    mappings.insert("tests".to_owned(), "tests".to_owned());
+    mappings.insert("wrappers".to_owned(), "tests/wrappers".to_owned());
+    config.mappings = Some(mappings);
+
     config.save()?;
 
     stdlib::ensure_latest(Path::new("."))?;

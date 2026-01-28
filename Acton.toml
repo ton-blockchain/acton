@@ -21,3 +21,6 @@ depends = []
 
 [test]
 [test.mutation]
+
+[mappings]
+acton = ".acton"
