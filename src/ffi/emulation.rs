@@ -123,7 +123,8 @@ fn build_impl(
     }
 
     let compile_start = Instant::now();
-    let result = tolkc::compile(Path::new(&path), ctx.build.need_debug_info);
+    let compiler = tolkc::Compiler::new(2).with_mappings(&ctx.env.config.mappings);
+    let result = compiler.compile(Path::new(&path), ctx.build.need_debug_info);
     let compile_time = compile_start.elapsed();
 
     match result {

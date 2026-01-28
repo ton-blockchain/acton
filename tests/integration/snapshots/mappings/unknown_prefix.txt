@@ -1,0 +1,4 @@
+Error: [ROOT]/contracts/main[LINE]: error: Failed to import: Unknown path mapping '@core'
+   2 |             import "@core/math"
+     |                    ^^^^^^^^^^^^
+

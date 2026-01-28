@@ -670,6 +670,7 @@ fn compile_test_file(
     file_cache: &mut FileBuildCache,
     file: &str,
     need_debug_info: bool,
+    acton_config: &ActonConfig,
 ) -> anyhow::Result<tolkc::CompilerResult> {
     let cache_entry = file_cache.get(file, need_debug_info, 0, "1.2".to_string());
     if let Some(cache_entry) = cache_entry {
@@ -682,7 +683,9 @@ fn compile_test_file(
             },
         ));
     }
-    let compilation_result = tolkc::compile(Path::new(&file), need_debug_info);
+
+    let compiler = tolkc::Compiler::new(0).with_mappings(&acton_config.mappings);
+    let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
         tolkc::CompilerResult::Success(result) => {
             let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.2".to_string());
@@ -719,8 +722,12 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
     let need_debug_info =
         config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
     let now = Instant::now();
-    let compilation_result =
-        compile_test_file(runner.file_build_cache, &tmp_test_filename, need_debug_info)?;
+    let compilation_result = compile_test_file(
+        runner.file_build_cache,
+        &tmp_test_filename,
+        need_debug_info,
+        &runner.acton_config,
+    )?;
     debug!("Test file '{file}' compilation time: {:?}", now.elapsed());
 
     match compilation_result {

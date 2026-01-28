@@ -53,7 +53,8 @@ pub fn verify_cmd(
     }
 
     println!("  {} Compiling contract", "→".blue().bold());
-    let compilation_result = tolkc::compile(Path::new(&contract_path), false);
+    let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings);
+    let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
     let code_boc64 = match compilation_result {
         tolkc::CompilerResult::Success(result) => {

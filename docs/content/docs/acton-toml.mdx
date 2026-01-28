@@ -15,6 +15,7 @@ The top-level of `Acton.toml` contains the following sections:
 - `[test]` — Configuration for the test runner.
 - `[lint]` — Linter configuration.
 - `[scripts]` — Custom shell commands or scripts.
+- `[mappings]` — Path mappings for Tolk compiler imports.
 
 ---
 
@@ -176,6 +177,37 @@ Example:
 deploy = "acton script scripts/deploy.tolk"
 check = "acton test --filter=.*_check"
 ```
+
+---
+
+## `[mappings]` Section
+
+Allows defining path aliases for the Tolk compiler, similar to `@stdlib`. These mappings let you import files using logical names instead of relative paths.
+
+| Field   | Type     | Description                                                                        |
+|:--------|:---------|:-----------------------------------------------------------------------------------|
+| `key`   | `string` | The alias prefix (e.g., `@core`). If `@` is omitted (preffered), it will be added. |
+| `value` | `string` | The relative or absolute path the prefix points to.                                |
+
+Example:
+```toml
+[mappings]
+"utils" = "./libs/utils" # Equivalent to "@utils"
+"@core" = "./libs/core"
+```
+
+With the above configuration, you can use these mappings in your Tolk source files:
+
+```tolk
+import "@core/math.tolk"  // Resolves to ./libs/core/math.tolk
+import "@utils/logic.tolk" // Resolves to ./libs/utils/logic.tolk
+```
+
+### Prefix Resolution Rules
+
+- **Longest Match First**: If you have multiple nested mappings (e.g., `@core` and `@core/utils`), Acton will use the longest matching prefix for resolution.
+- **Normalization**: If a mapping key doesn't start with `@` (preferred), Acton automatically prepends it.
+- **Relative Paths**: Relative paths in mappings are resolved relative to the project root (where `Acton.toml` is located).
 
 ## Additional Properties
 

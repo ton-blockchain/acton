@@ -118,7 +118,13 @@ fn run_script_file(
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content, file_path);
 
-    match tolkc::compile(Path::new(file_path), debug) {
+    let mut compiler = tolkc::Compiler::new(2);
+    let acton_config = ActonConfig::load().ok();
+    if let Some(config) = &acton_config {
+        compiler = compiler.with_mappings(&config.mappings);
+    }
+
+    match compiler.compile(Path::new(file_path), debug) {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
             let data_cell = ArcCell::default();

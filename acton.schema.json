@@ -209,6 +209,13 @@
         }
       }
     },
+    "mappings": {
+      "type": "object",
+      "description": "Path mappings for Tolk compiler imports (e.g., 'core' = './foo/core' maps to '@core/...')",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "scripts": {
       "type": "object",
       "description": "Custom scripts that can be run with 'acton run'",

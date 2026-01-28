@@ -63,6 +63,7 @@ pub struct ActonConfig {
     pub wallets: Option<WalletsConfig>,
     #[serde(skip)] // we build libraries manually
     pub libraries: Option<LibrariesConfig>,
+    pub mappings: Option<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -231,6 +232,7 @@ impl Default for ActonConfig {
             wallets: None,
             libraries: None,
             scripts: None,
+            mappings: None,
         }
     }
 }
@@ -748,5 +750,24 @@ keys = { mnemonic = "word1 word2 word3" }
         assert_eq!(direct.keys.mnemonic, Some("word1 word2 word3".to_string()));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_mappings_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[mappings]
+core = "./core"
+utils = "/usr/local/lib/tolk/utils"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let mappings = config.mappings.as_ref().unwrap();
+        assert_eq!(mappings.get("core").unwrap(), "./core");
+        assert_eq!(mappings.get("utils").unwrap(), "/usr/local/lib/tolk/utils");
     }
 }

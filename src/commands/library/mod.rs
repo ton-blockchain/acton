@@ -72,7 +72,8 @@ pub fn publish_cmd(
         contract_id = Some(contract_key.clone());
 
         println!("  {} Compiling contract", "→".blue().bold());
-        let compilation_result = tolkc::compile(Path::new(&contract_path), false);
+        let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings);
+        let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
         match compilation_result {
             CompilerResult::Success(result) => {
@@ -820,7 +821,16 @@ fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<ArcCell> {
     let tmp_file_path = tmp_dir.path().join("librarian.tolk");
     let mut tmp_file = File::create(&tmp_file_path)?;
     tmp_file.write_all(content.as_bytes())?;
-    let compilation_result = tolkc::compile(tmp_file_path.as_ref(), true);
+
+    let mut compiler = tolkc::Compiler::new(2);
+    let acton_config = ActonConfig::load().ok();
+    if let Some(config) = &acton_config
+        && let Some(mappings) = &config.mappings
+    {
+        compiler.mappings = mappings.clone().into_iter().collect();
+    }
+
+    let compilation_result = compiler.compile(tmp_file_path.as_ref(), true);
     match compilation_result {
         CompilerResult::Success(result) => Ok(ArcCell::from_boc_b64(&result.code_boc64)?),
         CompilerResult::Error(err) => {
