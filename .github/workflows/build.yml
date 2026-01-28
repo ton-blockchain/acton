@@ -290,7 +290,7 @@ jobs:
           path: target/release/acton
 
   build-linux:
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     if: true
 
     outputs:
@@ -498,7 +498,7 @@ jobs:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
         run: |
           gh release delete canary -y || true
-          
+
           gh api \
             repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
             -X DELETE || true
