@@ -210,6 +210,7 @@ impl Compiler {
                                 }
                             } else {
                                 let mut mapped_res = None;
+                                let mut mapped_path = None;
                                 CURRENT_MAPPINGS.with(|mappings| {
                                     let mappings = mappings.borrow();
                                     let mut keys = mappings.keys().collect::<Vec<_>>();
@@ -219,9 +220,10 @@ impl Compiler {
                                         if file_path.starts_with(&format!("{prefix}/")) {
                                             let target = &mappings[prefix];
                                             let suffix = &file_path[prefix.len()..];
-                                            let mapped_path = Path::new(target)
+                                            let cur_mapped_path = Path::new(target)
                                                 .join(suffix.trim_start_matches('/'));
-                                            mapped_res = Some(read_to_string(mapped_path));
+                                            mapped_res = Some(read_to_string(&cur_mapped_path));
+                                            mapped_path = Some(cur_mapped_path);
                                             break;
                                         }
                                     }
@@ -232,8 +234,9 @@ impl Compiler {
                                         Ok(content) => content,
                                         Err(error) => {
                                             let raw_str = CString::new(format!(
-                                                "Failed to read mapped file {file_path}: {error}"
-                                            ))
+                                                "Failed to read file {file_path} mapped to {}: {error}",
+                                                mapped_path.unwrap_or_else(|| "unknown".into()).display())
+                                            )
                                             .expect("Failed to create C string");
                                             // SAFETY: `dest_error` is valid not-null pointer
                                             unsafe { *dest_error = raw_str.into_raw() };
