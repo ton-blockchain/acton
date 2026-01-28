@@ -39,7 +39,7 @@ fun onInternalMessage(in: InMessage) {
     }
 }
 
-fun onBouncedMessage(in: InMessageBounced) {}
+fun onBouncedMessage(_in: InMessageBounced) {}
 
 get fun currentCounter(): int {
     val storage = lazy Storage.load();

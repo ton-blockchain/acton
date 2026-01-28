@@ -1,4 +1,3 @@
-import "@stdlib/gas-payments"
 import "errors"
 import "jetton-utils"
 import "messages"
@@ -39,8 +38,8 @@ fun onInternalMessage(in: InMessage) {
             storage.save();
 
             var msgValue = in.valueCoins;
-            var tonBalanceBeforeMsg = contract.getOriginalBalance() - msgValue;
-            var storageFee = MIN_TONS_FOR_STORAGE - min(tonBalanceBeforeMsg, MIN_TONS_FOR_STORAGE);
+            val tonBalanceBeforeMsg = contract.getOriginalBalance() - msgValue;
+            val storageFee = MIN_TONS_FOR_STORAGE - min(tonBalanceBeforeMsg, MIN_TONS_FOR_STORAGE);
             msgValue -= (storageFee + JETTON_WALLET_GAS_CONSUMPTION);
 
             if (msg.forwardTonAmount) {
@@ -83,7 +82,7 @@ fun onInternalMessage(in: InMessage) {
             storage.jettonBalance -= msg.jettonAmount;
             storage.save();
 
-            var forwardedMessagesCount = msg.forwardTonAmount ? 2 : 1;
+            val forwardedMessagesCount = msg.forwardTonAmount ? 2 : 1;
             assert (in.valueCoins >
                 msg.forwardTonAmount +
                 // 3 messages: wal1->wal2,  wal2->owner, wal2->response

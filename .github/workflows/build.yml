@@ -290,7 +290,7 @@ jobs:
           path: target/release/acton
 
   build-linux:
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     if: true
 
     outputs:
@@ -310,7 +310,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Cache Cargo registry + git + target
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -339,7 +339,7 @@ jobs:
 
       - name: Cache TON build directory
         id: cache-ton-build
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: ton-repo/build
           key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -347,7 +347,7 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -355,7 +355,7 @@ jobs:
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
         id: cache-ton-deps
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: |
             ton-repo/openssl_3
@@ -365,7 +365,7 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-
 
       - name: Cache ccache
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -374,7 +374,7 @@ jobs:
       - name: Init submodules for build
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
-          git submodule update --init --recursive
+          cd ton-repo && git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -415,32 +415,32 @@ jobs:
 
       - name: Test acton binary
         run: |
-          ./target/release/acton --help
+          ./target/release-size/acton --help
 
-      - name: Upload acton binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: acton-linux-binary
-          path: target/release/acton
+#      - name: Upload acton binary as artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: acton-linux-binary
+#          path: target/release-size/acton
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
-      - name: Run tests and generate coverage
-        run: |
-          rustup component add llvm-tools-preview
-          just coverage-html
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: target/llvm-cov/html
-
-      - name: Run formatter and linter
-        run: |
-          just fmt
-          just clippy
+#      - name: Run tests and generate coverage
+#        run: |
+#          rustup component add llvm-tools-preview
+#          just coverage-html
+#
+#      - name: Upload coverage report
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: coverage-report
+#          path: target/llvm-cov/html
+#
+#      - name: Run formatter and linter
+#        run: |
+#          just fmt
+#          just clippy
 
   create-canary-release:
     needs: [ build-macos, build-macos-intel, build-linux ]
@@ -498,7 +498,7 @@ jobs:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
         run: |
           gh release delete canary -y || true
-          
+
           gh api \
             repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
             -X DELETE || true

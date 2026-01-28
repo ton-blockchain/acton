@@ -55,14 +55,14 @@ Step 4 (step_over):
 Step 5 (step_over):
   Bytecode position: CCF6D799A9D2CE6F858582E277836BAE14B644E3258EFE112410C1ED98CF76A2:912
   Code:
-    630| /// ```
-    631| ///
-    632| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
-    633| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+    676| /// ```
+    677| ///
+    678| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
+    679| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    634|     val methodId = (crc16(name) & 0xffff) | 0x10000;
-    635|     return impl.runGetMethodById(addr, methodId, name, args)
-    636| }
+    680|     val methodId = (crc16(name) & 0xffff) | 0x10000;
+    681|     return impl.runGetMethodById(addr, methodId, name, args)
+    682| }
   Variables:
     '313 = currentCounter
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
@@ -71,14 +71,14 @@ Step 5 (step_over):
 Step 6 (step_over):
   Bytecode position: CCF6D799A9D2CE6F858582E277836BAE14B644E3258EFE112410C1ED98CF76A2:920
   Code:
-    630| /// ```
-    631| ///
-    632| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
-    633| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+    676| /// ```
+    677| ///
+    678| /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
+    679| fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
                                                                                            ^^^^
-    634|     val methodId = (crc16(name) & 0xffff) | 0x10000;
-    635|     return impl.runGetMethodById(addr, methodId, name, args)
-    636| }
+    680|     val methodId = (crc16(name) & 0xffff) | 0x10000;
+    681|     return impl.runGetMethodById(addr, methodId, name, args)
+    682| }
   Variables:
     '314 = null
     '313 = currentCounter
