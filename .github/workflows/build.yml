@@ -310,7 +310,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Cache Cargo registry + git + target
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
