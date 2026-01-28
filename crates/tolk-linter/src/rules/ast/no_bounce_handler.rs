@@ -47,9 +47,7 @@ pub fn check_call_expr(
         return None;
     };
 
-    let Expr::Ident(enum_value) = dot_access.obj()? else {
-        return None;
-    };
+    let enum_value = dot_access.field()?;
 
     if checker
         .file_db
