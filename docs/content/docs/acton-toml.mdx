@@ -192,15 +192,15 @@ Allows defining path aliases for the Tolk compiler, similar to `@stdlib`. These 
 Example:
 ```toml
 [mappings]
-"utils" = "./libs/utils" # Equivalent to "@utils"
+utils = "./libs/utils" # Equivalent to "@utils" and prefered
 "@core" = "./libs/core"
 ```
 
 With the above configuration, you can use these mappings in your Tolk source files:
 
 ```tolk
-import "@core/math.tolk"  // Resolves to ./libs/core/math.tolk
-import "@utils/logic.tolk" // Resolves to ./libs/utils/logic.tolk
+import "@core/math"  // Resolves to ./libs/core/math.tolk
+import "@utils/logic" // Resolves to ./libs/utils/logic.tolk
 ```
 
 ### Prefix Resolution Rules
