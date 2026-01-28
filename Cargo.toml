@@ -9,6 +9,7 @@ members = ["crates/*"]
 
 exclude = [
     "crates/acton-test-ui",
+    "crates/ffi-test",
 ]
 
 [dependencies]

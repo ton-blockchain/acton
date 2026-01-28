@@ -110,17 +110,17 @@ async fn test_retrace_lib_load() {
     .await;
 }
 
-// #[tokio::test]
-// async fn test_retrace_v12() {
-//     assert_retrace(
-//         Network::Testnet,
-//         "fadd5a2d53a26c4e8694e9e992c4f53f981655593b24847f19727c1140a255be",
-//         9,
-//         true,
-//         true,
-//     )
-//     .await;
-// }
+#[tokio::test]
+async fn test_retrace_v12() {
+    assert_retrace(
+        Network::Testnet,
+        "fadd5a2d53a26c4e8694e9e992c4f53f981655593b24847f19727c1140a255be",
+        9,
+        true,
+        true,
+    )
+    .await;
+}
 
 #[allow(unsafe_code)]
 async fn assert_retrace(
