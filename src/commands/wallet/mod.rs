@@ -1,11 +1,13 @@
 use crate::commands::common::{create_symlink, error_fmt, select_wallet};
 use crate::wallets;
+use crate::wallets::open_wallets;
 use acton_config::config;
 use acton_config::config::{ActonConfig, WalletsFile, global_wallets_path};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
 use log::error;
+use num_bigint::BigUint;
 use owo_colors::OwoColorize;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -16,7 +18,12 @@ use std::str::FromStr;
 use toml_edit::{DocumentMut, Item, Table, value};
 use ton_api::{Network, TonApiClient};
 use tonlib_core::TonAddress;
-use tonlib_core::wallet::mnemonic::Mnemonic;
+use tonlib_core::cell::ArcCell;
+use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
+use tonlib_core::tlb_types::block::message::{CommonMsgInfo, IntMsgInfo, Message};
+use tonlib_core::tlb_types::primitives::either::EitherRef;
+use tonlib_core::tlb_types::tlb::TLB;
+use tonlib_core::wallet::mnemonic::{KeyPair, Mnemonic};
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tonlib_core::wallet::wallet_version::WalletVersion;
 
@@ -167,22 +174,71 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
 fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
 
-    let name = select_wallet(name, &config)?;
+    let name = "hacknet-wallet".to_owned(); // select_wallet(name, &config)?;
 
-    let wallet = config
-        .get_wallet(&name)
+    let ton_wallet = TonWallet::new_with_params(
+        WalletVersion::V3R2,
+        KeyPair {
+            public_key: base64::decode("vJaPlGnBU4LVyZKlH+yFfmZStfDrLLm09jBiQANeCn4=").unwrap(),
+            secret_key: base64::decode("S5jydkGwpRKuH5F7eLRUBk42hJ/oz3ygys2hT00ZrWc=").unwrap(),
+        },
+        0,
+        0x29a9a317,
+    )?;
+
+    let network = Network::from_str("custom:hacknet")?;
+    let mut wallets = open_wallets(&config, Some(&"custom:hacknet"), true)?;
+    let wallet = wallets
+        .remove(&name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
 
-    let address = get_wallet_address(wallet)?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks(), None)?;
+    println!("{}", ton_wallet.address.to_base64_url());
+    let (seqno, _) = client.get_wallet_seqno(&ton_wallet.address.to_base64_url())?;
+
+    let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
+    let expire_at = expired_at_time
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs() as u32;
+
+    let message_info = IntMsgInfo {
+        ihr_disabled: true,
+        bounce: true,
+        bounced: false,
+        src: wallet.wallet.address.to_msg_address(),
+        dest: wallet.address().to_msg_address(),
+        value: CurrencyCollection::new(BigUint::from(1_000_000u64)),
+        ihr_fee: Grams::new(BigUint::from(0u64)),
+        fwd_fee: Grams::new(BigUint::from(0u64)),
+        created_at: 0,
+        created_lt: 0,
+    };
+
+    let message = Message {
+        info: CommonMsgInfo::Int(message_info),
+        init: None,
+        body: EitherRef::new(ArcCell::default()),
+    };
+
+    let message_cell = message.to_cell()?;
+
+    let external = ton_wallet.create_external_msg(expire_at, seqno, true, vec![message_cell.to_arc()])?;
+
+    let api_client = TonApiClient::new(network, config.custom_networks().clone(), None)?;
+    api_client
+        .send_boc(&external.to_boc_b64(false)?)
+        .context("Failed to send publication transaction")?;
 
     if !json {
         println!(
             "{} Requesting airdrop for wallet {} {}",
             "→".blue().bold(),
             name.cyan().bold(),
-            address
+            wallet.address()
         );
     }
+
+    // let address = get_wallet_address(wallet)?;
 
     let client = reqwest::blocking::Client::new();
 
@@ -230,7 +286,7 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyho
     let response = client
         .post(format!("{faucet_url}/claim"))
         .json(&serde_json::json!({
-            "address": address,
+            // "address": address,
             "challenge": challenge,
             "nonce": nonce
         }))
@@ -362,8 +418,10 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
         return Ok(());
     }
 
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
     let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
-    let client = TonApiClient::new(Network::Testnet, api_key)?;
+    let client = TonApiClient::new(Network::Custom("hacknet".to_owned()), custom_networks, api_key)?;
 
     if !json {
         println!("Available wallets:");

@@ -9,18 +9,21 @@ name = "Counter"
 src = "counter.tolk"
 depends = []
 
-[contracts.jetton-minter]
-name = "Minter"
-src = ".jetton/contracts/jetton-minter-contract.tolk"
-depends = ["jetton-wallet"]
-
-[contracts.jetton-wallet]
-name = "Wallet"
-src = ".jetton/contracts/jetton-wallet-contract.tolk"
-depends = []
+#[contracts.jetton-minter]
+#name = "Minter"
+#src = ".jetton/contracts/jetton-minter-contract.tolk"
+#depends = ["jetton-wallet"]
+#
+#[contracts.jetton-wallet]
+#name = "Wallet"
+#src = ".jetton/contracts/jetton-wallet-contract.tolk"
+#depends = []
 
 [test]
 [test.mutation]
+
+[networks.hacknet]
+v2-url = "http://103.244.113.196:8081"
 
 [mappings]
 acton = ".acton"

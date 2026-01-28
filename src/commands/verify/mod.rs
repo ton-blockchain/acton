@@ -15,6 +15,9 @@ use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
 use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tonlib_core::tlb_types::tlb::TLB;
+use tonlib_core::wallet::mnemonic::KeyPair;
+use tonlib_core::wallet::ton_wallet::TonWallet;
+use tonlib_core::wallet::wallet_version::WalletVersion;
 use tycho_types::boc::Boc;
 
 #[allow(clippy::too_many_arguments)]
@@ -335,16 +338,19 @@ pub fn verify_cmd(
 
     println!("  {} Sending verification transaction", "→".blue().bold());
 
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+
     let cell_data = &msg_cell.data;
     let cell = Boc::decode(cell_data)?;
     let cell_boc64 = Boc::encode_base64(&cell);
 
-    let api_client = TonApiClient::new(Network::from_str(&network)?, api_key.clone())?;
+    let api_client = TonApiClient::new(Network::from_str(&network)?, custom_networks.clone(), api_key.clone())?;
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
     wait_for_rate_limit(&api_key);
 
-    let (seqno, need_state_init) = wallet.seqno(&network)?;
+    let (seqno, need_state_init) = wallet.seqno(&network, custom_networks)?;
 
     wait_for_rate_limit(&api_key);
 

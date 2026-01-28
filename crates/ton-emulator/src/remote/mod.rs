@@ -32,7 +32,7 @@ pub fn get_account_info(
 
     let base_url = toncenter_url(network)?;
     let url = format!(
-        "{}/api/v2/getAddressInformation?address={}{}",
+        "{}/getAddressInformation?address={}{}",
         base_url,
         address,
         seqno
@@ -83,7 +83,7 @@ pub fn get_library_by_hash(
     api_key: Option<String>,
 ) -> anyhow::Result<Cell> {
     let base_url = toncenter_url(network)?;
-    let url = format!("{base_url}/api/v2/getLibraries");
+    let url = format!("{base_url}/getLibraries");
 
     let client = reqwest::blocking::Client::new();
     let mut request = client.get(&url).header("User-Agent", "acton-cli");

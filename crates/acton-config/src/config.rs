@@ -4,12 +4,43 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Network {
     Mainnet,
     Testnet,
+    #[serde(untagged)]
+    Custom(String),
+}
+
+impl Network {
+    pub fn as_str(&self) -> String {
+        match self {
+            Network::Mainnet => "mainnet".to_string(),
+            Network::Testnet => "testnet".to_string(),
+            Network::Custom(s) => s.clone(),
+        }
+    }
+}
+
+impl FromStr for Network {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.to_lowercase();
+        match s.as_str() {
+            "mainnet" => Ok(Network::Mainnet),
+            "testnet" => Ok(Network::Testnet),
+            _ if s.starts_with("custom:") => {
+                Ok(Network::Custom(s.trim_start_matches("custom:").to_string()))
+            }
+            _ => anyhow::bail!(
+                "Unsupported network: {s}. Supported: mainnet, testnet, custom:<network_name>"
+            ),
+        }
+    }
 }
 
 impl std::fmt::Display for Network {
@@ -17,6 +48,7 @@ impl std::fmt::Display for Network {
         match self {
             Network::Mainnet => write!(f, "mainnet"),
             Network::Testnet => write!(f, "testnet"),
+            Network::Custom(s) => write!(f, "{}", s),
         }
     }
 }
@@ -52,8 +84,15 @@ pub enum ContractDependency {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct CustomNetworkConfig {
+    pub v2_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActonConfig {
     pub package: PackageConfig,
+    pub networks: Option<BTreeMap<String, CustomNetworkConfig>>,
     pub contracts: Option<ContractsConfig>,
     pub test: Option<TestSettings>,
     pub lint: Option<LintConfig>,
@@ -222,6 +261,7 @@ impl Default for ActonConfig {
                 repository: None,
                 license: Some("MIT".to_string()),
             },
+            networks: None,
             test: None,
             lint: None,
             contracts: None,
@@ -412,6 +452,17 @@ impl ActonConfig {
     #[must_use]
     pub fn get_library(&self, name: &str) -> Option<&LibraryConfig> {
         self.libraries.as_ref()?.libraries.get(name)
+    }
+
+    #[must_use]
+    pub fn custom_networks(&self) -> std::collections::HashMap<String, String> {
+        let mut result = std::collections::HashMap::new();
+        if let Some(networks) = &self.networks {
+            for (name, config) in networks {
+                result.insert(name.clone(), config.v2_url.clone());
+            }
+        }
+        result
     }
 }
 

@@ -33,6 +33,20 @@
         }
       }
     },
+    "networks": {
+      "type": "object",
+      "description": "Custom network configurations",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["v2-url"],
+        "properties": {
+          "v2-url": {
+            "type": "string",
+            "description": "The URL for the TonCenter API v2"
+          }
+        }
+      }
+    },
     "test": {
       "type": "object",
       "description": "Default settings for the test runner",

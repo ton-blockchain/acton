@@ -161,7 +161,7 @@ impl<'a> Checker<'a> {
         // 2. Apply contract overrides
         if let Some(contract_name) = contract_name
             && let Some(acton_config::config::LintEntry::Config(override_settings)) =
-                lint.entries.get(contract_name)
+            lint.entries.get(contract_name)
         {
             for (name, level) in override_settings {
                 if let Some(rule) = find_rule_by_name(name) {
@@ -401,6 +401,16 @@ impl<'a, 'b> CheckerWalker<'a, 'b> {
         let Some(usage) = resolve_index.find_use(node.span().start()) else {
             return;
         };
+
+        if let Resolved::Local(resolved) = usage.resolved {
+            let local = resolve_index.locals.iter().find(|l| l.id == resolved).unwrap();
+            println!("local {:?}: {:?}", local.id, local.name);
+
+            let usages = resolve_index.local_usages_of(resolved);
+            for usage in usages {
+                println!("usage {:?}", usage.span);
+            }
+        }
 
         if let Resolved::Global(resolved) = usage.resolved
             && let Some(symbol) = self.checker.type_db.project_index.resolve_symbol(resolved)
