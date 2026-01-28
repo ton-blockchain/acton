@@ -43,6 +43,7 @@ Session.vim
 *.mnemonic
 wallets.toml
 global.wallets.toml
+global.libraries.toml
 
 # coverage
 lcov.info
