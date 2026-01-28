@@ -417,11 +417,11 @@ jobs:
         run: |
           ./target/release-size/acton --help
 
-      - name: Upload acton binary as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: acton-linux-binary
-          path: target/release-size/acton
+#      - name: Upload acton binary as artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: acton-linux-binary
+#          path: target/release-size/acton
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
