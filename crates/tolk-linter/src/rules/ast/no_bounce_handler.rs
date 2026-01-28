@@ -1,6 +1,6 @@
 use crate::diagnostic::{Annotation, Diagnostic, Severity};
 use crate::{Checker, FixAvailability, Violation, ViolationMetadata};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::collections::VecDeque;
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::{AstNodeSpanExt, FileId, SymbolId};
@@ -16,7 +16,7 @@ impl Violation for NoBounceHandler {
 
     fn message(&self) -> String {
         "contract sends a message that may bounce but `onBouncedMessage` handler doesn't exist"
-            .to_string()
+            .to_owned()
     }
 }
 
@@ -27,8 +27,10 @@ pub fn check_call_expr(
     current_decl: Option<SymbolId>,
 ) -> Option<()> {
     let name_node = node.callee_identifier()?;
-    let func_name = checker.file_db.text_of(file_id, &name_node)?;
-    if func_name != "createMessage" {
+    if !checker
+        .file_db
+        .text_matches(file_id, &name_node, "createMessage")
+    {
         return None;
     };
     let arg = node.arguments().first()?;
@@ -39,7 +41,7 @@ pub fn check_call_expr(
         let Some(name) = arg.name() else {
             return false;
         };
-        checker.file_db.text_of(file_id, &name) == Some("bounce".into())
+        checker.file_db.text_matches(file_id, &name, "bounce")
     })?;
     let Expr::DotAccess(dot_access) = bounce_arg.value()? else {
         return None;
@@ -49,20 +51,22 @@ pub fn check_call_expr(
         return None;
     };
 
-    let enum_value = checker.file_db.text_of(file_id, &enum_value)?;
-    if enum_value == "NoBounce" {
+    if checker
+        .file_db
+        .text_matches(file_id, &enum_value, "NoBounce")
+    {
         return None;
     }
 
     let current_decl = current_decl?;
 
     // BFS up the inverted call graph to find all onInternalMessage callers
-    let mut visited = FxHashSet::default();
-    let mut queue = VecDeque::new();
+    let mut visited = FxHashSet::with_capacity_and_hasher(10, FxBuildHasher);
+    let mut queue = VecDeque::with_capacity(10);
     queue.push_back(current_decl);
     visited.insert(current_decl);
 
-    let mut on_internal_message_ids: Vec<SymbolId> = Vec::new();
+    let mut on_internal_message_ids: Vec<SymbolId> = Vec::with_capacity(2);
 
     while let Some(sym_id) = queue.pop_front() {
         let Some(callers) = checker.type_db.inverted_call_graph.get(&sym_id) else {

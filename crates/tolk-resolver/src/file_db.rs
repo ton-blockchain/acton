@@ -248,6 +248,29 @@ impl FileDb {
         left.text_matches(&source, right_text)
     }
 
+    pub fn text_matches<'a, Left: AstNode<'a>>(&self, file_id: FileId, left: &Left, expected: &str) -> bool {
+        let syntax = left.syntax();
+        let start = syntax.start_byte();
+        let end = syntax.end_byte();
+        let width = end - start;
+        if width != expected.len() {
+            // fast path, width of node is not equal to width of expected string
+            return false;
+        }
+
+        let Some(file) = self.files_by_id.get(&file_id) else {
+            return false;
+        };
+        let source = file.source.source.clone();
+
+        if end > source.len() || start > end {
+            return false;
+        }
+
+        // don't create an actual string for substring and just compare bytes
+        &source.as_bytes()[start..end] == expected.as_bytes()
+    }
+
     pub fn text_contains<'a, Node: AstNode<'a>>(
         &self,
         file_id: FileId,
