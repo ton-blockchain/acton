@@ -1,19 +1,23 @@
+CARGO_TEST := `if cargo nextest --version >/dev/null 2>&1; then echo "cargo nextest run"; else echo "cargo test"; fi`
+TEST_SERIAL_ARGS := `if cargo nextest --version >/dev/null 2>&1; then echo "--test-threads 1"; else echo "-- --test-threads 1"; fi`
+
 all: precommit
 
 build:
     cargo build --release
 
 test-unit:
-    cargo test --workspace --lib --bins \
-        --exclude retrace \
-        --exclude ton-executor
+    {{ CARGO_TEST }} --workspace --lib --bins \
+        --exclude retrace
 
 test-serial:
-    cargo test -p retrace -p ton-executor -- --test-threads 1
+    # we need test by test execution due to Toncenter rate limit
+    {{ CARGO_TEST }} -p retrace {{ TEST_SERIAL_ARGS }}
 
 test-integration:
-    cargo test --test integration_test
-    cargo test --test debug_test -- --test-threads 1
+    {{ CARGO_TEST }} --test integration_test
+    # we need test by test execution due to single debug port
+    {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
 
 test: test-unit test-serial test-integration
 

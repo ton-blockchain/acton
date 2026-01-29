@@ -44,24 +44,56 @@ See [Documentation](https://i582.github.io/acton/docs/welcome/).
 
 ## Development
 
-Run all tests:
+### Prerequisites
 
-```
+To run tests and contribute to Acton, you'll need to install the following
+dependencies:
+
+1. **just**: Command runner used for all development tasks.
+   ```bash
+   cargo install just
+   ```
+2. **cargo-nextest**: Modern test runner (highly recommended for faster and
+   better test output).
+   ```bash
+   cargo install cargo-nextest
+   ```
+3. **bun**: Required for building the Acton Test UI.
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   ```
+4. **cargo-llvm-cov**: For test coverage reports (optional).
+   ```bash
+   cargo install cargo-llvm-cov
+   rustup component add llvm-tools-preview
+   ```
+5. **System Dependencies**:
+    - **macOS**: `brew install libsodium libmicrohttpd pkg-config graphviz`
+    - **Linux**:
+      `sudo apt install libsodium-dev libmicrohttpd-dev pkg-config graphviz`
+
+### Running Tests
+
+Run all tests (automatically uses `nextest` if available):
+
+```bash
 just test
 ```
 
-Run integration tests:
+Update test snapshots:
 
+```bash
+just test-update
 ```
+
+Run specific test suites:
+
+```bash
+# Integration tests
 cargo test --test integration_test
-```
 
-Run debugger tests:
-
-```
+# Debugger tests (must run sequentially)
 cargo test --test debug_test -- --test-threads 1
 ```
 
-To update snapshots set `SNAPSHOTS=overwrite`.
-
-See also: [justfile](justfile) for all commands.
+See also: [justfile](justfile) for all available commands.

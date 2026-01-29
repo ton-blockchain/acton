@@ -423,24 +423,26 @@ jobs:
 #          name: acton-linux-binary
 #          path: target/release-size/acton
 
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-llvm-cov and nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,nextest
 
-#      - name: Run tests and generate coverage
-#        run: |
-#          rustup component add llvm-tools-preview
-#          just coverage-html
-#
+      - name: Run tests and generate coverage
+        run: |
+          rustup component add llvm-tools-preview
+          just coverage-html
+
 #      - name: Upload coverage report
 #        uses: actions/upload-artifact@v4
 #        with:
 #          name: coverage-report
 #          path: target/llvm-cov/html
-#
-#      - name: Run formatter and linter
-#        run: |
-#          just fmt
-#          just clippy
+
+      - name: Run formatter and linter
+        run: |
+          just fmt
+          just clippy
 
   create-canary-release:
     needs: [ build-macos, build-macos-intel, build-linux ]
