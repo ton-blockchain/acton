@@ -439,10 +439,10 @@ jobs:
           name: coverage-report
           path: target/llvm-cov/html
 
-#      - name: Run formatter and linter
-#        run: |
-#          just fmt
-#          just clippy
+      - name: Run formatter and linter
+        run: |
+          just fmt
+          just clippy
 
   create-canary-release:
     needs: [ build-macos, build-macos-intel, build-linux ]
