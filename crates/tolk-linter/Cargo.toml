@@ -26,3 +26,6 @@ memchr = { workspace = true }
 
 [features]
 profile_rules = []
+
+[lints]
+workspace = true

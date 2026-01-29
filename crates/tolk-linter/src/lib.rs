@@ -5,7 +5,7 @@ use crate::rules::ast::{
     field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,
     unused_import, unused_variable, write_only_variable,
 };
-use rules::diagnostic::Diagnostic;
+use rules::diagnostic::{Diagnostic, Severity};
 pub use rules::*;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
@@ -129,10 +129,10 @@ impl<'a> Checker<'a> {
             match level {
                 acton_config::config::LintLevel::Allow => return,
                 acton_config::config::LintLevel::Warn => {
-                    diagnostic.severity = rules::diagnostic::Severity::Warning;
+                    diagnostic.severity = Severity::Warning;
                 }
                 acton_config::config::LintLevel::Deny => {
-                    diagnostic.severity = rules::diagnostic::Severity::Error;
+                    diagnostic.severity = Severity::Error;
                 }
             }
         }
