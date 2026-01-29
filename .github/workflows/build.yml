@@ -423,8 +423,10 @@ jobs:
 #          name: acton-linux-binary
 #          path: target/release-size/acton
 
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-llvm-cov and nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,nextest
 
 #      - name: Run tests and generate coverage
 #        run: |
