@@ -16,6 +16,14 @@ pub(crate) async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result
             "/api/v2/getAddressInformation",
             get(get_address_information_query).post(get_address_information_post),
         )
+        .route(
+            "/api/v2/getAddressBalance",
+            get(get_address_balance_query).post(get_address_balance_post),
+        )
+        .route(
+            "/api/v2/getAddressState",
+            get(get_address_state_query).post(get_address_state_post),
+        )
         .with_state(node);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
@@ -101,6 +109,62 @@ async fn get_address_information_post(
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
     match node.get_address_information(payload.address).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_address_balance_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetAddressInformationRequest>,
+) -> Json<Value> {
+    match node.get_address_balance(payload.address).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_address_balance_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<GetAddressInformationRequest>,
+) -> Json<Value> {
+    match node.get_address_balance(payload.address).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_address_state_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetAddressInformationRequest>,
+) -> Json<Value> {
+    match node.get_address_state(payload.address).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_address_state_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<GetAddressInformationRequest>,
+) -> Json<Value> {
+    match node.get_address_state(payload.address).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,

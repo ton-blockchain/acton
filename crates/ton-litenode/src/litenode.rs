@@ -34,6 +34,14 @@ pub(crate) enum Request {
         address: String,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
+    GetAddressBalance {
+        address: String,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetAddressState {
+        address: String,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
 }
 
 pub(crate) struct LiteNode {
@@ -90,6 +98,24 @@ impl LiteNode {
             .context("Failed to send request")?;
         rx.await.context("Node loop dropped response channel")?
     }
+
+    pub(crate) async fn get_address_balance(&self, address: String) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressBalance { address, resp })
+            .await
+            .context("Failed to send request")?;
+        rx.await.context("Node loop dropped response channel")?
+    }
+
+    pub(crate) async fn get_address_state(&self, address: String) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressState { address, resp })
+            .await
+            .context("Failed to send request")?;
+        rx.await.context("Node loop dropped response channel")?
+    }
 }
 
 fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
@@ -119,6 +145,14 @@ fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
             }
             Request::GetAddressInformation { address, resp } => {
                 let res = handle_get_address_information(&mut world_state, address);
+                let _ = resp.send(res);
+            }
+            Request::GetAddressBalance { address, resp } => {
+                let res = handle_get_address_balance(&mut world_state, address);
+                let _ = resp.send(res);
+            }
+            Request::GetAddressState { address, resp } => {
+                let res = handle_get_address_state(&mut world_state, address);
                 let _ = resp.send(res);
             }
         }
@@ -316,5 +350,41 @@ fn handle_get_address_information(
     Ok(serde_json::json!({
         "ok": true,
         "result": result
+    }))
+}
+
+fn handle_get_address_balance(state: &mut WorldState, address: String) -> anyhow::Result<Value> {
+    let account = state.get_account(&address);
+    let loaded_account = account.account.load().context("Failed to load account")?;
+
+    let balance = if let Some(acc) = loaded_account.0 {
+        u128::from(acc.balance.tokens).to_string()
+    } else {
+        "0".to_string()
+    };
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": balance
+    }))
+}
+
+fn handle_get_address_state(state: &mut WorldState, address: String) -> anyhow::Result<Value> {
+    let account = state.get_account(&address);
+    let loaded_account = account.account.load().context("Failed to load account")?;
+
+    let state_str = if let Some(acc) = loaded_account.0 {
+        match acc.state {
+            AccountState::Active(_) => "active",
+            AccountState::Frozen(_) => "frozen",
+            AccountState::Uninit => "uninitialized",
+        }
+    } else {
+        "uninitialized"
+    };
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": state_str
     }))
 }
