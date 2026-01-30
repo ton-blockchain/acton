@@ -518,6 +518,14 @@ enum Commands {
         command: LibraryCommand,
     },
     #[command(
+        about = "Manage lightweight TON node",
+        after_help = example_litenode_usage()
+    )]
+    Litenode {
+        #[command(subcommand)]
+        command: LitenodeCommand,
+    },
+    #[command(
         about = "Format Tolk source files",
         after_help = example_fmt_usage()
     )]
@@ -567,6 +575,24 @@ enum Commands {
         path: String,
         #[arg(long, help = "Contract ID")]
         id: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum LitenodeCommand {
+    #[command(about = "Start the lightweight TON node")]
+    Start {
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
+    },
+    #[command(about = "Request TON from faucet")]
+    Airdrop {
+        #[arg(help = "Address to receive TON")]
+        address: String,
+        #[arg(long, short, help = "Amount of TON to request", default_value = "100")]
+        amount: f64,
+        #[arg(long, short, help = "LiteNode server port", default_value_t = 3000)]
+        port: u16,
     },
 }
 
@@ -645,6 +671,26 @@ pub enum LibraryCommand {
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
     },
+}
+
+fn example_litenode_usage() -> StyledStr {
+    format_examples(
+        &[
+            (
+                "Start the lightweight TON node on default port 3000",
+                "acton litenode start",
+            ),
+            (
+                "Request 100 TON from faucet to specified address",
+                "acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM",
+            ),
+            (
+                "Request specific amount of TON from faucet",
+                "acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 50",
+            ),
+        ],
+        "",
+    )
 }
 
 fn example_test_usage() -> StyledStr {
@@ -1346,6 +1392,28 @@ fn main() {
         }
         Commands::Docgen { output } => docgen_cmd(output),
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
+        Commands::Litenode { command } => match command {
+            LitenodeCommand::Start { port } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async { commands::litenode::litenode_start_cmd(port).await })
+            }
+            LitenodeCommand::Airdrop {
+                address,
+                amount,
+                port,
+            } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::litenode::litenode_airdrop_cmd(&address, amount, port).await
+                })
+            }
+        },
     };
 
     if let Err(err) = result {

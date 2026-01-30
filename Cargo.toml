@@ -43,6 +43,7 @@ ton-api = { path = "crates/ton-api" }
 retrace = { path = "crates/retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
 tolkfmt = { path = "crates/tolkfmt" }
+ton-litenode = { path = "crates/ton-litenode" }
 
 # remote crates
 # base TON libraries
@@ -158,6 +159,7 @@ ton-api = { workspace = true }
 retrace = { workspace = true }
 ton-source-map = { workspace = true }
 tolkfmt = { workspace = true }
+ton-litenode = { workspace = true }
 
 # remote crates
 # base TON libraries
@@ -233,6 +235,7 @@ similar = { workspace = true }
 
 # actin check
 codespan-reporting = { workspace = true }
+tracing-subscriber = "0.3.22"
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }

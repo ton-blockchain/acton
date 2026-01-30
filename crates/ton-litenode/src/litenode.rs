@@ -325,7 +325,7 @@ fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
     let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
     let mut node = Node::new(executor, config_bytes)?;
 
-    tracing::info!("LiteNode started (new architecture)");
+    tracing::info!("TON lite node started");
 
     loop {
         // 1. Process all currently pending requests

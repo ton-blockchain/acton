@@ -7,7 +7,7 @@ use std::str::FromStr;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Network {
     Mainnet,
     Testnet,

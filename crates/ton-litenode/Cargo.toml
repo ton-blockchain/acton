@@ -22,11 +22,9 @@ base64 = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-axum = "0.7"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
-clap = { version = "4", features = ["derive"] }
+axum = { workspace = true }
+tower-http = { workspace = true, features = ["cors", "trace"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
 
 [lints]
 workspace = true
