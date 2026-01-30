@@ -83,6 +83,18 @@ pub(crate) enum Request {
     GetMasterchainInfo {
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
+    GetShards {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    LookupBlock {
+        _workchain: i32,
+        _shard: String,
+        seqno: Option<u32>,
+        lt: Option<u64>,
+        unixtime: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
     Faucet {
         address: String,
         amount: u128,
@@ -267,6 +279,34 @@ impl LiteNode {
         rx.await?
     }
 
+    pub async fn get_shards(&self, seqno: u32) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetShards { seqno, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn lookup_block(
+        &self,
+        workchain: i32,
+        shard: String,
+        seqno: Option<u32>,
+        lt: Option<u64>,
+        unixtime: Option<u32>,
+    ) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::LookupBlock {
+                _workchain: workchain,
+                _shard: shard,
+                seqno,
+                lt,
+                unixtime,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn faucet(&self, address: String, amount: u128) -> anyhow::Result<Value> {
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -395,6 +435,21 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_get_masterchain_info(node);
             let _ = resp.send(res);
         }
+        Request::GetShards { seqno, resp } => {
+            let res = handle_get_shards(node, seqno);
+            let _ = resp.send(res);
+        }
+        Request::LookupBlock {
+            _workchain: _,
+            _shard: _,
+            seqno,
+            lt,
+            unixtime,
+            resp,
+        } => {
+            let res = handle_lookup_block(node, seqno, lt, unixtime);
+            let _ = resp.send(res);
+        }
         Request::Faucet {
             address,
             amount,
@@ -439,7 +494,7 @@ fn handle_send_boc(node: &mut Node, boc_str: String) -> anyhow::Result<Value> {
                 serde_json::json!({
                     "@type": "ton.blockIdExt",
                     "workchain": 0,
-                    "shard": -9223372036854775808i64,
+                    "shard": "-9223372036854775808",
                     "seqno": seqno,
                     "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                     "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -471,7 +526,7 @@ fn convert_to_block_id_json(h: &crate::storage::BlockMeta) -> Value {
     serde_json::json!({
         "@type": "ton.blockIdExt",
         "workchain": 0,
-        "shard": -9223372036854775808i64,
+        "shard": "-9223372036854775808",
         "seqno": h.seqno,
         "root_hash": h.block_boc_hash.to_hex(),
         "file_hash": h.block_boc_hash.to_hex()
@@ -499,7 +554,7 @@ fn handle_get_address_info(
             serde_json::json!({
                 "@type": "ton.blockIdExt",
                 "workchain": 0,
-                "shard": -9223372036854775808i64,
+                "shard": "-9223372036854775808",
                 "seqno": query_seqno,
                 "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -658,7 +713,7 @@ fn handle_run_get_method(
             serde_json::json!({
                 "@type": "ton.blockIdExt",
                 "workchain": 0,
-                "shard": -9223372036854775808i64,
+                "shard": "-9223372036854775808",
                 "seqno": query_seqno,
                 "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -820,7 +875,7 @@ fn handle_run_get_method_std(
             serde_json::json!({
                 "@type": "ton.blockIdExt",
                 "workchain": 0,
-                "shard": -9223372036854775808i64,
+                "shard": "-9223372036854775808",
                 "seqno": query_seqno,
                 "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -1074,7 +1129,7 @@ fn handle_get_extended_address_info(
             serde_json::json!({
                 "@type": "ton.blockIdExt",
                 "workchain": 0,
-                "shard": -9223372036854775808i64,
+                "shard": "-9223372036854775808",
                 "seqno": query_seqno,
                 "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -1188,7 +1243,7 @@ fn handle_get_block_transactions_ext(node: &Node, seqno: u32) -> anyhow::Result<
                 serde_json::json!({
                     "@type": "ton.blockIdExt",
                     "workchain": 0,
-                    "shard": -9223372036854775808i64,
+                    "shard": "-9223372036854775808",
                     "seqno": seqno,
                     "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                     "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -1219,7 +1274,7 @@ fn handle_get_masterchain_info(node: &Node) -> anyhow::Result<Value> {
             serde_json::json!({
                 "@type": "ton.blockIdExt",
                 "workchain": 0,
-                "shard": -9223372036854775808i64,
+                "shard": "-9223372036854775808",
                 "seqno": 0,
                 "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
@@ -1235,11 +1290,55 @@ fn handle_get_masterchain_info(node: &Node) -> anyhow::Result<Value> {
             "init": {
                 "@type": "ton.blockIdExt",
                 "workchain": 0,
-                "shard": -9223372036854775808i64,
+                "shard": "-9223372036854775808",
                 "seqno": 0,
                 "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
             }
         }
     }))
+}
+
+fn handle_get_shards(node: &Node, seqno: u32) -> anyhow::Result<Value> {
+    let block = node.get_block_header(seqno);
+    let Some(block_id_json) = block.as_ref().map(convert_to_block_id_json) else {
+        anyhow::bail!("Block not found for seqno={seqno}")
+    };
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": {
+            "@type": "blocks.shards",
+            "shards": [block_id_json]
+        }
+    }))
+}
+
+fn handle_lookup_block(
+    node: &Node,
+    seqno: Option<u32>,
+    lt: Option<u64>,
+    unixtime: Option<u32>,
+) -> anyhow::Result<Value> {
+    let block = if let Some(s) = seqno {
+        node.get_block_header(s)
+    } else if let Some(l) = lt {
+        node.find_block_by_lt(l)
+    } else if let Some(u) = unixtime {
+        node.find_block_by_unixtime(u)
+    } else {
+        None
+    };
+
+    match block {
+        Some(b) => Ok(serde_json::json!({
+            "ok": true,
+            "result": convert_to_block_id_json(&b)
+        })),
+        None => Ok(serde_json::json!({
+            "ok": false,
+            "error": "Block not found",
+            "code": 404
+        })),
+    }
 }

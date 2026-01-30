@@ -20,7 +20,7 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 use ton_abi::contract_abi;
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use ton_emulator::{extension, register_ext_methods, remote};
+use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};

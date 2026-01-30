@@ -57,6 +57,18 @@ pub async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
             "/api/v2/getMasterchainInfo",
             get(get_masterchain_info_query).post(get_masterchain_info_post),
         )
+        .route(
+            "/api/v2/getShards",
+            get(get_shards_query).post(get_shards_post),
+        )
+        .route(
+            "/api/v2/shards",
+            get(get_shards_query).post(get_shards_post),
+        )
+        .route(
+            "/api/v2/lookupBlock",
+            get(lookup_block_query).post(lookup_block_post),
+        )
         .route("/faucet", post(faucet))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -189,14 +201,14 @@ async fn json_rpc(
         }
         "getBlockHeader" => {
             if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_header(req.seqno).await
+                node.get_block_header(req.seqno as u32).await
             } else {
                 Err(anyhow::anyhow!("Invalid params for getBlockHeader"))
             }
         }
         "getBlockTransactionsExt" => {
             if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_transactions_ext(req.seqno).await
+                node.get_block_transactions_ext(req.seqno as u32).await
             } else {
                 Err(anyhow::anyhow!(
                     "Invalid params for getBlockTransactionsExt"
@@ -204,6 +216,34 @@ async fn json_rpc(
             }
         }
         "getMasterchainInfo" => node.get_masterchain_info().await,
+        "shards" => {
+            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
+                node.get_shards(req.seqno as u32).await
+            } else {
+                Err(anyhow::anyhow!("Invalid params for shards"))
+            }
+        }
+        "lookupBlock" => {
+            match serde_json::from_value::<LookupBlockRequest>(payload.params.clone()) {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("{err}")
+                }
+            }
+
+            if let Ok(req) = serde_json::from_value::<LookupBlockRequest>(payload.params) {
+                node.lookup_block(
+                    req.workchain,
+                    req.shard,
+                    req.seqno.map(|x| x as u32),
+                    req.lt,
+                    req.unixtime,
+                )
+                .await
+            } else {
+                Err(anyhow::anyhow!("Invalid params for lookupBlock"))
+            }
+        }
         _ => {
             return (
                 StatusCode::NOT_FOUND,
@@ -549,15 +589,15 @@ struct GetBlockRequest {
     workchain: Option<i32>,
     /// Shard ID (ignored, dev node only uses shard -9223372036854775808)
     #[allow(dead_code)]
-    shard: Option<i64>,
-    seqno: u32,
+    shard: Option<String>,
+    seqno: i32,
 }
 
 async fn get_block_header_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
-    match node.get_block_header(payload.seqno).await {
+    match node.get_block_header(payload.seqno as u32).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -571,7 +611,7 @@ async fn get_block_header_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetBlockRequest>,
 ) -> Json<Value> {
-    match node.get_block_header(payload.seqno).await {
+    match node.get_block_header(payload.seqno as u32).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -585,7 +625,7 @@ async fn get_block_transactions_ext_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
-    match node.get_block_transactions_ext(payload.seqno).await {
+    match node.get_block_transactions_ext(payload.seqno as u32).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -599,7 +639,7 @@ async fn get_block_transactions_ext_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetBlockRequest>,
 ) -> Json<Value> {
-    match node.get_block_transactions_ext(payload.seqno).await {
+    match node.get_block_transactions_ext(payload.seqno as u32).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -622,6 +662,89 @@ async fn get_masterchain_info_query(State(node): State<Arc<LiteNode>>) -> Json<V
 
 async fn get_masterchain_info_post(State(node): State<Arc<LiteNode>>) -> Json<Value> {
     match node.get_masterchain_info().await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+async fn get_shards_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_shards(payload.seqno as u32).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+async fn get_shards_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_shards(payload.seqno as u32).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+#[derive(Deserialize)]
+struct LookupBlockRequest {
+    workchain: i32,
+    shard: String,
+    seqno: Option<i32>,
+    lt: Option<u64>,
+    unixtime: Option<u32>,
+}
+
+async fn lookup_block_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<LookupBlockRequest>,
+) -> Json<Value> {
+    match node
+        .lookup_block(
+            payload.workchain,
+            payload.shard,
+            payload.seqno.map(|x| x as u32),
+            payload.lt,
+            payload.unixtime,
+        )
+        .await
+    {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+async fn lookup_block_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<LookupBlockRequest>,
+) -> Json<Value> {
+    match node
+        .lookup_block(
+            payload.workchain,
+            payload.shard,
+            payload.seqno.map(|x| x as u32),
+            payload.lt,
+            payload.unixtime,
+        )
+        .await
+    {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,

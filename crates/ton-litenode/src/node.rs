@@ -390,6 +390,24 @@ impl Node {
         }
     }
 
+    pub fn find_block_by_lt(&self, lt: Lt) -> Option<BlockMeta> {
+        self.history
+            .blocks
+            .iter()
+            .find(|b| lt >= b.start_lt && lt <= b.end_lt)
+            .cloned()
+    }
+
+    pub fn find_block_by_unixtime(&self, utime: u32) -> Option<BlockMeta> {
+        // Find block with gen_utime closest but not greater than utime
+        self.history
+            .blocks
+            .iter()
+            .filter(|b| b.gen_utime <= utime)
+            .next_back()
+            .cloned()
+    }
+
     pub fn get_block_transactions_ext(&self, seqno: Seqno) -> Option<Vec<TxMeta>> {
         let tx_hash = self.indexes.tx_by_block.get(&seqno)?;
         let tx = self.history.tx_by_hash.get(tx_hash).cloned()?;

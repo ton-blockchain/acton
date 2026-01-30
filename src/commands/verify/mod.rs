@@ -15,9 +15,6 @@ use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
 use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tonlib_core::tlb_types::tlb::TLB;
-use tonlib_core::wallet::mnemonic::KeyPair;
-use tonlib_core::wallet::ton_wallet::TonWallet;
-use tonlib_core::wallet::wallet_version::WalletVersion;
 use tycho_types::boc::Boc;
 
 #[allow(clippy::too_many_arguments)]
