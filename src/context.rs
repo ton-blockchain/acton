@@ -434,7 +434,7 @@ impl Context<'_> {
         self.env
             .fork_net
             .clone()
-            .unwrap_or_else(|| "testnet".to_owned())
+            .unwrap_or_else(|| self.network.clone().unwrap_or_else(|| "testnet".to_owned()))
     }
 }
 

@@ -1,9 +1,9 @@
 import "@stdlib/gas-payments"
-import "lib/build/build"
-import "lib/emulation/network"
-import "lib/testing/assert"
-import "lib/testing/expect"
-import "lib/types/message"
+import "@acton/build/build"
+import "@acton/emulation/network"
+import "@acton/testing/assert"
+import "@acton/testing/expect"
+import "@acton/types/message"
 import "types"
 
 struct Counter {

@@ -1,4 +1,5 @@
 use crate::executor::{ExecContext, TvmExecutor};
+use crate::litenode::parse_addr;
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
     LatestState, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TxMeta,
@@ -6,7 +7,11 @@ use crate::storage::{
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
 use core::cmp;
+use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tonlib_core::TonHash;
+use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
+use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 use tycho_types::models::{AccountState, Message, MsgInfo, ShardAccount};
@@ -21,15 +26,36 @@ pub struct Node {
     pub executor: Box<dyn TvmExecutor>,
 }
 
+pub const GIVER_ADDR: Addr = Addr {
+    workchain: 0,
+    addr: [0x55; 32],
+};
+
+pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B TON
+
 impl Node {
     pub fn new(executor: Box<dyn TvmExecutor>, config_boc: BocBytes) -> anyhow::Result<Self> {
         let config_hash = compute_boc_hash(&config_boc)?;
         let mut cas = CellStore::new();
         cas.put(config_boc, config_hash);
 
+        let mut latest = LatestState::new();
+        latest.accounts.insert(
+            GIVER_ADDR,
+            AccountMeta {
+                account_hash: Hash256([0; 32]),
+                status: AccountStatus::Active,
+                balance_cache: Some(GIVER_BALANCE),
+                last_trans_lt: None,
+                last_trans_hash: None,
+                code_hash: None,
+                data_hash: None,
+            },
+        );
+
         Ok(Self {
             cas,
-            latest: LatestState::new(),
+            latest,
             history: History::new(),
             indexes: Indexes::new(),
             globals: Globals::new(config_hash),
@@ -418,6 +444,77 @@ impl Node {
             .collect();
         Some((tx, in_msg, out_msgs))
     }
+
+    pub fn faucet(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<Value> {
+        let mut giver_meta = self
+            .latest
+            .accounts
+            .get(&GIVER_ADDR)
+            .cloned()
+            .context("Giver account not found")?;
+        let giver_balance = giver_meta.balance_cache.unwrap_or(0);
+        if giver_balance < amount {
+            anyhow::bail!("Giver has insufficient balance");
+        }
+
+        use tonlib_core::cell::ArcCell;
+        use tonlib_core::tlb_types::block::message::{CommonMsgInfo, IntMsgInfo, Message};
+        use tonlib_core::tlb_types::tlb::TLB;
+        use tonlib_core::types::TonAddress;
+
+        let src = TonAddress::new(GIVER_ADDR.workchain, TonHash::from(&GIVER_ADDR.addr));
+        let dst = TonAddress::new(addr.workchain, TonHash::from(&addr.addr));
+
+        let message_info = IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: src.to_msg_address(),
+            dest: dst.to_msg_address(),
+            value: CurrencyCollection::new(amount.into()),
+            ihr_fee: Grams::new(0u64.into()),
+            fwd_fee: Grams::new(0u64.into()),
+            created_at: 0,
+            created_lt: 0,
+        };
+
+        let message = Message {
+            info: CommonMsgInfo::Int(message_info),
+            init: None,
+            body: EitherRef::new(ArcCell::default()),
+        };
+
+        let boc = message.to_cell()?.to_boc(false)?;
+        let hash = compute_boc_hash(&boc)?;
+        self.cas.put(boc.clone(), hash);
+
+        // 2. Register MsgMeta
+        let msg_meta = parse_msg_meta(&boc, hash)?;
+        self.history.msg_by_hash.insert(hash, msg_meta);
+
+        // 3. Decrease Giver balance
+        giver_meta.balance_cache = Some(giver_balance - amount);
+        self.latest.accounts.insert(GIVER_ADDR, giver_meta);
+
+        // 4. Enqueue internal message
+        self.pool.push_internal(hash);
+
+        // 5. Mine one
+        let (block_meta, tx_meta) = self.mine_one()?;
+
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "tx_hash": tx_meta.tx_hash.to_hex(),
+                "block_seqno": block_meta.seqno
+            }
+        }))
+    }
+}
+
+pub fn handle_faucet(node: &mut Node, addr_str: String, amount: u128) -> anyhow::Result<Value> {
+    let addr = parse_addr(&addr_str)?;
+    node.faucet(&addr, amount)
 }
 
 // Helpers

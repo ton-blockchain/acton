@@ -41,6 +41,14 @@ pub fn stack_to_json(stack: &Tuple) -> anyhow::Result<Vec<Value>> {
     Ok(entries)
 }
 
+pub fn legacy_stack_to_json(stack: &Tuple) -> anyhow::Result<Vec<Value>> {
+    let mut entries = Vec::new();
+    for item in &stack.0 {
+        entries.push(legacy_item_to_json(item)?);
+    }
+    Ok(entries)
+}
+
 fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
     match item {
         TupleItem::Null => Ok(JsonStackEntry::Null {}),
@@ -72,11 +80,42 @@ fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
     }
 }
 
+pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
+    match item {
+        TupleItem::Null => Ok(serde_json::json!(["null", null])),
+        TupleItem::Int(i) => Ok(serde_json::json!(["num", i.to_string()])),
+        TupleItem::Cell(c) => Ok(serde_json::json!(["cell", { "bytes": c.to_boc_b64(false)? }])),
+        TupleItem::Slice(c) => Ok(serde_json::json!(["slice", { "bytes": c.to_boc_b64(false)? }])),
+        TupleItem::Builder(c) => {
+            Ok(serde_json::json!(["builder", { "bytes": c.to_boc_b64(false)? }]))
+        }
+        TupleItem::Tuple(t) => {
+            let elements =
+                t.0.iter()
+                    .map(legacy_item_to_json)
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(serde_json::json!(["tuple", { "elements": elements }]))
+        }
+        TupleItem::TypedTuple { inner, .. } => {
+            legacy_item_to_json(&TupleItem::Tuple(inner.clone()))
+        }
+        TupleItem::Nan => anyhow::bail!("NaN not supported in legacy JSON stack"),
+    }
+}
+
 pub fn json_to_stack(entries: Vec<Value>) -> anyhow::Result<Tuple> {
     let mut items = Vec::new();
     for entry in entries {
         let entry: JsonStackEntry = serde_json::from_value(entry)?;
         items.push(json_to_item(entry)?);
+    }
+    Ok(Tuple(items))
+}
+
+pub fn json_to_legacy_stack(entries: Vec<Value>) -> anyhow::Result<Tuple> {
+    let mut items = Vec::new();
+    for entry in entries {
+        items.push(json_to_legacy_item(entry)?);
     }
     Ok(Tuple(items))
 }
@@ -110,6 +149,89 @@ fn json_to_item(entry: JsonStackEntry) -> anyhow::Result<TupleItem> {
             }
             Ok(TupleItem::Tuple(Tuple(elements)))
         }
+    }
+}
+
+pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
+    let arr = value
+        .as_array()
+        .context("Legacy stack entry must be an array")?;
+    if arr.len() != 2 {
+        anyhow::bail!("Legacy stack entry must have 2 elements");
+    }
+    let type_str = arr[0]
+        .as_str()
+        .context("Legacy stack entry type must be a string")?;
+    let val = &arr[1];
+
+    match type_str {
+        "null" => Ok(TupleItem::Null),
+        "num" => {
+            let s = val
+                .as_str()
+                .map(|s| s.to_owned())
+                .or_else(|| {
+                    if val.is_number() {
+                        Some(val.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .context("num value must be string or number")?;
+            let i = if s.starts_with("0x") || s.starts_with("0X") {
+                BigInt::parse_bytes(&s.as_bytes()[2..], 16).context("Failed to parse hex BigInt")?
+            } else {
+                s.parse::<BigInt>().context("Failed to parse BigInt")?
+            };
+            Ok(TupleItem::Int(i))
+        }
+        "cell" => {
+            let bytes = val
+                .get("bytes")
+                .and_then(|v| v.as_str())
+                .context("cell must have bytes")?;
+            let c = ArcCell::from_boc_b64(bytes)?;
+            Ok(TupleItem::Cell(c))
+        }
+        "slice" => {
+            let bytes = val
+                .get("bytes")
+                .and_then(|v| v.as_str())
+                .context("slice must have bytes")?;
+            let c = ArcCell::from_boc_b64(bytes)?;
+            Ok(TupleItem::Slice(c))
+        }
+        "builder" => {
+            let bytes = val
+                .get("bytes")
+                .and_then(|v| v.as_str())
+                .context("builder must have bytes")?;
+            let c = ArcCell::from_boc_b64(bytes)?;
+            Ok(TupleItem::Builder(c))
+        }
+        "tuple" => {
+            let elements = val
+                .get("elements")
+                .and_then(|v| v.as_array())
+                .context("tuple must have elements")?;
+            let items = elements
+                .iter()
+                .map(|v| json_to_legacy_item(v.clone()))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(TupleItem::Tuple(Tuple(items)))
+        }
+        "list" => {
+            let elements = val
+                .get("elements")
+                .and_then(|v| v.as_array())
+                .context("list must have elements")?;
+            let items = elements
+                .iter()
+                .map(|v| json_to_legacy_item(v.clone()))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(TupleItem::Tuple(Tuple(items)))
+        }
+        _ => anyhow::bail!("Unsupported legacy stack entry type: {}", type_str),
     }
 }
 

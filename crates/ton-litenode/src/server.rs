@@ -2,6 +2,8 @@ use crate::litenode::LiteNode;
 use axum::{
     Json, Router,
     extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
 };
 use serde::Deserialize;
@@ -22,6 +24,7 @@ pub async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
         .route("/api/v2/v2/jsonRPC", post(json_rpc))
         .route("/api/v2/sendBoc", post(send_boc))
         .route("/api/v2/runGetMethod", post(run_get_method))
+        .route("/api/v2/runGetMethodStd", post(run_get_method_std))
         .route(
             "/api/v2/getAddressInformation",
             get(get_address_information_query).post(get_address_information_post),
@@ -54,6 +57,7 @@ pub async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
             "/api/v2/getMasterchainInfo",
             get(get_masterchain_info_query).post(get_masterchain_info_post),
         )
+        .route("/faucet", post(faucet))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(node);
@@ -76,7 +80,7 @@ struct JsonRpcRequest {
 async fn json_rpc(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<JsonRpcRequest>,
-) -> Json<Value> {
+) -> impl IntoResponse {
     tracing::debug!(
         "JSON-RPC request: method={}, id={:?}",
         payload.method,
@@ -96,17 +100,48 @@ async fn json_rpc(
                     Value::String(s) => s,
                     Value::Number(n) => n.to_string(),
                     _ => {
-                        return Json(serde_json::json!({
-                            "jsonrpc": "2.0",
-                            "id": payload.id,
-                            "error": { "code": -32602, "message": "Invalid method format" }
-                        }));
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(serde_json::json!({
+                                "jsonrpc": "2.0",
+                                "id": payload.id,
+                                "ok": false,
+                                "error": "Invalid method format",
+                                "code": 400
+                            })),
+                        )
+                            .into_response();
                     }
                 };
                 node.run_get_method(req.address, method_str, req.stack, req.seqno)
                     .await
             } else {
                 Err(anyhow::anyhow!("Invalid params for runGetMethod"))
+            }
+        }
+        "runGetMethodStd" => {
+            if let Ok(req) = serde_json::from_value::<RunGetMethodRequest>(payload.params) {
+                let method_str = match req.method {
+                    Value::String(s) => s,
+                    Value::Number(n) => n.to_string(),
+                    _ => {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            Json(serde_json::json!({
+                                "jsonrpc": "2.0",
+                                "id": payload.id,
+                                "ok": false,
+                                "error": "Invalid method format",
+                                "code": 400
+                            })),
+                        )
+                            .into_response();
+                    }
+                };
+                node.run_get_method_std(req.address, method_str, req.stack, req.seqno)
+                    .await
+            } else {
+                Err(anyhow::anyhow!("Invalid params for runGetMethodStd"))
             }
         }
         "getAddressInformation" => {
@@ -170,25 +205,59 @@ async fn json_rpc(
         }
         "getMasterchainInfo" => node.get_masterchain_info().await,
         _ => {
-            return Json(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": payload.id,
-                "error": { "code": -32601, "message": "Method not found" }
-            }));
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": payload.id,
+                    "ok": false,
+                    "error": "Method not found",
+                    "code": 404
+                })),
+            )
+                .into_response();
         }
     };
 
     match result {
-        Ok(res) => Json(serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": payload.id,
-            "result": res.get("result").unwrap_or(&res)
-        })),
-        Err(e) => Json(serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": payload.id,
-            "error": { "code": -32603, "message": e.to_string() }
-        })),
+        Ok(res) => {
+            let mut response = serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": payload.id,
+            });
+
+            if let Some(ok) = res.get("ok").and_then(|v| v.as_bool()) {
+                if ok {
+                    response["ok"] = serde_json::json!(true);
+                    response["result"] = res.get("result").cloned().unwrap_or(res);
+                    (StatusCode::OK, Json(response)).into_response()
+                } else {
+                    let code = res.get("code").and_then(|v| v.as_u64()).unwrap_or(500) as u16;
+                    response["ok"] = serde_json::json!(false);
+                    response["error"] = res
+                        .get("error")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!("Unknown error"));
+                    response["code"] = serde_json::json!(code);
+                    (StatusCode::INTERNAL_SERVER_ERROR, Json(response)).into_response()
+                }
+            } else {
+                response["ok"] = serde_json::json!(true);
+                response["result"] = res;
+                (StatusCode::OK, Json(response)).into_response()
+            }
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": payload.id,
+                "ok": false,
+                "error": e.to_string(),
+                "code": 500
+            })),
+        )
+            .into_response(),
     }
 }
 
@@ -205,8 +274,8 @@ async fn send_boc(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -227,9 +296,11 @@ async fn run_get_method(
         Value::String(s) => s,
         Value::Number(n) => n.to_string(),
         _ => {
-            return Json(
-                serde_json::json!({ "@type": "error", "message": "Invalid method format" }),
-            );
+            return Json(serde_json::json!({
+                "ok": false,
+                "error": "Invalid method format",
+                "code": 400
+            }));
         }
     };
 
@@ -240,8 +311,37 @@ async fn run_get_method(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+async fn run_get_method_std(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<RunGetMethodRequest>,
+) -> Json<Value> {
+    let method_str = match payload.method {
+        Value::String(s) => s,
+        Value::Number(n) => n.to_string(),
+        _ => {
+            return Json(serde_json::json!({
+                "ok": false,
+                "error": "Invalid method format",
+                "code": 400
+            }));
+        }
+    };
+
+    match node
+        .run_get_method_std(payload.address, method_str, payload.stack, payload.seqno)
+        .await
+    {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -263,8 +363,8 @@ async fn get_address_information_query(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -280,8 +380,8 @@ async fn get_address_information_post(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -297,8 +397,8 @@ async fn get_address_balance_query(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -314,8 +414,8 @@ async fn get_address_balance_post(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -328,8 +428,8 @@ async fn get_address_state_query(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -342,8 +442,8 @@ async fn get_address_state_post(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -359,8 +459,8 @@ async fn get_extended_address_information_query(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -376,8 +476,8 @@ async fn get_extended_address_information_post(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -413,8 +513,8 @@ async fn get_transactions_query(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -436,8 +536,8 @@ async fn get_transactions_post(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -461,8 +561,8 @@ async fn get_block_header_query(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -475,8 +575,8 @@ async fn get_block_header_post(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -489,8 +589,8 @@ async fn get_block_transactions_ext_query(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -503,8 +603,8 @@ async fn get_block_transactions_ext_post(
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -514,8 +614,8 @@ async fn get_masterchain_info_query(State(node): State<Arc<LiteNode>>) -> Json<V
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }
@@ -525,8 +625,28 @@ async fn get_masterchain_info_post(State(node): State<Arc<LiteNode>>) -> Json<Va
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
-            "code": 500,
-            "error": e.to_string()
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+#[derive(Deserialize)]
+struct FaucetRequest {
+    address: String,
+    amount: u128,
+}
+
+async fn faucet(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<FaucetRequest>,
+) -> Json<Value> {
+    match node.faucet(payload.address, payload.amount).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
         })),
     }
 }

@@ -222,7 +222,8 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyho
 
     let message_cell = message.to_cell()?;
 
-    let external = ton_wallet.create_external_msg(expire_at, seqno, true, vec![message_cell.to_arc()])?;
+    let external =
+        ton_wallet.create_external_msg(expire_at, seqno, true, vec![message_cell.to_arc()])?;
 
     let api_client = TonApiClient::new(network, config.custom_networks().clone(), None)?;
     api_client
@@ -421,7 +422,11 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
-    let client = TonApiClient::new(Network::Custom("hacknet".to_owned()), custom_networks, api_key)?;
+    let client = TonApiClient::new(
+        Network::Custom("hacknet".to_owned()),
+        custom_networks,
+        api_key,
+    )?;
 
     if !json {
         println!("Available wallets:");

@@ -25,5 +25,8 @@ depends = []
 [networks.hacknet]
 v2-url = "http://103.244.113.196:8081"
 
+[networks.localnet]
+v2-url = "http://localhost:3000/api/v2"
+
 [mappings]
 acton = ".acton"

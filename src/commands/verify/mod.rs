@@ -345,7 +345,11 @@ pub fn verify_cmd(
     let cell = Boc::decode(cell_data)?;
     let cell_boc64 = Boc::encode_base64(&cell);
 
-    let api_client = TonApiClient::new(Network::from_str(&network)?, custom_networks.clone(), api_key.clone())?;
+    let api_client = TonApiClient::new(
+        Network::from_str(&network)?,
+        custom_networks.clone(),
+        api_key.clone(),
+    )?;
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
     wait_for_rate_limit(&api_key);

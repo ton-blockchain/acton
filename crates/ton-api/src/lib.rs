@@ -175,9 +175,7 @@ impl TonApiClient {
             return Err(anyhow!("Contract is not active (status: {})", state.state));
         }
 
-        state
-            .code
-            .ok_or_else(|| anyhow!("Contract has no code"))
+        state.code.ok_or_else(|| anyhow!("Contract has no code"))
     }
 
     /// Run get method on contract
@@ -210,14 +208,14 @@ impl TonApiClient {
             .context("Failed to send runGetMethod request")?;
 
         if !response.status().is_success() {
-            // return Err(anyhow!(
-            //     "TonCenter API returned status: {}",
-            //     response.status()
-            // ));
-            let error_text = response
-                .text()
-                .unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("Backend compilation failed: {error_text}");
+            return Err(anyhow!(
+                "TonCenter API returned status: {}",
+                response.status()
+            ));
+            // let error_text = response
+            //     .text()
+            //     .unwrap_or_else(|_| "Unknown error".to_string());
+            // anyhow::bail!("Run get method failed: {error_text}");
         }
 
         #[derive(Deserialize)]
@@ -234,7 +232,15 @@ impl TonApiClient {
 
     /// Get wallet seqno
     pub fn get_wallet_seqno(&self, address: &str) -> anyhow::Result<(u32, bool)> {
-        let result = self.run_get_method(address, "seqno", &[])?;
+        let result = self.run_get_method(address, "seqno", &[]);
+
+        let result = match result {
+            Ok(result) => result,
+            Err(_err) => {
+                // likely uninit wallet
+                return Ok((0, true));
+            }
+        };
 
         if result.exit_code == -13 {
             // likely uninit wallet
