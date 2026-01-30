@@ -1,23 +1,24 @@
+use crate::executor::TvmEmulatorAdapter;
+use crate::node::Node;
+use crate::storage::{MsgMeta, TxMeta};
+use crate::types::{Addr, BocBytes, Hash256};
 use anyhow::Context;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
-use ton_emulator::emulator::{Emulator, SendMessageResult};
-use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
-use ton_executor::{
-    ExecutorVerbosity,
-    get::{GetExecutor, GetMethodResult, RunGetMethodArgs},
-};
+use ton_executor::DEFAULT_CONFIG;
+use ton_executor::ExecutorVerbosity;
+use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::json_stack::{json_to_stack, stack_to_json};
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
-use tycho_types::models::{AccountState, IntAddr};
+use tycho_types::cell::{CellFamily, Store};
+use tycho_types::models::{IntAddr, Message};
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
 
@@ -27,26 +28,9 @@ pub(crate) enum Request {
         boc: String,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
-    RunGetMethod {
-        address: String,
-        method: String, // name or id
-        stack: Vec<Value>,
-        resp: oneshot::Sender<anyhow::Result<Value>>,
-    },
     GetAddressInformation {
         address: String,
-        resp: oneshot::Sender<anyhow::Result<Value>>,
-    },
-    GetAddressBalance {
-        address: String,
-        resp: oneshot::Sender<anyhow::Result<Value>>,
-    },
-    GetAddressState {
-        address: String,
-        resp: oneshot::Sender<anyhow::Result<Value>>,
-    },
-    GetExtendedAddressInformation {
-        address: String,
+        seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
     GetTransactions {
@@ -57,17 +41,56 @@ pub(crate) enum Request {
         to_lt: Option<u64>,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
+    // Optional/Legacy
+    RunGetMethod {
+        address: String,
+        method: String,
+        stack: Vec<Value>,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetAddressBalance {
+        address: String,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetAddressState {
+        address: String,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetExtendedAddressInformation {
+        address: String,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetBlockHeader {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetBlockTransactionsExt {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetMasterchainInfo {
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
 }
 
-pub(crate) struct LiteNode {
+pub struct LiteNode {
     tx: mpsc::Sender<Request>,
 }
 
+impl Default for LiteNode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LiteNode {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let (tx, rx) = mpsc::channel(100);
 
-        // spawn the node logic in a blocking task since emulator is single-threaded and CPU bound
         std::thread::spawn(move || {
             if let Err(e) = run_node_loop(rx) {
                 tracing::error!("Node loop failed: {:?}", e);
@@ -77,74 +100,29 @@ impl LiteNode {
         Self { tx }
     }
 
-    pub(crate) async fn send_boc(&self, boc: String) -> anyhow::Result<Value> {
+    pub async fn send_boc(&self, boc: String) -> anyhow::Result<Value> {
         let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::SendBoc { boc, resp })
-            .await
-            .context("Failed to send request")?;
-        rx.await.context("Node loop dropped response channel")?
+        self.tx.send(Request::SendBoc { boc, resp }).await?;
+        rx.await?
     }
 
-    pub(crate) async fn run_get_method(
+    pub async fn get_address_information(
         &self,
         address: String,
-        method: String,
-        stack: Vec<Value>,
+        seqno: Option<u32>,
     ) -> anyhow::Result<Value> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::RunGetMethod {
+            .send(Request::GetAddressInformation {
                 address,
-                method,
-                stack,
+                seqno,
                 resp,
             })
-            .await
-            .context("Failed to send request")?;
-        rx.await.context("Node loop dropped response channel")?
+            .await?;
+        rx.await?
     }
 
-    pub(crate) async fn get_address_information(&self, address: String) -> anyhow::Result<Value> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetAddressInformation { address, resp })
-            .await
-            .context("Failed to send request")?;
-        rx.await.context("Node loop dropped response channel")?
-    }
-
-    pub(crate) async fn get_address_balance(&self, address: String) -> anyhow::Result<Value> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetAddressBalance { address, resp })
-            .await
-            .context("Failed to send request")?;
-        rx.await.context("Node loop dropped response channel")?
-    }
-
-    pub(crate) async fn get_address_state(&self, address: String) -> anyhow::Result<Value> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetAddressState { address, resp })
-            .await
-            .context("Failed to send request")?;
-        rx.await.context("Node loop dropped response channel")?
-    }
-
-    pub(crate) async fn get_extended_address_information(
-        &self,
-        address: String,
-    ) -> anyhow::Result<Value> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetExtendedAddressInformation { address, resp })
-            .await
-            .context("Failed to send request")?;
-        rx.await.context("Node loop dropped response channel")?
-    }
-
-    pub(crate) async fn get_transactions(
+    pub async fn get_transactions(
         &self,
         address: String,
         limit: u32,
@@ -162,66 +140,120 @@ impl LiteNode {
                 to_lt,
                 resp,
             })
-            .await
-            .context("Failed to send request")?;
-        rx.await.context("Node loop dropped response channel")?
+            .await?;
+        rx.await?
+    }
+
+    pub async fn run_get_method(
+        &self,
+        address: String,
+        method: String,
+        stack: Vec<Value>,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::RunGetMethod {
+                address,
+                method,
+                stack,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_address_balance(
+        &self,
+        address: String,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressBalance {
+                address,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_address_state(
+        &self,
+        address: String,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressState {
+                address,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_extended_address_information(
+        &self,
+        address: String,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetExtendedAddressInformation {
+                address,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_block_header(&self, seqno: u32) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetBlockHeader { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_block_transactions_ext(&self, seqno: u32) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetBlockTransactionsExt { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_masterchain_info(&self) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetMasterchainInfo { resp }).await?;
+        rx.await?
     }
 }
 
 fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
-    let accounts_state = AccountsState::Local(LocalAccountsState::new());
-    let mut world_state =
-        WorldState::new(accounts_state, None).context("Failed to create world state")?;
+    let executor = Box::new(TvmEmulatorAdapter::new()?);
+    let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
+    let mut node = Node::new(executor, config_bytes)?;
 
-    let emulator =
-        Emulator::new(ExecutorVerbosity::Short, None).context("Failed to create emulator")?;
-
-    let mut tx_history: HashMap<String, Vec<Value>> = HashMap::new();
-
-    tracing::info!("LiteNode started");
+    tracing::info!("LiteNode started (new architecture)");
 
     while let Some(req) = rx.blocking_recv() {
         match req {
             Request::SendBoc { boc, resp } => {
-                let res = handle_send_boc(&emulator, &mut world_state, boc);
-                if let Ok(map) = &res
-                    && let Some(result) = map.get("result")
-                    && let Some(txs) = result.get("transactions").and_then(|v| v.as_array())
-                {
-                    for tx_summary in txs {
-                        if let Some(addr) = tx_summary.get("account").and_then(|v| v.as_str()) {
-                            tx_history
-                                .entry(addr.to_string())
-                                .or_default()
-                                .push(tx_summary.clone());
-                        }
-                    }
-                }
+                let res = handle_send_boc(&mut node, boc);
                 let _ = resp.send(res);
             }
-            Request::RunGetMethod {
+            Request::GetAddressInformation {
                 address,
-                method,
-                stack,
+                seqno,
                 resp,
             } => {
-                let res = handle_run_get_method(&mut world_state, address, method, stack);
-                let _ = resp.send(res);
-            }
-            Request::GetAddressInformation { address, resp } => {
-                let res = handle_get_address_information(&mut world_state, address);
-                let _ = resp.send(res);
-            }
-            Request::GetAddressBalance { address, resp } => {
-                let res = handle_get_address_balance(&mut world_state, address);
-                let _ = resp.send(res);
-            }
-            Request::GetAddressState { address, resp } => {
-                let res = handle_get_address_state(&mut world_state, address);
-                let _ = resp.send(res);
-            }
-            Request::GetExtendedAddressInformation { address, resp } => {
-                let res = handle_get_extended_address_information(&mut world_state, address);
+                let res = handle_get_address_info(&node, address, seqno);
                 let _ = resp.send(res);
             }
             Request::GetTransactions {
@@ -232,269 +264,285 @@ fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
                 to_lt,
                 resp,
             } => {
-                let res = handle_get_transactions(&tx_history, address, limit, lt, hash, to_lt);
-                let _ = resp.send(Ok(res));
+                let res = handle_get_transactions(&node, address, limit, lt, hash, to_lt);
+                let _ = resp.send(res);
+            }
+            Request::RunGetMethod {
+                address,
+                method,
+                stack,
+                seqno,
+                resp,
+            } => {
+                let res = handle_run_get_method(&node, address, method, stack, seqno);
+                let _ = resp.send(res);
+            }
+            Request::GetAddressBalance {
+                address,
+                seqno,
+                resp,
+            } => {
+                let res = handle_get_address_balance(&node, address, seqno);
+                let _ = resp.send(res);
+            }
+            Request::GetAddressState {
+                address,
+                seqno,
+                resp,
+            } => {
+                let res = handle_get_address_state(&node, address, seqno);
+                let _ = resp.send(res);
+            }
+            Request::GetExtendedAddressInformation {
+                address,
+                seqno,
+                resp,
+            } => {
+                let res = handle_get_extended_address_info(&node, address, seqno);
+                let _ = resp.send(res);
+            }
+            Request::GetBlockHeader { seqno, resp } => {
+                let res = handle_get_block_header(&node, seqno);
+                let _ = resp.send(res);
+            }
+            Request::GetBlockTransactionsExt { seqno, resp } => {
+                let res = handle_get_block_transactions_ext(&node, seqno);
+                let _ = resp.send(res);
+            }
+            Request::GetMasterchainInfo { resp } => {
+                let res = handle_get_masterchain_info(&node);
+                let _ = resp.send(res);
             }
         }
     }
-
     Ok(())
 }
 
-fn handle_send_boc(
-    emulator: &Emulator,
-    state: &mut WorldState,
-    boc_str: String,
-) -> anyhow::Result<Value> {
-    let cell = Boc::decode_base64(&boc_str).context("Invalid BOC")?;
-    let libs = tycho_types::dict::Dict::new(); // TODO: Load libs from state if needed
+fn parse_addr(s: &str) -> anyhow::Result<Addr> {
+    let int_addr = IntAddr::from_str(s).map_err(|_| anyhow::anyhow!("Invalid address"))?;
+    let mut bytes = [0u8; 32];
+    let (workchain, address) = match int_addr {
+        IntAddr::Std(std) => (std.workchain as i32, std.address.0),
+        _ => anyhow::bail!("VarAddr not supported"),
+    };
+    bytes.copy_from_slice(&address);
+    Ok(Addr {
+        workchain,
+        addr: bytes,
+    })
+}
 
-    let results = emulator
-        .send_message(state, cell, &libs, None)
-        .context("Emulation failed")?;
+fn handle_send_boc(node: &mut Node, boc_str: String) -> anyhow::Result<Value> {
+    let boc = base64::engine::general_purpose::STANDARD
+        .decode(&boc_str)
+        .context("Invalid BOC base64")?;
+    let (tx_hash, seqno, _) = node.send_boc(boc)?;
 
-    let mut tx_summaries = Vec::new();
-    for res in results {
-        match res {
-            SendMessageResult::Success(s) => {
-                let tx_cell =
-                    Boc::decode_base64(&s.raw_transaction).context("Failed to decode raw tx")?;
+    // Fetch full tx info
+    if let Some((tx, in_msg, out_msgs)) = node.get_transaction_by_hash_extended(&tx_hash) {
+        let tx_boc_b64 = node
+            .cas
+            .get(&tx.tx_boc_hash)
+            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+            .unwrap_or_default();
+        let tx_json = convert_to_tx_json(&tx, in_msg.as_ref(), &out_msgs, tx_boc_b64)?;
 
-                let address = s
-                    .shard_account
-                    .account
-                    .load()
-                    .ok()
-                    .and_then(|a| a.0)
-                    .map(|a| a.address.to_string())
-                    .unwrap_or_else(|| "unknown".to_string());
+        let block_id_json = node
+            .get_block_header(seqno)
+            .as_ref()
+            .map(convert_to_block_id_json)
+            .unwrap_or_else(|| {
+                serde_json::json!({
+                    "@type": "ton.blockIdExt",
+                    "workchain": 0,
+                    "shard": -9223372036854775808i64,
+                    "seqno": seqno,
+                    "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+                })
+            });
 
-                let tx_id = serde_json::json!({
-                    "@type": "internal.transactionId",
-                    "lt": s.transaction.lt.to_string(),
-                    "hash": hex::encode(tx_cell.repr_hash().as_slice())
-                });
-
-                let in_msg_json = if let Some(in_msg) = s.transaction.in_msg.as_ref()
-                    && let Ok(msg) = in_msg.parse::<tycho_types::models::Message>()
-                {
-                    let (src, dst) = match &msg.info {
-                        tycho_types::models::MsgInfo::Int(i) => {
-                            (i.src.to_string(), i.dst.to_string())
-                        }
-                        tycho_types::models::MsgInfo::ExtIn(i) => {
-                            ("".to_string(), i.dst.to_string())
-                        }
-                        tycho_types::models::MsgInfo::ExtOut(i) => {
-                            (i.src.to_string(), "".to_string())
-                        }
-                    };
-
-                    let body_cell =
-                        CellBuilder::build_from(msg.body).context("Failed to build body cell")?;
-
-                    serde_json::json!({
-                        "@type": "raw.message",
-                        "source": src,
-                        "destination": dst,
-                        "value": match &msg.info {
-                            tycho_types::models::MsgInfo::Int(i) => u128::from(i.value.tokens).to_string(),
-                            _ => "0".to_string(),
-                        },
-                        "fwd_fee": "0",
-                        "ihr_fee": "0",
-                        "created_lt": "0",
-                        "body_hash": hex::encode(body_cell.repr_hash().as_slice()),
-                        "msg_data": {
-                            "@type": "msg.dataRaw",
-                            "body": Boc::encode_base64(&body_cell),
-                            "init_state": ""
-                        }
-                    })
-                } else {
-                    Value::Null
-                };
-
-                let mut out_msgs = Vec::new();
-                for msg_cell in &s.out_messages {
-                    if let Ok(msg) = msg_cell.parse::<tycho_types::models::Message>() {
-                        let (src, dst) = match &msg.info {
-                            tycho_types::models::MsgInfo::Int(i) => {
-                                (i.src.to_string(), i.dst.to_string())
-                            }
-                            tycho_types::models::MsgInfo::ExtIn(i) => {
-                                ("".to_string(), i.dst.to_string())
-                            }
-                            tycho_types::models::MsgInfo::ExtOut(i) => {
-                                (i.src.to_string(), "".to_string())
-                            }
-                        };
-
-                        let body_cell = CellBuilder::build_from(msg.body)
-                            .context("Failed to build body cell")?;
-
-                        out_msgs.push(serde_json::json!({
-                            "@type": "raw.message",
-                            "source": src,
-                            "destination": dst,
-                            "value": match &msg.info {
-                                tycho_types::models::MsgInfo::Int(i) => u128::from(i.value.tokens).to_string(),
-                                _ => "0".to_string(),
-                            },
-                            "fwd_fee": "0",
-                            "ihr_fee": "0",
-                            "created_lt": "0",
-                            "body_hash": hex::encode(body_cell.repr_hash().as_slice()),
-                            "msg_data": {
-                                "@type": "msg.dataRaw",
-                                "body": Boc::encode_base64(&body_cell),
-                                "init_state": ""
-                            }
-                        }));
-                    }
-                }
-
-                tx_summaries.push(serde_json::json!({
-                    "@type": "ext.transaction",
-                    "address": {
-                        "@type": "accountAddress",
-                        "account_address": address
-                    },
-                    "account": address,
-                    "utime": s.transaction.now,
-                    "data": s.raw_transaction,
-                    "transaction_id": tx_id,
-                    "fee": u128::from(s.transaction.total_fees.tokens).to_string(),
-                    "storage_fee": "0",
-                    "other_fee": "0",
-                    "in_msg": in_msg_json,
-                    "out_msgs": out_msgs
-                }));
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "blocks.transactionsExt",
+                "id": block_id_json,
+                "req_count": 1,
+                "incomplete": false,
+                "transactions": [tx_json]
             }
-            SendMessageResult::Error(e) => {
-                tx_summaries.push(serde_json::json!({
-                    "success": false,
-                    "error": format!("{:?}", e),
-                }));
+        }))
+    } else {
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "tx_hash": tx_hash.to_hex(),
+                "block_seqno": seqno
             }
-        }
+        }))
     }
+}
 
-    Ok(serde_json::json!({
-        "ok": true,
-        "result": {
-            "transactions": tx_summaries
-        }
-    }))
+fn convert_to_block_id_json(h: &crate::storage::BlockMeta) -> Value {
+    serde_json::json!({
+        "@type": "ton.blockIdExt",
+        "workchain": 0,
+        "shard": -9223372036854775808i64,
+        "seqno": h.seqno,
+        "root_hash": h.block_boc_hash.to_hex(),
+        "file_hash": h.block_boc_hash.to_hex()
+    })
+}
+
+fn handle_get_address_info(
+    node: &Node,
+    addr_str: String,
+    seqno: Option<u32>,
+) -> anyhow::Result<Value> {
+    let addr = parse_addr(&addr_str)?;
+    let meta = if let Some(s) = seqno {
+        node.get_address_information_at_block(&addr, s)
+    } else {
+        node.get_address_information(&addr)
+    };
+
+    let query_seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let block = node.get_block_header(query_seqno);
+    let block_id_json = block
+        .as_ref()
+        .map(convert_to_block_id_json)
+        .unwrap_or_else(|| {
+            serde_json::json!({
+                "@type": "ton.blockIdExt",
+                "workchain": 0,
+                "shard": -9223372036854775808i64,
+                "seqno": query_seqno,
+                "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+            })
+        });
+
+    if let Some(m) = meta {
+        let code_boc = m
+            .code_hash
+            .and_then(|h| node.cas.get(&h))
+            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+            .unwrap_or_default();
+        let data_boc = m
+            .data_hash
+            .and_then(|h| node.cas.get(&h))
+            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+            .unwrap_or_default();
+
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "raw.fullAccountState",
+                "balance": m.balance_cache.unwrap_or(0).to_string(),
+                "code": code_boc,
+                "data": data_boc,
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": m.last_trans_lt.unwrap_or(0).to_string(),
+                    "hash": m.last_trans_hash.map(|h| h.to_hex()).unwrap_or_default()
+                },
+                "block_id": block_id_json,
+                "frozen_hash": "",
+                "extra_currencies": [],
+                "sync_utime": SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                "state": format!("{:?}", m.status).to_lowercase()
+            }
+        }))
+    } else {
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "raw.fullAccountState",
+                "balance": "0",
+                "code": "",
+                "data": "",
+                "last_transaction_id": {
+                     "@type": "internal.transactionId",
+                     "lt": "0",
+                     "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+                },
+                "block_id": block_id_json,
+                "frozen_hash": "",
+                "extra_currencies": [],
+                "sync_utime": SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                "state": "nonexist"
+            }
+        }))
+    }
 }
 
 fn handle_get_transactions(
-    tx_history: &HashMap<String, Vec<Value>>,
-    address: String,
+    node: &Node,
+    addr_str: String,
     limit: u32,
     lt: Option<u64>,
     hash: Option<String>,
     to_lt: Option<u64>,
-) -> Value {
-    let address = normalize_address(&address);
-    let history = tx_history.get(&address);
-    let result = match history {
-        Some(txs) => {
-            let mut filtered = txs.clone();
-            filtered.reverse(); // Newest first
-
-            let hash = hash.map(|h| {
-                hex::encode(
-                    base64::engine::general_purpose::STANDARD
-                        .decode(h)
-                        .expect("not lucky"),
-                )
-            });
-            let start_idx = if let Some(start_lt) = lt {
-                filtered
-                    .iter()
-                    .position(|tx| {
-                        let id = tx.get("transaction_id");
-                        let tx_lt = id
-                            .and_then(|id| id.get("lt"))
-                            .and_then(|v| v.as_str())
-                            .and_then(|s| s.parse::<u64>().ok());
-
-                        if let Some(tx_lt) = tx_lt {
-                            if let Some(start_hash) = &hash {
-                                // if tx_lt == start_lt {
-                                    let tx_hash =
-                                        id.and_then(|id| id.get("hash")).and_then(|v| v.as_str());
-                                    return tx_hash == Some(start_hash);
-                                // }
-                                // return tx_lt < start_lt;
-                            } else {
-                                return tx_lt <= start_lt;
-                            }
-                        }
-                        false
-                    })
-                    .unwrap_or(filtered.len())
-            } else {
-                0
-            };
-
-            let mut final_txs = if start_idx < filtered.len() {
-                filtered.split_off(start_idx)
-            } else {
-                vec![]
-            };
-
-            if let Some(min_lt) = to_lt {
-                final_txs.retain(|tx| {
-                    let tx_lt = tx
-                        .get("transaction_id")
-                        .and_then(|id| id.get("lt"))
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| s.parse::<u64>().ok());
-                    tx_lt.map(|lt| lt >= min_lt).unwrap_or(false)
-                });
-            }
-
-            final_txs.truncate(limit as usize);
-            final_txs
-        }
-        None => vec![],
+) -> anyhow::Result<Value> {
+    let addr = parse_addr(&addr_str)?;
+    let hash_obj = if let Some(h) = hash {
+        Some(Hash256::from_base64(&h)?)
+    } else {
+        None
     };
 
-    serde_json::json!({
+    let mut txs = node.get_transactions_extended(&addr, limit as usize, lt, hash_obj);
+
+    if let Some(min_lt) = to_lt {
+        txs.retain(|(tx, _, _)| tx.lt >= min_lt);
+    }
+
+    let mut result_json = Vec::new();
+    for (tx, in_msg, out_msgs) in txs {
+        let tx_boc_b64 = node
+            .cas
+            .get(&tx.tx_boc_hash)
+            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+            .unwrap_or_default();
+        result_json.push(convert_to_tx_json(
+            &tx,
+            in_msg.as_ref(),
+            &out_msgs,
+            tx_boc_b64,
+        )?);
+    }
+
+    Ok(serde_json::json!({
         "ok": true,
-        "result": result
-    })
-}
-
-fn normalize_address(address: &str) -> String {
-    let address = IntAddr::from_str(address).unwrap_or_else(|_| IntAddr::default());
-
-    address.to_string()
+        "result": result_json
+    }))
 }
 
 fn handle_run_get_method(
-    state: &mut WorldState,
-    address: String,
+    node: &Node,
+    addr_str: String,
     method: String,
     stack_json: Vec<Value>,
+    seqno: Option<u32>,
 ) -> anyhow::Result<Value> {
-    let address = normalize_address(&address);
-    let account = state.get_account(&address);
-    let loaded_account = account.account.load().context("Failed to load account")?;
+    let addr = parse_addr(&addr_str)?;
+    let meta = if let Some(s) = seqno {
+        node.get_address_information_at_block(&addr, s)
+    } else {
+        node.get_address_information(&addr)
+    }
+    .context("Account not found")?;
 
-    let (code, data) = match &loaded_account.0 {
-        Some(acc) => match &acc.state {
-            AccountState::Active(s) => {
-                let code = s.code.as_ref().context("Account has no code")?;
-                let data = s.data.as_ref().context("Account has no data")?;
-                (Boc::encode_base64(code), Boc::encode_base64(data))
-            }
-            _ => anyhow::bail!("Account is not active"),
-        },
-        None => anyhow::bail!("Account not found"),
-    };
+    let code_boc = meta
+        .code_hash
+        .and_then(|h| node.cas.get(&h))
+        .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+        .context("Account has no code")?;
+    let data_boc = meta
+        .data_hash
+        .and_then(|h| node.cas.get(&h))
+        .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+        .context("Account has no data")?;
 
     let method_id = if let Ok(id) = method.parse::<i32>() {
         id
@@ -503,25 +551,20 @@ fn handle_run_get_method(
         (crc as i32 & 0xffff) | 0x10000
     };
 
-    // 3. Prepare args
-    let balance_tokens = loaded_account
-        .0
-        .as_ref()
-        .map(|a| u128::from(a.balance.tokens))
-        .unwrap_or(0);
+    let balance_tokens = meta.balance_cache.unwrap_or(0);
 
     let args = RunGetMethodArgs {
-        code,
-        data,
+        code: code_boc,
+        data: data_boc,
         method_id,
-        address: address.clone(),
-        unixtime: state.get_now() as i64,
+        address: addr_str,
+        unixtime: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
         balance: balance_tokens.to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
         gas_limit: "10000000".to_owned(),
         debug_enabled: false,
         verbosity: ExecutorVerbosity::Short,
-        libs: String::new(), // TODO: serialize libs
+        libs: String::new(),
         extra_currencies: Default::default(),
         prev_blocks_info: None,
     };
@@ -563,154 +606,314 @@ fn handle_run_get_method(
     }
 }
 
-struct InternalAccountInfo {
-    balance: String,
-    code: String,
-    data: String,
-    last_trans_lt: String,
-    last_trans_hash: String,
-    frozen_hash: String,
-    state: String,
-}
-
-fn get_account_info_internal(
-    state: &mut WorldState,
-    address: &str,
-) -> anyhow::Result<InternalAccountInfo> {
-    let address = normalize_address(address);
-    let account = state.get_account(&address);
-    let loaded_account = account.account.load().context("Failed to load account")?;
-
-    let mut info = InternalAccountInfo {
-        balance: "0".to_string(),
-        code: String::new(),
-        data: String::new(),
-        last_trans_lt: account.last_trans_lt.to_string(),
-        last_trans_hash: hex::encode(account.last_trans_hash.as_slice()),
-        frozen_hash: String::new(),
-        state: "uninitialized".to_string(),
+fn convert_to_tx_json(
+    tx: &TxMeta,
+    in_msg: Option<&(MsgMeta, BocBytes)>,
+    out_msgs: &Vec<(MsgMeta, BocBytes)>,
+    tx_boc_b64: String,
+) -> anyhow::Result<Value> {
+    let in_msg_json = if let Some((meta, boc)) = in_msg {
+        convert_to_message_json(meta, boc)?
+    } else {
+        serde_json::json!({ "@type": "msg.message" })
     };
 
-    if let Some(acc) = loaded_account.0 {
-        info.balance = u128::from(acc.balance.tokens).to_string();
-        match acc.state {
-            AccountState::Active(s) => {
-                info.state = "active".to_string();
-                if let Some(code) = s.code {
-                    info.code = Boc::encode_base64(code);
-                }
-                if let Some(data) = s.data {
-                    info.data = Boc::encode_base64(data);
-                }
-            }
-            AccountState::Frozen(hash) => {
-                info.state = "frozen".to_string();
-                info.frozen_hash = hex::encode(hash.as_slice());
-            }
-            AccountState::Uninit => {
-                info.state = "uninitialized".to_string();
-            }
+    let mut out_msgs_json = Vec::new();
+    for (meta, boc) in out_msgs {
+        out_msgs_json.push(convert_to_message_json(meta, boc)?);
+    }
+
+    Ok(serde_json::json!({
+        "@type": "ext.transaction",
+        "address": { "@type": "accountAddress", "account_address": tx.account.to_string() },
+        "account": tx.account.to_string(),
+        "utime": tx.now,
+        "data": tx_boc_b64,
+        "transaction_id": {
+            "@type": "internal.transactionId",
+            "lt": tx.lt.to_string(),
+            "hash": tx.tx_hash.to_hex()
+        },
+        "fee": "0",
+        "storage_fee": "0",
+        "other_fee": "0",
+        "in_msg": in_msg_json,
+        "out_msgs": out_msgs_json
+    }))
+}
+
+fn convert_to_message_json(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<Value> {
+    let cell = Boc::decode(boc)?;
+    let msg = cell.parse::<Message<'_>>()?;
+
+    // Extract body
+    let mut builder = tycho_types::cell::CellBuilder::new();
+    builder.store_slice(msg.body)?;
+    let body_cell = builder.build()?;
+    let body_hash = hex::encode(body_cell.repr_hash().as_slice());
+    let body_base64 = base64::engine::general_purpose::STANDARD.encode(Boc::encode(body_cell));
+
+    let mut init_state_b64 = String::new();
+    if let Some(init) = msg.init {
+        let mut builder = tycho_types::cell::CellBuilder::new();
+        let _ = init.store_into(&mut builder, tycho_types::cell::Cell::empty_context());
+        if let Ok(cell) = builder.build() {
+            init_state_b64 = base64::engine::general_purpose::STANDARD.encode(Boc::encode(cell));
         }
     }
 
-    Ok(info)
+    Ok(serde_json::json!({
+        "@type": "raw.message",
+        "hash": meta.msg_hash.to_hex(),
+        "source": {
+            "@type": "accountAddress",
+            "account_address": meta.src.as_ref().map(|a| a.to_string()).unwrap_or_default()
+        },
+        "destination": {
+            "@type": "accountAddress",
+            "account_address": meta.dst.as_ref().map(|a| a.to_string()).unwrap_or_default()
+        },
+        "value": meta.value.unwrap_or(0).to_string(),
+        "fwd_fee": "0",
+        "ihr_fee": "0",
+        "created_lt": "0",
+        "body_hash": body_hash,
+        "msg_data": {
+            "@type": "msg.dataRaw",
+            "body": body_base64,
+            "init_state": init_state_b64
+        },
+        "extra_currencies": []
+    }))
 }
 
-fn handle_get_address_information(
-    state: &mut WorldState,
-    address: String,
+fn handle_get_address_balance(
+    node: &Node,
+    addr_str: String,
+    seqno: Option<u32>,
 ) -> anyhow::Result<Value> {
-    let info = get_account_info_internal(state, &address)?;
-
-    Ok(serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "raw.fullAccountState",
-            "balance": info.balance,
-            "code": info.code,
-            "data": info.data,
-            "last_transaction_id": {
-                "@type": "internal.transactionId",
-                "lt": info.last_trans_lt,
-                "hash": info.last_trans_hash
-            },
-            "block_id": {
-                "@type": "ton.blockIdExt",
-                "workchain": 0,
-                "shard": -9223372036854775808i64,
-                "seqno": 0,
-                "root_hash": "",
-                "file_hash": ""
-            },
-            "frozen_hash": info.frozen_hash,
-            "extra_currencies": [],
-            "sync_utime": state.get_now() as i64,
-            "state": info.state
-        }
-    }))
-}
-
-fn handle_get_address_balance(state: &mut WorldState, address: String) -> anyhow::Result<Value> {
-    let info = get_account_info_internal(state, &address)?;
-    Ok(serde_json::json!({
-        "ok": true,
-        "result": info.balance
-    }))
-}
-
-fn handle_get_address_state(state: &mut WorldState, address: String) -> anyhow::Result<Value> {
-    let info = get_account_info_internal(state, &address)?;
-    Ok(serde_json::json!({
-        "ok": true,
-        "result": info.state
-    }))
-}
-
-fn handle_get_extended_address_information(
-    state: &mut WorldState,
-    address: String,
-) -> anyhow::Result<Value> {
-    let info = get_account_info_internal(state, &address)?;
-
-    let account_state = if info.state == "uninitialized" {
-        serde_json::json!({
-            "@type": "uninited.accountState"
-        })
+    let addr = parse_addr(&addr_str)?;
+    let meta = if let Some(s) = seqno {
+        node.get_address_information_at_block(&addr, s)
     } else {
-        serde_json::json!({
-            "@type": "raw.accountState",
-            "code": info.code,
-            "data": info.data,
-            "frozen_hash": info.frozen_hash
-        })
+        node.get_address_information(&addr)
+    };
+    let balance = meta.and_then(|m| m.balance_cache).unwrap_or(0);
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": balance.to_string()
+    }))
+}
+
+fn handle_get_address_state(
+    node: &Node,
+    addr_str: String,
+    seqno: Option<u32>,
+) -> anyhow::Result<Value> {
+    let addr = parse_addr(&addr_str)?;
+    let meta = if let Some(s) = seqno {
+        node.get_address_information_at_block(&addr, s)
+    } else {
+        node.get_address_information(&addr)
+    };
+    let state = meta
+        .map(|m| format!("{:?}", m.status).to_lowercase())
+        .unwrap_or_else(|| "nonexist".to_string());
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": state
+    }))
+}
+
+fn handle_get_extended_address_info(
+    node: &Node,
+    addr_str: String,
+    seqno: Option<u32>,
+) -> anyhow::Result<Value> {
+    let addr = parse_addr(&addr_str)?;
+    let meta = if let Some(s) = seqno {
+        node.get_address_information_at_block(&addr, s)
+    } else {
+        node.get_address_information(&addr)
     };
 
-    Ok(serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "fullAccountState",
-            "address": {
-                "@type": "accountAddress",
-                "account_address": address
-            },
-            "balance": info.balance,
-            "extra_currencies": [],
-            "last_transaction_id": {
-                "@type": "internal.transactionId",
-                "lt": info.last_trans_lt,
-                "hash": info.last_trans_hash
-            },
-            "block_id": {
+    let query_seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let block = node.get_block_header(query_seqno);
+    let block_id_json = block
+        .as_ref()
+        .map(convert_to_block_id_json)
+        .unwrap_or_else(|| {
+            serde_json::json!({
+                "@type": "ton.blockIdExt",
+                "workchain": 0,
+                "shard": -9223372036854775808i64,
+                "seqno": query_seqno,
+                "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+            })
+        });
+
+    if let Some(m) = meta {
+        let code_boc = m
+            .code_hash
+            .and_then(|h| node.cas.get(&h))
+            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+            .unwrap_or_default();
+        let data_boc = m
+            .data_hash
+            .and_then(|h| node.cas.get(&h))
+            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+            .unwrap_or_default();
+
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "fullAccountState",
+                "address": { "@type": "accountAddress", "account_address": addr_str },
+                "balance": m.balance_cache.unwrap_or(0).to_string(),
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": m.last_trans_lt.unwrap_or(0).to_string(),
+                    "hash": m.last_trans_hash.map(|h| h.to_hex()).unwrap_or_default()
+                },
+                "block_id": block_id_json,
+                "sync_utime": SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                "account_state": {
+                    "@type": "raw.accountState",
+                    "code": code_boc,
+                    "data": data_boc,
+                    "frozen_hash": ""
+                },
+                "revision": 0
+            }
+        }))
+    } else {
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "fullAccountState",
+                "address": { "@type": "accountAddress", "account_address": addr_str },
+                "balance": "0",
+                "last_transaction_id": {
+                     "@type": "internal.transactionId",
+                     "lt": "0",
+                     "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+                },
+                "block_id": block_id_json,
+                "account_state": {
+                    "@type": "uninited.accountState",
+                    "frozen_hash": ""
+                },
+                "sync_utime": SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                "revision": 0
+            }
+        }))
+    }
+}
+
+fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<Value> {
+    let header = node.get_block_header(seqno);
+    if let Some(h) = header {
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "ton.blockHeader",
+                "id": convert_to_block_id_json(&h),
+                "gen_utime": h.gen_utime,
+                "start_lt": h.start_lt.to_string(),
+                "end_lt": h.end_lt.to_string(),
+                "prev_seqno": h.prev_seqno
+            }
+        }))
+    } else {
+        Err(anyhow::anyhow!("Block not found"))
+    }
+}
+
+fn handle_get_block_transactions_ext(node: &Node, seqno: u32) -> anyhow::Result<Value> {
+    let txs = node.get_block_transactions_ext(seqno);
+    if let Some(txs) = txs {
+        let mut result_json = Vec::new();
+        for tx in txs {
+            if let Some((tx_ext, in_msg, out_msgs)) =
+                node.get_transaction_by_hash_extended(&tx.tx_hash)
+            {
+                let tx_boc_b64 = node
+                    .cas
+                    .get(&tx_ext.tx_boc_hash)
+                    .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+                    .unwrap_or_default();
+                result_json.push(convert_to_tx_json(
+                    &tx_ext,
+                    in_msg.as_ref(),
+                    &out_msgs,
+                    tx_boc_b64,
+                )?);
+            }
+        }
+
+        let block_id_json = node
+            .get_block_header(seqno)
+            .as_ref()
+            .map(convert_to_block_id_json)
+            .unwrap_or_else(|| {
+                serde_json::json!({
+                    "@type": "ton.blockIdExt",
+                    "workchain": 0,
+                    "shard": -9223372036854775808i64,
+                    "seqno": seqno,
+                    "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+                })
+            });
+
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "blocks.transactionsExt",
+                "id": block_id_json,
+                "req_count": result_json.len(),
+                "incomplete": false,
+                "transactions": result_json
+            }
+        }))
+    } else {
+        Err(anyhow::anyhow!("Block not found"))
+    }
+}
+
+fn handle_get_masterchain_info(node: &Node) -> anyhow::Result<Value> {
+    let head_block = node.get_block_header(node.globals.head_seqno);
+    let block_id_json = head_block
+        .as_ref()
+        .map(convert_to_block_id_json)
+        .unwrap_or_else(|| {
+            serde_json::json!({
                 "@type": "ton.blockIdExt",
                 "workchain": 0,
                 "shard": -9223372036854775808i64,
                 "seqno": 0,
-                "root_hash": "",
-                "file_hash": ""
-            },
-            "sync_utime": state.get_now() as i64,
-            "account_state": account_state,
-            "revision": 0
+                "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+            })
+        });
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": {
+            "@type": "blocks.masterchainInfo",
+            "last": block_id_json,
+            "state_root_hash": head_block.map(|h| h.block_boc_hash.to_hex()).unwrap_or_else(|| "0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+            "init": {
+                "@type": "ton.blockIdExt",
+                "workchain": 0,
+                "shard": -9223372036854775808i64,
+                "seqno": 0,
+                "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+                "file_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
         }
     }))
 }

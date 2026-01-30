@@ -1,15 +1,15 @@
 use crate::litenode::LiteNode;
 use axum::{
+    Json, Router,
     extract::{Query, State},
     routing::{get, post},
-    Json, Router,
 };
 use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 
-pub(crate) async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
+pub async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -40,6 +40,18 @@ pub(crate) async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result
         .route(
             "/api/v2/getTransactions",
             get(get_transactions_query).post(get_transactions_post),
+        )
+        .route(
+            "/api/v2/getBlockHeader",
+            get(get_block_header_query).post(get_block_header_post),
+        )
+        .route(
+            "/api/v2/getBlockTransactionsExt",
+            get(get_block_transactions_ext_query).post(get_block_transactions_ext_post),
+        )
+        .route(
+            "/api/v2/getMasterchainInfo",
+            get(get_masterchain_info_query).post(get_masterchain_info_post),
         )
         .layer(cors)
         .with_state(node);
@@ -76,13 +88,16 @@ async fn json_rpc(
                 let method_str = match req.method {
                     Value::String(s) => s,
                     Value::Number(n) => n.to_string(),
-                    _ => return Json(serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": payload.id,
-                        "error": { "code": -32602, "message": "Invalid method format" }
-                    })),
+                    _ => {
+                        return Json(serde_json::json!({
+                            "jsonrpc": "2.0",
+                            "id": payload.id,
+                            "error": { "code": -32602, "message": "Invalid method format" }
+                        }));
+                    }
                 };
-                node.run_get_method(req.address, method_str, req.stack).await
+                node.run_get_method(req.address, method_str, req.stack, req.seqno)
+                    .await
             } else {
                 Err(anyhow::anyhow!("Invalid params for runGetMethod"))
             }
@@ -90,7 +105,7 @@ async fn json_rpc(
         "getAddressInformation" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                node.get_address_information(req.address).await
+                node.get_address_information(req.address, req.seqno).await
             } else {
                 Err(anyhow::anyhow!("Invalid params for getAddressInformation"))
             }
@@ -98,7 +113,7 @@ async fn json_rpc(
         "getAddressBalance" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                node.get_address_balance(req.address).await
+                node.get_address_balance(req.address, req.seqno).await
             } else {
                 Err(anyhow::anyhow!("Invalid params for getAddressBalance"))
             }
@@ -106,7 +121,7 @@ async fn json_rpc(
         "getAddressState" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                node.get_address_state(req.address).await
+                node.get_address_state(req.address, req.seqno).await
             } else {
                 Err(anyhow::anyhow!("Invalid params for getAddressState"))
             }
@@ -114,7 +129,8 @@ async fn json_rpc(
         "getExtendedAddressInformation" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                node.get_extended_address_information(req.address).await
+                node.get_extended_address_information(req.address, req.seqno)
+                    .await
             } else {
                 Err(anyhow::anyhow!(
                     "Invalid params for getExtendedAddressInformation"
@@ -129,6 +145,23 @@ async fn json_rpc(
                 Err(anyhow::anyhow!("Invalid params for getTransactions"))
             }
         }
+        "getBlockHeader" => {
+            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
+                node.get_block_header(req.seqno).await
+            } else {
+                Err(anyhow::anyhow!("Invalid params for getBlockHeader"))
+            }
+        }
+        "getBlockTransactionsExt" => {
+            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
+                node.get_block_transactions_ext(req.seqno).await
+            } else {
+                Err(anyhow::anyhow!(
+                    "Invalid params for getBlockTransactionsExt"
+                ))
+            }
+        }
+        "getMasterchainInfo" => node.get_masterchain_info().await,
         _ => {
             return Json(serde_json::json!({
                 "jsonrpc": "2.0",
@@ -176,6 +209,7 @@ struct RunGetMethodRequest {
     address: String,
     method: Value, // String or Integer
     stack: Vec<Value>,
+    seqno: Option<u32>,
 }
 
 async fn run_get_method(
@@ -193,7 +227,7 @@ async fn run_get_method(
     };
 
     match node
-        .run_get_method(payload.address, method_str, payload.stack)
+        .run_get_method(payload.address, method_str, payload.stack, payload.seqno)
         .await
     {
         Ok(res) => Json(res),
@@ -208,13 +242,17 @@ async fn run_get_method(
 #[derive(Deserialize)]
 struct GetAddressInformationRequest {
     address: String,
+    seqno: Option<u32>,
 }
 
 async fn get_address_information_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_address_information(payload.address).await {
+    match node
+        .get_address_information(payload.address, payload.seqno)
+        .await
+    {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -228,7 +266,10 @@ async fn get_address_information_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_address_information(payload.address).await {
+    match node
+        .get_address_information(payload.address, payload.seqno)
+        .await
+    {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -242,7 +283,10 @@ async fn get_address_balance_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_address_balance(payload.address).await {
+    match node
+        .get_address_balance(payload.address, payload.seqno)
+        .await
+    {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -256,7 +300,10 @@ async fn get_address_balance_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_address_balance(payload.address).await {
+    match node
+        .get_address_balance(payload.address, payload.seqno)
+        .await
+    {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -270,7 +317,7 @@ async fn get_address_state_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_address_state(payload.address).await {
+    match node.get_address_state(payload.address, payload.seqno).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -284,7 +331,7 @@ async fn get_address_state_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_address_state(payload.address).await {
+    match node.get_address_state(payload.address, payload.seqno).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -298,7 +345,10 @@ async fn get_extended_address_information_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_extended_address_information(payload.address).await {
+    match node
+        .get_extended_address_information(payload.address, payload.seqno)
+        .await
+    {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -312,7 +362,10 @@ async fn get_extended_address_information_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    match node.get_extended_address_information(payload.address).await {
+    match node
+        .get_extended_address_information(payload.address, payload.seqno)
+        .await
+    {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -373,6 +426,95 @@ async fn get_transactions_post(
         )
         .await
     {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+#[derive(Deserialize)]
+struct GetBlockRequest {
+    /// Workchain index (ignored, dev node only uses workchain 0)
+    #[allow(dead_code)]
+    workchain: Option<i32>,
+    /// Shard ID (ignored, dev node only uses shard -9223372036854775808)
+    #[allow(dead_code)]
+    shard: Option<i64>,
+    seqno: u32,
+}
+
+async fn get_block_header_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_block_header(payload.seqno).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_block_header_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_block_header(payload.seqno).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_block_transactions_ext_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_block_transactions_ext(payload.seqno).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_block_transactions_ext_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_block_transactions_ext(payload.seqno).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_masterchain_info_query(State(node): State<Arc<LiteNode>>) -> Json<Value> {
+    match node.get_masterchain_info().await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_masterchain_info_post(State(node): State<Arc<LiteNode>>) -> Json<Value> {
+    match node.get_masterchain_info().await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,

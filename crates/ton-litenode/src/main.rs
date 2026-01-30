@@ -1,9 +1,6 @@
-mod litenode;
-mod server;
-
-use crate::litenode::LiteNode;
 use clap::{Parser, Subcommand};
 use std::sync::Arc;
+use ton_litenode::{LiteNode, run_server};
 
 #[derive(Parser)]
 #[command(name = "ton-litenode")]
@@ -30,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Start { port } => {
             let node = Arc::new(LiteNode::new());
-            server::run_server(node, port).await?;
+            run_server(node, port).await?;
         }
     }
 
