@@ -208,14 +208,10 @@ impl TonApiClient {
             .context("Failed to send runGetMethod request")?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter API returned status: {}",
-                response.status()
-            ));
-            // let error_text = response
-            //     .text()
-            //     .unwrap_or_else(|_| "Unknown error".to_string());
-            // anyhow::bail!("Run get method failed: {error_text}");
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Run get method failed: {error_text}");
         }
 
         #[derive(Deserialize)]
