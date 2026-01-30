@@ -287,103 +287,123 @@ fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
 
     tracing::info!("LiteNode started (new architecture)");
 
-    while let Some(req) = rx.blocking_recv() {
-        tracing::debug!(
-            "Node loop processing request: {:?}, pending_requests={}",
-            req,
-            rx.len()
-        );
-        match req {
-            Request::SendBoc { boc, resp } => {
-                let res = handle_send_boc(&mut node, boc);
-                let _ = resp.send(res);
+    loop {
+        // 1. Process all currently pending requests
+        while let Ok(req) = rx.try_recv() {
+            process_loop_request(&mut node, req);
+        }
+
+        // 2. If there are pending messages in the pool, mine one
+        if node.has_pending_messages() {
+            tracing::info!("Auto-mining message from pool");
+            if let Err(e) = node.mine_one() {
+                tracing::error!("Auto-mining failed: {:?}", e);
             }
-            Request::GetAddressInformation {
-                address,
-                seqno,
-                resp,
-            } => {
-                let res = handle_get_address_info(&node, address, seqno);
-                let _ = resp.send(res);
-            }
-            Request::GetTransactions {
-                address,
-                limit,
-                lt,
-                hash,
-                to_lt,
-                resp,
-            } => {
-                let res = handle_get_transactions(&node, address, limit, lt, hash, to_lt);
-                let _ = resp.send(res);
-            }
-            Request::RunGetMethod {
-                address,
-                method,
-                stack,
-                seqno,
-                resp,
-            } => {
-                let res = handle_run_get_method(&node, address, method, stack, seqno);
-                let _ = resp.send(res);
-            }
-            Request::RunGetMethodStd {
-                address,
-                method,
-                stack,
-                seqno,
-                resp,
-            } => {
-                let res = handle_run_get_method_std(&node, address, method, stack, seqno);
-                let _ = resp.send(res);
-            }
-            Request::GetAddressBalance {
-                address,
-                seqno,
-                resp,
-            } => {
-                let res = handle_get_address_balance(&node, address, seqno);
-                let _ = resp.send(res);
-            }
-            Request::GetAddressState {
-                address,
-                seqno,
-                resp,
-            } => {
-                let res = handle_get_address_state(&node, address, seqno);
-                let _ = resp.send(res);
-            }
-            Request::GetExtendedAddressInformation {
-                address,
-                seqno,
-                resp,
-            } => {
-                let res = handle_get_extended_address_info(&node, address, seqno);
-                let _ = resp.send(res);
-            }
-            Request::GetBlockHeader { seqno, resp } => {
-                let res = handle_get_block_header(&node, seqno);
-                let _ = resp.send(res);
-            }
-            Request::GetBlockTransactionsExt { seqno, resp } => {
-                let res = handle_get_block_transactions_ext(&node, seqno);
-                let _ = resp.send(res);
-            }
-            Request::GetMasterchainInfo { resp } => {
-                let res = handle_get_masterchain_info(&node);
-                let _ = resp.send(res);
-            }
-            Request::Faucet {
-                address,
-                amount,
-                resp,
-            } => {
-                let res = crate::node::handle_faucet(&mut node, address, amount);
-                let _ = resp.send(res);
-            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+            continue;
+        }
+
+        // 3. If pool is empty, block until next request
+        if let Some(req) = rx.blocking_recv() {
+            process_loop_request(&mut node, req);
+        } else {
+            break; // Channel closed
         }
     }
     Ok(())
+}
+
+fn process_loop_request(node: &mut Node, req: Request) {
+    tracing::debug!("Node loop processing request: {:?}", req);
+    match req {
+        Request::SendBoc { boc, resp } => {
+            let res = handle_send_boc(node, boc);
+            let _ = resp.send(res);
+        }
+        Request::GetAddressInformation {
+            address,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_address_info(node, address, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetTransactions {
+            address,
+            limit,
+            lt,
+            hash,
+            to_lt,
+            resp,
+        } => {
+            let res = handle_get_transactions(node, address, limit, lt, hash, to_lt);
+            let _ = resp.send(res);
+        }
+        Request::RunGetMethod {
+            address,
+            method,
+            stack,
+            seqno,
+            resp,
+        } => {
+            let res = handle_run_get_method(node, address, method, stack, seqno);
+            let _ = resp.send(res);
+        }
+        Request::RunGetMethodStd {
+            address,
+            method,
+            stack,
+            seqno,
+            resp,
+        } => {
+            let res = handle_run_get_method_std(node, address, method, stack, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetAddressBalance {
+            address,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_address_balance(node, address, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetAddressState {
+            address,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_address_state(node, address, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetExtendedAddressInformation {
+            address,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_extended_address_info(node, address, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetBlockHeader { seqno, resp } => {
+            let res = handle_get_block_header(node, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetBlockTransactionsExt { seqno, resp } => {
+            let res = handle_get_block_transactions_ext(node, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetMasterchainInfo { resp } => {
+            let res = handle_get_masterchain_info(node);
+            let _ = resp.send(res);
+        }
+        Request::Faucet {
+            address,
+            amount,
+            resp,
+        } => {
+            let res = crate::node::handle_faucet(node, address, amount);
+            let _ = resp.send(res);
+        }
+    }
 }
 
 pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {

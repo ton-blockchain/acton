@@ -445,6 +445,10 @@ impl Node {
         Some((tx, in_msg, out_msgs))
     }
 
+    pub fn has_pending_messages(&self) -> bool {
+        !self.pool.external.is_empty() || !self.pool.internal.is_empty()
+    }
+
     pub fn faucet(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<Value> {
         let mut giver_meta = self
             .latest
