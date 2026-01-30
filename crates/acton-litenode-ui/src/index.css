@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#FBFBFD] text-apple-gray-600 font-sans antialiased transition-colors duration-300;
+  }
+
+  .dark body {
+    @apply bg-[#000000] text-apple-gray-300;
+  }
+}
+
+@layer components {
+  .apple-glass {
+    @apply bg-white/80 dark:bg-[#161617]/80 backdrop-blur-apple border border-white/20 dark:border-white/5;
+  }
+  
+  .apple-card {
+    @apply bg-white dark:bg-[#1C1C1E] rounded-2xl p-6 shadow-apple-card transition-all duration-300 border border-transparent dark:border-white/5;
+  }
+
+  .apple-button-primary {
+    @apply bg-apple-blue text-white px-4 py-2 rounded-full font-medium hover:bg-opacity-90 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-apple-blue/20;
+  }
+
+  .apple-button-secondary {
+    @apply bg-apple-gray-100 dark:bg-white/10 text-apple-blue dark:text-apple-gray-200 px-4 py-2 rounded-full font-medium hover:bg-apple-gray-200 dark:hover:bg-white/20 transition-all active:scale-95;
+  }
+
+  .apple-input {
+    @apply bg-apple-gray-50 dark:bg-[#2C2C2E] border border-apple-gray-200 dark:border-transparent rounded-xl px-4 py-2 focus:outline-none outline-none focus:ring-[3px] focus:ring-apple-blue/20 dark:focus:ring-apple-blue/30 focus:border-apple-blue/50 dark:text-white transition-all placeholder:text-apple-gray-300 dark:placeholder:text-white/30;
+  }
+}
+
+/* Remove number input spinners */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}

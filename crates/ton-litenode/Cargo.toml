@@ -23,8 +23,10 @@ tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 axum = { workspace = true }
-tower-http = { workspace = true, features = ["cors", "trace"] }
+tower-http = { workspace = true, features = ["cors", "trace", "fs"] }
 tracing = "0.1"
+include_dir = { workspace = true }
+opener = { workspace = true }
 
 [lints]
 workspace = true

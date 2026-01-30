@@ -2,9 +2,9 @@ use owo_colors::OwoColorize;
 use std::sync::Arc;
 use ton_litenode::{LiteNode, run_server};
 
-pub async fn litenode_start_cmd(port: u16) -> anyhow::Result<()> {
+pub async fn litenode_start_cmd(port: u16, ui: bool, ui_port: u16) -> anyhow::Result<()> {
     let node = Arc::new(LiteNode::new());
-    run_server(node, port).await?;
+    run_server(node, port, ui, ui_port).await?;
     Ok(())
 }
 

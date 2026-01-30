@@ -6,78 +6,155 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+#[cfg(not(debug_assertions))]
+use include_dir::{Dir, include_dir};
 use serde::Deserialize;
 use serde_json::Value;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
-pub async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
+#[cfg(not(debug_assertions))]
+static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../crates/acton-litenode-ui/dist");
+
+pub async fn run_server(
+    node: Arc<LiteNode>,
+    port: u16,
+    ui: bool,
+    ui_port: u16,
+) -> anyhow::Result<()> {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        .route("/api/v2", post(json_rpc))
-        .route("/api/v2/jsonRPC", post(json_rpc))
-        .route("/api/v2/v2/jsonRPC", post(json_rpc))
-        .route("/api/v2/sendBoc", post(send_boc))
-        .route("/api/v2/runGetMethod", post(run_get_method))
-        .route("/api/v2/runGetMethodStd", post(run_get_method_std))
+    let api_router = Router::new()
+        .route("/v2", post(json_rpc))
+        .route("/v2/jsonRPC", post(json_rpc))
+        .route("/v2/v2/jsonRPC", post(json_rpc))
+        .route("/v2/sendBoc", post(send_boc))
+        .route("/v2/runGetMethod", post(run_get_method))
+        .route("/v2/runGetMethodStd", post(run_get_method_std))
         .route(
-            "/api/v2/getAddressInformation",
+            "/v2/getAddressInformation",
             get(get_address_information_query).post(get_address_information_post),
         )
         .route(
-            "/api/v2/getAddressBalance",
+            "/v2/getAddressBalance",
             get(get_address_balance_query).post(get_address_balance_post),
         )
         .route(
-            "/api/v2/getAddressState",
+            "/v2/getAddressState",
             get(get_address_state_query).post(get_address_state_post),
         )
         .route(
-            "/api/v2/getExtendedAddressInformation",
+            "/v2/getExtendedAddressInformation",
             get(get_extended_address_information_query).post(get_extended_address_information_post),
         )
         .route(
-            "/api/v2/getTransactions",
+            "/v2/getTransactions",
             get(get_transactions_query).post(get_transactions_post),
         )
         .route(
-            "/api/v2/getBlockHeader",
+            "/v2/getBlockHeader",
             get(get_block_header_query).post(get_block_header_post),
         )
         .route(
-            "/api/v2/getBlockTransactionsExt",
+            "/v2/getBlockTransactionsExt",
             get(get_block_transactions_ext_query).post(get_block_transactions_ext_post),
         )
         .route(
-            "/api/v2/getMasterchainInfo",
+            "/v2/getMasterchainInfo",
             get(get_masterchain_info_query).post(get_masterchain_info_post),
         )
+        .route("/v2/getShards", get(get_shards_query).post(get_shards_post))
+        .route("/v2/shards", get(get_shards_query).post(get_shards_post))
         .route(
-            "/api/v2/getShards",
-            get(get_shards_query).post(get_shards_post),
-        )
-        .route(
-            "/api/v2/shards",
-            get(get_shards_query).post(get_shards_post),
-        )
-        .route(
-            "/api/v2/lookupBlock",
+            "/v2/lookupBlock",
             get(lookup_block_query).post(lookup_block_post),
-        )
+        );
+
+    let app = Router::new()
+        .nest("/api", api_router.clone())
         .route("/faucet", post(faucet))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(node);
+        .with_state(node.clone());
+
+    if ui {
+        let ui_app = Router::new()
+            .nest("/api", api_router)
+            .route("/faucet", post(faucet))
+            .layer(CorsLayer::permissive())
+            .with_state(node);
+
+        #[cfg(debug_assertions)]
+        let ui_app = {
+            let dist_path = PathBuf::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../crates/acton-litenode-ui/dist"
+            ));
+            let index_path = dist_path.join("index.html");
+            ui_app.fallback_service(ServeDir::new(&dist_path).fallback(ServeFile::new(index_path)))
+        };
+
+        #[cfg(not(debug_assertions))]
+        let ui_app = ui_app.fallback(handle_embedded_ui);
+
+        let ui_listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", ui_port)).await?;
+        let ui_url = format!("http://127.0.0.1:{}", ui_port);
+        println!("     \x1b[1;32mStarting\x1b[0m LiteNode UI at {}", ui_url);
+
+        // Open browser
+        #[cfg(target_os = "macos")]
+        {
+            let _ = opener::open(&ui_url);
+        }
+
+        tokio::spawn(async move {
+            if let Err(e) = axum::serve(ui_listener, ui_app).await {
+                eprintln!("UI server error: {}", e);
+            }
+        });
+    }
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-    tracing::info!("Server running on http://0.0.0.0:{}", port);
+    println!(
+        "\x1b[1;32mStarting\x1b[0m LiteNode server on http://0.0.0.0:{}",
+        port
+    );
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+#[cfg(not(debug_assertions))]
+async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
+    let path = uri.path().trim_start_matches('/');
+    // default to index.html for root requests
+    let path = if path.is_empty() { "index.html" } else { path };
+
+    if let Some(file) = UI_DIR.get_file(path) {
+        // Map common file extensions to their respective MIME types.
+        let content_type = match path.split('.').last() {
+            Some("html") => "text/html",
+            Some("js") => "application/javascript",
+            Some("css") => "text/css",
+            Some("svg") => "image/svg+xml",
+            Some("png") => "image/png",
+            Some("json") => "application/json",
+            _ => "application/octet-stream",
+        };
+        return (([("content-type", content_type)]), file.contents()).into_response();
+    }
+
+    // fallback to index.html for SPA routing.
+    if let Some(index) = UI_DIR.get_file("index.html") {
+        return (([("content-type", "text/html")]), index.contents()).into_response();
+    }
+
+    StatusCode::NOT_FOUND.into_response()
 }
 
 #[derive(Deserialize)]

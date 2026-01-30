@@ -3091,6 +3091,8 @@ dependencies = [
  "base64",
  "crc",
  "hex",
+ "include_dir",
+ "opener",
  "serde",
  "serde_json",
  "tokio",

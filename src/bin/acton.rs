@@ -584,6 +584,10 @@ pub enum LitenodeCommand {
     Start {
         #[arg(long, default_value_t = 3000)]
         port: u16,
+        #[arg(long, help = "Open node control UI in a browser")]
+        ui: bool,
+        #[arg(long, help = "UI server port", default_value_t = 12346)]
+        ui_port: u16,
     },
     #[command(about = "Request TON from faucet")]
     Airdrop {
@@ -1393,12 +1397,14 @@ fn main() {
         Commands::Docgen { output } => docgen_cmd(output),
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
         Commands::Litenode { command } => match command {
-            LitenodeCommand::Start { port } => {
+            LitenodeCommand::Start { port, ui, ui_port } => {
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
-                rt.block_on(async { commands::litenode::litenode_start_cmd(port).await })
+                rt.block_on(async {
+                    commands::litenode::litenode_start_cmd(port, ui, ui_port).await
+                })
             }
             LitenodeCommand::Airdrop {
                 address,
