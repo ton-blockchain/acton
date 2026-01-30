@@ -1,5 +1,4 @@
 use anyhow::Context;
-use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
@@ -39,6 +38,10 @@ pub(crate) enum Request {
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
     GetAddressState {
+        address: String,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetExtendedAddressInformation {
         address: String,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
@@ -116,6 +119,18 @@ impl LiteNode {
             .context("Failed to send request")?;
         rx.await.context("Node loop dropped response channel")?
     }
+
+    pub(crate) async fn get_extended_address_information(
+        &self,
+        address: String,
+    ) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetExtendedAddressInformation { address, resp })
+            .await
+            .context("Failed to send request")?;
+        rx.await.context("Node loop dropped response channel")?
+    }
 }
 
 fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
@@ -153,6 +168,10 @@ fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
             }
             Request::GetAddressState { address, resp } => {
                 let res = handle_get_address_state(&mut world_state, address);
+                let _ = resp.send(res);
+            }
+            Request::GetExtendedAddressInformation { address, resp } => {
+                let res = handle_get_extended_address_information(&mut world_state, address);
                 let _ = resp.send(res);
             }
         }
@@ -292,99 +311,153 @@ fn handle_run_get_method(
     }
 }
 
-fn handle_get_address_information(
+struct InternalAccountInfo {
+    balance: String,
+    code: String,
+    data: String,
+    last_trans_lt: String,
+    last_trans_hash: String,
+    frozen_hash: String,
+    state: String,
+}
+
+fn get_account_info_internal(
     state: &mut WorldState,
-    address: String,
-) -> anyhow::Result<Value> {
-    let account = state.get_account(&address);
+    address: &str,
+) -> anyhow::Result<InternalAccountInfo> {
+    let account = state.get_account(address);
     let loaded_account = account.account.load().context("Failed to load account")?;
 
-    let mut result = serde_json::json!({
-        "@type": "raw.fullAccountState",
-        "balance": "0",
-        "code": "",
-        "data": "",
-        "last_transaction_id": {
-            "@type": "internal.transactionId",
-            "lt": account.last_trans_lt.to_string(),
-            "hash": base64::engine::general_purpose::STANDARD.encode(account.last_trans_hash.as_slice())
-        },
-        "block_id": {
-            "@type": "ton.blockIdExt",
-            "workchain": 0,
-            "shard": "-9223372036854775808", // 0x8000000000000000
-            "seqno": 0,
-            "root_hash": "",
-            "file_hash": ""
-        },
-        "frozen_hash": "",
-        "extra_currencies": [],
-        "sync_utime": state.get_now() as i64, // TODO: what is it?
-        "state": "uninitialized",
-        "suspended": false, // TODO
-    });
+    let mut info = InternalAccountInfo {
+        balance: "0".to_string(),
+        code: String::new(),
+        data: String::new(),
+        last_trans_lt: account.last_trans_lt.to_string(),
+        last_trans_hash: hex::encode(account.last_trans_hash.as_slice()),
+        frozen_hash: String::new(),
+        state: "uninitialized".to_string(),
+    };
 
     if let Some(acc) = loaded_account.0 {
-        result["balance"] = serde_json::json!(u128::from(acc.balance.tokens).to_string());
-
+        info.balance = u128::from(acc.balance.tokens).to_string();
         match acc.state {
             AccountState::Active(s) => {
-                result["state"] = serde_json::json!("active");
+                info.state = "active".to_string();
                 if let Some(code) = s.code {
-                    result["code"] = serde_json::json!(Boc::encode_base64(code));
+                    info.code = Boc::encode_base64(code);
                 }
                 if let Some(data) = s.data {
-                    result["data"] = serde_json::json!(Boc::encode_base64(data));
+                    info.data = Boc::encode_base64(data);
                 }
             }
             AccountState::Frozen(hash) => {
-                result["state"] = serde_json::json!("frozen");
-                result["frozen_hash"] = serde_json::json!(hex::encode(hash.as_slice()));
+                info.state = "frozen".to_string();
+                info.frozen_hash = hex::encode(hash.as_slice());
             }
             AccountState::Uninit => {
-                result["state"] = serde_json::json!("uninitialized");
+                info.state = "uninitialized".to_string();
             }
         }
     }
 
+    Ok(info)
+}
+
+fn handle_get_address_information(
+    state: &mut WorldState,
+    address: String,
+) -> anyhow::Result<Value> {
+    let info = get_account_info_internal(state, &address)?;
+
     Ok(serde_json::json!({
         "ok": true,
-        "result": result
+        "result": {
+            "@type": "raw.fullAccountState",
+            "balance": info.balance,
+            "code": info.code,
+            "data": info.data,
+            "last_transaction_id": {
+                "@type": "internal.transactionId",
+                "lt": info.last_trans_lt,
+                "hash": info.last_trans_hash
+            },
+            "block_id": {
+                "@type": "ton.blockIdExt",
+                "workchain": 0,
+                "shard": -9223372036854775808i64,
+                "seqno": 0,
+                "root_hash": "",
+                "file_hash": ""
+            },
+            "frozen_hash": info.frozen_hash,
+            "extra_currencies": [],
+            "sync_utime": state.get_now() as i64,
+            "state": info.state
+        }
     }))
 }
 
 fn handle_get_address_balance(state: &mut WorldState, address: String) -> anyhow::Result<Value> {
-    let account = state.get_account(&address);
-    let loaded_account = account.account.load().context("Failed to load account")?;
-
-    let balance = if let Some(acc) = loaded_account.0 {
-        u128::from(acc.balance.tokens).to_string()
-    } else {
-        "0".to_string()
-    };
-
+    let info = get_account_info_internal(state, &address)?;
     Ok(serde_json::json!({
         "ok": true,
-        "result": balance
+        "result": info.balance
     }))
 }
 
 fn handle_get_address_state(state: &mut WorldState, address: String) -> anyhow::Result<Value> {
-    let account = state.get_account(&address);
-    let loaded_account = account.account.load().context("Failed to load account")?;
+    let info = get_account_info_internal(state, &address)?;
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": info.state
+    }))
+}
 
-    let state_str = if let Some(acc) = loaded_account.0 {
-        match acc.state {
-            AccountState::Active(_) => "active",
-            AccountState::Frozen(_) => "frozen",
-            AccountState::Uninit => "uninitialized",
-        }
+fn handle_get_extended_address_information(
+    state: &mut WorldState,
+    address: String,
+) -> anyhow::Result<Value> {
+    let info = get_account_info_internal(state, &address)?;
+
+    let account_state = if info.state == "uninitialized" {
+        serde_json::json!({
+            "@type": "uninited.accountState"
+        })
     } else {
-        "uninitialized"
+        serde_json::json!({
+            "@type": "raw.accountState",
+            "code": info.code,
+            "data": info.data,
+            "frozen_hash": info.frozen_hash
+        })
     };
 
     Ok(serde_json::json!({
         "ok": true,
-        "result": state_str
+        "result": {
+            "@type": "fullAccountState",
+            "address": {
+                "@type": "accountAddress",
+                "account_address": address
+            },
+            "balance": info.balance,
+            "extra_currencies": [],
+            "last_transaction_id": {
+                "@type": "internal.transactionId",
+                "lt": info.last_trans_lt,
+                "hash": info.last_trans_hash
+            },
+            "block_id": {
+                "@type": "ton.blockIdExt",
+                "workchain": 0,
+                "shard": -9223372036854775808i64,
+                "seqno": 0,
+                "root_hash": "",
+                "file_hash": ""
+            },
+            "sync_utime": state.get_now() as i64,
+            "account_state": account_state,
+            "revision": 0
+        }
     }))
 }
