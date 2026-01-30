@@ -1,4 +1,5 @@
 use anyhow::Context;
+use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use serde_json::Value;
 use tokio::sync::{mpsc, oneshot};
@@ -27,6 +28,10 @@ pub(crate) enum Request {
         address: String,
         method: String, // name or id
         stack: Vec<Value>,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
+    GetAddressInformation {
+        address: String,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
 }
@@ -76,6 +81,15 @@ impl LiteNode {
             .context("Failed to send request")?;
         rx.await.context("Node loop dropped response channel")?
     }
+
+    pub(crate) async fn get_address_information(&self, address: String) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressInformation { address, resp })
+            .await
+            .context("Failed to send request")?;
+        rx.await.context("Node loop dropped response channel")?
+    }
 }
 
 fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
@@ -101,6 +115,10 @@ fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
                 resp,
             } => {
                 let res = handle_run_get_method(&mut world_state, address, method, stack);
+                let _ = resp.send(res);
+            }
+            Request::GetAddressInformation { address, resp } => {
+                let res = handle_get_address_information(&mut world_state, address);
                 let _ = resp.send(res);
             }
         }
@@ -145,7 +163,7 @@ fn handle_send_boc(
     }
 
     Ok(serde_json::json!({
-        "@type": "ok",
+        "ok": true,
         "result": {
             "transactions": tx_summaries
         }
@@ -227,7 +245,7 @@ fn handle_run_get_method(
                 stack_to_json(&stack_tuple).context("Failed to convert result stack to JSON")?;
 
             Ok(serde_json::json!({
-                "@type": "ok",
+                "ok": true,
                 "result": {
                     "gas_used": s.gas_used,
                     "stack": result_stack_json,
@@ -238,4 +256,65 @@ fn handle_run_get_method(
         }
         GetMethodResult::Error(e) => anyhow::bail!("Get method error: {:?}", e),
     }
+}
+
+fn handle_get_address_information(
+    state: &mut WorldState,
+    address: String,
+) -> anyhow::Result<Value> {
+    let account = state.get_account(&address);
+    let loaded_account = account.account.load().context("Failed to load account")?;
+
+    let mut result = serde_json::json!({
+        "@type": "raw.fullAccountState",
+        "balance": "0",
+        "code": "",
+        "data": "",
+        "last_transaction_id": {
+            "@type": "internal.transactionId",
+            "lt": account.last_trans_lt.to_string(),
+            "hash": base64::engine::general_purpose::STANDARD.encode(account.last_trans_hash.as_slice())
+        },
+        "block_id": {
+            "@type": "ton.blockIdExt",
+            "workchain": 0,
+            "shard": "-9223372036854775808", // 0x8000000000000000
+            "seqno": 0,
+            "root_hash": "",
+            "file_hash": ""
+        },
+        "frozen_hash": "",
+        "extra_currencies": [],
+        "sync_utime": state.get_now() as i64, // TODO: what is it?
+        "state": "uninitialized",
+        "suspended": false, // TODO
+    });
+
+    if let Some(acc) = loaded_account.0 {
+        result["balance"] = serde_json::json!(u128::from(acc.balance.tokens).to_string());
+
+        match acc.state {
+            AccountState::Active(s) => {
+                result["state"] = serde_json::json!("active");
+                if let Some(code) = s.code {
+                    result["code"] = serde_json::json!(Boc::encode_base64(code));
+                }
+                if let Some(data) = s.data {
+                    result["data"] = serde_json::json!(Boc::encode_base64(data));
+                }
+            }
+            AccountState::Frozen(hash) => {
+                result["state"] = serde_json::json!("frozen");
+                result["frozen_hash"] = serde_json::json!(hex::encode(hash.as_slice()));
+            }
+            AccountState::Uninit => {
+                result["state"] = serde_json::json!("uninitialized");
+            }
+        }
+    }
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": result
+    }))
 }

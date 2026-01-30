@@ -1,5 +1,9 @@
 use crate::litenode::LiteNode;
-use axum::{Json, Router, extract::State, routing::post};
+use axum::{
+    Json, Router,
+    extract::{Query, State},
+    routing::{get, post},
+};
 use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -8,6 +12,10 @@ pub(crate) async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result
     let app = Router::new()
         .route("/api/v2/sendBoc", post(send_boc))
         .route("/api/v2/runGetMethod", post(run_get_method))
+        .route(
+            "/api/v2/getAddressInformation",
+            get(get_address_information_query).post(get_address_information_post),
+        )
         .with_state(node);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
@@ -28,9 +36,9 @@ async fn send_boc(
     match node.send_boc(payload.boc).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
-            "@type": "error",
+            "ok": false,
             "code": 500,
-            "message": e.to_string()
+            "error": e.to_string()
         })),
     }
 }
@@ -62,9 +70,42 @@ async fn run_get_method(
     {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
-            "@type": "error",
+            "ok": false,
             "code": 500,
-            "message": e.to_string()
+            "error": e.to_string()
+        })),
+    }
+}
+
+#[derive(Deserialize)]
+struct GetAddressInformationRequest {
+    address: String,
+}
+
+async fn get_address_information_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetAddressInformationRequest>,
+) -> Json<Value> {
+    match node.get_address_information(payload.address).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
+        })),
+    }
+}
+
+async fn get_address_information_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<GetAddressInformationRequest>,
+) -> Json<Value> {
+    match node.get_address_information(payload.address).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "code": 500,
+            "error": e.to_string()
         })),
     }
 }

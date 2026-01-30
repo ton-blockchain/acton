@@ -3150,6 +3150,7 @@ dependencies = [
  "base64",
  "clap",
  "crc",
+ "hex",
  "serde",
  "serde_json",
  "tokio",
