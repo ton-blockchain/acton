@@ -1,4 +1,3 @@
-use core::cmp;
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
@@ -6,6 +5,7 @@ use crate::storage::{
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
+use core::cmp;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
@@ -41,6 +41,11 @@ impl Node {
     pub fn send_boc(&mut self, boc: BocBytes) -> anyhow::Result<(Hash256, Seqno, Vec<Hash256>)> {
         // 1. Validate & Store
         let hash = compute_boc_hash(&boc)?;
+        tracing::info!(
+            "send_boc: msg_hash={}, current_queue={}",
+            hash.to_hex(),
+            self.pool.external.len() + self.pool.internal.len()
+        );
         if self.cas.get(&hash).is_none() {
             self.cas.put(boc.clone(), hash);
         }
@@ -62,6 +67,9 @@ impl Node {
 
     pub fn mine_one(&mut self) -> anyhow::Result<(BlockMeta, TxMeta)> {
         // 1. Select message
+        let queue_size = self.pool.external.len() + self.pool.internal.len();
+        tracing::debug!("Message pool size: {}", queue_size);
+
         let msg_hash = self
             .pool
             .pop_next(self.globals.queue_policy, &self.history.msg_by_hash)
@@ -228,6 +236,11 @@ impl Node {
     }
 
     fn apply_commit(&mut self, pending: PendingCommit) -> anyhow::Result<()> {
+        tracing::info!(
+            "Applying block commit: seqno={}, tx_hash={}",
+            pending.block_meta.seqno,
+            pending.tx_meta.tx_hash.to_hex()
+        );
         // Apply delta
         if let Some(new_meta) = &pending.delta.new_meta {
             self.latest
@@ -260,10 +273,7 @@ impl Node {
         }
 
         // Indexes
-        let key = ReverseLtKey(
-            cmp::Reverse(pending.tx_meta.lt),
-            pending.tx_meta.tx_hash,
-        );
+        let key = ReverseLtKey(cmp::Reverse(pending.tx_meta.lt), pending.tx_meta.tx_hash);
         self.indexes
             .tx_by_account
             .entry(pending.tx_meta.account)
@@ -276,6 +286,11 @@ impl Node {
         // Enqueue out msgs
         for h in pending.out_msg_hashes {
             self.pool.push_internal(h);
+        }
+
+        let remaining = self.pool.external.len() + self.pool.internal.len();
+        if remaining > 0 {
+            tracing::info!("Queue size after commit: {} messages remaining", remaining);
         }
 
         self.globals.head_seqno = seqno;

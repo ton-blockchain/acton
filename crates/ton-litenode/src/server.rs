@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
 
 pub async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
     let cors = CorsLayer::new()
@@ -54,6 +55,7 @@ pub async fn run_server(node: Arc<LiteNode>, port: u16) -> anyhow::Result<()> {
             get(get_masterchain_info_query).post(get_masterchain_info_post),
         )
         .layer(cors)
+        .layer(TraceLayer::new_for_http())
         .with_state(node);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
@@ -75,6 +77,11 @@ async fn json_rpc(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<JsonRpcRequest>,
 ) -> Json<Value> {
+    tracing::debug!(
+        "JSON-RPC request: method={}, id={:?}",
+        payload.method,
+        payload.id
+    );
     let result = match payload.method.as_str() {
         "sendBoc" => {
             if let Ok(req) = serde_json::from_value::<SendBocRequest>(payload.params) {

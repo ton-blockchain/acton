@@ -243,6 +243,11 @@ fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
     tracing::info!("LiteNode started (new architecture)");
 
     while let Some(req) = rx.blocking_recv() {
+        tracing::debug!(
+            "Node loop processing request: {:?}, pending_requests={}",
+            req,
+            rx.len()
+        );
         match req {
             Request::SendBoc { boc, resp } => {
                 let res = handle_send_boc(&mut node, boc);
@@ -333,6 +338,7 @@ fn parse_addr(s: &str) -> anyhow::Result<Addr> {
 }
 
 fn handle_send_boc(node: &mut Node, boc_str: String) -> anyhow::Result<Value> {
+    tracing::info!("handle_send_boc: decoding BOC");
     let boc = base64::engine::general_purpose::STANDARD
         .decode(&boc_str)
         .context("Invalid BOC base64")?;
@@ -484,6 +490,13 @@ fn handle_get_transactions(
     hash: Option<String>,
     to_lt: Option<u64>,
 ) -> anyhow::Result<Value> {
+    tracing::info!(
+        "handle_get_transactions: addr={}, limit={}, lt={:?}, to_lt={:?}",
+        addr_str,
+        limit,
+        lt,
+        to_lt
+    );
     let addr = parse_addr(&addr_str)?;
     let hash_obj = if let Some(h) = hash {
         Some(Hash256::from_base64(&h)?)
@@ -525,6 +538,12 @@ fn handle_run_get_method(
     stack_json: Vec<Value>,
     seqno: Option<u32>,
 ) -> anyhow::Result<Value> {
+    tracing::info!(
+        "handle_run_get_method: addr={}, method={}, seqno={:?}",
+        addr_str,
+        method,
+        seqno
+    );
     let addr = parse_addr(&addr_str)?;
     let meta = if let Some(s) = seqno {
         node.get_address_information_at_block(&addr, s)
