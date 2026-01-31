@@ -86,6 +86,7 @@ pub struct TxMeta {
     pub now: u32,
     /// Whether the transaction was successful (currently always true in MVP)
     pub success: bool,
+    pub exit_code: i32,
     pub total_fees: Option<u128>,
     pub in_msg_hash: Option<Hash256>,
     pub out_msg_hashes: Vec<Hash256>,

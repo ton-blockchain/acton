@@ -19,6 +19,7 @@ pub struct ExecResult {
     pub tx_boc: BocBytes,
     pub new_account_boc: Option<BocBytes>,
     pub out_msgs_boc: Vec<BocBytes>,
+    pub exit_code: i32,
 }
 
 pub trait TvmExecutor {
@@ -119,6 +120,7 @@ impl TvmExecutor for TvmEmulatorAdapter {
                     tx_boc,
                     new_account_boc,
                     out_msgs_boc,
+                    exit_code: 0, // TODO: extract from tx if needed
                 })
             }
             EmulationResult::Error(e) => {

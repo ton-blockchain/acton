@@ -6,6 +6,7 @@ use crate::storage::{
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
+use base64::Engine;
 use core::cmp;
 use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -221,7 +222,8 @@ impl Node {
             account: dst,
             lt,
             now: gen_utime,
-            success: true, // TODO: parse from tx
+            success: exec_result.exit_code == 0,
+            exit_code: exec_result.exit_code,
             total_fees: None,
             in_msg_hash: Some(msg_hash),
             out_msg_hashes: out_msg_hashes.clone(),
@@ -461,6 +463,120 @@ impl Node {
             .filter_map(|h| self.get_message_meta(h))
             .collect();
         Some((tx, in_msg, out_msgs))
+    }
+
+    pub fn get_traces(&self, tx_hash: &Hash256) -> anyhow::Result<Vec<Value>> {
+        let mut all_tx_hashes = std::collections::HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+
+        // 1. Find the root transaction (traverse UP)
+        let mut root_hash = *tx_hash;
+        let mut curr_tx_hash = *tx_hash;
+        
+        // Use a set to detect cycles and prevent infinite loops
+        let mut visited_up = std::collections::HashSet::new();
+        visited_up.insert(curr_tx_hash);
+
+        loop {
+            let tx = match self.history.tx_by_hash.get(&curr_tx_hash) {
+                Some(tx) => tx,
+                None => break,
+            };
+
+            if let Some(in_msg_hash) = &tx.in_msg_hash {
+                // Find message to see if it has a source
+                if let Some(msg) = self.history.msg_by_hash.get(in_msg_hash) {
+                    if msg.src.is_none() {
+                        // External message, this is the root
+                        root_hash = curr_tx_hash;
+                        break;
+                    }
+                    
+                    // Find transaction that produced this message
+                    // Optimized: we can find it in msg_to_tx if we know the out_msg_hash
+                    // But we are going BACKWARDS, so we need a map from out_msg_hash to producing_tx_hash
+                    // For now, scan (MVP). In production add index.
+                    let mut found_parent = false;
+                    for (h, t) in &self.history.tx_by_hash {
+                        if t.out_msg_hashes.contains(in_msg_hash) {
+                            if visited_up.contains(h) {
+                                // Cycle detected
+                                break;
+                            }
+                            root_hash = *h;
+                            curr_tx_hash = *h;
+                            visited_up.insert(*h);
+                            found_parent = true;
+                            break;
+                        }
+                    }
+                    if !found_parent {
+                        // Source is not in our history (maybe external or pruned)
+                        root_hash = curr_tx_hash;
+                        break;
+                    }
+                } else {
+                    root_hash = curr_tx_hash;
+                    break;
+                }
+            } else {
+                root_hash = curr_tx_hash;
+                break;
+            }
+        }
+
+        // 2. Collect all descendants starting from root_hash (traverse DOWN)
+        queue.push_back(root_hash);
+        all_tx_hashes.insert(root_hash);
+
+        let mut results = Vec::new();
+
+        while let Some(h) = queue.pop_front() {
+            if let Some((tx, in_msg, out_msgs)) = self.get_transaction_by_hash_extended(&h) {
+                let tx_boc_b64 = self
+                    .cas
+                    .get(&tx.tx_boc_hash)
+                    .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
+                    .unwrap_or_default();
+                
+                let tx_json = crate::litenode::convert_to_tx_json(&tx, in_msg.as_ref(), &out_msgs, tx_boc_b64)?;
+                let mut tx_val = tx_json;
+                
+                // Add parent/child info for shared UI component
+                if let Some(in_msg_hash) = &tx.in_msg_hash {
+                    for (h, t) in &self.history.tx_by_hash {
+                        if t.out_msg_hashes.contains(in_msg_hash) {
+                            tx_val["parent_transaction"] = serde_json::json!(t.lt.to_string());
+                            break;
+                        }
+                    }
+                }
+                
+                let mut children = Vec::new();
+                for out_msg in &tx.out_msg_hashes {
+                    if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg) {
+                        if let Some(child_tx) = self.history.tx_by_hash.get(child_tx_hash) {
+                            children.push(child_tx.lt.to_string());
+                        }
+                    }
+                }
+                tx_val["child_transactions"] = serde_json::json!(children);
+                tx_val["raw_transaction"] = tx_val["data"].clone();
+
+                results.push(tx_val);
+
+                for out_msg in &tx.out_msg_hashes {
+                    if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg) {
+                        if !all_tx_hashes.contains(child_tx_hash) {
+                            all_tx_hashes.insert(*child_tx_hash);
+                            queue.push_back(*child_tx_hash);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(results)
     }
 
     pub fn has_pending_messages(&self) -> bool {

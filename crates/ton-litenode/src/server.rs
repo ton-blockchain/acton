@@ -74,7 +74,8 @@ pub async fn run_server(
         .route(
             "/v2/lookupBlock",
             get(lookup_block_query).post(lookup_block_post),
-        );
+        )
+        .route("/v3/traces", get(get_traces_query));
 
     let app = Router::new()
         .nest("/api", api_router.clone())
@@ -842,6 +843,25 @@ async fn faucet(
     Json(payload): Json<FaucetRequest>,
 ) -> Json<Value> {
     match node.faucet(payload.address, payload.amount).await {
+        Ok(res) => Json(res),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+#[derive(Deserialize)]
+struct GetTracesQuery {
+    hash: String,
+}
+
+async fn get_traces_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetTracesQuery>,
+) -> Json<Value> {
+    match node.get_traces(payload.hash).await {
         Ok(res) => Json(res),
         Err(e) => Json(serde_json::json!({
             "ok": false,

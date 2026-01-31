@@ -100,6 +100,10 @@ pub(crate) enum Request {
         amount: u128,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
+    GetTraces {
+        tx_hash: String,
+        resp: oneshot::Sender<anyhow::Result<Value>>,
+    },
 }
 
 pub struct LiteNode {
@@ -318,6 +322,12 @@ impl LiteNode {
             .await?;
         rx.await?
     }
+
+    pub async fn get_traces(&self, tx_hash: String) -> anyhow::Result<Value> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetTraces { tx_hash, resp }).await?;
+        rx.await?
+    }
 }
 
 fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
@@ -458,7 +468,19 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = crate::node::handle_faucet(node, address, amount);
             let _ = resp.send(res);
         }
+        Request::GetTraces { tx_hash, resp } => {
+            let res = handle_get_traces(node, tx_hash);
+            let _ = resp.send(res);
+        }
     }
+}
+
+fn handle_get_traces(node: &mut Node, tx_hash_hex: String) -> anyhow::Result<Value> {
+    let tx_hash = Hash256::from_hex(&tx_hash_hex)?;
+    let traces = node.get_traces(&tx_hash)?;
+    Ok(serde_json::json!({
+        "traces": traces
+    }))
 }
 
 pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
@@ -987,7 +1009,7 @@ fn handle_run_get_method_std(
     }
 }
 
-fn convert_to_tx_json(
+pub(crate) fn convert_to_tx_json(
     tx: &TxMeta,
     in_msg: Option<&(MsgMeta, BocBytes)>,
     out_msgs: &Vec<(MsgMeta, BocBytes)>,
@@ -1006,10 +1028,13 @@ fn convert_to_tx_json(
 
     Ok(serde_json::json!({
         "@type": "ext.transaction",
+        "hash": tx.tx_hash.to_hex(),
         "address": { "@type": "accountAddress", "account_address": tx.account.to_string() },
         "account": tx.account.to_string(),
         "utime": tx.now,
         "data": tx_boc_b64,
+        "success": tx.success,
+        "exit_code": tx.exit_code,
         "transaction_id": {
             "@type": "internal.transactionId",
             "lt": tx.lt.to_string(),
@@ -1034,6 +1059,15 @@ fn convert_to_message_json(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<Value> 
     let body_hash = hex::encode(body_cell.repr_hash().as_slice());
     let body_base64 = base64::engine::general_purpose::STANDARD.encode(Boc::encode(body_cell));
 
+    // Extract opcode (first 32 bits)
+    let mut opcode = None;
+    let mut body_slice = msg.body;
+    if body_slice.size_bits() >= 32
+        && let Ok(op) = body_slice.load_uint(32)
+    {
+        opcode = Some(format!("0x{:08x}", op));
+    }
+
     let mut init_state_b64 = String::new();
     if let Some(init) = msg.init {
         let mut builder = tycho_types::cell::CellBuilder::new();
@@ -1046,6 +1080,7 @@ fn convert_to_message_json(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<Value> 
     Ok(serde_json::json!({
         "@type": "raw.message",
         "hash": meta.msg_hash.to_hex(),
+        "opcode": opcode,
         "source": {
             "@type": "accountAddress",
             "account_address": meta.src.as_ref().map(|a| a.to_string()).unwrap_or_default()
