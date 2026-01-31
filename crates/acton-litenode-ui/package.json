@@ -8,7 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ton/core": "^0.62.0",
+    "@acton/ui-shared": "../acton-ui-shared",
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

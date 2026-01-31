@@ -1,16 +1,20 @@
-import { Address } from "@ton/core"
+import { 
+  Address, 
+  TestStatus, 
+  type TestReport, 
+  type Trace, 
+  type ContractData,
+  formatAddress,
+  processTransactions,
+  TransactionTree
+} from "@acton/ui-shared"
 import type React from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { FiCheck, FiCircle, FiCode, FiMinus, FiX } from "react-icons/fi"
 import { SiIntellijidea, SiRust, SiWebstorm } from "react-icons/si"
 import { VscCode } from "react-icons/vsc"
 import { useContracts } from "../../hooks/useContracts"
-import { type TestReport, TestStatus, type Trace } from "../../types"
-import type { ContractData } from "../../types/transaction"
-import { formatAddress } from "../../utils/format"
-import { processTransactions } from "../../utils/transaction"
 import { DataBlock } from "../common/DataBlock/DataBlock"
-import { TransactionTree } from "../TransactionView/TransactionTree/TransactionTree"
 import styles from "./TestDetails.module.css"
 
 interface TestDetailsProps {

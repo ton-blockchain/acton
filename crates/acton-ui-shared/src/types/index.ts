@@ -21,10 +21,10 @@ export interface BackendTransaction {
   readonly raw_transaction: string
   readonly parent_transaction: string | null
   readonly child_transactions: string[]
-  readonly shard_account_before: string
-  readonly shard_account: string
-  readonly vm_log_diff: string
-  readonly executor_logs: string
+  readonly shard_account_before?: string
+  readonly shard_account?: string
+  readonly vm_log_diff?: string
+  readonly executor_logs?: string
   readonly actions?: string
   readonly dest_contract_info?: string
 }

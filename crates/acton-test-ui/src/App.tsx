@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { FiChevronRight } from "react-icons/fi"
 import { Sidebar } from "./components/Sidebar/Sidebar"
 import { TestDetails } from "./components/TestDetails/TestDetails"
-import type { TestReport, Trace } from "./types"
+import type { TestReport, Trace } from "@acton/ui-shared"
 
 export const App: React.FC = () => {
   const [reports, setReports] = useState<TestReport[]>([])

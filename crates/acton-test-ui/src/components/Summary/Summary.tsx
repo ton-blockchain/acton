@@ -1,5 +1,5 @@
 import type React from "react"
-import { type TestReport, TestStatus } from "../../types"
+import { type TestReport, TestStatus } from "@acton/ui-shared"
 import styles from "./Summary.module.css"
 
 interface SummaryProps {

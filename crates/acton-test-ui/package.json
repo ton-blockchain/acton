@@ -28,7 +28,7 @@
     "vite": "^7.3.0"
   },
   "dependencies": {
-    "@ton/core": "^0.62.0",
+    "@acton/ui-shared": "../acton-ui-shared",
     "bignumber.js": "^9.3.1",
     "buffer": "^6.0.3",
     "react-d3-tree": "^3.6.6",
