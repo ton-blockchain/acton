@@ -1029,6 +1029,7 @@ pub(crate) fn convert_to_tx_json(
     Ok(serde_json::json!({
         "@type": "ext.transaction",
         "hash": tx.tx_hash.to_hex(),
+        "lt": tx.lt.to_string(),
         "address": { "@type": "accountAddress", "account_address": tx.account.to_string() },
         "account": tx.account.to_string(),
         "utime": tx.now,

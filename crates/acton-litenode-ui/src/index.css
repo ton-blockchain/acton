@@ -1,3 +1,5 @@
+@import "../../acton-ui-shared/src/styles/variables.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -32,6 +34,17 @@
   .apple-input {
     @apply bg-apple-gray-50 dark:bg-[#2C2C2E] border border-apple-gray-200 dark:border-transparent rounded-xl px-4 py-2 focus:outline-none outline-none focus:ring-[3px] focus:ring-apple-blue/20 dark:focus:ring-apple-blue/30 focus:border-apple-blue/50 dark:text-white transition-all placeholder:text-apple-gray-300 dark:placeholder:text-white/30;
   }
+}
+
+/* Transaction Tree Custom Styles */
+.rd3t-tree-container {
+  background-image: radial-gradient(var(--text-muted) 0.5px, transparent 0.5px);
+  background-size: 20px 20px;
+  background-color: var(--bg-color);
+}
+
+.dark .rd3t-tree-container {
+  background-image: radial-gradient(rgba(255,255,255,0.1) 0.5px, transparent 0.5px);
 }
 
 /* Remove number input spinners */

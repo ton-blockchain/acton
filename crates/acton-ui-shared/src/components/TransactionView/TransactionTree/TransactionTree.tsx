@@ -195,7 +195,11 @@ export function TransactionTree({
   }
 
   const treeData: RawNodeDatum = useMemo(() => {
-    const convertTransactionToNode = (tx: TransactionInfo): RawNodeDatum => {
+    const convertTransactionToNode = (
+      tx: TransactionInfo,
+      index: number = 0,
+      total: number = 1,
+    ): RawNodeDatum => {
       const thisAddress = tx.address
       const addressName = formatAddress(thisAddress, contracts)
 
@@ -239,11 +243,15 @@ export function TransactionTree({
               attributes: {
                 isExternalOut: true,
                 parentLt: lt,
+                isFirst: false,
+                isLast: tx.children.length === 0,
               },
               children: [],
             },
           ]
         : []
+
+      const totalChildren = tx.children.length + externalOutChildren.length
 
       return {
         name: addressName,
@@ -260,9 +268,11 @@ export function TransactionTree({
           isBounced,
           contractLetter,
           isSelected,
+          isFirst: index === 0 && total > 1,
+          isLast: index === total - 1 && total > 1,
         },
         children: [
-          ...tx.children.map((it) => convertTransactionToNode(it)),
+          ...tx.children.map((it, idx) => convertTransactionToNode(it, idx, totalChildren)),
           ...externalOutChildren,
         ],
       } satisfies RawNodeDatum
@@ -274,7 +284,9 @@ export function TransactionTree({
         attributes: {
           isRoot: "true",
         },
-        children: rootTransactions.map((it) => convertTransactionToNode(it)),
+        children: rootTransactions.map((it, idx) =>
+          convertTransactionToNode(it, idx, rootTransactions.length),
+        ),
       }
     }
 

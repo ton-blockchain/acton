@@ -1,12 +1,12 @@
 .tooltip {
   position: fixed;
   z-index: 10000;
-  background-color: var(--card-bg);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  padding: 16px;
-  font-size: 0.875rem;
+  background-color: var(--color-surface-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-popup);
+  padding: var(--space-lg);
+  font-size: var(--font-size-sm);
   min-width: 280px;
   max-width: 450px;
   max-height: 90vh;

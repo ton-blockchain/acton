@@ -1,48 +1,32 @@
-.exitCode {
-  font-size: var(--font-size-xsm);
+.exitCodeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  padding: 0 var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-  display: inline-block;
-  cursor: help;
-  transition: all 0.2s ease;
+  white-space: nowrap;
+  border: 1px solid transparent;
 }
 
 .success {
-  background-color: var(--color-passed-bg);
-  color: var(--color-passed-text);
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: rgba(52, 199, 89, 0.2);
 }
 
-.error {
-  background-color: var(--color-failed-bg);
-  color: var(--color-failed-text);
+.failure {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-color: rgba(255, 59, 48, 0.2);
 }
 
-.exitCodeName {
-  font-weight: var(--font-weight-normal);
-  opacity: 0.8;
+.code {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
 }
 
-.tooltipContent {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.tooltipSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.tooltipLabel {
-  font-weight: var(--font-weight-semibold);
-}
-
-.tooltipDescription {
-  margin-top: var(--spacing-xs);
-}
-
-.tooltipPhase {
-  margin-top: var(--spacing-xs);
+.name {
+  opacity: 0.9;
 }

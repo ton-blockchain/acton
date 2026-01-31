@@ -1,19 +1,19 @@
 .sidebar {
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  background-color: var(--card-bg);
+  background-color: var(--color-surface-1); /* was card-bg */
   height: 100vh;
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .header {
-  padding: 16px;
-  border-bottom: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-md);
 }
 
 .headerTop {
@@ -24,31 +24,11 @@
 
 .headerButtons {
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
   align-items: center;
 }
 
-.themeButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-color);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.themeButton:hover {
-  background-color: var(--card-bg);
-  color: var(--color-todo);
-  border-color: var(--color-todo);
-}
-
+.themeButton,
 .collapseButton {
   display: flex;
   align-items: center;
@@ -56,27 +36,28 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
+.themeButton:hover,
 .collapseButton:hover {
-  background-color: var(--card-bg);
-  color: var(--color-todo);
-  border-color: var(--color-todo);
+  background-color: var(--color-surface-2); /* was card-bg */
+  color: var(--color-accent); /* was todo */
+  border-color: var(--color-accent);
 }
 
 .title {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   font-size: 1.1rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-sm);
 }
 
 .searchContainer {
@@ -88,29 +69,29 @@
 .searchIcon {
   position: absolute;
   left: 10px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
 .searchInput {
   width: 100%;
   padding: 8px 8px 8px 32px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 0.9rem;
   outline: none;
-  background-color: var(--bg-color);
-  color: var(--text-primary);
-  transition: border-color 0.2s;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
 }
 
 .searchInput:focus {
-  border-color: var(--link-color);
+  border-color: var(--color-accent);
 }
 
 .filters {
   display: flex;
-  gap: 8px;
+  gap: var(--space-xs);
   padding-bottom: 4px;
 }
 
@@ -121,45 +102,45 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-color);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
   cursor: pointer;
-  color: var(--text-muted);
-  transition: all 0.2s;
+  color: var(--color-text-muted);
+  transition: all var(--transition-fast);
 }
 
 .filterButton:hover {
-  border-color: var(--text-secondary);
+  border-color: var(--color-text-secondary);
 }
 
 .filterButton.activeFilter {
   border-color: currentColor;
-  background-color: var(--card-bg);
+  background-color: var(--color-surface-1);
 }
 
 .filterButton.passed.activeFilter {
-  background-color: var(--color-passed-bg);
-  color: var(--color-passed-text);
-  border-color: var(--color-passed);
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: var(--color-success);
 }
 
 .filterButton.failed.activeFilter {
-  background-color: var(--color-failed-bg);
-  color: var(--color-failed-text);
-  border-color: var(--color-failed);
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger);
 }
 
 .filterButton.skipped.activeFilter {
-  background-color: var(--color-skipped-bg);
-  color: var(--color-skipped-text);
-  border-color: var(--color-skipped);
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: var(--color-warning);
 }
 
 .filterButton.todo.activeFilter {
-  background-color: var(--color-todo-bg);
-  color: var(--color-todo-text);
-  border-color: var(--color-todo);
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent-text);
+  border-color: var(--color-accent);
 }
 
 .content {
@@ -169,7 +150,7 @@
 }
 
 .suite {
-  border-bottom: 1px solid var(--divider-color);
+  border-bottom: 1px solid var(--color-divider);
 }
 
 .suiteHeader {
@@ -182,29 +163,29 @@
   cursor: pointer;
   text-align: left;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  transition: background-color 0.2s;
-  gap: 8px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  transition: background-color var(--transition-fast);
+  gap: var(--space-sm);
 }
 
 .suiteHeader:hover {
-  background-color: var(--hover-bg);
+  background-color: var(--color-hover);
 }
 
 .suiteFailed .suiteName {
-  color: var(--color-failed);
+  color: var(--color-danger);
 }
 
 .testFailed .testName {
-  color: var(--color-failed);
+  color: var(--color-danger);
 }
 
 .suiteToggle {
   display: flex;
   align-items: center;
   font-size: 1rem;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .suiteIcon {
@@ -223,9 +204,9 @@
 .suiteCount {
   font-size: 0.75rem;
   padding: 2px 6px;
-  background-color: var(--bg-color);
+  background-color: var(--color-bg);
   border-radius: 10px;
-  color: var(--text-muted);
+  color: var(--color-text-muted);
 }
 
 .testList {
@@ -243,18 +224,18 @@
   text-align: left;
   font-family: inherit;
   font-size: 0.9rem;
-  color: var(--text-primary);
+  color: var(--color-text-primary);
   width: 100%;
-  transition: background-color 0.2s;
+  transition: background-color var(--transition-fast);
 }
 
 .testItem:hover {
-  background-color: var(--hover-bg);
+  background-color: var(--color-hover);
 }
 
 .testItem.selected {
-  background-color: var(--color-todo-bg);
-  color: var(--color-todo-text);
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent-text);
   position: relative;
 }
 
@@ -265,7 +246,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background-color: var(--color-todo);
+  background-color: var(--color-accent);
 }
 
 .testStatusIcon {
@@ -281,15 +262,7 @@
   text-overflow: ellipsis;
 }
 
-.passed {
-  color: var(--color-passed);
-}
-.failed {
-  color: var(--color-failed);
-}
-.skipped {
-  color: var(--color-skipped);
-}
-.todo {
-  color: var(--color-todo);
-}
+.passed { color: var(--color-success); }
+.failed { color: var(--color-danger); }
+.skipped { color: var(--color-warning); }
+.todo { color: var(--color-accent); }

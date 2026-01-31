@@ -1,21 +1,28 @@
 .container {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modeValue {
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+}
+
+.flagsList {
+  display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  font-size: 0.85rem;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
 }
 
-.constant {
-  color: var(--color-todo);
-  text-decoration: underline dotted;
+.flag {
+  display: inline-flex;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xss);
+  border: 1px solid var(--color-border);
   cursor: help;
-}
-
-.plus {
-  color: var(--text-muted);
-}
-
-.empty {
-  color: var(--text-muted);
-  font-style: italic;
 }

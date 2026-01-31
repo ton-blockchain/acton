@@ -3,6 +3,9 @@ import { defineConfig } from "vite"
 import { nodePolyfills } from "vite-plugin-node-polyfills"
 
 export default defineConfig({
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
   plugins: [
     react(),
     nodePolyfills({

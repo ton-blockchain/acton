@@ -1,15 +1,15 @@
 .transactionDetailsContainer {
-  border-radius: 8px;
-  background-color: var(--card-bg);
-  margin-bottom: 16px;
-  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface-1);
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--color-border);
   position: relative;
 }
 
 .detailRow {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
-  transition: background-color 0.15s ease;
+  border-bottom: 1px solid var(--color-border);
+  transition: background-color var(--transition-fast);
 }
 
 .detailRow:last-child {
@@ -20,37 +20,37 @@
   display: flex;
   align-items: center;
   text-align: left;
-  font-weight: 500;
-  color: var(--text-secondary);
-  padding: 4px 12px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  padding: var(--space-xs) var(--space-md);
   width: 160px;
   flex-shrink: 0;
   vertical-align: top;
-  font-size: 0.8125rem;
-  border-right: 1px solid var(--border-color);
+  font-size: var(--font-size-sm);
+  border-right: 1px solid var(--color-border);
   box-sizing: border-box;
 }
 
 .detailValue {
-  padding: 4px 12px;
-  color: var(--text-primary);
+  padding: var(--space-xs) var(--space-md);
+  color: var(--color-text-primary);
   word-break: break-all;
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
   flex-grow: 1;
   box-sizing: border-box;
 }
 
 .timestampValue {
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .timestampDetailSecondary {
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .labeledSectionRow {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .labeledSectionRow:last-child {
@@ -59,26 +59,26 @@
 
 .labeledSectionTitle {
   text-align: left;
-  font-weight: 600;
-  color: var(--text-secondary);
-  padding: 4px 12px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  padding: var(--space-xs) var(--space-md);
   width: 160px;
   flex-shrink: 0;
-  font-size: 0.8125rem;
-  border-right: 1px solid var(--border-color);
+  font-size: var(--font-size-sm);
+  border-right: 1px solid var(--color-border);
   box-sizing: border-box;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.01em;
   display: flex;
   align-items: center;
 }
 
 .labeledSectionContent {
-  padding: 4px 12px;
+  padding: var(--space-xs) var(--space-md);
   flex-grow: 1;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   overflow: visible;
   min-width: 0;
   width: 100%;
@@ -88,7 +88,7 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-lg);
 }
 
 .multiColumnItem {
@@ -104,55 +104,55 @@
 }
 
 .multiColumnItemTitle {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
+  font-size: var(--font-size-xss);
+  color: var(--color-text-muted);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .multiColumnItemValue {
-  font-size: 0.8125rem;
-  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
   word-break: break-word;
-  gap: 4px;
+  gap: var(--space-xs);
   display: flex;
 }
 
 .booleanTrue {
-  font-weight: 600;
-  color: var(--color-passed);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-success-text);
 }
 
 .booleanFalse {
-  font-weight: 600;
-  color: var(--color-failed);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-danger-text);
 }
 
 .numberValue {
-  font-size: 0.8125rem;
+  font-size: var(--font-size-sm);
 }
 
 .actionsToggleButton {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  padding: 4px;
-  margin-left: 4px;
+  padding: var(--space-xs);
+  margin-left: var(--space-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .actionsToggleButton:hover {
-  color: var(--text-primary);
+  color: var(--color-text-primary);
 }
 
 .actionsToggleText {
-  margin-left: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
+  margin-left: var(--space-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }
 
 @media (max-width: 768px) {
@@ -166,7 +166,7 @@
   .labeledSectionTitle {
     width: 100%;
     border-right: none;
-    padding-bottom: 4px;
+    padding-bottom: var(--space-xs);
     padding-left: 0;
     padding-right: 0;
     text-align: left;
@@ -176,7 +176,7 @@
   .labeledSectionContent {
     width: 100%;
     box-sizing: border-box;
-    padding-top: 4px;
+    padding-top: var(--space-xs);
     padding-left: 0;
     padding-right: 0;
   }
@@ -192,8 +192,8 @@
   .multiColumnItem {
     width: 100%;
     box-sizing: border-box;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border-color);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--color-border);
   }
 
   .multiColumnItem:last-child {

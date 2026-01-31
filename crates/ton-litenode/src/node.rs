@@ -472,7 +472,7 @@ impl Node {
         // 1. Find the root transaction (traverse UP)
         let mut root_hash = *tx_hash;
         let mut curr_tx_hash = *tx_hash;
-        
+
         // Use a set to detect cycles and prevent infinite loops
         let mut visited_up = std::collections::HashSet::new();
         visited_up.insert(curr_tx_hash);
@@ -491,7 +491,7 @@ impl Node {
                         root_hash = curr_tx_hash;
                         break;
                     }
-                    
+
                     // Find transaction that produced this message
                     // Optimized: we can find it in msg_to_tx if we know the out_msg_hash
                     // But we are going BACKWARDS, so we need a map from out_msg_hash to producing_tx_hash
@@ -538,20 +538,20 @@ impl Node {
                     .get(&tx.tx_boc_hash)
                     .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
                     .unwrap_or_default();
-                
+
                 let tx_json = crate::litenode::convert_to_tx_json(&tx, in_msg.as_ref(), &out_msgs, tx_boc_b64)?;
                 let mut tx_val = tx_json;
-                
+
                 // Add parent/child info for shared UI component
                 if let Some(in_msg_hash) = &tx.in_msg_hash {
-                    for (h, t) in &self.history.tx_by_hash {
+                    for (_h, t) in &self.history.tx_by_hash {
                         if t.out_msg_hashes.contains(in_msg_hash) {
                             tx_val["parent_transaction"] = serde_json::json!(t.lt.to_string());
                             break;
                         }
                     }
                 }
-                
+
                 let mut children = Vec::new();
                 for out_msg in &tx.out_msg_hashes {
                     if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg) {

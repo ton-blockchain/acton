@@ -1,30 +1,14 @@
-@import "./styles/variables.module.css";
+@import "../../acton-ui-shared/src/styles/base.css";
 
-* {
-  box-sizing: border-box;
-}
+/* No need to redefine body/h1/etc as base.css does it */
+/* But we might need specific overrides if acton-test-ui layout depends on them */
 
 body {
-  margin: 0;
-  padding: 0;
-  background-color: var(--bg-color);
-  color: var(--text-primary);
-  font-family: var(--font-family), serif;
-  line-height: 1.6;
-}
-
-h1,
-h2,
-h3 {
-  margin-top: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  /* font-family and line-height are in base.css */
 }
 
 a {
-  color: var(--link-color);
-  text-decoration: none;
-}
-
-pre {
-  font-family: var(--font-mono);
-  margin: 0;
+  color: var(--color-accent);
 }
