@@ -79,12 +79,14 @@ pub struct LocalDef {
 pub enum LocalDefKind {
     /// A function or method parameter.
     Param {
+        has_type: bool,
         /// Whether the parameter is declared as mutable.
         is_mutable: bool,
         in_asm_or_builtin: bool,
     },
     /// A local variable.
     Var {
+        has_type: bool,
         /// Whether the variable is declared as mutable.
         is_mutable: bool,
     },

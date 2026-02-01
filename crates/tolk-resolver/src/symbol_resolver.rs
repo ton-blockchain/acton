@@ -306,7 +306,14 @@ impl<'a> SymbolResolver<'a> {
                     let name_str = name.text(self.file_content()).to_string();
                     self.check_redeclaration(&name_str, "var_declaration");
                     let is_mutable = matches!(kind, VarKind::Var);
-                    self.add_symbol(&name.0, name_str, LocalDefKind::Var { is_mutable });
+                    self.add_symbol(
+                        &name.0,
+                        name_str,
+                        LocalDefKind::Var {
+                            is_mutable,
+                            has_type: var_decl.typ().is_some(),
+                        },
+                    );
                 }
 
                 if let Some(typ) = var_decl.typ() {
@@ -529,6 +536,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 &name.0,
                 name_str,
                 LocalDefKind::Param {
+                    has_type: node.typ().is_some(),
                     is_mutable: node.mutate(),
                     in_asm_or_builtin: false, // lambda cannot be assembly or builtin
                 },
@@ -567,6 +575,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 &name.0,
                 name_str,
                 LocalDefKind::Param {
+                    has_type: node.typ().is_some(),
                     is_mutable: node.mutate(),
                     in_asm_or_builtin: !in_common,
                 },

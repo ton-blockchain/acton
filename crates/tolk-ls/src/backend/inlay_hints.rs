@@ -1,75 +1,105 @@
+use crate::backend::utils::offset_to_pos;
 use lsp_types::*;
 use std::sync::Arc;
+use tolk_resolver::FileResolveIndex;
 use tolk_resolver::file_db::FileInfo;
-use tolk_resolver::file_index::FileId;
 use tolk_resolver::project_index::ProjectIndex;
+use tolk_resolver::resolve_index::LocalDefKind;
 use tolk_syntax::{FunctionLike, TopLevel};
 use tolk_ty::{InferenceResult, TyId, TypeInterner};
-use crate::backend::utils::offset_to_lsp_pos;
 
 pub fn collect_inlay_hints(
-    inference_result: &InferenceResult,
+    inference: &InferenceResult,
     project_index: &ProjectIndex,
-    type_interner: &TypeInterner,
-    file_id: FileId,
-    file_info: &Arc<FileInfo>,
+    interner: &TypeInterner,
+    file: &Arc<FileInfo>,
     decl: &TopLevel,
     hints: &mut Vec<InlayHint>,
 ) {
-    let Some(file_resolve_index) = project_index.resolved_uses.get(&file_id) else {
+    let Some(resolve_index) = project_index.get_resolved_uses(file.id()) else {
         return;
     };
 
-    for local_def in &file_resolve_index.locals {
-        match local_def.kind {
-            tolk_resolver::resolve_index::LocalDefKind::Param { .. }
-            | tolk_resolver::resolve_index::LocalDefKind::Var { .. }
-            | tolk_resolver::resolve_index::LocalDefKind::Catch => {
-                if let Some(ty_id) = inference_result.type_of(local_def.def_span) {
-                    if ty_id == type_interner.ty_unknown {
-                        continue;
-                    }
+    collect_locals_hints(inference, interner, file, hints, resolve_index);
+    collect_return_ty_hint(inference, interner, file, decl, hints);
+}
 
-                    let type_string = type_interner.display(ty_id).to_string();
-
-                    let position = offset_to_lsp_pos(
-                        local_def.def_span.end as usize,
-                        &file_info.source().source,
-                    );
-                    let hint = InlayHint {
-                        position,
-                        label: InlayHintLabel::String(format!(": {}", type_string)),
-                        kind: Some(InlayHintKind::TYPE),
-                        text_edits: None,
-                        tooltip: None,
-                        padding_left: Some(false),
-                        padding_right: Some(true),
-                        data: None,
-                    };
-                    hints.push(hint);
-                }
-            }
-            _ => {}
+fn collect_locals_hints(
+    inference: &InferenceResult,
+    interner: &TypeInterner,
+    file: &Arc<FileInfo>,
+    hints: &mut Vec<InlayHint>,
+    resolve_index: &Arc<FileResolveIndex>,
+) {
+    for local_def in &resolve_index.locals {
+        if matches!(local_def.kind, LocalDefKind::TypeParameter) {
+            // no need to show type hint for type parameters
+            continue;
         }
-    }
 
-    if let Some(inferred_ty) = inference_result.inferred_return_type
-        && inferred_ty != type_interner.ty_unknown
+        if let LocalDefKind::Param { has_type, .. } = local_def.kind
+            && has_type
+        {
+            // no need to show type hint for parameter with explicit type hint
+            continue;
+        }
+
+        if let LocalDefKind::Var { has_type, .. } = local_def.kind
+            && has_type
+        {
+            // no need to show type hint for variable with explicit type hint
+            continue;
+        }
+
+        let Some(ty_id) = inference.type_of(local_def.def_span) else {
+            continue;
+        };
+
+        if ty_id == interner.ty_unknown {
+            continue;
+        }
+
+        let type_string = interner.format(ty_id);
+
+        let position = offset_to_pos(local_def.def_span.end(), &file.source().source);
+        let hint = InlayHint {
+            position,
+            label: InlayHintLabel::String(format!(": {}", type_string)),
+            kind: Some(InlayHintKind::TYPE),
+            text_edits: None,
+            tooltip: None,
+            padding_left: Some(false),
+            padding_right: Some(true),
+            data: None,
+        };
+        hints.push(hint);
+    }
+}
+
+fn collect_return_ty_hint(
+    inference: &InferenceResult,
+    interner: &TypeInterner,
+    file: &Arc<FileInfo>,
+    decl: &TopLevel,
+    hints: &mut Vec<InlayHint>,
+) {
+    if let Some(inferred_ty) = inference.inferred_return_type
+        && inferred_ty != interner.ty_unknown
     {
         match decl {
             TopLevel::Func(f) => {
                 if f.return_type().is_none() {
-                    add_return_type_hint(f, inferred_ty, type_interner, file_info, hints);
+                    add_return_type_hint(f, inferred_ty, interner, file, hints);
                 }
             }
             TopLevel::Method(m) => {
                 if m.return_type().is_none() {
-                    add_return_type_hint(m, inferred_ty, type_interner, file_info, hints);
+                    add_return_type_hint(m, inferred_ty, interner, file, hints);
                 }
             }
             TopLevel::GetMethod(g) => {
                 if g.return_type().is_none() {
-                    add_return_type_hint(g, inferred_ty, type_interner, file_info, hints);
+                    add_return_type_hint(g, inferred_ty, interner, file, hints);
                 }
             }
             _ => {}
@@ -84,23 +114,23 @@ fn add_return_type_hint<'tree, T: tolk_syntax::AstNode<'tree>>(
     file_info: &Arc<FileInfo>,
     hints: &mut Vec<InlayHint>,
 ) {
-    let parameters_node = node.syntax().child_by_field_name("parameters");
-    if let Some(params_node) = parameters_node {
-        let position =
-            offset_to_lsp_pos(params_node.end_byte(), &file_info.source().source);
+    let Some(params_node) = node.syntax().child_by_field_name("parameters") else {
+        return;
+    };
 
-        let type_string = type_interner.display(return_ty).to_string();
+    let position = offset_to_pos(params_node.end_byte(), &file_info.source().source);
 
-        let hint = InlayHint {
-            position,
-            label: InlayHintLabel::String(format!(": {}", type_string)),
-            kind: Some(InlayHintKind::TYPE),
-            text_edits: None,
-            tooltip: None,
-            padding_left: Some(true),
-            padding_right: Some(true),
-            data: None,
-        };
-        hints.push(hint);
-    }
+    let type_string = type_interner.display(return_ty).to_string();
+
+    let hint = InlayHint {
+        position,
+        label: InlayHintLabel::String(format!(": {}", type_string)),
+        kind: Some(InlayHintKind::TYPE),
+        text_edits: None,
+        tooltip: None,
+        padding_left: Some(true),
+        padding_right: Some(true),
+        data: None,
+    };
+    hints.push(hint);
 }

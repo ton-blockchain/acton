@@ -59,7 +59,7 @@ pub fn get_point(text: &str, pos: Position) -> Point {
     Point::new(pos.line as usize, byte_col)
 }
 
-pub fn offset_to_lsp_pos(offset: usize, text: &str) -> Position {
+pub fn offset_to_pos(offset: usize, text: &str) -> Position {
     let mut current_offset = 0;
     for (i, line) in text.split('\n').enumerate() {
         if current_offset + line.len() >= offset {

@@ -11,17 +11,17 @@ use tolk_resolver::file_index::FileId;
 use tolk_resolver::symbol_resolver::resolve;
 use tolk_syntax::{AstNode, HasName, TopLevel};
 use tolk_ty::TypeDb;
-use tolk_ty::infer;
 use tolk_ty::TypeInterner;
+use tolk_ty::infer;
 use tower_lsp::jsonrpc::Result as LspResult;
 use tower_lsp::lsp_types::Url;
 use tower_lsp::{Client, LanguageServer};
 use tree_sitter::{InputEdit, Point, Range as TSRange, Tree};
 
 use crate::backend::analysis::{AnalysisResult, ChangeType};
-use crate::backend::utils::*;
 use crate::backend::diagnostics::convert_single_diagnostic;
 use crate::backend::inlay_hints::collect_inlay_hints;
+use crate::backend::utils::*;
 
 pub struct Backend {
     pub client: Client,
@@ -107,8 +107,7 @@ impl LanguageServer for Backend {
                 text.replace_range(start_byte..old_end_byte, &change.text);
 
                 let new_end_byte = start_byte + change.text.len();
-                let new_end_position =
-                    get_point(&text, offset_to_lsp_pos(new_end_byte, &text));
+                let new_end_position = get_point(&text, offset_to_pos(new_end_byte, &text));
 
                 if let Some(ref mut tree) = old_tree {
                     tree.edit(&InputEdit {
@@ -146,7 +145,7 @@ impl LanguageServer for Backend {
                     start_byte: 0,
                     end_byte: text.len(),
                     start_point: Point::new(0, 0),
-                    end_point: get_point(&text, offset_to_lsp_pos(text.len(), &text)),
+                    end_point: get_point(&text, offset_to_pos(text.len(), &text)),
                 });
             }
         }
@@ -158,8 +157,7 @@ impl LanguageServer for Backend {
         log::info!("Notification: did_change took {:?}", now.elapsed());
     }
 
-    async fn did_save(&self, _params: DidSaveTextDocumentParams) {
-    }
+    async fn did_save(&self, _params: DidSaveTextDocumentParams) {}
 
     async fn goto_definition(
         &self,
@@ -296,27 +294,26 @@ impl LanguageServer for Backend {
             let file_info = self.file_db.get_by_path(&path)?;
             let file_id = file_info.id();
 
-            let mut hints = Vec::new();
+            let mut hints = Vec::with_capacity(10);
 
-            if let Some(body_types) = analysis.all_body_types.get(&file_id) {
-                for (&symbol_id, inference_result) in body_types {
-                    let decl = file_info.source().top_levels().find(|decl| {
-                        file_info
-                            .find_declaration(decl)
-                            .is_some_and(|index_decl| index_decl.id == symbol_id)
-                    });
+            let body_types = analysis.all_body_types.get(&file_id)?;
 
-                    if let Some(decl) = decl {
-                        collect_inlay_hints(
-                            inference_result,
-                            &analysis.project_index,
-                            &analysis.type_interner,
-                            file_id,
-                            &file_info,
-                            &decl,
-                            &mut hints,
-                        );
-                    }
+            for (&symbol_id, inference_result) in body_types {
+                let decl = file_info.source().top_levels().find(|decl| {
+                    file_info
+                        .find_declaration(decl)
+                        .is_some_and(|index_decl| index_decl.id == symbol_id)
+                });
+
+                if let Some(decl) = decl {
+                    collect_inlay_hints(
+                        inference_result,
+                        &analysis.project_index,
+                        &analysis.type_interner,
+                        &file_info,
+                        &decl,
+                        &mut hints,
+                    );
                 }
             }
 
@@ -794,7 +791,7 @@ impl Backend {
             .get(&file_info.index().path)
             .map(|o| o.clone())
             .unwrap_or_else(|| Arc::new(compute_offsets(&file_info.source().source)));
-        
+
         convert_single_diagnostic(diag, file_info, &offsets)
     }
 
