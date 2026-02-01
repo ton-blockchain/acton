@@ -1,13 +1,12 @@
+use crate::backend::utils::offset_to_range;
 use lsp_types::*;
 use std::sync::Arc;
 use tolk_resolver::file_db::FileInfo;
 use tower_lsp::lsp_types::Url;
-use crate::backend::utils::offset_to_range;
 
 pub fn convert_single_diagnostic(
     diag: &tolk_linter::diagnostic::Diagnostic,
     file_info: &Arc<FileInfo>,
-    line_offsets: &[usize],
 ) -> Diagnostic {
     let uri = Url::from_file_path(&file_info.index().path).unwrap();
 
@@ -15,7 +14,7 @@ pub fn convert_single_diagnostic(
     let mut primary_range = None;
 
     for annotation in &diag.annotations {
-        let range = offset_to_range(line_offsets, &file_info.source().source, annotation.span.start());
+        let range = offset_to_range(file_info, annotation.span.start());
 
         if annotation.is_primary {
             primary_range = Some(range);
@@ -30,7 +29,7 @@ pub fn convert_single_diagnostic(
     let range = primary_range.unwrap_or_else(|| {
         diag.annotations
             .first()
-            .map(|ann| offset_to_range(line_offsets, &file_info.source().source, ann.span.start()))
+            .map(|ann| offset_to_range(file_info, ann.span.start()))
             .unwrap_or_default()
     });
 

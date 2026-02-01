@@ -1,5 +1,23 @@
 use lsp_types::*;
+use std::sync::Arc;
+use tolk_resolver::FileInfo;
+use tolk_resolver::file_index::Span;
 use tree_sitter::Point;
+
+pub trait SpanExt {
+    fn start_position(&self, file: &Arc<FileInfo>) -> Position;
+    fn end_position(&self, file: &Arc<FileInfo>) -> Position;
+}
+
+impl SpanExt for Span {
+    fn start_position(&self, file: &Arc<FileInfo>) -> Position {
+        offset_to_pos(file, self.start())
+    }
+
+    fn end_position(&self, file: &Arc<FileInfo>) -> Position {
+        offset_to_pos(file, self.end())
+    }
+}
 
 pub fn compute_offsets(text: &str) -> Vec<usize> {
     let mut offsets = vec![0];
@@ -11,15 +29,9 @@ pub fn compute_offsets(text: &str) -> Vec<usize> {
     offsets
 }
 
-pub fn offset_to_range(line_offsets: &[usize], _source: &str, offset: usize) -> Range {
-    let line = line_offsets
-        .binary_search(&offset)
-        .unwrap_or_else(|idx| idx.saturating_sub(1));
-    let character = offset - line_offsets[line];
-    Range::new(
-        Position::new(line as u32, character as u32),
-        Position::new(line as u32, (character + 1) as u32),
-    )
+pub fn offset_to_range(file: &Arc<FileInfo>, offset: usize) -> Range {
+    let pos = offset_to_pos(file, offset);
+    Range::new(pos, Position::new(pos.line, pos.character + 1))
 }
 
 pub fn get_byte_offset(text: &str, pos: Position) -> usize {
@@ -59,24 +71,38 @@ pub fn get_point(text: &str, pos: Position) -> Point {
     Point::new(pos.line as usize, byte_col)
 }
 
-pub fn offset_to_pos(offset: usize, text: &str) -> Position {
-    let mut current_offset = 0;
-    for (i, line) in text.split('\n').enumerate() {
-        if current_offset + line.len() >= offset {
-            let mut utf16_count = 0;
-            let mut byte_in_line = 0;
-            for c in line.chars() {
-                if current_offset + byte_in_line >= offset {
-                    break;
-                }
-                byte_in_line += c.len_utf8();
-                utf16_count += c.len_utf16();
-            }
-            return Position::new(i as u32, utf16_count as u32);
+pub fn offset_to_pos(file: &Arc<FileInfo>, offset: usize) -> Position {
+    let line_offsets = file.line_offsets();
+    let source = file.source().source.clone();
+
+    offset_to_pos_internal(line_offsets, &source, offset)
+}
+
+fn offset_to_pos_internal(line_offsets: &[usize], source: &str, offset: usize) -> Position {
+    let line = line_offsets
+        .binary_search(&offset)
+        .unwrap_or_else(|idx| idx.saturating_sub(1));
+
+    let line_start_offset = line_offsets[line];
+    let col_byte_offset = offset - line_start_offset;
+
+    let line_content = &source[line_start_offset..];
+    let mut utf16_count = 0;
+    let mut byte_count = 0;
+    for c in line_content.chars() {
+        if byte_count >= col_byte_offset {
+            break;
         }
-        current_offset += line.len() + 1;
+        byte_count += c.len_utf8();
+        utf16_count += c.len_utf16();
     }
-    Position::new(0, 0)
+
+    Position::new(line as u32, utf16_count as u32)
+}
+
+pub fn offset_to_lsp_pos(offset: usize, text: &str) -> Position {
+    let offsets = compute_offsets(text);
+    offset_to_pos_internal(&offsets, text, offset)
 }
 
 pub fn ranges_intersect(a: &Range, b: &Range) -> bool {

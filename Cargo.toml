@@ -13,6 +13,7 @@ exclude = [
     "crates/acton-ui-shared",
     "crates/ffi-test",
     "crates/ton-litenode",
+    "crates/acton-js-emulator",
 ]
 
 [workspace.package]

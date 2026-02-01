@@ -28,7 +28,6 @@ pub struct Backend {
     pub file_db: Arc<FileDb>,
     pub documents: DashMap<Url, String>,
     pub analysis: DashMap<Url, Arc<AnalysisResult>>,
-    pub line_offsets: DashMap<PathBuf, Arc<Vec<usize>>>,
     pub file_urls: DashMap<FileId, Url>,
 }
 
@@ -107,7 +106,7 @@ impl LanguageServer for Backend {
                 text.replace_range(start_byte..old_end_byte, &change.text);
 
                 let new_end_byte = start_byte + change.text.len();
-                let new_end_position = get_point(&text, offset_to_pos(new_end_byte, &text));
+                let new_end_position = get_point(&text, offset_to_lsp_pos(new_end_byte, &text));
 
                 if let Some(ref mut tree) = old_tree {
                     tree.edit(&InputEdit {
@@ -145,7 +144,7 @@ impl LanguageServer for Backend {
                     start_byte: 0,
                     end_byte: text.len(),
                     start_point: Point::new(0, 0),
-                    end_point: get_point(&text, offset_to_pos(text.len(), &text)),
+                    end_point: get_point(&text, offset_to_lsp_pos(text.len(), &text)),
                 });
             }
         }
@@ -175,7 +174,7 @@ impl LanguageServer for Backend {
             let file_info = self.file_db.get_by_path(&path)?;
             let file_id = file_info.id();
 
-            let offsets = self.line_offsets.get(&path)?;
+            let offsets = file_info.line_offsets();
             let offset = (*offsets.get(position.line as usize)?) + position.character as usize;
 
             if let Some(body_types) = analysis.all_body_types.get(&file_id) {
@@ -221,7 +220,7 @@ impl LanguageServer for Backend {
             let file_info = self.file_db.get_by_path(&path)?;
             let file_id = file_info.id();
 
-            let offsets = self.line_offsets.get(&path)?;
+            let offsets = file_info.line_offsets();
             let offset = (*offsets.get(position.line as usize)?) + position.character as usize;
 
             let mut locations = Vec::new();
@@ -241,7 +240,7 @@ impl LanguageServer for Backend {
                             && let Some(file_info) = self.file_db.get_by_id(*fid)
                             && let Ok(file_uri) = Url::from_file_path(&file_info.index().path)
                         {
-                            let range = self.offset_to_range(&file_info, usage.span.start());
+                            let range = offset_to_range(&file_info, usage.span.start());
                             locations.push(Location::new(file_uri.clone(), range));
                         }
                     }
@@ -264,7 +263,7 @@ impl LanguageServer for Backend {
                                 && let Some(file_info) = self.file_db.get_by_id(*fid)
                                 && let Ok(file_uri) = Url::from_file_path(&file_info.index().path)
                             {
-                                let range = self.offset_to_range(&file_info, usage.span.start());
+                                let range = offset_to_range(&file_info, usage.span.start());
                                 locations.push(Location::new(file_uri.clone(), range));
                             }
                         }
@@ -292,29 +291,23 @@ impl LanguageServer for Backend {
             let analysis = self.analysis.get(&uri)?;
             let path = uri.to_file_path().ok()?;
             let file_info = self.file_db.get_by_path(&path)?;
-            let file_id = file_info.id();
 
             let mut hints = Vec::with_capacity(10);
 
-            let body_types = analysis.all_body_types.get(&file_id)?;
+            let body_types = analysis.all_body_types.get(&file_info.id())?;
 
             for (&symbol_id, inference_result) in body_types {
-                let decl = file_info.source().top_levels().find(|decl| {
-                    file_info
-                        .find_declaration(decl)
-                        .is_some_and(|index_decl| index_decl.id == symbol_id)
-                });
+                let decl = file_info.find_syntax_declaration(symbol_id);
+                let Some(decl) = decl else { continue };
 
-                if let Some(decl) = decl {
-                    collect_inlay_hints(
-                        inference_result,
-                        &analysis.project_index,
-                        &analysis.type_interner,
-                        &file_info,
-                        &decl,
-                        &mut hints,
-                    );
-                }
+                collect_inlay_hints(
+                    inference_result,
+                    &analysis.project_index,
+                    &analysis.type_interner,
+                    &file_info,
+                    &decl,
+                    &mut hints,
+                );
             }
 
             Some(hints)
@@ -344,7 +337,7 @@ impl LanguageServer for Backend {
                         // Check if the diagnostic range intersects with the requested range
                         if let Some(first_annotation) = diag.annotations.first() {
                             let diag_range =
-                                self.offset_to_range(&file_info, first_annotation.span.start());
+                                offset_to_range(&file_info, first_annotation.span.start());
                             if !ranges_intersect(&diag_range, &params.range) {
                                 continue;
                             }
@@ -354,9 +347,8 @@ impl LanguageServer for Backend {
                         for (fix_idx, fix) in diag.fixes.iter().enumerate() {
                             let mut edits = Vec::new();
                             for edit in &fix.edits {
-                                let start_range =
-                                    self.offset_to_range(&file_info, edit.span.start());
-                                let end_range = self.offset_to_range(&file_info, edit.span.end());
+                                let start_range = offset_to_range(&file_info, edit.span.start());
+                                let end_range = offset_to_range(&file_info, edit.span.end());
                                 let edit_range = Range::new(start_range.start, end_range.start);
 
                                 edits.push(TextEdit::new(edit_range, edit.replacement.clone()));
@@ -424,7 +416,7 @@ impl LanguageServer for Backend {
                     && let Some(file_info) = self.file_db.get_by_id(id.file_id)
                     && let Ok(uri) = Url::from_file_path(&file_info.index().path)
                 {
-                    let range = self.offset_to_range(&file_info, symbol.name_span.start());
+                    let range = offset_to_range(&file_info, symbol.name_span.start());
                     symbols.push(SymbolInformation {
                         name: symbol.fqn.to_string(),
                         kind: self.to_lsp_symbol_kind(&symbol.kind),
@@ -449,9 +441,6 @@ impl LanguageServer for Backend {
 
 impl Backend {
     fn update_document(&self, uri: &Url, text: String) {
-        let offsets = compute_offsets(&text);
-        self.line_offsets
-            .insert(uri.to_file_path().unwrap(), Arc::new(offsets));
         self.documents.insert(uri.clone(), text);
     }
 
@@ -597,16 +586,6 @@ impl Backend {
             "Analysing took: resolving {resolving_time:?}, type inference {type_inference_time:?}, bodies: {bodies}"
         );
 
-        // Pre-compute offsets for all reachable files
-        for file_id in &reachable {
-            let file_info = self.file_db.get_by_id(*file_id).expect("file not found");
-            if !self.line_offsets.contains_key(&file_info.index().path) {
-                let offsets = compute_offsets(&file_info.source().source);
-                self.line_offsets
-                    .insert(file_info.index().path.clone(), Arc::new(offsets));
-            }
-        }
-
         let now = Instant::now();
         let mut checker = Checker::new(&self.file_db, &mut type_db, &all_body_types);
 
@@ -645,7 +624,7 @@ impl Backend {
                     .entry(def_id.file_id)
                     .or_insert_with(|| Url::from_file_path(&target_info.index().path).unwrap())
                     .clone();
-                let range = self.offset_to_range(&target_info, def_id.local as usize);
+                let range = offset_to_range(&target_info, def_id.local as usize);
                 Some(GotoDefinitionResponse::Scalar(Location::new(
                     target_uri, range,
                 )))
@@ -658,23 +637,13 @@ impl Backend {
                     .entry(sym_id.file_id)
                     .or_insert_with(|| Url::from_file_path(&target_info.index().path).unwrap())
                     .clone();
-                let range = self.offset_to_range(&target_info, symbol.name_span.start());
+                let range = offset_to_range(&target_info, symbol.name_span.start());
                 Some(GotoDefinitionResponse::Scalar(Location::new(
                     target_uri, range,
                 )))
             }
             _ => None,
         }
-    }
-
-    fn offset_to_range(&self, file_info: &Arc<FileInfo>, offset: usize) -> Range {
-        let offsets = self
-            .line_offsets
-            .get(&file_info.index().path)
-            .map(|o| o.clone())
-            .unwrap_or_else(|| Arc::new(compute_offsets(&file_info.source().source)));
-
-        crate::backend::utils::offset_to_range(&offsets, &file_info.source().source, offset)
     }
 
     fn detect_change_type(
@@ -786,13 +755,7 @@ impl Backend {
         diag: &tolk_linter::diagnostic::Diagnostic,
         file_info: &Arc<FileInfo>,
     ) -> Diagnostic {
-        let offsets = self
-            .line_offsets
-            .get(&file_info.index().path)
-            .map(|o| o.clone())
-            .unwrap_or_else(|| Arc::new(compute_offsets(&file_info.source().source)));
-
-        convert_single_diagnostic(diag, file_info, &offsets)
+        convert_single_diagnostic(diag, file_info)
     }
 
     fn convert_linter_diagnostics_to_lsp(

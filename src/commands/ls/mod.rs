@@ -43,7 +43,6 @@ async fn ls_cmd_internal(port: Option<u16>, stdio: bool, file_db: FileDb) -> any
         file_db: Arc::new(file_db),
         documents: DashMap::new(),
         analysis: DashMap::new(),
-        line_offsets: DashMap::new(),
         file_urls: DashMap::new(),
     });
 

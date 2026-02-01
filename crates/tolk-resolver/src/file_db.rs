@@ -26,6 +26,8 @@ pub struct FileInfo {
     index: Arc<FileIndex>,
     /// The parsed AST and source code.
     source: ast::SourceFile,
+    /// Pre-computed line offsets for efficient position mapping.
+    line_offsets: Vec<usize>,
 }
 
 impl FileInfo {
@@ -39,6 +41,10 @@ impl FileInfo {
 
     pub const fn source(&self) -> &ast::SourceFile {
         &self.source
+    }
+
+    pub fn line_offsets(&self) -> &[usize] {
+        &self.line_offsets
     }
 
     /// Checks if passed file resides in Tolk standard library.
@@ -150,6 +156,13 @@ impl FileDb {
     ) -> anyhow::Result<Arc<FileInfo>> {
         let file = tolk_syntax::parse_with_old_tree(content, old_tree)?;
 
+        let mut line_offsets = vec![0];
+        let mut last_offset = 0;
+        for line in content.lines() {
+            last_offset += line.len() + 1;
+            line_offsets.push(last_offset);
+        }
+
         let existing = self.files.get(&path);
         let file_id = existing.map(|e| e.id).unwrap_or_else(|| self.alloc_id());
 
@@ -168,6 +181,7 @@ impl FileDb {
                 source_kind,
             )),
             source: file,
+            line_offsets,
         });
 
         // TODO: possible double work on concurrent run

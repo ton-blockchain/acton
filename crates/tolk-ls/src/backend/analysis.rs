@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tolk_resolver::project_index::ProjectIndex;
-use tolk_ty::TypeInterner;
 use tolk_resolver::file_index::{FileId, SymbolId};
+use tolk_resolver::project_index::ProjectIndex;
 use tolk_ty::InferenceResult;
+use tolk_ty::TypeInterner;
 
 #[derive(Debug, Clone)]
 pub struct AnalysisResult {
