@@ -82,6 +82,7 @@ pub enum LocalDefKind {
         has_type: bool,
         /// Whether the parameter is declared as mutable.
         is_mutable: bool,
+        is_self: bool,
         in_asm_or_builtin: bool,
     },
     /// A local variable.

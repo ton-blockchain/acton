@@ -16,6 +16,7 @@ pub mod goto_definition;
 pub mod inlay_hints;
 pub mod references;
 pub mod resolution;
+pub mod semantic_tokens;
 pub mod symbols;
 pub mod utils;
 
@@ -44,6 +45,31 @@ impl LanguageServer for Backend {
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                semantic_tokens_provider: Some(
+                    SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
+                        SemanticTokensRegistrationOptions {
+                            text_document_registration_options: TextDocumentRegistrationOptions {
+                                document_selector: Some(vec![DocumentFilter {
+                                    language: Some("tolk".to_string()),
+                                    scheme: Some("file".to_string()),
+                                    pattern: None,
+                                }]),
+                            },
+                            semantic_tokens_options: SemanticTokensOptions {
+                                work_done_progress_options: WorkDoneProgressOptions {
+                                    work_done_progress: None,
+                                },
+                                range: Some(false),
+                                full: Some(SemanticTokensFullOptions::Bool(true)),
+                                legend: SemanticTokensLegend {
+                                    token_types: semantic_tokens::TOKEN_TYPES.to_vec(),
+                                    token_modifiers: semantic_tokens::TOKEN_MODIFIERS.to_vec(),
+                                },
+                            },
+                            static_registration_options: StaticRegistrationOptions { id: None },
+                        },
+                    ),
+                ),
                 ..Default::default()
             },
             ..Default::default()
@@ -107,6 +133,13 @@ impl LanguageServer for Backend {
         params: WorkspaceSymbolParams,
     ) -> LspResult<Option<Vec<SymbolInformation>>> {
         self.handle_symbol(params).await
+    }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> LspResult<Option<SemanticTokensResult>> {
+        self.handle_semantic_tokens_full(params).await
     }
 }
 

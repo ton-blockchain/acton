@@ -89,10 +89,13 @@ fn collect_locals_hints(
             continue;
         }
 
-        if let LocalDefKind::Param { has_type, .. } = local_def.kind
-            && has_type
+        if let LocalDefKind::Param {
+            has_type, is_self, ..
+        } = local_def.kind
+            && (has_type || is_self)
         {
             // no need to show type hint for parameter with explicit type hint
+            // or if it is self parameter
             continue;
         }
 

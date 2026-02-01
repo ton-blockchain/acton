@@ -538,6 +538,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 LocalDefKind::Param {
                     has_type: node.typ().is_some(),
                     is_mutable: node.mutate(),
+                    is_self: false,           // there is no self parameters in lambdas
                     in_asm_or_builtin: false, // lambda cannot be assembly or builtin
                 },
             );
@@ -570,6 +571,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
     fn walk_parameter(&mut self, node: &ast::Parameter<'tree>, in_common: bool) -> Self::Result {
         if let Some(name) = node.name() {
             let name_str = name.text(self.file_content()).to_string();
+            let is_self = name_str == "self";
             self.check_redeclaration(&name_str, "parameter_declaration");
             self.add_symbol(
                 &name.0,
@@ -577,6 +579,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 LocalDefKind::Param {
                     has_type: node.typ().is_some(),
                     is_mutable: node.mutate(),
+                    is_self,
                     in_asm_or_builtin: !in_common,
                 },
             );

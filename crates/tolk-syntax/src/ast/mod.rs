@@ -4,6 +4,7 @@ pub mod node;
 pub mod statements;
 pub mod top_level;
 pub mod traits;
+pub mod traversal;
 pub mod types;
 pub mod walker;
 
@@ -12,6 +13,7 @@ pub use node::*;
 pub use statements::*;
 pub use top_level::*;
 pub use traits::*;
+pub use traversal::*;
 pub use tree_sitter::*;
 pub use types::*;
 pub use walker::*;
