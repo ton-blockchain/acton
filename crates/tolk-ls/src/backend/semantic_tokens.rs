@@ -3,13 +3,9 @@ use crate::backend::utils::SpanExt;
 use lsp_types::*;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tolk_resolver::resolve_index::LocalDefKind;
-use tolk_resolver::{AstNodeSpanExt, FileInfo, Resolved, SymbolKind};
-use tolk_syntax::ast::{
-    Constant, Enum, EnumMember, Func, GetMethod, GlobalVar, Method, NodeTraversalExt, Parameter,
-    Struct, StructField, TypeAlias, TypeParameter,
-};
-use tolk_syntax::{AstNode, AstNodeBytesKind, HasName, TryFromNode};
+use tolk_resolver::resolve_index::{LocalDef, LocalDefKind, Resolved};
+use tolk_resolver::{AstNodeSpanExt, FileInfo, Span, Symbol, SymbolKind};
+use tolk_syntax::AstNode;
 use tower_lsp::jsonrpc::Result as LspResult;
 
 pub const TOKEN_TYPES: &[SemanticTokenType] = &[
@@ -79,7 +75,11 @@ impl SemanticTokensBuilder {
         token_type: TokenType,
         token_modifiers: u32,
     ) {
-        let range = node.span().range(&self.file);
+        self.add_token_at_span(node.span(), token_type, token_modifiers);
+    }
+
+    pub fn add_token_at_span(&mut self, span: Span, token_type: TokenType, token_modifiers: u32) {
+        let range = span.range(&self.file);
         self.tokens.push(RawSemanticToken {
             line: range.start.line,
             start: range.start.character,
@@ -157,88 +157,69 @@ impl Backend {
         let file_info = self.file_db.get_by_path(&path)?;
 
         let mut builder = SemanticTokensBuilder::new(file_info.clone());
-        let source = &file_info.source().source;
-        let root = file_info.source().root_node();
 
-        for node in root.traverse() {
-            if let Ok(decl) = Struct::try_from_node(node) {
-                if let Some(name) = decl.name() {
-                    let token_type = if is_special_struct(name.text(source)) {
-                        TokenType::Macro
-                    } else {
-                        TokenType::Struct
-                    };
-                    builder.add_token(name, token_type, 0);
+        let resolved_uses = analysis.project_index.get_resolved_uses(file_info.id())?;
+
+        // 1. Process all declarations
+        if let Some(file_index) = analysis.project_index.get_file_index(file_info.id()) {
+            for decl in &file_index.decls {
+                Self::add_symbol_tokens(&mut builder, decl);
+            }
+        }
+
+        // 2. Process all local definitions
+        for local in &resolved_uses.locals {
+            let (token_type, modifiers) = Self::semantic_token_of_local(local);
+            builder.add_token_at_span(local.def_span, token_type, modifiers);
+        }
+
+        // 3. Process all name usages
+        for name_use in &resolved_uses.uses {
+            match name_use.resolved {
+                Resolved::Local(local_id) => {
+                    if let Some(local) = resolved_uses.find_local(local_id) {
+                        let (token_type, modifiers) = Self::semantic_token_of_local(local);
+                        builder.add_token_at_span(name_use.span, token_type, modifiers);
+                    }
                 }
-                continue;
+                Resolved::Global(symbol_id) => {
+                    if let Some(symbol) = analysis.project_index.resolve_symbol(symbol_id) {
+                        let token_type = match symbol.kind {
+                            SymbolKind::Struct { .. } => {
+                                if is_special_struct(&symbol.name) {
+                                    TokenType::Macro
+                                } else {
+                                    TokenType::Struct
+                                }
+                            }
+                            SymbolKind::StructField => TokenType::Property,
+                            SymbolKind::Enum { .. } => TokenType::Enum,
+                            SymbolKind::EnumMember => TokenType::EnumMember,
+                            SymbolKind::TypeAlias { .. } => TokenType::Type,
+                            SymbolKind::Constant => TokenType::Property,
+                            SymbolKind::GlobalVariable => TokenType::Variable,
+                            SymbolKind::Function { .. }
+                            | SymbolKind::Method { .. }
+                            | SymbolKind::GetMethod { .. } => TokenType::Function,
+                        };
+                        builder.add_token_at_span(name_use.span, token_type, 0);
+                    }
+                }
+                Resolved::Unresolved => {}
             }
-            if let Ok(decl) = StructField::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Property, 0);
-                continue;
-            }
-            if let Ok(decl) = Enum::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Enum, 0);
-                continue;
-            }
-            if let Ok(decl) = EnumMember::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::EnumMember, 0);
-                continue;
-            }
-            if let Ok(decl) = TypeAlias::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Type, 0);
-                continue;
-            }
-            if let Ok(decl) = Constant::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Property, 0);
-                continue;
-            }
-            if let Ok(decl) = GlobalVar::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Variable, 0);
-                continue;
-            }
-            if let Ok(decl) = Func::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Function, 0);
-                continue;
-            }
-            if let Ok(decl) = Method::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Function, 0);
-                continue;
-            }
-            if let Ok(decl) = GetMethod::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::Function, 0);
-                continue;
-            }
-            if let Ok(decl) = TypeParameter::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                builder.add_token(name, TokenType::TypeParameter, 0);
-                continue;
-            }
+        }
 
-            if let Ok(decl) = Parameter::try_from_node(node)
-                && let Some(name) = decl.name()
-            {
-                let is_mutable = decl.mutate();
-                let text = name.text(source);
-                let (token_type, modifiers) = if text == "self" {
+        Some(builder.build())
+    }
+
+    fn semantic_token_of_local(local: &LocalDef) -> (TokenType, u32) {
+        let (token_type, modifiers) = match local.kind {
+            LocalDefKind::Param {
+                is_mutable,
+                is_self,
+                ..
+            } => {
+                if is_self {
                     (
                         TokenType::Keyword,
                         if is_mutable {
@@ -256,74 +237,50 @@ impl Backend {
                             0
                         },
                     )
-                };
-                builder.add_token(name, token_type, modifiers);
-                continue;
-            }
-
-            let kind = node.kind_bytes();
-            if (kind == b"identifier" || kind == b"type_identifier")
-                && let Some(resolved) =
-                    self.resolve_symbol_at(&analysis, &file_info, node.start_byte())
-            {
-                match resolved {
-                    Resolved::Local(local_id) => {
-                        if let Some(resolved_uses) =
-                            analysis.project_index.get_resolved_uses(file_info.id())
-                            && let Some(local_def) = resolved_uses.find_local(local_id)
-                        {
-                            let is_mutable = matches!(local_def.kind, LocalDefKind::Param { is_mutable, .. } if is_mutable);
-                            let (token_type, modifiers) = if node.text_matches(source, "self") {
-                                (
-                                    TokenType::Keyword,
-                                    if is_mutable {
-                                        1 << TokenModifier::Modification as u32
-                                    } else {
-                                        0
-                                    },
-                                )
-                            } else {
-                                (
-                                    TokenType::Parameter,
-                                    if is_mutable {
-                                        1 << TokenModifier::Modification as u32
-                                    } else {
-                                        0
-                                    },
-                                )
-                            };
-                            builder.add_token(node, token_type, modifiers);
-                        }
-                    }
-                    Resolved::Global(symbol_id) => {
-                        if let Some(symbol) = analysis.project_index.resolve_symbol(symbol_id) {
-                            let token_type = match symbol.kind {
-                                SymbolKind::Struct { .. } => {
-                                    if is_special_struct(&symbol.name) {
-                                        TokenType::Macro
-                                    } else {
-                                        TokenType::Struct
-                                    }
-                                }
-                                SymbolKind::StructField => TokenType::Property,
-                                SymbolKind::Enum { .. } => TokenType::Enum,
-                                SymbolKind::EnumMember => TokenType::EnumMember,
-                                SymbolKind::TypeAlias { .. } => TokenType::Type,
-                                SymbolKind::Constant => TokenType::Property,
-                                SymbolKind::GlobalVariable => TokenType::Variable,
-                                SymbolKind::Function { .. }
-                                | SymbolKind::Method { .. }
-                                | SymbolKind::GetMethod { .. } => TokenType::Function,
-                            };
-                            builder.add_token(node, token_type, 0);
-                        }
-                    }
-                    Resolved::Unresolved => {}
                 }
             }
-        }
+            LocalDefKind::Var { is_mutable, .. } => (
+                TokenType::Variable,
+                if is_mutable {
+                    1 << TokenModifier::Modification as u32
+                } else {
+                    0
+                },
+            ),
+            LocalDefKind::Catch => (TokenType::Variable, 0),
+            LocalDefKind::TypeParameter => (TokenType::TypeParameter, 0),
+        };
+        (token_type, modifiers)
+    }
 
-        Some(builder.build())
+    fn add_symbol_tokens(builder: &mut SemanticTokensBuilder, symbol: &Symbol) {
+        let token_type = match symbol.kind {
+            SymbolKind::Struct { ref fields, .. } => {
+                for field in fields {
+                    Self::add_symbol_tokens(builder, field);
+                }
+                if is_special_struct(&symbol.name) {
+                    TokenType::Macro
+                } else {
+                    TokenType::Struct
+                }
+            }
+            SymbolKind::StructField => TokenType::Property,
+            SymbolKind::Enum { ref members } => {
+                for member in members {
+                    Self::add_symbol_tokens(builder, member);
+                }
+                TokenType::Enum
+            }
+            SymbolKind::EnumMember => TokenType::EnumMember,
+            SymbolKind::TypeAlias { .. } => TokenType::Type,
+            SymbolKind::Constant => TokenType::Property,
+            SymbolKind::GlobalVariable => TokenType::Variable,
+            SymbolKind::Function { .. }
+            | SymbolKind::Method { .. }
+            | SymbolKind::GetMethod { .. } => TokenType::Function,
+        };
+        builder.add_token_at_span(symbol.name_span, token_type, 0);
     }
 
     fn result_id() -> String {
