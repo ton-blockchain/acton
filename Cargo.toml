@@ -9,7 +9,10 @@ members = ["crates/*"]
 
 exclude = [
     "crates/acton-test-ui",
+    "crates/acton-litenode-ui",
+    "crates/acton-ui-shared",
     "crates/ffi-test",
+    "crates/ton-litenode",
 ]
 
 [workspace.package]
@@ -150,6 +153,9 @@ tolk-syntax = { workspace = true }
 tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }
 tolk-linter = { workspace = true }
+tolk-ls = { path = "crates/tolk-ls" }
+tower-lsp = "0.20"
+dashmap = { workspace = true }
 tvmffi = { workspace = true }
 vmlogs = { workspace = true }
 tasm = { workspace = true }

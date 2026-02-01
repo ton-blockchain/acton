@@ -1,0 +1,59 @@
+{
+  "name": "tolk-vscode",
+  "displayName": "Tolk Support",
+  "description": "Language support for Tolk",
+  "version": "0.0.1",
+  "publisher": "petrmakhnev",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:tolk"
+  ],
+  "main": "./out/extension",
+  "contributes": {
+    "languages": [
+      {
+        "id": "tolk",
+        "aliases": [
+          "Tolk"
+        ],
+        "extensions": [
+          ".tolk"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Tolk",
+      "properties": {
+        "tolk.serverPath": {
+          "type": "string",
+          "default": "tolk-ls",
+          "description": "Path to the tolk-ls executable"
+        },
+        "tolk.serverPort": {
+          "type": "number",
+          "default": 0,
+          "description": "Port to connect to for TCP debugging (0 to use executable)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.14.6",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^4.9.5"
+  }
+}
