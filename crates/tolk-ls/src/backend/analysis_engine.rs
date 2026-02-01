@@ -1,14 +1,14 @@
+use lsp_types::MessageType;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use lsp_types::MessageType;
-use tower_lsp::lsp_types::Url;
-use tree_sitter::Tree;
+use tolk_linter::Checker;
 use tolk_resolver::ProjectIndexBuilder;
 use tolk_resolver::symbol_resolver::resolve;
 use tolk_ty::{TypeDb, TypeInterner, infer};
-use tolk_linter::Checker;
+use tower_lsp::lsp_types::Url;
+use tree_sitter::Tree;
 
 use crate::backend::Backend;
 use crate::backend::analysis::AnalysisResult;

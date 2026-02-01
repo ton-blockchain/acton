@@ -1,8 +1,8 @@
-use lsp_types::*;
-use tree_sitter::{InputEdit, Point, Range as TSRange};
-use tower_lsp::lsp_types::Url;
 use crate::backend::Backend;
 use crate::backend::utils::*;
+use lsp_types::*;
+use tower_lsp::lsp_types::Url;
+use tree_sitter::{InputEdit, Point, Range as TSRange};
 
 impl Backend {
     pub fn update_document(&self, uri: &Url, text: String) {
@@ -36,10 +36,7 @@ impl Backend {
                 text.replace_range(start_byte..old_end_byte, &change.text);
 
                 let new_end_byte = start_byte + change.text.len();
-                let new_end_position = get_point(
-                    &text,
-                    offset_to_lsp_pos(new_end_byte, &text),
-                );
+                let new_end_position = get_point(&text, offset_to_lsp_pos(new_end_byte, &text));
 
                 if let Some(ref mut tree) = old_tree {
                     tree.edit(&InputEdit {
@@ -53,9 +50,8 @@ impl Backend {
                 }
 
                 let diff = (new_end_byte as isize) - (old_end_byte as isize);
-                changes_ranges.retain(|r: &TSRange| {
-                    r.end_byte <= start_byte || r.start_byte >= old_end_byte
-                });
+                changes_ranges
+                    .retain(|r: &TSRange| r.end_byte <= start_byte || r.start_byte >= old_end_byte);
 
                 for r in changes_ranges.iter_mut() {
                     if r.start_byte >= old_end_byte {
@@ -78,10 +74,7 @@ impl Backend {
                     start_byte: 0,
                     end_byte: text.len(),
                     start_point: Point::new(0, 0),
-                    end_point: get_point(
-                        &text,
-                        offset_to_lsp_pos(text.len(), &text),
-                    ),
+                    end_point: get_point(&text, offset_to_lsp_pos(text.len(), &text)),
                 });
             }
         }

@@ -7,6 +7,7 @@ use tree_sitter::Point;
 pub trait SpanExt {
     fn start_position(&self, file: &Arc<FileInfo>) -> Position;
     fn end_position(&self, file: &Arc<FileInfo>) -> Position;
+    fn range(&self, file: &Arc<FileInfo>) -> Range;
     fn start_range(&self, file: &Arc<FileInfo>) -> Range;
 }
 
@@ -49,6 +50,13 @@ impl SpanExt for Span {
 
     fn end_position(&self, file: &Arc<FileInfo>) -> Position {
         offset_to_pos(file, self.end())
+    }
+
+    fn range(&self, file: &Arc<FileInfo>) -> Range {
+        Range {
+            start: self.start_position(file),
+            end: self.end_position(file),
+        }
     }
 
     fn start_range(&self, file: &Arc<FileInfo>) -> Range {

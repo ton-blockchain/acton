@@ -9,14 +9,14 @@ use tower_lsp::{Client, LanguageServer};
 
 pub mod analysis;
 pub mod analysis_engine;
+pub mod code_actions;
 pub mod diagnostics;
 pub mod document_sync;
 pub mod goto_definition;
+pub mod inlay_hints;
 pub mod references;
 pub mod resolution;
 pub mod symbols;
-pub mod code_actions;
-pub mod inlay_hints;
 pub mod utils;
 
 use crate::backend::analysis::AnalysisResult;
@@ -111,13 +111,16 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
-    pub fn get_file_url(&self, file_id: FileId, file_info: &tolk_resolver::file_db::FileInfo) -> Option<Url> {
+    pub fn get_file_url(
+        &self,
+        file_id: FileId,
+        file_info: &tolk_resolver::file_db::FileInfo,
+    ) -> Option<Url> {
         use crate::backend::utils::FileInfoExt;
-        let url = self.file_urls.entry(file_id).or_insert_with(|| {
-            file_info
-                .url()
-                .expect("Failed to get URL for file")
-        });
+        let url = self
+            .file_urls
+            .entry(file_id)
+            .or_insert_with(|| file_info.url().expect("Failed to get URL for file"));
         Some(url.clone())
     }
 }

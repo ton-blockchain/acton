@@ -1,7 +1,7 @@
-use lsp_types::*;
-use tower_lsp::jsonrpc::Result as LspResult;
 use crate::backend::Backend;
 use crate::backend::utils::{FileInfoExt, offset_to_range};
+use lsp_types::*;
+use tower_lsp::jsonrpc::Result as LspResult;
 
 impl Backend {
     pub async fn handle_symbol(

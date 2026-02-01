@@ -14,7 +14,6 @@ impl Backend {
         log::info!("Request: goto_definition for {}", uri);
 
         let position = params.text_document_position_params.position;
-
         let result = self.definition(&uri, position);
 
         log::info!("Response: goto_definition took {:?}", now.elapsed());
@@ -34,9 +33,9 @@ impl Backend {
                 let symbol = analysis.project_index.resolve_symbol(symbol_id)?;
                 let target_info = self.file_db.get_by_id(symbol_id.file_id)?;
                 let target_uri = self.get_file_url(symbol_id.file_id, &target_info)?;
-                let range = symbol.name_span.start_range(&target_info);
                 Some(GotoDefinitionResponse::Scalar(Location::new(
-                    target_uri, range,
+                    target_uri,
+                    symbol.name_span.range(&target_info),
                 )))
             }
             Resolved::Local(local_id) => {
@@ -44,9 +43,9 @@ impl Backend {
                 let local = resolved_uses.find_local(local_id)?;
                 let target_info = self.file_db.get_by_id(local_id.file_id)?;
                 let target_uri = self.get_file_url(local_id.file_id, &target_info)?;
-                let range = local.def_span.start_range(&target_info);
                 Some(GotoDefinitionResponse::Scalar(Location::new(
-                    target_uri, range,
+                    target_uri,
+                    local.def_span.range(&target_info),
                 )))
             }
             Resolved::Unresolved => None,

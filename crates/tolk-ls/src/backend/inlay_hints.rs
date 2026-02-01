@@ -12,7 +12,10 @@ use tolk_ty::{InferenceResult, TyId, TypeInterner};
 use tower_lsp::jsonrpc::Result as LspResult;
 
 impl Backend {
-    pub async fn handle_inlay_hint(&self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
+    pub async fn handle_inlay_hint(
+        &self,
+        params: InlayHintParams,
+    ) -> LspResult<Option<Vec<InlayHint>>> {
         let now = std::time::Instant::now();
         let uri = params.text_document.uri;
         log::info!("Request: inlay_hint for {}", uri);

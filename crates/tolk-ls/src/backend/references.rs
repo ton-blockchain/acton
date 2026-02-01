@@ -1,11 +1,11 @@
 use crate::AnalysisResult;
 use crate::backend::Backend;
-use crate::backend::utils::{FileInfoExt, offset_to_range};
+use crate::backend::utils::{FileInfoExt, SpanExt};
 use dashmap::mapref::one::Ref;
 use lsp_types::*;
 use std::sync::Arc;
 use tolk_resolver::resolve_index::LocalDefId;
-use tolk_resolver::{FileInfo, FileResolveIndex, Resolved, SymbolId};
+use tolk_resolver::{FileInfo, Resolved, SymbolId};
 use tower_lsp::jsonrpc::Result as LspResult;
 
 impl Backend {
@@ -35,28 +35,25 @@ impl Backend {
 
         let offset = file.position_to_offset(position)?;
         let resolved = self.resolve_symbol_at(&analysis, &file, offset)?;
-        let resolved_uses = analysis.project_index.get_resolved_uses(file.id())?;
 
         match resolved {
             Resolved::Global(symbol_id) => self.global_references(analysis, symbol_id),
-            Resolved::Local(local_id) => self.local_refences(uri, &file, resolved_uses, local_id),
+            Resolved::Local(local_id) => self.local_refences(analysis, uri, &file, local_id),
             Resolved::Unresolved => None,
         }
     }
 
     fn local_refences(
         &self,
+        analysis: Ref<Url, Arc<AnalysisResult>>,
         uri: &Url,
         file: &Arc<FileInfo>,
-        resolved_uses: &Arc<FileResolveIndex>,
         local_id: LocalDefId,
     ) -> Option<Vec<Location>> {
+        let resolved_uses = analysis.project_index.get_resolved_uses(file.id())?;
         let locations = resolved_uses
             .local_usages_of(local_id)
-            .map(|usage| {
-                let range = offset_to_range(file, usage.span.start());
-                Location::new(uri.clone(), range)
-            })
+            .map(|usage| Location::new(uri.clone(), usage.span.range(file)))
             .collect::<Vec<_>>();
         Some(locations)
     }
@@ -66,21 +63,24 @@ impl Backend {
         analysis: Ref<Url, Arc<AnalysisResult>>,
         symbol_id: SymbolId,
     ) -> Option<Vec<Location>> {
-        let usages = analysis
-            .project_index
-            .resolved_uses
-            .iter()
-            .map(|(file_id, index)| (file_id, index.global_usages_of(symbol_id)));
+        // Typically, a project can have dozens or even hundreds of files (the Tolk standard library,
+        // the Acton standard library, test files, scripts, contract files), but a global symbol is typically
+        // used across few files.
+        //
+        // We find files that directly import the file with the definition and search only
+        // within them, which speeds up the search by orders of magnitude.
+        let dependents = analysis.project_index.direct_dependents(symbol_id.file_id);
 
-        let locations = usages
-            .flat_map(|(&file_id, usages)| {
-                let file_info = self.file_db.get_by_id(file_id)?;
-                let url = self.get_file_url(file_id, &file_info)?;
-                let locations = usages
-                    .map(|usage| {
-                        let range = offset_to_range(&file_info, usage.span.start());
-                        Location::new(url.clone(), range)
-                    })
+        let locations = dependents
+            .into_iter()
+            .filter_map(|file_id| {
+                let index = analysis.project_index.get_resolved_uses(file_id)?;
+                let file = self.file_db.get_by_id(file_id)?;
+                let url = self.get_file_url(file_id, &file)?;
+
+                let locations = index
+                    .global_usages_of(symbol_id)
+                    .map(|usage| Location::new(url.clone(), usage.span.range(&file)))
                     .collect::<Vec<_>>();
                 Some(locations)
             })
