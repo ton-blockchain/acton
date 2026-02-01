@@ -10,6 +10,9 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[features]
+profiling = []
+
 [dependencies]
 tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }

@@ -9,6 +9,7 @@ impl Backend {
         &self,
         params: GotoDefinitionParams,
     ) -> LspResult<Option<GotoDefinitionResponse>> {
+        crate::profile!(self, "goto_definition");
         let now = std::time::Instant::now();
         let uri = params.text_document_position_params.text_document.uri;
         log::info!("Request: goto_definition for {}", uri);

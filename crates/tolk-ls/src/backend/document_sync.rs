@@ -10,6 +10,7 @@ impl Backend {
     }
 
     pub async fn handle_did_change(&self, params: DidChangeTextDocumentParams) {
+        crate::profile!(self, "did_change");
         let now = std::time::Instant::now();
         let uri = params.text_document.uri;
         log::info!("Notification: did_change for {}", &uri);

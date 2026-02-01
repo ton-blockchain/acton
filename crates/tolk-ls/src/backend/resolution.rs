@@ -9,6 +9,7 @@ impl Backend {
         file_info: &FileInfo,
         offset: usize,
     ) -> Option<Resolved> {
+        crate::profile!(self, "resolve_symbol_at");
         let file_id = file_info.id();
         let resolved_uses = analysis.project_index.get_resolved_uses(file_id)?;
 

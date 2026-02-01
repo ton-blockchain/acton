@@ -16,6 +16,7 @@ impl Backend {
         &self,
         params: InlayHintParams,
     ) -> LspResult<Option<Vec<InlayHint>>> {
+        crate::profile!(self, "inlay_hint");
         let now = std::time::Instant::now();
         let uri = params.text_document.uri;
         log::info!("Request: inlay_hint for {}", uri);

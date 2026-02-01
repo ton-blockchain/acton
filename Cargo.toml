@@ -292,3 +292,4 @@ workspace = true
 
 [features]
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
+profiling = ["tolk-ls/profiling"]

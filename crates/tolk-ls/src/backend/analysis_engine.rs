@@ -20,6 +20,7 @@ impl Backend {
     }
 
     pub async fn analyze_incremental(&self, uri: Url, old_tree: Option<Tree>) {
+        crate::profile!(self, "analyze");
         let path = match uri.to_file_path() {
             Ok(p) => p,
             Err(_) => return,
@@ -78,6 +79,7 @@ impl Backend {
     }
 
     pub fn run_analysis(&self, root_path: PathBuf) -> anyhow::Result<AnalysisResult> {
+        crate::profile!(self, "run_analysis");
         let now = Instant::now();
 
         let stdlib_path = self

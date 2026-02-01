@@ -38,12 +38,31 @@ pub async fn ls_cmd(
 }
 
 async fn ls_cmd_internal(port: Option<u16>, stdio: bool, file_db: FileDb) -> anyhow::Result<()> {
-    let (service, socket) = LspService::new(|client| Backend {
-        client,
-        file_db: Arc::new(file_db),
-        documents: DashMap::new(),
-        analysis: DashMap::new(),
-        file_urls: DashMap::new(),
+    let (service, socket) = LspService::new(|client| {
+        #[cfg(feature = "profiling")]
+        let profiling = Arc::new(tolk_ls::ProfilingContext::new());
+
+        #[cfg(feature = "profiling")]
+        {
+            let profiling = profiling.clone();
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+                loop {
+                    interval.tick().await;
+                    profiling.log_stats();
+                }
+            });
+        }
+
+        Backend {
+            client,
+            file_db: Arc::new(file_db),
+            documents: DashMap::new(),
+            analysis: DashMap::new(),
+            file_urls: DashMap::new(),
+            #[cfg(feature = "profiling")]
+            profiling,
+        }
     });
 
     if let Some(port) = port {

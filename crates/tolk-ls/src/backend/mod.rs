@@ -14,6 +14,7 @@ pub mod diagnostics;
 pub mod document_sync;
 pub mod goto_definition;
 pub mod inlay_hints;
+pub mod profiling;
 pub mod references;
 pub mod resolution;
 pub mod semantic_tokens;
@@ -21,6 +22,8 @@ pub mod symbols;
 pub mod utils;
 
 use crate::backend::analysis::AnalysisResult;
+#[cfg(feature = "profiling")]
+pub use profiling::ProfilingContext;
 
 pub struct Backend {
     pub client: Client,
@@ -28,6 +31,8 @@ pub struct Backend {
     pub documents: DashMap<Url, String>,
     pub analysis: DashMap<Url, Arc<AnalysisResult>>,
     pub file_urls: DashMap<FileId, Url>,
+    #[cfg(feature = "profiling")]
+    pub profiling: Arc<ProfilingContext>,
 }
 
 #[tower_lsp::async_trait]

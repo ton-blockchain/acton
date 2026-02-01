@@ -138,6 +138,7 @@ impl Backend {
         &self,
         params: SemanticTokensParams,
     ) -> LspResult<Option<SemanticTokensResult>> {
+        crate::profile!(self, "semantic_tokens");
         let now = std::time::Instant::now();
         let uri = params.text_document.uri;
         log::info!("Request: semantic_tokens_full for {}", uri);

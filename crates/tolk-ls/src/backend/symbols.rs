@@ -8,6 +8,7 @@ impl Backend {
         &self,
         params: WorkspaceSymbolParams,
     ) -> LspResult<Option<Vec<SymbolInformation>>> {
+        crate::profile!(self, "workspace_symbol");
         let now = std::time::Instant::now();
         log::info!("Request: workspace/symbol query='{}'", params.query);
 

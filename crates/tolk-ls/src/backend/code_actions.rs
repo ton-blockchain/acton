@@ -11,6 +11,7 @@ impl Backend {
         &self,
         params: CodeActionParams,
     ) -> LspResult<Option<CodeActionResponse>> {
+        crate::profile!(self, "code_action");
         let now = Instant::now();
         let uri = params.text_document.uri;
         log::info!("Request: code_action for {}", uri);
