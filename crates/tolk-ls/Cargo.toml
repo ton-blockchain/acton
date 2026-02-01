@@ -17,6 +17,7 @@ tolk-syntax = { workspace = true }
 tolk-linter = { workspace = true }
 tolk-analysis = { workspace = true }
 acton-config = { workspace = true }
+rustc-hash = { workspace = true }
 tower-lsp = "0.20"
 lsp-types = "0.94.1"
 tokio = { workspace = true }

@@ -3010,6 +3010,7 @@ dependencies = [
  "fern",
  "log",
  "lsp-types",
+ "rustc-hash",
  "serde",
  "serde_json",
  "tokio",

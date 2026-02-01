@@ -1,20 +1,21 @@
-use crate::backend::utils::offset_to_range;
+use crate::backend::utils::{FileInfoExt, SpanExt, offset_to_range};
+use diagnostic::Severity;
 use lsp_types::*;
 use std::sync::Arc;
+use tolk_linter::diagnostic;
 use tolk_resolver::file_db::FileInfo;
-use tower_lsp::lsp_types::Url;
 
 pub fn convert_single_diagnostic(
-    diag: &tolk_linter::diagnostic::Diagnostic,
-    file_info: &Arc<FileInfo>,
-) -> Diagnostic {
-    let uri = Url::from_file_path(&file_info.index().path).unwrap();
+    diag: &diagnostic::Diagnostic,
+    file: &Arc<FileInfo>,
+) -> Option<Diagnostic> {
+    let uri = file.url()?;
 
     let mut related_information = Vec::new();
     let mut primary_range = None;
 
     for annotation in &diag.annotations {
-        let range = offset_to_range(file_info, annotation.span.start());
+        let range = annotation.span.start_range(file);
 
         if annotation.is_primary {
             primary_range = Some(range);
@@ -29,19 +30,19 @@ pub fn convert_single_diagnostic(
     let range = primary_range.unwrap_or_else(|| {
         diag.annotations
             .first()
-            .map(|ann| offset_to_range(file_info, ann.span.start()))
+            .map(|ann| offset_to_range(file, ann.span.start()))
             .unwrap_or_default()
     });
 
     let severity = match diag.severity {
-        tolk_linter::diagnostic::Severity::Info => DiagnosticSeverity::INFORMATION,
-        tolk_linter::diagnostic::Severity::Warning => DiagnosticSeverity::WARNING,
-        tolk_linter::diagnostic::Severity::Error => DiagnosticSeverity::ERROR,
-        tolk_linter::diagnostic::Severity::Fatal => DiagnosticSeverity::ERROR,
-        tolk_linter::diagnostic::Severity::Help => DiagnosticSeverity::HINT,
+        Severity::Info => DiagnosticSeverity::INFORMATION,
+        Severity::Warning => DiagnosticSeverity::WARNING,
+        Severity::Error => DiagnosticSeverity::ERROR,
+        Severity::Fatal => DiagnosticSeverity::ERROR,
+        Severity::Help => DiagnosticSeverity::HINT,
     };
 
-    Diagnostic {
+    Some(Diagnostic {
         range,
         severity: Some(severity),
         code: None,
@@ -55,5 +56,5 @@ pub fn convert_single_diagnostic(
         },
         tags: None,
         data: None,
-    }
+    })
 }

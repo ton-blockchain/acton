@@ -361,7 +361,7 @@ fn emit_diagnostics(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Res
 
     for info in file_db.iter() {
         let cs_file_id = files.add(
-            info.index().path.to_string_lossy().to_string(),
+            info.path().to_string_lossy().to_string(),
             info.source().source.as_ref().to_owned(),
         );
         file_id_map.insert(info.id(), cs_file_id);
@@ -455,7 +455,7 @@ fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Result<(
             .get_by_id(diag.file_id)
             .ok_or_else(|| anyhow::anyhow!("File info not found for file_id {}", diag.file_id))?;
 
-        let file_path = file_info.index().path.to_string_lossy().to_string();
+        let file_path = file_info.path().to_string_lossy().to_string();
 
         *total_diags_by_file.entry(file_path.clone()).or_default() += 1;
 
@@ -549,7 +549,7 @@ fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value 
     let file_info = file_db
         .get_by_id(diag.file_id)
         .expect("File info should exist for diagnostic");
-    let file_path = file_info.index().path.to_string_lossy().to_string();
+    let file_path = file_info.path().to_string_lossy().to_string();
     let source = file_info.source().source.as_ref();
 
     let severity = match diag.severity {

@@ -39,6 +39,10 @@ impl FileInfo {
         &self.index
     }
 
+    pub fn path(&self) -> &PathBuf {
+        &self.index.path
+    }
+
     pub const fn source(&self) -> &ast::SourceFile {
         &self.source
     }

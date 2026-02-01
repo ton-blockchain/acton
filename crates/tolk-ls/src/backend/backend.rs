@@ -1,15 +1,15 @@
 use dashmap::DashMap;
 use lsp_types::*;
+use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use tolk_linter::Checker;
+use tolk_linter::{Checker, diagnostic};
 use tolk_resolver::ProjectIndexBuilder;
-use tolk_resolver::file_db::{FileDb, FileInfo};
+use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::FileId;
 use tolk_resolver::symbol_resolver::resolve;
-use tolk_syntax::{AstNode, HasName, TopLevel};
 use tolk_ty::TypeDb;
 use tolk_ty::TypeInterner;
 use tolk_ty::infer;
@@ -18,7 +18,7 @@ use tower_lsp::lsp_types::Url;
 use tower_lsp::{Client, LanguageServer};
 use tree_sitter::{InputEdit, Point, Range as TSRange, Tree};
 
-use crate::backend::analysis::{AnalysisResult, ChangeType};
+use crate::backend::analysis::AnalysisResult;
 use crate::backend::diagnostics::convert_single_diagnostic;
 use crate::backend::inlay_hints::collect_inlay_hints;
 use crate::backend::utils::*;
@@ -150,8 +150,7 @@ impl LanguageServer for Backend {
         }
 
         self.update_document(&uri, text.clone());
-        self.analyze_incremental(uri, old_tree, changes_ranges)
-            .await;
+        self.analyze_incremental(uri, old_tree).await;
 
         log::info!("Notification: did_change took {:?}", now.elapsed());
     }
@@ -238,10 +237,10 @@ impl LanguageServer for Backend {
                             &usage.resolved
                             && usage_symbol_id == &global_symbol.id
                             && let Some(file_info) = self.file_db.get_by_id(*fid)
-                            && let Ok(file_uri) = Url::from_file_path(&file_info.index().path)
+                            && let Some(url) = file_info.url()
                         {
                             let range = offset_to_range(&file_info, usage.span.start());
-                            locations.push(Location::new(file_uri.clone(), range));
+                            locations.push(Location::new(url, range));
                         }
                     }
                 }
@@ -261,10 +260,10 @@ impl LanguageServer for Backend {
                                 &usage.resolved
                                 && usage_symbol_id == &local_def.id
                                 && let Some(file_info) = self.file_db.get_by_id(*fid)
-                                && let Ok(file_uri) = Url::from_file_path(&file_info.index().path)
+                                && let Some(url) = file_info.url()
                             {
                                 let range = offset_to_range(&file_info, usage.span.start());
-                                locations.push(Location::new(file_uri.clone(), range));
+                                locations.push(Location::new(url, range));
                             }
                         }
                     }
@@ -354,12 +353,15 @@ impl LanguageServer for Backend {
                                 edits.push(TextEdit::new(edit_range, edit.replacement.clone()));
                             }
 
+                            let Some(diagnostic) = convert_single_diagnostic(diag, &file_info)
+                            else {
+                                continue;
+                            };
+
                             let action = CodeActionOrCommand::CodeAction(CodeAction {
                                 title: fix.message.clone(),
                                 kind: Some(CodeActionKind::QUICKFIX),
-                                diagnostics: Some(vec![
-                                    self.convert_single_diagnostic(diag, &file_info),
-                                ]),
+                                diagnostics: Some(vec![diagnostic]),
                                 edit: Some(WorkspaceEdit {
                                     changes: Some(HashMap::from([(uri.clone(), edits)])),
                                     document_changes: None,
@@ -414,13 +416,13 @@ impl LanguageServer for Backend {
             for &id in ids {
                 if let Some(symbol) = analysis.project_index.resolve_symbol(id)
                     && let Some(file_info) = self.file_db.get_by_id(id.file_id)
-                    && let Ok(uri) = Url::from_file_path(&file_info.index().path)
+                    && let Some(url) = file_info.url()
                 {
                     let range = offset_to_range(&file_info, symbol.name_span.start());
                     symbols.push(SymbolInformation {
                         name: symbol.fqn.to_string(),
                         kind: self.to_lsp_symbol_kind(&symbol.kind),
-                        location: Location::new(uri, range),
+                        location: Location::new(url, range),
                         container_name: None,
                         tags: None,
                         #[allow(deprecated)]
@@ -445,19 +447,17 @@ impl Backend {
     }
 
     async fn analyze(&self, uri: Url) {
-        self.analyze_incremental(uri, None, vec![]).await;
+        self.analyze_incremental(uri, None).await;
     }
 
-    async fn analyze_incremental(&self, uri: Url, old_tree: Option<Tree>, changes: Vec<TSRange>) {
+    async fn analyze_incremental(&self, uri: Url, old_tree: Option<Tree>) {
         let path = match uri.to_file_path() {
             Ok(p) => p,
             Err(_) => return,
         };
 
-        let old_info = self.file_db.get_by_path(&path);
-
         let now = Instant::now();
-        let new_info = if let Some(content) = self.documents.get(&uri) {
+        if let Some(content) = self.documents.get(&uri) {
             match self.file_db.process_content_incremental(
                 path.clone(),
                 &content,
@@ -473,39 +473,16 @@ impl Backend {
                         .await;
                     return;
                 }
-            }
-        } else {
-            None
-        };
+            };
+        }
         log::info!("Reparse took {:?}", now.elapsed());
 
-        let changed_decl = if let Some(info) = &new_info
-            && let Some(first_change) = changes.first()
-            && let Some(decl) = info
-                .source()
-                .find_top_levels_at(first_change.start_byte, first_change.end_byte)
-            && let Some(name) = decl.name()
-        {
-            log::info!(
-                "Changes inside {}",
-                info.text(&name.syntax()).expect("invalid utf8")
-            );
-            Some(decl)
-        } else {
-            None
-        };
-
-        if let (Some(old), Some(new)) = (old_info, &new_info) {
-            let change_type = self.detect_change_type(&old, new.source(), &changes);
-            log::info!("Change type for {}: {:?}", path.display(), change_type);
-        }
-
-        match self.run_analysis(path.clone(), changed_decl) {
+        match self.run_analysis(path.clone()) {
             Ok(analysis) => {
                 let arc_analysis = Arc::new(analysis);
                 for &file_id in arc_analysis.all_body_types.keys() {
                     if let Some(info) = self.file_db.get_by_id(file_id)
-                        && let Ok(file_uri) = Url::from_file_path(&info.index().path)
+                        && let Some(file_uri) = info.url()
                     {
                         self.analysis.insert(file_uri, arc_analysis.clone());
                     }
@@ -531,11 +508,7 @@ impl Backend {
         }
     }
 
-    fn run_analysis(
-        &self,
-        root_path: PathBuf,
-        _changed_decl: Option<TopLevel>,
-    ) -> anyhow::Result<AnalysisResult> {
+    fn run_analysis(&self, root_path: PathBuf) -> anyhow::Result<AnalysisResult> {
         let now = Instant::now();
 
         let stdlib_path = self
@@ -595,7 +568,7 @@ impl Backend {
                 // we don't want to check non-workspace files
                 continue;
             }
-            println!("{:?}", file_info.index().path);
+            println!("{:?}", file_info.path());
             checker.process_file(file_info.source(), *file_id);
         }
 
@@ -622,7 +595,7 @@ impl Backend {
                 let target_uri = self
                     .file_urls
                     .entry(def_id.file_id)
-                    .or_insert_with(|| Url::from_file_path(&target_info.index().path).unwrap())
+                    .or_insert_with(|| target_info.url().unwrap())
                     .clone();
                 let range = offset_to_range(&target_info, def_id.local as usize);
                 Some(GotoDefinitionResponse::Scalar(Location::new(
@@ -635,7 +608,7 @@ impl Backend {
                 let target_uri = self
                     .file_urls
                     .entry(sym_id.file_id)
-                    .or_insert_with(|| Url::from_file_path(&target_info.index().path).unwrap())
+                    .or_insert_with(|| target_info.url().unwrap())
                     .clone();
                 let range = offset_to_range(&target_info, symbol.name_span.start());
                 Some(GotoDefinitionResponse::Scalar(Location::new(
@@ -646,140 +619,39 @@ impl Backend {
         }
     }
 
-    fn detect_change_type(
-        &self,
-        old_file: &FileInfo,
-        new_file: &tolk_syntax::SourceFile,
-        changes: &[TSRange],
-    ) -> ChangeType {
-        let changed_ranges = old_file
-            .source()
-            .tree
-            .changed_ranges(&new_file.tree)
-            .collect::<Vec<_>>();
-
-        if changed_ranges.is_empty() {
-            return ChangeType::WhitespaceOnly;
-        }
-
-        let mut common_function = None;
-
-        for range in changes {
-            let node = new_file
-                .tree
-                .root_node()
-                .descendant_for_byte_range(range.start_byte, range.end_byte);
-
-            // Find if this node is inside a function body
-            let mut current = node;
-            let mut found_function = None;
-
-            while let Some(n) = current {
-                let kind = n.kind();
-                if kind == "function_declaration"
-                    || kind == "method_declaration"
-                    || kind == "get_method_declaration"
-                {
-                    // Check if the change is within the body
-                    if let Some(body) = n.child_by_field_name("body")
-                        && range.start_byte >= body.start_byte()
-                        && range.end_byte <= body.end_byte()
-                    {
-                        let name = n
-                            .child_by_field_name("name")
-                            .and_then(|id| id.utf8_text(new_file.source.as_bytes()).ok())
-                            .unwrap_or("unknown")
-                            .to_string();
-                        found_function = Some(name);
-                        break;
-                    }
-                    // If it's in the function but not in the body (e.g. signature changed), it's global
-                    return ChangeType::Global;
-                }
-                current = n.parent();
-            }
-
-            match found_function {
-                Some(name) => {
-                    if let Some(ref existing_name) = common_function {
-                        if existing_name != &name {
-                            return ChangeType::Global; // Multiple functions changed
-                        }
-                    } else {
-                        common_function = Some(name);
-                    }
-                }
-                None => return ChangeType::Global, // Change outside any function
-            }
-        }
-
-        if let Some(name) = common_function {
-            ChangeType::Local(name)
-        } else {
-            // Should be unreachable if changed_ranges is not empty but changes is empty
-            // But if we had full reparse (changes empty) -> Global
-            if changes.is_empty() {
-                ChangeType::Global
-            } else {
-                ChangeType::WhitespaceOnly
-            }
-        }
-    }
-
-    fn to_lsp_symbol_kind(
-        &self,
-        kind: &tolk_resolver::file_index::SymbolKind,
-    ) -> lsp_types::SymbolKind {
+    fn to_lsp_symbol_kind(&self, kind: &tolk_resolver::file_index::SymbolKind) -> SymbolKind {
         match kind {
-            tolk_resolver::file_index::SymbolKind::GlobalVariable => {
-                lsp_types::SymbolKind::VARIABLE
-            }
-            tolk_resolver::file_index::SymbolKind::Function { .. } => {
-                lsp_types::SymbolKind::FUNCTION
-            }
-            tolk_resolver::file_index::SymbolKind::Method { .. } => lsp_types::SymbolKind::METHOD,
-            tolk_resolver::file_index::SymbolKind::GetMethod { .. } => {
-                lsp_types::SymbolKind::METHOD
-            }
-            tolk_resolver::file_index::SymbolKind::Struct { .. } => lsp_types::SymbolKind::STRUCT,
-            tolk_resolver::file_index::SymbolKind::StructField => lsp_types::SymbolKind::FIELD,
-            tolk_resolver::file_index::SymbolKind::Enum { .. } => lsp_types::SymbolKind::ENUM,
-            tolk_resolver::file_index::SymbolKind::EnumMember => lsp_types::SymbolKind::ENUM_MEMBER,
-            tolk_resolver::file_index::SymbolKind::Constant => lsp_types::SymbolKind::CONSTANT,
-            tolk_resolver::file_index::SymbolKind::TypeAlias { .. } => lsp_types::SymbolKind::CLASS,
+            tolk_resolver::file_index::SymbolKind::GlobalVariable => SymbolKind::VARIABLE,
+            tolk_resolver::file_index::SymbolKind::Function { .. } => SymbolKind::FUNCTION,
+            tolk_resolver::file_index::SymbolKind::Method { .. } => SymbolKind::METHOD,
+            tolk_resolver::file_index::SymbolKind::GetMethod { .. } => SymbolKind::METHOD,
+            tolk_resolver::file_index::SymbolKind::Struct { .. } => SymbolKind::STRUCT,
+            tolk_resolver::file_index::SymbolKind::StructField => SymbolKind::FIELD,
+            tolk_resolver::file_index::SymbolKind::Enum { .. } => SymbolKind::ENUM,
+            tolk_resolver::file_index::SymbolKind::EnumMember => SymbolKind::ENUM_MEMBER,
+            tolk_resolver::file_index::SymbolKind::Constant => SymbolKind::CONSTANT,
+            tolk_resolver::file_index::SymbolKind::TypeAlias { .. } => SymbolKind::CLASS,
         }
-    }
-
-    fn convert_single_diagnostic(
-        &self,
-        diag: &tolk_linter::diagnostic::Diagnostic,
-        file_info: &Arc<FileInfo>,
-    ) -> Diagnostic {
-        convert_single_diagnostic(diag, file_info)
     }
 
     fn convert_linter_diagnostics_to_lsp(
         &self,
-        linter_diagnostics: &[tolk_linter::diagnostic::Diagnostic],
-    ) -> HashMap<Url, Vec<Diagnostic>> {
-        let mut diagnostics_by_uri = HashMap::new();
+        diagnostics: &[diagnostic::Diagnostic],
+    ) -> FxHashMap<Url, Vec<Diagnostic>> {
+        let mut diagnostics_by_uri: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
-        for diag in linter_diagnostics {
-            let file_info = match self.file_db.get_by_id(diag.file_id) {
-                Some(info) => info,
-                None => continue,
+        for diag in diagnostics {
+            let Some(file_info) = self.file_db.get_by_id(diag.file_id) else {
+                continue;
+            };
+            let Some(uri) = file_info.url() else {
+                continue;
+            };
+            let Some(lsp_diag) = convert_single_diagnostic(diag, &file_info) else {
+                continue;
             };
 
-            let uri = match Url::from_file_path(&file_info.index().path) {
-                Ok(uri) => uri,
-                Err(_) => continue,
-            };
-
-            let lsp_diag = self.convert_single_diagnostic(diag, &file_info);
-            diagnostics_by_uri
-                .entry(uri)
-                .or_insert_with(Vec::new)
-                .push(lsp_diag);
+            diagnostics_by_uri.entry(uri).or_default().push(lsp_diag);
         }
 
         diagnostics_by_uri

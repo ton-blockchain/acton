@@ -12,10 +12,3 @@ pub struct AnalysisResult {
     pub all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
     pub diagnostics: Vec<tolk_linter::diagnostic::Diagnostic>,
 }
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ChangeType {
-    WhitespaceOnly,
-    Local(String), // Function name
-    Global,
-}
