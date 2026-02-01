@@ -1,10 +1,10 @@
 use crate::backend::Backend;
-use crate::backend::utils::{FileInfoExt, SpanExt, offset_to_range};
+use crate::backend::utils::{FileInfoExt, SpanExt};
 use diagnostic::Severity;
 use lsp_types::*;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
-use tolk_linter::diagnostic;
+use tolk_linter::diagnostic::{self, DiagnosticTag};
 use tolk_resolver::file_db::FileInfo;
 use tower_lsp::lsp_types::Url;
 
@@ -42,8 +42,21 @@ pub fn convert_single_diagnostic(
     let mut related_information = Vec::new();
     let mut primary_range = None;
 
+    let mut tags = Vec::new();
+
     for annotation in &diag.annotations {
-        let range = annotation.span.start_range(file);
+        let range = annotation.span.range(file);
+
+        for tag in &annotation.tags {
+            match tag {
+                DiagnosticTag::Unnecessary => {
+                    tags.push(lsp_types::DiagnosticTag::UNNECESSARY);
+                }
+                DiagnosticTag::Deprecated => {
+                    tags.push(lsp_types::DiagnosticTag::DEPRECATED);
+                }
+            }
+        }
 
         if annotation.is_primary {
             primary_range = Some(range);
@@ -58,7 +71,7 @@ pub fn convert_single_diagnostic(
     let range = primary_range.unwrap_or_else(|| {
         diag.annotations
             .first()
-            .map(|ann| offset_to_range(file, ann.span.start()))
+            .map(|ann| ann.span.range(file))
             .unwrap_or_default()
     });
 
@@ -82,7 +95,7 @@ pub fn convert_single_diagnostic(
         } else {
             Some(related_information)
         },
-        tags: None,
+        tags: if tags.is_empty() { None } else { Some(tags) },
         data: None,
     })
 }

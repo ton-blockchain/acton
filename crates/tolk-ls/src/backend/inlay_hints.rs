@@ -260,8 +260,8 @@ fn create_type_hint(position: Position, typ: String) -> InlayHint {
         kind: Some(InlayHintKind::TYPE),
         text_edits: None,
         tooltip: None,
-        padding_left: Some(true),
-        padding_right: Some(true),
+        padding_left: Some(false),
+        padding_right: Some(false),
         data: None,
     }
 }

@@ -3,10 +3,12 @@ use crate::backend::utils::SpanExt;
 use lsp_types::*;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tolk_resolver::resolve_index::{LocalDef, LocalDefKind, Resolved};
+use tolk_resolver::resolve_index::{FileResolveIndex, LocalDef, LocalDefKind, NameUse, Resolved};
 use tolk_resolver::{AstNodeSpanExt, FileInfo, Span, Symbol, SymbolKind};
 use tolk_syntax::AstNode;
 use tower_lsp::jsonrpc::Result as LspResult;
+
+use crate::AnalysisResult;
 
 pub const TOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::STRUCT,         // 0
@@ -175,41 +177,59 @@ impl Backend {
 
         // 3. Process all name usages
         for name_use in &resolved_uses.uses {
-            match name_use.resolved {
-                Resolved::Local(local_id) => {
-                    if let Some(local) = resolved_uses.find_local(local_id) {
-                        let (token_type, modifiers) = Self::semantic_token_of_local(local);
-                        builder.add_token_at_span(name_use.span, token_type, modifiers);
-                    }
+            Self::add_name_use_token(&mut builder, name_use, &analysis, resolved_uses);
+        }
+
+        // 4. Process all name usages from inference results
+        if let Some(inferences) = analysis.all_body_types.get(&file_info.id()) {
+            for inference in inferences.values() {
+                for name_use in &inference.resolved_refs {
+                    Self::add_name_use_token(&mut builder, name_use, &analysis, resolved_uses);
                 }
-                Resolved::Global(symbol_id) => {
-                    if let Some(symbol) = analysis.project_index.resolve_symbol(symbol_id) {
-                        let token_type = match symbol.kind {
-                            SymbolKind::Struct { .. } => {
-                                if is_special_struct(&symbol.name) {
-                                    TokenType::Macro
-                                } else {
-                                    TokenType::Struct
-                                }
-                            }
-                            SymbolKind::StructField => TokenType::Property,
-                            SymbolKind::Enum { .. } => TokenType::Enum,
-                            SymbolKind::EnumMember => TokenType::EnumMember,
-                            SymbolKind::TypeAlias { .. } => TokenType::Type,
-                            SymbolKind::Constant => TokenType::Property,
-                            SymbolKind::GlobalVariable => TokenType::Variable,
-                            SymbolKind::Function { .. }
-                            | SymbolKind::Method { .. }
-                            | SymbolKind::GetMethod { .. } => TokenType::Function,
-                        };
-                        builder.add_token_at_span(name_use.span, token_type, 0);
-                    }
-                }
-                Resolved::Unresolved => {}
             }
         }
 
         Some(builder.build())
+    }
+
+    fn add_name_use_token(
+        builder: &mut SemanticTokensBuilder,
+        name_use: &NameUse,
+        analysis: &AnalysisResult,
+        resolved_uses: &FileResolveIndex,
+    ) {
+        match name_use.resolved {
+            Resolved::Local(local_id) => {
+                if let Some(local) = resolved_uses.find_local(local_id) {
+                    let (token_type, modifiers) = Self::semantic_token_of_local(local);
+                    builder.add_token_at_span(name_use.span, token_type, modifiers);
+                }
+            }
+            Resolved::Global(symbol_id) => {
+                if let Some(symbol) = analysis.project_index.resolve_symbol(symbol_id) {
+                    let token_type = match symbol.kind {
+                        SymbolKind::Struct { .. } => {
+                            if is_special_struct(&symbol.name) {
+                                TokenType::Macro
+                            } else {
+                                TokenType::Struct
+                            }
+                        }
+                        SymbolKind::StructField => TokenType::Property,
+                        SymbolKind::Enum { .. } => TokenType::Enum,
+                        SymbolKind::EnumMember => TokenType::EnumMember,
+                        SymbolKind::TypeAlias { .. } => TokenType::Type,
+                        SymbolKind::Constant => TokenType::Property,
+                        SymbolKind::GlobalVariable => TokenType::Variable,
+                        SymbolKind::Function { .. }
+                        | SymbolKind::Method { .. }
+                        | SymbolKind::GetMethod { .. } => TokenType::Function,
+                    };
+                    builder.add_token_at_span(name_use.span, token_type, 0);
+                }
+            }
+            Resolved::Unresolved => {}
+        }
     }
 
     fn semantic_token_of_local(local: &LocalDef) -> (TokenType, u32) {

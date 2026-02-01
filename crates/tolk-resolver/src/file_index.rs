@@ -34,6 +34,13 @@ impl Span {
         end: u32::MAX,
     };
 
+    pub const fn from_offset(offset: usize) -> Self {
+        Span {
+            start: offset as u32,
+            end: offset as u32 + 1,
+        }
+    }
+
     /// Creates a span from a tree-sitter node.
     pub fn from_syntax(node: &Node) -> Self {
         Span {

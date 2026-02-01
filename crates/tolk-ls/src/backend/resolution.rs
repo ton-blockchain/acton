@@ -1,6 +1,6 @@
 use crate::backend::Backend;
 use crate::backend::analysis::AnalysisResult;
-use tolk_resolver::{FileInfo, Resolved};
+use tolk_resolver::{FileInfo, Resolved, Span};
 
 impl Backend {
     pub fn resolve_symbol_at(
@@ -25,6 +25,14 @@ impl Backend {
         // Maybe we point to name of some local variable
         if let Some(local_def) = resolved_uses.find_local_at(offset) {
             return Some(Resolved::Local(local_def.id));
+        }
+
+        let symbol = file_info.find_symbol_at(offset)?;
+        let inferences = analysis.all_body_types.get(&file_info.id())?;
+
+        let inference = inferences.get(&symbol.id)?;
+        if let Some(resolved) = inference.resolve(Span::from_offset(offset)) {
+            return Some(resolved.resolved.clone());
         }
 
         None

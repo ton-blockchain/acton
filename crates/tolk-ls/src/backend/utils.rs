@@ -8,7 +8,6 @@ pub trait SpanExt {
     fn start_position(&self, file: &Arc<FileInfo>) -> Position;
     fn end_position(&self, file: &Arc<FileInfo>) -> Position;
     fn range(&self, file: &Arc<FileInfo>) -> Range;
-    fn start_range(&self, file: &Arc<FileInfo>) -> Range;
 }
 
 pub trait FileInfoExt {
@@ -57,10 +56,6 @@ impl SpanExt for Span {
             start: self.start_position(file),
             end: self.end_position(file),
         }
-    }
-
-    fn start_range(&self, file: &Arc<FileInfo>) -> Range {
-        offset_to_range(file, self.start())
     }
 }
 

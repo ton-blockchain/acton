@@ -137,7 +137,6 @@ impl Backend {
                 // we don't want to check non-workspace files
                 continue;
             }
-            println!("{:?}", file_info.path());
             checker.process_file(file_info.source(), *file_id);
         }
 
