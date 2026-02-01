@@ -138,4 +138,14 @@ impl FileResolveIndex {
             .iter()
             .filter(move |u| matches!(u.resolved, Resolved::Global(id) if id == symbol_id))
     }
+
+    pub fn find_local(&self, id: LocalDefId) -> Option<&LocalDef> {
+        self.locals.iter().find(|local| local.id == id)
+    }
+
+    pub fn find_local_at(&self, offset: usize) -> Option<&LocalDef> {
+        self.locals
+            .iter()
+            .find(|local| local.def_span.contains(offset))
+    }
 }

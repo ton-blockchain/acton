@@ -12,11 +12,33 @@ pub trait SpanExt {
 
 pub trait FileInfoExt {
     fn url(&self) -> Option<Url>;
+    fn position_to_offset(&self, pos: Position) -> Option<usize>;
 }
 
 impl FileInfoExt for FileInfo {
     fn url(&self) -> Option<Url> {
         Url::from_file_path(self.path()).ok()
+    }
+
+    fn position_to_offset(&self, pos: Position) -> Option<usize> {
+        let line_start = *self.line_offsets().get(pos.line as usize)?;
+        let source = &self.source().source;
+
+        let line_content = &source[line_start..];
+        let mut utf16_count = 0;
+        let mut byte_offset = 0;
+        for c in line_content.chars() {
+            if utf16_count >= pos.character as usize {
+                break;
+            }
+            if c == '\n' || c == '\r' {
+                break;
+            }
+            byte_offset += c.len_utf8();
+            utf16_count += c.len_utf16();
+        }
+
+        Some(line_start + byte_offset)
     }
 }
 

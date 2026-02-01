@@ -135,6 +135,13 @@ impl ProjectIndex {
         })
     }
 
+    pub fn find_symbol_at(&self, file_id: FileId, offset: usize) -> Option<&Symbol> {
+        let file = self.files().get(&file_id)?;
+        file.decls
+            .iter()
+            .find(|decl| decl.name_span.contains(offset))
+    }
+
     /// Finds a name usage at the specified byte offset in a file.
     pub fn find_use(&self, file_id: FileId, pos: usize) -> Option<&NameUse> {
         self.resolved_uses.get(&file_id)?.find_use(pos)
