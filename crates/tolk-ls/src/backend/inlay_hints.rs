@@ -5,7 +5,8 @@ use tolk_resolver::file_db::FileInfo;
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::resolve_index::LocalDefKind;
 use tolk_resolver::{AstNodeSpanExt, FileResolveIndex};
-use tolk_syntax::{AstNode, FunctionLike, TopLevel};
+use tolk_syntax::ast::expressions::Expr;
+use tolk_syntax::{AstNode, FunctionLike, HasName, TopLevel};
 use tolk_ty::{InferenceResult, TyId, TypeInterner};
 
 pub fn collect_inlay_hints(
@@ -22,6 +23,7 @@ pub fn collect_inlay_hints(
 
     collect_locals_hints(inference, interner, file, hints, resolve_index);
     collect_return_ty_hint(inference, interner, file, decl, hints);
+    collect_constants_hints(inference, interner, file, decl, hints);
 }
 
 /// Collect hints for local variables and parameters.
@@ -67,19 +69,10 @@ fn collect_locals_hints(
             continue;
         }
 
-        let type_string = interner.format(ty_id);
-
-        let hint = InlayHint {
-            position: local_def.def_span.end_position(file),
-            label: InlayHintLabel::String(format!(": {type_string}")),
-            kind: Some(InlayHintKind::TYPE),
-            text_edits: None,
-            tooltip: None,
-            padding_left: Some(false),
-            padding_right: Some(true),
-            data: None,
-        };
-        hints.push(hint);
+        hints.push(create_type_hint(
+            local_def.def_span.end_position(file),
+            interner.format(ty_id),
+        ));
     }
 }
 
@@ -97,21 +90,25 @@ fn collect_return_ty_hint(
     decl: &TopLevel,
     hints: &mut Vec<InlayHint>,
 ) {
-    if let Some(inferred_ty) = inference.inferred_return_type
-        && inferred_ty != interner.ty_unknown
-    {
-        match decl {
-            TopLevel::Func(f) if f.return_type().is_none() => {
-                add_return_type_hint(f, inferred_ty, interner, file, hints);
-            }
-            TopLevel::Method(m) if m.return_type().is_none() => {
-                add_return_type_hint(m, inferred_ty, interner, file, hints);
-            }
-            TopLevel::GetMethod(m) if m.return_type().is_none() => {
-                add_return_type_hint(m, inferred_ty, interner, file, hints);
-            }
-            _ => {}
+    let Some(inferred_ty) = inference.inferred_return_type else {
+        return;
+    };
+
+    if inferred_ty == interner.ty_unknown {
+        return;
+    }
+
+    match decl {
+        TopLevel::Func(f) if f.return_type().is_none() => {
+            add_return_type_hint(f, inferred_ty, interner, file, hints);
         }
+        TopLevel::Method(m) if m.return_type().is_none() => {
+            add_return_type_hint(m, inferred_ty, interner, file, hints);
+        }
+        TopLevel::GetMethod(m) if m.return_type().is_none() => {
+            add_return_type_hint(m, inferred_ty, interner, file, hints);
+        }
+        _ => {}
     }
 }
 
@@ -126,17 +123,100 @@ fn add_return_type_hint<'tree, T: AstNode<'tree>>(
         return;
     };
 
-    let type_string = interner.display(return_ty).to_string();
+    hints.push(create_type_hint(
+        params_node.span().end_position(file),
+        interner.format(return_ty),
+    ));
+}
 
-    let hint = InlayHint {
-        position: params_node.span().end_position(file),
-        label: InlayHintLabel::String(format!(": {type_string}")),
+/// Collect hints for constants.
+///
+/// ```tolk
+/// const FOO/*: int*/ = 100
+/// //       ^^^^^^^^^ this one
+/// ```
+fn collect_constants_hints(
+    inference: &InferenceResult,
+    interner: &TypeInterner,
+    file: &Arc<FileInfo>,
+    decl: &TopLevel,
+    hints: &mut Vec<InlayHint>,
+) {
+    let TopLevel::Constant(c) = decl else {
+        return;
+    };
+
+    if c.typ().is_some() {
+        // already have type hint
+        return;
+    }
+
+    let Some(name) = c.name() else {
+        // no name, likely incomplete code
+        return;
+    };
+
+    let Some(expr) = c.value() else {
+        // no value, likely incomplete code
+        return;
+    };
+
+    let source = &file.source().source;
+    if has_obvious_type(&expr, source) {
+        return;
+    }
+
+    let Some(ty_id) = inference.type_of(expr.span()) else {
+        return;
+    };
+
+    if ty_id == interner.ty_unknown {
+        return;
+    }
+
+    hints.push(create_type_hint(
+        name.span().end_position(file),
+        interner.format(ty_id),
+    ));
+}
+
+fn has_obvious_type(expr: &Expr, source: &str) -> bool {
+    match expr {
+        // don't show a hint for:
+        // val params = SomeParams{}
+        Expr::ObjectLit(_) => true,
+        // don't show a hint for:
+        // val foo = Foo.fromCell(cell)
+        Expr::Call(call) => {
+            if let Some(callee) = call.callee_identifier() {
+                let name = callee.text(source);
+                if name == "fromCell" || name == "fromSlice" {
+                    return true;
+                }
+            }
+            false
+        }
+        // don't show a hint for:
+        // val params = lazy SomeParams.fromCell()
+        Expr::Lazy(lazy) => {
+            let Some(inner) = lazy.expr() else {
+                return false;
+            };
+            has_obvious_type(&inner, source)
+        }
+        _ => false,
+    }
+}
+
+fn create_type_hint(position: Position, typ: String) -> InlayHint {
+    InlayHint {
+        position,
+        label: InlayHintLabel::String(format!(": {typ}")),
         kind: Some(InlayHintKind::TYPE),
         text_edits: None,
         tooltip: None,
         padding_left: Some(true),
         padding_right: Some(true),
         data: None,
-    };
-    hints.push(hint);
+    }
 }
