@@ -159,9 +159,21 @@ impl ProjectIndex {
 
     pub fn find_symbol_at(&self, file_id: FileId, offset: usize) -> Option<&Symbol> {
         let file = self.files().get(&file_id)?;
-        file.decls
-            .iter()
-            .find(|decl| decl.name_span.contains(offset))
+        file.decls.iter().find_map(|d| {
+            if d.name_span.contains(offset) {
+                return Some(d);
+            }
+
+            match &d.kind {
+                SymbolKind::Struct { fields, .. } => {
+                    fields.iter().find(|f| f.name_span.contains(offset))
+                }
+                SymbolKind::Enum { members } => {
+                    members.iter().find(|f| f.name_span.contains(offset))
+                }
+                _ => None,
+            }
+        })
     }
 
     /// Finds a name usage at the specified byte offset in a file.

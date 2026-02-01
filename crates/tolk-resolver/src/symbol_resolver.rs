@@ -14,8 +14,8 @@ use crate::resolve_index::{
 use std::collections::HashMap;
 use std::sync::Arc;
 use tolk_syntax::{
-    AstNode, Constant, Enum, FuncBody, FunctionLike, GlobalVar, HasGenericParams, HasName,
-    InstanceArg, Struct, TypeAlias, VarKind, Walker, ast,
+    AstNode, Constant, Enum, EnumMember, FuncBody, FunctionLike, GlobalVar, HasGenericParams,
+    HasName, InstanceArg, Struct, StructField, TypeAlias, VarKind, Walker, ast,
 };
 use tree_sitter::Node;
 
@@ -390,6 +390,16 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
         self.default_result()
     }
 
+    fn walk_struct_field(&mut self, node: &StructField<'tree>) -> Self::Result {
+        if let Some(typ) = node.typ() {
+            self.visit_type(&typ);
+        }
+        if let Some(default) = node.default() {
+            self.visit_expr(&default);
+        }
+        self.default_result()
+    }
+
     fn walk_enum(&mut self, node: &Enum<'tree>) -> Self::Result {
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
@@ -399,6 +409,13 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
         }
         if let Some(body) = node.body() {
             self.walk_enum_body(&body);
+        }
+        self.default_result()
+    }
+
+    fn walk_enum_member(&mut self, node: &EnumMember<'tree>) -> Self::Result {
+        if let Some(default) = node.default() {
+            self.visit_expr(&default);
         }
         self.default_result()
     }
