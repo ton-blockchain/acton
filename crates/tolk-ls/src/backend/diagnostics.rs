@@ -1,9 +1,37 @@
+use crate::backend::Backend;
 use crate::backend::utils::{FileInfoExt, SpanExt, offset_to_range};
 use diagnostic::Severity;
 use lsp_types::*;
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 use tolk_linter::diagnostic;
 use tolk_resolver::file_db::FileInfo;
+use tower_lsp::lsp_types::Url;
+
+impl Backend {
+    pub fn convert_linter_diagnostics_to_lsp(
+        &self,
+        diagnostics: &[tolk_linter::diagnostic::Diagnostic],
+    ) -> FxHashMap<Url, Vec<Diagnostic>> {
+        let mut diagnostics_by_uri: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
+
+        for diag in diagnostics {
+            let Some(file_info) = self.file_db.get_by_id(diag.file_id) else {
+                continue;
+            };
+            let Some(uri) = file_info.url() else {
+                continue;
+            };
+            let Some(lsp_diag) = convert_single_diagnostic(diag, &file_info) else {
+                continue;
+            };
+
+            diagnostics_by_uri.entry(uri).or_default().push(lsp_diag);
+        }
+
+        diagnostics_by_uri
+    }
+}
 
 pub fn convert_single_diagnostic(
     diag: &diagnostic::Diagnostic,

@@ -1,3 +1,4 @@
+use crate::backend::Backend;
 use crate::backend::utils::SpanExt;
 use lsp_types::*;
 use std::sync::Arc;
@@ -8,6 +9,44 @@ use tolk_resolver::{AstNodeSpanExt, FileResolveIndex};
 use tolk_syntax::ast::expressions::Expr;
 use tolk_syntax::{AstNode, FunctionLike, HasName, TopLevel};
 use tolk_ty::{InferenceResult, TyId, TypeInterner};
+use tower_lsp::jsonrpc::Result as LspResult;
+
+impl Backend {
+    pub async fn handle_inlay_hint(&self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
+        let now = std::time::Instant::now();
+        let uri = params.text_document.uri;
+        log::info!("Request: inlay_hint for {}", uri);
+
+        let result = (|| {
+            let analysis = self.analysis.get(&uri)?;
+            let path = uri.to_file_path().ok()?;
+            let file_info = self.file_db.get_by_path(&path)?;
+
+            let mut hints = Vec::with_capacity(10);
+
+            let body_types = analysis.all_body_types.get(&file_info.id())?;
+
+            for (&symbol_id, inference_result) in body_types {
+                let decl = file_info.find_syntax_declaration(symbol_id);
+                let Some(decl) = decl else { continue };
+
+                collect_inlay_hints(
+                    inference_result,
+                    &analysis.project_index,
+                    &analysis.type_interner,
+                    &file_info,
+                    &decl,
+                    &mut hints,
+                );
+            }
+
+            Some(hints)
+        })();
+
+        log::info!("Response: inlay_hint took {:?}", now.elapsed());
+        Ok(result)
+    }
+}
 
 pub fn collect_inlay_hints(
     inference: &InferenceResult,
