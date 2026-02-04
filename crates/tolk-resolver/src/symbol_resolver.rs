@@ -415,6 +415,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
             self.walk_struct_body(&body);
         }
         self.exit_scope();
+        self.exit_scope();
         self.default_result()
     }
 
