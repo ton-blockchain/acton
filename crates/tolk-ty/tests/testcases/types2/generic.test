@@ -1,0 +1,128 @@
+========================================================================
+Generic function with no arguments: explicit type argument
+========================================================================
+fun generic<T>(): T {}
+
+fun main() {
+    val foo = generic<int>();
+//!     ^ int
+}
+------------------------------------------------------------------------
+type inference error at offset 45: expected int, got unknown
+
+========================================================================
+Generic function with no arguments: explicit two type arguments and union type
+========================================================================
+fun generic<T, U>(): T | U {}
+
+fun main() {
+    val foo = generic<int, slice>();
+//!     ^ int | slice
+}
+------------------------------------------------------------------------
+type inference error at offset 52: expected int | slice, got unknown
+
+========================================================================
+Generic function with no arguments: explicit two type arguments and tuple type
+========================================================================
+fun generic<T, U>(): [T, U] {}
+
+fun main() {
+    val foo = generic<int, slice>();
+//!     ^ [int, slice]
+}
+------------------------------------------------------------------------
+type inference error at offset 53: expected [int, slice], got unknown
+
+========================================================================
+Generic function with no arguments: explicit two type arguments and tuple type 2
+========================================================================
+fun generic<T, U>(): [T | U, U] {}
+
+fun main() {
+    val foo = generic<int, slice>();
+//!     ^ [int | slice, slice]
+}
+------------------------------------------------------------------------
+type inference error at offset 57: expected [int | slice, slice], got unknown
+
+========================================================================
+Generic function with no arguments: explicit two type arguments and tensor type
+========================================================================
+fun generic<T, U>(): (T, U) {}
+
+fun main() {
+    val foo = generic<int, slice>();
+//!     ^ (int, slice)
+}
+------------------------------------------------------------------------
+type inference error at offset 53: expected (int, slice), got unknown
+
+========================================================================
+Generic function with no arguments: explicit two type arguments and function type
+========================================================================
+fun generic<T, U>(): (T) -> U {}
+
+fun main() {
+    val foo = generic<int, slice>();
+//!     ^ (int) -> slice
+
+    val res = foo();
+//!     ^ slice
+}
+------------------------------------------------------------------------
+type inference error at offset 55: expected (int) -> slice, got unknown
+type inference error at offset 118: expected slice, got unknown
+
+========================================================================
+Generic function with single arguments: explicit struct type
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T>(a: T): T {}
+
+fun main() {
+    val foo =
+//!     ^ Foo
+        generic<Foo>({
+//!                  ^ Foo
+            value: 10,
+//!         ^ int
+        });
+}
+------------------------------------------------------------------------
+type inference error at offset 81: expected Foo, got unknown
+type inference error at offset 122: unknown type
+type inference error at offset 163: unknown type
+
+========================================================================
+Generic method toCell
+========================================================================
+struct Cell<T> {}
+
+fun T.toCell2(self): Cell<T> {}
+
+fun main() {
+    val foo = 10.toCell2();
+//!     ^ Cell<int>
+}
+------------------------------------------------------------------------
+type inference error at offset 73: expected Cell<int>, got Cell<T>
+
+========================================================================
+Generic method as right hand of ternary inside other generic function call
+========================================================================
+fun eq<T1>(a: T1): [T1] {
+    return [a];
+}
+
+fun eq2<X>(value: X) { return value; }
+
+fun name(f: int) {
+    eq(f ? null as int? : eq2(2));
+//!                     ^ int?
+}
+------------------------------------------------------------------------
+type inference error at offset 128: unknown type

@@ -281,6 +281,11 @@ impl TypeInterner {
         self.intern(TyData::Instantiation { inner_ty, types })
     }
 
+    /// Creates a type parameter type.
+    pub fn type_parameter(&mut self, name: String, default_type: Option<TyId>) -> TyId {
+        self.intern(TyData::TypeParameter { name, default_type })
+    }
+
     /// when `var v = rhs`, `v` is `unknown` before assignment (before rhs->inferred_type is assigned to it);
     /// when `var (v1,v2,v3) = rhs`, left side is `(unknown,unknown,unknown)`
     pub(crate) fn is_type_unknown_from_var_lhs_decl(&self, id: TyId) -> bool {

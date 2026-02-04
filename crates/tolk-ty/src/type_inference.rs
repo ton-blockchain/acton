@@ -140,6 +140,9 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         let declared_type = self.lower(v.typ());
         self.ctx.set_top_level_type(symbol_id, declared_type);
         self.ctx.set_node_type(v, declared_type);
+        if let Some(name) = v.name() {
+            self.ctx.set_node_type(&name, declared_type);
+        }
     }
 
     pub(crate) fn infer_type_alias<'t>(&mut self, v: &TypeAlias<'t>, symbol_id: SymbolId) {
@@ -151,6 +154,9 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
             .unwrap_or_else(|| self.intrn().ty_unknown);
         self.ctx.set_node_type(&name_ident, ty);
         self.ctx.set_node_type(v, ty);
+        if let Some(name) = v.name() {
+            self.ctx.set_node_type(&name, ty);
+        }
     }
 
     pub(crate) fn infer_constant<'t>(&mut self, v: &Constant<'t>, symbol_id: SymbolId) {
@@ -162,9 +168,15 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
             let final_type = declared_type.unwrap_or(inferred_type);
             self.ctx.set_top_level_type(symbol_id, final_type);
             self.ctx.set_node_type(v, final_type);
+            if let Some(name) = v.name() {
+                self.ctx.set_node_type(&name, final_type);
+            }
         } else if let Some(declared_type) = declared_type {
             self.ctx.set_top_level_type(symbol_id, declared_type);
             self.ctx.set_node_type(v, declared_type);
+            if let Some(name) = v.name() {
+                self.ctx.set_node_type(&name, declared_type);
+            }
         }
     }
 
@@ -192,6 +204,9 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         let struct_ty = self.intrn().struct_ty(symbol_id, name.into());
         self.ctx.set_node_type(&name_ident, struct_ty);
         self.ctx.set_node_type(v, struct_ty);
+        if let Some(name) = v.name() {
+            self.ctx.set_node_type(&name, struct_ty);
+        }
     }
 
     pub(crate) fn infer_enum<'t>(&mut self, v: &Enum<'t>, symbol_id: SymbolId) {
@@ -210,6 +225,9 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         let enum_ty = self.intrn().enum_ty(symbol_id, name.into());
         self.ctx.set_node_type(&name_ident, enum_ty);
         self.ctx.set_node_type(v, enum_ty);
+        if let Some(name) = v.name() {
+            self.ctx.set_node_type(&name, enum_ty);
+        }
     }
 
     fn update_function_return_type(&mut self, symbol_id: SymbolId) {

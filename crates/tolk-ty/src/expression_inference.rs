@@ -2142,6 +2142,9 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     }
 
                     self.ctx.set_node_type(&arg, val_ty);
+                } else {
+                    // incomplete code
+                    self.ctx.set_node_type(&arg, field_ty);
                 }
             } else if let Some(val) = arg.value() {
                 // unknown field, just infer value type

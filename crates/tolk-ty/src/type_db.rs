@@ -7,7 +7,7 @@ use tolk_resolver::file_index::{
     FileId, OptionalSyntaxNodeSpanExt, Span, Symbol, SymbolId, SymbolKind,
 };
 use tolk_resolver::project_index::ProjectIndex;
-use tolk_resolver::resolve_index::Resolved;
+use tolk_resolver::resolve_index::{LocalDefKind, Resolved};
 use tolk_syntax::{
     AstNode, FunCallableType, FunctionLike, HasName, Method, NullableType, TensorType, TupleType,
     Type, TypeIdent, TypeInstantiatedTs, UnionType, match_parents,
@@ -403,7 +403,17 @@ impl<'a> TypeDb<'a> {
             .find_use(file_id, type_ident.0.start_byte())?;
         let symbol_id = match name_use.resolved {
             Resolved::Global(global) => global,
-            Resolved::Local(_) | Resolved::Unresolved => return None,
+            Resolved::Local(local) => {
+                if let Some(resolved) = self.project_index.get_resolved_uses(file_id)
+                    && let Some(resolved) = resolved.find_local(local)
+                    && matches!(resolved.kind, LocalDefKind::TypeParameter)
+                {
+                    // TODO: default type
+                    return Some(self.intrn.type_parameter(resolved.name.to_string(), None));
+                }
+                return None;
+            }
+            Resolved::Unresolved => return None,
         };
         self.get_top_level_type(None, symbol_id)
     }

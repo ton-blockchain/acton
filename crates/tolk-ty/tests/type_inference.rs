@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::{AstNodeSpanExt, resolve};
+use tolk_syntax::HasName;
 use tolk_ty::TypeDb;
 use tolk_ty::TypeInterner;
 use tolk_ty::infer;
@@ -97,6 +98,7 @@ fn run_type_test(test_case: &TestCase) -> String {
     let positions = find_type_positions(&test_case.input);
 
     for decl in file_info.source().top_levels() {
+        let Some(name) = decl.name() else { continue };
         let Some(index_decl) = file_info.find_declaration(&decl) else {
             continue;
         };
@@ -115,6 +117,10 @@ fn run_type_test(test_case: &TestCase) -> String {
                 if span.start() == pos.offset {
                     found_type = Some(*ty_id);
                 }
+            }
+
+            if found_type.is_none() && name.span().contains(pos.offset) {
+                found_type = type_db.top_level_types.get(&index_decl.id).cloned()
             }
 
             if let Some(ty_id) = found_type {
@@ -191,6 +197,12 @@ fn get_test_path(relative_path: &str) -> PathBuf {
         .join(relative_path)
 }
 
+fn get_test_path2(relative_path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/testcases/types2")
+        .join(relative_path)
+}
+
 #[test]
 fn test_types_basic() {
     run_tests_from_file(&get_test_path("basic.test"));
@@ -220,4 +232,114 @@ fn test_types_map() {
 #[test]
 fn test_types_unions() {
     run_tests_from_file(&get_test_path("unions.test"));
+}
+
+#[test]
+fn test_types2_assign_smartcast() {
+    run_tests_from_file(&get_test_path2("assign-smartcast.test"));
+}
+
+#[test]
+fn test_types2_auto_return_type() {
+    run_tests_from_file(&get_test_path2("auto-return-type.test"));
+}
+
+#[test]
+fn test_types2_call() {
+    run_tests_from_file(&get_test_path2("call.test"));
+}
+
+#[test]
+fn test_types2_constants() {
+    run_tests_from_file(&get_test_path2("constants.test"));
+}
+
+#[test]
+fn test_types2_dot_access() {
+    run_tests_from_file(&get_test_path2("dot-access.test"));
+}
+
+#[test]
+fn test_types2_expressions() {
+    run_tests_from_file(&get_test_path2("expressions.test"));
+}
+
+#[test]
+fn test_types2_fields() {
+    run_tests_from_file(&get_test_path2("fields.test"));
+}
+
+#[test]
+fn test_types2_generic_deduce() {
+    run_tests_from_file(&get_test_path2("generic-deduce.test"));
+}
+
+#[test]
+fn test_types2_generic_structs() {
+    run_tests_from_file(&get_test_path2("generic-structs.test"));
+}
+
+#[test]
+fn test_types2_generic() {
+    run_tests_from_file(&get_test_path2("generic.test"));
+}
+
+#[test]
+fn test_types2_global_vats() {
+    run_tests_from_file(&get_test_path2("global-vats.test"));
+}
+
+#[test]
+fn test_types2_lambdas() {
+    run_tests_from_file(&get_test_path2("lambdas.test"));
+}
+
+#[test]
+fn test_types2_literals() {
+    run_tests_from_file(&get_test_path2("literals.test"));
+}
+
+#[test]
+fn test_types2_loops() {
+    run_tests_from_file(&get_test_path2("loops.test"));
+}
+
+#[test]
+fn test_types2_match() {
+    run_tests_from_file(&get_test_path2("match.test"));
+}
+
+#[test]
+fn test_types2_object_literals() {
+    run_tests_from_file(&get_test_path2("object-literals.test"));
+}
+
+#[test]
+fn test_types2_path_smartcasts() {
+    run_tests_from_file(&get_test_path2("path-smartcasts.test"));
+}
+
+#[test]
+fn test_types2_smartcasts_is() {
+    run_tests_from_file(&get_test_path2("smartcasts-is.test"));
+}
+
+#[test]
+fn test_types2_smartcasts_throw_assert() {
+    run_tests_from_file(&get_test_path2("smartcasts-throw-assert.test"));
+}
+
+#[test]
+fn test_types2_smartcasts() {
+    run_tests_from_file(&get_test_path2("smartcasts.test"));
+}
+
+#[test]
+fn test_types2_try_catch() {
+    run_tests_from_file(&get_test_path2("try-catch.test"));
+}
+
+#[test]
+fn test_types2_vars() {
+    run_tests_from_file(&get_test_path2("vars.test"));
 }

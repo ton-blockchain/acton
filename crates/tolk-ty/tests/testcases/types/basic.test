@@ -409,4 +409,4 @@ fun main() {
 //!     ^ SwapStep
 }
 ------------------------------------------------------------------------
-type inference error at offset 172: expected SwapStep, got unknown
+type inference error at offset 172: expected SwapStep, got T
