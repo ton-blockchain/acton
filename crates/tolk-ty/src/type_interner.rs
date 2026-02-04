@@ -694,7 +694,7 @@ impl TypeInterner {
                 }
                 tl.iter()
                     .zip(tr.iter())
-                    .all(|(&el, &er)| self.equals(el, er))
+                    .all(|(&el, &er)| self.can_rhs_be_assigned(el, er))
             }
             (TyData::Struct { def: dl, .. }, TyData::Struct { def: dr, .. }) => {
                 // C<C<int>> = C<CIntAlias>
@@ -1060,6 +1060,24 @@ impl TypeInterner {
             return rest_variants[0];
         }
         self.union(rest_variants)
+    }
+
+    pub fn as_nullable_union(&self, ty: TyId) -> Option<(TyId, TyId)> {
+        let TyData::Union(elements) = self.data(ty) else {
+            return None;
+        };
+        if elements.len() != 2 {
+            return None;
+        }
+        let left = elements[0];
+        let right = elements[1];
+        if left == self.ty_null {
+            return Some((right, left));
+        }
+        if right == self.ty_null {
+            return Some((left, right));
+        }
+        None
     }
 }
 

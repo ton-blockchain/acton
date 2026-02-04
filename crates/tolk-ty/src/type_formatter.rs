@@ -52,9 +52,13 @@ impl<'a> TypeFormatter<'a> {
             }
             TyData::Func { params, return_ty } => {
                 let ps = params.iter().map(|t| self.format(*t)).collect::<Vec<_>>();
-                format!("fun ({}) -> {}", ps.join(", "), self.format(*return_ty))
+                format!("({}) -> {}", ps.join(", "), self.format(*return_ty))
             }
             TyData::Union(elements) => {
+                if let Some((inner, _)) = self.interner.as_nullable_union(id) {
+                    return format!("{}?", self.format(inner));
+                }
+
                 let parts = elements.iter().map(|t| self.format(*t)).collect::<Vec<_>>();
                 parts.join(" | ")
             }
@@ -135,7 +139,7 @@ mod tests {
 
         let formatter = TypeFormatter::new(&interner);
         assert_eq!(formatter.format(t_tuple), "[int, bool]");
-        assert_eq!(formatter.format(t_func), "fun (int, bool) -> void");
+        assert_eq!(formatter.format(t_func), "(int, bool) -> void");
         assert_eq!(formatter.format(t_struct), "MyStruct");
         assert_eq!(formatter.format(t_inst), "MyStruct<int>");
         assert_eq!(formatter.format(t_union), "int | bool");

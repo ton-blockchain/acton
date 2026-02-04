@@ -172,13 +172,16 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         let Some(name_ident) = v.name() else { return };
         let Some(body) = v.body() else { return };
         for field in body.fields() {
+            let declared_type = self.lower_or_none(field.typ());
             if let Some(default_value) = field.default() {
-                let declared_type = self.lower_or_none(field.typ());
                 let flow = FlowContext::new();
                 self.infer_expr(default_value, flow, false, declared_type);
+            }
 
-                if let Some(declared_type) = declared_type {
-                    self.ctx.set_node_type(&field, declared_type);
+            if let Some(declared_type) = declared_type {
+                self.ctx.set_node_type(&field, declared_type);
+                if let Some(name) = field.name() {
+                    self.ctx.set_node_type(&name, declared_type);
                 }
             }
         }
@@ -227,6 +230,12 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
     ) -> Option<()> {
         let mut body_start = FlowContext::new();
         let declared_return_ty = self.lower_or_none(v.return_type());
+
+        if let Some(return_type) = v.return_type()
+            && let Some(declared_return_ty) = declared_return_ty
+        {
+            self.ctx.set_node_type(&return_type, declared_return_ty)
+        }
         self.ctx.declared_return_ty = declared_return_ty;
 
         for param in v.parameters() {

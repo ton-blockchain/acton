@@ -18,8 +18,8 @@ use tolk_resolver::{AstNodeSpanExt, Span, Symbol, SymbolKind};
 use tolk_syntax::{
     AsCast, Assign, AstNode, Bin, BoolLit, Call, DotAccess, DotAccessField, Expr, HasName, Ident,
     IsType, Lambda, Lazy, Match, MatchArmBody, MatchPattern, NotNull, NullLit, NumberLit,
-    ObjectLit, Paren, StringLit, Tensor, Ternary, TopLevel, Tuple, Unary, Underscore, VarDecl,
-    VarDeclPattern,
+    ObjectLit, Paren, SetAssign, StringLit, Tensor, Ternary, TopLevel, Tuple, Unary, Underscore,
+    VarDecl, VarDeclPattern,
 };
 
 impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
@@ -46,6 +46,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 ExprFlow::create(flow, as_cond)
             }
             Expr::Assign(assignment) => self.infer_assignment(assignment, flow, as_cond),
+            Expr::SetAssign(assignment) => self.infer_set_assignment(assignment, flow, as_cond),
             Expr::Unary(unary_op) => self.infer_unary_operator(unary_op, flow, as_cond),
             Expr::Bin(binary_op) => self.infer_binary_expression(binary_op, flow, as_cond),
             Expr::Ternary(ternary_op) => {
@@ -278,6 +279,10 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 let current_ty = self.ctx.get_node_type_or_unknown(&var);
                 if current_ty == self.intrn().ty_unknown {
                     self.ctx.set_node_type(&var, rhs_ty);
+
+                    if let Some(name) = var.name() {
+                        self.ctx.set_node_type(&name, rhs_ty);
+                    }
                 }
 
                 let declared_type = if var.is_redefinition() {
@@ -339,6 +344,27 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         self.ctx.set_node_type(&v, rhs_ty); // note, that the resulting type is rhs, not lhs
 
         ExprFlow::create(flow, as_cond)
+    }
+
+    //+ CHECKED
+    pub(crate) fn infer_set_assignment(
+        &mut self,
+        v: SetAssign<'t>,
+        flow: FlowContext,
+        as_cond: bool,
+    ) -> ExprFlow {
+        let lhs = try_expr_flow!(flow, v.left());
+        let rhs = try_expr_flow!(flow, v.right());
+
+        let after_lhs = self.infer_expr(lhs, flow, false, None);
+        let rhs_flow = after_lhs.out_flow;
+        let lhs_ty = self.ctx.get_node_type(&lhs);
+        let after_rhs = self.infer_expr(rhs, rhs_flow, false, lhs_ty);
+
+        self.ctx
+            .set_node_type(&v, lhs_ty.unwrap_or_else(|| self.const_intrn().ty_unknown));
+
+        ExprFlow::create(after_rhs.out_flow, as_cond)
     }
 
     //+ CHECKED
@@ -535,7 +561,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 let ty = self.intrn().ty_bool;
                 let flow = self.infer_expr(lhs, flow, false, None).out_flow;
                 let flow = self.infer_expr(rhs, flow, false, None).out_flow;
-                self.ctx.set_node_type(&v.0, ty);
+                self.ctx.set_node_type(&v, ty);
                 ExprFlow::create(flow, as_cond)
             }
             "!=" | "==" => {
@@ -550,7 +576,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 let ty = self.intrn().ty_bool;
                 let flow = self.infer_expr(lhs, flow, false, None).out_flow;
                 let flow = self.infer_expr(rhs, flow, false, None).out_flow;
-                self.ctx.set_node_type(&v.0, ty);
+                self.ctx.set_node_type(&v, ty);
                 ExprFlow::create(flow, as_cond)
             }
             // & | ^ are "overloaded" both for integers and booleans
@@ -1410,11 +1436,31 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     resolved: Resolved::Global(fun_ref),
                 })
             }
-        } else if let Some(_fun_id) = fun_ref {
-            // so, it's `user.method` / `t.tupleAt<int>` as a reference
-            let return_ty = self.intrn().ty_unknown; // placeholder
-            // TODO: calculate full function type
-            self.ctx.set_node_type(&v.0, return_ty);
+        } else if let Some(fun_ref) = fun_ref {
+            let symbol = self.ctx.type_db.project_index.resolve_symbol(fun_ref);
+            let typ = self.ctx.get_top_level_type(fun_ref);
+            let f_callable = typ
+                .map(|t| self.const_intrn().unwrap_alias(t))
+                .and_then(|t| self.return_type_or_none(t));
+
+            if let Some(f_callable) = f_callable
+                && let Some(symbol) = symbol
+            {
+                let mut return_ty = f_callable.1;
+
+                // if return type is omitted we need to infer function body first
+                // once inferred, subsequent `return_ty` for this function will be non-auto
+                if return_ty == self.const_intrn().ty_auto
+                    && let Some(inferred_ty) = self.infer_auto_return_type_of_function(symbol)
+                {
+                    let func_ty = self.intrn().func(f_callable.0.clone(), inferred_ty);
+                    self.ctx.set_top_level_type(symbol.id, func_ty);
+                    return_ty = inferred_ty
+                }
+
+                let func_ty = self.intrn().func(f_callable.0, return_ty);
+                self.ctx.set_node_type(&v, func_ty);
+            }
         }
 
         ExprFlow::create(flow, as_cond)
@@ -1479,13 +1525,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             .ctx
             .get_node_type(&callee)
             .map(|t| self.const_intrn().unwrap_alias(t))
-            .and_then(|t| {
-                if let TyData::Func { params, return_ty } = self.const_intrn().data(t) {
-                    Some((params.clone(), *return_ty))
-                } else {
-                    None
-                }
-            });
+            .and_then(|t| self.return_type_or_none(t));
         let Some(f_callable) = f_callable else {
             return ExprFlow::create(flow, as_cond);
         };
@@ -1505,6 +1545,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 self.ctx.set_node_type(&v, arg_ty);
             }
 
+            self.ctx.set_node_type(&v, f_callable.1);
             return ExprFlow::create(flow, as_cond);
         }
 
@@ -1656,6 +1697,14 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         ExprFlow::create(flow, as_cond)
     }
 
+    fn return_type_or_none(&self, t: TyId) -> Option<(Vec<TyId>, TyId)> {
+        if let TyData::Func { params, return_ty } = self.const_intrn().data(t) {
+            Some((params.clone(), *return_ty))
+        } else {
+            None
+        }
+    }
+
     //+ CHECKED
     fn infer_tensor(
         &mut self,
@@ -1741,13 +1790,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // > call(fun(i) { ... })
         // then from a hint, calculate params_types=[int], return_type=slice
         let hint_unwrapped = hint.map(|h| self.const_intrn().unwrap_alias(h));
-        let h_callable = hint_unwrapped.and_then(|h| {
-            if let TyData::Func { params, return_ty } = self.const_intrn().data(h) {
-                Some((params.clone(), *return_ty))
-            } else {
-                None
-            }
-        });
+        let h_callable = hint_unwrapped.and_then(|h| self.return_type_or_none(h));
 
         let mut params_types = Vec::new();
         let mut body_start = FlowContext::new();

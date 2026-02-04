@@ -107,6 +107,9 @@ impl<'a> TypeDb<'a> {
 
         if !self.currently_lowering.insert(symbol_id) {
             // Cycle detected or already lowering
+            if let Some(&ty) = self.top_level_types.get(&symbol_id) {
+                return Some(ty);
+            }
             return None;
         }
 
@@ -216,7 +219,9 @@ impl<'a> TypeDb<'a> {
 
         // like `type int = builtin` from stdlib
         if matches!(&symbol.kind, SymbolKind::TypeAlias { is_builtin: true }) {
-            return self.as_primitive_type(&symbol.name);
+            let ty = self.as_primitive_type(&symbol.name)?;
+            self.top_level_types.insert(symbol_id, ty);
+            return Some(ty);
         }
 
         let file_index = self.project_index.get_file_index(file_id)?;
