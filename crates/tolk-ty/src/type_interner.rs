@@ -277,8 +277,8 @@ impl TypeInterner {
     }
 
     /// Creates an instantiation of a generic type.
-    pub fn instantiation(&mut self, inner_ty: TyId, types: Vec<TyId>) -> TyId {
-        self.intern(TyData::Instantiation { inner_ty, types })
+    pub fn generic_type_with_ts(&mut self, inner_ty: TyId, types: Vec<TyId>) -> TyId {
+        self.intern(TyData::GenericTypeWithTs { inner_ty, types })
     }
 
     /// Creates a type parameter type.
@@ -389,7 +389,7 @@ impl TypeInterner {
             TyData::Func { params, return_ty } => {
                 params.iter().any(|&p| self.has_generics(p)) || self.has_generics(*return_ty)
             }
-            TyData::Instantiation { inner_ty, types } => {
+            TyData::GenericTypeWithTs { inner_ty, types } => {
                 self.has_generics(*inner_ty) || types.iter().any(|&t| self.has_generics(t))
             }
             TyData::Struct { args, .. } => args
@@ -529,11 +529,11 @@ impl TypeInterner {
                 na == nb
             }
             (
-                TyData::Instantiation {
+                TyData::GenericTypeWithTs {
                     inner_ty: ia,
                     types: ta,
                 },
-                TyData::Instantiation {
+                TyData::GenericTypeWithTs {
                     inner_ty: ib,
                     types: tb,
                 },
@@ -635,7 +635,7 @@ impl TypeInterner {
             },
             (TyData::Cell, TyData::Struct { .. }) => {
                 // Cell<Something> to cell, e.g. `contract.setData(obj.toCell())`
-                if let TyData::Instantiation { inner_ty, .. } = dr
+                if let TyData::GenericTypeWithTs { inner_ty, .. } = dr
                     && let TyData::Struct { name, .. } = self.data(*inner_ty)
                 {
                     return name.as_ref() == "Cell";
@@ -682,11 +682,11 @@ impl TypeInterner {
                 self.equals(*kl, *kr) && self.equals(*vl, *vr)
             }
             (
-                TyData::Instantiation {
+                TyData::GenericTypeWithTs {
                     inner_ty: il,
                     types: tl,
                 },
-                TyData::Instantiation {
+                TyData::GenericTypeWithTs {
                     inner_ty: ir,
                     types: tr,
                 },
@@ -766,7 +766,7 @@ impl TypeInterner {
                     unsigned: false, ..
                 }),
             ) => true, // bool as intN (not uint)
-            (TyData::Cell, TyData::Instantiation { inner_ty, .. }) => {
+            (TyData::Cell, TyData::GenericTypeWithTs { inner_ty, .. }) => {
                 // cell as Cell<T>
                 if let TyData::Struct { name, .. } = self.data(*inner_ty) {
                     return name.as_ref() == "Cell";

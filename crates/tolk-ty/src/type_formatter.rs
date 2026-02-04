@@ -66,7 +66,7 @@ impl<'a> TypeFormatter<'a> {
             TyData::Enum { name, .. } => name.to_string(),
             TyData::TypeAlias { name, .. } => name.to_string(),
             TyData::TypeParameter { name, .. } => name.clone(),
-            TyData::Instantiation { inner_ty, types } => {
+            TyData::GenericTypeWithTs { inner_ty, types } => {
                 let a = types
                     .iter()
                     .map(|t| self.format(*t))
@@ -132,7 +132,7 @@ mod tests {
         let t_struct = interner.struct_ty(dummy_id, "MyStruct".into());
 
         // MyStruct<int>
-        let t_inst = interner.instantiation(t_struct, vec![t_int]);
+        let t_inst = interner.generic_type_with_ts(t_struct, vec![t_int]);
 
         // int | bool
         let t_union = interner.union(vec![t_int, interner.ty_bool]);

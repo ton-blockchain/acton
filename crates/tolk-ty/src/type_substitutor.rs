@@ -116,7 +116,7 @@ impl<'a> TypeSubstitutor<'a> {
                 }
                 self.interner.intern(TyData::Func { params, return_ty })
             }
-            TyData::Instantiation {
+            TyData::GenericTypeWithTs {
                 inner_ty: old_inner,
                 types: ref old_types,
             } => {
@@ -134,7 +134,7 @@ impl<'a> TypeSubstitutor<'a> {
                     return id;
                 }
                 self.interner
-                    .intern(TyData::Instantiation { inner_ty, types })
+                    .intern(TyData::GenericTypeWithTs { inner_ty, types })
             }
             TyData::Struct {
                 def,

@@ -132,7 +132,7 @@ impl<'a> TypeDb<'a> {
         let unwrapped = self.intrn.unwrap_alias(struct_ty);
         match self.intrn.data(unwrapped) {
             TyData::Struct { def, .. } => Some(*def),
-            TyData::Instantiation { inner_ty, .. } => {
+            TyData::GenericTypeWithTs { inner_ty, .. } => {
                 if let TyData::Struct { def, .. } = self.intrn.data(*inner_ty) {
                     Some(*def)
                 } else {
@@ -188,7 +188,20 @@ impl<'a> TypeDb<'a> {
             for symbol in &file_index.decls {
                 let Symbol { kind, name, id, .. } = symbol;
                 let ty = match kind {
-                    SymbolKind::Struct { .. } => Some(self.intrn.struct_ty(*id, name.clone())),
+                    SymbolKind::Struct {
+                        type_parameters, ..
+                    } => {
+                        let base_ty = self.intrn.struct_ty(*id, name.clone());
+                        if type_parameters.is_empty() {
+                            Some(base_ty)
+                        } else {
+                            let type_parameters = type_parameters
+                                .iter()
+                                .map(|p| self.intrn.type_parameter(p.to_string(), None))
+                                .collect();
+                            Some(self.intrn.generic_type_with_ts(base_ty, type_parameters))
+                        }
+                    }
                     SymbolKind::Enum { .. } => Some(self.intrn.enum_ty(*id, name.clone())),
                     // other symbols will be inferred later, we need all top level types for them, or whole type inference
                     _ => continue,
@@ -218,7 +231,13 @@ impl<'a> TypeDb<'a> {
         }
 
         // like `type int = builtin` from stdlib
-        if matches!(&symbol.kind, SymbolKind::TypeAlias { is_builtin: true }) {
+        if matches!(
+            &symbol.kind,
+            SymbolKind::TypeAlias {
+                is_builtin: true,
+                ..
+            }
+        ) {
             let ty = self.as_primitive_type(&symbol.name)?;
             self.top_level_types.insert(symbol_id, ty);
             return Some(ty);
@@ -509,7 +528,31 @@ impl<'a> TypeDb<'a> {
         let types = args_list.types();
         let tys = types.map(|t| self.lower_type(file_id, &t)).collect();
 
-        Some(self.intrn.instantiation(inner_ty, tys))
+        if let TyData::GenericTypeWithTs { inner_ty, .. } = self.intrn.data(inner_ty) {
+            if let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
+                return Some(
+                    self.intrn
+                        .struct_instantiation(*def, name.clone(), *def, tys),
+                );
+            }
+
+            if let TyData::TypeAlias {
+                def,
+                name,
+                inner_ty,
+                ..
+            } = self.intrn.data(*inner_ty)
+            {
+                return Some(self.intrn.type_alias_instantiation(
+                    *def,
+                    name.clone(),
+                    *inner_ty,
+                    tys,
+                ));
+            }
+        }
+
+        Some(self.intrn.generic_type_with_ts(inner_ty, tys))
     }
 
     fn convert_function_type(&mut self, func: &FunCallableType, file_id: FileId) -> Option<TyId> {

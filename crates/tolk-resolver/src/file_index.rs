@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, ast};
+use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, SourceFile, ast};
 use tree_sitter::Node;
 
 /// Represents a byte range in the source code.
@@ -200,6 +200,7 @@ pub enum SymbolKind {
         /// Fields of the struct.
         fields: Vec<Symbol>,
         is_generic: bool,
+        type_parameters: Vec<Arc<str>>,
     },
     /// A field within a struct.
     StructField,
@@ -216,6 +217,7 @@ pub enum SymbolKind {
     TypeAlias {
         /// When `type slice = builtin`
         is_builtin: bool,
+        type_parameters: Vec<Arc<str>>,
     },
 }
 
@@ -358,6 +360,7 @@ impl FileIndex {
                             decl.underlying_type(),
                             Some(ast::TypeAliasUnderlyingType::BuiltinSpecifier(_))
                         ),
+                        type_parameters: Self::extract_type_parameters(file, decl),
                     },
                     name_span,
                     body_span,
@@ -397,6 +400,7 @@ impl FileIndex {
                         kind: SymbolKind::Struct {
                             fields,
                             is_generic: decl.type_parameters().is_some(),
+                            type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
                         body_span,
@@ -566,6 +570,24 @@ impl FileIndex {
             symbol_id_to_decl_index,
             body_spans,
         }
+    }
+
+    fn extract_type_parameters<'a, Node: HasGenericParams<'a>>(
+        file: &SourceFile,
+        decl: Node,
+    ) -> Vec<Arc<str>> {
+        decl.type_parameters()
+            .map(|tp| {
+                tp.parameters()
+                    .flat_map(|p| {
+                        let name_ident = p.name()?;
+                        Some(Arc::from(name_ident.text(&file.source)))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+            .into_iter()
+            .collect()
     }
 
     fn is_deprecated<'a, Node: HasAnnotations<'a>>(content: &str, node: Node) -> bool {
