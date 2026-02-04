@@ -4,7 +4,7 @@
   background-color: var(--bg-color);
   color: var(--text-secondary);
   padding: var(--spacing-mds) var(--spacing-mds) calc(var(--spacing-mds) - 2px);
-  border-radius: 6px;
+  border-radius: var(--border-radius-md);
   border: 1px solid var(--border-color);
   word-break: break-all;
   white-space: pre-wrap;

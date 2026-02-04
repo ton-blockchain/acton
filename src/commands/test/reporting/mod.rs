@@ -37,13 +37,11 @@ pub struct TestReport {
     pub file_path: String,
     pub row: usize,
     pub column: usize,
-    #[serde(skip)]
     pub duration: Duration,
     #[serde(skip)]
     pub gas_limit: Option<u64>,
     pub status: TestStatus,
     pub message: Option<String>,
-    #[serde(skip)]
     pub details: Option<String>,
     #[serde(skip)]
     pub abi: ContractAbi,

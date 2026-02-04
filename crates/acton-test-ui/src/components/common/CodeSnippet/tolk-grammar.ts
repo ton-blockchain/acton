@@ -1,0 +1,109 @@
+export const tolkGrammar = {
+  $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  name: "tolk",
+  scopeName: "source.tolk",
+  foldingStartMarker: "\\{\\s*$",
+  foldingStopMarker: "^\\s*\\}",
+  fileTypes: ["tolk"],
+  patterns: [
+    {
+      name: "comment.line.double-slash",
+      match: "//(.*)",
+    },
+    {
+      name: "comment.block",
+      begin: "/\\*",
+      end: "\\*/",
+    },
+    {
+      name: "string.quoted.triple.tolk",
+      begin: '"""',
+      end: '"""',
+      patterns: [
+        {
+          name: "constant.character.escape.tolk",
+          match: "\\\\.",
+        },
+      ],
+    },
+    {
+      name: "string.quoted.double.tolk",
+      begin: '"',
+      end: '"',
+      patterns: [
+        {
+          name: "constant.character.escape.tolk",
+          match: "\\\\([nrt0\\\\'\"u]|u[0-9a-fA-F]{4})",
+        },
+      ],
+    },
+    {
+      name: "constant.numeric",
+      match: "\\b(-?([\\d]+|0x[\\da-fA-F]+|0b[01]+))\\b",
+    },
+    {
+      name: "keyword.control",
+      match:
+        "\\b(do|if|try|else|while|break|throw|catch|return|assert|repeat|continue|asm|builtin|match|lazy)\\b",
+    },
+    {
+      name: "keyword.operator",
+      match:
+        "\\+|-|\\*|/|%|\\?|:|,|;|\\(|\\)|\\[|\\]|{|}|=|<|>|!|&|\\||\\^|==|!=|<=|>=|<<|>>|&&|\\|\\||~/|\\^/|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|->|<=>|~>>|\\^>>|<<=|>>=|=>|\\?\\?",
+    },
+    {
+      name: "keyword.other",
+      match:
+        "\\b(import|export|true|false|null|redef|mutate|tolk|as|is|!is|private|readonly|string|contract)\\b",
+    },
+    {
+      name: "keyword.other",
+      match: "\\bself\\b",
+    },
+    {
+      name: "entity.name.type.parameter",
+      match: "\\b[TU]\\b",
+    },
+    {
+      match:
+        "\\b(val|var)\\s+(?:type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|coins|address|int\\d+|uint\\d+|bits\\d+|bytes\\d+)\\b",
+      captures: {
+        "1": { name: "storage.modifier" },
+      },
+    },
+    {
+      name: "constant.other",
+      match: "\\b[A-Z][A-Z0-9_]{2,}\\b",
+    },
+    {
+      name: "storage.type",
+      match:
+        "\\b(type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|coins|int\\d+|uint\\d+|bits\\d+|bytes\\d+)\\b",
+    },
+    {
+      name: "storage.type",
+      match: "(?<!\\.)\\baddress\\b(?!\\s*:)",
+    },
+    {
+      name: "storage.modifier",
+      match: "\\b(global|const|var|val|fun|get|struct|contract)\\b",
+    },
+    {
+      name: "entity.name.type",
+      match: "@\\w+",
+    },
+    {
+      name: "entity.name.function",
+      match: "(`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*)(?=\\s*(?:<[^>]+>)?\\s*\\()",
+    },
+    {
+      name: "entity.name.type",
+      match: "\\b[A-Z][a-zA-Z0-9]*\\b",
+    },
+    {
+      name: "variable.name",
+      match: "`[^`]+`|[a-zA-Z$_][a-zA-Z0-9$_]*",
+    },
+  ],
+  repository: {},
+}

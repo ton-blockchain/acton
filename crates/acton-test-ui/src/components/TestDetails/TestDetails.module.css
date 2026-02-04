@@ -43,6 +43,10 @@
   position: relative;
   display: flex;
   align-items: center;
+  background-color: var(--bg-secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px;
 }
 
 .ideTrigger {
@@ -50,8 +54,7 @@
   align-items: center;
   justify-content: center;
   padding: 4px;
-  border-radius: 4px;
-  border: 1px solid transparent;
+  border: none;
   background: none;
   color: var(--text-muted);
   cursor: pointer;
@@ -59,48 +62,64 @@
     background-color 0.2s,
     color 0.2s,
     border-color 0.2s;
-  margin-left: 4px;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  border-left: 1px solid var(--border-color);
 }
 
 .ideTrigger:hover,
 .ideTrigger.active {
-  color: var(--color-todo);
+  color: var(--text-primary);
   background-color: var(--hover-bg);
-  border-color: var(--border-color);
 }
 
 .ideDropdown {
   position: absolute;
   top: 100%;
-  left: 0;
-  margin-top: 8px;
+  right: 0;
+  margin-top: var(--spacing-xs);
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow);
   z-index: 1000;
-  min-width: 140px;
-  padding: 6px;
+  min-width: 180px;
+  padding: var(--spacing-xss);
   display: flex;
   flex-direction: column;
+  gap: 1px;
 }
 
 .ideItem {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 6px;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
   color: var(--text-primary);
   text-decoration: none;
-  font-size: 0.85rem;
-  transition: background-color 0.2s;
+  font-size: var(--font-size-sm);
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
 .ideItem:hover {
-  background-color: var(--bg-color);
-  color: var(--color-todo);
+  background-color: var(--hover-bg);
+}
+
+.selectedIde {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.selectedIde .ideIcon {
+  color: var(--text-primary);
 }
 
 .ideIcon {
@@ -126,11 +145,6 @@
 }
 .todoIcon {
   color: var(--color-todo);
-}
-
-.errorMessage {
-  margin: 16px 24px 0;
-  padding: 0;
 }
 
 .traceSelector {
@@ -251,6 +265,149 @@
   border-radius: var(--border-radius-sm);
   font-weight: var(--font-weight-normal);
   font-family: var(--font-mono);
+}
+
+.infoTab {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.infoItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xss);
+}
+
+.infoLabel {
+  font-size: var(--font-size-xss);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+}
+
+.infoValue {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.gridIdeSelector {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--bg-secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1px;
+}
+
+.gridIdeQuickLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  font-size: 0.85rem;
+}
+
+.gridIdeQuickLink:hover {
+  color: var(--text-primary);
+}
+
+.gridIdeTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.7rem;
+  border-left: 1px solid var(--border-color);
+}
+
+.gridIdeTrigger:hover,
+.gridIdeTrigger.active {
+  color: var(--text-primary);
+  background-color: var(--hover-bg);
+}
+
+.ideQuickLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  color: var(--text-muted);
+  transition: all 0.2s;
+  font-size: 1rem;
+}
+
+.ideQuickLink:hover {
+  color: var(--text-primary);
+}
+
+.gridIdeDropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--spacing-xs);
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  min-width: 180px;
+  padding: var(--spacing-xss);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.infoValue.passed {
+  color: var(--color-passed);
+}
+.infoValue.failed {
+  color: var(--color-failed);
+}
+.infoValue.skipped {
+  color: var(--color-skipped);
+}
+.infoValue.todo {
+  color: var(--color-todo);
+}
+
+.errorSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.errorTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.errorMessageBlock {
+  border-left: 4px solid var(--border-color);
+  background-color: var(--bg-secondary-color);
+  color: var(--text-primary);
 }
 
 .empty {

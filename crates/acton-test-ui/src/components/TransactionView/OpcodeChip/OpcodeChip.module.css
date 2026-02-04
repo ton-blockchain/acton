@@ -1,9 +1,9 @@
 .opcodeChip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacing-sm);
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   color: var(--text-primary);
   position: relative;
   transition: background-color 0.2s ease;

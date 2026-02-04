@@ -1,7 +1,7 @@
 .transactionDetailsContainer {
-  border-radius: 8px;
+  border-radius: var(--border-radius-md);
   background-color: var(--bg-color);
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-md);
   border: 1px solid var(--border-color);
   position: relative;
 }
@@ -20,9 +20,9 @@
   display: flex;
   align-items: center;
   text-align: left;
-  font-weight: 500;
+  font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
-  padding: 4px 12px;
+  padding: var(--spacing-xs) var(--spacing-mds);
   width: 160px;
   flex-shrink: 0;
   vertical-align: top;
@@ -32,7 +32,7 @@
 }
 
 .detailValue {
-  padding: 4px 12px;
+  padding: var(--spacing-xs) var(--spacing-mds);
   color: var(--text-primary);
   word-break: break-all;
   font-size: 0.8125rem;
@@ -59,9 +59,9 @@
 
 .labeledSectionTitle {
   text-align: left;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
-  padding: 4px 12px;
+  padding: var(--spacing-xs) var(--spacing-mds);
   width: 160px;
   flex-shrink: 0;
   font-size: 0.8125rem;
@@ -73,12 +73,12 @@
 }
 
 .labeledSectionContent {
-  padding: 4px 12px;
+  padding: var(--spacing-xs) var(--spacing-mds);
   flex-grow: 1;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacing-xs);
   overflow: visible;
   min-width: 0;
   width: 100%;
@@ -88,7 +88,7 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 16px;
+  gap: var(--spacing-md);
 }
 
 .multiColumnItem {
@@ -114,17 +114,17 @@
   font-size: 0.8125rem;
   color: var(--text-primary);
   word-break: break-word;
-  gap: 4px;
+  gap: var(--spacing-xs);
   display: flex;
 }
 
 .booleanTrue {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-passed);
 }
 
 .booleanFalse {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   color: var(--color-failed);
 }
 
@@ -137,8 +137,8 @@
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 4px;
-  margin-left: 4px;
+  padding: var(--spacing-xs);
+  margin-left: var(--spacing-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -150,9 +150,9 @@
 }
 
 .actionsToggleText {
-  margin-left: 4px;
-  font-size: 0.75rem;
-  font-weight: 500;
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }
 
 @media (max-width: 768px) {

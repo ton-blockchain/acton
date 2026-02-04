@@ -14,11 +14,11 @@
 
 .expandButton {
   position: absolute;
-  left: 12px;
-  top: 12px;
+  left: var(--spacing-md);
+  top: var(--spacing-md);
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: var(--border-radius-sm);
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
   display: flex;

@@ -527,10 +527,22 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     {
         let reports = reports.lock().expect("cannot lock mutex").clone();
         let trace_dir = config.save_test_trace.clone();
+        let project_root = std::env::current_dir().unwrap_or_default();
+        let project_root = fs::canonicalize(project_root)
+            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default())
+            .to_string_lossy()
+            .to_string();
+        let project_root = if project_root.ends_with(std::path::MAIN_SEPARATOR) {
+            project_root
+        } else {
+            format!("{}{}", project_root, std::path::MAIN_SEPARATOR)
+        };
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        rt.block_on(async { start_ui_server(reports, trace_dir, config.ui_port).await })?;
+        rt.block_on(async {
+            start_ui_server(reports, trace_dir, project_root, config.ui_port).await
+        })?;
     }
 
     if let Some(filter) = &config.filter

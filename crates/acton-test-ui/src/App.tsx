@@ -10,6 +10,7 @@ export const App: React.FC = () => {
   const [reports, setReports] = useState<TestReport[]>([])
   const [selectedTest, setSelectedTest] = useState<TestReport | null>(null)
   const [currentTrace, setCurrentTrace] = useState<Trace | null>(null)
+  const [projectRoot, setProjectRoot] = useState<string>("")
   const [theme, setTheme] = useState(() => {
     return (
       localStorage.getItem("theme") ||
@@ -89,6 +90,15 @@ export const App: React.FC = () => {
   }, [])
 
   useEffect(() => {
+    fetch("/api/config")
+      .then((res) => res.json())
+      .then((data: { project_root: string }) => {
+        setProjectRoot(data.project_root)
+      })
+      .catch((err) => {
+        console.error("Failed to fetch config", err)
+      })
+
     fetch("/api/reports")
       .then((res) => res.json())
       .then((data: TestReport[]) => {
@@ -159,7 +169,7 @@ export const App: React.FC = () => {
 
       <div className={styles.mainContent}>
         {selectedTest ? (
-          <TestDetails test={selectedTest} trace={currentTrace} />
+          <TestDetails test={selectedTest} trace={currentTrace} projectRoot={projectRoot} />
         ) : (
           <div className={styles.noSelection}>Select a test to see details</div>
         )}
