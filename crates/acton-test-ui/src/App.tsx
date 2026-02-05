@@ -1,14 +1,16 @@
 import type React from "react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { FiChevronRight } from "react-icons/fi"
+import styles from "./App.module.css"
 import { Sidebar } from "./components/Sidebar/Sidebar"
 import { TestDetails } from "./components/TestDetails/TestDetails"
-import type { TestReport, Trace } from "./types"
+import type { TestReport, Trace } from "@acton/shared-ui"
 
 export const App: React.FC = () => {
   const [reports, setReports] = useState<TestReport[]>([])
   const [selectedTest, setSelectedTest] = useState<TestReport | null>(null)
   const [currentTrace, setCurrentTrace] = useState<Trace | null>(null)
+  const [projectRoot, setProjectRoot] = useState<string>("")
   const [theme, setTheme] = useState(() => {
     return (
       localStorage.getItem("theme") ||
@@ -88,6 +90,15 @@ export const App: React.FC = () => {
   }, [])
 
   useEffect(() => {
+    fetch("/api/config")
+      .then((res) => res.json())
+      .then((data: { project_root: string }) => {
+        setProjectRoot(data.project_root)
+      })
+      .catch((err) => {
+        console.error("Failed to fetch config", err)
+      })
+
     fetch("/api/reports")
       .then((res) => res.json())
       .then((data: TestReport[]) => {
@@ -113,17 +124,11 @@ export const App: React.FC = () => {
   }, [handleSelectTest, selectedTest])
 
   if (loading && reports.length === 0) {
-    return (
-      <div
-        style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}
-      >
-        Loading...
-      </div>
-    )
+    return <div className={styles.loadingContainer}>Loading...</div>
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", position: "relative" }}>
+    <div className={styles.app}>
       {!isSidebarCollapsed && (
         <Sidebar
           reports={reports}
@@ -140,23 +145,7 @@ export const App: React.FC = () => {
         <button
           type="button"
           onClick={toggleSidebar}
-          style={{
-            position: "absolute",
-            left: "12px",
-            top: "12px",
-            width: "32px",
-            height: "32px",
-            borderRadius: "6px",
-            backgroundColor: "var(--card-bg)",
-            border: "1px solid var(--border-color)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            zIndex: 100,
-            color: "var(--text-secondary)",
-            boxShadow: "var(--shadow)",
-          }}
+          className={styles.expandButton}
           title="Expand sidebar"
         >
           <FiChevronRight size={20} />
@@ -173,34 +162,16 @@ export const App: React.FC = () => {
         aria-valuemin={200}
         aria-valuemax={800}
         aria-label="Resize sidebar"
-        style={{
-          width: "4px",
-          cursor: isSidebarCollapsed ? "default" : "col-resize",
-          backgroundColor:
-            isHoveredResizer && !isSidebarCollapsed ? "var(--color-todo)" : "transparent",
-          transition: "background-color 0.2s",
-          borderLeft: "1px solid var(--border-color)",
-          zIndex: 10,
-          flexShrink: 0,
-          outline: "none",
-          position: "relative",
-        }}
+        className={`${styles.resizer} ${!isSidebarCollapsed ? styles.resizerActive : ""} ${
+          isHoveredResizer && !isSidebarCollapsed ? styles.resizerHovered : ""
+        }`}
       />
 
-      <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
+      <div className={styles.mainContent}>
         {selectedTest ? (
-          <TestDetails test={selectedTest} trace={currentTrace} />
+          <TestDetails test={selectedTest} trace={currentTrace} projectRoot={projectRoot} />
         ) : (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              height: "100%",
-            }}
-          >
-            Select a test to see details
-          </div>
+          <div className={styles.noSelection}>Select a test to see details</div>
         )}
       </div>
     </div>

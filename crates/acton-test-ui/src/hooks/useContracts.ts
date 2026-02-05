@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { BackendContractInfo } from "../types"
+import type { BackendContractInfo } from "@acton/shared-ui"
 
 export function useContracts(contractNames: string[]) {
   const [contracts, setContracts] = useState<Record<string, BackendContractInfo>>({})

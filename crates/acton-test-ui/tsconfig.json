@@ -14,7 +14,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@acton/shared-ui": ["../acton-shared-ui/src/index.ts"],
+      "@acton/shared-ui/*": ["../acton-shared-ui/*"],
+      "@/*": ["../acton-shared-ui/src/*"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

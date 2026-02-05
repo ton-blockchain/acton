@@ -32,7 +32,7 @@ pub(super) struct ContractInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) struct TransactionInfo {
+pub struct TransactionInfo {
     pub lt: String,
     pub raw_transaction: String,
     pub parent_transaction: Option<String>,

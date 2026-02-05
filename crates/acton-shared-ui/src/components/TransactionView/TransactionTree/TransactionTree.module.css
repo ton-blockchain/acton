@@ -1,0 +1,195 @@
+.container {
+  width: 100%;
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+}
+
+.treeContainer {
+  width: 100%;
+  height: auto;
+  overflow: auto hidden;
+  position: relative;
+  background-color: var(--bg-color);
+}
+
+.treeWrapper {
+  height: 100%;
+  position: relative;
+}
+
+.treeContainer :global(.rd3t-tree-container) {
+  width: 100%;
+  height: 100%;
+}
+
+.treeContainer :global(.rd3t-node) {
+  cursor: pointer;
+}
+
+.treeContainer :global(.rd3t-node text) {
+  pointer-events: none;
+  user-select: none;
+}
+
+.edgeStyle {
+  stroke: var(--text-muted);
+  stroke-width: 1px;
+}
+
+.edgeStyleWithInit {
+  /* stroke-width: 2px; */
+}
+
+.edgeStyleBounced {
+  stroke-dasharray: 10;
+}
+
+.edgeTextTitle {
+  font-size: var(--font-size-xs);
+  font-weight: bold;
+  margin: 0;
+  color: var(--text-primary);
+  text-align: end;
+}
+
+.edgeText {
+  font-size: 0.625rem;
+  margin: 0;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: end;
+  cursor: pointer;
+}
+
+.edgeText * {
+  pointer-events: none;
+}
+
+.edgeTextContent {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.treeContainer :global(.rd3t-link) {
+  stroke: var(--text-muted);
+}
+
+.tooltip {
+  background-color: var(--bg-color);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  min-width: 200px;
+  max-width: 280px;
+  z-index: 1000;
+  position: relative;
+}
+
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -8px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--bg-color);
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.1));
+}
+
+.tooltipContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.tooltipField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.tooltipFieldLabel {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+}
+
+.tooltipFieldValue {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.tooltipSubValue {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.foreignObjectContainer {
+  pointer-events: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.iconSvg {
+  display: block;
+  stroke: none;
+}
+
+.transactionDetails {
+  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+  background-color: var(--bg-color);
+  margin: 0 var(--spacing-md);
+}
+
+.topText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bottonText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nodeCircle,
+.nodeCircleSelected {
+  cursor: pointer;
+}
+
+.nodeCircleSelected:focus {
+  outline: none;
+}
+
+.nodeCircle:focus {
+  outline-width: 1px;
+  border-radius: 50%;
+}
+
+.nodeCircleDefault {
+  cursor: default;
+}
+
+.nodeText {
+  pointer-events: none;
+}
+
+.contractStateData {
+  font-family: var(--font-mono), monospace;
+  font-size: var(--font-size-xs);
+}

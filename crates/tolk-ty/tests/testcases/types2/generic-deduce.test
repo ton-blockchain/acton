@@ -1,0 +1,352 @@
+========================================================================
+Generic function with single argument: deduce primitive type argument
+========================================================================
+fun generic<T>(a: T): T {}
+
+fun main() {
+    val foo = generic(10);
+//!     ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce struct type argument
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T>(a: T): T {}
+
+fun main() {
+    val foo = generic(Foo {});
+//!     ^ Foo
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce union type argument
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T>(a: T): T {}
+
+fun main(a: int | bool) {
+    val foo = generic(a);
+//!     ^ int | bool
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce tuple type argument
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T>(a: T): T {}
+
+fun main(a: int | bool) {
+    val foo = generic([a, 1, true]);
+//!     ^ [int | bool, int, bool]
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce tensor type argument
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T>(a: T): T {}
+
+fun main(a: int | bool) {
+    val foo = generic((a, 1, true));
+//!     ^ (int | bool, int, bool)
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with several arguments: deduce all types
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T, U, V>(a: T, b: U, c: V): [T | U, V] {}
+
+fun main() {
+    val foo = generic(1, true, "");
+//!     ^ [int | bool, slice]
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce types from tuple
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T, U>(a: [T, U]): T | U {}
+
+fun main(a: int | bool) {
+    val foo = generic([1, true]);
+//!     ^ int | bool
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce types from tensor
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T, U>(a: (T, U)): T | U {}
+
+fun main(a: int | bool) {
+    val foo = generic((1, true));
+//!     ^ int | bool
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce types from function
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T, U>(a: (T) -> U): T | U {}
+
+fun inc(a: int): bool {}
+
+fun main(a: int | bool) {
+    val foo = generic(inc);
+//!     ^ int | bool
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce types union type
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T, U>(a: T | U): T | U {}
+
+fun main(a: int | bool) {
+    val foo = generic(a);
+//!     ^ int | bool
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic function with single argument: deduce types union type with non generic one
+========================================================================
+struct Foo {
+    value: int,
+}
+
+fun generic<T>(a: int | T): T {}
+
+fun main(a: int | bool | slice) {
+    val foo = generic(a);
+//!     ^ bool | slice
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic instance method with single argument: deduce primitive type argument
+========================================================================
+fun int.generic<T>(self, a: T): T {}
+
+fun main() {
+    val foo = 10.generic(10);
+//!     ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic static method with T receiver
+========================================================================
+fun T.generic(): T {}
+
+fun main() {
+    val foo1 = int.generic();
+//!     ^ int
+    val foo2 = slice.generic();
+//!     ^ slice
+}
+------------------------------------------------------------------------
+type inference error at offset 44: expected int, got T
+type inference error at offset 88: expected slice, got T
+
+========================================================================
+Generic instance method with T receiver
+========================================================================
+fun T.generic(self): T {}
+
+fun main() {
+    val foo1 = 10.generic();
+//!     ^ int
+    val foo2 = "hello".generic();
+//!     ^ slice
+}
+------------------------------------------------------------------------
+type inference error at offset 48: expected int, got T
+type inference error at offset 91: expected slice, got T
+
+========================================================================
+Generic instance method with T? receiver
+========================================================================
+fun T?.generic(self): T {}
+
+fun main() {
+    val foo1 = 10.generic();
+//!     ^ int
+    val foo2 = "hello".generic();
+//!     ^ slice
+}
+------------------------------------------------------------------------
+type inference error at offset 49: expected int, got T
+type inference error at offset 92: expected slice, got T
+
+========================================================================
+Generic static method with single argument and T receiver
+========================================================================
+fun T.generic<U>(a: U): T | U {}
+
+fun main() {
+    val foo = int.generic("hello");
+//!     ^ int | slice
+}
+------------------------------------------------------------------------
+type inference error at offset 55: expected int | slice, got T | slice
+
+========================================================================
+Generic instance method with single argument and T receiver
+========================================================================
+fun T.generic<U>(self, a: U): T | U {}
+
+fun main() {
+    val foo = 10.generic("hello");
+//!     ^ int | slice
+}
+------------------------------------------------------------------------
+type inference error at offset 61: expected int | slice, got T | slice
+
+========================================================================
+Generic struct with single field: deduce primitive type
+========================================================================
+struct Foo<T> {
+    field: T,
+}
+
+fun main() {
+    val foo =
+//!     ^ Foo<int>
+        Foo { field: 10 }
+//!           ^ int
+}
+------------------------------------------------------------------------
+type inference error at offset 54: expected Foo<int>, got Foo
+
+========================================================================
+Generic struct with single field and short init: deduce primitive type
+========================================================================
+struct Foo<T> {
+    field: T,
+}
+
+fun main() {
+    val field = 10;
+    val foo =
+//!     ^ Foo<int>
+        Foo { field }
+//!           ^ int
+}
+------------------------------------------------------------------------
+type inference error at offset 74: expected Foo<int>, got Foo
+type inference error at offset 113: expected int, got T
+
+========================================================================
+Generic struct with never default type
+========================================================================
+struct Foo<T=never> {
+    field: T,
+}
+
+fun main() {
+    val field = 10;
+    val foo =
+//!     ^ Foo<never>
+        Foo {}
+}
+------------------------------------------------------------------------
+type inference error at offset 80: expected Foo<never>, got Foo
+
+========================================================================
+Generic struct with several never default types and single type deduced
+========================================================================
+struct Foo<T=never, U=never> {
+    field: T,
+    other: U,
+}
+
+fun main() {
+    val field = 10;
+    val foo =
+//!     ^ Foo<never, never>
+        Foo {};
+
+    val foo2 =
+//!     ^ Foo<never, int>
+        Foo { other: 10 };
+}
+------------------------------------------------------------------------
+type inference error at offset 103: expected Foo<never, never>, got Foo
+type inference error at offset 162: expected Foo<never, int>, got Foo
+
+========================================================================
+Generic struct with other struct default type
+========================================================================
+struct Bar {
+    value: int,
+}
+
+struct Foo<T=Bar> {
+    field: T,
+}
+
+fun main() {
+    val field = 10;
+    val foo2 =
+//!     ^ Foo<Bar>
+        Foo { field: {
+//!                  ^ Bar
+            value: 10,
+//!         ^ int
+        } };
+}
+------------------------------------------------------------------------
+type inference error at offset 110: expected Foo<Bar>, got Foo
+type inference error at offset 157: unknown type
+type inference error at offset 198: unknown type

@@ -229,7 +229,7 @@ mod tests {
         let result = substitutor.substitute(t_func, &mapping);
 
         let formatter = TypeFormatter::new(&interner);
-        assert_eq!(formatter.format(result), "fun (int) -> bool");
+        assert_eq!(formatter.format(result), "(int) -> bool");
     }
 
     #[test]

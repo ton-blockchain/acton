@@ -1,0 +1,62 @@
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.expandButton {
+  position: absolute;
+  left: var(--spacing-md);
+  top: var(--spacing-md);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow);
+}
+
+.resizer {
+  width: 2px;
+  transition: background-color 0.2s;
+  z-index: 10;
+  flex-shrink: 0;
+  outline: none;
+  position: relative;
+  background: transparent;
+}
+
+.resizerActive {
+  cursor: col-resize;
+}
+
+.resizerHovered {
+  background-color: var(--color-todo);
+}
+
+.mainContent {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.noSelection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}

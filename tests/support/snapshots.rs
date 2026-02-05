@@ -59,7 +59,7 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
         .insert("[BOC_HEX]", regex!("b5ee[\\d\\w]*"))
         .unwrap();
     redactions
-        .insert("[MAYBE_UNIX_TIME_VALUE]", regex!(" = 176\\d+"))
+        .insert("[MAYBE_UNIX_TIME_VALUE]", regex!(" = 17\\d+"))
         .unwrap();
     redactions
         .insert(

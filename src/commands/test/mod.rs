@@ -22,6 +22,7 @@ use crate::debugger::dap::DapTransport;
 use crate::debugger::debug_context::DebugContext;
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
+use crate::formatter::FormatterContext;
 use acton_config::config::{ActonConfig, ContractDependency, DependencyKind};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::anyhow;
@@ -59,8 +60,8 @@ mod coverage;
 mod instrumentation;
 pub mod mutation;
 mod profiling;
-mod reporting;
-mod trace;
+pub mod reporting;
+pub mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -527,10 +528,22 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     {
         let reports = reports.lock().expect("cannot lock mutex").clone();
         let trace_dir = config.save_test_trace.clone();
+        let project_root = std::env::current_dir().unwrap_or_default();
+        let project_root = fs::canonicalize(project_root)
+            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default())
+            .to_string_lossy()
+            .to_string();
+        let project_root = if project_root.ends_with(std::path::MAIN_SEPARATOR) {
+            project_root
+        } else {
+            format!("{}{}", project_root, std::path::MAIN_SEPARATOR)
+        };
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        rt.block_on(async { start_ui_server(reports, trace_dir, config.ui_port).await })?;
+        rt.block_on(async {
+            start_ui_server(reports, trace_dir, project_root, config.ui_port).await
+        })?;
     }
 
     if let Some(filter) = &config.filter
@@ -803,6 +816,9 @@ fn run_file_tests(
             gas_limit: test.gas_limit,
             status: TestStatus::Passed,
             message: None,
+            detailed_message: None,
+            failed_transactions: None,
+            failed_transaction_context: None,
             details: None,
             abi: abi.clone(),
             source_map: source_map.clone(),
@@ -906,15 +922,47 @@ fn run_file_tests(
         } else {
             test_report.status = TestStatus::Failed;
 
+            let formatter = FormatterContext {
+                contract_abi: abi.clone(),
+                accounts: accounts.clone(),
+                build_cache: runner.build_cache.clone(),
+                emulations: runner.emulations.clone(),
+                known_addresses: runner.known_addresses.clone(),
+                known_code_cells: runner.known_code_cells.clone(),
+                backtrace: runner.config.backtrace.as_ref().map(ToString::to_string),
+                fork_net: None,
+                network: None,
+                api_key: None,
+            };
+
             if let Some(failure) = &assert_failure {
                 test_report.message = failure.message();
                 test_report.details = failure.location();
+                test_report.detailed_message =
+                    Some(formatter.format_detailed_assert_failure(failure, abi));
+
+                if let AssertFailure::TransactionNotFound(tx_failure)
+                | AssertFailure::TransactionIsFound(tx_failure) = failure
+                {
+                    test_report.failed_transactions =
+                        Some(formatter.parse_failed_transactions(&tx_failure.txs));
+                    test_report.failed_transaction_context =
+                        Some(formatter.get_failed_transaction_context(tx_failure, abi));
+                }
             } else if expected_exit_code != 0 {
                 test_report.message = Some(format!(
                     "Expected exit_code={expected_exit_code}, got={exit_code}"
                 ));
+                if let GetMethodResult::Success(result) = &get_result {
+                    test_report.detailed_message =
+                        Some(formatter.format_detailed_exit_code(&test_report, result, exit_code));
+                }
             } else {
                 test_report.message = Some(format!("exit_code={exit_code}"));
+                if let GetMethodResult::Success(result) = &get_result {
+                    test_report.detailed_message =
+                        Some(formatter.format_detailed_exit_code(&test_report, result, exit_code));
+                }
             }
 
             failed += 1;

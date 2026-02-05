@@ -103,6 +103,7 @@ pub struct SymbolResolver<'a> {
     file: Arc<FileInfo>,
     env: GlobalEnv,
     decl: Option<ast::TopLevel<'a>>,
+    inside_method_receiver: bool,
 }
 
 /// Represents an error encountered during symbol resolution.
@@ -136,6 +137,7 @@ impl<'a> SymbolResolver<'a> {
             file,
             env,
             decl: None,
+            inside_method_receiver: false,
         }
     }
 
@@ -216,6 +218,28 @@ impl<'a> SymbolResolver<'a> {
         let candidates = self.env.visible.get(&name).unwrap_or(&empty_candidates);
 
         if candidates.is_empty() {
+            if self.inside_method_receiver {
+                // fun Foo<T>.foo() {}
+                //         ^ unresolved
+
+                let normalized_name = norm(&name);
+                let local_def = LocalDef {
+                    id: LocalDefId {
+                        file_id: self.file.id(),
+                        local: ident.start_byte() as u32, // this way LocalDefId can be constructed right away from Node
+                    },
+                    name: normalized_name.clone(),
+                    def_span: ident.span(),
+                    kind: LocalDefKind::TypeParameter,
+                };
+
+                self.locals.push(local_def.clone());
+                self.scopes[self.current_scope]
+                    .symbols
+                    .insert(normalized_name, local_def.id);
+                return None;
+            }
+
             self.uses.push(NameUse {
                 decl: decl_start,
                 span: ident.span(),
@@ -358,6 +382,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
     }
 
     fn walk_type_alias(&mut self, node: &TypeAlias<'tree>) -> Self::Result {
+        self.enter_scope(); // for type parameters
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -367,10 +392,12 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
         if let Some(underlying_type) = node.underlying_type() {
             self.walk_type_alias_underlying_type(&underlying_type);
         }
+        self.exit_scope();
         self.default_result()
     }
 
     fn walk_struct(&mut self, node: &Struct<'tree>) -> Self::Result {
+        self.enter_scope(); // for type parameters
         if let Some(annotations) = node.annotations() {
             self.walk_annotation_list(&annotations);
         }
@@ -380,6 +407,7 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
         if let Some(body) = node.body() {
             self.walk_struct_body(&body);
         }
+        self.exit_scope();
         self.default_result()
     }
 
@@ -425,7 +453,9 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
         let is_common = matches!(body, Some(FuncBody::Block(_)));
 
         if let Some(receiver) = node.receiver() {
+            self.inside_method_receiver = true;
             self.walk_method_receiver(&receiver);
+            self.inside_method_receiver = false;
         }
         if let Some(params) = node.type_parameters() {
             self.walk_type_parameters(&params);

@@ -1,0 +1,119 @@
+========================================================================
+If smartcast to non nullable value for struct field
+========================================================================
+struct Foo {
+    value: int | null,
+}
+
+fun main(foo: Foo) {
+    if (foo.value != null) {
+        val res = foo.value;
+//!         ^ int
+    }
+
+    val res = foo.value;
+//!     ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value for deep struct field
+========================================================================
+struct Foo {
+    value1: Foo2,
+}
+
+struct Foo2 {
+    value2: Foo3
+}
+
+struct Foo3 {
+    value3: int | null,
+}
+
+fun main(foo: Foo) {
+    if (foo.value1.value2.value3 != null) {
+        val res = foo.value1.value2.value3;
+//!         ^ int
+    }
+
+    val res = foo.value1.value2.value3;
+//!     ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value for struct field and tuple index TODO
+========================================================================
+struct Foo {
+    value: [int | null],
+}
+
+fun main(foo: Foo) {
+    if (foo.value.0 != null) {
+        val res = foo.value.0;
+//!         ^ int
+    }
+
+    val res = foo.value.0;
+//!     ^ int?
+}
+------------------------------------------------------------------------
+type inference error at offset 105: expected int, got int?
+
+========================================================================
+If smartcast to non nullable value for struct field and tensor index TODO
+========================================================================
+struct Foo {
+    value: (int | null, bool),
+}
+
+fun main(foo: Foo) {
+    if (foo.value.0 != null) {
+        val res = foo.value.0;
+//!         ^ int
+    }
+
+    val res = foo.value.0;
+//!     ^ int?
+}
+------------------------------------------------------------------------
+type inference error at offset 111: expected int, got int?
+
+========================================================================
+If smartcast to non nullable value for struct field and deep tuple index TODO
+========================================================================
+struct Foo {
+    value: [[[[[[int | null]]]]], bool],
+}
+
+fun main(foo: Foo) {
+    if (foo.value.0.0.0.0.0.0 != null) {
+        val res = foo.value.0.0.0.0.0.0;
+//!         ^ int
+    }
+
+    val res = foo.value.0.0.0.0.0.0;
+//!     ^ int?
+}
+------------------------------------------------------------------------
+type inference error at offset 131: expected int, got int?
+
+========================================================================
+Assert smartcast to non nullable value for struct field
+========================================================================
+struct Foo {
+    value: int | null,
+}
+
+fun main(foo: Foo) {
+    assert (foo.value != null) throw 10;
+//!                                  ^ int
+
+    val res = foo.value;
+//!     ^ int
+}
+------------------------------------------------------------------------
+ok

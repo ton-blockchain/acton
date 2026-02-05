@@ -12,8 +12,8 @@ import {
   FiSun,
   FiX,
 } from "react-icons/fi"
-import { type TestReport, TestStatus } from "../../types"
-import { AppIcon } from "../common/AppIcon"
+import { type TestReport, TestStatus } from "@acton/shared-ui"
+import { AppIcon } from "@acton/shared-ui"
 import { Summary } from "../Summary/Summary"
 import styles from "./Sidebar.module.css"
 
@@ -111,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className={styles.headerTop}>
           <div className={styles.title}>
             <AppIcon theme={theme ?? "light"} />
-            Acton Tests
+            Test UI
           </div>
           <div className={styles.headerButtons}>
             {onToggleTheme && (
@@ -142,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <FiSearch className={styles.searchIcon} />
           <input
             type="text"
-            placeholder="Search tests..."
+            placeholder="Filter tests..."
             className={styles.searchInput}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -156,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               className={`${styles.filterButton} ${statusFilter.has(status) ? styles.activeFilter : ""} ${styles[status.toLowerCase()]}`}
               onClick={() => toggleStatusFilter(status)}
-              title={status}
+              title={`Show ${status} tests`}
             >
               {getStatusIcon(status)}
             </button>

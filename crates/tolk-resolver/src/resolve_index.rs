@@ -136,4 +136,8 @@ impl FileResolveIndex {
             .iter()
             .filter(move |u| matches!(u.resolved, Resolved::Global(id) if id == symbol_id))
     }
+
+    pub fn find_local(&self, local_id: LocalDefId) -> Option<&LocalDef> {
+        self.locals.iter().find(move |u| u.id == local_id)
+    }
 }

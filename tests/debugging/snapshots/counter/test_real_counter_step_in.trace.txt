@@ -1055,7 +1055,7 @@ Step 60 (step_over):
      77| 
      78|     val res = counter.sendIncrease(deployer.address, 100);
   Variables:
-    'UTag = 176
+    'UTag[MAYBE_UNIX_TIME_VALUE]
     '353 = 168
     '352 = null
     '351 = 999742800
@@ -1063,7 +1063,7 @@ Step 60 (step_over):
     'UTag = 133
     'USlot1 = null
     '347[MAYBE_UNIX_TIME_VALUE]
-    'UTag = 174
+    'UTag[MAYBE_UNIX_TIME_VALUE]
     'USlot1 = null
     '344 = 997
     '343 = 8

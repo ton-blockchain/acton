@@ -1,5 +1,8 @@
+use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
+use crate::commands::test::trace::TransactionInfo;
 use crate::context::{
-    BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
+    AssertFailure, BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
+    to_cell,
 };
 use crate::retrace::{ExecutedAction, InstalledActions};
 use crate::{exit_codes, retrace};
@@ -1721,6 +1724,228 @@ impl FormatterContext {
             AccountState::Frozen(_) => None,
         }
     }
+
+    #[must_use]
+    pub fn get_failed_transaction_context(
+        &self,
+        failure: &TransactionGenericAssertFailure,
+        abi: &ContractAbi,
+    ) -> FailedTransactionContext {
+        let from_address = failure.params.from.as_ref().map(|addr| match addr {
+            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
+            _ => addr.to_string(),
+        });
+        let to_address = failure.params.to.as_ref().map(|addr| match addr {
+            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
+            _ => addr.to_string(),
+        });
+        let params = self
+            .format_search_transaction_parameters(failure, abi)
+            .into_iter()
+            .map(|p| {
+                let p = strip_ansi_codes(&p);
+                let p = p.trim();
+                if let Some((k, v)) = p.split_once('=') {
+                    (k.trim().to_string(), v.trim().to_string())
+                } else {
+                    (p.to_string(), String::new())
+                }
+            })
+            .collect();
+
+        FailedTransactionContext {
+            from_address,
+            to_address,
+            params,
+        }
+    }
+
+    #[must_use]
+    pub fn parse_failed_transactions(&self, txs: &TupleItem) -> Vec<TransactionInfo> {
+        let TupleItem::TypedTuple { inner: items, .. } = txs else {
+            return vec![];
+        };
+
+        let send_results = self.parse_send_results(items);
+        send_results
+            .into_iter()
+            .map(|res| {
+                let tx = res.tx;
+                let code = Self::account_code(&self.accounts, tx.account.to_string());
+                let build = self.build_cache.result_for_code(&code);
+
+                TransactionInfo {
+                    lt: tx.lt.to_string(),
+                    raw_transaction: Boc::encode_base64(to_cell(&tx)),
+                    parent_transaction: res.parent_lt.map(|lt| lt.to_string()),
+                    dest_contract_info: build.map(|(_, info)| info.name),
+                    child_transactions: res.children_ids.iter().map(ToString::to_string).collect(),
+                    shard_account_before: String::new(),
+                    shard_account: String::new(),
+                    vm_log_diff: self
+                        .emulations
+                        .find_tx_logs(tx.lt)
+                        .map(vmlogs::convert_to_diff_logs)
+                        .unwrap_or_default(),
+                    executor_logs: self
+                        .emulations
+                        .find_tx_executor_logs(tx.lt)
+                        .map(ToString::to_string)
+                        .unwrap_or_default(),
+                    actions: None,
+                }
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn format_detailed_assert_failure(
+        &self,
+        failure: &AssertFailure,
+        abi: &ContractAbi,
+    ) -> String {
+        let mut result = String::new();
+
+        if let Some(message) = &failure.message()
+            && !message.is_empty()
+        {
+            let highlighted_message = Self::highlight_actual_expected(message);
+            let clean_message = strip_ansi_codes(&highlighted_message);
+            writeln!(result, "Error: {clean_message}").ok();
+        }
+
+        match failure {
+            AssertFailure::Bin(bin_failure) if bin_failure.operator == "==" => {
+                let diff = self.format_tuple_diff(
+                    &bin_failure.left,
+                    &bin_failure.right,
+                    &bin_failure.left_type,
+                    &bin_failure.right_type,
+                );
+                writeln!(result, "{}", strip_ansi_codes(&diff)).ok();
+            }
+            AssertFailure::Bin(bin_failure) if bin_failure.operator == "!=" => {
+                let value = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
+                writeln!(result, "Values are equal but expected to be different:").ok();
+                writeln!(result, "  {}", strip_ansi_codes(&value)).ok();
+            }
+            AssertFailure::Bin(bin_failure) if bin_failure.is_ord() => {
+                let left = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
+                let right = self.format_tuple_value(&bin_failure.right, &bin_failure.right_type, 0);
+                writeln!(result, "Actual:   {}", strip_ansi_codes(&left)).ok();
+                writeln!(result, "Expected: {}", strip_ansi_codes(&right)).ok();
+            }
+            AssertFailure::TransactionNotFound(tx_failure) => {
+                let params = self.format_search_transaction_parameters(tx_failure, abi);
+                let tx_tree = self.format(&tx_failure.txs);
+                writeln!(result, "{}", strip_ansi_codes(&tx_tree)).ok();
+                writeln!(
+                    result,
+                    "Cannot find transaction from {} to {}",
+                    self.format_address(&tx_failure.txs, &tx_failure.params.from),
+                    self.format_address(&tx_failure.txs, &tx_failure.params.to)
+                )
+                .ok();
+                writeln!(result, "with:").ok();
+                for param in params {
+                    writeln!(result, "  {}", strip_ansi_codes(&param)).ok();
+                }
+            }
+            AssertFailure::TransactionIsFound(tx_failure) => {
+                let params = self.format_search_transaction_parameters(tx_failure, abi);
+                let tx_tree = self.format(&tx_failure.txs);
+                writeln!(result, "{}", strip_ansi_codes(&tx_tree)).ok();
+                let from_to = if tx_failure.params.from.is_none() && tx_failure.params.to.is_none()
+                {
+                    "".to_string()
+                } else {
+                    format!(
+                        " from {} to {}",
+                        self.format_address(&tx_failure.txs, &tx_failure.params.from),
+                        self.format_address(&tx_failure.txs, &tx_failure.params.to)
+                    )
+                };
+                writeln!(result, "Unexpected transaction{from_to}").ok();
+                if !params.is_empty() {
+                    writeln!(result, "with:").ok();
+                    for param in params {
+                        writeln!(result, "  {}", strip_ansi_codes(&param)).ok();
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if let Some(location) = &failure.location()
+            && !location.is_empty()
+        {
+            writeln!(result, "at {location}").ok();
+        }
+
+        result.trim().to_string()
+    }
+
+    #[must_use]
+    pub fn format_detailed_exit_code(
+        &self,
+        test: &TestReport,
+        result: &ton_executor::get::GetMethodResultSuccess,
+        exit_code: i32,
+    ) -> String {
+        let mut output = String::new();
+        writeln!(output, "exit_code={exit_code}").ok();
+
+        let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.source_map);
+
+        if let Some(info) = &exit_code_info {
+            if let Some(loc) = &info.loc {
+                writeln!(
+                    output,
+                    "at {}:{}:{}",
+                    SourceLocation::normalize_path(&loc.file),
+                    loc.line + 1,
+                    loc.column + 2
+                )
+                .ok();
+
+                let backtrace_lines = Self::format_backtrace(&info.backtrace);
+                if !backtrace_lines.is_empty() {
+                    writeln!(output, "Backtrace:").ok();
+                    for line in backtrace_lines {
+                        writeln!(output, "  {}", strip_ansi_codes(&line)).ok();
+                    }
+                }
+            }
+
+            if !info.description.is_empty() {
+                writeln!(output, "Description: {}", info.description).ok();
+            }
+        }
+
+        if let Some(info) = exit_codes::find(exit_code) {
+            if exit_code_info.is_none() {
+                writeln!(output, "Description: {}", info.description).ok();
+            }
+            writeln!(output, "Phase: {}", info.phase).ok();
+        }
+
+        output.trim().to_string()
+    }
+}
+
+fn strip_ansi_codes(s: &str) -> String {
+    let mut result = String::new();
+    let mut in_escape = false;
+    for ch in s.chars() {
+        if ch == '\x1b' {
+            in_escape = true;
+        } else if in_escape && ch == 'm' {
+            in_escape = false;
+        } else if !in_escape {
+            result.push(ch);
+        }
+    }
+    result
 }
 
 /// Calculate visible length of a string (excluding ANSI escape codes)

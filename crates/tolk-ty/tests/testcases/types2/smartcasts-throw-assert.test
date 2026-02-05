@@ -1,0 +1,107 @@
+========================================================================
+If smartcast to non nullable value with throw
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value != null) {
+        value
+//!     ^ int
+        throw 10;
+//!           ^ int
+    }
+
+    value
+//! ^ null
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assert smartcast to non nullable value
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    assert (value != null) throw 10;
+//!                              ^ int
+
+    value
+//! ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assert smartcast to non nullable value with second syntax
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    assert (value != null, 10);
+//!                        ^ int
+
+    value
+//! ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assert smartcast to nullable value with second syntax
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    assert (value == null, 10);
+//!                        ^ int
+
+    value
+//! ^ null
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assert smartcast to nullable value with second syntax, check second expression
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    assert (value == null, value);
+//!                        ^ int
+
+    value
+//! ^ null
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assert smartcast to non nullable value with second syntax, check second expression
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    assert (value != null, value);
+//!                        ^ null
+
+    value
+//! ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assert smartcast to non nullable value for self
+========================================================================
+struct Foo {}
+
+fun int?.name(self) {
+    assert (self != null) throw 10;
+
+    val some = self;
+//!     ^ int
+}
+------------------------------------------------------------------------
+ok

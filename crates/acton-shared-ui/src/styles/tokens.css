@@ -1,0 +1,106 @@
+:root {
+  --bg-color: #ffffff;
+  --bg-secondary-color: #f4f4f5;
+  --bg-selection-color: #f4f4f5;
+  --text-primary: #09090b;
+  --text-secondary: #71717a;
+  --text-muted: #a1a1aa;
+
+  --color-passed: #10b981;
+  --color-passed-bg: #ecfdf5;
+  --color-passed-text: #065f46;
+
+  --color-failed: #ef4444;
+  --color-failed-bg: #fef2f2;
+  --color-failed-text: #991b1b;
+
+  --color-skipped: #f59e0b;
+  --color-skipped-bg: #fffbeb;
+  --color-skipped-text: #92400e;
+
+  --color-todo: #3b82f6;
+  --color-todo-bg: #eff6ff;
+  --color-todo-text: #1e40af;
+
+  --link-color: #3b82f6;
+  --border-color: #e4e4e7;
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+
+  --hover-bg: #f4f4f5;
+
+  --font-family:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Fira Code", "Source Code Pro", Menlo, Monaco, Consolas, "Courier New", monospace;
+
+  --font-size-xss: 0.5rem;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --spacing-xss: 0.1rem;
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-mds: 0.75rem;
+  --spacing-md: 1rem;
+  --spacing-lmd: 1.25rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-full: 9999px;
+
+  --transition-duration-fast: 0.15s;
+  --transition-duration-normal: 0.3s;
+}
+
+:root.dark-theme {
+  --bg-color: hsl(30, 0%, 6%);
+  --bg-secondary-color: hsl(240, 5%, 10%);
+  --bg-selection-color: hsl(30, 0%, 15%);
+  --text-primary: hsl(240, 5%, 80%);
+  --text-secondary: hsl(247, 4%, 70%);
+  --text-muted: hsl(247, 4%, 50%);
+
+  --color-passed: #30d158;
+  --color-passed-icon: hsl(126, 50%, 55%);
+  --color-passed-bg: #1c3e26;
+  --color-passed-text: #7cd996;
+
+  --color-failed: #ff453a;
+  --color-failed-bg: #4d1a16;
+  --color-failed-text: #ff8f87;
+
+  --color-skipped: #ffd60a;
+  --color-skipped-bg: #4d3800;
+  --color-skipped-text: #ffe580;
+
+  --color-todo: #0a84ff;
+  --color-todo-bg: #003366;
+  --color-todo-text: #66b3ff;
+
+  --link-color: #0a84ff;
+  --border-color: hsl(240, 5%, 14%);
+  --shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+
+  --hover-bg: rgba(255, 255, 255, 0.06);
+
+  --color-background-primary: #1c1c1e;
+}
+
+.variables {
+  /* This is just a placeholder to export variables if needed via CSS modules,
+     but mostly we'll use them via var() */
+  display: none;
+}

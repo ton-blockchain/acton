@@ -877,14 +877,29 @@ mod tests {
     fn test_type_parameters() {
         check_definition(
             r#"
-                type MyType<T> = T;
+                type MyType<T> = <caret>T;
 
                 fun main() {
                     val result: <caret>MyType<int>;
                 }
             "#,
             expect![[r#"
+                T -> Local(T at 29-30)
                 MyType -> Global(MyType at test.tolk:22-28)
+            "#]],
+        );
+    }
+
+    #[test]
+    fn test_type_parameters_in_method_receiver() {
+        check_definition(
+            r#"
+                struct Generic<T> {}
+
+                fun Generic<T>.foo(): <caret>T {}
+            "#,
+            expect![[r#"
+                T -> Local(T at 67-68)
             "#]],
         );
     }
