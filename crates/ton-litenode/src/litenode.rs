@@ -561,7 +561,7 @@ fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LiteNodeBlo
         anyhow::bail!("Transaction not found after mining")
     };
 
-    let tx_boc = node.cas.get(&tx_hash).unwrap_or_default();
+    let tx_boc = node.get_cell(&tx_hash).unwrap_or_default();
     let tx_struct = convert_to_tx_struct(&ext_tx, tx_boc)?;
 
     let Some(block_header) = node.get_block_header(seqno) else {
@@ -593,8 +593,8 @@ fn handle_get_address_info(
         return Ok(LiteNodeAccountState::empty(address, block_id, sync_utime));
     };
 
-    let code = meta.code_hash.and_then(|h| node.cas.get(&h));
-    let data = meta.data_hash.and_then(|h| node.cas.get(&h));
+    let code = meta.code_hash.and_then(|h| node.get_cell(&h));
+    let data = meta.data_hash.and_then(|h| node.get_cell(&h));
     let last_transaction_id = meta.last_tx_id();
 
     Ok(LiteNodeAccountState {
@@ -626,7 +626,7 @@ fn handle_get_transactions(
     let full_txs = raw_txs
         .iter()
         .flat_map(|tx| {
-            let tx_boc = node.cas.get(&tx.meta.tx_hash).unwrap_or_default();
+            let tx_boc = node.get_cell(&tx.meta.tx_hash).unwrap_or_default();
             convert_to_tx_struct(tx, tx_boc)
         })
         .collect();
@@ -653,13 +653,13 @@ fn handle_run_get_method(
 
     let code_boc = meta
         .code_hash
-        .and_then(|h| node.cas.get(&h))
+        .and_then(|h| node.get_cell(&h))
         .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
         .unwrap_or_else(|| EMPTY_CELL_BASE64.to_owned());
 
     let data_boc = meta
         .data_hash
-        .and_then(|h| node.cas.get(&h))
+        .and_then(|h| node.get_cell(&h))
         .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
         .unwrap_or_else(|| EMPTY_CELL_BASE64.to_owned());
 
@@ -824,7 +824,7 @@ fn handle_get_block_transactions(
             continue;
         };
 
-        let tx_boc = node.cas.get(&ext_tx.meta.tx_hash).unwrap_or_default();
+        let tx_boc = node.get_cell(&ext_tx.meta.tx_hash).unwrap_or_default();
         result.push(convert_to_tx_struct(&ext_tx, tx_boc)?);
     }
 

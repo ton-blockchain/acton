@@ -567,6 +567,10 @@ impl Node {
         None
     }
 
+    pub fn get_cell(&self, hash: &Hash256) -> Option<BocBytes> {
+        self.cas.get(hash)
+    }
+
     pub fn get_transactions(
         &self,
         addr: &Addr,

@@ -3323,6 +3323,7 @@ dependencies = [
  "base64 0.22.1",
  "crc",
  "hex",
+ "owo-colors",
  "reqwest 0.11.27",
  "rusqlite",
  "serde",
