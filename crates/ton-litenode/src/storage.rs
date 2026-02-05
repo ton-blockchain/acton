@@ -1,25 +1,54 @@
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::sync::{Arc, Mutex};
 
 pub struct CellStore {
+    pub conn: Option<Arc<Mutex<Connection>>>,
     pub boc_by_hash: HashMap<Hash256, BocBytes>,
 }
 
 impl CellStore {
     pub fn new() -> Self {
         Self {
+            conn: None,
+            boc_by_hash: HashMap::new(),
+        }
+    }
+
+    pub fn with_conn(conn: Arc<Mutex<Connection>>) -> Self {
+        Self {
+            conn: Some(conn),
             boc_by_hash: HashMap::new(),
         }
     }
 
     pub fn put(&mut self, boc: BocBytes, hash: Hash256) -> Hash256 {
-        self.boc_by_hash.insert(hash, boc);
+        if let Some(conn) = &self.conn {
+            let conn = conn.lock().expect("Failed to lock DB connection");
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO cas (hash, boc) VALUES (?1, ?2)",
+                params![hash.0.to_vec(), boc],
+            );
+        } else {
+            self.boc_by_hash.insert(hash, boc);
+        }
         hash
     }
 
-    pub fn get(&self, hash: &Hash256) -> Option<&BocBytes> {
-        self.boc_by_hash.get(hash)
+    pub fn get(&self, hash: &Hash256) -> Option<BocBytes> {
+        if let Some(conn) = &self.conn {
+            let conn = conn.lock().expect("Failed to lock DB connection");
+            conn.query_row(
+                "SELECT boc FROM cas WHERE hash = ?1",
+                params![hash.0.to_vec()],
+                |row| row.get(0),
+            )
+            .ok()
+        } else {
+            self.boc_by_hash.get(hash).cloned()
+        }
     }
 }
 
@@ -37,7 +66,7 @@ pub enum AccountStatus {
     Nonexist,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AccountMeta {
     pub account_hash: Hash256,
     pub status: AccountStatus,
@@ -66,7 +95,7 @@ impl Default for LatestState {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockMeta {
     pub seqno: Seqno,
     pub prev_seqno: Option<Seqno>,
@@ -77,7 +106,7 @@ pub struct BlockMeta {
     pub block_boc_hash: Hash256,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TxMeta {
     pub tx_hash: Hash256,
     pub tx_boc_hash: Hash256,
@@ -93,7 +122,7 @@ pub struct TxMeta {
     pub block_seqno: Seqno,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MsgMeta {
     pub msg_hash: Hash256,
     pub msg_boc_hash: Hash256,
@@ -153,6 +182,7 @@ pub struct AccountDelta {
 }
 
 pub struct History {
+    pub conn: Option<Arc<Mutex<Connection>>>,
     pub blocks: Vec<BlockMeta>,
     pub deltas_by_seqno: Vec<Vec<AccountDelta>>,
     pub tx_by_hash: HashMap<Hash256, TxMeta>,
@@ -169,6 +199,18 @@ impl Default for History {
 impl History {
     pub fn new() -> Self {
         Self {
+            conn: None,
+            blocks: Vec::new(),
+            deltas_by_seqno: Vec::new(),
+            tx_by_hash: HashMap::new(),
+            msg_by_hash: HashMap::new(),
+            msg_to_tx: HashMap::new(),
+        }
+    }
+
+    pub fn with_conn(conn: Arc<Mutex<Connection>>) -> Self {
+        Self {
+            conn: Some(conn),
             blocks: Vec::new(),
             deltas_by_seqno: Vec::new(),
             tx_by_hash: HashMap::new(),

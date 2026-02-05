@@ -188,16 +188,16 @@ pub struct LiteNode {
 
 impl Default for LiteNode {
     fn default() -> Self {
-        Self::new(crate::node::StateSource::Local)
+        Self::new(crate::node::StateSource::Local, None)
     }
 }
 
 impl LiteNode {
-    pub fn new(state_source: crate::node::StateSource) -> Self {
+    pub fn new(state_source: crate::node::StateSource, db_path: Option<String>) -> Self {
         let (tx, rx) = mpsc::channel(100);
 
         std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(rx, state_source) {
+            if let Err(e) = run_node_loop(rx, state_source, db_path) {
                 tracing::error!("Node loop failed: {:?}", e);
             }
         });
@@ -390,10 +390,11 @@ impl LiteNode {
 fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
     state_source: crate::node::StateSource,
+    db_path: Option<String>,
 ) -> anyhow::Result<()> {
     let executor = Box::new(TvmEmulatorAdapter::new()?);
     let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
-    let mut node = Node::new(executor, config_bytes, state_source)?;
+    let mut node = Node::with_db_path(executor, config_bytes, state_source, db_path)?;
 
     tracing::info!("TON lite node started");
 

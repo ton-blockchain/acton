@@ -48,6 +48,7 @@ tolkfmt = { path = "crates/tolkfmt" }
 ton-litenode = { path = "crates/ton-litenode" }
 
 # remote crates
+rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
 tonlib-core = "0.26.6"
 tycho-types = { version = "0.3.0", features = ["bigint"] }

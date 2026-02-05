@@ -8,9 +8,11 @@ use crate::storage::{
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
 use core::cmp;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tonlib_core::TonHash;
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
@@ -34,6 +36,7 @@ pub struct Node {
     pub pool: MessagePool,
     pub executor: Box<dyn TvmExecutor>,
     pub state_source: StateSource,
+    pub conn: Option<Arc<std::sync::Mutex<rusqlite::Connection>>>,
 }
 
 pub const GIVER_ADDR: Addr = Addr {
@@ -49,14 +52,152 @@ impl Node {
         config_boc: BocBytes,
         state_source: StateSource,
     ) -> anyhow::Result<Self> {
+        Self::with_db_path(executor, config_boc, state_source, None::<&str>)
+    }
+
+    pub fn with_db_path<P: AsRef<std::path::Path>>(
+        executor: Box<dyn TvmExecutor>,
+        config_boc: BocBytes,
+        state_source: StateSource,
+        db_path: Option<P>,
+    ) -> anyhow::Result<Self> {
+        let conn_obj = if let Some(path) = db_path {
+            let conn = rusqlite::Connection::open(path)?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS cas (hash BLOB PRIMARY KEY, boc BLOB)",
+                [],
+            )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS blocks (seqno INTEGER PRIMARY KEY, data BLOB)",
+                [],
+            )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS transactions (hash BLOB PRIMARY KEY, data BLOB, account BLOB, lt INTEGER, seqno INTEGER)",
+                [],
+            )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS messages (hash BLOB PRIMARY KEY, data BLOB)",
+                [],
+            )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS accounts (address BLOB PRIMARY KEY, data BLOB)",
+                [],
+            )?;
+            Some(conn)
+        } else {
+            None
+        };
+
         let config_hash = compute_boc_hash(&config_boc)?;
-        let mut cas = CellStore::new();
+
+        let mut history = History::new();
+        let mut latest = LatestState::new();
+        let mut indexes = Indexes::new();
+        let mut head_seqno = 0;
+
+        if let Some(conn) = &conn_obj {
+            // Load blocks
+            let mut stmt = conn.prepare("SELECT data FROM blocks ORDER BY seqno ASC")?;
+            let block_iter = stmt.query_map([], |row| {
+                let data: Vec<u8> = row.get(0)?;
+                serde_json::from_slice::<BlockMeta>(&data)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+            })?;
+            for block in block_iter {
+                let block = block?;
+                head_seqno = block.seqno;
+                history.blocks.push(block);
+            }
+
+            // Load transactions into indexes
+            let mut stmt =
+                conn.prepare("SELECT hash, data, account, lt, seqno FROM transactions")?;
+            let tx_iter = stmt.query_map([], |row| {
+                let hash_bytes: Vec<u8> = row.get(0)?;
+                let data: Vec<u8> = row.get(1)?;
+                let account_bytes: Vec<u8> = row.get(2)?;
+                let lt: u64 = row.get(3)?;
+                let seqno: u32 = row.get(4)?;
+
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes);
+                let mut addr = [0u8; 32];
+                addr.copy_from_slice(&account_bytes);
+
+                let tx_meta = serde_json::from_slice::<TxMeta>(&data)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+
+                Ok((
+                    Hash256(hash),
+                    tx_meta,
+                    Addr { workchain: 0, addr },
+                    lt,
+                    seqno,
+                ))
+            })?;
+            for tx in tx_iter {
+                let (hash, tx_meta, addr, lt, seqno) = tx?;
+                history.tx_by_hash.insert(hash, tx_meta);
+
+                let key = ReverseLtKey(cmp::Reverse(lt), hash);
+                indexes
+                    .tx_by_account
+                    .entry(addr)
+                    .or_default()
+                    .insert(key, hash);
+                indexes.tx_by_block.insert(seqno, hash);
+            }
+
+            // Load accounts
+            let mut stmt = conn.prepare("SELECT address, data FROM accounts")?;
+            let acc_iter = stmt.query_map([], |row| {
+                let addr_bytes: Vec<u8> = row.get(0)?;
+                let data: Vec<u8> = row.get(1)?;
+                let mut addr = [0u8; 32];
+                addr.copy_from_slice(&addr_bytes);
+                let meta = serde_json::from_slice::<AccountMeta>(&data)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+                Ok((Addr { workchain: 0, addr }, meta))
+            })?;
+            for acc in acc_iter {
+                let (addr, meta) = acc?;
+                latest.accounts.insert(addr, meta);
+            }
+
+            // Load messages
+            let mut stmt = conn.prepare("SELECT hash, data FROM messages")?;
+            let msg_iter = stmt.query_map([], |row| {
+                let hash_bytes: Vec<u8> = row.get(0)?;
+                let data: Vec<u8> = row.get(1)?;
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes);
+                let meta = serde_json::from_slice::<MsgMeta>(&data)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+                Ok((Hash256(hash), meta))
+            })?;
+            for msg in msg_iter {
+                let (hash, meta) = msg?;
+                history.msg_by_hash.insert(hash, meta);
+            }
+        }
+
+        let conn = conn_obj.map(|c| Arc::new(std::sync::Mutex::new(c)));
+
+        let mut cas = if let Some(conn) = &conn {
+            CellStore::with_conn(conn.clone())
+        } else {
+            CellStore::new()
+        };
         cas.put(config_boc, config_hash);
 
-        let mut latest = LatestState::new();
-        latest.accounts.insert(
-            GIVER_ADDR,
-            AccountMeta {
+        if let Some(conn) = &conn {
+            history.conn = Some(conn.clone());
+        }
+
+        latest
+            .accounts
+            .entry(GIVER_ADDR)
+            .or_insert_with(|| AccountMeta {
                 account_hash: Hash256([0; 32]),
                 status: AccountStatus::Active,
                 balance_cache: Some(GIVER_BALANCE),
@@ -64,18 +205,23 @@ impl Node {
                 last_trans_hash: None,
                 code_hash: None,
                 data_hash: None,
-            },
-        );
+            });
+
+        let mut globals = Globals::new(config_hash);
+        globals.head_seqno = head_seqno;
+        // Approximation of global LT
+        globals.global_lt = history.blocks.last().map(|b| b.end_lt).unwrap_or(0);
 
         Ok(Self {
             cas,
             latest,
-            history: History::new(),
-            indexes: Indexes::new(),
-            globals: Globals::new(config_hash),
+            history,
+            indexes,
+            globals,
             pool: MessagePool::new(),
             executor,
             state_source,
+            conn,
         })
     }
 
@@ -122,8 +268,7 @@ impl Node {
         let msg_boc = self
             .cas
             .get(&msg_meta.msg_boc_hash)
-            .context("Msg BOC missing")?
-            .clone();
+            .context("Msg BOC missing")?;
         let dst = msg_meta
             .dst
             .ok_or_else(|| anyhow::anyhow!("Msg has no dst"))?;
@@ -141,8 +286,7 @@ impl Node {
         let config_boc = self
             .cas
             .get(&self.globals.config_boc_hash)
-            .context("Config missing")?
-            .clone();
+            .context("Config missing")?;
         let ctx = ExecContext {
             lt,
             gen_utime,
@@ -281,6 +425,52 @@ impl Node {
             pending.block_meta.seqno,
             pending.tx_meta.tx_hash.to_hex()
         );
+
+        // Persistent storage
+        if let Some(conn) = &self.conn {
+            let conn = conn.lock().expect("Failed to lock DB connection");
+
+            // Save block
+            let block_data = serde_json::to_vec(&pending.block_meta)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO blocks (seqno, data) VALUES (?1, ?2)",
+                params![pending.block_meta.seqno, block_data],
+            )?;
+
+            // Save transaction
+            let tx_data = serde_json::to_vec(&pending.tx_meta)?;
+            conn.execute(
+                "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![
+                    pending.tx_meta.tx_hash.0.to_vec(),
+                    tx_data,
+                    pending.tx_meta.account.addr.to_vec(),
+                    pending.tx_meta.lt,
+                    pending.block_meta.seqno
+                ],
+            )?;
+
+            // Save account state
+            if let Some(new_meta) = &pending.delta.new_meta {
+                let account_data = serde_json::to_vec(new_meta)?;
+                conn.execute(
+                    "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
+                    params![pending.delta.addr.addr.to_vec(), account_data],
+                )?;
+            }
+
+            // Save messages
+            for h in &pending.out_msg_hashes {
+                if let Some(msg_meta) = self.history.msg_by_hash.get(h) {
+                    let msg_data = serde_json::to_vec(msg_meta)?;
+                    conn.execute(
+                        "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
+                        params![h.0.to_vec(), msg_data],
+                    )?;
+                }
+            }
+        }
+
         // Apply delta
         if let Some(new_meta) = &pending.delta.new_meta {
             self.latest
@@ -453,7 +643,7 @@ impl Node {
 
     pub fn get_message_info(&self, hash: &Hash256) -> Option<MessageInfo> {
         let meta = self.history.msg_by_hash.get(hash).cloned()?;
-        let boc = self.cas.get(&meta.msg_boc_hash).cloned()?;
+        let boc = self.cas.get(&meta.msg_boc_hash)?;
         Some(MessageInfo { meta, boc })
     }
 
@@ -559,13 +749,14 @@ impl Node {
 
     pub fn get_shard_account(&mut self, addr: &Addr) -> anyhow::Result<BocBytes> {
         if let Some(meta) = self.latest.accounts.get(addr)
-            && let Some(boc) = self.cas.get(&meta.account_hash) {
-                return Ok(boc.clone());
-            }
+            && let Some(boc) = self.cas.get(&meta.account_hash)
+        {
+            return Ok(boc);
+        }
 
         if let StateSource::Remote(provider) = &self.state_source {
             let provider = provider.clone();
-            if let Ok(boc) = self.fetch_remote_shard_account(addr, &provider) {
+            if let Ok(Some(boc)) = self.fetch_remote_shard_account(addr, &provider) {
                 return Ok(boc);
             }
         }
@@ -586,10 +777,13 @@ impl Node {
         &mut self,
         addr: &Addr,
         provider: &RemoteProvider,
-    ) -> anyhow::Result<BocBytes> {
+    ) -> anyhow::Result<Option<BocBytes>> {
         let (boc, meta) = fetch_remote_shard_account(addr, provider, &mut self.cas)?;
+        if meta.status == AccountStatus::Nonexist {
+            return Ok(None);
+        }
         self.latest.accounts.insert(*addr, meta);
-        Ok(boc)
+        Ok(Some(boc))
     }
 
     pub fn has_pending_messages(&self) -> bool {

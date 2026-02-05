@@ -29,6 +29,8 @@ tower-http = { workspace = true, features = ["cors", "trace", "fs"] }
 tracing = "0.1"
 include_dir = { workspace = true }
 opener = { workspace = true }
+rusqlite = { workspace = true }
+clap = { workspace = true }
 
 [lints]
 workspace = true

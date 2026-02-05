@@ -99,7 +99,8 @@ pub fn fetch_remote_shard_account(
     let status = match info.state.as_str() {
         "active" => AccountStatus::Active,
         "frozen" => AccountStatus::Frozen,
-        _ => AccountStatus::Uninit,
+        "uninitialized" => AccountStatus::Uninit,
+        _ => AccountStatus::Nonexist,
     };
 
     let balance = info.balance.parse::<u128>().unwrap_or(0);

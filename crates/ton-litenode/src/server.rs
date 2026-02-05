@@ -8,6 +8,7 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use clap::Parser;
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
 use serde::Deserialize;
@@ -23,12 +24,23 @@ use tower_http::trace::TraceLayer;
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../crates/acton-litenode-ui/dist");
 
-pub async fn run_server(
-    node: Arc<LiteNode>,
-    port: u16,
-    ui: bool,
-    ui_port: u16,
-) -> anyhow::Result<()> {
+#[derive(Parser, Debug)]
+pub struct ServerArgs {
+    #[arg(long, default_value = "8080")]
+    pub port: u16,
+    #[arg(long)]
+    pub ui: bool,
+    #[arg(long, default_value = "8081")]
+    pub ui_port: u16,
+    #[arg(long)]
+    pub db_path: Option<String>,
+}
+
+pub async fn run_server(node: Arc<LiteNode>, args: ServerArgs) -> anyhow::Result<()> {
+    let port = args.port;
+    let ui = args.ui;
+    let ui_port = args.ui_port;
+
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)

@@ -592,6 +592,8 @@ pub enum LitenodeCommand {
         fork_net: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
+        #[arg(long, help = "Path to SQLite database for persistent storage")]
+        db_path: Option<String>,
     },
     #[command(about = "Request TON from faucet")]
     Airdrop {
@@ -1407,6 +1409,7 @@ fn main() {
                 ui_port,
                 fork_net,
                 api_key,
+                db_path,
             } => {
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -1419,6 +1422,7 @@ fn main() {
                         ui_port,
                         fork_net,
                         api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
+                        db_path,
                     )
                     .await
                 })
