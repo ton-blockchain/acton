@@ -584,10 +584,6 @@ pub enum LitenodeCommand {
     Start {
         #[arg(long, default_value_t = 3000)]
         port: u16,
-        #[arg(long, help = "Open node control UI in a browser")]
-        ui: bool,
-        #[arg(long, help = "UI server port", default_value_t = 12346)]
-        ui_port: u16,
         #[arg(long, help = "Fork from network for remote account resolution")]
         fork_net: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
@@ -1405,8 +1401,6 @@ fn main() {
         Commands::Litenode { command } => match command {
             LitenodeCommand::Start {
                 port,
-                ui,
-                ui_port,
                 fork_net,
                 api_key,
                 db_path,
@@ -1418,11 +1412,9 @@ fn main() {
                 rt.block_on(async {
                     commands::litenode::litenode_start_cmd(
                         port,
-                        ui,
-                        ui_port,
+                        db_path,
                         fork_net,
                         api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                        db_path,
                     )
                     .await
                 })

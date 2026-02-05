@@ -6,11 +6,9 @@ use ton_litenode::{LiteNode, ServerArgs, run_server};
 
 pub async fn litenode_start_cmd(
     port: u16,
-    ui: bool,
-    ui_port: u16,
+    db_path: Option<String>,
     fork_net: Option<String>,
     api_key: Option<String>,
-    db_path: Option<String>,
 ) -> anyhow::Result<()> {
     let state_source = if let Some(network) = fork_net {
         StateSource::Remote(RemoteProvider { network, api_key })
@@ -19,16 +17,7 @@ pub async fn litenode_start_cmd(
     };
 
     let node = Arc::new(LiteNode::new(state_source, db_path.clone()));
-    run_server(
-        node,
-        ServerArgs {
-            port,
-            ui,
-            ui_port,
-            db_path,
-        },
-    )
-    .await?;
+    run_server(node, ServerArgs { port, db_path }).await?;
     Ok(())
 }
 

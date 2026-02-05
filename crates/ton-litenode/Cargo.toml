@@ -11,7 +11,6 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ton-emulator = { workspace = true }
 ton-executor = { workspace = true }
 tycho-types = { workspace = true }
 tvmffi = { workspace = true }
@@ -25,12 +24,9 @@ tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 axum = { workspace = true }
-tower-http = { workspace = true, features = ["cors", "trace", "fs"] }
+tower-http = { workspace = true, features = ["cors", "trace"] }
 tracing = "0.1"
-include_dir = { workspace = true }
-opener = { workspace = true }
 rusqlite = { workspace = true }
-clap = { workspace = true }
 
 [lints]
 workspace = true

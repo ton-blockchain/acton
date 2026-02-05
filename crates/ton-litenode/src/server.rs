@@ -8,38 +8,20 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
-use clap::Parser;
-#[cfg(not(debug_assertions))]
-use include_dir::{Dir, include_dir};
 use serde::Deserialize;
 use serde_json::Value;
-#[cfg(debug_assertions)]
-use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
-#[cfg(debug_assertions)]
-use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
-#[cfg(not(debug_assertions))]
-static UI_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../crates/acton-litenode-ui/dist");
-
-#[derive(Parser, Debug)]
+#[derive(Debug)]
 pub struct ServerArgs {
-    #[arg(long, default_value = "8080")]
     pub port: u16,
-    #[arg(long)]
-    pub ui: bool,
-    #[arg(long, default_value = "8081")]
-    pub ui_port: u16,
-    #[arg(long)]
     pub db_path: Option<String>,
 }
 
 pub async fn run_server(node: Arc<LiteNode>, args: ServerArgs) -> anyhow::Result<()> {
     let port = args.port;
-    let ui = args.ui;
-    let ui_port = args.ui_port;
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -109,43 +91,6 @@ pub async fn run_server(node: Arc<LiteNode>, args: ServerArgs) -> anyhow::Result
         .layer(TraceLayer::new_for_http())
         .with_state(node.clone());
 
-    if ui {
-        let ui_app = Router::new()
-            .nest("/api", api_router)
-            .route("/faucet", post(faucet))
-            .layer(CorsLayer::permissive())
-            .with_state(node);
-
-        #[cfg(debug_assertions)]
-        let ui_app = {
-            let dist_path = PathBuf::from(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../crates/acton-litenode-ui/dist"
-            ));
-            let index_path = dist_path.join("index.html");
-            ui_app.fallback_service(ServeDir::new(&dist_path).fallback(ServeFile::new(index_path)))
-        };
-
-        #[cfg(not(debug_assertions))]
-        let ui_app = ui_app.fallback(handle_embedded_ui);
-
-        let ui_listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", ui_port)).await?;
-        let ui_url = format!("http://127.0.0.1:{}", ui_port);
-        println!("     \x1b[1;32mStarting\x1b[0m LiteNode UI at {}", ui_url);
-
-        // Open browser
-        #[cfg(target_os = "macos")]
-        {
-            let _ = opener::open(&ui_url);
-        }
-
-        tokio::spawn(async move {
-            if let Err(e) = axum::serve(ui_listener, ui_app).await {
-                eprintln!("UI server error: {}", e);
-            }
-        });
-    }
-
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
     println!(
         "     \x1b[1;32mStarting\x1b[0m LiteNode server on http://0.0.0.0:{}",
@@ -153,34 +98,6 @@ pub async fn run_server(node: Arc<LiteNode>, args: ServerArgs) -> anyhow::Result
     );
     axum::serve(listener, app).await?;
     Ok(())
-}
-
-#[cfg(not(debug_assertions))]
-async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
-    let path = uri.path().trim_start_matches('/');
-    // default to index.html for root requests
-    let path = if path.is_empty() { "index.html" } else { path };
-
-    if let Some(file) = UI_DIR.get_file(path) {
-        // Map common file extensions to their respective MIME types.
-        let content_type = match path.split('.').last() {
-            Some("html") => "text/html",
-            Some("js") => "application/javascript",
-            Some("css") => "text/css",
-            Some("svg") => "image/svg+xml",
-            Some("png") => "image/png",
-            Some("json") => "application/json",
-            _ => "application/octet-stream",
-        };
-        return (([("content-type", content_type)]), file.contents()).into_response();
-    }
-
-    // fallback to index.html for SPA routing.
-    if let Some(index) = UI_DIR.get_file("index.html") {
-        return (([("content-type", "text/html")]), index.contents()).into_response();
-    }
-
-    StatusCode::NOT_FOUND.into_response()
 }
 
 #[derive(Deserialize)]
