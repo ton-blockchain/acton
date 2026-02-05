@@ -165,6 +165,32 @@ coverage-format = "lcov"
 |-------------------|-----------------|---------|----------------------------------|
 | `junit-path`      | `--junit-path`  | String  | JUnit XML output directory       |
 | `junit-merge`     | `--junit-merge` | Boolean | Merge all suites into one file   |
+| `fork-net`        | `--fork-net`    | String  | Network to fork from             |
+| `api-key`         | `--api-key`     | String  | API key for the network          |
+
+### Fork Testing Options
+
+| Configuration       | CLI Flag              | Type      | Description                                                                                          |
+|:--------------------|:----------------------|:----------|:-----------------------------------------------------------------------------------------------------|
+| `fork-net`          | `--fork-net`          | `string`  | Network name to fork state from (`mainnet`, `testnet`, or a custom network defined in `[networks]`). |
+| `api-key`           | `--api-key`           | `string`  | API key for the network provider.                                                                    |
+| `fork-block-number` | `--fork-block-number` | `integer` | Specific block number to fork from.                                                                  |
+
+**Examples:**
+```toml
+[test]
+fork-net = "mainnet"
+api-key = "YOUR_API_KEY"
+```
+
+Using a custom network:
+```toml
+[networks.my-local-node]
+v2-url = "http://localhost:8081/api/v2/jsonRPC"
+
+[test]
+fork-net = "my-local-node"
+```
 
 **Examples:**
 ```toml

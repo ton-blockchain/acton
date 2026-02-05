@@ -14,6 +14,7 @@ The top-level of `Acton.toml` contains the following sections:
 - `[contracts]` — Definition of smart contracts in the project.
 - `[test]` — Configuration for the test runner.
 - `[lint]` — Linter configuration.
+- `[networks]` — Custom network definitions.
 - `[scripts]` — Custom shell commands or scripts.
 - `[mappings]` — Path mappings for Tolk compiler imports.
 
@@ -164,6 +165,26 @@ unused-variable = "deny"
 [lint.counter]
 unused-variable = "allow" # Disable for counter contract only
 ```
+
+---
+
+## `[networks]` Section
+
+Defines custom networks that can be used for deployment, testing, and interaction. Each key is a unique network identifier.
+
+| Field    | Type     | Required | Description                               |
+|:---------|:---------|:---------|:------------------------------------------|
+| `v2-url` | `string` | **Yes**  | The URL for the TonCenter v2 API.         |
+| `v3-url` | `string` | No       | The URL for the TonCenter v3 API.         |
+
+Example:
+```toml
+[networks.my-custom-net]
+v2-url = "https://my-custom-net.com/api/v2"
+v3-url = "https://my-custom-net.com/api/v3"
+```
+
+You can then use this network in commands like `acton test --fork-net my-custom-net`, `acton script --net my-custom-net` or in scripts.
 
 ---
 
