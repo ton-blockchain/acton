@@ -1,8 +1,11 @@
+use crate::litenode::{LiteNodeBlockId, LiteNodeTransactionId};
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
+
+pub const EMPTY_CELL_BASE64: &str = "te6cckEBAQEAAgAAAEysuc0=";
 
 pub struct CellStore {
     pub conn: Option<Arc<Mutex<Connection>>>,
@@ -70,11 +73,20 @@ pub enum AccountStatus {
 pub struct AccountMeta {
     pub account_hash: Hash256,
     pub status: AccountStatus,
-    pub balance_cache: Option<u128>,
+    pub cached_balance: Option<u128>,
     pub last_trans_lt: Option<Lt>,
     pub last_trans_hash: Option<Hash256>,
     pub code_hash: Option<Hash256>,
     pub data_hash: Option<Hash256>,
+}
+
+impl AccountMeta {
+    pub fn last_tx_id(&self) -> LiteNodeTransactionId {
+        LiteNodeTransactionId {
+            lt: self.last_trans_lt.unwrap_or(0),
+            hash: self.last_trans_hash.unwrap_or(Hash256([0; 32])),
+        }
+    }
 }
 
 pub struct LatestState {
@@ -106,10 +118,21 @@ pub struct BlockMeta {
     pub block_boc_hash: Hash256,
 }
 
+impl BlockMeta {
+    pub const fn block_id(&self) -> LiteNodeBlockId {
+        LiteNodeBlockId {
+            workchain: 0,
+            shard: -9223372036854775808,
+            seqno: self.seqno,
+            root_hash: self.block_boc_hash,
+            file_hash: self.block_boc_hash,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TxMeta {
     pub tx_hash: Hash256,
-    pub tx_boc_hash: Hash256,
     pub account: Addr,
     pub lt: Lt,
     pub now: u32,

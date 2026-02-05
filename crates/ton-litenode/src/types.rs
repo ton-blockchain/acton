@@ -4,7 +4,9 @@ use std::fmt::Display;
 
 pub type BocBytes = Vec<u8>;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, PartialOrd, Ord, Default,
+)]
 pub struct Hash256(pub [u8; 32]);
 
 impl Hash256 {

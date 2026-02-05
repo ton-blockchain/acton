@@ -1,6 +1,6 @@
-use crate::api;
 use crate::api::toncenter_v3;
 use crate::litenode::LiteNode;
+use crate::{api, node};
 use axum::{
     Json, Router,
     extract::{Query, State},
@@ -586,13 +586,13 @@ async fn get_extended_address_information_post(
 struct GetTransactionsRequest {
     address: String,
     #[serde(default = "default_limit")]
-    limit: u32,
+    limit: usize,
     lt: Option<u64>,
     hash: Option<String>,
     to_lt: Option<u64>,
 }
 
-const fn default_limit() -> u32 {
+const fn default_limit() -> usize {
     10
 }
 
@@ -920,7 +920,7 @@ async fn get_state_source(State(node): State<Arc<LiteNode>>) -> Json<Value> {
 
 async fn set_state_source(
     State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<crate::node::StateSource>,
+    Json(payload): Json<node::StateSource>,
 ) -> Json<Value> {
     match node.set_state_source(payload).await {
         Ok(_) => Json(serde_json::json!({ "ok": true })),

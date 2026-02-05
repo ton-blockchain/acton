@@ -158,7 +158,7 @@ pub fn fetch_remote_shard_account(
     let meta = AccountMeta {
         account_hash,
         status,
-        balance_cache: Some(balance),
+        cached_balance: Some(balance),
         last_trans_lt: Some(last_trans_lt),
         last_trans_hash,
         code_hash: code,

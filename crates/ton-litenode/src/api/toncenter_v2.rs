@@ -3,6 +3,8 @@ use crate::litenode::{
     LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult, LiteNodeTransaction,
 };
 use crate::storage::AccountStatus;
+use crate::types::BocBytes;
+use base64::Engine;
 use serde_json::value::Value;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
@@ -13,7 +15,7 @@ pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
     serde_json::json!({
         "@type": "ton.blockIdExt",
         "workchain": id.workchain,
-        "shard": id.shard,
+        "shard": id.shard.to_string(),
         "seqno": id.seqno,
         "root_hash": id.root_hash.to_hex(),
         "file_hash": id.file_hash.to_hex()
@@ -27,7 +29,7 @@ pub fn map_transaction(tx: &LiteNodeTransaction) -> Value {
         "address": { "@type": "accountAddress", "account_address": tx.address.to_string() },
         "account": tx.address.to_string(),
         "utime": tx.utime,
-        "data": tx.data,
+        "data": base64::engine::general_purpose::STANDARD.encode(&tx.data),
         "success": tx.success,
         "exit_code": tx.exit_code,
         "transaction_id": {
@@ -50,7 +52,7 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
     serde_json::json!({
         "@type": "raw.message",
         "hash": msg.hash.to_hex(),
-        "opcode": msg.opcode,
+        "opcode": msg.opcode.map(|op| format!("0x{:08x}", op)),
         "source": {
             "@type": "accountAddress",
             "account_address": msg.source.as_ref().map(|a| a.to_string()).unwrap_or_default()
@@ -63,11 +65,11 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
         "fwd_fee": "0",
         "ihr_fee": "0",
         "created_lt": "0",
-        "body_hash": msg.body_hash,
+        "body_hash": msg.body_hash.to_hex(),
         "msg_data": {
             "@type": "msg.dataRaw",
-            "body": msg.body,
-            "init_state": msg.init_state
+            "body": base64::engine::general_purpose::STANDARD.encode(&msg.body),
+            "init_state": base64::engine::general_purpose::STANDARD.encode(&msg.init_state)
         },
         "extra_currencies": []
     })
@@ -92,8 +94,8 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
                 "hash": "0000000000000000000000000000000000000000000000000000000000000000"
             })),
             "block_id": map_block_id(&s.block_id),
-            "code": s.code,
-            "data": s.data,
+            "code": encode_optional_boc(s.code.as_ref()),
+            "data": encode_optional_boc(s.data.as_ref()),
             "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000", // TODO
             "sync_utime": s.sync_utime,
             "state": match s.state {
@@ -134,8 +136,8 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
                 }),
                 _ => serde_json::json!({
                     "@type": "raw.accountState",
-                    "code": s.code,
-                    "data": s.data,
+                    "code": encode_optional_boc(s.code.as_ref()),
+                    "data": encode_optional_boc(s.data.as_ref()),
                     "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
                 }),
             },
@@ -145,7 +147,7 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
 }
 
 pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Value {
-    let stack_cell = ArcCell::from_boc_b64(&r.stack).unwrap_or_default();
+    let stack_cell = ArcCell::from_boc(&r.stack).unwrap_or_default();
     let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
     let stack_json: Value = if is_legacy {
         Value::Array(legacy_stack_to_json(&stack_tuple).unwrap_or_default())
@@ -249,4 +251,9 @@ pub fn map_block_header(bh: &LiteNodeBlockHeader) -> Value {
             "prev_seqno": bh.prev_seqno
         }
     })
+}
+
+fn encode_optional_boc(data: Option<&BocBytes>) -> String {
+    data.map(|c| base64::engine::general_purpose::STANDARD.encode(c))
+        .unwrap_or_default()
 }

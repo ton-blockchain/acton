@@ -1,8 +1,8 @@
 use crate::executor::TvmEmulatorAdapter;
-use crate::node::Node;
+use crate::node::{Node, StateSource};
 use crate::storage;
-use crate::storage::{AccountStatus, MsgMeta, TransactionInfo};
-use crate::types::{Addr, Hash256, Lt, Seqno};
+use crate::storage::{AccountStatus, BlockMeta, EMPTY_CELL_BASE64, MsgMeta, TransactionInfo};
+use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
@@ -24,25 +24,37 @@ const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiteNodeBlockId {
     pub workchain: i32,
-    pub shard: String,
+    pub shard: i64,
     pub seqno: Seqno,
     pub root_hash: Hash256,
     pub file_hash: Hash256,
+}
+
+impl LiteNodeBlockId {
+    pub const fn first() -> Self {
+        Self {
+            workchain: 0,
+            shard: -9223372036854775808,
+            seqno: 0,
+            root_hash: Hash256([0; 32]),
+            file_hash: Hash256([0; 32]),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiteNodeAccountState {
     pub address: Addr,
     pub balance: u128,
-    pub code: String, // base64
-    pub data: String, // base64
+    pub code: Option<BocBytes>,
+    pub data: Option<BocBytes>,
     pub last_transaction_id: Option<LiteNodeTransactionId>,
     pub block_id: LiteNodeBlockId,
     pub state: AccountStatus,
     pub sync_utime: u64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct LiteNodeTransactionId {
     pub lt: Lt,
     pub hash: Hash256,
@@ -53,7 +65,7 @@ pub struct LiteNodeTransaction {
     pub hash: Hash256,
     pub address: Addr,
     pub utime: u32,
-    pub data: String, // base64
+    pub data: BocBytes,
     pub success: bool,
     pub exit_code: i32,
     pub transaction_id: LiteNodeTransactionId,
@@ -67,16 +79,16 @@ pub struct LiteNodeMessage {
     pub source: Option<Addr>,
     pub destination: Option<Addr>,
     pub value: u128,
-    pub body_hash: String,
-    pub body: String,       // base64
-    pub init_state: String, // base64
-    pub opcode: Option<String>,
+    pub body_hash: Hash256,
+    pub body: BocBytes,
+    pub init_state: BocBytes,
+    pub opcode: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiteNodeRunGetMethodResult {
     pub gas_used: u64,
-    pub stack: String, // base64 BOC
+    pub stack: BocBytes,
     pub exit_code: i32,
     pub vm_log: String,
     pub block_id: LiteNodeBlockId,
@@ -108,25 +120,25 @@ pub struct LiteNodeBlockTransactions {
 #[derive(Debug)]
 pub(crate) enum Request {
     SendBoc {
-        boc: String,
+        boc: BocBytes,
         resp: oneshot::Sender<anyhow::Result<LiteNodeBlockTransactions>>,
     },
     GetAddressInformation {
-        address: String,
+        address: Addr,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LiteNodeAccountState>>,
     },
     GetTransactions {
-        address: String,
-        limit: u32,
+        address: Addr,
+        limit: usize,
         lt: Option<u64>,
-        hash: Option<String>,
+        hash: Option<Hash256>,
         to_lt: Option<u64>,
         resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
     },
     RunGetMethod {
-        address: String,
-        method: String,
+        address: Addr,
+        method_id: i32,
         stack: Vec<Value>,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LiteNodeRunGetMethodResult>>,
@@ -147,28 +159,30 @@ pub(crate) enum Request {
         resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeBlockId>>>,
     },
     LookupBlock {
-        _workchain: i32,
-        _shard: String,
+        #[allow(dead_code)] // unused since litenode have only one workchain
+        workchain: i32,
+        #[allow(dead_code)] // unused since litenode have only one shard
+        shard: i64,
         seqno: Option<u32>,
         lt: Option<u64>,
         unixtime: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LiteNodeBlockId>>,
     },
     Faucet {
-        address: String,
+        address: Addr,
         amount: u128,
         resp: oneshot::Sender<anyhow::Result<Value>>,
     },
     GetTraces {
-        tx_hash: String,
+        tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
     },
     SetStateSource {
-        source: crate::node::StateSource,
+        source: StateSource,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
     GetStateSource {
-        resp: oneshot::Sender<anyhow::Result<crate::node::StateSource>>,
+        resp: oneshot::Sender<anyhow::Result<StateSource>>,
     },
 }
 
@@ -178,12 +192,12 @@ pub struct LiteNode {
 
 impl Default for LiteNode {
     fn default() -> Self {
-        Self::new(crate::node::StateSource::Local, None)
+        Self::new(StateSource::Local, None)
     }
 }
 
 impl LiteNode {
-    pub fn new(state_source: crate::node::StateSource, db_path: Option<String>) -> Self {
+    pub fn new(state_source: StateSource, db_path: Option<String>) -> Self {
         let (tx, rx) = mpsc::channel(100);
 
         std::thread::spawn(move || {
@@ -195,7 +209,10 @@ impl LiteNode {
         Self { tx }
     }
 
-    pub async fn send_boc(&self, boc: String) -> anyhow::Result<LiteNodeBlockTransactions> {
+    pub async fn send_boc(&self, boc_str: String) -> anyhow::Result<LiteNodeBlockTransactions> {
+        let boc = base64::engine::general_purpose::STANDARD
+            .decode(&boc_str)
+            .context("Invalid BOC base64")?;
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SendBoc { boc, resp }).await?;
         rx.await?
@@ -203,9 +220,10 @@ impl LiteNode {
 
     pub async fn get_address_information(
         &self,
-        address: String,
+        address_str: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<LiteNodeAccountState> {
+        let address = Self::parse_addr(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetAddressInformation {
@@ -219,12 +237,19 @@ impl LiteNode {
 
     pub async fn get_transactions(
         &self,
-        address: String,
-        limit: u32,
+        address_str: String,
+        limit: usize,
         lt: Option<u64>,
-        hash: Option<String>,
+        hash_str: Option<String>,
         to_lt: Option<u64>,
     ) -> anyhow::Result<Vec<LiteNodeTransaction>> {
+        let address = Self::parse_addr(&address_str)?;
+        let hash = if let Some(h) = hash_str {
+            Some(Hash256::from_base64(&h)?)
+        } else {
+            None
+        };
+
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetTransactions {
@@ -241,16 +266,24 @@ impl LiteNode {
 
     pub async fn run_get_method(
         &self,
-        address: String,
+        address_str: String,
         method: String,
         stack: Vec<Value>,
         seqno: Option<u32>,
     ) -> anyhow::Result<LiteNodeRunGetMethodResult> {
+        let address = Self::parse_addr(&address_str)?;
+        let method_id = if let Ok(id) = method.parse::<i32>() {
+            id
+        } else {
+            let crc = CRC16.checksum(method.as_bytes());
+            (crc as i32 & 0xffff) | 0x10000
+        };
+
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::RunGetMethod {
                 address,
-                method,
+                method_id,
                 stack,
                 seqno,
                 resp,
@@ -264,8 +297,8 @@ impl LiteNode {
         address: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<u128> {
-        let info = self.get_address_information(address, seqno).await;
-        info.map(|i| i.balance)
+        let info = self.get_address_information(address, seqno).await?;
+        Ok(info.balance)
     }
 
     pub async fn get_address_state(
@@ -273,8 +306,8 @@ impl LiteNode {
         address: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<AccountStatus> {
-        let info = self.get_address_information(address, seqno).await;
-        info.map(|i| i.state)
+        let info = self.get_address_information(address, seqno).await?;
+        Ok(info.state)
     }
 
     pub async fn get_block_header(&self, seqno: u32) -> anyhow::Result<LiteNodeBlockHeader> {
@@ -316,11 +349,12 @@ impl LiteNode {
         lt: Option<u64>,
         unixtime: Option<u32>,
     ) -> anyhow::Result<LiteNodeBlockId> {
+        let shard = shard.parse::<i64>().context("invalid shard number")?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::LookupBlock {
-                _workchain: workchain,
-                _shard: shard,
+                workchain,
+                shard,
                 seqno,
                 lt,
                 unixtime,
@@ -330,7 +364,8 @@ impl LiteNode {
         rx.await?
     }
 
-    pub async fn faucet(&self, address: String, amount: u128) -> anyhow::Result<Value> {
+    pub async fn faucet(&self, address_str: String, amount: u128) -> anyhow::Result<Value> {
+        let address = Self::parse_addr(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::Faucet {
@@ -342,13 +377,14 @@ impl LiteNode {
         rx.await?
     }
 
-    pub async fn get_traces(&self, tx_hash: String) -> anyhow::Result<storage::TraceNode> {
+    pub async fn get_traces(&self, tx_hash_str: String) -> anyhow::Result<storage::TraceNode> {
+        let tx_hash = Hash256::from_hex(&tx_hash_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetTraces { tx_hash, resp }).await?;
         rx.await?
     }
 
-    pub async fn set_state_source(&self, source: crate::node::StateSource) -> anyhow::Result<()> {
+    pub async fn set_state_source(&self, source: StateSource) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::SetStateSource { source, resp })
@@ -356,16 +392,26 @@ impl LiteNode {
         rx.await?
     }
 
-    pub async fn get_state_source(&self) -> anyhow::Result<crate::node::StateSource> {
+    pub async fn get_state_source(&self) -> anyhow::Result<StateSource> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetStateSource { resp }).await?;
         rx.await?
+    }
+
+    fn parse_addr(s: &str) -> anyhow::Result<Addr> {
+        let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
+            anyhow::anyhow!("Invalid address, only standard internal address is allowed")
+        })?;
+        Ok(Addr {
+            workchain: int_addr.workchain as i32,
+            addr: int_addr.address.0,
+        })
     }
 }
 
 fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
-    state_source: crate::node::StateSource,
+    state_source: StateSource,
     db_path: Option<String>,
 ) -> anyhow::Result<()> {
     let executor = Box::new(TvmEmulatorAdapter::new()?);
@@ -428,12 +474,12 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::RunGetMethod {
             address,
-            method,
+            method_id,
             stack,
             seqno,
             resp,
         } => {
-            let res = handle_run_get_method(node, address, method, stack, seqno);
+            let res = handle_run_get_method(node, address, method_id, stack, seqno);
             let _ = resp.send(res);
         }
         Request::GetBlockHeader { seqno, resp } => {
@@ -453,8 +499,8 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let _ = resp.send(res);
         }
         Request::LookupBlock {
-            _workchain: _,
-            _shard: _,
+            workchain: _, // unused since litenode have only one workchain
+            shard: _,     // unused since litenode have only one shard
             seqno,
             lt,
             unixtime,
@@ -468,11 +514,11 @@ fn process_loop_request(node: &mut Node, req: Request) {
             amount,
             resp,
         } => {
-            let res = handle_faucet(node, address, amount);
+            let res = node.faucet(&address, amount);
             let _ = resp.send(res);
         }
         Request::GetTraces { tx_hash, resp } => {
-            let res = handle_get_traces(node, tx_hash);
+            let res = node.get_traces(&tx_hash);
             let _ = resp.send(res);
         }
         Request::SetStateSource { source, resp } => {
@@ -485,233 +531,130 @@ fn process_loop_request(node: &mut Node, req: Request) {
     }
 }
 
-fn handle_faucet(node: &mut Node, addr_str: String, amount: u128) -> anyhow::Result<Value> {
-    let addr = parse_addr(&addr_str)?;
-    node.faucet(&addr, amount)
-}
-
-fn handle_get_traces(node: &Node, tx_hash_hex: String) -> anyhow::Result<storage::TraceNode> {
-    let tx_hash = Hash256::from_hex(&tx_hash_hex)?;
-    node.get_traces(&tx_hash)
-}
-
-pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
-    let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any())
-        .map_err(|_| anyhow::anyhow!("Invalid address"))?;
-    Ok(Addr {
-        workchain: int_addr.workchain as i32,
-        addr: int_addr.address.0,
-    })
-}
-
-fn handle_send_boc(node: &mut Node, boc_str: String) -> anyhow::Result<LiteNodeBlockTransactions> {
-    tracing::info!("handle_send_boc: decoding BOC");
-    let boc = base64::engine::general_purpose::STANDARD
-        .decode(&boc_str)
-        .context("Invalid BOC base64")?;
+fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LiteNodeBlockTransactions> {
     let (tx_hash, seqno, _) = node.send_boc(boc)?;
 
-    // Fetch full tx info
-    if let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) {
-        let tx_boc_b64 = node
-            .cas
-            .get(&ext_tx.meta.tx_boc_hash)
-            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-            .unwrap_or_default();
-        let tx_struct = convert_to_tx_struct(&ext_tx, tx_boc_b64)?;
-
-        let block_id = node
-            .get_block_header(seqno)
-            .as_ref()
-            .map(convert_to_block_id_struct)
-            .unwrap_or_else(|| LiteNodeBlockId {
-                workchain: 0,
-                shard: "-9223372036854775808".to_string(),
-                seqno,
-                root_hash: Hash256([0; 32]),
-                file_hash: Hash256([0; 32]),
-            });
-
-        Ok(LiteNodeBlockTransactions {
-            id: block_id,
-            transactions: vec![tx_struct],
-        })
-    } else {
+    let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) else {
         anyhow::bail!("Transaction not found after mining")
-    }
-}
+    };
 
-fn convert_to_block_id_struct(h: &storage::BlockMeta) -> LiteNodeBlockId {
-    LiteNodeBlockId {
-        workchain: 0,
-        shard: "-9223372036854775808".to_string(),
-        seqno: h.seqno,
-        root_hash: h.block_boc_hash,
-        file_hash: h.block_boc_hash,
-    }
+    let tx_boc = node.cas.get(&tx_hash).unwrap_or_default();
+    let tx_struct = convert_to_tx_struct(&ext_tx, tx_boc)?;
+
+    let Some(block_header) = node.get_block_header(seqno) else {
+        anyhow::bail!("Block {seqno} with transaction not found after mining")
+    };
+
+    Ok(LiteNodeBlockTransactions {
+        id: block_header.block_id(),
+        transactions: vec![tx_struct],
+    })
 }
 
 fn handle_get_address_info(
     node: &mut Node,
-    addr_str: String,
+    address: Addr,
     seqno: Option<u32>,
 ) -> anyhow::Result<LiteNodeAccountState> {
-    let address = parse_addr(&addr_str)?;
-    let meta = if let Some(s) = seqno {
-        node.get_address_information_at_block(&address, s)
-    } else {
-        node.get_address_information(&address)
+    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let meta = node.get_address_information_at_block(&address, seqno);
+
+    let Some(block_header) = node.get_block_header(seqno) else {
+        anyhow::bail!("Block {seqno} not found")
     };
 
-    let query_seqno = seqno.unwrap_or(node.globals.head_seqno);
-    let block = node.get_block_header(query_seqno);
-    let block_id = block
-        .as_ref()
-        .map(convert_to_block_id_struct)
-        .unwrap_or_else(|| LiteNodeBlockId {
-            workchain: 0,
-            shard: "-9223372036854775808".to_string(),
-            seqno: query_seqno,
-            root_hash: Hash256([0; 32]),
-            file_hash: Hash256([0; 32]),
-        });
+    let block_id = block_header.block_id();
+    let sync_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
     if let Some(m) = meta {
-        let code_boc = m
-            .code_hash
-            .and_then(|h| node.cas.get(&h))
-            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-            .unwrap_or_default();
-        let data_boc = m
-            .data_hash
-            .and_then(|h| node.cas.get(&h))
-            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-            .unwrap_or_default();
+        let code = m.code_hash.and_then(|h| node.cas.get(&h));
+        let data = m.data_hash.and_then(|h| node.cas.get(&h));
 
         Ok(LiteNodeAccountState {
             address,
-            balance: m.balance_cache.unwrap_or(0),
-            code: code_boc,
-            data: data_boc,
-            last_transaction_id: Some(LiteNodeTransactionId {
-                lt: m.last_trans_lt.unwrap_or(0),
-                hash: m.last_trans_hash.unwrap_or(Hash256([0; 32])),
-            }),
+            balance: m.cached_balance.unwrap_or(0),
+            code,
+            data,
+            last_transaction_id: Some(m.last_tx_id()),
             block_id,
             state: m.status,
-            sync_utime: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+            sync_utime,
         })
     } else {
         Ok(LiteNodeAccountState {
             address,
             balance: 0,
-            code: "".to_string(),
-            data: "".to_string(),
-            last_transaction_id: Some(LiteNodeTransactionId {
-                lt: 0,
-                hash: Hash256([0; 32]),
-            }),
+            code: None,
+            data: None,
+            last_transaction_id: Some(LiteNodeTransactionId::default()),
             block_id,
             state: AccountStatus::Nonexist,
-            sync_utime: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+            sync_utime,
         })
     }
 }
 
 fn handle_get_transactions(
     node: &Node,
-    addr_str: String,
-    limit: u32,
+    address: Addr,
+    limit: usize,
     lt: Option<u64>,
-    hash: Option<String>,
+    hash: Option<Hash256>,
     to_lt: Option<u64>,
 ) -> anyhow::Result<Vec<LiteNodeTransaction>> {
-    let addr = parse_addr(&addr_str)?;
-    let hash_obj = if let Some(h) = hash {
-        Some(Hash256::from_base64(&h)?)
-    } else {
-        None
-    };
-
-    let mut txs = node.get_transactions(&addr, limit as usize, lt, hash_obj);
+    let mut raw_txs = node.get_transactions(&address, limit, lt, hash);
 
     if let Some(min_lt) = to_lt {
-        txs.retain(|tx| tx.meta.lt >= min_lt);
+        raw_txs.retain(|tx| tx.meta.lt >= min_lt);
     }
 
-    let mut result = Vec::new();
-    for ext_tx in txs {
-        let tx_boc_b64 = node
-            .cas
-            .get(&ext_tx.meta.tx_boc_hash)
-            .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-            .unwrap_or_default();
-        result.push(convert_to_tx_struct(&ext_tx, tx_boc_b64)?);
-    }
-
-    Ok(result)
+    let full_txs = raw_txs
+        .iter()
+        .flat_map(|tx| {
+            let tx_boc = node.cas.get(&tx.meta.tx_hash).unwrap_or_default();
+            convert_to_tx_struct(tx, tx_boc)
+        })
+        .collect();
+    Ok(full_txs)
 }
 
 fn handle_run_get_method(
     node: &mut Node,
-    addr_str: String,
-    method: String,
+    address: Addr,
+    method_id: i32,
     stack_json: Vec<Value>,
     seqno: Option<u32>,
 ) -> anyhow::Result<LiteNodeRunGetMethodResult> {
-    let addr = parse_addr(&addr_str)?;
-    let meta = if let Some(s) = seqno {
-        node.get_address_information_at_block(&addr, s)
-    } else {
-        node.get_address_information(&addr)
+    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let meta = node.get_address_information_at_block(&address, seqno);
+    let meta = meta.ok_or_else(|| anyhow::anyhow!("Account {address} not found"))?;
+
+    let Some(block_header) = node.get_block_header(seqno) else {
+        anyhow::bail!("Block {seqno} not found")
     };
 
-    let meta = meta.ok_or_else(|| anyhow::anyhow!("Account not found"))?;
-
-    let query_seqno = seqno.unwrap_or(node.globals.head_seqno);
-    let block = node.get_block_header(query_seqno);
-    let block_id = block
-        .as_ref()
-        .map(convert_to_block_id_struct)
-        .unwrap_or_else(|| LiteNodeBlockId {
-            workchain: 0,
-            shard: "-9223372036854775808".to_string(),
-            seqno: query_seqno,
-            root_hash: Hash256([0; 32]),
-            file_hash: Hash256([0; 32]),
-        });
-
-    let last_transaction_id = LiteNodeTransactionId {
-        lt: meta.last_trans_lt.unwrap_or(0),
-        hash: meta.last_trans_hash.unwrap_or(Hash256([0; 32])),
-    };
+    let block_id = block_header.block_id();
+    let last_transaction_id = meta.last_tx_id();
 
     let code_boc = meta
         .code_hash
         .and_then(|h| node.cas.get(&h))
         .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-        .ok_or_else(|| anyhow::anyhow!("Account has no code"))?;
+        .unwrap_or_else(|| EMPTY_CELL_BASE64.to_owned());
 
     let data_boc = meta
         .data_hash
         .and_then(|h| node.cas.get(&h))
         .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-        .ok_or_else(|| anyhow::anyhow!("Account has no data"))?;
+        .unwrap_or_else(|| EMPTY_CELL_BASE64.to_owned());
 
-    let method_id = if let Ok(id) = method.parse::<i32>() {
-        id
-    } else {
-        let crc = CRC16.checksum(method.as_bytes());
-        (crc as i32 & 0xffff) | 0x10000
-    };
-
-    let balance_tokens = meta.balance_cache.unwrap_or(0);
+    let balance_tokens = meta.cached_balance.unwrap_or(0);
 
     let args = RunGetMethodArgs {
         code: code_boc,
         data: data_boc,
         method_id,
-        address: addr_str,
+        address: address.to_string(),
         unixtime: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
         balance: balance_tokens.to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
@@ -739,21 +682,26 @@ fn handle_run_get_method(
         .context("Execution failed")?;
 
     match res {
-        GetMethodResult::Success(s) => Ok(LiteNodeRunGetMethodResult {
-            gas_used: s.gas_used.parse().unwrap_or(0),
-            stack: s.stack,
-            exit_code: s.vm_exit_code,
-            vm_log: s.vm_log,
-            block_id,
-            last_transaction_id,
-        }),
+        GetMethodResult::Success(s) => {
+            let stack_bytes = base64::engine::general_purpose::STANDARD
+                .decode(&s.stack)
+                .unwrap_or_default();
+            Ok(LiteNodeRunGetMethodResult {
+                gas_used: s.gas_used.parse().unwrap_or(0),
+                stack: stack_bytes,
+                exit_code: s.vm_exit_code,
+                vm_log: s.vm_log,
+                block_id,
+                last_transaction_id,
+            })
+        }
         GetMethodResult::Error(e) => anyhow::bail!("Get method error: {:?}", e),
     }
 }
 
 pub(crate) fn convert_to_tx_struct(
     tx: &TransactionInfo,
-    tx_boc_b64: String,
+    tx_boc: Vec<u8>,
 ) -> anyhow::Result<LiteNodeTransaction> {
     let in_msg_struct = if let Some(in_msg) = &tx.in_msg {
         convert_to_message_struct(&in_msg.meta, &in_msg.boc)?
@@ -763,9 +711,9 @@ pub(crate) fn convert_to_tx_struct(
             source: None,
             destination: None,
             value: 0,
-            body_hash: "".to_string(),
-            body: "".to_string(),
-            init_state: "".to_string(),
+            body_hash: Hash256([0; 32]),
+            body: Vec::new(),
+            init_state: Vec::new(),
             opcode: None,
         }
     };
@@ -779,7 +727,7 @@ pub(crate) fn convert_to_tx_struct(
         hash: tx.meta.tx_hash,
         address: tx.meta.account,
         utime: tx.meta.now,
-        data: tx_boc_b64,
+        data: tx_boc,
         success: tx.meta.success,
         exit_code: tx.meta.compute_exit_code.unwrap_or(0),
         transaction_id: LiteNodeTransactionId {
@@ -799,8 +747,8 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LiteN
     let mut builder = tycho_types::cell::CellBuilder::new();
     builder.store_slice(msg.body)?;
     let body_cell = builder.build()?;
-    let body_hash = hex::encode(body_cell.repr_hash().as_slice());
-    let body_base64 = base64::engine::general_purpose::STANDARD.encode(Boc::encode(body_cell));
+    let body_hash = Hash256(*body_cell.repr_hash().as_array());
+    let body_bytes = Boc::encode(body_cell);
 
     // Extract opcode (first 32 bits)
     let mut opcode = None;
@@ -808,15 +756,15 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LiteN
     if body_slice.size_bits() >= 32
         && let Ok(op) = body_slice.load_uint(32)
     {
-        opcode = Some(format!("0x{:08x}", op));
+        opcode = Some(op as u32);
     }
 
-    let mut init_state_b64 = String::new();
+    let mut init_state_bytes = Vec::new();
     if let Some(init) = msg.init {
         let mut builder = tycho_types::cell::CellBuilder::new();
         let _ = init.store_into(&mut builder, tycho_types::cell::Cell::empty_context());
         if let Ok(cell) = builder.build() {
-            init_state_b64 = base64::engine::general_purpose::STANDARD.encode(Boc::encode(cell));
+            init_state_bytes = Boc::encode(cell);
         }
     }
 
@@ -826,101 +774,74 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LiteN
         destination: meta.dst,
         value: meta.value.unwrap_or(0),
         body_hash,
-        body: body_base64,
-        init_state: init_state_b64,
+        body: body_bytes,
+        init_state: init_state_bytes,
         opcode,
     })
 }
 
 fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LiteNodeBlockHeader> {
-    let header = node.get_block_header(seqno);
-    if let Some(h) = header {
-        Ok(LiteNodeBlockHeader {
-            id: convert_to_block_id_struct(&h),
-            gen_utime: h.gen_utime,
-            start_lt: h.start_lt,
-            end_lt: h.end_lt,
-            prev_seqno: h.prev_seqno,
-        })
-    } else {
-        Err(anyhow::anyhow!("Block not found"))
-    }
+    let Some(header) = node.get_block_header(seqno) else {
+        anyhow::bail!("Block {seqno} not found")
+    };
+
+    Ok(LiteNodeBlockHeader {
+        id: header.block_id(),
+        gen_utime: header.gen_utime,
+        start_lt: header.start_lt,
+        end_lt: header.end_lt,
+        prev_seqno: header.prev_seqno,
+    })
 }
 
 fn handle_get_block_transactions(
     node: &Node,
     seqno: u32,
 ) -> anyhow::Result<LiteNodeBlockTransactions> {
-    let txs = node.get_block_transactions(seqno);
-    if let Some(txs) = txs {
-        let mut result = Vec::new();
-        for tx in txs {
-            if let Some(ext_tx) = node.get_transaction_by_hash(&tx.tx_hash) {
-                let tx_boc_b64 = node
-                    .cas
-                    .get(&ext_tx.meta.tx_boc_hash)
-                    .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-                    .unwrap_or_default();
-                result.push(convert_to_tx_struct(&ext_tx, tx_boc_b64)?);
-            }
-        }
+    let Some(block_header) = node.get_block_header(seqno) else {
+        anyhow::bail!("Block {seqno} not found")
+    };
+    let Some(txs) = node.get_block_transactions(&block_header) else {
+        anyhow::bail!("Transaction in block {seqno} not found")
+    };
 
-        let block_id = node
-            .get_block_header(seqno)
-            .as_ref()
-            .map(convert_to_block_id_struct)
-            .unwrap_or_else(|| LiteNodeBlockId {
-                workchain: 0,
-                shard: "-9223372036854775808".to_string(),
-                seqno,
-                root_hash: Hash256([0; 32]),
-                file_hash: Hash256([0; 32]),
-            });
+    let mut result = Vec::new();
+    for tx in txs {
+        let Some(ext_tx) = node.get_transaction_by_hash(&tx.tx_hash) else {
+            continue;
+        };
 
-        Ok(LiteNodeBlockTransactions {
-            id: block_id,
-            transactions: result,
-        })
-    } else {
-        Err(anyhow::anyhow!("Block not found"))
+        let tx_boc = node.cas.get(&ext_tx.meta.tx_hash).unwrap_or_default();
+        result.push(convert_to_tx_struct(&ext_tx, tx_boc)?);
     }
+
+    let block_id = block_header.block_id();
+
+    Ok(LiteNodeBlockTransactions {
+        id: block_id,
+        transactions: result,
+    })
 }
 
 fn handle_get_masterchain_info(node: &Node) -> anyhow::Result<LiteNodeMasterchainInfo> {
     let head_block = node.get_block_header(node.globals.head_seqno);
     let block_id = head_block
         .as_ref()
-        .map(convert_to_block_id_struct)
-        .unwrap_or_else(|| LiteNodeBlockId {
-            workchain: 0,
-            shard: "-9223372036854775808".to_string(),
-            seqno: 0,
-            root_hash: Hash256([0; 32]),
-            file_hash: Hash256([0; 32]),
-        });
+        .map(BlockMeta::block_id)
+        .unwrap_or_else(LiteNodeBlockId::first);
 
     Ok(LiteNodeMasterchainInfo {
+        state_root_hash: block_id.root_hash,
         last: block_id,
-        state_root_hash: head_block
-            .map(|h| h.block_boc_hash)
-            .unwrap_or(Hash256([0; 32])),
-        init: LiteNodeBlockId {
-            workchain: 0,
-            shard: "-9223372036854775808".to_string(),
-            seqno: 0,
-            root_hash: Hash256([0; 32]),
-            file_hash: Hash256([0; 32]),
-        },
+        init: LiteNodeBlockId::first(),
     })
 }
 
 fn handle_get_shards(node: &Node, seqno: u32) -> anyhow::Result<Vec<LiteNodeBlockId>> {
-    let block = node.get_block_header(seqno);
-    let Some(block_id) = block.as_ref().map(convert_to_block_id_struct) else {
+    let Some(block_header) = node.get_block_header(seqno) else {
         anyhow::bail!("Block not found for seqno={seqno}")
     };
-
-    Ok(vec![block_id])
+    Ok(vec![block_header.block_id()])
 }
 
 fn handle_lookup_block(
@@ -929,7 +850,7 @@ fn handle_lookup_block(
     lt: Option<u64>,
     unixtime: Option<u32>,
 ) -> anyhow::Result<LiteNodeBlockId> {
-    let block = if let Some(s) = seqno {
+    let found_block = if let Some(s) = seqno {
         node.get_block_header(s)
     } else if let Some(l) = lt {
         node.find_block_by_lt(l)
@@ -939,8 +860,9 @@ fn handle_lookup_block(
         None
     };
 
-    match block {
-        Some(b) => Ok(convert_to_block_id_struct(&b)),
-        None => anyhow::bail!("Block not found"),
-    }
+    let Some(block) = found_block else {
+        anyhow::bail!("Block not found for seqno={seqno:?}, lt={lt:?}, unixtime={unixtime:?}")
+    };
+
+    Ok(block.block_id())
 }

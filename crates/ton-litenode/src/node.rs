@@ -200,7 +200,7 @@ impl Node {
             .or_insert_with(|| AccountMeta {
                 account_hash: Hash256([0; 32]),
                 status: AccountStatus::Active,
-                balance_cache: Some(GIVER_BALANCE),
+                cached_balance: Some(GIVER_BALANCE),
                 last_trans_lt: None,
                 last_trans_hash: None,
                 code_hash: None,
@@ -373,7 +373,6 @@ impl Node {
 
         let tx_meta = TxMeta {
             tx_hash,
-            tx_boc_hash: tx_hash,
             account: dst,
             lt,
             now: gen_utime,
@@ -390,7 +389,7 @@ impl Node {
         let new_meta = new_account_hash.map(|hash| AccountMeta {
             account_hash: hash,
             status,
-            balance_cache,
+            cached_balance: balance_cache,
             last_trans_lt: Some(lt),
             last_trans_hash: Some(tx_hash),
             code_hash,
@@ -635,8 +634,8 @@ impl Node {
             .cloned()
     }
 
-    pub fn get_block_transactions(&self, seqno: Seqno) -> Option<Vec<TxMeta>> {
-        let tx_hash = self.indexes.tx_by_block.get(&seqno)?;
+    pub fn get_block_transactions(&self, block_meta: &BlockMeta) -> Option<Vec<TxMeta>> {
+        let tx_hash = self.indexes.tx_by_block.get(&block_meta.seqno)?;
         let tx = self.history.tx_by_hash.get(tx_hash).cloned()?;
         Some(vec![tx])
     }
@@ -797,7 +796,7 @@ impl Node {
             .get(&GIVER_ADDR)
             .cloned()
             .context("Giver account not found")?;
-        let giver_balance = giver_meta.balance_cache.unwrap_or(0);
+        let giver_balance = giver_meta.cached_balance.unwrap_or(0);
         if giver_balance < amount {
             anyhow::bail!("Giver has insufficient balance");
         }
@@ -838,7 +837,7 @@ impl Node {
         self.history.msg_by_hash.insert(hash, msg_meta);
 
         // 3. Decrease Giver balance
-        giver_meta.balance_cache = Some(giver_balance - amount);
+        giver_meta.cached_balance = Some(giver_balance - amount);
         self.latest.accounts.insert(GIVER_ADDR, giver_meta);
 
         // 4. Enqueue internal message
