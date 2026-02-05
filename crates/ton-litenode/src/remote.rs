@@ -1,8 +1,10 @@
 use crate::storage::{AccountMeta, AccountStatus, CellStore};
 use crate::types::{Addr, BocBytes, Hash256};
-use anyhow::Context;
+use acton_config::config;
 use base64::Engine;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use ton_api::TonApiClient;
+use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{CellBuilder, CellFamily, Store};
 use tycho_types::models::{
@@ -11,9 +13,9 @@ use tycho_types::models::{
 };
 use tycho_types::num::Tokens;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteProvider {
-    pub network: String, // "mainnet" or "testnet"
+    pub network: Network,
     pub api_key: Option<String>,
 }
 
@@ -23,57 +25,16 @@ pub fn fetch_remote_shard_account(
     cas: &mut CellStore,
 ) -> anyhow::Result<(BocBytes, AccountMeta)> {
     tracing::info!("Fetching remote account state for {}", addr);
-    let address_str = format!("{}:{}", addr.workchain, hex::encode(addr.addr));
-    let base_url = match provider.network.as_str() {
-        "mainnet" => "https://toncenter.com/api/v2",
-        "testnet" => "https://testnet.toncenter.com/api/v2",
-        _ => anyhow::bail!("Unsupported network: {}", provider.network),
-    };
 
-    let url = format!("{}/getAddressInformation?address={}", base_url, address_str);
-    let client = reqwest::blocking::Client::new();
-    let mut request = client.get(url).header("User-Agent", "acton-litenode");
+    let config = config::ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+    let api_client = TonApiClient::new(
+        provider.network.clone(),
+        custom_networks,
+        provider.api_key.as_deref().map(ToString::to_string),
+    )?;
 
-    if let Some(key) = &provider.api_key {
-        request = request.header("X-API-Key", key);
-    }
-
-    let response = request
-        .send()
-        .context("Failed to send request to TonCenter")?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("TonCenter API returned status: {}", response.status());
-    }
-
-    #[derive(Deserialize)]
-    struct TonCenterResponse {
-        result: TonCenterAccountInfo,
-    }
-
-    #[derive(Deserialize)]
-    struct TonCenterAccountInfo {
-        state: String,
-        balance: String,
-        code: String,
-        data: String,
-        last_transaction_id: TonCenterTxId,
-    }
-
-    #[derive(Deserialize)]
-    struct TonCenterTxId {
-        lt: String,
-        hash: String,
-    }
-
-    let data: TonCenterResponse = response
-        .json()
-        .context("Failed to parse TonCenter response")?;
-
-    let info = data.result;
-    if info.state == "uninitialized" || info.state == "nonexist" {
-        anyhow::bail!("Account does not exist on remote");
-    }
+    let info = api_client.get_account_info(None, &addr.to_string())?;
 
     let code = if info.code.is_empty() {
         None
@@ -103,9 +64,8 @@ pub fn fetch_remote_shard_account(
         _ => AccountStatus::Nonexist,
     };
 
-    let balance = info.balance.parse::<u128>().unwrap_or(0);
+    let balance = u128::try_from(info.balance.to_bigint().unwrap_or_default())?;
 
-    // Construct ShardAccount BOC
     let account_state = if status == AccountStatus::Active {
         let code_cell = code
             .and_then(|h| cas.get(&h))

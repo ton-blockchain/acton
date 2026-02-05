@@ -1,4 +1,6 @@
 use owo_colors::OwoColorize;
+use retrace::Network;
+use std::str::FromStr;
 use std::sync::Arc;
 use ton_litenode::node::StateSource;
 use ton_litenode::remote::RemoteProvider;
@@ -11,6 +13,7 @@ pub async fn litenode_start_cmd(
     api_key: Option<String>,
 ) -> anyhow::Result<()> {
     let state_source = if let Some(network) = fork_net {
+        let network = Network::from_str(&network)?;
         StateSource::Remote(RemoteProvider { network, api_key })
     } else {
         StateSource::Local

@@ -12,13 +12,15 @@ license = { workspace = true }
 
 [dependencies]
 ton-executor = { workspace = true }
+ton-networks = { workspace = true }
+ton-api = { workspace = true }
+acton-config = { workspace = true }
 tycho-types = { workspace = true }
 tvmffi = { workspace = true }
 tonlib-core = { workspace = true }
 crc = { workspace = true }
 hex = { workspace = true }
 anyhow = { workspace = true }
-reqwest = { version = "0.11", features = ["blocking", "json"] }
 base64 = { workspace = true }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
