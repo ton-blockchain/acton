@@ -1,17 +1,15 @@
 use crate::executor::{ExecContext, TvmExecutor};
-use crate::litenode;
 use crate::litenode::parse_addr;
 use crate::storage::{
-    AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, ExtendedMessage, Globals,
-    History, Indexes, LatestState, MessagePool, MsgMeta, PendingCommit, ReverseLtKey,
+    AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
+    LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
     TransactionInfo, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
-use base64::Engine;
 use core::cmp;
 use serde_json::Value;
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tonlib_core::TonHash;
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
@@ -389,17 +387,11 @@ impl Node {
             .take(limit)
             .filter_map(|(_, tx_hash)| self.history.tx_by_hash.get(tx_hash).cloned())
             .map(|tx| {
-                let in_msg = tx.in_msg_hash.and_then(|h| {
-                    self.get_message_meta(&h)
-                        .map(|(meta, boc)| ExtendedMessage { meta, boc })
-                });
+                let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
                 let out_msgs = tx
                     .out_msg_hashes
                     .iter()
-                    .filter_map(|h| {
-                        self.get_message_meta(h)
-                            .map(|(meta, boc)| ExtendedMessage { meta, boc })
-                    })
+                    .filter_map(|h| self.get_message_info(h))
                     .collect();
                 TransactionInfo {
                     meta: tx,
@@ -442,25 +434,19 @@ impl Node {
         Some(vec![tx])
     }
 
-    pub fn get_message_meta(&self, hash: &Hash256) -> Option<(MsgMeta, BocBytes)> {
+    pub fn get_message_info(&self, hash: &Hash256) -> Option<MessageInfo> {
         let meta = self.history.msg_by_hash.get(hash).cloned()?;
         let boc = self.cas.get(&meta.msg_boc_hash).cloned()?;
-        Some((meta, boc))
+        Some(MessageInfo { meta, boc })
     }
 
     pub fn get_transaction_by_hash(&self, hash: &Hash256) -> Option<TransactionInfo> {
         let tx = self.history.tx_by_hash.get(hash).cloned()?;
-        let in_msg = tx.in_msg_hash.and_then(|h| {
-            self.get_message_meta(&h)
-                .map(|(meta, boc)| ExtendedMessage { meta, boc })
-        });
+        let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
         let out_msgs = tx
             .out_msg_hashes
             .iter()
-            .filter_map(|h| {
-                self.get_message_meta(h)
-                    .map(|(meta, boc)| ExtendedMessage { meta, boc })
-            })
+            .filter_map(|h| self.get_message_info(h))
             .collect();
         Some(TransactionInfo {
             meta: tx,
@@ -469,10 +455,7 @@ impl Node {
         })
     }
 
-    pub fn get_traces(&self, tx_hash: &Hash256) -> anyhow::Result<Vec<Value>> {
-        let mut all_tx_hashes = HashSet::new();
-        let mut queue = VecDeque::new();
-
+    pub fn get_traces(&self, tx_hash: &Hash256) -> anyhow::Result<TraceNode> {
         // 1. Find the root transaction (traverse UP)
         let mut root_hash = *tx_hash;
         let mut curr_tx_hash = *tx_hash;
@@ -492,9 +475,6 @@ impl Node {
                     }
 
                     // Find transaction that produced this message
-                    // Optimized: we can find it in msg_to_tx if we know the out_msg_hash
-                    // But we are going BACKWARDS, so we need a map from out_msg_hash to producing_tx_hash
-                    // For now, scan (MVP). In production add index.
                     let mut found_parent = false;
                     for (h, t) in &self.history.tx_by_hash {
                         if t.out_msg_hashes.contains(in_msg_hash) {
@@ -524,64 +504,38 @@ impl Node {
             }
         }
 
-        // 2. Collect all descendants starting from root_hash (traverse DOWN)
-        queue.push_back(root_hash);
-        all_tx_hashes.insert(root_hash);
+        // 2. Build trace tree starting from root_hash (traverse DOWN)
+        let external_hash = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
+            tx.in_msg_hash.and_then(|h| {
+                self.history.msg_by_hash.get(&h).and_then(|msg| {
+                    if msg.src.is_none() { Some(h) } else { None }
+                })
+            })
+        });
 
-        let mut results = Vec::new();
+        let mut trace = self.build_trace_node(&root_hash)
+            .ok_or_else(|| anyhow::anyhow!("Root transaction not found"))?;
+        trace.external_hash = external_hash;
+        Ok(trace)
+    }
 
-        while let Some(h) = queue.pop_front() {
-            if let Some(ext_tx) = self.get_transaction_by_hash(&h) {
-                let tx_boc_b64 = self
-                    .cas
-                    .get(&ext_tx.meta.tx_boc_hash)
-                    .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-                    .unwrap_or_default();
+    fn build_trace_node(&self, tx_hash: &Hash256) -> Option<TraceNode> {
+        let tx_info = self.get_transaction_by_hash(tx_hash)?;
+        let mut children = Vec::new();
 
-                let tx_struct = litenode::convert_to_tx_struct(&ext_tx, tx_boc_b64)?;
-                let mut tx_val = serde_json::to_value(tx_struct)?;
-
-                // TODO
-                // Add @type for UI compatibility if needed, though convert_to_tx_struct doesn't add it
-                // Actually, the UI might expect the TonCenter v2 format.
-                // Let's use the same mapping as in server.rs if possible, but Node is in lib.
-                // For now, let's just fix the compilation error by using the new struct and converting to Value.
-
-                // Add parent/child info for shared UI component
-                if let Some(in_msg_hash) = &ext_tx.meta.in_msg_hash {
-                    for t in self.history.tx_by_hash.values() {
-                        if t.out_msg_hashes.contains(in_msg_hash) {
-                            tx_val["parent_transaction"] = serde_json::json!(t.lt.to_string());
-                            break;
-                        }
-                    }
-                }
-
-                let mut children = Vec::new();
-                for out_msg in &ext_tx.meta.out_msg_hashes {
-                    if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg)
-                        && let Some(child_tx) = self.history.tx_by_hash.get(child_tx_hash)
-                    {
-                        children.push(child_tx.lt.to_string());
-                    }
-                }
-                tx_val["child_transactions"] = serde_json::json!(children);
-                tx_val["raw_transaction"] = tx_val["data"].clone();
-
-                results.push(tx_val);
-
-                for out_msg in &ext_tx.meta.out_msg_hashes {
-                    if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg)
-                        && !all_tx_hashes.contains(child_tx_hash)
-                    {
-                        all_tx_hashes.insert(*child_tx_hash);
-                        queue.push_back(*child_tx_hash);
-                    }
-                }
+        for out_msg in &tx_info.meta.out_msg_hashes {
+            if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg)
+                && let Some(child_node) = self.build_trace_node(child_tx_hash)
+            {
+                children.push(child_node);
             }
         }
 
-        Ok(results)
+        Some(TraceNode {
+            transaction: tx_info,
+            children,
+            external_hash: None,
+        })
     }
 
     pub fn has_pending_messages(&self) -> bool {

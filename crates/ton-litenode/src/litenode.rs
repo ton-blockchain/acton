@@ -1,5 +1,6 @@
 use crate::executor::TvmEmulatorAdapter;
 use crate::node::Node;
+use crate::storage;
 use crate::storage::{AccountStatus, MsgMeta, TransactionInfo};
 use crate::types::{Addr, Hash256, Lt, Seqno};
 use anyhow::Context;
@@ -170,7 +171,7 @@ pub(crate) enum Request {
     },
     GetTraces {
         tx_hash: String,
-        resp: oneshot::Sender<anyhow::Result<Value>>,
+        resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
     },
 }
 
@@ -358,7 +359,7 @@ impl LiteNode {
         rx.await?
     }
 
-    pub async fn get_traces(&self, tx_hash: String) -> anyhow::Result<Value> {
+    pub async fn get_traces(&self, tx_hash: String) -> anyhow::Result<storage::TraceNode> {
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::GetTraces { tx_hash, resp }).await?;
         rx.await?
@@ -492,12 +493,9 @@ fn process_loop_request(node: &mut Node, req: Request) {
     }
 }
 
-fn handle_get_traces(node: &Node, tx_hash_hex: String) -> anyhow::Result<Value> {
+fn handle_get_traces(node: &Node, tx_hash_hex: String) -> anyhow::Result<storage::TraceNode> {
     let tx_hash = Hash256::from_hex(&tx_hash_hex)?;
-    let traces = node.get_traces(&tx_hash)?;
-    Ok(serde_json::json!({
-        "traces": traces
-    }))
+    node.get_traces(&tx_hash)
 }
 
 pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
@@ -546,7 +544,7 @@ fn handle_send_boc(node: &mut Node, boc_str: String) -> anyhow::Result<LiteNodeB
     }
 }
 
-fn convert_to_block_id_struct(h: &crate::storage::BlockMeta) -> LiteNodeBlockId {
+fn convert_to_block_id_struct(h: &storage::BlockMeta) -> LiteNodeBlockId {
     LiteNodeBlockId {
         workchain: 0,
         shard: "-9223372036854775808".to_string(),

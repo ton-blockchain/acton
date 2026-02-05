@@ -1,4 +1,5 @@
 use crate::api;
+use crate::api::toncenter_v3;
 use crate::litenode::LiteNode;
 use axum::{
     Json, Router,
@@ -968,7 +969,7 @@ async fn get_traces_query(
     Query(payload): Query<GetTracesQuery>,
 ) -> Json<Value> {
     match node.get_traces(payload.hash).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(toncenter_v3::map_traces(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),

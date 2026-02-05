@@ -106,7 +106,7 @@ pub struct MsgMeta {
 }
 
 #[derive(Clone, Debug)]
-pub struct ExtendedMessage {
+pub struct MessageInfo {
     pub meta: MsgMeta,
     pub boc: BocBytes,
 }
@@ -114,8 +114,33 @@ pub struct ExtendedMessage {
 #[derive(Clone, Debug)]
 pub struct TransactionInfo {
     pub meta: TxMeta,
-    pub in_msg: Option<ExtendedMessage>,
-    pub out_msgs: Vec<ExtendedMessage>,
+    pub in_msg: Option<MessageInfo>,
+    pub out_msgs: Vec<MessageInfo>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TraceNode {
+    pub transaction: TransactionInfo,
+    pub children: Vec<TraceNode>,
+    pub external_hash: Option<Hash256>,
+}
+
+impl TraceNode {
+    pub fn max_lt(&self) -> u64 {
+        let mut max = self.transaction.meta.lt;
+        for child in &self.children {
+            max = max.max(child.max_lt());
+        }
+        max
+    }
+
+    pub fn max_utime(&self) -> u32 {
+        let mut max = self.transaction.meta.now;
+        for child in &self.children {
+            max = max.max(child.max_utime());
+        }
+        max
+    }
 }
 
 #[derive(Clone, Debug)]
