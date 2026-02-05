@@ -82,17 +82,11 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
             "@type": "raw.fullAccountState",
             "balance": s.balance.to_string(),
             "extra_currencies": [],
-            "last_transaction_id": s.last_transaction_id.as_ref().map(|tid| {
-                serde_json::json!({
-                    "@type": "internal.transactionId",
-                    "lt": tid.lt.to_string(),
-                    "hash": tid.hash.to_hex()
-                })
-            }).unwrap_or_else(|| serde_json::json!({
+            "last_transaction_id": {
                 "@type": "internal.transactionId",
-                "lt": "0",
-                "hash": "0000000000000000000000000000000000000000000000000000000000000000"
-            })),
+                "lt": s.last_transaction_id.lt.to_string(),
+                "hash": s.last_transaction_id.hash.to_hex()
+            },
             "block_id": map_block_id(&s.block_id),
             "code": encode_optional_boc(s.code.as_ref()),
             "data": encode_optional_boc(s.data.as_ref()),
@@ -116,17 +110,11 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
             "address": { "@type": "accountAddress", "account_address": s.address.to_string() },
             "balance": s.balance.to_string(),
             "extra_currencies": [],
-            "last_transaction_id": s.last_transaction_id.as_ref().map(|tid| {
-                serde_json::json!({
-                    "@type": "internal.transactionId",
-                    "lt": tid.lt.to_string(),
-                    "hash": tid.hash.to_hex()
-                })
-            }).unwrap_or_else(|| serde_json::json!({
+            "last_transaction_id": {
                 "@type": "internal.transactionId",
-                "lt": "0",
-                "hash": "0000000000000000000000000000000000000000000000000000000000000000"
-            })),
+                "lt": s.last_transaction_id.lt.to_string(),
+                "hash": s.last_transaction_id.hash.to_hex()
+            },
             "block_id": map_block_id(&s.block_id),
             "sync_utime": s.sync_utime,
             "account_state": match s.state {

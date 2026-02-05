@@ -14,7 +14,8 @@ use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tonlib_core::tlb_types::tlb::TLB;
-use tvmffi::json_stack::json_to_legacy_stack;
+use tvmffi::json_stack::json_to_legacy_item;
+use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{CellFamily, Store};
 use tycho_types::models::{Message, StdAddr, StdAddrFormat};
@@ -48,10 +49,25 @@ pub struct LiteNodeAccountState {
     pub balance: u128,
     pub code: Option<BocBytes>,
     pub data: Option<BocBytes>,
-    pub last_transaction_id: Option<LiteNodeTransactionId>,
+    pub last_transaction_id: LiteNodeTransactionId,
     pub block_id: LiteNodeBlockId,
     pub state: AccountStatus,
     pub sync_utime: u64,
+}
+
+impl LiteNodeAccountState {
+    pub fn empty(address: Addr, block_id: LiteNodeBlockId, sync_utime: u64) -> Self {
+        Self {
+            address,
+            balance: 0,
+            code: None,
+            data: None,
+            last_transaction_id: LiteNodeTransactionId::default(),
+            block_id,
+            state: AccountStatus::Nonexist,
+            sync_utime,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -139,7 +155,7 @@ pub(crate) enum Request {
     RunGetMethod {
         address: Addr,
         method_id: i32,
-        stack: Vec<Value>,
+        stack: Tuple,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LiteNodeRunGetMethodResult>>,
     },
@@ -268,7 +284,7 @@ impl LiteNode {
         &self,
         address_str: String,
         method: String,
-        stack: Vec<Value>,
+        stack_json: Vec<Value>,
         seqno: Option<u32>,
     ) -> anyhow::Result<LiteNodeRunGetMethodResult> {
         let address = Self::parse_addr(&address_str)?;
@@ -278,6 +294,13 @@ impl LiteNode {
             let crc = CRC16.checksum(method.as_bytes());
             (crc as i32 & 0xffff) | 0x10000
         };
+
+        let stack = Tuple(
+            stack_json
+                .into_iter()
+                .map(json_to_legacy_item)
+                .collect::<anyhow::Result<Vec<_>>>()?,
+        );
 
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -566,32 +589,24 @@ fn handle_get_address_info(
     let block_id = block_header.block_id();
     let sync_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
-    if let Some(m) = meta {
-        let code = m.code_hash.and_then(|h| node.cas.get(&h));
-        let data = m.data_hash.and_then(|h| node.cas.get(&h));
+    let Some(meta) = meta else {
+        return Ok(LiteNodeAccountState::empty(address, block_id, sync_utime));
+    };
 
-        Ok(LiteNodeAccountState {
-            address,
-            balance: m.cached_balance.unwrap_or(0),
-            code,
-            data,
-            last_transaction_id: Some(m.last_tx_id()),
-            block_id,
-            state: m.status,
-            sync_utime,
-        })
-    } else {
-        Ok(LiteNodeAccountState {
-            address,
-            balance: 0,
-            code: None,
-            data: None,
-            last_transaction_id: Some(LiteNodeTransactionId::default()),
-            block_id,
-            state: AccountStatus::Nonexist,
-            sync_utime,
-        })
-    }
+    let code = meta.code_hash.and_then(|h| node.cas.get(&h));
+    let data = meta.data_hash.and_then(|h| node.cas.get(&h));
+    let last_transaction_id = meta.last_tx_id();
+
+    Ok(LiteNodeAccountState {
+        address,
+        balance: meta.cached_balance.unwrap_or(0),
+        code,
+        data,
+        last_transaction_id,
+        block_id,
+        state: meta.status,
+        sync_utime,
+    })
 }
 
 fn handle_get_transactions(
@@ -622,7 +637,7 @@ fn handle_run_get_method(
     node: &mut Node,
     address: Addr,
     method_id: i32,
-    stack_json: Vec<Value>,
+    stack: Tuple,
     seqno: Option<u32>,
 ) -> anyhow::Result<LiteNodeRunGetMethodResult> {
     let seqno = seqno.unwrap_or(node.globals.head_seqno);
@@ -666,11 +681,9 @@ fn handle_run_get_method(
         prev_blocks_info: None,
     };
 
-    let tuple_stack =
-        json_to_legacy_stack(stack_json).context("Failed to parse input legacy stack")?;
-    let stack_cell = tuple_stack
+    let stack_cell = stack
         .serialize()
-        .context("Failed to serialize stack to BOC")?;
+        .context("Failed to serialize stack to BoC")?;
     let stack_b64 = stack_cell
         .to_boc_b64(false)
         .context("Failed to encode stack to Base64")?;
