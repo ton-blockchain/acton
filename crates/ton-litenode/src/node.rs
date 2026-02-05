@@ -2,14 +2,16 @@ use crate::executor::{ExecContext, TvmExecutor};
 use crate::litenode;
 use crate::litenode::parse_addr;
 use crate::storage::{
-    AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
-    LatestState, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TxMeta,
+    AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, ExtendedMessage, Globals,
+    History, Indexes, LatestState, MessagePool, MsgMeta, PendingCommit, ReverseLtKey,
+    TransactionInfo, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
 use base64::Engine;
 use core::cmp;
 use serde_json::Value;
+use std::collections::{HashSet, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tonlib_core::TonHash;
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
@@ -192,12 +194,12 @@ impl Node {
         };
 
         let mut out_msg_hashes = Vec::new();
-        for out_boc in exec_result.out_msgs_boc {
-            let h = compute_boc_hash(&out_boc)?;
+        for out_boc in &exec_result.out_msgs_boc {
+            let h = compute_boc_hash(out_boc)?;
             self.cas.put(out_boc.clone(), h);
             out_msg_hashes.push(h);
 
-            let out_meta = parse_msg_meta(&out_boc, h)?;
+            let out_meta = parse_msg_meta(out_boc, h)?;
             self.history.msg_by_hash.insert(h, out_meta);
         }
 
@@ -217,14 +219,18 @@ impl Node {
             block_boc_hash: block_hash,
         };
 
+        let compute_exit_code = exec_result.compute_exit_code();
+        let action_result_code = exec_result.action_result_code();
+
         let tx_meta = TxMeta {
             tx_hash,
             tx_boc_hash: tx_hash,
             account: dst,
             lt,
             now: gen_utime,
-            success: exec_result.exit_code == 0,
-            exit_code: exec_result.exit_code,
+            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            compute_exit_code,
+            action_result_code,
             total_fees: None,
             in_msg_hash: Some(msg_hash),
             out_msg_hashes: out_msg_hashes.clone(),
@@ -342,7 +348,7 @@ impl Node {
             return self.get_address_information(addr);
         }
 
-        // Search backwards from seqno to find the state as it was after block 'seqno'
+        // search backwards from seqno to find the state as it was after block 'seqno'
         for s in (1..=seqno).rev() {
             if s as usize > self.history.deltas_by_seqno.len() {
                 continue;
@@ -363,7 +369,7 @@ impl Node {
         limit: usize,
         lt: Option<Lt>,
         hash: Option<Hash256>,
-    ) -> Vec<TxMeta> {
+    ) -> Vec<TransactionInfo> {
         let index = if let Some(map) = self.indexes.tx_by_account.get(addr) {
             map
         } else {
@@ -382,6 +388,25 @@ impl Node {
             .range(start_key..)
             .take(limit)
             .filter_map(|(_, tx_hash)| self.history.tx_by_hash.get(tx_hash).cloned())
+            .map(|tx| {
+                let in_msg = tx.in_msg_hash.and_then(|h| {
+                    self.get_message_meta(&h)
+                        .map(|(meta, boc)| ExtendedMessage { meta, boc })
+                });
+                let out_msgs = tx
+                    .out_msg_hashes
+                    .iter()
+                    .filter_map(|h| {
+                        self.get_message_meta(h)
+                            .map(|(meta, boc)| ExtendedMessage { meta, boc })
+                    })
+                    .collect();
+                TransactionInfo {
+                    meta: tx,
+                    in_msg,
+                    out_msgs,
+                }
+            })
             .collect()
     }
 
@@ -411,7 +436,7 @@ impl Node {
             .cloned()
     }
 
-    pub fn get_block_transactions_ext(&self, seqno: Seqno) -> Option<Vec<TxMeta>> {
+    pub fn get_block_transactions(&self, seqno: Seqno) -> Option<Vec<TxMeta>> {
         let tx_hash = self.indexes.tx_by_block.get(&seqno)?;
         let tx = self.history.tx_by_hash.get(tx_hash).cloned()?;
         Some(vec![tx])
@@ -423,59 +448,37 @@ impl Node {
         Some((meta, boc))
     }
 
-    pub fn get_transactions_extended(
-        &self,
-        addr: &Addr,
-        limit: usize,
-        lt: Option<Lt>,
-        hash: Option<Hash256>,
-    ) -> Vec<(
-        TxMeta,
-        Option<(MsgMeta, BocBytes)>,
-        Vec<(MsgMeta, BocBytes)>,
-    )> {
-        let txs = self.get_transactions(addr, limit, lt, hash);
-        txs.into_iter()
-            .map(|tx| {
-                let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_meta(&h));
-                let out_msgs = tx
-                    .out_msg_hashes
-                    .iter()
-                    .filter_map(|h| self.get_message_meta(h))
-                    .collect();
-                (tx, in_msg, out_msgs)
-            })
-            .collect()
-    }
-
-    pub fn get_transaction_by_hash_extended(
-        &self,
-        hash: &Hash256,
-    ) -> Option<(
-        TxMeta,
-        Option<(MsgMeta, BocBytes)>,
-        Vec<(MsgMeta, BocBytes)>,
-    )> {
+    pub fn get_transaction_by_hash(&self, hash: &Hash256) -> Option<TransactionInfo> {
         let tx = self.history.tx_by_hash.get(hash).cloned()?;
-        let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_meta(&h));
+        let in_msg = tx.in_msg_hash.and_then(|h| {
+            self.get_message_meta(&h)
+                .map(|(meta, boc)| ExtendedMessage { meta, boc })
+        });
         let out_msgs = tx
             .out_msg_hashes
             .iter()
-            .filter_map(|h| self.get_message_meta(h))
+            .filter_map(|h| {
+                self.get_message_meta(h)
+                    .map(|(meta, boc)| ExtendedMessage { meta, boc })
+            })
             .collect();
-        Some((tx, in_msg, out_msgs))
+        Some(TransactionInfo {
+            meta: tx,
+            in_msg,
+            out_msgs,
+        })
     }
 
     pub fn get_traces(&self, tx_hash: &Hash256) -> anyhow::Result<Vec<Value>> {
-        let mut all_tx_hashes = std::collections::HashSet::new();
-        let mut queue = std::collections::VecDeque::new();
+        let mut all_tx_hashes = HashSet::new();
+        let mut queue = VecDeque::new();
 
         // 1. Find the root transaction (traverse UP)
         let mut root_hash = *tx_hash;
         let mut curr_tx_hash = *tx_hash;
 
         // Use a set to detect cycles and prevent infinite loops
-        let mut visited_up = std::collections::HashSet::new();
+        let mut visited_up = HashSet::new();
         visited_up.insert(curr_tx_hash);
 
         while let Some(tx) = self.history.tx_by_hash.get(&curr_tx_hash) {
@@ -528,15 +531,14 @@ impl Node {
         let mut results = Vec::new();
 
         while let Some(h) = queue.pop_front() {
-            if let Some((tx, in_msg, out_msgs)) = self.get_transaction_by_hash_extended(&h) {
+            if let Some(ext_tx) = self.get_transaction_by_hash(&h) {
                 let tx_boc_b64 = self
                     .cas
-                    .get(&tx.tx_boc_hash)
+                    .get(&ext_tx.meta.tx_boc_hash)
                     .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
                     .unwrap_or_default();
 
-                let tx_struct =
-                    litenode::convert_to_tx_struct(&tx, in_msg.as_ref(), &out_msgs, tx_boc_b64)?;
+                let tx_struct = litenode::convert_to_tx_struct(&ext_tx, tx_boc_b64)?;
                 let mut tx_val = serde_json::to_value(tx_struct)?;
 
                 // TODO
@@ -546,7 +548,7 @@ impl Node {
                 // For now, let's just fix the compilation error by using the new struct and converting to Value.
 
                 // Add parent/child info for shared UI component
-                if let Some(in_msg_hash) = &tx.in_msg_hash {
+                if let Some(in_msg_hash) = &ext_tx.meta.in_msg_hash {
                     for t in self.history.tx_by_hash.values() {
                         if t.out_msg_hashes.contains(in_msg_hash) {
                             tx_val["parent_transaction"] = serde_json::json!(t.lt.to_string());
@@ -556,7 +558,7 @@ impl Node {
                 }
 
                 let mut children = Vec::new();
-                for out_msg in &tx.out_msg_hashes {
+                for out_msg in &ext_tx.meta.out_msg_hashes {
                     if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg)
                         && let Some(child_tx) = self.history.tx_by_hash.get(child_tx_hash)
                     {
@@ -568,7 +570,7 @@ impl Node {
 
                 results.push(tx_val);
 
-                for out_msg in &tx.out_msg_hashes {
+                for out_msg in &ext_tx.meta.out_msg_hashes {
                     if let Some(child_tx_hash) = self.history.msg_to_tx.get(out_msg)
                         && !all_tx_hashes.contains(child_tx_hash)
                     {
@@ -670,15 +672,24 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
     let cell = Boc::decode(boc)?;
     let msg = cell.parse::<Message<'_>>()?;
 
-    let (src, dst, value, bounce) = match msg.info {
+    let (src, dst, value, bounce, created_lt, created_at) = match msg.info {
         MsgInfo::Int(info) => (
             Some(convert_addr(&info.src)),
             Some(convert_addr(&info.dst)),
             Some(info.value.tokens.into()),
             Some(info.bounce),
+            Some(info.created_lt),
+            Some(info.created_at),
         ),
-        MsgInfo::ExtIn(info) => (None, Some(convert_addr(&info.dst)), None, None),
-        MsgInfo::ExtOut(info) => (Some(convert_addr(&info.src)), None, None, None),
+        MsgInfo::ExtIn(info) => (None, Some(convert_addr(&info.dst)), None, None, None, None),
+        MsgInfo::ExtOut(info) => (
+            Some(convert_addr(&info.src)),
+            None,
+            None,
+            None,
+            Some(info.created_lt),
+            Some(info.created_at),
+        ),
     };
 
     Ok(MsgMeta {
@@ -688,8 +699,8 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
         dst,
         value,
         bounce,
-        created_lt: None,
-        created_at: None,
+        created_lt,
+        created_at,
     })
 }
 

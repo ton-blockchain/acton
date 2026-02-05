@@ -1,10 +1,11 @@
 use crate::types::{BocBytes, Lt};
 use anyhow::Context;
+use base64::engine::general_purpose::STANDARD;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily};
-use tycho_types::models::{ShardAccount, Transaction};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::models::{ComputePhase, ShardAccount, Transaction, TxInfo};
 use tycho_types::prelude::HashBytes;
 
 #[derive(Clone, Debug)]
@@ -16,10 +17,34 @@ pub struct ExecContext {
 
 #[derive(Clone, Debug)]
 pub struct ExecResult {
+    pub tx: Transaction,
     pub tx_boc: BocBytes,
     pub new_account_boc: Option<BocBytes>,
     pub out_msgs_boc: Vec<BocBytes>,
-    pub exit_code: i32,
+}
+
+impl ExecResult {
+    #[must_use]
+    pub fn compute_exit_code(&self) -> Option<i32> {
+        let info = self.tx.info.load().ok()?;
+        let TxInfo::Ordinary(info) = info else {
+            return None;
+        };
+        let ComputePhase::Executed(info) = info.compute_phase else {
+            return None;
+        };
+        Some(info.exit_code)
+    }
+
+    #[must_use]
+    pub fn action_result_code(&self) -> Option<i32> {
+        let info = self.tx.info.load().ok()?;
+        let TxInfo::Ordinary(info) = info else {
+            return None;
+        };
+        let info = info.action_phase?;
+        Some(info.result_code)
+    }
 }
 
 pub trait TvmExecutor {
@@ -53,26 +78,22 @@ impl TvmExecutor for TvmEmulatorAdapter {
     ) -> anyhow::Result<ExecResult> {
         use base64::Engine;
         // 1. Prepare inputs
-        // Set config
-        let config_b64 = base64::engine::general_purpose::STANDARD.encode(config);
+        let config_b64 = STANDARD.encode(config);
         self.inner
             .set_config(&config_b64)
             .context("Failed to set config")?;
 
-        let in_msg_b64 = base64::engine::general_purpose::STANDARD.encode(in_msg);
+        let in_msg_b64 = STANDARD.encode(in_msg);
 
-        // Prepare shard account
         let shard_account_b64 = if let Some(acc_bytes) = old_account {
-            base64::engine::general_purpose::STANDARD.encode(acc_bytes)
+            STANDARD.encode(acc_bytes)
         } else {
-            // Create empty shard account
             let sa = ShardAccount {
                 account: tycho_types::cell::Lazy::new(&tycho_types::models::OptionalAccount(None))?,
                 last_trans_hash: HashBytes([0u8; 32]),
                 last_trans_lt: 0,
             };
             let mut builder = CellBuilder::new();
-            use tycho_types::cell::Store;
             sa.store_into(&mut builder, Cell::empty_context())?;
             let cell = builder.build()?;
             Boc::encode_base64(&cell)
@@ -96,11 +117,9 @@ impl TvmExecutor for TvmEmulatorAdapter {
         // 3. Process output
         match res {
             EmulationResult::Success(s) => {
-                let tx_boc = base64::engine::general_purpose::STANDARD.decode(&s.transaction)?;
-                let new_account_boc =
-                    Some(base64::engine::general_purpose::STANDARD.decode(&s.shard_account)?);
+                let tx_boc = STANDARD.decode(&s.transaction)?;
+                let new_account_boc = Some(STANDARD.decode(&s.shard_account)?);
 
-                // Parse transaction to get out messages
                 let tx_cell = Boc::decode_base64(&s.transaction)?;
                 let tx = tx_cell.parse::<Transaction>()?;
 
@@ -117,10 +136,10 @@ impl TvmExecutor for TvmEmulatorAdapter {
                     .collect::<anyhow::Result<Vec<_>>>()?;
 
                 Ok(ExecResult {
+                    tx,
                     tx_boc,
                     new_account_boc,
                     out_msgs_boc,
-                    exit_code: 0, // TODO: extract from tx if needed
                 })
             }
             EmulationResult::Error(e) => {

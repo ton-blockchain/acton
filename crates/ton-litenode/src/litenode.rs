@@ -1,7 +1,7 @@
 use crate::executor::TvmEmulatorAdapter;
 use crate::node::Node;
-use crate::storage::{AccountStatus, MsgMeta, TxMeta};
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::storage::{AccountStatus, MsgMeta, TransactionInfo};
+use crate::types::{Addr, Hash256, Lt, Seqno};
 use anyhow::Context;
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
@@ -517,13 +517,13 @@ fn handle_send_boc(node: &mut Node, boc_str: String) -> anyhow::Result<LiteNodeB
     let (tx_hash, seqno, _) = node.send_boc(boc)?;
 
     // Fetch full tx info
-    if let Some((tx, in_msg, out_msgs)) = node.get_transaction_by_hash_extended(&tx_hash) {
+    if let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) {
         let tx_boc_b64 = node
             .cas
-            .get(&tx.tx_boc_hash)
+            .get(&ext_tx.meta.tx_boc_hash)
             .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
             .unwrap_or_default();
-        let tx_struct = convert_to_tx_struct(&tx, in_msg.as_ref(), &out_msgs, tx_boc_b64)?;
+        let tx_struct = convert_to_tx_struct(&ext_tx, tx_boc_b64)?;
 
         let block_id = node
             .get_block_header(seqno)
@@ -638,25 +638,20 @@ fn handle_get_transactions(
         None
     };
 
-    let mut txs = node.get_transactions_extended(&addr, limit as usize, lt, hash_obj);
+    let mut txs = node.get_transactions(&addr, limit as usize, lt, hash_obj);
 
     if let Some(min_lt) = to_lt {
-        txs.retain(|(tx, _, _)| tx.lt >= min_lt);
+        txs.retain(|tx| tx.meta.lt >= min_lt);
     }
 
     let mut result = Vec::new();
-    for (tx, in_msg, out_msgs) in txs {
+    for ext_tx in txs {
         let tx_boc_b64 = node
             .cas
-            .get(&tx.tx_boc_hash)
+            .get(&ext_tx.meta.tx_boc_hash)
             .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
             .unwrap_or_default();
-        result.push(convert_to_tx_struct(
-            &tx,
-            in_msg.as_ref(),
-            &out_msgs,
-            tx_boc_b64,
-        )?);
+        result.push(convert_to_tx_struct(&ext_tx, tx_boc_b64)?);
     }
 
     Ok(result)
@@ -762,13 +757,11 @@ fn handle_run_get_method(
 }
 
 pub(crate) fn convert_to_tx_struct(
-    tx: &TxMeta,
-    in_msg: Option<&(MsgMeta, BocBytes)>,
-    out_msgs: &Vec<(MsgMeta, BocBytes)>,
+    tx: &TransactionInfo,
     tx_boc_b64: String,
 ) -> anyhow::Result<LiteNodeTransaction> {
-    let in_msg_struct = if let Some((meta, boc)) = in_msg {
-        convert_to_message_struct(meta, boc)?
+    let in_msg_struct = if let Some(in_msg) = &tx.in_msg {
+        convert_to_message_struct(&in_msg.meta, &in_msg.boc)?
     } else {
         LiteNodeMessage {
             hash: Hash256([0; 32]),
@@ -783,20 +776,20 @@ pub(crate) fn convert_to_tx_struct(
     };
 
     let mut out_msgs_struct = Vec::new();
-    for (meta, boc) in out_msgs {
-        out_msgs_struct.push(convert_to_message_struct(meta, boc)?);
+    for out_msg in &tx.out_msgs {
+        out_msgs_struct.push(convert_to_message_struct(&out_msg.meta, &out_msg.boc)?);
     }
 
     Ok(LiteNodeTransaction {
-        hash: tx.tx_hash,
-        address: tx.account,
-        utime: tx.now,
+        hash: tx.meta.tx_hash,
+        address: tx.meta.account,
+        utime: tx.meta.now,
         data: tx_boc_b64,
-        success: tx.success,
-        exit_code: tx.exit_code,
+        success: tx.meta.success,
+        exit_code: tx.meta.compute_exit_code.unwrap_or(0),
         transaction_id: LiteNodeTransactionId {
-            lt: tx.lt,
-            hash: tx.tx_hash,
+            lt: tx.meta.lt,
+            hash: tx.meta.tx_hash,
         },
         in_msg: in_msg_struct,
         out_msgs: out_msgs_struct,
@@ -891,24 +884,17 @@ fn handle_get_block_transactions(
     node: &Node,
     seqno: u32,
 ) -> anyhow::Result<LiteNodeBlockTransactions> {
-    let txs = node.get_block_transactions_ext(seqno);
+    let txs = node.get_block_transactions(seqno);
     if let Some(txs) = txs {
         let mut result = Vec::new();
         for tx in txs {
-            if let Some((tx_ext, in_msg, out_msgs)) =
-                node.get_transaction_by_hash_extended(&tx.tx_hash)
-            {
+            if let Some(ext_tx) = node.get_transaction_by_hash(&tx.tx_hash) {
                 let tx_boc_b64 = node
                     .cas
-                    .get(&tx_ext.tx_boc_hash)
+                    .get(&ext_tx.meta.tx_boc_hash)
                     .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
                     .unwrap_or_default();
-                result.push(convert_to_tx_struct(
-                    &tx_ext,
-                    in_msg.as_ref(),
-                    &out_msgs,
-                    tx_boc_b64,
-                )?);
+                result.push(convert_to_tx_struct(&ext_tx, tx_boc_b64)?);
             }
         }
 

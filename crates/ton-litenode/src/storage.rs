@@ -2,7 +2,6 @@ use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
-// CAS
 pub struct CellStore {
     pub boc_by_hash: HashMap<Hash256, BocBytes>,
 }
@@ -85,9 +84,9 @@ pub struct TxMeta {
     pub account: Addr,
     pub lt: Lt,
     pub now: u32,
-    /// Whether the transaction was successful (currently always true in MVP)
     pub success: bool,
-    pub exit_code: i32,
+    pub compute_exit_code: Option<i32>,
+    pub action_result_code: Option<i32>,
     pub total_fees: Option<u128>,
     pub in_msg_hash: Option<Hash256>,
     pub out_msg_hashes: Vec<Hash256>,
@@ -102,10 +101,21 @@ pub struct MsgMeta {
     pub dst: Option<Addr>,
     pub value: Option<u128>,
     pub bounce: Option<bool>,
-    /// Logical time when the message was created (currently unused in MVP)
     pub created_lt: Option<Lt>,
-    /// Unix timestamp when the message was created (currently unused in MVP)
     pub created_at: Option<u32>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExtendedMessage {
+    pub meta: MsgMeta,
+    pub boc: BocBytes,
+}
+
+#[derive(Clone, Debug)]
+pub struct TransactionInfo {
+    pub meta: TxMeta,
+    pub in_msg: Option<ExtendedMessage>,
+    pub out_msgs: Vec<ExtendedMessage>,
 }
 
 #[derive(Clone, Debug)]
@@ -179,7 +189,7 @@ pub struct Globals {
     pub lt_step: Lt,
     pub config_boc_hash: Hash256,
     pub queue_policy: QueuePolicy,
-    /// Number of blocks between checkpoints (currently unused in MVP)
+    /// Number of blocks between checkpoints (currently unused)
     pub checkpoint_every: u32,
 }
 
