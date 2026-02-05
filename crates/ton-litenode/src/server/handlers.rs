@@ -1,6 +1,7 @@
 use super::models::*;
 use crate::api::toncenter_v3;
 use crate::litenode::LiteNode;
+use crate::storage::AccountStatus;
 use crate::{api, node};
 use axum::response::{IntoResponse, Response};
 use axum::{
@@ -103,7 +104,7 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
             let req: GetAddressInformationRequest = parse_params(params, method)?;
             node.get_address_state(req.address, req.seqno)
                 .await
-                .map(|r| format!("{:?}", r).to_lowercase().into())?
+                .map(|r| r.to_string().into())?
         }
         "getExtendedAddressInformation" => {
             let req: GetAddressInformationRequest = parse_params(params, method)?;
@@ -279,7 +280,7 @@ pub async fn get_address_state(
 ) -> Json<Value> {
     handle_result(
         node.get_address_state(payload.address, payload.seqno),
-        |res| format!("{:?}", res).to_lowercase().into(),
+        |res| res.to_string().into(),
     )
     .await
 }

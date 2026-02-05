@@ -97,7 +97,7 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
         "sync_utime": s.sync_utime,
         "state": match s.state {
             AccountStatus::Active => "active",
-            AccountStatus::Uninit => "uninit",
+            AccountStatus::Uninit => "uninitialized",
             AccountStatus::Frozen => "frozen",
             AccountStatus::Nonexist => "nonexist",
         }

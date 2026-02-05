@@ -3,6 +3,7 @@ use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 
 pub const EMPTY_CELL_BASE64: &str = "te6cckEBAQEAAgAAAEysuc0=";
@@ -68,6 +69,18 @@ pub enum AccountStatus {
     Uninit,
     Frozen,
     Nonexist,
+}
+
+impl Display for AccountStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            AccountStatus::Active => "active".to_owned(),
+            AccountStatus::Uninit => "uninitialized".to_owned(),
+            AccountStatus::Frozen => "frozen".to_owned(),
+            AccountStatus::Nonexist => "nonexist".to_owned(),
+        };
+        write!(f, "{}", str)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
