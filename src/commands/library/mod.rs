@@ -1,7 +1,6 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
 use crate::wallets::open_wallets;
-use acton_config::config;
 use acton_config::config::{ActonConfig, global_libraries_path};
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Local};
@@ -136,7 +135,7 @@ pub fn publish_cmd(
     );
 
     let wallet_name = select_wallet(wallet_name, &config)?;
-    let mut wallets = open_wallets(&config, Some(network.as_str()), true)?;
+    let mut wallets = open_wallets(&config, Some(&network), true)?;
     let wallet = wallets
         .remove(&wallet_name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
@@ -197,8 +196,10 @@ pub fn publish_cmd(
         }
     }
 
-    let api_client = TonApiClient::new(network.clone(), api_key)?;
-    let (seqno, need_state_init) = wallet.seqno(network.as_str())?;
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
@@ -286,8 +287,10 @@ pub fn fetch_cmd(
     net: String,
     json: bool,
 ) -> anyhow::Result<()> {
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
     let network = Network::from_str(&net)?;
-    let client = TonApiClient::new(network, api_key)?;
+    let client = TonApiClient::new(network, custom_networks, api_key)?;
 
     if !json {
         println!("  {} Fetching library: {}", "→".blue().bold(), hash);
@@ -363,8 +366,9 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
         .get(&lib_name)
         .ok_or_else(|| anyhow!(error_fmt::library_not_found(&config, &lib_name)))?;
 
+    let custom_networks = config.custom_networks();
     let network = Network::from_str(&lib.network.to_string())?;
-    let api_client = TonApiClient::new(network, api_key)?;
+    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
 
     let mut balance_u128: Option<u128> = None;
     let mut remaining_seconds: Option<u128> = None;
@@ -466,7 +470,7 @@ pub fn topup_cmd(
 
     let wallet_name = select_wallet(wallet_name, &config)?;
     let network = Network::from_str(&lib.network.to_string())?;
-    let mut wallets = open_wallets(&config, Some(network.as_str()), true)?;
+    let mut wallets = open_wallets(&config, Some(&network), true)?;
     let wallet = wallets
         .remove(&wallet_name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
@@ -478,7 +482,7 @@ pub fn topup_cmd(
         wallet
             .wallet
             .address
-            .to_base64_url_flags(true, lib.network == config::Network::Testnet)
+            .to_base64_url_flags(true, lib.network == Network::Testnet)
             .dimmed()
     );
 
@@ -528,8 +532,10 @@ pub fn topup_cmd(
         }
     }
 
-    let api_client = TonApiClient::new(network.clone(), api_key)?;
-    let (seqno, need_state_init) = wallet.seqno(network.as_str())?;
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time

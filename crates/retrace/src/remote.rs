@@ -22,6 +22,7 @@ impl TonCenterClient {
         let base_url = match network {
             Network::Mainnet => "https://toncenter.com/api/v3".to_string(),
             Network::Testnet => "https://testnet.toncenter.com/api/v3".to_string(),
+            Network::Custom(_) => todo!("Custom networks are not yet supported in retrace"),
         };
         Self {
             client: Client::new(),
@@ -179,6 +180,7 @@ impl TonHubClient {
         let base_url = match network {
             Network::Mainnet => "https://mainnet-v4.tonhubapi.com".to_string(),
             Network::Testnet => "https://testnet-v4.tonhubapi.com".to_string(),
+            Network::Custom(_) => todo!("Custom networks are not yet supported in retrace"),
         };
         Self {
             client: Client::new(),
@@ -304,6 +306,7 @@ impl DtonClient {
         let endpoint = match network {
             Network::Mainnet => format!("https://dton.io/{}/graphql", self.api_key),
             Network::Testnet => format!("https://testnet.dton.io/{}/graphql", self.api_key),
+            Network::Custom(_) => anyhow::bail!("Custom networks are not yet supported in retrace"),
         };
 
         let query = serde_json::json!({

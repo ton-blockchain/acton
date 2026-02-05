@@ -5,7 +5,6 @@ use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig}
 use num_bigint::BigInt;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
-use std::str::FromStr;
 use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -355,9 +354,7 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn seqno(&self, net: &str) -> anyhow::Result<(u32, bool)> {
-        let network = Network::from_str(net)?;
-        let client = TonApiClient::new(network, None)?;
+    pub fn seqno(&self, client: &TonApiClient) -> anyhow::Result<(u32, bool)> {
         client.get_wallet_seqno(&self.wallet.address.to_base64_url())
     }
 
@@ -375,7 +372,7 @@ pub struct Env<'a> {
     pub open_wallets: BTreeMap<String, Wallet>,
     pub build_override: BTreeMap<String, ArcCell>, // contract ID -> code
     pub explorer: Option<Explorer>,
-    pub fork_net: Option<String>,
+    pub fork_net: Option<Network>,
     pub api_key: Option<String>,
     pub running_id: String,
 }
@@ -389,7 +386,7 @@ pub struct Context<'a> {
     pub build: BuildContext<'a>,
     pub debug: DebugCtx<'a>,
     pub is_broadcasting: bool,
-    pub network: Option<String>,
+    pub network: Option<Network>,
 }
 
 #[derive(Debug, Clone)]
@@ -426,11 +423,12 @@ pub enum DebugCtx<'a> {
 
 impl Context<'_> {
     #[must_use]
-    pub fn network(&self) -> String {
+    pub fn network(&self) -> Network {
         self.env
             .fork_net
+            .as_ref()
+            .unwrap_or(&Network::Testnet)
             .clone()
-            .unwrap_or_else(|| "testnet".to_owned())
     }
 }
 

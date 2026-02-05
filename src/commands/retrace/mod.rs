@@ -32,7 +32,7 @@ pub fn retrace_cmd(
 
     let mut last_error = None;
     for network in networks {
-        let retrace_future = retrace(network, &hash, HashMap::new());
+        let retrace_future = retrace(network.clone(), &hash, HashMap::new());
         match rt.block_on(retrace_future) {
             Ok(result) => {
                 if let Some(logs_dir) = &logs_dir {

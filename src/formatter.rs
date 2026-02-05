@@ -12,6 +12,7 @@ use owo_colors::OwoColorize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use ton_abi::{ContractAbi, TypeAbi};
+use ton_api::Network;
 use ton_source_map::{DebugLocation, SourceLocation};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
@@ -54,9 +55,9 @@ pub struct FormatterContext {
     pub known_addresses: KnownAddresses,
     pub known_code_cells: HashMap<String, String>,
     pub backtrace: Option<String>,
-    pub fork_net: Option<String>,
+    pub fork_net: Option<Network>,
     pub api_key: Option<String>,
-    pub network: Option<String>,
+    pub network: Option<Network>,
 }
 
 impl FormatterContext {
@@ -112,8 +113,8 @@ impl FormatterContext {
     }
 
     fn address_to_string(&self, address: &TonAddress) -> String {
-        let need_mainnet_address = self.fork_net.as_deref() == Some("mainnet")
-            || self.network.as_deref() == Some("mainnet");
+        let need_mainnet_address =
+            self.fork_net == Some(Network::Mainnet) || self.network == Some(Network::Mainnet);
         address.to_base64_std_flags(false, !need_mainnet_address)
     }
 

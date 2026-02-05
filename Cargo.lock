@@ -87,6 +87,7 @@ dependencies = [
  "clap",
  "serde",
  "toml",
+ "ton-networks",
 ]
 
 [[package]]
@@ -2176,6 +2177,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "ton-executor",
+ "ton-networks",
  "tycho-types",
  "vmlogs",
 ]
@@ -3033,6 +3035,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "ton-networks",
  "tycho-types",
  "urlencoding",
 ]
@@ -3041,12 +3044,14 @@ dependencies = [
 name = "ton-emulator"
 version = "0.1.0"
 dependencies = [
+ "acton-config",
  "anyhow",
  "num-bigint",
  "num-traits",
  "reqwest",
  "serde",
  "ton-executor",
+ "ton-networks",
  "tonlib-core",
  "tvmffi",
  "tycho-types",
@@ -3061,6 +3066,14 @@ dependencies = [
  "pkg-config",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ton-networks"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
 ]
 
 [[package]]

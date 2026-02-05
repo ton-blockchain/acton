@@ -36,7 +36,7 @@ pub fn verify_cmd(
     let contract_path = fs::canonicalize(contract.src.clone())
         .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
 
-    Network::from_str(&network)?; // validate
+    let network = Network::from_str(&network)?; // validate
 
     println!("  {} Contract: {}", "→".blue().bold(), contract_key.cyan());
 
@@ -92,7 +92,7 @@ pub fn verify_cmd(
         "  {} Contract address: {}",
         "→".blue().bold(),
         contract_address
-            .to_base64_url_flags(true, network == "testnet")
+            .to_base64_url_flags(true, network == Network::Testnet)
             .dimmed()
     );
 
@@ -110,7 +110,7 @@ pub fn verify_cmd(
         wallet
             .wallet
             .address
-            .to_base64_url_flags(true, network == "testnet")
+            .to_base64_url_flags(true, network == Network::Testnet)
             .dimmed()
     );
 
@@ -185,11 +185,12 @@ pub fn verify_cmd(
     let contract_hash = base64::engine::general_purpose::STANDARD.encode(code_hash);
     let sources_object = SourcesObject {
         known_contract_hash: contract_hash.clone(),
-        known_contract_address: contract_address.to_base64_url_flags(true, network == "testnet"),
+        known_contract_address: contract_address
+            .to_base64_url_flags(true, network == Network::Testnet),
         sender_address: wallet
             .wallet
             .address
-            .to_base64_url_flags(true, network == "testnet"),
+            .to_base64_url_flags(true, network == Network::Testnet),
         sources: sources_meta,
         compiler: CompilerSettings::Tolk {
             compiler_settings: TolkCompilerSettings {
@@ -335,16 +336,19 @@ pub fn verify_cmd(
 
     println!("  {} Sending verification transaction", "→".blue().bold());
 
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+
     let cell_data = &msg_cell.data;
     let cell = Boc::decode(cell_data)?;
     let cell_boc64 = Boc::encode_base64(&cell);
 
-    let api_client = TonApiClient::new(Network::from_str(&network)?, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
     wait_for_rate_limit(&api_key);
 
-    let (seqno, need_state_init) = wallet.seqno(&network)?;
+    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     wait_for_rate_limit(&api_key);
 
@@ -512,14 +516,14 @@ fn get_backends() -> anyhow::Result<BackendsConfig> {
     Ok(config)
 }
 
-fn get_backend_info(network: &str, config: &BackendsConfig) -> anyhow::Result<BackendInfo> {
+fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Result<BackendInfo> {
     match network {
-        "mainnet" => Ok(BackendInfo {
+        Network::Mainnet => Ok(BackendInfo {
             source_registry: "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL".to_string(),
             backends: config.backends.clone(),
             id: "orbs.com".to_string(),
         }),
-        "testnet" => Ok(BackendInfo {
+        Network::Testnet => Ok(BackendInfo {
             source_registry: "EQCsdKYwUaXkgJkz2l0ol6qT_WxeRbE_wBCwnEybmR0u5TO8".to_string(),
             backends: config.backends_testnet.clone(),
             id: "orbs-testnet".to_string(),
@@ -541,13 +545,14 @@ fn wait_for_rate_limit(api_key: &Option<String>) {
     }
 }
 
-fn show_verifier_link(network: &str, contract_address: TonAddress) {
+fn show_verifier_link(network: &Network, contract_address: TonAddress) {
+    let is_testnet = network == &Network::Testnet;
     println!(
         "View at: {}",
         format!(
             "https://verifier.ton.org/{}{}",
-            contract_address.to_base64_url_flags(true, network == "testnet"),
-            if network == "testnet" { "?testnet" } else { "" }
+            contract_address.to_base64_url_flags(true, is_testnet),
+            if is_testnet { "?testnet" } else { "" }
         )
         .blue()
     );

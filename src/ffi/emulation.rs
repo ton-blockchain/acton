@@ -20,7 +20,7 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 use ton_abi::contract_abi;
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use ton_emulator::{extension, register_ext_methods, remote};
+use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
@@ -196,8 +196,14 @@ fn send_message_impl(
     })?;
 
     if let Some(wallet) = ctx.env.find_wallet_by_address(&src_addr) {
-        send_wallet_message(&msg, wallet, &ctx.network(), &ctx.env.api_key)
-            .context("Failed to send message to real network")?;
+        send_wallet_message(
+            &msg,
+            wallet,
+            &ctx.network(),
+            &ctx.env.api_key,
+            ctx.env.config.custom_networks(),
+        )
+        .context("Failed to send message to real network")?;
 
         // Add pseudo transaction to the result list to wait on it
         let tx = Transaction {
@@ -355,13 +361,16 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
 fn send_wallet_message(
     message: &ArcCell,
     wallet: Wallet,
-    network: &str,
+    network: &Network,
     api_key: &Option<String>,
+    custom_networks: HashMap<String, acton_config::config::CustomNetworkUrls>,
 ) -> anyhow::Result<()> {
     let expired_at_time = std::time::SystemTime::now() + Duration::from_secs(600);
     let expire_at = expired_at_time.duration_since(UNIX_EPOCH)?.as_secs() as u32;
 
-    let (seqno, need_state_init) = wallet.seqno(network)?;
+    let client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+
+    let (seqno, need_state_init) = wallet.seqno(&client)?;
     let external = wallet.wallet.create_external_msg(
         expire_at,
         seqno,
@@ -373,8 +382,6 @@ fn send_wallet_message(
         std::thread::sleep(Duration::from_millis(1000)); // rate limit
     }
 
-    let network = Network::from_str(network)?;
-    let client = TonApiClient::new(network, api_key.clone())?;
     client.send_boc(&external.to_boc_b64(false)?)?;
 
     Ok(())
@@ -1175,7 +1182,11 @@ fn load_library_by_hash_impl(
     stack: &mut Tuple,
     hash: String,
 ) -> anyhow::Result<()> {
-    let lib = remote::get_library_by_hash(&ctx.network(), hash.as_str(), None);
+    let network = ctx.network();
+    let custom_networks = ctx.env.config.custom_networks();
+    let api_client = TonApiClient::new(network, custom_networks, ctx.env.api_key.clone())?;
+
+    let lib = api_client.get_library_by_hash(hash.as_str());
     match lib {
         Ok(lib) => {
             let cell = ArcCell::from_boc(&Boc::encode(lib))?;
@@ -1236,10 +1247,11 @@ fn wait_for_transaction_impl(
 
     let address_str = cell_address_to_raw(address).context("Failed to decode address")?;
 
-    let network = Network::from_str(&ctx.network()).context("Failed to parse network")?;
+    let network = ctx.network();
 
+    let custom_networks = ctx.env.config.custom_networks();
     let api_key = ctx.env.api_key.clone();
-    let api_client = TonApiClient::new(network, api_key.clone())?;
+    let api_client = TonApiClient::new(network, custom_networks, api_key.clone())?;
 
     let ext_message_hash_bytes = ext_message_hash.data();
 
@@ -1306,7 +1318,7 @@ fn get_transaction_link(
     tx: TonCenterTransaction,
     hex: String,
 ) -> String {
-    let network_prefix = if ctx.network() == "testnet" {
+    let network_prefix = if ctx.network() == Network::Testnet {
         "testnet."
     } else {
         ""

@@ -4,22 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Network {
-    Mainnet,
-    Testnet,
-}
-
-impl std::fmt::Display for Network {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Network::Mainnet => write!(f, "mainnet"),
-            Network::Testnet => write!(f, "testnet"),
-        }
-    }
-}
+use std::sync::Arc;
+pub use ton_networks::{CustomNetworkUrls, Network};
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone)]
 pub enum Explorer {
@@ -52,6 +38,13 @@ pub enum ContractDependency {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct CustomNetworkConfig {
+    pub v2_url: String,
+    pub v3_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActonConfig {
     pub package: PackageConfig,
     pub contracts: Option<ContractsConfig>,
@@ -64,6 +57,7 @@ pub struct ActonConfig {
     #[serde(skip)] // we build libraries manually
     pub libraries: Option<LibrariesConfig>,
     pub mappings: Option<BTreeMap<String, String>>,
+    pub networks: Option<BTreeMap<String, CustomNetworkConfig>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -233,6 +227,7 @@ impl Default for ActonConfig {
             libraries: None,
             scripts: None,
             mappings: None,
+            networks: None,
         }
     }
 }
@@ -412,6 +407,23 @@ impl ActonConfig {
     #[must_use]
     pub fn get_library(&self, name: &str) -> Option<&LibraryConfig> {
         self.libraries.as_ref()?.libraries.get(name)
+    }
+
+    #[must_use]
+    pub fn custom_networks(&self) -> std::collections::HashMap<String, CustomNetworkUrls> {
+        let mut result = std::collections::HashMap::new();
+        if let Some(networks) = &self.networks {
+            for (name, config) in networks {
+                result.insert(
+                    name.clone(),
+                    CustomNetworkUrls {
+                        v2_url: Arc::from(config.v2_url.as_str()),
+                        v3_url: config.v3_url.as_ref().map(|s| Arc::from(s.as_str())),
+                    },
+                );
+            }
+        }
+        result
     }
 }
 

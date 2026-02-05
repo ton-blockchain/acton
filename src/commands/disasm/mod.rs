@@ -30,6 +30,8 @@ pub fn disasm_cmd(
         ));
     }
 
+    let network = Network::from_str(&net)?;
+
     let boc_data = if let Some(string) = boc_string {
         string
     } else if let Some(path) = boc_file {
@@ -77,7 +79,6 @@ pub fn disasm_cmd(
         ));
     };
 
-    let network = Network::from_str(&net)?;
     let disassembler = Disassembler::new();
     let mut final_cell = cell;
 
@@ -91,7 +92,9 @@ pub fn disasm_cmd(
         if instructions.len() == 1
             && let Some(lib_hash) = extract_library_hash_from_instruction(&instructions[0])
         {
-            let client = TonApiClient::new(network, api_key)?;
+            let config = acton_config::config::ActonConfig::load().unwrap_or_default();
+            let custom_networks = config.custom_networks();
+            let client = TonApiClient::new(network, custom_networks, api_key)?;
             match client.get_library_by_hash(&lib_hash.to_string()) {
                 Ok(lib_cell) => {
                     final_cell = lib_cell;

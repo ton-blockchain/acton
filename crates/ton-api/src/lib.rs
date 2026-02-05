@@ -2,65 +2,36 @@ use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
-use std::str::FromStr;
+use std::collections::HashMap;
+pub use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
-
-#[derive(Debug, Clone)]
-pub enum Network {
-    Mainnet,
-    Testnet,
-}
-
-impl FromStr for Network {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "mainnet" => Ok(Network::Mainnet),
-            "testnet" => Ok(Network::Testnet),
-            _ => anyhow::bail!("Unsupported network: {s}. Supported: mainnet, testnet"),
-        }
-    }
-}
-
-impl Network {
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Network::Mainnet => "mainnet",
-            Network::Testnet => "testnet",
-        }
-    }
-
-    #[must_use]
-    pub const fn toncenter_url(&self) -> &'static str {
-        match self {
-            Network::Mainnet => "https://toncenter.com",
-            Network::Testnet => "https://testnet.toncenter.com",
-        }
-    }
-}
 
 pub struct TonApiClient {
     client: reqwest::blocking::Client,
     network: Network,
     api_key: Option<String>,
+    custom_networks: HashMap<String, CustomNetworkUrls>,
 }
 
 impl TonApiClient {
-    pub fn new(network: Network, api_key: Option<String>) -> anyhow::Result<TonApiClient> {
+    pub fn new(
+        network: Network,
+        custom_networks: HashMap<String, CustomNetworkUrls>,
+        api_key: Option<String>,
+    ) -> anyhow::Result<TonApiClient> {
         Ok(TonApiClient {
             client: reqwest::blocking::ClientBuilder::new()
                 .build()
                 .context("Cannot create HTTP client, please check if network is available")?,
             network,
             api_key,
+            custom_networks,
         })
     }
 
     #[must_use]
-    pub const fn with_network(mut self, network: Network) -> Self {
+    pub fn with_network(mut self, network: Network) -> Self {
         self.network = network;
         self
     }
@@ -111,7 +82,10 @@ impl TonApiClient {
             return Ok(vec![]);
         }
 
-        let mut url = format!("{}/api/v3/accountStates?", self.network.toncenter_url());
+        let mut url = format!(
+            "{}/accountStates?",
+            self.network.toncenter_v3_url(&self.custom_networks)?
+        );
         for (i, address) in addresses.iter().enumerate() {
             if i > 0 {
                 url.push('&');
@@ -164,7 +138,10 @@ impl TonApiClient {
         method: &str,
         stack: &[serde_json::Value],
     ) -> anyhow::Result<GetMethodResult> {
-        let url = format!("{}/api/v2/jsonRPC", self.network.toncenter_url());
+        let url = format!(
+            "{}/jsonRPC",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
 
         let json = serde_json::json!({
             "id": "1",
@@ -184,10 +161,10 @@ impl TonApiClient {
             .context("Failed to send runGetMethod request")?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter API returned status: {}",
-                response.status()
-            ));
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Run get method failed: {error_text}");
         }
 
         #[derive(Deserialize)]
@@ -225,7 +202,10 @@ impl TonApiClient {
 
     /// Send BOC to network
     pub fn send_boc(&self, boc: &str) -> anyhow::Result<()> {
-        let url = format!("{}/api/v2/sendBoc", self.network.toncenter_url());
+        let url = format!(
+            "{}/sendBoc",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
 
         let json = serde_json::json!({ "boc": boc });
 
@@ -243,7 +223,10 @@ impl TonApiClient {
     }
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
-        let url = format!("{}/api/v2/getMasterchainInfo", self.network.toncenter_url());
+        let url = format!(
+            "{}/getMasterchainInfo",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
 
         let response = self
             .build_request(&url)
@@ -282,8 +265,8 @@ impl TonApiClient {
         address: &str,
     ) -> anyhow::Result<TonCenterAccountInfoResult> {
         let url = format!(
-            "{}/api/v2/getAddressInformation?address={}{}",
-            self.network.toncenter_url(),
+            "{}/getAddressInformation?address={}{}",
+            self.network.toncenter_v2_url(&self.custom_networks)?,
             urlencoding::encode(address),
             seqno
                 .map(|seqno| format!("&seqno={seqno}"))
@@ -312,7 +295,10 @@ impl TonApiClient {
     }
 
     pub fn get_library_by_hash(&self, hash: &str) -> anyhow::Result<Cell> {
-        let url = format!("{}/api/v2/getLibraries", self.network.toncenter_url(),);
+        let url = format!(
+            "{}/getLibraries",
+            self.network.toncenter_v2_url(&self.custom_networks)?,
+        );
 
         let response = self
             .build_request(&url)
@@ -365,7 +351,10 @@ impl TonApiClient {
         lt: Option<String>,
         hash: Option<String>,
     ) -> anyhow::Result<Vec<TonCenterTransaction>> {
-        let url = format!("{}/api/v2/getTransactions", self.network.toncenter_url());
+        let url = format!(
+            "{}/getTransactions",
+            self.network.toncenter_v2_url(&self.custom_networks)?
+        );
 
         let mut params = vec![("address", address.to_string())];
         if let Some(limit) = limit {
@@ -405,8 +394,8 @@ impl TonApiClient {
 
     pub fn get_address_balance(&self, address: &str) -> anyhow::Result<BigInt> {
         let url = format!(
-            "{}/api/v2/getAddressBalance?address={}",
-            self.network.toncenter_url(),
+            "{}/getAddressBalance?address={}",
+            self.network.toncenter_v2_url(&self.custom_networks)?,
             urlencoding::encode(address)
         );
 

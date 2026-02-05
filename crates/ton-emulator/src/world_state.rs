@@ -13,6 +13,7 @@ use std::env;
 use std::rc::Rc;
 use std::str::FromStr;
 use ton_executor::DEFAULT_CONFIG;
+use ton_networks::Network;
 use tycho_types::boc;
 use tycho_types::cell::{Cell, CellFamily, HashBytes, Lazy};
 use tycho_types::models::{
@@ -150,7 +151,7 @@ pub struct RemoteAccountState {
     /// Local cache and overrides for accounts.
     pub accounts: HashMap<String, ShardAccount>,
     /// The network to fork from (e.g., "mainnet", "testnet").
-    pub fork_net: String,
+    pub fork_net: Network,
     /// Optional block number to pin the state to.
     pub fork_block_number: Option<u64>,
     /// Optional API key for `TonCenter`.
@@ -163,7 +164,7 @@ impl RemoteAccountState {
     /// Creates a new remote state for the given network.
     #[must_use]
     pub fn new(
-        fork_net: String,
+        fork_net: Network,
         fork_block_number: Option<u64>,
         api_key: Option<String>,
         cache: RemoteSnapshotCache,
@@ -213,7 +214,7 @@ impl RemoteAccountState {
         // return cached version if it already resolved earlier in current suite
         let cache_key = RemoteCacheKey {
             fork_block_number: self.fork_block_number,
-            fork_net: self.fork_net.clone(),
+            fork_net: self.fork_net.to_string(),
             address: address.to_owned(),
         };
         if let Some(cached) = self.cache.get(&cache_key) {
@@ -226,7 +227,18 @@ impl RemoteAccountState {
             .clone()
             .or_else(|| env::var("TONCENTER_API_KEY").ok());
 
-        let info = remote::get_account_info(self.fork_block_number, address, network, api_key)?;
+        let mut custom_networks = HashMap::new();
+        if let Ok(config) = acton_config::config::ActonConfig::load() {
+            custom_networks = config.custom_networks()
+        }
+
+        let info = remote::get_account_info(
+            self.fork_block_number,
+            address,
+            network,
+            api_key,
+            custom_networks,
+        )?;
 
         let balance = info
             .balance

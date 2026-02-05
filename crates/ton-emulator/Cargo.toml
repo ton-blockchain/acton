@@ -20,6 +20,8 @@ anyhow = { workspace = true }
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
 reqwest = { workspace = true }
+ton-networks = { workspace = true }
+acton-config = { workspace = true }
 
 [lints]
 workspace = true

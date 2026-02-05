@@ -249,7 +249,7 @@ impl<'a> TestRunner<'a> {
         let mut emulator = Emulator::new(verbosity, config_b64)?;
         let state = match &self.config.fork_net {
             Some(net) => AccountsState::Remote(RemoteAccountState::new(
-                net.to_string(),
+                net.clone(),
                 self.config.fork_block_number,
                 self.config.api_key.clone(),
                 self.remote_cache.clone(),
@@ -276,7 +276,7 @@ impl<'a> TestRunner<'a> {
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
                 api_key: self.config.api_key.clone(),
-                fork_net: self.config.fork_net.as_ref().map(ToString::to_string),
+                fork_net: self.config.fork_net.clone(),
                 running_id: test.name.clone(),
             },
             io: IoContext {
@@ -305,7 +305,7 @@ impl<'a> TestRunner<'a> {
             },
             debug: DebugCtx::Disabled,
             is_broadcasting: false,
-            network: self.config.fork_net.as_ref().map(ToString::to_string),
+            network: self.config.fork_net.clone(),
         };
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =

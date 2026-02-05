@@ -196,6 +196,7 @@ fn execute_script(
     };
 
     let config_b64: Option<&str> = None;
+    let fork_net = fork_net.and_then(|net| Network::from_str(&net).ok());
 
     let mut emulator = Emulator::new(verbosity, config_b64)?;
     let resolver = match &fork_net {
@@ -218,7 +219,8 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
-    let open_wallets = wallets::open_wallets(&config, net.as_deref(), broadcast)?;
+    let network = net.and_then(|net| Network::from_str(&net).ok());
+    let open_wallets = wallets::open_wallets(&config, network.as_ref(), broadcast)?;
 
     let mut ctx = Context {
         env: Env {
@@ -257,7 +259,7 @@ fn execute_script(
         },
         debug: DebugCtx::Disabled,
         is_broadcasting: broadcast,
-        network: net,
+        network,
     };
 
     if debug {

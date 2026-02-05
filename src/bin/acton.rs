@@ -30,6 +30,7 @@ use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
 use owo_colors::OwoColorize;
 use std::fs::OpenOptions;
+use std::str::FromStr;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
 use ton_source_map::SourceMap;
@@ -194,7 +195,7 @@ enum Commands {
             help = "Fork from network for remote account resolution",
             help_heading = "Remote"
         )]
-        fork_net: Option<Network>,
+        fork_net: Option<String>,
         #[arg(
             long,
             help = "Block sequence number to fork from (for historical state)",
@@ -322,7 +323,7 @@ enum Commands {
             help = "Fork from network for remote account resolution",
             help_heading = "Remote"
         )]
-        fork_net: Option<Network>,
+        fork_net: Option<String>,
         #[arg(
             long,
             help = "Block sequence number to fork from (for historical state)",
@@ -350,7 +351,7 @@ enum Commands {
             help = "Network to use for broadcasting",
             help_heading = "Broadcasting"
         )]
-        net: Option<Network>,
+        net: Option<String>,
 
         #[arg(
             value_enum,
@@ -447,7 +448,7 @@ enum Commands {
             help = "Network to use for fetching from blockchain",
             default_value = "mainnet"
         )]
-        net: Network,
+        net: String,
         #[arg(
             long,
             help = "Follow library references and disassemble the actual library code instead of showing library hash"
@@ -464,7 +465,7 @@ enum Commands {
         #[arg(long, help = "Deployed contract address (prompts if not provided)")]
         address: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
-        net: Network,
+        net: String,
         #[arg(
             long,
             help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)"
@@ -496,7 +497,7 @@ enum Commands {
         #[arg(help = "Transaction hash in hex format to retrace")]
         hash: String,
         #[arg(long, help = "Network to use")]
-        net: Option<Network>,
+        net: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
         #[arg(
@@ -587,7 +588,7 @@ pub enum LibraryCommand {
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
-        net: Network,
+        net: String,
         #[arg(long, help = "Amount of TON to send for publication")]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -612,7 +613,7 @@ pub enum LibraryCommand {
         )]
         output: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
-        net: Network,
+        net: String,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
@@ -1136,7 +1137,7 @@ fn main() {
             api_key,
             verbose,
             logs_dir,
-        } => retrace_cmd(hash, net.map(|n| n.to_string()), api_key, verbose, logs_dir),
+        } => retrace_cmd(hash, net, api_key, verbose, logs_dir),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,
@@ -1168,11 +1169,11 @@ fn main() {
             debug,
             debug_port,
             clear_cache,
-            fork_net.map(|n| n.to_string()),
+            fork_net,
             api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
             fork_block_number,
             broadcast,
-            net.map(|n| n.to_string()),
+            net,
             explorer,
         ),
         Commands::Build {
@@ -1230,7 +1231,7 @@ fn main() {
                 },
                 address,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net.to_string(),
+                net,
                 follow_libraries,
             ),
             Err(err) => Err(err),
@@ -1246,7 +1247,7 @@ fn main() {
         } => verify_cmd(
             contract_id,
             address,
-            net.to_string(),
+            net,
             wallet,
             compiler_version,
             dry_run,
@@ -1270,7 +1271,7 @@ fn main() {
                 duration,
                 wallet,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net.to_string(),
+                net,
                 amount,
                 yes,
                 local,
@@ -1289,7 +1290,7 @@ fn main() {
                     disasm,
                     api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     output,
-                    net.to_string(),
+                    net,
                     json,
                 );
                 if json {
@@ -1427,7 +1428,7 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
-    fork_net: Option<Network>,
+    fork_net: Option<String>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
     save_test_trace: Option<String>,
@@ -1468,7 +1469,7 @@ fn create_test_config(
             junit_merge,
             snapshot,
             baseline_snapshot,
-            fork_net,
+            fork_net.and_then(|n| Network::from_str(&n).ok()),
             api_key,
             fork_block_number,
             save_test_trace,
@@ -1498,7 +1499,6 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
-        fork_net,
         api_key,
         fork_block_number,
         save_test_trace,
@@ -1509,5 +1509,6 @@ fn create_test_config(
         fail_fast: fail_fast.unwrap_or(false),
         ui,
         ui_port,
+        fork_net: fork_net.and_then(|n| Network::from_str(&n).ok()),
     }
 }

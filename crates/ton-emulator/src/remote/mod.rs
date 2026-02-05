@@ -7,6 +7,8 @@ use anyhow::{Context, anyhow};
 use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
+use std::collections::HashMap;
+use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
 
@@ -22,17 +24,18 @@ use tycho_types::cell::Cell;
 pub fn get_account_info(
     seqno: Option<u64>,
     address: &str,
-    network: &str,
+    network: &Network,
     api_key: Option<String>,
+    custom_networks: HashMap<String, CustomNetworkUrls>,
 ) -> anyhow::Result<TonCenterAccountInfoResult> {
     if api_key.is_none() {
         // we need to wait for TonCenter rate limit
         std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 
-    let base_url = toncenter_url(network)?;
+    let base_url = network.toncenter_v2_url(&custom_networks)?;
     let url = format!(
-        "{}/api/v2/getAddressInformation?address={}{}",
+        "{}/getAddressInformation?address={}{}",
         base_url,
         address,
         seqno
@@ -61,15 +64,6 @@ pub fn get_account_info(
     Ok(data.result)
 }
 
-fn toncenter_url(network: &str) -> anyhow::Result<&str> {
-    let base_url = match network {
-        "mainnet" => "https://toncenter.com",
-        "testnet" => "https://testnet.toncenter.com",
-        _ => anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet"),
-    };
-    Ok(base_url)
-}
-
 /// Fetches a global library by its hash from `TonCenter`.
 ///
 /// # Arguments
@@ -78,12 +72,13 @@ fn toncenter_url(network: &str) -> anyhow::Result<&str> {
 /// * `hash` - Hex-encoded hash of the library.
 /// * `api_key` - Optional `TonCenter` API key.
 pub fn get_library_by_hash(
-    network: &str,
+    network: &Network,
     hash: &str,
     api_key: Option<String>,
+    custom_networks: HashMap<String, CustomNetworkUrls>,
 ) -> anyhow::Result<Cell> {
-    let base_url = toncenter_url(network)?;
-    let url = format!("{base_url}/api/v2/getLibraries");
+    let base_url = network.toncenter_v2_url(&custom_networks)?;
+    let url = format!("{base_url}/getLibraries");
 
     let client = reqwest::blocking::Client::new();
     let mut request = client.get(&url).header("User-Agent", "acton-cli");
