@@ -62,6 +62,7 @@ impl Default for CellStore {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum AccountStatus {
     Active,
     Uninit,

@@ -22,50 +22,26 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
         .route("/v2/sendBocReturnHash", post(send_boc_return_hash))
         .route("/v2/runGetMethod", post(run_get_method))
         .route("/v2/runGetMethodStd", post(run_get_method_std))
-        .route(
-            "/v2/getAddressInformation",
-            get(get_address_information_query).post(get_address_information_post),
-        )
-        .route(
-            "/v2/getAddressBalance",
-            get(get_address_balance_query).post(get_address_balance_post),
-        )
-        .route(
-            "/v2/getAddressState",
-            get(get_address_state_query).post(get_address_state_post),
-        )
+        .route("/v2/getAddressInformation", get(get_address_information))
+        .route("/v2/getAddressBalance", get(get_address_balance))
+        .route("/v2/getAddressState", get(get_address_state))
         .route(
             "/v2/getExtendedAddressInformation",
-            get(get_extended_address_information_query).post(get_extended_address_information_post),
+            get(get_extended_address_information),
         )
-        .route(
-            "/v2/getTransactions",
-            get(get_transactions_query).post(get_transactions_post),
-        )
-        .route(
-            "/v2/getBlockHeader",
-            get(get_block_header_query).post(get_block_header_post),
-        )
-        .route(
-            "/v2/getBlockTransactions",
-            get(get_block_transactions_query).post(get_block_transactions_post),
-        )
+        .route("/v2/getTransactions", get(get_transactions))
+        .route("/v2/getBlockHeader", get(get_block_header))
+        .route("/v2/getBlockTransactions", get(get_block_transactions))
         .route(
             "/v2/getBlockTransactionsExt",
-            get(get_block_transactions_ext_query).post(get_block_transactions_ext_post),
+            get(get_block_transactions_ext),
         )
-        .route(
-            "/v2/getMasterchainInfo",
-            get(get_masterchain_info_query).post(get_masterchain_info_post),
-        )
-        .route("/v2/getShards", get(get_shards_query).post(get_shards_post))
-        .route("/v2/shards", get(get_shards_query).post(get_shards_post))
-        .route(
-            "/v2/lookupBlock",
-            get(lookup_block_query).post(lookup_block_post),
-        );
+        .route("/v2/getMasterchainInfo", get(get_masterchain_info))
+        .route("/v2/getShards", get(get_shards))
+        .route("/v2/shards", get(get_shards))
+        .route("/v2/lookupBlock", get(lookup_block));
 
-    let api_v3_router = Router::new().route("/v3/traces", get(get_traces_query));
+    let api_v3_router = Router::new().route("/v3/traces", get(get_traces));
 
     Router::new()
         .nest("/api", api_v2_router)

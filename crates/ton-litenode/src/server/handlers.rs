@@ -313,7 +313,7 @@ pub async fn run_get_method_std(
     .await
 }
 
-pub async fn get_address_information_query(
+pub async fn get_address_information(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
@@ -324,18 +324,7 @@ pub async fn get_address_information_query(
     .await
 }
 
-pub async fn get_address_information_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetAddressInformationRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.get_address_information(payload.address, payload.seqno),
-        api::map_account_state,
-    )
-    .await
-}
-
-pub async fn get_address_balance_query(
+pub async fn get_address_balance(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
@@ -346,40 +335,18 @@ pub async fn get_address_balance_query(
     .await
 }
 
-pub async fn get_address_balance_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetAddressInformationRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.get_address_balance(payload.address, payload.seqno),
-        |res| serde_json::json!({ "ok": true, "result": res.to_string() }),
-    )
-    .await
-}
-
-pub async fn get_address_state_query(
+pub async fn get_address_state(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
     handle_result(
         node.get_address_state(payload.address, payload.seqno),
-        |res| serde_json::json!({ "ok": true, "result": format!("{:?}", res).to_lowercase() }),
+        |res| serde_json::json!({ "ok": true, "result": res }),
     )
     .await
 }
 
-pub async fn get_address_state_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetAddressInformationRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.get_address_state(payload.address, payload.seqno),
-        |res| serde_json::json!({ "ok": true, "result": format!("{:?}", res).to_lowercase() }),
-    )
-    .await
-}
-
-pub async fn get_extended_address_information_query(
+pub async fn get_extended_address_information(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
@@ -390,18 +357,7 @@ pub async fn get_extended_address_information_query(
     .await
 }
 
-pub async fn get_extended_address_information_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetAddressInformationRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.get_address_information(payload.address, payload.seqno),
-        api::map_extended_account_state,
-    )
-    .await
-}
-
-pub async fn get_transactions_query(
+pub async fn get_transactions(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetTransactionsRequest>,
 ) -> Json<Value> {
@@ -418,37 +374,9 @@ pub async fn get_transactions_query(
     .await
 }
 
-pub async fn get_transactions_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetTransactionsRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.get_transactions(
-            payload.address,
-            payload.limit,
-            payload.lt,
-            payload.hash,
-            payload.to_lt,
-        ),
-        |res| serde_json::json!({ "ok": true, "result": res.iter().map(api::map_transaction).collect::<Vec<_>>() }),
-    )
-    .await
-}
-
-pub async fn get_block_header_query(
+pub async fn get_block_header(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.get_block_header(payload.seqno as u32),
-        api::map_block_header,
-    )
-    .await
-}
-
-pub async fn get_block_header_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetBlockRequest>,
 ) -> Json<Value> {
     handle_result(
         node.get_block_header(payload.seqno as u32),
@@ -475,7 +403,7 @@ pub async fn send_boc_return_hash(
     handle_result(node.send_boc(payload.boc), api::map_send_boc_return_hash).await
 }
 
-pub async fn get_block_transactions_query(
+pub async fn get_block_transactions(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
@@ -486,18 +414,7 @@ pub async fn get_block_transactions_query(
     .await
 }
 
-pub async fn get_block_transactions_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetBlockRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.get_block_transactions(payload.seqno as u32),
-        api::map_block_transactions,
-    )
-    .await
-}
-
-pub async fn get_block_transactions_ext_query(
+pub async fn get_block_transactions_ext(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
@@ -508,15 +425,11 @@ pub async fn get_block_transactions_ext_query(
     .await
 }
 
-pub async fn get_masterchain_info_query(State(node): State<Arc<LiteNode>>) -> Json<Value> {
+pub async fn get_masterchain_info(State(node): State<Arc<LiteNode>>) -> Json<Value> {
     handle_result(node.get_masterchain_info(), api::map_masterchain_info).await
 }
 
-pub async fn get_masterchain_info_post(State(node): State<Arc<LiteNode>>) -> Json<Value> {
-    handle_result(node.get_masterchain_info(), api::map_masterchain_info).await
-}
-
-pub async fn get_shards_query(
+pub async fn get_shards(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
@@ -532,42 +445,9 @@ pub async fn get_shards_query(
     .await
 }
 
-pub async fn get_shards_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<GetBlockRequest>,
-) -> Json<Value> {
-    handle_result(node.get_shards(payload.seqno as u32), |res| {
-        serde_json::json!({
-            "ok": true,
-            "result": {
-                "@type": "blocks.shards",
-                "shards": res.iter().map(api::map_block_id).collect::<Vec<_>>()
-            }
-        })
-    })
-    .await
-}
-
-pub async fn lookup_block_query(
+pub async fn lookup_block(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<LookupBlockRequest>,
-) -> Json<Value> {
-    handle_result(
-        node.lookup_block(
-            payload.workchain,
-            payload.shard,
-            payload.seqno.map(|x| x as u32),
-            payload.lt,
-            payload.unixtime,
-        ),
-        |res| serde_json::json!({ "ok": true, "result": api::map_block_id(res) }),
-    )
-    .await
-}
-
-pub async fn lookup_block_post(
-    State(node): State<Arc<LiteNode>>,
-    Json(payload): Json<LookupBlockRequest>,
 ) -> Json<Value> {
     handle_result(
         node.lookup_block(
@@ -592,7 +472,7 @@ pub async fn faucet(
     .await
 }
 
-pub async fn get_traces_query(
+pub async fn get_traces(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetTracesQuery>,
 ) -> Json<Value> {
