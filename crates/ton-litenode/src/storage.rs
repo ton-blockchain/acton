@@ -1,4 +1,5 @@
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
 // CAS
@@ -29,7 +30,7 @@ impl Default for CellStore {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AccountStatus {
     Active,
     Uninit,

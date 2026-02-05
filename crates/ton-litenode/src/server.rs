@@ -1,3 +1,4 @@
+use crate::api;
 use crate::litenode::LiteNode;
 use axum::{
     Json, Router,
@@ -181,7 +182,9 @@ async fn json_rpc(
     let result = match payload.method.as_str() {
         "sendBoc" => {
             if let Ok(req) = serde_json::from_value::<SendBocRequest>(payload.params) {
-                node.send_boc(req.boc).await
+                node.send_boc(req.boc)
+                    .await
+                    .map(|r| api::map_block_transactions(&r))
             } else {
                 Err(anyhow::anyhow!("Invalid params for sendBoc"))
             }
@@ -207,6 +210,7 @@ async fn json_rpc(
                 };
                 node.run_get_method(req.address, method_str, req.stack, req.seqno)
                     .await
+                    .map(|r| api::map_run_get_method(&r))
             } else {
                 Err(anyhow::anyhow!("Invalid params for runGetMethod"))
             }
@@ -232,6 +236,7 @@ async fn json_rpc(
                 };
                 node.run_get_method_std(req.address, method_str, req.stack, req.seqno)
                     .await
+                    .map(|r| api::map_run_get_method(&r))
             } else {
                 Err(anyhow::anyhow!("Invalid params for runGetMethodStd"))
             }
@@ -239,7 +244,9 @@ async fn json_rpc(
         "getAddressInformation" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                node.get_address_information(req.address, req.seqno).await
+                node.get_address_information(req.address, req.seqno)
+                    .await
+                    .map(|r| api::map_account_state(&r))
             } else {
                 Err(anyhow::anyhow!("Invalid params for getAddressInformation"))
             }
@@ -247,7 +254,9 @@ async fn json_rpc(
         "getAddressBalance" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                node.get_address_balance(req.address, req.seqno).await
+                node.get_address_balance(req.address, req.seqno)
+                    .await
+                    .map(|r| serde_json::json!({ "ok": true, "result": r.to_string() }))
             } else {
                 Err(anyhow::anyhow!("Invalid params for getAddressBalance"))
             }
@@ -255,7 +264,7 @@ async fn json_rpc(
         "getAddressState" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                node.get_address_state(req.address, req.seqno).await
+                node.get_address_state(req.address, req.seqno).await.map(|r| serde_json::json!({ "ok": true, "result": format!("{:?}", r).to_lowercase() }))
             } else {
                 Err(anyhow::anyhow!("Invalid params for getAddressState"))
             }
@@ -263,8 +272,14 @@ async fn json_rpc(
         "getExtendedAddressInformation" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
+                let addr = req.address.clone();
                 node.get_extended_address_information(req.address, req.seqno)
                     .await
+                    .map(|r| {
+                        let mut val = api::map_extended_account_state(&r);
+                        val["result"]["address"]["account_address"] = serde_json::json!(addr);
+                        val
+                    })
             } else {
                 Err(anyhow::anyhow!(
                     "Invalid params for getExtendedAddressInformation"
@@ -274,43 +289,51 @@ async fn json_rpc(
         "getTransactions" => {
             if let Ok(req) = serde_json::from_value::<GetTransactionsRequest>(payload.params) {
                 node.get_transactions(req.address, req.limit, req.lt, req.hash, req.to_lt)
-                    .await
+                    .await.map(|r| serde_json::json!({ "ok": true, "result": r.iter().map(api::map_transaction).collect::<Vec<_>>() }))
             } else {
                 Err(anyhow::anyhow!("Invalid params for getTransactions"))
             }
         }
         "getBlockHeader" => {
             if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_header(req.seqno as u32).await
+                node.get_block_header(req.seqno as u32)
+                    .await
+                    .map(|r| api::map_block_header(&r))
             } else {
                 Err(anyhow::anyhow!("Invalid params for getBlockHeader"))
             }
         }
         "getBlockTransactionsExt" => {
             if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_transactions_ext(req.seqno as u32).await
+                node.get_block_transactions_ext(req.seqno as u32)
+                    .await
+                    .map(|r| api::map_block_transactions(&r))
             } else {
                 Err(anyhow::anyhow!(
                     "Invalid params for getBlockTransactionsExt"
                 ))
             }
         }
-        "getMasterchainInfo" => node.get_masterchain_info().await,
+        "getMasterchainInfo" => node
+            .get_masterchain_info()
+            .await
+            .map(|r| api::map_masterchain_info(&r)),
         "shards" => {
             if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_shards(req.seqno as u32).await
+                node.get_shards(req.seqno as u32).await.map(|r| {
+                    serde_json::json!({
+                        "ok": true,
+                        "result": {
+                            "@type": "blocks.shards",
+                            "shards": r.iter().map(api::map_block_id).collect::<Vec<_>>()
+                        }
+                    })
+                })
             } else {
                 Err(anyhow::anyhow!("Invalid params for shards"))
             }
         }
         "lookupBlock" => {
-            match serde_json::from_value::<LookupBlockRequest>(payload.params.clone()) {
-                Ok(_) => {}
-                Err(err) => {
-                    println!("{err}")
-                }
-            }
-
             if let Ok(req) = serde_json::from_value::<LookupBlockRequest>(payload.params) {
                 node.lookup_block(
                     req.workchain,
@@ -320,6 +343,7 @@ async fn json_rpc(
                     req.unixtime,
                 )
                 .await
+                .map(|r| serde_json::json!({ "ok": true, "result": api::map_block_id(&r) }))
             } else {
                 Err(anyhow::anyhow!("Invalid params for lookupBlock"))
             }
@@ -391,7 +415,7 @@ async fn send_boc(
     Json(payload): Json<SendBocRequest>,
 ) -> Json<Value> {
     match node.send_boc(payload.boc).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_block_transactions(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -428,7 +452,7 @@ async fn run_get_method(
         .run_get_method(payload.address, method_str, payload.stack, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_run_get_method(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -457,7 +481,7 @@ async fn run_get_method_std(
         .run_get_method_std(payload.address, method_str, payload.stack, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_run_get_method(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -480,7 +504,7 @@ async fn get_address_information_query(
         .get_address_information(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_account_state(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -497,7 +521,7 @@ async fn get_address_information_post(
         .get_address_information(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_account_state(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -514,7 +538,7 @@ async fn get_address_balance_query(
         .get_address_balance(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(serde_json::json!({ "ok": true, "result": res.to_string() })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -531,7 +555,7 @@ async fn get_address_balance_post(
         .get_address_balance(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(serde_json::json!({ "ok": true, "result": res.to_string() })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -545,7 +569,9 @@ async fn get_address_state_query(
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
     match node.get_address_state(payload.address, payload.seqno).await {
-        Ok(res) => Json(res),
+        Ok(res) => {
+            Json(serde_json::json!({ "ok": true, "result": format!("{:?}", res).to_lowercase() }))
+        }
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -559,7 +585,9 @@ async fn get_address_state_post(
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
     match node.get_address_state(payload.address, payload.seqno).await {
-        Ok(res) => Json(res),
+        Ok(res) => {
+            Json(serde_json::json!({ "ok": true, "result": format!("{:?}", res).to_lowercase() }))
+        }
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -572,11 +600,16 @@ async fn get_extended_address_information_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
+    let addr = payload.address.clone();
     match node
         .get_extended_address_information(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => {
+            let mut val = api::map_extended_account_state(&res);
+            val["result"]["address"]["account_address"] = serde_json::json!(addr);
+            Json(val)
+        }
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -589,11 +622,16 @@ async fn get_extended_address_information_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
+    let addr = payload.address.clone();
     match node
         .get_extended_address_information(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => {
+            let mut val = api::map_extended_account_state(&res);
+            val["result"]["address"]["account_address"] = serde_json::json!(addr);
+            Json(val)
+        }
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -630,7 +668,9 @@ async fn get_transactions_query(
         )
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(
+            serde_json::json!({ "ok": true, "result": res.iter().map(api::map_transaction).collect::<Vec<_>>() }),
+        ),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -653,7 +693,9 @@ async fn get_transactions_post(
         )
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(
+            serde_json::json!({ "ok": true, "result": res.iter().map(api::map_transaction).collect::<Vec<_>>() }),
+        ),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -678,7 +720,7 @@ async fn get_block_header_query(
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
     match node.get_block_header(payload.seqno as u32).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_block_header(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -692,7 +734,7 @@ async fn get_block_header_post(
     Json(payload): Json<GetBlockRequest>,
 ) -> Json<Value> {
     match node.get_block_header(payload.seqno as u32).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_block_header(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -706,7 +748,7 @@ async fn get_block_transactions_ext_query(
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
     match node.get_block_transactions_ext(payload.seqno as u32).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_block_transactions(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -720,7 +762,7 @@ async fn get_block_transactions_ext_post(
     Json(payload): Json<GetBlockRequest>,
 ) -> Json<Value> {
     match node.get_block_transactions_ext(payload.seqno as u32).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_block_transactions(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -731,7 +773,7 @@ async fn get_block_transactions_ext_post(
 
 async fn get_masterchain_info_query(State(node): State<Arc<LiteNode>>) -> Json<Value> {
     match node.get_masterchain_info().await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_masterchain_info(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -742,7 +784,7 @@ async fn get_masterchain_info_query(State(node): State<Arc<LiteNode>>) -> Json<V
 
 async fn get_masterchain_info_post(State(node): State<Arc<LiteNode>>) -> Json<Value> {
     match node.get_masterchain_info().await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(api::map_masterchain_info(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -756,7 +798,13 @@ async fn get_shards_query(
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
     match node.get_shards(payload.seqno as u32).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "blocks.shards",
+                "shards": res.iter().map(api::map_block_id).collect::<Vec<_>>()
+            }
+        })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -770,7 +818,13 @@ async fn get_shards_post(
     Json(payload): Json<GetBlockRequest>,
 ) -> Json<Value> {
     match node.get_shards(payload.seqno as u32).await {
-        Ok(res) => Json(res),
+        Ok(res) => Json(serde_json::json!({
+            "ok": true,
+            "result": {
+                "@type": "blocks.shards",
+                "shards": res.iter().map(api::map_block_id).collect::<Vec<_>>()
+            }
+        })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -802,7 +856,7 @@ async fn lookup_block_query(
         )
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(serde_json::json!({ "ok": true, "result": api::map_block_id(&res) })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -825,7 +879,7 @@ async fn lookup_block_post(
         )
         .await
     {
-        Ok(res) => Json(res),
+        Ok(res) => Json(serde_json::json!({ "ok": true, "result": api::map_block_id(&res) })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),

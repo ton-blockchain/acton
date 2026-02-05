@@ -16,6 +16,7 @@ use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 use tycho_types::models::{AccountState, Message, MsgInfo, ShardAccount};
+use crate::litenode;
 
 pub struct Node {
     pub cas: CellStore,
@@ -534,13 +535,19 @@ impl Node {
                     .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
                     .unwrap_or_default();
 
-                let tx_json = crate::litenode::convert_to_tx_json(
+                let tx_struct = litenode::convert_to_tx_struct(
                     &tx,
                     in_msg.as_ref(),
                     &out_msgs,
                     tx_boc_b64,
                 )?;
-                let mut tx_val = tx_json;
+                let mut tx_val = serde_json::to_value(tx_struct)?;
+
+                // TODO
+                // Add @type for UI compatibility if needed, though convert_to_tx_struct doesn't add it
+                // Actually, the UI might expect the TonCenter v2 format.
+                // Let's use the same mapping as in server.rs if possible, but Node is in lib.
+                // For now, let's just fix the compilation error by using the new struct and converting to Value.
 
                 // Add parent/child info for shared UI component
                 if let Some(in_msg_hash) = &tx.in_msg_hash {
