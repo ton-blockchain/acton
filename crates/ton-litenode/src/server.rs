@@ -272,14 +272,9 @@ async fn json_rpc(
         "getExtendedAddressInformation" => {
             if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
             {
-                let addr = req.address.clone();
-                node.get_extended_address_information(req.address, req.seqno)
+                node.get_address_information(req.address, req.seqno)
                     .await
-                    .map(|r| {
-                        let mut val = api::map_extended_account_state(&r);
-                        val["result"]["address"]["account_address"] = serde_json::json!(addr);
-                        val
-                    })
+                    .map(|r| api::map_extended_account_state(&r))
             } else {
                 Err(anyhow::anyhow!(
                     "Invalid params for getExtendedAddressInformation"
@@ -600,16 +595,11 @@ async fn get_extended_address_information_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    let addr = payload.address.clone();
     match node
-        .get_extended_address_information(payload.address, payload.seqno)
+        .get_address_information(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => {
-            let mut val = api::map_extended_account_state(&res);
-            val["result"]["address"]["account_address"] = serde_json::json!(addr);
-            Json(val)
-        }
+        Ok(res) => Json(api::map_extended_account_state(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -622,16 +612,11 @@ async fn get_extended_address_information_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetAddressInformationRequest>,
 ) -> Json<Value> {
-    let addr = payload.address.clone();
     match node
-        .get_extended_address_information(payload.address, payload.seqno)
+        .get_address_information(payload.address, payload.seqno)
         .await
     {
-        Ok(res) => {
-            let mut val = api::map_extended_account_state(&res);
-            val["result"]["address"]["account_address"] = serde_json::json!(addr);
-            Json(val)
-        }
+        Ok(res) => Json(api::map_extended_account_state(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),

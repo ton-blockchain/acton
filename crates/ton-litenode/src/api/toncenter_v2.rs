@@ -79,8 +79,7 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
         "result": {
             "@type": "raw.fullAccountState",
             "balance": s.balance.to_string(),
-            "code": s.code,
-            "data": s.data,
+            "extra_currencies": [],
             "last_transaction_id": s.last_transaction_id.as_ref().map(|tid| {
                 serde_json::json!({
                     "@type": "internal.transactionId",
@@ -93,8 +92,9 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
                 "hash": "0000000000000000000000000000000000000000000000000000000000000000"
             })),
             "block_id": map_block_id(&s.block_id),
-            "frozen_hash": "",
-            "extra_currencies": [],
+            "code": s.code,
+            "data": s.data,
+            "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000", // TODO
             "sync_utime": s.sync_utime,
             "state": match s.state {
                 AccountStatus::Active => "active",
@@ -111,8 +111,9 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
         "ok": true,
         "result": {
             "@type": "fullAccountState",
-            "address": { "@type": "accountAddress", "account_address": "TODO" }, // addr_str is not in struct
+            "address": { "@type": "accountAddress", "account_address": s.address.to_string() },
             "balance": s.balance.to_string(),
+            "extra_currencies": [],
             "last_transaction_id": s.last_transaction_id.as_ref().map(|tid| {
                 serde_json::json!({
                     "@type": "internal.transactionId",
@@ -129,13 +130,13 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
             "account_state": match s.state {
                 AccountStatus::Nonexist => serde_json::json!({
                     "@type": "uninited.accountState",
-                    "frozen_hash": ""
+                    "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
                 }),
                 _ => serde_json::json!({
                     "@type": "raw.accountState",
                     "code": s.code,
                     "data": s.data,
-                    "frozen_hash": ""
+                    "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
                 }),
             },
             "revision": 0

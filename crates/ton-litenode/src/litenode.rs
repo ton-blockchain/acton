@@ -31,6 +31,7 @@ pub struct LiteNodeBlockId {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiteNodeAccountState {
+    pub address: Addr,
     pub balance: u128,
     pub code: String, // base64
     pub data: String, // base64
@@ -138,11 +139,6 @@ pub(crate) enum Request {
         address: String,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<AccountStatus>>,
-    },
-    GetExtendedAddressInformation {
-        address: String,
-        seqno: Option<u32>,
-        resp: oneshot::Sender<anyhow::Result<LiteNodeAccountState>>,
     },
     GetBlockHeader {
         seqno: u32,
@@ -289,22 +285,6 @@ impl LiteNode {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetAddressState {
-                address,
-                seqno,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn get_extended_address_information(
-        &self,
-        address: String,
-        seqno: Option<u32>,
-    ) -> anyhow::Result<LiteNodeAccountState> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetExtendedAddressInformation {
                 address,
                 seqno,
                 resp,
@@ -470,14 +450,6 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_get_address_state(node, address, seqno);
             let _ = resp.send(res);
         }
-        Request::GetExtendedAddressInformation {
-            address,
-            seqno,
-            resp,
-        } => {
-            let res = handle_get_extended_address_info(node, address, seqno);
-            let _ = resp.send(res);
-        }
         Request::GetBlockHeader { seqno, resp } => {
             let res = handle_get_block_header(node, seqno);
             let _ = resp.send(res);
@@ -589,11 +561,11 @@ fn handle_get_address_info(
     addr_str: String,
     seqno: Option<u32>,
 ) -> anyhow::Result<LiteNodeAccountState> {
-    let addr = parse_addr(&addr_str)?;
+    let address = parse_addr(&addr_str)?;
     let meta = if let Some(s) = seqno {
-        node.get_address_information_at_block(&addr, s)
+        node.get_address_information_at_block(&address, s)
     } else {
-        node.get_address_information(&addr)
+        node.get_address_information(&address)
     };
 
     let query_seqno = seqno.unwrap_or(node.globals.head_seqno);
@@ -622,6 +594,7 @@ fn handle_get_address_info(
             .unwrap_or_default();
 
         Ok(LiteNodeAccountState {
+            address,
             balance: m.balance_cache.unwrap_or(0),
             code: code_boc,
             data: data_boc,
@@ -635,6 +608,7 @@ fn handle_get_address_info(
         })
     } else {
         Ok(LiteNodeAccountState {
+            address,
             balance: 0,
             code: "".to_string(),
             data: "".to_string(),
@@ -896,14 +870,6 @@ fn handle_get_address_state(
         node.get_address_information(&addr)
     };
     Ok(meta.map(|m| m.status).unwrap_or(AccountStatus::Nonexist))
-}
-
-fn handle_get_extended_address_info(
-    node: &Node,
-    addr_str: String,
-    seqno: Option<u32>,
-) -> anyhow::Result<LiteNodeAccountState> {
-    handle_get_address_info(node, addr_str, seqno)
 }
 
 fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LiteNodeBlockHeader> {
