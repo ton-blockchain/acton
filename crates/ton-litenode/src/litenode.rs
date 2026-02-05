@@ -475,7 +475,7 @@ fn process_loop_request(node: &mut Node, req: Request) {
     }
 }
 
-fn handle_get_traces(node: &mut Node, tx_hash_hex: String) -> anyhow::Result<Value> {
+fn handle_get_traces(node: &Node, tx_hash_hex: String) -> anyhow::Result<Value> {
     let tx_hash = Hash256::from_hex(&tx_hash_hex)?;
     let traces = node.get_traces(&tx_hash)?;
     Ok(serde_json::json!({

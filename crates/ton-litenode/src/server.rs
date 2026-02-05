@@ -10,9 +10,11 @@ use axum::{
 use include_dir::{Dir, include_dir};
 use serde::Deserialize;
 use serde_json::Value;
+#[cfg(debug_assertions)]
 use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
+#[cfg(debug_assertions)]
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
@@ -123,7 +125,7 @@ pub async fn run_server(
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
     println!(
-        "\x1b[1;32mStarting\x1b[0m LiteNode server on http://0.0.0.0:{}",
+        "     \x1b[1;32mStarting\x1b[0m LiteNode server on http://0.0.0.0:{}",
         port
     );
     axum::serve(listener, app).await?;

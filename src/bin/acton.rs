@@ -1281,7 +1281,7 @@ fn main() {
                 },
                 address,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net.to_string(),
+                net,
                 follow_libraries,
             ),
             Err(err) => Err(err),
@@ -1297,7 +1297,7 @@ fn main() {
         } => verify_cmd(
             contract_id,
             address,
-            net.to_string(),
+            net,
             wallet,
             compiler_version,
             dry_run,
@@ -1321,7 +1321,7 @@ fn main() {
                 duration,
                 wallet,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net.to_string(),
+                net,
                 amount,
                 yes,
                 local,
@@ -1340,7 +1340,7 @@ fn main() {
                     disasm,
                     api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     output,
-                    net.to_string(),
+                    net,
                     json,
                 );
                 if json {
