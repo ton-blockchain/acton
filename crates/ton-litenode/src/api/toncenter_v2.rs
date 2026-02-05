@@ -1,6 +1,13 @@
-use serde_json::value::Value;
-use crate::litenode::{LiteNodeAccountState, LiteNodeBlockHeader, LiteNodeBlockId, LiteNodeBlockTransactions, LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult, LiteNodeTransaction};
+use crate::litenode::{
+    LiteNodeAccountState, LiteNodeBlockHeader, LiteNodeBlockId, LiteNodeBlockTransactions,
+    LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult, LiteNodeTransaction,
+};
 use crate::storage::AccountStatus;
+use serde_json::value::Value;
+use tonlib_core::cell::ArcCell;
+use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::json_stack::{legacy_stack_to_json, stack_to_json};
+use tvmffi::stack::Tuple;
 
 pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
     serde_json::json!({
@@ -136,13 +143,26 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
     })
 }
 
-pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult) -> Value {
+pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Value {
+    let stack_cell = ArcCell::from_boc_b64(&r.stack).unwrap_or_default();
+    let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
+    let stack_json: Value = if is_legacy {
+        Value::Array(legacy_stack_to_json(&stack_tuple).unwrap_or_default())
+    } else {
+        Value::Array(stack_to_json(&stack_tuple).unwrap_or_default())
+    };
+
+    let stack = match stack_json {
+        Value::Array(a) => a,
+        v => vec![v],
+    };
+
     serde_json::json!({
         "ok": true,
         "result": {
             "@type": "smc.runResult",
             "gas_used": r.gas_used,
-            "stack": r.stack,
+            "stack": stack,
             "exit_code": r.exit_code,
             "vm_log": r.vm_log,
             "block_id": map_block_id(&r.block_id),

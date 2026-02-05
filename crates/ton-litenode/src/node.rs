@@ -1,4 +1,5 @@
 use crate::executor::{ExecContext, TvmExecutor};
+use crate::litenode;
 use crate::litenode::parse_addr;
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
@@ -16,7 +17,6 @@ use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 use tycho_types::models::{AccountState, Message, MsgInfo, ShardAccount};
-use crate::litenode;
 
 pub struct Node {
     pub cas: CellStore,
@@ -535,12 +535,8 @@ impl Node {
                     .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
                     .unwrap_or_default();
 
-                let tx_struct = litenode::convert_to_tx_struct(
-                    &tx,
-                    in_msg.as_ref(),
-                    &out_msgs,
-                    tx_boc_b64,
-                )?;
+                let tx_struct =
+                    litenode::convert_to_tx_struct(&tx, in_msg.as_ref(), &out_msgs, tx_boc_b64)?;
                 let mut tx_val = serde_json::to_value(tx_struct)?;
 
                 // TODO

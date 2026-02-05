@@ -12,12 +12,8 @@ use tokio::sync::{mpsc, oneshot};
 use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
-use tonlib_core::cell::ArcCell;
 use tonlib_core::tlb_types::tlb::TLB;
-use tvmffi::json_stack::{
-    json_to_legacy_stack, json_to_stack, legacy_stack_to_json, stack_to_json,
-};
-use tvmffi::stack::Tuple;
+use tvmffi::json_stack::json_to_legacy_stack;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{CellFamily, Store};
 use tycho_types::models::{Message, StdAddr, StdAddrFormat};
@@ -78,7 +74,7 @@ pub struct LiteNodeMessage {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiteNodeRunGetMethodResult {
     pub gas_used: u64,
-    pub stack: Vec<Value>,
+    pub stack: String, // base64 BOC
     pub exit_code: i32,
     pub vm_log: String,
     pub block_id: LiteNodeBlockId,
@@ -127,13 +123,6 @@ pub(crate) enum Request {
         resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
     },
     RunGetMethod {
-        address: String,
-        method: String,
-        stack: Vec<Value>,
-        seqno: Option<u32>,
-        resp: oneshot::Sender<anyhow::Result<LiteNodeRunGetMethodResult>>,
-    },
-    RunGetMethodStd {
         address: String,
         method: String,
         stack: Vec<Value>,
@@ -266,26 +255,6 @@ impl LiteNode {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::RunGetMethod {
-                address,
-                method,
-                stack,
-                seqno,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn run_get_method_std(
-        &self,
-        address: String,
-        method: String,
-        stack: Vec<Value>,
-        seqno: Option<u32>,
-    ) -> anyhow::Result<LiteNodeRunGetMethodResult> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::RunGetMethodStd {
                 address,
                 method,
                 stack,
@@ -483,16 +452,6 @@ fn process_loop_request(node: &mut Node, req: Request) {
             resp,
         } => {
             let res = handle_run_get_method(node, address, method, stack, seqno);
-            let _ = resp.send(res);
-        }
-        Request::RunGetMethodStd {
-            address,
-            method,
-            stack,
-            seqno,
-            resp,
-        } => {
-            let res = handle_run_get_method_std(node, address, method, stack, seqno);
             let _ = resp.send(res);
         }
         Request::GetAddressBalance {
@@ -816,134 +775,14 @@ fn handle_run_get_method(
         .context("Execution failed")?;
 
     match res {
-        GetMethodResult::Success(s) => {
-            let stack_cell =
-                ArcCell::from_boc_b64(&s.stack).context("Failed to decode result stack BOC")?;
-            let stack_tuple =
-                Tuple::deserialize(&stack_cell).context("Failed to deserialize result stack")?;
-            let result_stack_json = legacy_stack_to_json(&stack_tuple)
-                .context("Failed to convert result legacy stack to JSON")?;
-
-            let stack = result_stack_json;
-
-            Ok(LiteNodeRunGetMethodResult {
-                gas_used: s.gas_used.parse().unwrap_or(0),
-                stack,
-                exit_code: s.vm_exit_code,
-                vm_log: s.vm_log,
-                block_id,
-                last_transaction_id,
-            })
-        }
-        GetMethodResult::Error(e) => anyhow::bail!("Get method error: {:?}", e),
-    }
-}
-
-fn handle_run_get_method_std(
-    node: &Node,
-    addr_str: String,
-    method: String,
-    stack_json: Vec<Value>,
-    seqno: Option<u32>,
-) -> anyhow::Result<LiteNodeRunGetMethodResult> {
-    let addr = parse_addr(&addr_str)?;
-    let meta = if let Some(s) = seqno {
-        node.get_address_information_at_block(&addr, s)
-    } else {
-        node.get_address_information(&addr)
-    };
-
-    let meta = meta.ok_or_else(|| anyhow::anyhow!("Account not found"))?;
-
-    let query_seqno = seqno.unwrap_or(node.globals.head_seqno);
-    let block = node.get_block_header(query_seqno);
-    let block_id = block
-        .as_ref()
-        .map(convert_to_block_id_struct)
-        .unwrap_or_else(|| LiteNodeBlockId {
-            workchain: 0,
-            shard: "-9223372036854775808".to_string(),
-            seqno: query_seqno,
-            root_hash: Hash256([0; 32]),
-            file_hash: Hash256([0; 32]),
-        });
-
-    let last_transaction_id = LiteNodeTransactionId {
-        lt: meta.last_trans_lt.unwrap_or(0),
-        hash: meta.last_trans_hash.unwrap_or(Hash256([0; 32])),
-    };
-
-    let code_boc = meta
-        .code_hash
-        .and_then(|h| node.cas.get(&h))
-        .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-        .ok_or_else(|| anyhow::anyhow!("Account has no code"))?;
-
-    let data_boc = meta
-        .data_hash
-        .and_then(|h| node.cas.get(&h))
-        .map(|b| base64::engine::general_purpose::STANDARD.encode(b))
-        .ok_or_else(|| anyhow::anyhow!("Account has no data"))?;
-
-    let method_id = if let Ok(id) = method.parse::<i32>() {
-        id
-    } else {
-        let crc = CRC16.checksum(method.as_bytes());
-        (crc as i32 & 0xffff) | 0x10000
-    };
-
-    let balance_tokens = meta.balance_cache.unwrap_or(0);
-
-    let args = RunGetMethodArgs {
-        code: code_boc,
-        data: data_boc,
-        method_id,
-        address: addr_str,
-        unixtime: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
-        balance: balance_tokens.to_string(),
-        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
-        gas_limit: "10000000".to_owned(),
-        debug_enabled: false,
-        verbosity: ExecutorVerbosity::Short,
-        libs: String::new(),
-        extra_currencies: Default::default(),
-        prev_blocks_info: None,
-    };
-
-    let tuple_stack = json_to_stack(stack_json).context("Failed to parse input stack")?;
-    let stack_cell = tuple_stack
-        .serialize()
-        .context("Failed to serialize stack to BOC")?;
-    let stack_b64 = stack_cell
-        .to_boc_b64(false)
-        .context("Failed to encode stack to Base64")?;
-
-    let exec = GetExecutor::new(&args).context("Failed to create GetExecutor")?;
-
-    let res = exec
-        .run_get_method(&stack_b64, &args, None)
-        .context("Execution failed")?;
-
-    match res {
-        GetMethodResult::Success(s) => {
-            let stack_cell =
-                ArcCell::from_boc_b64(&s.stack).context("Failed to decode result stack BOC")?;
-            let stack_tuple =
-                Tuple::deserialize(&stack_cell).context("Failed to deserialize result stack")?;
-            let result_stack_json =
-                stack_to_json(&stack_tuple).context("Failed to convert result stack to JSON")?;
-
-            let stack = result_stack_json;
-
-            Ok(LiteNodeRunGetMethodResult {
-                gas_used: s.gas_used.parse().unwrap_or(0),
-                stack,
-                exit_code: s.vm_exit_code,
-                vm_log: s.vm_log,
-                block_id,
-                last_transaction_id,
-            })
-        }
+        GetMethodResult::Success(s) => Ok(LiteNodeRunGetMethodResult {
+            gas_used: s.gas_used.parse().unwrap_or(0),
+            stack: s.stack,
+            exit_code: s.vm_exit_code,
+            vm_log: s.vm_log,
+            block_id,
+            last_transaction_id,
+        }),
         GetMethodResult::Error(e) => anyhow::bail!("Get method error: {:?}", e),
     }
 }

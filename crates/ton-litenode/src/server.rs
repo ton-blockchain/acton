@@ -210,7 +210,7 @@ async fn json_rpc(
                 };
                 node.run_get_method(req.address, method_str, req.stack, req.seqno)
                     .await
-                    .map(|r| api::map_run_get_method(&r))
+                    .map(|r| api::map_run_get_method(&r, true))
             } else {
                 Err(anyhow::anyhow!("Invalid params for runGetMethod"))
             }
@@ -234,9 +234,9 @@ async fn json_rpc(
                             .into_response();
                     }
                 };
-                node.run_get_method_std(req.address, method_str, req.stack, req.seqno)
+                node.run_get_method(req.address, method_str, req.stack, req.seqno)
                     .await
-                    .map(|r| api::map_run_get_method(&r))
+                    .map(|r| api::map_run_get_method(&r, false))
             } else {
                 Err(anyhow::anyhow!("Invalid params for runGetMethodStd"))
             }
@@ -452,7 +452,7 @@ async fn run_get_method(
         .run_get_method(payload.address, method_str, payload.stack, payload.seqno)
         .await
     {
-        Ok(res) => Json(api::map_run_get_method(&res)),
+        Ok(res) => Json(api::map_run_get_method(&res, true)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
@@ -478,10 +478,10 @@ async fn run_get_method_std(
     };
 
     match node
-        .run_get_method_std(payload.address, method_str, payload.stack, payload.seqno)
+        .run_get_method(payload.address, method_str, payload.stack, payload.seqno)
         .await
     {
-        Ok(res) => Json(api::map_run_get_method(&res)),
+        Ok(res) => Json(api::map_run_get_method(&res, false)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
