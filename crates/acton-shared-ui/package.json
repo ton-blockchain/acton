@@ -25,6 +25,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@ton/core": "^0.62.0",
+    "react-d3-tree": "^3.6.6",
     "react-icons": "^5.5.0",
     "shiki": "^3.22.0"
   }
