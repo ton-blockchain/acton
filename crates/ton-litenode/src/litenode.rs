@@ -144,7 +144,7 @@ pub(crate) enum Request {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<LiteNodeBlockHeader>>,
     },
-    GetBlockTransactionsExt {
+    GetBlockTransactions {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<LiteNodeBlockTransactions>>,
     },
@@ -301,13 +301,13 @@ impl LiteNode {
         rx.await?
     }
 
-    pub async fn get_block_transactions_ext(
+    pub async fn get_block_transactions(
         &self,
         seqno: u32,
     ) -> anyhow::Result<LiteNodeBlockTransactions> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetBlockTransactionsExt { seqno, resp })
+            .send(Request::GetBlockTransactions { seqno, resp })
             .await?;
         rx.await?
     }
@@ -454,8 +454,8 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_get_block_header(node, seqno);
             let _ = resp.send(res);
         }
-        Request::GetBlockTransactionsExt { seqno, resp } => {
-            let res = handle_get_block_transactions_ext(node, seqno);
+        Request::GetBlockTransactions { seqno, resp } => {
+            let res = handle_get_block_transactions(node, seqno);
             let _ = resp.send(res);
         }
         Request::GetMasterchainInfo { resp } => {
@@ -887,7 +887,7 @@ fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LiteNodeBl
     }
 }
 
-fn handle_get_block_transactions_ext(
+fn handle_get_block_transactions(
     node: &Node,
     seqno: u32,
 ) -> anyhow::Result<LiteNodeBlockTransactions> {

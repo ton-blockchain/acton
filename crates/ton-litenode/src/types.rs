@@ -31,6 +31,10 @@ impl Hash256 {
         arr.copy_from_slice(&bytes);
         Ok(Self(arr))
     }
+
+    pub fn to_base64(&self) -> String {
+        base64::engine::general_purpose::STANDARD.encode(self.0)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]

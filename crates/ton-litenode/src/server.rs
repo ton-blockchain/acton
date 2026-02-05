@@ -65,6 +65,10 @@ pub async fn run_server(
             get(get_block_header_query).post(get_block_header_post),
         )
         .route(
+            "/v2/getBlockTransactions",
+            get(get_block_transactions_query).post(get_block_transactions_post),
+        )
+        .route(
             "/v2/getBlockTransactionsExt",
             get(get_block_transactions_ext_query).post(get_block_transactions_ext_post),
         )
@@ -298,11 +302,22 @@ async fn json_rpc(
                 Err(anyhow::anyhow!("Invalid params for getBlockHeader"))
             }
         }
-        "getBlockTransactionsExt" => {
+        "getBlockTransactions" => {
             if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_transactions_ext(req.seqno as u32)
+                node.get_block_transactions(req.seqno as u32)
                     .await
                     .map(|r| api::map_block_transactions(&r))
+            } else {
+                Err(anyhow::anyhow!(
+                    "Invalid params for getBlockTransactions"
+                ))
+            }
+        }
+        "getBlockTransactionsExt" => {
+            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
+                node.get_block_transactions(req.seqno as u32)
+                    .await
+                    .map(|r| api::map_block_transactions_ext(&r))
             } else {
                 Err(anyhow::anyhow!(
                     "Invalid params for getBlockTransactionsExt"
@@ -728,11 +743,25 @@ async fn get_block_header_post(
     }
 }
 
-async fn get_block_transactions_ext_query(
+async fn get_block_transactions_ext_post(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_block_transactions(payload.seqno as u32).await {
+        Ok(res) => Json(api::map_block_transactions_ext(&res)),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+async fn get_block_transactions_query(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
-    match node.get_block_transactions_ext(payload.seqno as u32).await {
+    match node.get_block_transactions(payload.seqno as u32).await {
         Ok(res) => Json(api::map_block_transactions(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
@@ -742,12 +771,26 @@ async fn get_block_transactions_ext_query(
     }
 }
 
-async fn get_block_transactions_ext_post(
+async fn get_block_transactions_post(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<GetBlockRequest>,
 ) -> Json<Value> {
-    match node.get_block_transactions_ext(payload.seqno as u32).await {
+    match node.get_block_transactions(payload.seqno as u32).await {
         Ok(res) => Json(api::map_block_transactions(&res)),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+async fn get_block_transactions_ext_query(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetBlockRequest>,
+) -> Json<Value> {
+    match node.get_block_transactions(payload.seqno as u32).await {
+        Ok(res) => Json(api::map_block_transactions_ext(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
