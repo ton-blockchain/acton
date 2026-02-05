@@ -36,7 +36,7 @@ pub fn verify_cmd(
     let contract_path = fs::canonicalize(contract.src.clone())
         .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
 
-    let network = Network::from_str(&network)?; // validate
+    let network = Network::from_str(&network)?;
 
     println!("  {} Contract: {}", "→".blue().bold(), contract_key.cyan());
 

@@ -1,8 +1,18 @@
 [package]
 name = "ton-networks"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 serde = { workspace = true, features = ["derive", "rc"] }
 anyhow = { workspace = true }
+
+[lints]
+workspace = true

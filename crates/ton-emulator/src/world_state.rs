@@ -5,6 +5,7 @@
 //! TON network (mainnet or testnet).
 
 use crate::remote;
+use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use num_traits::cast::ToPrimitive;
 use std::cell::RefCell;
@@ -24,6 +25,7 @@ use tycho_types::models::{
 /// Represents the source of the world state.
 ///
 /// It can either be purely local or partially remote (forked from a network).
+#[allow(clippy::large_enum_variant)]
 pub enum AccountsState {
     /// Purely local state, stored in memory.
     Local(LocalAccountsState),
@@ -156,6 +158,7 @@ pub struct RemoteAccountState {
     pub fork_block_number: Option<u64>,
     /// Optional API key for `TonCenter`.
     pub api_key: Option<String>,
+    pub acton_config: Option<ActonConfig>,
     /// Cache for less network queries in subsequent tests.
     cache: RemoteSnapshotCache,
 }
@@ -174,6 +177,7 @@ impl RemoteAccountState {
             fork_net,
             fork_block_number,
             api_key,
+            acton_config: ActonConfig::load().ok(),
             cache,
         }
     }
@@ -228,7 +232,7 @@ impl RemoteAccountState {
             .or_else(|| env::var("TONCENTER_API_KEY").ok());
 
         let mut custom_networks = HashMap::new();
-        if let Ok(config) = acton_config::config::ActonConfig::load() {
+        if let Some(config) = &self.acton_config {
             custom_networks = config.custom_networks()
         }
 
