@@ -11,7 +11,6 @@ exclude = [
     "crates/acton-test-ui",
     "crates/acton-shared-ui",
     "crates/ffi-test",
-    "crates/ton-litenode",
 ]
 
 [workspace.package]
@@ -46,8 +45,10 @@ retrace = { path = "crates/retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
 tolkfmt = { path = "crates/tolkfmt" }
 ton-networks = { path = "crates/ton-networks" }
+ton-litenode = { path = "crates/ton-litenode" }
 
 # remote crates
+rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
 tonlib-core = "0.26.6"
 tycho-types = { version = "0.3.0", features = ["bigint"] }
@@ -161,6 +162,7 @@ ton-api = { workspace = true }
 retrace = { workspace = true }
 ton-source-map = { workspace = true }
 tolkfmt = { workspace = true }
+ton-litenode = { workspace = true }
 
 # remote crates
 # base TON libraries
@@ -236,6 +238,7 @@ similar = { workspace = true }
 
 # actin check
 codespan-reporting = { workspace = true }
+tracing-subscriber = "0.3.22"
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }

@@ -181,7 +181,15 @@ impl TonApiClient {
 
     /// Get wallet seqno
     pub fn get_wallet_seqno(&self, address: &str) -> anyhow::Result<(u32, bool)> {
-        let result = self.run_get_method(address, "seqno", &[])?;
+        let result = self.run_get_method(address, "seqno", &[]);
+
+        let result = match result {
+            Ok(result) => result,
+            Err(_) => {
+                // likely uninit wallet
+                return Ok((0, true));
+            }
+        };
 
         if result.exit_code == -13 {
             // likely uninit wallet

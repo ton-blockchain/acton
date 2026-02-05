@@ -1,0 +1,18 @@
+use super::utils::handle_result;
+use crate::api::toncenter_v3;
+use crate::litenode::LiteNode;
+use crate::server::models::*;
+use axum::{
+    Json,
+    extract::{Query, State},
+};
+use serde_json::Value;
+use std::sync::Arc;
+use toncenter_v3 as v3;
+
+pub async fn get_traces(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetTracesQuery>,
+) -> Json<Value> {
+    handle_result(node.get_traces(payload.hash), v3::map_traces).await
+}

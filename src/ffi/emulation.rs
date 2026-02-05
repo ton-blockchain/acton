@@ -378,7 +378,7 @@ fn send_wallet_message(
         vec![message.clone()],
     )?;
 
-    if api_key.is_none() {
+    if api_key.is_none() && network != &Network::Custom("localnet".into()) {
         std::thread::sleep(Duration::from_millis(1000)); // rate limit
     }
 
@@ -1251,11 +1251,11 @@ fn wait_for_transaction_impl(
 
     let custom_networks = ctx.env.config.custom_networks();
     let api_key = ctx.env.api_key.clone();
-    let api_client = TonApiClient::new(network, custom_networks, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
 
     let ext_message_hash_bytes = ext_message_hash.data();
 
-    if api_key.is_none() {
+    if api_key.is_none() && network != Network::Custom("localnet".into()) {
         std::thread::sleep(Duration::from_millis(1000)); // rate limit
     }
 
