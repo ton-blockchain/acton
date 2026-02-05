@@ -1,12 +1,12 @@
 use crate::types::{BocBytes, Lt};
 use anyhow::Context;
+use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
-use tycho_types::models::{ComputePhase, ShardAccount, Transaction, TxInfo};
-use tycho_types::prelude::HashBytes;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily};
+use tycho_types::models::{ComputePhase, Transaction, TxInfo};
 
 #[derive(Clone, Debug)]
 pub struct ExecContext {
@@ -50,7 +50,7 @@ impl ExecResult {
 pub trait TvmExecutor {
     fn execute(
         &self,
-        old_account: Option<&BocBytes>,
+        shard_account: &BocBytes,
         in_msg: &BocBytes,
         ctx: &ExecContext,
         config: &BocBytes,
@@ -71,12 +71,11 @@ impl TvmEmulatorAdapter {
 impl TvmExecutor for TvmEmulatorAdapter {
     fn execute(
         &self,
-        old_account: Option<&BocBytes>,
+        shard_account: &BocBytes,
         in_msg: &BocBytes,
         ctx: &ExecContext,
         config: &BocBytes,
     ) -> anyhow::Result<ExecResult> {
-        use base64::Engine;
         // 1. Prepare inputs
         let config_b64 = STANDARD.encode(config);
         self.inner
@@ -84,20 +83,7 @@ impl TvmExecutor for TvmEmulatorAdapter {
             .context("Failed to set config")?;
 
         let in_msg_b64 = STANDARD.encode(in_msg);
-
-        let shard_account_b64 = if let Some(acc_bytes) = old_account {
-            STANDARD.encode(acc_bytes)
-        } else {
-            let sa = ShardAccount {
-                account: tycho_types::cell::Lazy::new(&tycho_types::models::OptionalAccount(None))?,
-                last_trans_hash: HashBytes([0u8; 32]),
-                last_trans_lt: 0,
-            };
-            let mut builder = CellBuilder::new();
-            sa.store_into(&mut builder, Cell::empty_context())?;
-            let cell = builder.build()?;
-            Boc::encode_base64(&cell)
-        };
+        let shard_account_b64 = STANDARD.encode(shard_account);
 
         let args = RunTransactionArgs {
             shard_account: shard_account_b64,

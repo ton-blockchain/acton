@@ -588,6 +588,10 @@ pub enum LitenodeCommand {
         ui: bool,
         #[arg(long, help = "UI server port", default_value_t = 12346)]
         ui_port: u16,
+        #[arg(long, help = "Fork from network for remote account resolution")]
+        fork_net: Option<String>,
+        #[arg(long, help = "TonCenter API key for blockchain queries")]
+        api_key: Option<String>,
     },
     #[command(about = "Request TON from faucet")]
     Airdrop {
@@ -1397,13 +1401,26 @@ fn main() {
         Commands::Docgen { output } => docgen_cmd(output),
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
         Commands::Litenode { command } => match command {
-            LitenodeCommand::Start { port, ui, ui_port } => {
+            LitenodeCommand::Start {
+                port,
+                ui,
+                ui_port,
+                fork_net,
+                api_key,
+            } => {
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::litenode::litenode_start_cmd(port, ui, ui_port).await
+                    commands::litenode::litenode_start_cmd(
+                        port,
+                        ui,
+                        ui_port,
+                        fork_net,
+                        api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
+                    )
+                    .await
                 })
             }
             LitenodeCommand::Airdrop {

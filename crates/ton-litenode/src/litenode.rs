@@ -173,6 +173,13 @@ pub(crate) enum Request {
         tx_hash: String,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
     },
+    SetStateSource {
+        source: crate::node::StateSource,
+        resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    GetStateSource {
+        resp: oneshot::Sender<anyhow::Result<crate::node::StateSource>>,
+    },
 }
 
 pub struct LiteNode {
@@ -181,16 +188,16 @@ pub struct LiteNode {
 
 impl Default for LiteNode {
     fn default() -> Self {
-        Self::new()
+        Self::new(crate::node::StateSource::Local)
     }
 }
 
 impl LiteNode {
-    pub fn new() -> Self {
+    pub fn new(state_source: crate::node::StateSource) -> Self {
         let (tx, rx) = mpsc::channel(100);
 
         std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(rx) {
+            if let Err(e) = run_node_loop(rx, state_source) {
                 tracing::error!("Node loop failed: {:?}", e);
             }
         });
@@ -364,12 +371,29 @@ impl LiteNode {
         self.tx.send(Request::GetTraces { tx_hash, resp }).await?;
         rx.await?
     }
+
+    pub async fn set_state_source(&self, source: crate::node::StateSource) -> anyhow::Result<()> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::SetStateSource { source, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_state_source(&self) -> anyhow::Result<crate::node::StateSource> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetStateSource { resp }).await?;
+        rx.await?
+    }
 }
 
-fn run_node_loop(mut rx: mpsc::Receiver<Request>) -> anyhow::Result<()> {
+fn run_node_loop(
+    mut rx: mpsc::Receiver<Request>,
+    state_source: crate::node::StateSource,
+) -> anyhow::Result<()> {
     let executor = Box::new(TvmEmulatorAdapter::new()?);
     let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
-    let mut node = Node::new(executor, config_bytes)?;
+    let mut node = Node::new(executor, config_bytes, state_source)?;
 
     tracing::info!("TON lite node started");
 
@@ -483,14 +507,26 @@ fn process_loop_request(node: &mut Node, req: Request) {
             amount,
             resp,
         } => {
-            let res = crate::node::handle_faucet(node, address, amount);
+            let res = handle_faucet(node, address, amount);
             let _ = resp.send(res);
         }
         Request::GetTraces { tx_hash, resp } => {
             let res = handle_get_traces(node, tx_hash);
             let _ = resp.send(res);
         }
+        Request::SetStateSource { source, resp } => {
+            node.state_source = source;
+            let _ = resp.send(Ok(()));
+        }
+        Request::GetStateSource { resp } => {
+            let _ = resp.send(Ok(node.state_source.clone()));
+        }
     }
+}
+
+fn handle_faucet(node: &mut Node, addr_str: String, amount: u128) -> anyhow::Result<Value> {
+    let addr = parse_addr(&addr_str)?;
+    node.faucet(&addr, amount)
 }
 
 fn handle_get_traces(node: &Node, tx_hash_hex: String) -> anyhow::Result<storage::TraceNode> {
@@ -555,7 +591,7 @@ fn convert_to_block_id_struct(h: &storage::BlockMeta) -> LiteNodeBlockId {
 }
 
 fn handle_get_address_info(
-    node: &Node,
+    node: &mut Node,
     addr_str: String,
     seqno: Option<u32>,
 ) -> anyhow::Result<LiteNodeAccountState> {
@@ -656,7 +692,7 @@ fn handle_get_transactions(
 }
 
 fn handle_run_get_method(
-    node: &Node,
+    node: &mut Node,
     addr_str: String,
     method: String,
     stack_json: Vec<Value>,
@@ -836,7 +872,7 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LiteN
 }
 
 fn handle_get_address_balance(
-    node: &Node,
+    node: &mut Node,
     addr_str: String,
     seqno: Option<u32>,
 ) -> anyhow::Result<u128> {
@@ -850,7 +886,7 @@ fn handle_get_address_balance(
 }
 
 fn handle_get_address_state(
-    node: &Node,
+    node: &mut Node,
     addr_str: String,
     seqno: Option<u32>,
 ) -> anyhow::Result<AccountStatus> {

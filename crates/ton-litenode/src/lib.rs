@@ -2,6 +2,7 @@ pub mod api;
 pub mod executor;
 mod litenode;
 pub mod node;
+pub mod remote;
 mod server;
 pub mod storage;
 pub mod types;

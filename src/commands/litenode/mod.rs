@@ -1,9 +1,23 @@
 use owo_colors::OwoColorize;
 use std::sync::Arc;
+use ton_litenode::node::StateSource;
+use ton_litenode::remote::RemoteProvider;
 use ton_litenode::{LiteNode, run_server};
 
-pub async fn litenode_start_cmd(port: u16, ui: bool, ui_port: u16) -> anyhow::Result<()> {
-    let node = Arc::new(LiteNode::new());
+pub async fn litenode_start_cmd(
+    port: u16,
+    ui: bool,
+    ui_port: u16,
+    fork_net: Option<String>,
+    api_key: Option<String>,
+) -> anyhow::Result<()> {
+    let state_source = if let Some(network) = fork_net {
+        StateSource::Remote(RemoteProvider { network, api_key })
+    } else {
+        StateSource::Local
+    };
+
+    let node = Arc::new(LiteNode::new(state_source));
     run_server(node, port, ui, ui_port).await?;
     Ok(())
 }

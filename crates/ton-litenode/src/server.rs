@@ -89,6 +89,10 @@ pub async fn run_server(
     let app = Router::new()
         .nest("/api", api_router.clone())
         .route("/faucet", post(faucet))
+        .route(
+            "/state-source",
+            get(get_state_source).post(set_state_source),
+        )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(node.clone());
@@ -975,5 +979,22 @@ async fn get_traces_query(
             "error": e.to_string(),
             "code": 500
         })),
+    }
+}
+
+async fn get_state_source(State(node): State<Arc<LiteNode>>) -> Json<Value> {
+    match node.get_state_source().await {
+        Ok(res) => Json(serde_json::json!({ "ok": true, "result": res })),
+        Err(e) => Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
+    }
+}
+
+async fn set_state_source(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<crate::node::StateSource>,
+) -> Json<Value> {
+    match node.set_state_source(payload).await {
+        Ok(_) => Json(serde_json::json!({ "ok": true })),
+        Err(e) => Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
     }
 }

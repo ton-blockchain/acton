@@ -1,5 +1,5 @@
 use crate::executor::{ExecContext, TvmExecutor};
-use crate::litenode::parse_addr;
+use crate::remote::{RemoteProvider, fetch_remote_shard_account};
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
     LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
@@ -8,6 +8,7 @@ use crate::storage::{
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
 use core::cmp;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -15,8 +16,14 @@ use tonlib_core::TonHash;
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
 use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
+use tycho_types::cell::{CellBuilder, CellFamily, Store};
 use tycho_types::models::{AccountState, Message, MsgInfo, ShardAccount};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StateSource {
+    Local,
+    Remote(RemoteProvider),
+}
 
 pub struct Node {
     pub cas: CellStore,
@@ -26,6 +33,7 @@ pub struct Node {
     pub globals: Globals,
     pub pool: MessagePool,
     pub executor: Box<dyn TvmExecutor>,
+    pub state_source: StateSource,
 }
 
 pub const GIVER_ADDR: Addr = Addr {
@@ -36,7 +44,11 @@ pub const GIVER_ADDR: Addr = Addr {
 pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B TON
 
 impl Node {
-    pub fn new(executor: Box<dyn TvmExecutor>, config_boc: BocBytes) -> anyhow::Result<Self> {
+    pub fn new(
+        executor: Box<dyn TvmExecutor>,
+        config_boc: BocBytes,
+        state_source: StateSource,
+    ) -> anyhow::Result<Self> {
         let config_hash = compute_boc_hash(&config_boc)?;
         let mut cas = CellStore::new();
         cas.put(config_boc, config_hash);
@@ -63,6 +75,7 @@ impl Node {
             globals: Globals::new(config_hash),
             pool: MessagePool::new(),
             executor,
+            state_source,
         })
     }
 
@@ -95,9 +108,6 @@ impl Node {
 
     pub fn mine_one(&mut self) -> anyhow::Result<(BlockMeta, TxMeta)> {
         // 1. Select message
-        let queue_size = self.pool.external.len() + self.pool.internal.len();
-        tracing::debug!("Message pool size: {}", queue_size);
-
         let msg_hash = self
             .pool
             .pop_next(self.globals.queue_policy, &self.history.msg_by_hash)
@@ -112,18 +122,15 @@ impl Node {
         let msg_boc = self
             .cas
             .get(&msg_meta.msg_boc_hash)
-            .context("Msg BOC missing")?;
+            .context("Msg BOC missing")?
+            .clone();
         let dst = msg_meta
             .dst
             .ok_or_else(|| anyhow::anyhow!("Msg has no dst"))?;
 
         // 3. Load old account
+        let shard_account_boc = self.get_shard_account(&dst)?;
         let old_meta = self.latest.accounts.get(&dst).cloned();
-        let old_account_boc = if let Some(meta) = &old_meta {
-            self.cas.get(&meta.account_hash).cloned()
-        } else {
-            None
-        };
 
         // 4. Allocate LT & time
         let lt = self.globals.global_lt + self.globals.lt_step;
@@ -142,9 +149,9 @@ impl Node {
             rand_seed: None,
         };
 
-        let exec_result =
-            self.executor
-                .execute(old_account_boc.as_ref(), msg_boc, &ctx, &config_boc)?;
+        let exec_result = self
+            .executor
+            .execute(&shard_account_boc, &msg_boc, &ctx, &config_boc)?;
 
         // 6. Store outputs & 7. Derive hashes
         let tx_hash = compute_boc_hash(&exec_result.tx_boc)?;
@@ -331,14 +338,24 @@ impl Node {
         Ok(())
     }
 
-    // --- Query API ---
+    pub fn get_address_information(&mut self, addr: &Addr) -> Option<AccountMeta> {
+        if let Some(meta) = self.latest.accounts.get(addr) {
+            return Some(meta.clone());
+        }
 
-    pub fn get_address_information(&self, addr: &Addr) -> Option<AccountMeta> {
-        self.latest.accounts.get(addr).cloned()
+        if let StateSource::Remote(provider) = &self.state_source {
+            let provider = provider.clone();
+            if let Ok((_, meta)) = fetch_remote_shard_account(addr, &provider, &mut self.cas) {
+                self.latest.accounts.insert(*addr, meta.clone());
+                return Some(meta);
+            }
+        }
+
+        None
     }
 
     pub fn get_address_information_at_block(
-        &self,
+        &mut self,
         addr: &Addr,
         seqno: Seqno,
     ) -> Option<AccountMeta> {
@@ -507,13 +524,15 @@ impl Node {
         // 2. Build trace tree starting from root_hash (traverse DOWN)
         let external_hash = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
             tx.in_msg_hash.and_then(|h| {
-                self.history.msg_by_hash.get(&h).and_then(|msg| {
-                    if msg.src.is_none() { Some(h) } else { None }
-                })
+                self.history
+                    .msg_by_hash
+                    .get(&h)
+                    .and_then(|msg| if msg.src.is_none() { Some(h) } else { None })
             })
         });
 
-        let mut trace = self.build_trace_node(&root_hash)
+        let mut trace = self
+            .build_trace_node(&root_hash)
             .ok_or_else(|| anyhow::anyhow!("Root transaction not found"))?;
         trace.external_hash = external_hash;
         Ok(trace)
@@ -536,6 +555,41 @@ impl Node {
             children,
             external_hash: None,
         })
+    }
+
+    pub fn get_shard_account(&mut self, addr: &Addr) -> anyhow::Result<BocBytes> {
+        if let Some(meta) = self.latest.accounts.get(addr)
+            && let Some(boc) = self.cas.get(&meta.account_hash) {
+                return Ok(boc.clone());
+            }
+
+        if let StateSource::Remote(provider) = &self.state_source {
+            let provider = provider.clone();
+            if let Ok(boc) = self.fetch_remote_shard_account(addr, &provider) {
+                return Ok(boc);
+            }
+        }
+
+        // Create empty shard account
+        let sa = ShardAccount {
+            account: tycho_types::cell::Lazy::new(&tycho_types::models::OptionalAccount(None))?,
+            last_trans_hash: tycho_types::prelude::HashBytes([0u8; 32]),
+            last_trans_lt: 0,
+        };
+        let mut builder = CellBuilder::new();
+        sa.store_into(&mut builder, tycho_types::cell::Cell::empty_context())?;
+        let cell = builder.build()?;
+        Ok(Boc::encode(cell))
+    }
+
+    fn fetch_remote_shard_account(
+        &mut self,
+        addr: &Addr,
+        provider: &RemoteProvider,
+    ) -> anyhow::Result<BocBytes> {
+        let (boc, meta) = fetch_remote_shard_account(addr, provider, &mut self.cas)?;
+        self.latest.accounts.insert(*addr, meta);
+        Ok(boc)
     }
 
     pub fn has_pending_messages(&self) -> bool {
@@ -608,13 +662,6 @@ impl Node {
         }))
     }
 }
-
-pub fn handle_faucet(node: &mut Node, addr_str: String, amount: u128) -> anyhow::Result<Value> {
-    let addr = parse_addr(&addr_str)?;
-    node.faucet(&addr, amount)
-}
-
-// Helpers
 
 fn compute_boc_hash(boc: &[u8]) -> anyhow::Result<Hash256> {
     let cell = Boc::decode(boc)?;
