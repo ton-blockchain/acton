@@ -2,17 +2,17 @@ use super::models::*;
 use crate::api::toncenter_v3;
 use crate::litenode::LiteNode;
 use crate::{api, node};
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use axum::{
     Json,
     extract::{Query, State},
     http::StatusCode,
-    response::IntoResponse,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub async fn json_rpc(
     State(node): State<Arc<LiteNode>>,
@@ -24,8 +24,14 @@ pub async fn json_rpc(
         payload.id
     );
 
-    let id = payload.id.clone();
-    let result = json_rpc_router(node, payload).await;
+    let id_str = match &payload.id {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.to_string(),
+        Value::Null => "null".to_string(),
+        v => v.to_string(),
+    };
+
+    let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
 
     match result {
         Ok(resp) => resp,
@@ -33,10 +39,11 @@ pub async fn json_rpc(
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
                 "jsonrpc": "2.0",
-                "id": id,
+                "id": id_str,
                 "ok": false,
                 "error": e.to_string(),
-                "code": 500
+                "code": 500,
+                "@extra": get_extra()
             })),
         )
             .into_response(),
@@ -46,6 +53,12 @@ pub async fn json_rpc(
 async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow::Result<Response> {
     let params = payload.params;
     let method = payload.method.as_str();
+    let id_str = match &payload.id {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.to_string(),
+        Value::Null => "null".to_string(),
+        v => v.to_string(),
+    };
 
     let res: Value = match method {
         "sendBoc" => {
@@ -149,10 +162,11 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
                 StatusCode::NOT_FOUND,
                 Json(serde_json::json!({
                     "jsonrpc": "2.0",
-                    "id": payload.id,
+                    "id": id_str,
                     "ok": false,
                     "error": "Method not found",
-                    "code": 404
+                    "code": 404,
+                    "@extra": get_extra()
                 })),
             )
                 .into_response());
@@ -163,9 +177,10 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
         StatusCode::OK,
         Json(serde_json::json!({
             "jsonrpc": "2.0",
-            "id": payload.id,
+            "id": id_str,
             "ok": true,
-            "result": res
+            "result": res,
+            "@extra": get_extra()
         })),
     )
         .into_response())
@@ -173,6 +188,14 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
 
 fn parse_params<T: DeserializeOwned>(params: Value, method: &str) -> anyhow::Result<T> {
     serde_json::from_value(params).map_err(|_| anyhow::anyhow!("Invalid params for {}", method))
+}
+
+fn parse_method_name(method: &Value) -> anyhow::Result<String> {
+    match method {
+        Value::String(s) => Ok(s.clone()),
+        Value::Number(n) => Ok(n.to_string()),
+        _ => anyhow::bail!("Invalid method format"),
+    }
 }
 
 pub async fn send_boc(
@@ -192,7 +215,8 @@ pub async fn run_get_method(
             return Json(serde_json::json!({
                 "ok": false,
                 "error": e.to_string(),
-                "code": 400
+                "code": 400,
+                "@extra": get_extra()
             }));
         }
     };
@@ -214,7 +238,8 @@ pub async fn run_get_method_std(
             return Json(serde_json::json!({
                 "ok": false,
                 "error": e.to_string(),
-                "code": 400
+                "code": 400,
+                "@extra": get_extra()
             }));
         }
     };
@@ -397,14 +422,6 @@ pub async fn set_state_source(
     handle_result(node.set_state_source(payload), |_| Value::Null).await
 }
 
-fn parse_method_name(method: &Value) -> anyhow::Result<String> {
-    match method {
-        Value::String(s) => Ok(s.clone()),
-        Value::Number(n) => Ok(n.to_string()),
-        _ => anyhow::bail!("Invalid method format"),
-    }
-}
-
 async fn handle_result<T, F>(
     result: impl Future<Output = anyhow::Result<T>>,
     mapper: F,
@@ -415,12 +432,21 @@ where
     match result.await {
         Ok(res) => Json(serde_json::json!({
             "ok": true,
-            "result": mapper(&res)
+            "result": mapper(&res),
+            "@extra": get_extra()
         })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
-            "code": 500
+            "code": 500,
+            "@extra": get_extra()
         })),
     }
+}
+
+fn get_extra() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis().to_string())
+        .unwrap_or_else(|_| "0".to_string())
 }

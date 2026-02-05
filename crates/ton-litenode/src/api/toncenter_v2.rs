@@ -1,4 +1,3 @@
-use crate::api;
 use crate::litenode::{
     LiteNodeAccountState, LiteNodeBlockHeader, LiteNodeBlockId, LiteNodeBlockTransactions,
     LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult, LiteNodeTransaction,
@@ -23,9 +22,11 @@ pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
     })
 }
 
+#[allow(clippy::ptr_arg)]
 pub fn map_transactions(txs: &Vec<LiteNodeTransaction>) -> Value {
     txs.iter().map(map_transaction).collect::<Vec<_>>().into()
 }
+
 pub fn map_transaction(tx: &LiteNodeTransaction) -> Value {
     serde_json::json!({
         "@type": "ext.transaction",
@@ -221,6 +222,7 @@ pub fn map_block_header(bh: &LiteNodeBlockHeader) -> Value {
     })
 }
 
+#[allow(clippy::ptr_arg)]
 pub fn map_shards(shards: &Vec<LiteNodeBlockId>) -> Value {
     serde_json::json!({
         "@type": "blocks.shards",
