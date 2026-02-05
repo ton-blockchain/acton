@@ -1,6 +1,6 @@
 {
-  "name": "emulator-rs",
-  "version": "1.0.0",
+  "name": "acton",
+  "version": "0.1.0",
   "private": true,
   "workspaces": [
     "crates/*"
