@@ -47,7 +47,6 @@ pub struct CustomNetworkConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActonConfig {
     pub package: PackageConfig,
-    pub networks: Option<BTreeMap<String, CustomNetworkConfig>>,
     pub contracts: Option<ContractsConfig>,
     pub test: Option<TestSettings>,
     pub lint: Option<LintConfig>,
@@ -217,7 +216,6 @@ impl Default for ActonConfig {
                 repository: None,
                 license: Some("MIT".to_string()),
             },
-            networks: None,
             test: None,
             lint: None,
             contracts: None,

@@ -3,7 +3,6 @@ use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::collections::HashMap;
 pub use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -123,11 +122,13 @@ impl TonApiClient {
     pub fn get_contract_boc(&self, address: &str) -> anyhow::Result<String> {
         let state = self.get_account_state(address)?;
 
-        if state.state != "active" {
-            return Err(anyhow!("Contract is not active (status: {})", state.state));
+        if state.status != "active" {
+            return Err(anyhow!("Contract is not active (status: {})", state.status));
         }
 
-        state.code.ok_or_else(|| anyhow!("Contract has no code"))
+        state
+            .code_boc
+            .ok_or_else(|| anyhow!("Contract has no code"))
     }
 
     /// Run get method on contract
@@ -184,7 +185,7 @@ impl TonApiClient {
 
         let result = match result {
             Ok(result) => result,
-            Err(_err) => {
+            Err(_) => {
                 // likely uninit wallet
                 return Ok((0, true));
             }
@@ -450,8 +451,8 @@ impl TonApiClient {
 pub struct AccountState {
     pub address: String,
     pub balance: Option<String>,
-    pub code: Option<String>,
-    pub state: String,
+    pub code_boc: Option<String>,
+    pub status: String,
 }
 
 #[derive(Deserialize, Debug)]
