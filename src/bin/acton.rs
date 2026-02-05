@@ -443,12 +443,8 @@ enum Commands {
         address: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
-        #[arg(
-            long,
-            help = "Network to use for fetching from blockchain",
-            default_value = "mainnet"
-        )]
-        net: String,
+        #[arg(long, help = "Network to use for fetching from blockchain")]
+        net: Option<String>,
         #[arg(
             long,
             help = "Follow library references and disassemble the actual library code instead of showing library hash"

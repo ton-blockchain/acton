@@ -35,7 +35,7 @@ use tycho_types::prelude::{Cell, HashBytes};
 /// ```
 pub async fn find_base_tx_by_hash(net: Network, hash: &str) -> anyhow::Result<BaseTxInfo> {
     let api_key = std::env::var("TONCENTER_API_KEY").ok();
-    let client = TonCenterClient::new(net, api_key);
+    let client = TonCenterClient::new(net.clone(), api_key);
 
     let resp = client.get_transactions(hash, 1).await?;
 
@@ -506,7 +506,7 @@ pub(crate) fn compute_final_data(
 /// Attempts to fetch from `TonCenter` first, falling back to dton.io if needed.
 pub(crate) async fn get_library_by_hash(net: Network, hash: &str) -> anyhow::Result<Cell> {
     let api_key = std::env::var("TONCENTER_API_KEY").ok();
-    let toncenter = TonCenterClient::new(net, api_key);
+    let toncenter = TonCenterClient::new(net.clone(), api_key);
 
     Ok(if let Ok(data) = toncenter.get_libraries(hash).await {
         Boc::decode_base64(data)?
@@ -580,7 +580,7 @@ pub(crate) async fn collect_used_libraries(
         // cell may itself be a 264‑bit exotic library reference (tag 2).
         // If that’s the case, download the real library code and
         // register it in the `libs` dictionary.
-        if let Some((hash, code)) = add_maybe_exotic_library(net, state.code).await? {
+        if let Some((hash, code)) = add_maybe_exotic_library(net.clone(), state.code).await? {
             libs.insert(hash, code.clone());
             loaded_cell_code = Some(code);
         }
@@ -619,40 +619,7 @@ pub(crate) async fn collect_used_libraries(
     Ok((dict.into_root(), loaded_cell_code))
 }
 
-// pub fn build_libs(libs_root: Option<Cell>, owner: &IntAddr) -> Dict<HashBytes, LibDescr> {
-//     let mut libs_dict = Dict::<HashBytes, LibDescr>::new();
-//     let Some(libs_root) = libs_root else {
-//         return libs_dict;
-//     };
-//
-//     let Ok(dict) = Dict::<HashBytes, Cell>::from_root(libs_root) else {
-//         return libs_dict;
-//     };
-//
-//     let owner_hash = match owner {
-//         IntAddr::Std(std) => std.address,
-//         IntAddr::Var(var) => var.address.clone().into(),
-//     };
-//
-//     for entry in dict.iter() {
-//         let Ok((hash, lib)) = entry else { continue };
-//         let mut publishers = Dict::new();
-//         publishers.add(owner_hash, ()).ok();
-//
-//         libs_dict
-//             .add(
-//                 hash,
-//                 LibDescr {
-//                     lib: lib.clone(),
-//                     publishers,
-//                 },
-//             )
-//             .ok();
-//     }
-//     libs_dict
-// }
-
-mod boc_ext {
+pub(crate) mod boc_ext {
     use base64::Engine;
     use base64::engine::general_purpose;
     use tycho_types::boc::de;

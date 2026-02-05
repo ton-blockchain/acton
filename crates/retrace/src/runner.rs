@@ -8,30 +8,14 @@ use crate::{ComputeInfo, find_base_tx_by_hash, methods};
 use base64::Engine;
 use base64::engine::general_purpose;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
+pub use ton_networks::Network;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::models::{AccountState, ShardAccount, Transaction};
 use tycho_types::num::Tokens;
 use vmlogs::parser::{CellLike, VmLine, VmStackValue, parse_lines};
-
-/// Supported TON networks for transaction retracing.
-#[derive(Debug, Clone, Copy)]
-pub enum Network {
-    Mainnet,
-    Testnet,
-}
-
-impl Display for Network {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Network::Mainnet => write!(f, "mainnet"),
-            Network::Testnet => write!(f, "testnet"),
-        }
-    }
-}
 
 /// Fully reproduce (re‑trace) a TON transaction inside a local TON Sandbox
 /// and return a structured report with VM logs, money flow, generated
@@ -85,10 +69,10 @@ pub async fn retrace(
     link: &str,
     mut additional_libs: HashMap<HashBytes, Cell>,
 ) -> anyhow::Result<TraceResult> {
-    let base_tx = find_base_tx_by_hash(net, link).await?;
+    let base_tx = find_base_tx_by_hash(net.clone(), link).await?;
 
     for _ in 0..5 {
-        let result = retrace_base_tx(net, base_tx.clone(), additional_libs.clone()).await?;
+        let result = retrace_base_tx(net.clone(), base_tx.clone(), additional_libs.clone()).await?;
 
         if let ComputeInfo::Success { exit_code: 9, .. } = result.emulated_tx.compute_info {
             // This can be both a simple cell underflow and failed to load a library cell.
@@ -128,7 +112,7 @@ pub async fn retrace(
             ) && message == &"failed to load library cell"
                 && instr == &"CTOS"
                 && let Some(VmStackValue::Cell(CellLike::Cell(hex_boc))) = stack.parsed().last()
-                && let Some((hash, code)) = try_load_as_library(net, hex_boc).await?
+                && let Some((hash, code)) = try_load_as_library(net.clone(), hex_boc).await?
             {
                 // So we find out that the transaction failed to load a library cell.
                 // Stack before CTOS will contain the library cell as the top element.
@@ -196,13 +180,13 @@ pub async fn retrace_base_tx(
     base_tx: BaseTxInfo,
     additional_libs: HashMap<HashBytes, Cell>,
 ) -> anyhow::Result<TraceResult> {
-    let txs = find_raw_tx_by_hash(net, base_tx.clone()).await?;
+    let txs = find_raw_tx_by_hash(net.clone(), base_tx.clone()).await?;
     let Some(tx) = txs.first() else {
         anyhow::bail!("Cannot find transaction info")
     };
 
     let shard = &tx.block;
-    let Some(block) = find_shard_block_for_tx(net, tx).await? else {
+    let Some(block) = find_shard_block_for_tx(net.clone(), tx).await? else {
         anyhow::bail!("Cannot find shard block for transaction")
     };
 
@@ -225,13 +209,14 @@ pub async fn retrace_base_tx(
     }
 
     // load the complete master‑block object (includes the list of shard‑blocks)
-    let full_block = find_full_block_for_seqno(net, mc_seqno).await?;
+    let full_block = find_full_block_for_seqno(net.clone(), mc_seqno).await?;
 
     // determine the earliest logical‑time (lt) for this account in the same master‑block
     let min_lt = compute_min_lt(&tx.tx, &base_tx.address, &full_block);
     // find all transactions between the earliest one and the emulated transaction to correctly
     // recreate all state before execution of the emulated transaction
-    let mut prev_txs_in_block = find_all_transactions_between(net, &base_tx, min_lt).await?;
+    let mut prev_txs_in_block =
+        find_all_transactions_between(net.clone(), &base_tx, min_lt).await?;
     // order oldest → newest, and remove the base_tx itself (the one we want to retrace)
     prev_txs_in_block.reverse();
     let Some(our_tx) = prev_txs_in_block.pop() else {
@@ -239,9 +224,9 @@ pub async fn retrace_base_tx(
     };
 
     // retrieve block config to pass it to emulator
-    let block_config = get_block_config(net, &full_block).await?;
+    let block_config = get_block_config(net.clone(), &full_block).await?;
     // load an account snapshot *before* the master‑block N
-    let mut shard_account = get_block_account(net, &base_tx.address, &full_block).await?;
+    let mut shard_account = get_block_account(net.clone(), &base_tx.address, &full_block).await?;
 
     let (libs, loaded_code) =
         collect_used_libraries(net, &shard_account, &tx.tx, &additional_libs).await?;

@@ -44,6 +44,7 @@ ton-api = { path = "crates/ton-api" }
 retrace = { path = "crates/retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
 tolkfmt = { path = "crates/tolkfmt" }
+ton-networks = { path = "crates/ton-networks" }
 ton-litenode = { path = "crates/ton-litenode" }
 
 # remote crates

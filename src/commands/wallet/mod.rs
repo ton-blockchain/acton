@@ -467,7 +467,7 @@ fn get_wallet_address(wallet: &config::WalletConfig) -> anyhow::Result<String> {
 
     let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
     let version = parse_wallet_version(&wallet.kind)?;
-    let wallet_id = wallets::wallet_id(version, "testnet");
+    let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let ton_wallet = TonWallet::new_with_params(
         version,
         mnemonic.to_key_pair()?,
@@ -705,7 +705,7 @@ fn new_wallet(
     let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
     let key_pair = mnemonic.to_key_pair()?;
 
-    let wallet_id = wallets::wallet_id(version, "testnet");
+    let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
     let wallet_address = wallet.address.to_base64_url_flags(false, true);
@@ -824,7 +824,7 @@ fn import_wallet(
 
     let version = get_or_prompt_version(version)?;
 
-    let wallet_id = wallets::wallet_id(version, "testnet");
+    let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
     let wallet_address = wallet.address.to_base64_url_flags(false, true);

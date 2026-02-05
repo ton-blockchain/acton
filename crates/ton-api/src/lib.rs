@@ -3,70 +3,22 @@ use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::str::FromStr;
+use std::collections::HashMap;
+pub use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Network {
-    Mainnet,
-    Testnet,
-    Custom(String),
-}
-
-impl FromStr for Network {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "mainnet" => Ok(Network::Mainnet),
-            "testnet" => Ok(Network::Testnet),
-            _ if s.starts_with("custom:") => {
-                Ok(Network::Custom(s.trim_start_matches("custom:").to_string()))
-            }
-            _ => anyhow::bail!("Unsupported network: {s}. Supported: mainnet, testnet"),
-        }
-    }
-}
-
-impl Network {
-    #[must_use]
-    pub fn as_str(&self) -> String {
-        match self {
-            Network::Mainnet => "mainnet".to_owned(),
-            Network::Testnet => "testnet".to_owned(),
-            Network::Custom(name) => format!("custom:{name}"),
-        }
-    }
-
-    pub fn toncenter_url(
-        &self,
-        custom_networks: &HashMap<String, String>,
-    ) -> anyhow::Result<String> {
-        match self {
-            Network::Mainnet => Ok("https://toncenter.com/api/v2/".to_owned()),
-            Network::Testnet => Ok("https://testnet.toncenter.com/api/v2/".to_owned()),
-            Network::Custom(name) => {
-                let Some(url) = custom_networks.get(name) else {
-                    anyhow::bail!("unknown custom network: {name}")
-                };
-                Ok(url.clone())
-            }
-        }
-    }
-}
 
 pub struct TonApiClient {
     client: reqwest::blocking::Client,
     network: Network,
     api_key: Option<String>,
-    custom_networks: HashMap<String, String>,
+    custom_networks: HashMap<String, CustomNetworkUrls>,
 }
 
 impl TonApiClient {
     pub fn new(
         network: Network,
-        custom_networks: HashMap<String, String>,
+        custom_networks: HashMap<String, CustomNetworkUrls>,
         api_key: Option<String>,
     ) -> anyhow::Result<TonApiClient> {
         Ok(TonApiClient {
@@ -132,8 +84,8 @@ impl TonApiClient {
         }
 
         let mut url = format!(
-            "{}/api/v3/accountStates?",
-            self.network.toncenter_url(&self.custom_networks)?
+            "{}/accountStates?",
+            self.network.toncenter_v3_url(&self.custom_networks)?
         );
         for (i, address) in addresses.iter().enumerate() {
             if i > 0 {
@@ -187,7 +139,7 @@ impl TonApiClient {
     ) -> anyhow::Result<GetMethodResult> {
         let url = format!(
             "{}/jsonRPC",
-            self.network.toncenter_url(&self.custom_networks)?
+            self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
         let json = serde_json::json!({
@@ -259,7 +211,7 @@ impl TonApiClient {
     pub fn send_boc(&self, boc: &str) -> anyhow::Result<()> {
         let url = format!(
             "{}/sendBoc",
-            self.network.toncenter_url(&self.custom_networks)?
+            self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
         let json = serde_json::json!({ "boc": boc });
@@ -280,7 +232,7 @@ impl TonApiClient {
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
         let url = format!(
             "{}/getMasterchainInfo",
-            self.network.toncenter_url(&self.custom_networks)?
+            self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
         let response = self
@@ -321,7 +273,7 @@ impl TonApiClient {
     ) -> anyhow::Result<TonCenterAccountInfoResult> {
         let url = format!(
             "{}/getAddressInformation?address={}{}",
-            self.network.toncenter_url(&self.custom_networks)?,
+            self.network.toncenter_v2_url(&self.custom_networks)?,
             urlencoding::encode(address),
             seqno
                 .map(|seqno| format!("&seqno={seqno}"))
@@ -352,7 +304,7 @@ impl TonApiClient {
     pub fn get_library_by_hash(&self, hash: &str) -> anyhow::Result<Cell> {
         let url = format!(
             "{}/getLibraries",
-            self.network.toncenter_url(&self.custom_networks)?,
+            self.network.toncenter_v2_url(&self.custom_networks)?,
         );
 
         let response = self
@@ -408,7 +360,7 @@ impl TonApiClient {
     ) -> anyhow::Result<Vec<TonCenterTransaction>> {
         let url = format!(
             "{}/getTransactions",
-            self.network.toncenter_url(&self.custom_networks)?
+            self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
         let mut params = vec![("address", address.to_string())];
@@ -450,7 +402,7 @@ impl TonApiClient {
     pub fn get_address_balance(&self, address: &str) -> anyhow::Result<BigInt> {
         let url = format!(
             "{}/getAddressBalance?address={}",
-            self.network.toncenter_url(&self.custom_networks)?,
+            self.network.toncenter_v2_url(&self.custom_networks)?,
             urlencoding::encode(address)
         );
 

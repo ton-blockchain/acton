@@ -1,5 +1,5 @@
 [package]
-name = "ton-emulator"
+name = "ton-networks"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }
@@ -11,17 +11,8 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-tvmffi = { workspace = true }
-ton-executor = { workspace = true }
-tycho-types = { workspace = true }
-serde = { workspace = true }
-tonlib-core = { workspace = true }
+serde = { workspace = true, features = ["derive", "rc"] }
 anyhow = { workspace = true }
-num-bigint = { workspace = true }
-num-traits = { workspace = true }
-reqwest = { workspace = true }
-ton-networks = { workspace = true }
-acton-config = { workspace = true }
 
 [lints]
 workspace = true

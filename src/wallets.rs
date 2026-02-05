@@ -8,6 +8,7 @@ use owo_colors::OwoColorize;
 use pbkdf2::password_hash::Output;
 use pbkdf2::{Params, pbkdf2_hmac};
 use rand::Rng;
+use retrace::Network;
 use sha2::Sha512;
 use std::collections::BTreeMap;
 use std::fs;
@@ -84,14 +85,14 @@ pub fn load_mnemonic(wallet: &config::WalletConfig) -> anyhow::Result<String> {
 
 pub fn open_wallets(
     config: &ActonConfig,
-    net: Option<&str>,
+    net: Option<&Network>,
     broadcast: bool,
 ) -> anyhow::Result<BTreeMap<String, Wallet>> {
     if !broadcast {
         return Ok(BTreeMap::new());
     }
 
-    let net = net.unwrap_or("testnet");
+    let net = net.unwrap_or(&Network::Testnet);
     let wallets = config
         .wallets
         .as_ref()
@@ -118,11 +119,11 @@ pub fn open_wallets(
 
         if let Some(expected) = &wallet.expected {
             let expected_address = match net {
-                "mainnet" => expected
+                Network::Mainnet => expected
                     .address_mainnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.to_string())),
-                "testnet" => expected
+                Network::Testnet => expected
                     .address_testnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.to_string())),
@@ -137,14 +138,14 @@ pub fn open_wallets(
                                 "Wallet address mismatch for '{name}' on '{net}':\n  Expected: {expected_addr}\n  Derived:  {}\n\nPossible causes:\n  - Wrong mnemonic/private key\n  - Incorrect 'kind' or 'workchain'\n  - Keys rotated but expected.address-{net} not updated",
                                 ton_wallet
                                     .address
-                                    .to_base64_url_flags(true, net == "testnet"),
+                                    .to_base64_url_flags(true, net == &Network::Testnet),
                             );
                         }
                     }
                     Err(err) => {
                         let expected_address = match net {
-                            "mainnet" => expected.address_mainnet.as_deref(),
-                            "testnet" => expected.address_testnet.as_deref(),
+                            Network::Mainnet => expected.address_mainnet.as_deref(),
+                            Network::Testnet => expected.address_testnet.as_deref(),
                             _ => None,
                         }
                         .unwrap_or("<unknown>");
@@ -170,10 +171,10 @@ pub fn open_wallets(
 }
 
 #[must_use]
-pub fn wallet_id(wallet: WalletVersion, net: &str) -> i32 {
+pub fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
     match wallet {
         WalletVersion::V5R1 => {
-            if net == "testnet" {
+            if net == &Network::Testnet {
                 return DEFAULT_WALLET_ID_V5R1_TESTNET;
             }
             DEFAULT_WALLET_ID_V5R1
