@@ -131,16 +131,6 @@ pub(crate) enum Request {
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LiteNodeRunGetMethodResult>>,
     },
-    GetAddressBalance {
-        address: String,
-        seqno: Option<u32>,
-        resp: oneshot::Sender<anyhow::Result<u128>>,
-    },
-    GetAddressState {
-        address: String,
-        seqno: Option<u32>,
-        resp: oneshot::Sender<anyhow::Result<AccountStatus>>,
-    },
     GetBlockHeader {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<LiteNodeBlockHeader>>,
@@ -274,15 +264,8 @@ impl LiteNode {
         address: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<u128> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetAddressBalance {
-                address,
-                seqno,
-                resp,
-            })
-            .await?;
-        rx.await?
+        let info = self.get_address_information(address, seqno).await;
+        info.map(|i| i.balance)
     }
 
     pub async fn get_address_state(
@@ -290,15 +273,8 @@ impl LiteNode {
         address: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<AccountStatus> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetAddressState {
-                address,
-                seqno,
-                resp,
-            })
-            .await?;
-        rx.await?
+        let info = self.get_address_information(address, seqno).await;
+        info.map(|i| i.state)
     }
 
     pub async fn get_block_header(&self, seqno: u32) -> anyhow::Result<LiteNodeBlockHeader> {
@@ -458,22 +434,6 @@ fn process_loop_request(node: &mut Node, req: Request) {
             resp,
         } => {
             let res = handle_run_get_method(node, address, method, stack, seqno);
-            let _ = resp.send(res);
-        }
-        Request::GetAddressBalance {
-            address,
-            seqno,
-            resp,
-        } => {
-            let res = handle_get_address_balance(node, address, seqno);
-            let _ = resp.send(res);
-        }
-        Request::GetAddressState {
-            address,
-            seqno,
-            resp,
-        } => {
-            let res = handle_get_address_state(node, address, seqno);
             let _ = resp.send(res);
         }
         Request::GetBlockHeader { seqno, resp } => {
@@ -870,34 +830,6 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LiteN
         init_state: init_state_b64,
         opcode,
     })
-}
-
-fn handle_get_address_balance(
-    node: &mut Node,
-    addr_str: String,
-    seqno: Option<u32>,
-) -> anyhow::Result<u128> {
-    let addr = parse_addr(&addr_str)?;
-    let meta = if let Some(s) = seqno {
-        node.get_address_information_at_block(&addr, s)
-    } else {
-        node.get_address_information(&addr)
-    };
-    Ok(meta.and_then(|m| m.balance_cache).unwrap_or(0))
-}
-
-fn handle_get_address_state(
-    node: &mut Node,
-    addr_str: String,
-    seqno: Option<u32>,
-) -> anyhow::Result<AccountStatus> {
-    let addr = parse_addr(&addr_str)?;
-    let meta = if let Some(s) = seqno {
-        node.get_address_information_at_block(&addr, s)
-    } else {
-        node.get_address_information(&addr)
-    };
-    Ok(meta.map(|m| m.status).unwrap_or(AccountStatus::Nonexist))
 }
 
 fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LiteNodeBlockHeader> {
