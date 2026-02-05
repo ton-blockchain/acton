@@ -1,4 +1,1 @@
-error: invalid value 'invalid' for '--net <NET>'
-  [possible values: mainnet, testnet]
-
-For more information, try '--help'.
+Error: Unknown network 'invalid', supported networks: 'mainnet', 'testnet' and 'custom:<network-name>'

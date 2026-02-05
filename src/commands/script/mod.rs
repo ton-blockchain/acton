@@ -196,7 +196,7 @@ fn execute_script(
     };
 
     let config_b64: Option<&str> = None;
-    let fork_net = fork_net.and_then(|net| Network::from_str(&net).ok());
+    let fork_net = fork_net.as_deref().map(Network::from_str).transpose()?;
 
     let mut emulator = Emulator::new(verbosity, config_b64)?;
     let resolver = match &fork_net {
@@ -219,7 +219,7 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
-    let network = net.and_then(|net| Network::from_str(&net).ok());
+    let network = net.as_deref().map(Network::from_str).transpose()?;
     let open_wallets = wallets::open_wallets(&config, network.as_ref(), broadcast)?;
 
     let mut ctx = Context {

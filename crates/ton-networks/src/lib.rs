@@ -33,8 +33,8 @@ impl Network {
         custom_networks: &HashMap<String, CustomNetworkUrls>,
     ) -> anyhow::Result<String> {
         match self {
-            Network::Mainnet => Ok("https://toncenter.com/api/v3/".to_owned()),
-            Network::Testnet => Ok("https://testnet.toncenter.com/api/v3/".to_owned()),
+            Network::Mainnet => Ok("https://toncenter.com/api/v3".to_owned()),
+            Network::Testnet => Ok("https://testnet.toncenter.com/api/v3".to_owned()),
             Network::Custom(name) => {
                 let Some(urls) = custom_networks.get(name.as_ref()) else {
                     anyhow::bail!("unknown custom network: {name}")
@@ -74,7 +74,9 @@ impl FromStr for Network {
             _ if s.starts_with("custom:") => {
                 Ok(Network::Custom(Arc::from(s.trim_start_matches("custom:"))))
             }
-            _ => Ok(Network::Custom(Arc::from(s))),
+            _ => anyhow::bail!(
+                "Unknown network '{s}', supported networks: 'mainnet', 'testnet' and 'custom:<network-name>'"
+            ),
         }
     }
 }

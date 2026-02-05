@@ -312,7 +312,7 @@ pub fn fetch_cmd(
             FormatOptions::default(),
             None,
             None,
-            net,
+            Some(net),
             false,
         )?;
     } else {

@@ -417,8 +417,11 @@ impl ActonConfig {
                 result.insert(
                     name.clone(),
                     CustomNetworkUrls {
-                        v2_url: Arc::from(config.v2_url.as_str()),
-                        v3_url: config.v3_url.as_ref().map(|s| Arc::from(s.as_str())),
+                        v2_url: Arc::from(config.v2_url.trim_end_matches("/")),
+                        v3_url: config
+                            .v3_url
+                            .as_ref()
+                            .map(|s| Arc::from(s.trim_end_matches("/"))),
                     },
                 );
             }
