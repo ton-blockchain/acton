@@ -1,3 +1,4 @@
+use crate::api;
 use crate::litenode::{
     LiteNodeAccountState, LiteNodeBlockHeader, LiteNodeBlockId, LiteNodeBlockTransactions,
     LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult, LiteNodeTransaction,
@@ -22,6 +23,9 @@ pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
     })
 }
 
+pub fn map_transactions(txs: &Vec<LiteNodeTransaction>) -> Value {
+    txs.iter().map(map_transaction).collect::<Vec<_>>().into()
+}
 pub fn map_transaction(tx: &LiteNodeTransaction) -> Value {
     serde_json::json!({
         "@type": "ext.transaction",
@@ -77,60 +81,54 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
 
 pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "raw.fullAccountState",
-            "balance": s.balance.to_string(),
-            "extra_currencies": [],
-            "last_transaction_id": {
-                "@type": "internal.transactionId",
-                "lt": s.last_transaction_id.lt.to_string(),
-                "hash": s.last_transaction_id.hash.to_hex()
-            },
-            "block_id": map_block_id(&s.block_id),
-            "code": encode_optional_boc(s.code.as_ref()),
-            "data": encode_optional_boc(s.data.as_ref()),
-            "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000", // TODO
-            "sync_utime": s.sync_utime,
-            "state": match s.state {
-                AccountStatus::Active => "active",
-                AccountStatus::Uninit => "uninit",
-                AccountStatus::Frozen => "frozen",
-                AccountStatus::Nonexist => "nonexist",
-            }
+        "@type": "raw.fullAccountState",
+        "balance": s.balance.to_string(),
+        "extra_currencies": [],
+        "last_transaction_id": {
+            "@type": "internal.transactionId",
+            "lt": s.last_transaction_id.lt.to_string(),
+            "hash": s.last_transaction_id.hash.to_hex()
+        },
+        "block_id": map_block_id(&s.block_id),
+        "code": encode_optional_boc(s.code.as_ref()),
+        "data": encode_optional_boc(s.data.as_ref()),
+        "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000", // TODO
+        "sync_utime": s.sync_utime,
+        "state": match s.state {
+            AccountStatus::Active => "active",
+            AccountStatus::Uninit => "uninit",
+            AccountStatus::Frozen => "frozen",
+            AccountStatus::Nonexist => "nonexist",
         }
     })
 }
 
 pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "fullAccountState",
-            "address": { "@type": "accountAddress", "account_address": s.address.to_string() },
-            "balance": s.balance.to_string(),
-            "extra_currencies": [],
-            "last_transaction_id": {
-                "@type": "internal.transactionId",
-                "lt": s.last_transaction_id.lt.to_string(),
-                "hash": s.last_transaction_id.hash.to_hex()
-            },
-            "block_id": map_block_id(&s.block_id),
-            "sync_utime": s.sync_utime,
-            "account_state": match s.state {
-                AccountStatus::Nonexist => serde_json::json!({
-                    "@type": "uninited.accountState",
-                    "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
-                }),
-                _ => serde_json::json!({
-                    "@type": "raw.accountState",
-                    "code": encode_optional_boc(s.code.as_ref()),
-                    "data": encode_optional_boc(s.data.as_ref()),
-                    "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
-                }),
-            },
-            "revision": 0
-        }
+        "@type": "fullAccountState",
+        "address": { "@type": "accountAddress", "account_address": s.address.to_string() },
+        "balance": s.balance.to_string(),
+        "extra_currencies": [],
+        "last_transaction_id": {
+            "@type": "internal.transactionId",
+            "lt": s.last_transaction_id.lt.to_string(),
+            "hash": s.last_transaction_id.hash.to_hex()
+        },
+        "block_id": map_block_id(&s.block_id),
+        "sync_utime": s.sync_utime,
+        "account_state": match s.state {
+            AccountStatus::Nonexist => serde_json::json!({
+                "@type": "uninited.accountState",
+                "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+            }),
+            _ => serde_json::json!({
+                "@type": "raw.accountState",
+                "code": encode_optional_boc(s.code.as_ref()),
+                "data": encode_optional_boc(s.data.as_ref()),
+                "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+            }),
+        },
+        "revision": 0
     })
 }
 
@@ -149,66 +147,54 @@ pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Va
     };
 
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "smc.runResult",
-            "gas_used": r.gas_used,
-            "stack": stack,
-            "exit_code": r.exit_code,
-            "vm_log": r.vm_log,
-            "block_id": map_block_id(&r.block_id),
-            "last_transaction_id": {
-                "@type": "internal.transactionId",
-                "lt": r.last_transaction_id.lt.to_string(),
-                "hash": r.last_transaction_id.hash.to_hex()
-            },
-        }
+        "@type": "smc.runResult",
+        "gas_used": r.gas_used,
+        "stack": stack,
+        "exit_code": r.exit_code,
+        "vm_log": r.vm_log,
+        "block_id": map_block_id(&r.block_id),
+        "last_transaction_id": {
+            "@type": "internal.transactionId",
+            "lt": r.last_transaction_id.lt.to_string(),
+            "hash": r.last_transaction_id.hash.to_hex()
+        },
     })
 }
 
 pub fn map_block_transactions(bt: &LiteNodeBlockTransactions) -> Value {
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "blocks.transactions",
-            "id": map_block_id(&bt.id),
-            "req_count": bt.transactions.len(),
-            "incomplete": false,
-            "transactions": bt.transactions.iter().map(|tx| {
-                serde_json::json!({
-                    "@type": "blocks.shortTxId",
-                    "mode": 0,
-                    "account": tx.address.to_string(),
-                    "lt": tx.transaction_id.lt.to_string(),
-                    "hash": tx.transaction_id.hash.to_base64()
-                })
-            }).collect::<Vec<_>>()
-        }
+        "@type": "blocks.transactions",
+        "id": map_block_id(&bt.id),
+        "req_count": bt.transactions.len(),
+        "incomplete": false,
+        "transactions": bt.transactions.iter().map(|tx| {
+            serde_json::json!({
+                "@type": "blocks.shortTxId",
+                "mode": 0,
+                "account": tx.address.to_string(),
+                "lt": tx.transaction_id.lt.to_string(),
+                "hash": tx.transaction_id.hash.to_base64()
+            })
+        }).collect::<Vec<_>>()
     })
 }
 
 pub fn map_block_transactions_ext(bt: &LiteNodeBlockTransactions) -> Value {
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "blocks.transactionsExt",
-            "id": map_block_id(&bt.id),
-            "req_count": bt.transactions.len(),
-            "incomplete": false,
-            "transactions": bt.transactions.iter().map(map_transaction).collect::<Vec<_>>()
-        }
+        "@type": "blocks.transactionsExt",
+        "id": map_block_id(&bt.id),
+        "req_count": bt.transactions.len(),
+        "incomplete": false,
+        "transactions": bt.transactions.iter().map(map_transaction).collect::<Vec<_>>()
     })
 }
 
 pub fn map_masterchain_info(mi: &LiteNodeMasterchainInfo) -> Value {
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "blocks.masterchainInfo",
-            "last": map_block_id(&mi.last),
-            "state_root_hash": mi.state_root_hash.to_hex(),
-            "init": map_block_id(&mi.init)
-        }
+        "@type": "blocks.masterchainInfo",
+        "last": map_block_id(&mi.last),
+        "state_root_hash": mi.state_root_hash.to_hex(),
+        "init": map_block_id(&mi.init)
     })
 }
 
@@ -219,26 +205,31 @@ pub fn map_send_boc_return_hash(bt: &LiteNodeBlockTransactions) -> Value {
         .map(|tx| tx.hash.to_base64())
         .unwrap_or_default();
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "ok",
-            "hash": hash
-        }
+        "@type": "ok",
+        "hash": hash
     })
 }
 
 pub fn map_block_header(bh: &LiteNodeBlockHeader) -> Value {
     serde_json::json!({
-        "ok": true,
-        "result": {
-            "@type": "ton.blockHeader",
-            "id": map_block_id(&bh.id),
-            "gen_utime": bh.gen_utime,
-            "start_lt": bh.start_lt.to_string(),
-            "end_lt": bh.end_lt.to_string(),
-            "prev_seqno": bh.prev_seqno
-        }
+        "@type": "ton.blockHeader",
+        "id": map_block_id(&bh.id),
+        "gen_utime": bh.gen_utime,
+        "start_lt": bh.start_lt.to_string(),
+        "end_lt": bh.end_lt.to_string(),
+        "prev_seqno": bh.prev_seqno
     })
+}
+
+pub fn map_shards(shards: &Vec<LiteNodeBlockId>) -> Value {
+    serde_json::json!({
+        "@type": "blocks.shards",
+        "shards": shards.iter().map(map_block_id).collect::<Vec<_>>()
+    })
+}
+
+pub fn map_lookup_block(id: &LiteNodeBlockId) -> Value {
+    map_block_id(id)
 }
 
 fn encode_optional_boc(data: Option<&BocBytes>) -> String {

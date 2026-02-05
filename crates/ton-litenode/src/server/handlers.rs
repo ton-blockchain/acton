@@ -2,12 +2,14 @@ use super::models::*;
 use crate::api::toncenter_v3;
 use crate::litenode::LiteNode;
 use crate::{api, node};
+use axum::response::Response;
 use axum::{
     Json,
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::future::Future;
 use std::sync::Arc;
@@ -21,190 +23,129 @@ pub async fn json_rpc(
         payload.method,
         payload.id
     );
-    let result = match payload.method.as_str() {
+
+    let id = payload.id.clone();
+    let result = json_rpc_router(node, payload).await;
+
+    match result {
+        Ok(resp) => resp,
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "ok": false,
+                "error": e.to_string(),
+                "code": 500
+            })),
+        )
+            .into_response(),
+    }
+}
+
+async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow::Result<Response> {
+    let params = payload.params;
+    let method = payload.method.as_str();
+
+    let res: Value = match method {
         "sendBoc" => {
-            if let Ok(req) = serde_json::from_value::<SendBocRequest>(payload.params) {
-                node.send_boc(req.boc)
-                    .await
-                    .map(|r| api::map_block_transactions(&r))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for sendBoc"))
-            }
+            let req: SendBocRequest = parse_params(params, method)?;
+            node.send_boc(req.boc)
+                .await
+                .map(|r| api::map_block_transactions(&r))?
         }
         "sendBocReturnHash" => {
-            if let Ok(req) = serde_json::from_value::<SendBocRequest>(payload.params) {
-                node.send_boc(req.boc)
-                    .await
-                    .map(|r| api::map_send_boc_return_hash(&r))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for sendBocReturnHash"))
-            }
+            let req: SendBocRequest = parse_params(params, method)?;
+            node.send_boc(req.boc)
+                .await
+                .map(|r| api::map_send_boc_return_hash(&r))?
         }
         "runGetMethod" => {
-            if let Ok(req) = serde_json::from_value::<RunGetMethodRequest>(payload.params) {
-                let method_str = match req.method {
-                    Value::String(s) => s,
-                    Value::Number(n) => n.to_string(),
-                    _ => {
-                        return (
-                            StatusCode::BAD_REQUEST,
-                            Json(serde_json::json!({
-                                "jsonrpc": "2.0",
-                                "id": payload.id,
-                                "ok": false,
-                                "error": "Invalid method format",
-                                "code": 400
-                            })),
-                        )
-                            .into_response();
-                    }
-                };
-                node.run_get_method(req.address, method_str, req.stack, req.seqno)
-                    .await
-                    .map(|r| api::map_run_get_method(&r, true))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for runGetMethod"))
-            }
+            let req: RunGetMethodRequest = parse_params(params, method)?;
+            let method_str = parse_method_name(&req.method)?;
+            node.run_get_method(req.address, method_str, req.stack, req.seqno)
+                .await
+                .map(|r| api::map_run_get_method(&r, true))?
         }
         "runGetMethodStd" => {
-            if let Ok(req) = serde_json::from_value::<RunGetMethodRequest>(payload.params) {
-                let method_str = match req.method {
-                    Value::String(s) => s,
-                    Value::Number(n) => n.to_string(),
-                    _ => {
-                        return (
-                            StatusCode::BAD_REQUEST,
-                            Json(serde_json::json!({
-                                "jsonrpc": "2.0",
-                                "id": payload.id,
-                                "ok": false,
-                                "error": "Invalid method format",
-                                "code": 400
-                            })),
-                        )
-                            .into_response();
-                    }
-                };
-                node.run_get_method(req.address, method_str, req.stack, req.seqno)
-                    .await
-                    .map(|r| api::map_run_get_method(&r, false))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for runGetMethodStd"))
-            }
+            let req: RunGetMethodRequest = parse_params(params, method)?;
+            let method_str = parse_method_name(&req.method)?;
+            node.run_get_method(req.address, method_str, req.stack, req.seqno)
+                .await
+                .map(|r| api::map_run_get_method(&r, false))?
         }
         "getAddressInformation" => {
-            if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
-            {
-                node.get_address_information(req.address, req.seqno)
-                    .await
-                    .map(|r| api::map_account_state(&r))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for getAddressInformation"))
-            }
+            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            node.get_address_information(req.address, req.seqno)
+                .await
+                .map(|r| api::map_account_state(&r))?
         }
         "getAddressBalance" => {
-            if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
-            {
-                node.get_address_balance(req.address, req.seqno)
-                    .await
-                    .map(|r| serde_json::json!({ "ok": true, "result": r.to_string() }))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for getAddressBalance"))
-            }
+            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            node.get_address_balance(req.address, req.seqno)
+                .await
+                .map(|r| r.to_string().into())?
         }
         "getAddressState" => {
-            if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
-            {
-                node.get_address_state(req.address, req.seqno).await.map(|r| serde_json::json!({ "ok": true, "result": format!("{:?}", r).to_lowercase() }))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for getAddressState"))
-            }
+            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            node.get_address_state(req.address, req.seqno)
+                .await
+                .map(|r| format!("{:?}", r).to_lowercase().into())?
         }
         "getExtendedAddressInformation" => {
-            if let Ok(req) = serde_json::from_value::<GetAddressInformationRequest>(payload.params)
-            {
-                node.get_address_information(req.address, req.seqno)
-                    .await
-                    .map(|r| api::map_extended_account_state(&r))
-            } else {
-                Err(anyhow::anyhow!(
-                    "Invalid params for getExtendedAddressInformation"
-                ))
-            }
+            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            node.get_address_information(req.address, req.seqno)
+                .await
+                .map(|r| api::map_extended_account_state(&r))?
         }
         "getTransactions" => {
-            if let Ok(req) = serde_json::from_value::<GetTransactionsRequest>(payload.params) {
-                node.get_transactions(req.address, req.limit, req.lt, req.hash, req.to_lt)
-                    .await.map(|r| serde_json::json!({ "ok": true, "result": r.iter().map(api::map_transaction).collect::<Vec<_>>() }))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for getTransactions"))
-            }
+            let req: GetTransactionsRequest = parse_params(params, method)?;
+            node.get_transactions(req.address, req.limit, req.lt, req.hash, req.to_lt)
+                .await
+                .map(|r| api::map_transactions(&r))?
         }
         "getBlockHeader" => {
-            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_header(req.seqno as u32)
-                    .await
-                    .map(|r| api::map_block_header(&r))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for getBlockHeader"))
-            }
+            let req: GetBlockRequest = parse_params(params, method)?;
+            node.get_block_header(req.seqno as u32)
+                .await
+                .map(|r| api::map_block_header(&r))?
         }
         "getBlockTransactions" => {
-            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_transactions(req.seqno as u32)
-                    .await
-                    .map(|r| api::map_block_transactions(&r))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for getBlockTransactions"))
-            }
+            let req: GetBlockRequest = parse_params(params, method)?;
+            node.get_block_transactions(req.seqno as u32)
+                .await
+                .map(|r| api::map_block_transactions(&r))?
         }
         "getBlockTransactionsExt" => {
-            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_block_transactions(req.seqno as u32)
-                    .await
-                    .map(|r| api::map_block_transactions_ext(&r))
-            } else {
-                Err(anyhow::anyhow!(
-                    "Invalid params for getBlockTransactionsExt"
-                ))
-            }
+            let req: GetBlockRequest = parse_params(params, method)?;
+            node.get_block_transactions(req.seqno as u32)
+                .await
+                .map(|r| api::map_block_transactions_ext(&r))?
         }
         "getMasterchainInfo" => node
             .get_masterchain_info()
             .await
-            .map(|r| api::map_masterchain_info(&r)),
+            .map(|r| api::map_masterchain_info(&r))?,
         "shards" => {
-            if let Ok(req) = serde_json::from_value::<GetBlockRequest>(payload.params) {
-                node.get_shards(req.seqno as u32).await.map(|r| {
-                    serde_json::json!({
-                        "ok": true,
-                        "result": {
-                            "@type": "blocks.shards",
-                            "shards": r.iter().map(api::map_block_id).collect::<Vec<_>>()
-                        }
-                    })
-                })
-            } else {
-                Err(anyhow::anyhow!("Invalid params for shards"))
-            }
+            let req: GetBlockRequest = parse_params(params, method)?;
+            node.get_shards(req.seqno as u32)
+                .await
+                .map(|r| api::map_shards(&r))?
         }
         "lookupBlock" => {
-            if let Ok(req) = serde_json::from_value::<LookupBlockRequest>(payload.params) {
-                node.lookup_block(
-                    req.workchain,
-                    req.shard,
-                    req.seqno.map(|x| x as u32),
-                    req.lt,
-                    req.unixtime,
-                )
-                .await
-                .map(|r| serde_json::json!({ "ok": true, "result": api::map_block_id(&r) }))
-            } else {
-                Err(anyhow::anyhow!("Invalid params for lookupBlock"))
-            }
+            let req: LookupBlockRequest = parse_params(params, method)?;
+            node.lookup_block(
+                req.workchain,
+                req.shard,
+                req.seqno.map(|x| x as u32),
+                req.lt,
+                req.unixtime,
+            )
+            .await
+            .map(|r| api::map_lookup_block(&r))?
         }
         _ => {
-            return (
+            return Ok((
                 StatusCode::NOT_FOUND,
                 Json(serde_json::json!({
                     "jsonrpc": "2.0",
@@ -214,50 +155,24 @@ pub async fn json_rpc(
                     "code": 404
                 })),
             )
-                .into_response();
+                .into_response());
         }
     };
 
-    match result {
-        Ok(res) => {
-            let mut response = serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": payload.id,
-            });
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": payload.id,
+            "ok": true,
+            "result": res
+        })),
+    )
+        .into_response())
+}
 
-            if let Some(ok) = res.get("ok").and_then(|v| v.as_bool()) {
-                if ok {
-                    response["ok"] = serde_json::json!(true);
-                    response["result"] = res.get("result").cloned().unwrap_or(res);
-                    (StatusCode::OK, Json(response)).into_response()
-                } else {
-                    let code = res.get("code").and_then(|v| v.as_u64()).unwrap_or(500) as u16;
-                    response["ok"] = serde_json::json!(false);
-                    response["error"] = res
-                        .get("error")
-                        .cloned()
-                        .unwrap_or_else(|| serde_json::json!("Unknown error"));
-                    response["code"] = serde_json::json!(code);
-                    (StatusCode::INTERNAL_SERVER_ERROR, Json(response)).into_response()
-                }
-            } else {
-                response["ok"] = serde_json::json!(true);
-                response["result"] = res;
-                (StatusCode::OK, Json(response)).into_response()
-            }
-        }
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": payload.id,
-                "ok": false,
-                "error": e.to_string(),
-                "code": 500
-            })),
-        )
-            .into_response(),
-    }
+fn parse_params<T: DeserializeOwned>(params: Value, method: &str) -> anyhow::Result<T> {
+    serde_json::from_value(params).map_err(|_| anyhow::anyhow!("Invalid params for {}", method))
 }
 
 pub async fn send_boc(
@@ -271,13 +186,12 @@ pub async fn run_get_method(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<RunGetMethodRequest>,
 ) -> Json<Value> {
-    let method_str = match payload.method {
-        Value::String(s) => s,
-        Value::Number(n) => n.to_string(),
-        _ => {
+    let method_str = match parse_method_name(&payload.method) {
+        Ok(s) => s,
+        Err(e) => {
             return Json(serde_json::json!({
                 "ok": false,
-                "error": "Invalid method format",
+                "error": e.to_string(),
                 "code": 400
             }));
         }
@@ -294,13 +208,12 @@ pub async fn run_get_method_std(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<RunGetMethodRequest>,
 ) -> Json<Value> {
-    let method_str = match payload.method {
-        Value::String(s) => s,
-        Value::Number(n) => n.to_string(),
-        _ => {
+    let method_str = match parse_method_name(&payload.method) {
+        Ok(s) => s,
+        Err(e) => {
             return Json(serde_json::json!({
                 "ok": false,
-                "error": "Invalid method format",
+                "error": e.to_string(),
                 "code": 400
             }));
         }
@@ -330,7 +243,7 @@ pub async fn get_address_balance(
 ) -> Json<Value> {
     handle_result(
         node.get_address_balance(payload.address, payload.seqno),
-        |res| serde_json::json!({ "ok": true, "result": res.to_string() }),
+        |res| res.to_string().into(),
     )
     .await
 }
@@ -341,7 +254,7 @@ pub async fn get_address_state(
 ) -> Json<Value> {
     handle_result(
         node.get_address_state(payload.address, payload.seqno),
-        |res| serde_json::json!({ "ok": true, "result": res }),
+        |res| format!("{:?}", res).to_lowercase().into(),
     )
     .await
 }
@@ -369,7 +282,7 @@ pub async fn get_transactions(
             payload.hash,
             payload.to_lt,
         ),
-        |res| serde_json::json!({ "ok": true, "result": res.iter().map(api::map_transaction).collect::<Vec<_>>() }),
+        api::map_transactions,
     )
     .await
 }
@@ -433,16 +346,7 @@ pub async fn get_shards(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,
 ) -> Json<Value> {
-    handle_result(node.get_shards(payload.seqno as u32), |res| {
-        serde_json::json!({
-            "ok": true,
-            "result": {
-                "@type": "blocks.shards",
-                "shards": res.iter().map(api::map_block_id).collect::<Vec<_>>()
-            }
-        })
-    })
-    .await
+    handle_result(node.get_shards(payload.seqno as u32), api::map_shards).await
 }
 
 pub async fn lookup_block(
@@ -457,7 +361,7 @@ pub async fn lookup_block(
             payload.lt,
             payload.unixtime,
         ),
-        |res| serde_json::json!({ "ok": true, "result": api::map_block_id(res) }),
+        api::map_lookup_block,
     )
     .await
 }
@@ -480,10 +384,9 @@ pub async fn get_traces(
 }
 
 pub async fn get_state_source(State(node): State<Arc<LiteNode>>) -> Json<Value> {
-    handle_result(
-        node.get_state_source(),
-        |res| serde_json::json!({ "ok": true, "result": res }),
-    )
+    handle_result(node.get_state_source(), |res| {
+        serde_json::to_value(res).unwrap_or(Value::Null)
+    })
     .await
 }
 
@@ -491,11 +394,15 @@ pub async fn set_state_source(
     State(node): State<Arc<LiteNode>>,
     Json(payload): Json<node::StateSource>,
 ) -> Json<Value> {
-    handle_result(
-        node.set_state_source(payload),
-        |_| serde_json::json!({ "ok": true }),
-    )
-    .await
+    handle_result(node.set_state_source(payload), |_| Value::Null).await
+}
+
+fn parse_method_name(method: &Value) -> anyhow::Result<String> {
+    match method {
+        Value::String(s) => Ok(s.clone()),
+        Value::Number(n) => Ok(n.to_string()),
+        _ => anyhow::bail!("Invalid method format"),
+    }
 }
 
 async fn handle_result<T, F>(
@@ -506,7 +413,10 @@ where
     F: FnOnce(&T) -> Value,
 {
     match result.await {
-        Ok(res) => Json(mapper(&res)),
+        Ok(res) => Json(serde_json::json!({
+            "ok": true,
+            "result": mapper(&res)
+        })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
