@@ -250,7 +250,7 @@ impl Node {
         // 5. Mine one
         let (block_meta, tx_meta) = self.mine_one()?;
 
-        Ok((tx_meta.tx_hash, block_meta.seqno, tx_meta.out_msg_hashes))
+        Ok((hash, block_meta.seqno, tx_meta.out_msg_hashes))
     }
 
     pub fn mine_one(&mut self) -> anyhow::Result<(BlockMeta, TxMeta)> {

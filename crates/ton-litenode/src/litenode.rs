@@ -104,6 +104,9 @@ pub struct LiteNodeMessage {
     pub body: BocBytes,
     pub init_state: BocBytes,
     pub opcode: Option<u32>,
+    pub fwd_fee: u128,
+    pub ihr_fee: u128,
+    pub created_lt: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -136,6 +139,7 @@ pub struct LiteNodeBlockHeader {
 pub struct LiteNodeBlockTransactions {
     pub id: LiteNodeBlockId,
     pub transactions: Vec<LiteNodeTransaction>,
+    pub msg_hash: Option<Hash256>,
 }
 
 #[derive(Debug)]
@@ -576,6 +580,7 @@ fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LiteNodeBlo
     Ok(LiteNodeBlockTransactions {
         id: block_header.block_id(),
         transactions: vec![tx_struct],
+        msg_hash: Some(tx_hash),
     })
 }
 
@@ -734,6 +739,9 @@ pub(crate) fn convert_to_tx_struct(
             body: Vec::new(),
             init_state: Vec::new(),
             opcode: None,
+            fwd_fee: 0,
+            ihr_fee: 0,
+            created_lt: 0,
         }
     };
 
@@ -772,6 +780,11 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LiteN
     let body_hash = Hash256(*body_cell.repr_hash().as_array());
     let body_bytes = Boc::encode(body_cell);
 
+    let (fwd_fee, ihr_fee) = match &msg.info {
+        tycho_types::models::MsgInfo::Int(info) => (info.fwd_fee.into(), info.ihr_fee.into()),
+        _ => (0, 0),
+    };
+
     // Extract opcode (first 32 bits)
     let mut opcode = None;
     let mut body_slice = msg.body;
@@ -799,6 +812,9 @@ fn convert_to_message_struct(meta: &MsgMeta, boc: &[u8]) -> anyhow::Result<LiteN
         body: body_bytes,
         init_state: init_state_bytes,
         opcode,
+        fwd_fee,
+        ihr_fee,
+        created_lt: meta.created_lt.unwrap_or(0),
     })
 }
 
@@ -842,6 +858,7 @@ fn handle_get_block_transactions(
     Ok(LiteNodeBlockTransactions {
         id: block_id,
         transactions: result,
+        msg_hash: None,
     })
 }
 

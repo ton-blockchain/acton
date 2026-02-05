@@ -67,9 +67,9 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
             "account_address": msg.destination.as_ref().map(|a| a.to_string()).unwrap_or_default()
         },
         "value": msg.value.to_string(),
-        "fwd_fee": "0",
-        "ihr_fee": "0",
-        "created_lt": "0",
+        "fwd_fee": msg.fwd_fee.to_string(),
+        "ihr_fee": msg.ihr_fee.to_string(),
+        "created_lt": msg.created_lt.to_string(),
         "body_hash": msg.body_hash.to_hex(),
         "msg_data": {
             "@type": "msg.dataRaw",
@@ -120,13 +120,13 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
         "account_state": match s.state {
             AccountStatus::Nonexist => serde_json::json!({
                 "@type": "uninited.accountState",
-                "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+                "frozen_hash": ""
             }),
             _ => serde_json::json!({
                 "@type": "raw.accountState",
                 "code": encode_optional_boc(s.code.as_ref()),
                 "data": encode_optional_boc(s.data.as_ref()),
-                "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+                "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_hex()).unwrap_or_default()
             }),
         },
         "revision": 0
@@ -200,14 +200,14 @@ pub fn map_masterchain_info(mi: &LiteNodeMasterchainInfo) -> Value {
 }
 
 pub fn map_send_boc_return_hash(bt: &LiteNodeBlockTransactions) -> Value {
-    let hash = bt
-        .transactions
-        .first()
-        .map(|tx| tx.hash.to_base64())
+    let msg_hash = bt
+        .msg_hash
+        .as_ref()
+        .map(|h| h.to_base64())
         .unwrap_or_default();
     serde_json::json!({
         "@type": "ok",
-        "hash": hash
+        "hash": msg_hash
     })
 }
 
