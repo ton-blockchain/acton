@@ -163,6 +163,7 @@ pub fn fetch_remote_shard_account(
         last_trans_hash,
         code_hash: code,
         data_hash: data_boc,
+        frozen_hash: None,
     };
 
     Ok((boc, meta))

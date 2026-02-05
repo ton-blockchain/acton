@@ -42,9 +42,9 @@ pub fn map_transaction(tx: &LiteNodeTransaction) -> Value {
             "lt": tx.transaction_id.lt.to_string(),
             "hash": tx.transaction_id.hash.to_hex()
         },
-        "fee": "0",
-        "storage_fee": "0",
-        "other_fee": "0",
+        "fee": tx.total_fees.to_string(),
+        "storage_fee": tx.storage_fees.to_string(),
+        "other_fee": tx.other_fees.to_string(),
         "in_msg": map_message(&tx.in_msg),
         "out_msgs": tx.out_msgs.iter().map(map_message).collect::<Vec<_>>()
     })
@@ -93,7 +93,7 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
         "block_id": map_block_id(&s.block_id),
         "code": encode_optional_boc(s.code.as_ref()),
         "data": encode_optional_boc(s.data.as_ref()),
-        "frozen_hash": "0000000000000000000000000000000000000000000000000000000000000000", // TODO
+        "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_hex()).unwrap_or_default(),
         "sync_utime": s.sync_utime,
         "state": match s.state {
             AccountStatus::Active => "active",

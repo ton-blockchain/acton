@@ -53,6 +53,7 @@ pub struct LiteNodeAccountState {
     pub block_id: LiteNodeBlockId,
     pub state: AccountStatus,
     pub sync_utime: u64,
+    pub frozen_hash: Option<Hash256>,
 }
 
 impl LiteNodeAccountState {
@@ -66,6 +67,7 @@ impl LiteNodeAccountState {
             block_id,
             state: AccountStatus::Nonexist,
             sync_utime,
+            frozen_hash: None,
         }
     }
 }
@@ -87,6 +89,9 @@ pub struct LiteNodeTransaction {
     pub transaction_id: LiteNodeTransactionId,
     pub in_msg: LiteNodeMessage,
     pub out_msgs: Vec<LiteNodeMessage>,
+    pub total_fees: u128,
+    pub storage_fees: u128,
+    pub other_fees: u128,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -606,6 +611,7 @@ fn handle_get_address_info(
         block_id,
         state: meta.status,
         sync_utime,
+        frozen_hash: meta.frozen_hash,
     })
 }
 
@@ -749,6 +755,9 @@ pub(crate) fn convert_to_tx_struct(
         },
         in_msg: in_msg_struct,
         out_msgs: out_msgs_struct,
+        total_fees: tx.meta.total_fees.unwrap_or(0),
+        storage_fees: tx.meta.storage_fees.unwrap_or(0),
+        other_fees: tx.meta.other_fees.unwrap_or(0),
     })
 }
 

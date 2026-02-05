@@ -79,6 +79,7 @@ pub struct AccountMeta {
     pub last_trans_hash: Option<Hash256>,
     pub code_hash: Option<Hash256>,
     pub data_hash: Option<Hash256>,
+    pub frozen_hash: Option<Hash256>,
 }
 
 impl AccountMeta {
@@ -141,6 +142,8 @@ pub struct TxMeta {
     pub compute_exit_code: Option<i32>,
     pub action_result_code: Option<i32>,
     pub total_fees: Option<u128>,
+    pub storage_fees: Option<u128>,
+    pub other_fees: Option<u128>,
     pub in_msg_hash: Option<Hash256>,
     pub out_msg_hashes: Vec<Hash256>,
     pub block_seqno: Seqno,

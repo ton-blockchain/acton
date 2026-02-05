@@ -205,6 +205,7 @@ impl Node {
                 last_trans_hash: None,
                 code_hash: None,
                 data_hash: None,
+                frozen_hash: None,
             });
 
         let mut globals = Globals::new(config_hash);
@@ -305,6 +306,7 @@ impl Node {
         let mut status = AccountStatus::Nonexist;
         let mut code_hash = None;
         let mut data_hash = None;
+        let mut frozen_hash = None;
 
         let new_account_hash = if let Some(acc_boc) = &exec_result.new_account_boc {
             let h = compute_boc_hash(acc_boc)?;
@@ -334,7 +336,10 @@ impl Node {
                         }
                         AccountStatus::Active
                     }
-                    AccountState::Frozen(_) => AccountStatus::Frozen,
+                    AccountState::Frozen(state) => {
+                        frozen_hash = Some(Hash256(state.0));
+                        AccountStatus::Frozen
+                    }
                 };
             }
             Some(h)
@@ -371,6 +376,20 @@ impl Node {
         let compute_exit_code = exec_result.compute_exit_code();
         let action_result_code = exec_result.action_result_code();
 
+        let info = exec_result.tx.info.load().ok();
+        let (storage_fees, other_fees) =
+            if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
+                let storage: u128 = ord
+                    .storage_phase
+                    .map(|p| p.storage_fees_collected.into())
+                    .unwrap_or(0);
+                let total: u128 = exec_result.tx.total_fees.tokens.into();
+                (storage, total.saturating_sub(storage))
+            } else {
+                (0, exec_result.tx.total_fees.tokens.into())
+            };
+        let total_fees = exec_result.tx.total_fees.tokens.into();
+
         let tx_meta = TxMeta {
             tx_hash,
             account: dst,
@@ -379,7 +398,9 @@ impl Node {
             success: compute_exit_code == Some(0) && action_result_code == Some(0),
             compute_exit_code,
             action_result_code,
-            total_fees: None,
+            total_fees: Some(total_fees),
+            storage_fees: Some(storage_fees),
+            other_fees: Some(other_fees),
             in_msg_hash: Some(msg_hash),
             out_msg_hashes: out_msg_hashes.clone(),
             block_seqno: seqno,
@@ -394,6 +415,7 @@ impl Node {
             last_trans_hash: Some(tx_hash),
             code_hash,
             data_hash,
+            frozen_hash,
         });
 
         let delta = AccountDelta {
