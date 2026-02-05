@@ -38,6 +38,7 @@ pub async fn run_server(
         .route("/v2/jsonRPC", post(json_rpc))
         .route("/v2/v2/jsonRPC", post(json_rpc))
         .route("/v2/sendBoc", post(send_boc))
+        .route("/v2/sendBocReturnHash", post(send_boc_return_hash))
         .route("/v2/runGetMethod", post(run_get_method))
         .route("/v2/runGetMethodStd", post(run_get_method_std))
         .route(
@@ -193,6 +194,15 @@ async fn json_rpc(
                 Err(anyhow::anyhow!("Invalid params for sendBoc"))
             }
         }
+        "sendBocReturnHash" => {
+            if let Ok(req) = serde_json::from_value::<SendBocRequest>(payload.params) {
+                node.send_boc(req.boc)
+                    .await
+                    .map(|r| api::map_send_boc_return_hash(&r))
+            } else {
+                Err(anyhow::anyhow!("Invalid params for sendBocReturnHash"))
+            }
+        }
         "runGetMethod" => {
             if let Ok(req) = serde_json::from_value::<RunGetMethodRequest>(payload.params) {
                 let method_str = match req.method {
@@ -308,9 +318,7 @@ async fn json_rpc(
                     .await
                     .map(|r| api::map_block_transactions(&r))
             } else {
-                Err(anyhow::anyhow!(
-                    "Invalid params for getBlockTransactions"
-                ))
+                Err(anyhow::anyhow!("Invalid params for getBlockTransactions"))
             }
         }
         "getBlockTransactionsExt" => {
@@ -749,6 +757,20 @@ async fn get_block_transactions_ext_post(
 ) -> Json<Value> {
     match node.get_block_transactions(payload.seqno as u32).await {
         Ok(res) => Json(api::map_block_transactions_ext(&res)),
+        Err(e) => Json(serde_json::json!({
+            "ok": false,
+            "error": e.to_string(),
+            "code": 500
+        })),
+    }
+}
+
+async fn send_boc_return_hash(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<SendBocRequest>,
+) -> Json<Value> {
+    match node.send_boc(payload.boc).await {
+        Ok(res) => Json(api::map_send_boc_return_hash(&res)),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),

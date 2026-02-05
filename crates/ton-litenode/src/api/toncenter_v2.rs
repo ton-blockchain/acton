@@ -222,6 +222,21 @@ pub fn map_masterchain_info(mi: &LiteNodeMasterchainInfo) -> Value {
     })
 }
 
+pub fn map_send_boc_return_hash(bt: &LiteNodeBlockTransactions) -> Value {
+    let hash = bt
+        .transactions
+        .first()
+        .map(|tx| tx.hash.to_base64())
+        .unwrap_or_default();
+    serde_json::json!({
+        "ok": true,
+        "result": {
+            "@type": "ok",
+            "hash": hash
+        }
+    })
+}
+
 pub fn map_block_header(bh: &LiteNodeBlockHeader) -> Value {
     serde_json::json!({
         "ok": true,
