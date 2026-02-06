@@ -37,6 +37,7 @@ interface TransactionTreeProps {
   readonly transactions: TransactionInfo[]
   readonly contracts: Map<string, ContractData>
   readonly allContracts: readonly BackendContractInfo[]
+  readonly onContractClick?: (address: string) => void
 }
 
 function TransactionTooltipContent({ data }: { data: TransactionTooltipData }): React.JSX.Element {
@@ -92,6 +93,7 @@ export function TransactionTree({
   transactions,
   contracts,
   allContracts,
+  onContractClick,
 }: TransactionTreeProps): React.JSX.Element {
   const {
     tooltip,
@@ -556,6 +558,7 @@ export function TransactionTree({
             tx={selectedTransaction}
             contracts={contracts}
             allContracts={allContracts}
+            onContractClick={onContractClick}
           />
         </div>
       )}
@@ -568,6 +571,7 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
     return "unknown"
   }
 
+  const displayAddress = address.toString({ testOnly: true })
   const addressStr = address.toString()
   const meta = contracts.get(addressStr)
   if (meta) {
@@ -577,5 +581,5 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
     }
   }
 
-  return `${addressStr.slice(0, 5)}...${addressStr.slice(-5)}`
+  return `${displayAddress.slice(0, 5)}...${displayAddress.slice(-5)}`
 }

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { Address } from "@ton/core";
 import { TonClient } from "./api/client";
 import { FullAccountState, Transaction } from "./types";
 import { AccountInfo } from "./components/AccountInfo";
 import { TransactionList } from "./components/TransactionList";
+import { Breadcrumbs } from "./components/Breadcrumbs";
 import styles from "./TonExplorer.module.css";
 
 interface TonExplorerProps {
@@ -63,6 +65,14 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
 
       {accountState && !loading && (
         <>
+          <Breadcrumbs 
+            items={[
+              { 
+                label: externalAddress ? Address.parse(externalAddress).toString({ testOnly: true }) : "", 
+                isAddress: true 
+              }
+            ]} 
+          />
           <AccountInfo address={externalAddress} state={accountState} />
           <TransactionList 
             transactions={transactions} 

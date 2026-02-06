@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Address } from "@ton/core";
 import { TonClient } from "./explorer/api/client";
 import { TonExplorer } from "./explorer/TonExplorer";
 import { TransactionPage } from "./explorer/pages/TransactionPage";
@@ -52,7 +53,12 @@ export const App: React.FC = () => {
                       if (val.length === 64) {
                         window.location.href = `/tx/${val}`;
                       } else {
-                        window.location.href = `/?address=${val}`;
+                        try {
+                          const formatted = Address.parse(val).toString({ testOnly: true });
+                          window.location.href = `/?address=${formatted}`;
+                        } catch {
+                          window.location.href = `/?address=${val}`;
+                        }
                       }
                     }
                   }}
@@ -97,10 +103,19 @@ const TonExplorerWrapper: React.FC<{ client: TonClient }> = ({ client }) => {
   }, []);
 
   const handleSearch = (addr: string) => {
-    setSearchAddress(addr);
+    let finalAddr = addr;
+    try {
+      if (addr) {
+        finalAddr = Address.parse(addr).toString({ testOnly: true });
+      }
+    } catch {
+      // Keep original if not a valid TON address
+    }
+    
+    setSearchAddress(finalAddr);
     const url = new URL(window.location.href);
-    if (addr) {
-      url.searchParams.set('address', addr);
+    if (finalAddr) {
+      url.searchParams.set('address', finalAddr);
     } else {
       url.searchParams.delete('address');
     }

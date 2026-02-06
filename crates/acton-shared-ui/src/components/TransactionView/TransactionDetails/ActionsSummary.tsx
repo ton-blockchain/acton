@@ -14,6 +14,7 @@ interface ActionsSummaryProps {
   readonly actions: readonly OutAction[]
   readonly contracts: Map<string, ContractData>
   readonly contractAddress: string
+  readonly onContractClick?: (address: string) => void
 }
 
 const getActionIcon = (actionType: OutAction["type"]): React.JSX.Element => {
@@ -80,6 +81,7 @@ const renderActionDetails = (
   action: OutAction,
   contractAddress: string,
   contracts: Map<string, ContractData>,
+  onContractClick?: (address: string) => void,
 ): React.JSX.Element | undefined => {
   switch (action.type) {
     case "sendMsg": {
@@ -107,13 +109,13 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>From:</span>
                   <div className={styles.detailValue}>
-                    <ContractChip address={contractAddress} contracts={contracts} />
+                    <ContractChip address={contractAddress} contracts={contracts} onContractClick={onContractClick} />
                   </div>
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>To:</span>
                   <div className={styles.detailValue}>
-                    <ContractChip address={info.dest.toString()} contracts={contracts} />
+                    <ContractChip address={info.dest.toString()} contracts={contracts} onContractClick={onContractClick} />
                   </div>
                 </div>
                 <div className={styles.detailRow}>
@@ -135,14 +137,14 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>From:</span>
                   <div className={styles.detailValue}>
-                    <ContractChip address={contractAddress} contracts={contracts} />
+                    <ContractChip address={contractAddress} contracts={contracts} onContractClick={onContractClick} />
                   </div>
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>To:</span>
                   <div className={styles.detailValue}>
                     {info.dest ? (
-                      <ContractChip address={info.dest.toString()} contracts={contracts} />
+                      <ContractChip address={info.dest.toString()} contracts={contracts} onContractClick={onContractClick} />
                     ) : (
                       "External"
                     )}
@@ -209,6 +211,7 @@ export function ActionsSummary({
   actions,
   contracts,
   contractAddress,
+  onContractClick,
 }: ActionsSummaryProps): React.JSX.Element {
   const [selectedActionIndex, setSelectedActionIndex] = useState<number | undefined>(undefined)
 
@@ -277,7 +280,11 @@ export function ActionsSummary({
                 enhancedDescription = (
                   <div className={styles.actionDescriptionWithChip}>
                     <span>Internal → </span>
-                    <ContractChip address={info.dest.toString()} contracts={contracts} />
+                    <ContractChip 
+                      address={info.dest.toString()} 
+                      contracts={contracts} 
+                      onContractClick={onContractClick}
+                    />
                   </div>
                 )
               }
@@ -314,7 +321,7 @@ export function ActionsSummary({
 
       {selectedActionIndex !== undefined && selectedActionIndex < actions.length && (
         <div className={styles.detailsContainer}>
-          {renderActionDetails(actions[selectedActionIndex], contractAddress, contracts)}
+          {renderActionDetails(actions[selectedActionIndex], contractAddress, contracts, onContractClick)}
         </div>
       )}
     </div>

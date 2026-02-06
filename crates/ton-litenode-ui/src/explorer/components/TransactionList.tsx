@@ -92,7 +92,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 <TableHead className={styles.tableHeader}>Action</TableHead>
                 <TableHead className={styles.tableHeader}>Address</TableHead>
                 <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>Value</TableHead>
-                <TableHead className={styles.tableHeader}></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -188,11 +187,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     <TableCell className={styles.valueContainer}>
                       <div className={isIncoming ? styles.valuePositive : styles.valueNegative}>
                         {isIncoming ? "+" : "-"} {parseFloat(valueStr).toLocaleString()} TON
-                      </div>
-                    </TableCell>
-                    <TableCell className={styles.txLinkCell}>
-                      <div className={styles.txLink}>
-                        <ExternalLink size={14} />
                       </div>
                     </TableCell>
                   </TableRow>

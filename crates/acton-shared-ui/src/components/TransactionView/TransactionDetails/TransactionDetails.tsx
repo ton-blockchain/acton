@@ -15,12 +15,14 @@ export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
   readonly allContracts: readonly BackendContractInfo[]
+  readonly onContractClick?: (address: string) => void
 }
 
 export function TransactionDetails({
   tx,
   contracts,
   allContracts,
+  onContractClick,
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
 
@@ -72,11 +74,13 @@ export function TransactionDetails({
           <ContractChip
             address={tx.transaction.inMessage?.info.src?.toString()}
             contracts={contracts}
+            onContractClick={onContractClick}
           />
           {" → "}
           <ContractChip
             address={tx.transaction.inMessage?.info.dest?.toString()}
             contracts={contracts}
+            onContractClick={onContractClick}
           />
         </div>
       </div>

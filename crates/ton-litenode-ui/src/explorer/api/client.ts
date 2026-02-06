@@ -12,9 +12,12 @@ export class TonClient {
     }
   }
 
-  async getAddressInformation(address: string): Promise<FullAccountState> {
+  async getAddressInformation(address: string, seqno?: number): Promise<FullAccountState> {
     const url = this.buildUrl(this.v2BaseUrl, "/getAddressInformation");
     url.searchParams.append("address", address);
+    if (seqno !== undefined) {
+      url.searchParams.append("seqno", seqno.toString());
+    }
     const response = await fetch(url.toString());
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "Failed to fetch address information");

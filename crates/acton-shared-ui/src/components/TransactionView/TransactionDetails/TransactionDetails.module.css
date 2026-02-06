@@ -1,9 +1,9 @@
 .transactionDetailsContainer {
   border-radius: var(--border-radius-md);
   background-color: var(--bg-color);
-  margin-bottom: var(--spacing-md);
   border: 1px solid var(--border-color);
   position: relative;
+  line-height: 1.6;
 }
 
 .detailRow {

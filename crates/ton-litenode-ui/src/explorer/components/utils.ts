@@ -31,27 +31,21 @@ export function formatAddress(address: string, shorten: boolean = true): string 
   
   let displayAddress = address;
   try {
-    // If it's a hex address (with or without workchain), convert to user-friendly base64
-    if (address.includes(':') || /^[0-9a-fA-F]+$/.test(address)) {
-      displayAddress = Address.parse(address).toString({ testOnly: true });
-    } else {
-      // Re-parse base64 to ensure it's in testnet format if it's not already
-      displayAddress = Address.parse(address).toString({ testOnly: true });
-    }
+    displayAddress = Address.parse(address).toString({ testOnly: true });
   } catch (e) {
     // If parsing fails, use original address
   }
 
   if (!shorten) return displayAddress;
 
-  // Check if it's a workchain:address format
+  // Standard base64 address or workchain:address format
   if (displayAddress.includes(':')) {
     const [workchain, hash] = displayAddress.split(':');
     return `${workchain}:${hash.slice(0, 6)}…${hash.slice(-6)}`;
   }
-  // Standard base64 address
-  if (displayAddress.length > 16) {
-    return `${displayAddress.slice(0, 8)}…${displayAddress.slice(-8)}`;
+  
+  if (displayAddress.length > 12) {
+    return `${displayAddress.slice(0, 6)}…${displayAddress.slice(-6)}`;
   }
   return displayAddress;
 }

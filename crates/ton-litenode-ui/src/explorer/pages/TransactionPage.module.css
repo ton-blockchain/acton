@@ -1,34 +1,10 @@
 .container {
+  padding: var(--spacing-lg) var(--spacing-md);
   display: flex;
   flex-direction: column;
-  height: 100%;
-  gap: 20px;
+  gap: var(--spacing-lg);
   max-width: 1400px;
   margin: 0 auto;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px 20px 0 20px;
-}
-
-.backButton {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: none;
-  border: none;
-  color: var(--tonscan-link);
-  cursor: pointer;
-  padding: 0;
-  font-size: 14px;
-  width: fit-content;
-}
-
-.backButton:hover {
-  text-decoration: underline;
 }
 
 .title {
@@ -48,15 +24,237 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--spacing-lg);
   flex: 1;
   min-height: 0;
 }
 
-.treeSection {
+.overviewCard {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.overviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.statusSuccess {
+  color: var(--tonscan-success);
+}
+
+.statusError {
+  color: var(--tonscan-error);
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.overviewItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--tonscan-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.value {
+  font-size: 14px;
+  color: var(--tonscan-text-primary);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.valueMono {
+  font-family: var(--font-mono);
+}
+
+.link {
+  color: var(--tonscan-accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.tabsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   flex: 1;
-  width: 100%;
   min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--tonscan-border);
+  padding-bottom: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px;
+  color: var(--tonscan-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.tabActive {
+  color: var(--tonscan-accent);
+  border-bottom-color: var(--tonscan-accent);
+}
+
+.tabContent {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.detailsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailCard {
+  background: var(--tonscan-card-bg);
+  padding: 0;
+  margin-bottom: var(--spacing-sm);
+}
+
+.transactionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.txListItem {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.txListHeader {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.txListBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--tonscan-text-secondary);
+}
+
+.treeSection {
+  width: 100%;
+  min-height: 400px;
+  padding-top: 20px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--tonscan-text-primary);
+}
+
+.valueFlowContainer {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.flowList {
+  display: flex;
+  flex-direction: column;
+}
+
+.flowHeader {
+  display: flex;
+  background: var(--tonscan-row-hover);
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--tonscan-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tonscan-text-secondary);
+  text-transform: uppercase;
+}
+
+.flowRow {
+  display: flex;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--tonscan-border);
+  align-items: center;
+}
+
+.flowRow:last-child {
+  border-bottom: none;
+}
+
+.flowCol {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+}
+
+.changeValue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.contractHeader {
+  padding: 20px;
+  border-bottom: 1px solid var(--tonscan-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .detailsSection {
