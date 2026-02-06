@@ -56,6 +56,7 @@ coverage-clean:
 
 build-ui:
     cd crates/acton-test-ui && bun i && bun run build
+    cd crates/ton-litenode-ui && bun i && bun run build
 
 precommit: build-ui build check
 

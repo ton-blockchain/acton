@@ -23,8 +23,8 @@ depends = []
 [test.mutation]
 
 [networks.localnet]
-v2-url = "http://localhost:3000/api/v2"
-v3-url = "http://localhost:3000/api/v3"
+v2-url = "http://localhost:3010/api/v2"
+v3-url = "http://localhost:3010/api/v3"
 
 [mappings]
 acton = ".acton"

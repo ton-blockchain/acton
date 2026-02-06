@@ -30,6 +30,7 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
             get(get_extended_address_information),
         )
         .route("/v2/getTransactions", get(get_transactions))
+        .route("/v2/getTransactionsBySource", get(get_transactions_by_source))
         .route("/v2/getBlockHeader", get(get_block_header))
         .route("/v2/getBlockTransactions", get(get_block_transactions))
         .route(

@@ -226,7 +226,10 @@ impl Node {
         })
     }
 
-    pub fn send_boc(&mut self, boc: BocBytes) -> anyhow::Result<(Hash256, Seqno, Vec<Hash256>)> {
+    pub fn send_boc(
+        &mut self,
+        boc: BocBytes,
+    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
         // 1. Validate & Store
         let hash = compute_boc_hash(&boc)?;
         tracing::info!(
@@ -250,7 +253,12 @@ impl Node {
         // 5. Mine one
         let (block_meta, tx_meta) = self.mine_one()?;
 
-        Ok((hash, block_meta.seqno, tx_meta.out_msg_hashes))
+        Ok((
+            hash,
+            tx_meta.tx_hash,
+            block_meta.seqno,
+            tx_meta.out_msg_hashes,
+        ))
     }
 
     pub fn mine_one(&mut self) -> anyhow::Result<(BlockMeta, TxMeta)> {
@@ -625,10 +633,12 @@ impl Node {
                     .iter()
                     .filter_map(|h| self.get_message_info(h))
                     .collect();
+                let tx_boc = self.get_cell(&tx.tx_hash).unwrap_or_default();
                 TransactionInfo {
                     meta: tx,
                     in_msg,
                     out_msgs,
+                    tx_boc,
                 }
             })
             .collect()
@@ -680,10 +690,12 @@ impl Node {
             .iter()
             .filter_map(|h| self.get_message_info(h))
             .collect();
+        let tx_boc = self.get_cell(hash).unwrap_or_default();
         Some(TransactionInfo {
             meta: tx,
             in_msg,
             out_msgs,
+            tx_boc,
         })
     }
 

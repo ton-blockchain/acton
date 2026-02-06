@@ -185,6 +185,7 @@ pub struct TransactionInfo {
     pub meta: TxMeta,
     pub in_msg: Option<MessageInfo>,
     pub out_msgs: Vec<MessageInfo>,
+    pub tx_boc: Vec<u8>,
 }
 
 #[derive(Clone, Debug)]

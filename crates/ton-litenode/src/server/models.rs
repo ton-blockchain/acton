@@ -73,3 +73,9 @@ pub struct FaucetRequest {
 pub struct GetTracesQuery {
     pub hash: String,
 }
+
+#[derive(Deserialize)]
+pub struct GetTransactionsBySourceRequest {
+    pub source: String,
+    pub limit: Option<usize>,
+}

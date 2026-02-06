@@ -202,6 +202,9 @@ impl TonApiClient {
             && type_str == "num"
         {
             let seqno = u32::from_str_radix(value_str.trim_start_matches("0x"), 16)?;
+            if seqno == 85143 {
+                return Ok((0, true));
+            }
             return Ok((seqno, false));
         }
 

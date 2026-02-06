@@ -202,6 +202,11 @@ pub(crate) enum Request {
         tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
     },
+    GetTransactionsBySource {
+        source: Addr,
+        limit: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
+    },
     SetStateSource {
         source: StateSource,
         resp: oneshot::Sender<anyhow::Result<()>>,
@@ -416,6 +421,23 @@ impl LiteNode {
         rx.await?
     }
 
+    pub async fn get_transactions_by_source(
+        &self,
+        source_str: String,
+        limit: usize,
+    ) -> anyhow::Result<Vec<LiteNodeTransaction>> {
+        let source = Self::parse_addr(&source_str)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetTransactionsBySource {
+                source,
+                limit,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn set_state_source(&self, source: StateSource) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -553,6 +575,14 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = node.get_traces(&tx_hash);
             let _ = resp.send(res);
         }
+        Request::GetTransactionsBySource {
+            source,
+            limit,
+            resp,
+        } => {
+            let res = handle_get_transactions_by_source(node, source, limit);
+            let _ = resp.send(res);
+        }
         Request::SetStateSource { source, resp } => {
             node.state_source = source;
             let _ = resp.send(Ok(()));
@@ -564,7 +594,7 @@ fn process_loop_request(node: &mut Node, req: Request) {
 }
 
 fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LiteNodeBlockTransactions> {
-    let (tx_hash, seqno, _) = node.send_boc(boc)?;
+    let (msg_hash, tx_hash, seqno, _) = node.send_boc(boc)?;
 
     let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) else {
         anyhow::bail!("Transaction not found after mining")
@@ -580,7 +610,7 @@ fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LiteNodeBlo
     Ok(LiteNodeBlockTransactions {
         id: block_header.block_id(),
         transactions: vec![tx_struct],
-        msg_hash: Some(tx_hash),
+        msg_hash: Some(msg_hash),
     })
 }
 
@@ -642,6 +672,41 @@ fn handle_get_transactions(
         })
         .collect();
     Ok(full_txs)
+}
+
+fn handle_get_transactions_by_source(
+    node: &Node,
+    source: Addr,
+    limit: usize,
+) -> anyhow::Result<Vec<LiteNodeTransaction>> {
+    let mut result = Vec::new();
+
+    // Iterate over all transactions and find those where in_msg.source == source
+    // In a real node this would be indexed, but for dev node we can scan
+    for tx_meta in node.history.tx_by_hash.values() {
+        if let Some(in_msg_hash) = &tx_meta.in_msg_hash {
+            if let Some(msg_meta) = node.history.msg_by_hash.get(in_msg_hash) {
+                if let Some(src) = &msg_meta.src {
+                    if src == &source {
+                        if let Some(tx_info) = node.get_transaction_by_hash(&tx_meta.tx_hash) {
+                            let tx_boc = node.get_cell(&tx_info.meta.tx_hash).unwrap_or_default();
+                            if let Ok(tx_struct) = convert_to_tx_struct(&tx_info, tx_boc) {
+                                result.push(tx_struct);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if result.len() >= limit {
+            break;
+        }
+    }
+
+    // Sort by LT descending
+    result.sort_by(|a, b| b.transaction_id.lt.cmp(&a.transaction_id.lt));
+
+    Ok(result)
 }
 
 fn handle_run_get_method(

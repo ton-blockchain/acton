@@ -1,0 +1,29 @@
+.container {
+  padding: var(--spacing-lg) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.loading {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--tonscan-text-secondary);
+}
+
+.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--tonscan-error);
+  color: var(--tonscan-error);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+}
+
+.empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--tonscan-text-secondary);
+  background-color: var(--tonscan-card-bg);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--tonscan-border);
+}

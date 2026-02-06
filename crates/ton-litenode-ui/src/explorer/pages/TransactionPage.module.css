@@ -1,0 +1,119 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 20px 0 20px;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--tonscan-link);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  width: fit-content;
+}
+
+.backButton:hover {
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--tonscan-text);
+}
+
+.hash {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--tonscan-text-secondary);
+  word-break: break-all;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.treeSection {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.detailsSection {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  overflow: auto;
+  padding: 20px;
+}
+
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 16px;
+  color: var(--tonscan-text-secondary);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  width: 32px;
+  height: 32px;
+}
+
+.errorIcon {
+  color: var(--tonscan-error);
+  width: 48px;
+  height: 48px;
+}
+
+.errorText {
+  color: var(--tonscan-error);
+  font-weight: 500;
+}
+
+.noSelection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--tonscan-text-secondary);
+  text-align: center;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1024px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .detailsSection {
+    height: 500px;
+  }
+}

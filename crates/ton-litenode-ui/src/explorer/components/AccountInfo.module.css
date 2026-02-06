@@ -1,0 +1,122 @@
+.addressTitle {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-xs);
+}
+
+.addressValue {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  color: var(--tonscan-text-primary);
+  word-break: break-all;
+}
+
+.addressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.iconButton {
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-duration-fast);
+}
+
+.iconButton:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-xl);
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--tonscan-border);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.label {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--tonscan-text-primary);
+}
+
+.subValue {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xss) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: capitalize;
+  background-color: rgba(48, 209, 88, 0.1);
+  color: var(--tonscan-success);
+}
+
+.statusUninitialized {
+  background-color: rgba(160, 160, 160, 0.1);
+  color: var(--tonscan-text-secondary);
+}
+
+.detailsGrid {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.tag {
+  background-color: #1a1a1a;
+  color: var(--tonscan-text-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+}
+
+.tooltip {
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  min-width: unset;
+  width: max-content;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tooltip::before,
+.tooltip::after {
+  display: none;
+}

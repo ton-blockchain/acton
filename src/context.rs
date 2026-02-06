@@ -427,6 +427,7 @@ impl Context<'_> {
         self.env
             .fork_net
             .as_ref()
+            .or(self.network.as_ref())
             .unwrap_or(&Network::Testnet)
             .clone()
     }

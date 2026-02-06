@@ -1,6 +1,7 @@
 use crate::storage::{MsgMeta, TraceNode, TransactionInfo};
 use serde_json::value::Value;
 use std::collections::HashMap;
+use base64::Engine;
 
 pub fn map_traces(tn: &TraceNode) -> Value {
     let mut transactions = HashMap::new();
@@ -23,7 +24,17 @@ fn collect_transactions(
 ) {
     let tx_hash = tn.transaction.meta.tx_hash.to_hex();
     if !transactions.contains_key(&tx_hash) {
-        transactions.insert(tx_hash.clone(), map_transaction(&tn.transaction));
+        let mut tx_val = map_transaction(&tn.transaction);
+
+        let child_lts: Vec<String> = tn.children.iter()
+            .map(|c| c.transaction.meta.lt.to_string())
+            .collect();
+
+        if let Some(obj) = tx_val.as_object_mut() {
+            obj.insert("child_transactions".to_string(), serde_json::json!(child_lts));
+        }
+
+        transactions.insert(tx_hash.clone(), tx_val);
         order.push(tx_hash);
     }
     for child in &tn.children {
@@ -71,6 +82,9 @@ fn map_trace_node(tn: &TraceNode) -> Value {
 }
 
 fn map_transaction(tx: &TransactionInfo) -> Value {
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let raw_transaction = b64.encode(&tx.tx_boc);
+
     serde_json::json!({
         "account": tx.meta.account.to_string(),
         "hash": tx.meta.tx_hash.to_hex(),
@@ -102,6 +116,8 @@ fn map_transaction(tx: &TransactionInfo) -> Value {
             "seqno": tx.meta.block_seqno
         },
         "mc_block_seqno": tx.meta.block_seqno,
+        "raw_transaction": raw_transaction,
+        "child_transactions": [], // will be filled if needed, but processTransactions uses this field
     })
 }
 

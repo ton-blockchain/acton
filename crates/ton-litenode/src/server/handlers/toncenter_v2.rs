@@ -123,6 +123,17 @@ pub async fn get_transactions(
     .await
 }
 
+pub async fn get_transactions_by_source(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetTransactionsBySourceRequest>,
+) -> Json<Value> {
+    handle_result(
+        node.get_transactions_by_source(payload.source, payload.limit.unwrap_or(20)),
+        v2::map_transactions,
+    )
+    .await
+}
+
 pub async fn get_block_header(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,

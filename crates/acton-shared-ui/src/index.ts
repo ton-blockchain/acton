@@ -1,3 +1,5 @@
+export * from "./components/ui/Card"
+export * from "./components/ui/Table"
 export * from "./components/AppIcon/AppIcon"
 export * from "./components/CodeSnippet/CodeSnippet"
 export * from "./components/DataBlock/DataBlock"

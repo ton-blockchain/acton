@@ -83,7 +83,7 @@ fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
 pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
     match item {
         TupleItem::Null => Ok(serde_json::json!(["null", null])),
-        TupleItem::Int(i) => Ok(serde_json::json!(["num", i.to_string()])),
+        TupleItem::Int(i) => Ok(serde_json::json!(["num", format!("0x{i:x}")])),
         TupleItem::Cell(c) => Ok(serde_json::json!(["cell", { "bytes": c.to_boc_b64(false)? }])),
         TupleItem::Slice(c) => Ok(serde_json::json!(["slice", { "bytes": c.to_boc_b64(false)? }])),
         TupleItem::Builder(c) => {

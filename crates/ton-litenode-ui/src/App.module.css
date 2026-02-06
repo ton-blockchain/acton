@@ -1,0 +1,113 @@
+.app {
+  min-height: 100vh;
+  background-color: var(--tonscan-bg);
+  color: var(--tonscan-text-primary);
+}
+
+.header {
+  background-color: var(--tonscan-header-bg);
+  border-bottom: 1px solid var(--tonscan-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.headerContent {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-md);
+  height: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+  background-color: var(--tonscan-accent);
+  border-radius: var(--border-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav {
+  display: flex;
+  gap: var(--spacing-lg);
+}
+
+.navItem {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  padding: var(--spacing-sm) 0;
+  transition: color var(--transition-duration-fast);
+}
+
+.navItem:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.navItemActive {
+  color: var(--tonscan-text-primary);
+  border-bottom: 2px solid var(--tonscan-accent);
+}
+
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.searchBox {
+  width: 400px;
+  background-color: var(--tonscan-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  display: flex;
+  align-items: center;
+}
+
+.searchInput {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--tonscan-text-primary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  outline: none;
+}
+
+.themeButton {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--tonscan-border);
+  background-color: var(--tonscan-card-bg);
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-duration-fast);
+}
+
+.themeButton:hover {
+  background-color: var(--tonscan-row-hover);
+  color: var(--tonscan-text-primary);
+}
+
+.main {
+  max-width: 1200px;
+  margin: 0 auto;
+}

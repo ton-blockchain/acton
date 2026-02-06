@@ -2,6 +2,7 @@
   width: 100%;
   border-radius: var(--border-radius-md);
   overflow: hidden;
+  line-height: 1.6;
 }
 
 .treeContainer {
@@ -9,7 +10,6 @@
   height: auto;
   overflow: auto hidden;
   position: relative;
-  background-color: var(--bg-color);
 }
 
 .treeWrapper {
