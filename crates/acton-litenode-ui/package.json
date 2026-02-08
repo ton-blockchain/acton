@@ -31,7 +31,6 @@
     "@acton/shared-ui": "workspace:*",
     "@ton/core": "^0.62.0",
     "@types/react-router-dom": "^5.3.3",
-    "bignumber.js": "^9.3.1",
     "buffer": "^6.0.3",
     "lucide-react": "^0.474.0",
     "react-d3-tree": "^3.6.6",
