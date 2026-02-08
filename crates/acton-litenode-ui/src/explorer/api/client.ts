@@ -47,7 +47,7 @@ export class TonClient {
     return this.request(url, "Failed to fetch traces");
   }
 
-  async getAddressName(address: string): Promise<string | null> {
+  async getAddressName(address: string): Promise<string | undefined> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/address-name");
     url.searchParams.append("address", address);
     return this.request(url, "Failed to fetch address name");

@@ -61,7 +61,7 @@ const buildBackendTransactions = (
   return Object.values(transactionsMap).map((tx) => ({
     lt: tx.lt,
     raw_transaction: tx.raw_transaction || "",
-    parent_transaction: findParentLt(tx.lt) ?? null,
+    parent_transaction: findParentLt(tx.lt),
     child_transactions: tx.child_transactions,
     shard_account_before: "",
     shard_account: "",

@@ -16,8 +16,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@acton/shared-ui": path.resolve(__dirname, "../acton-shared-ui/src"),
-      "@": path.resolve(__dirname, "../acton-shared-ui/src"),
+      "@acton/shared-ui": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
+      "@": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
     },
   },
   build: {

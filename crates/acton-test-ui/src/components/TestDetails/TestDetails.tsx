@@ -23,7 +23,7 @@ import styles from "./TestDetails.module.css"
 
 interface TestDetailsProps {
   readonly test: TestReport
-  readonly trace: Trace | null
+  readonly trace: Trace | undefined
   readonly projectRoot?: string
 }
 
@@ -54,7 +54,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
   const contractNames = useMemo(() => trace?.contracts ?? [], [trace])
   const {contracts: backendContracts} = useContracts(contractNames)
 
-  const ides: IDEConfig[] = [
+  const ides: IDEConfig[] = useMemo(() => [
     {
       name: "Cursor",
       icon: <VscCode />,
@@ -90,11 +90,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       icon: <SiIntellijidea />,
       getUrl: t => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
     },
-  ]
+  ], [])
 
   const selectedIde = useMemo(() => {
     return ides.find(i => i.name === selectedIdeName) || ides[0]
-  }, [selectedIdeName])
+  }, [ides, selectedIdeName])
 
   const handleSelectIde = (ide: IDEConfig) => {
     setSelectedIdeName(ide.name)
@@ -134,7 +134,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       }
 
       if (e.key === ".") {
-        window.location.href = selectedIde.getUrl({
+        globalThis.location.href = selectedIde.getUrl({
           ...test,
           file_path: errorLocation.filePath,
           row: errorLocation.row,
@@ -148,8 +148,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
+    globalThis.addEventListener("keydown", handleKeyDown)
+    return () => globalThis.removeEventListener("keydown", handleKeyDown)
   }, [test, selectedIde, errorLocation])
 
   useEffect(() => {
@@ -167,7 +167,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
 
   const getRelativePath = (path: string) => {
     if (projectRoot && path.startsWith(projectRoot)) {
-      const rel = path.substring(projectRoot.length)
+      const rel = path.slice(projectRoot.length)
       return rel || path
     }
     const parts = path.split("/")
@@ -178,7 +178,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
   }
 
   const formatDuration = (duration: {secs: number; nanos: number}) => {
-    const ms = duration.secs * 1000 + duration.nanos / 1000000
+    const ms = duration.secs * 1000 + duration.nanos / 1_000_000
     if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
     if (ms < 1000) return `${ms.toFixed(1)}ms`
     return `${(ms / 1000).toFixed(2)}s`
@@ -193,8 +193,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     if (!trace || !trace.traces[selectedTraceIndex]) return []
     try {
       return processTransactions(trace.traces[selectedTraceIndex].transactions)
-    } catch (e) {
-      console.error("Failed to process trace", e)
+    } catch (error) {
+      console.error("Failed to process trace", error)
       return []
     }
   }, [trace, selectedTraceIndex])
@@ -203,8 +203,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     if (!test.failed_transactions) return []
     try {
       return processTransactions(test.failed_transactions)
-    } catch (e) {
-      console.error("Failed to process failed transactions", e)
+    } catch (error) {
+      console.error("Failed to process failed transactions", error)
       return []
     }
   }, [test.failed_transactions])
@@ -220,7 +220,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       map.set(addrStr, {
         displayName: name ?? fmt.formatAddress(addrStr),
         address: address,
-        letter: String.fromCharCode(65 + (map.size % 26)),
+        letter: String.fromCodePoint(65 + (map.size % 26)),
         abi: backendContract?.abi,
       } as ContractData)
     }
@@ -229,8 +229,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       for (const [address, name] of Object.entries(trace.wallets)) {
         try {
           addContract(Address.parse(address), name)
-        } catch (e) {
-          console.error("Failed to parse wallet address", address, e)
+        } catch (error) {
+          console.error("Failed to parse wallet address", address, error)
         }
       }
     }
@@ -255,7 +255,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
   }, [parsedTransactions, failedTransactions, trace, backendContracts])
 
   const normalizeAddress = (addr: string | undefined) => {
-    if (!addr) return undefined
+    if (!addr) return
     try {
       return Address.parse(addr).toString()
     } catch {
@@ -285,22 +285,27 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     localStorage.setItem("activeTab", tab)
   }
 
-  const allContracts = [...Object.values(backendContracts)]
+  const allContracts = Object.values(backendContracts)
 
-  if (!test) return null
+  if (!test) return
 
   const getStatusIcon = (status: TestStatus) => {
     switch (status) {
-      case TestStatus.Passed:
+      case TestStatus.Passed: {
         return <FiCheck className={styles.passedIcon} />
-      case TestStatus.Failed:
+      }
+      case TestStatus.Failed: {
         return <FiX className={styles.failedIcon} />
-      case TestStatus.Skipped:
+      }
+      case TestStatus.Skipped: {
         return <FiCircle className={styles.skippedIcon} />
-      case TestStatus.Todo:
+      }
+      case TestStatus.Todo: {
         return <FiMinus className={styles.todoIcon} />
-      default:
-        return null
+      }
+      default: {
+        return
+      }
     }
   }
 
@@ -474,7 +479,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
         const hasVmLog = tx.vm_log_diff && tx.vm_log_diff.trim().length > 0
         const hasExecutorLog = tx.executor_logs && tx.executor_logs.trim().length > 0
 
-        if (!hasVmLog && !hasExecutorLog) return null
+        if (!hasVmLog && !hasExecutorLog) return
 
         return (
           <div key={tx.lt} className={styles.txLogs}>

@@ -10,13 +10,13 @@ import {TestDetails} from "./components/TestDetails/TestDetails"
 
 export const App: React.FC = () => {
   const [reports, setReports] = useState<TestReport[]>([])
-  const [selectedTest, setSelectedTest] = useState<TestReport | null>(null)
-  const [currentTrace, setCurrentTrace] = useState<Trace | null>(null)
+  const [selectedTest, setSelectedTest] = useState<TestReport | undefined>()
+  const [currentTrace, setCurrentTrace] = useState<Trace | undefined>()
   const [projectRoot, setProjectRoot] = useState<string>("")
   const [theme, setTheme] = useState(() => {
     return (
       localStorage.getItem("theme") ||
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      (globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
     )
   })
   const [loading, setLoading] = useState(true)
@@ -49,12 +49,12 @@ export const App: React.FC = () => {
         .then(data => {
           setCurrentTrace(data)
         })
-        .catch(err => {
-          console.error("Failed to fetch trace", err)
-          setCurrentTrace(null)
+        .catch(error => {
+          console.error("Failed to fetch trace", error)
+          setCurrentTrace(undefined)
         })
     } else {
-      setCurrentTrace(null)
+      setCurrentTrace(undefined)
     }
   }, [])
 
@@ -154,17 +154,17 @@ export const App: React.FC = () => {
         </button>
       )}
 
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
         onMouseDown={startResizing}
         onMouseEnter={() => setIsHoveredResizer(true)}
         onMouseLeave={() => setIsHoveredResizer(false)}
         role="separator"
-        tabIndex={0}
         aria-valuenow={isSidebarCollapsed ? 0 : sidebarWidth}
         aria-valuemin={200}
         aria-valuemax={800}
         aria-label="Resize sidebar"
-        className={`${styles.resizer} ${!isSidebarCollapsed ? styles.resizerActive : ""} ${
+        className={`${styles.resizer} ${isSidebarCollapsed ? "" : styles.resizerActive} ${
           isHoveredResizer && !isSidebarCollapsed ? styles.resizerHovered : ""
         }`}
       />

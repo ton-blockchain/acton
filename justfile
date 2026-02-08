@@ -59,7 +59,10 @@ build-ui:
     cd crates/acton-test-ui && bun i && bun run build
     cd crates/acton-litenode-ui && bun i && bun run build
 
-precommit: build-ui build check
+check-ui:
+    bun run lint
+
+precommit: build-ui build check check-ui
 
 clean:
     cargo clean

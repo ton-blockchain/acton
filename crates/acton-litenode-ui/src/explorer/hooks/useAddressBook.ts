@@ -13,7 +13,7 @@ import {
 
 import type { TonClient } from "../api/client";
 
-type AddressName = string | null | undefined;
+type AddressName = string | undefined;
 
 interface AddressBookContextValue {
   readonly getCachedName: (address: string) => AddressName | undefined;
@@ -79,7 +79,7 @@ export const AddressBookProvider: React.FC<{
           return name;
         } catch (error) {
           console.warn(`Failed to fetch name for ${address}:`, error);
-          updateName(address, undefined);
+          updateName(address, undefined as AddressName)
           return;
         } finally {
           pendingRef.current.delete(key);

@@ -21,9 +21,9 @@ export function useContracts(contractNames: string[]) {
             return (await res.json()) as BackendContractInfo
           })
           .then(data => ({name, data}))
-          .catch(err => {
-            console.error(err)
-            return {name, data: null}
+          .catch(error => {
+            console.error(error)
+            return {name, data: undefined}
           }),
       ),
     ).then(results => {

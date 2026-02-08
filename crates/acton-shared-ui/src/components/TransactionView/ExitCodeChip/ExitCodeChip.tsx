@@ -6,7 +6,7 @@ import {EXIT_CODE_DESCRIPTIONS} from "./error-codes"
 
 interface ExitCodeViewerProps {
   readonly exitCode: number | undefined
-  readonly abi?: Abi | null
+  readonly abi?: Abi | undefined
 }
 
 export function ExitCodeChip({exitCode, abi}: ExitCodeViewerProps) {

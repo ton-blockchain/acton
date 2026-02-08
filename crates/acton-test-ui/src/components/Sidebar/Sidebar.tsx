@@ -21,7 +21,7 @@ import styles from "./Sidebar.module.css"
 
 interface SidebarProps {
   readonly reports: TestReport[]
-  readonly selectedTest: TestReport | null
+  readonly selectedTest: TestReport | undefined
   readonly onSelectTest: (test: TestReport) => void
   readonly width?: number
   readonly onCollapse?: () => void
@@ -88,16 +88,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const getStatusIcon = (status: TestStatus) => {
     switch (status) {
-      case TestStatus.Passed:
+      case TestStatus.Passed: {
         return <FiCheck className={styles.passed} />
-      case TestStatus.Failed:
+      }
+      case TestStatus.Failed: {
         return <FiX className={styles.failed} />
-      case TestStatus.Skipped:
+      }
+      case TestStatus.Skipped: {
         return <FiCircle className={styles.skipped} />
-      case TestStatus.Todo:
+      }
+      case TestStatus.Todo: {
         return <FiMinus className={styles.todo} />
-      default:
-        return null
+      }
+      default: {
+        return
+      }
     }
   }
 
@@ -186,7 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <FiX className={styles.failed} />
                   ) : allPassed ? (
                     <FiCheck className={styles.passed} />
-                  ) : null}
+                  ) : undefined}
                 </span>
                 <span className={styles.suiteName}>{suiteName}</span>
                 <span className={styles.suiteCount}>{suiteReports.length}</span>
