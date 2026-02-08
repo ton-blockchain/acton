@@ -4,7 +4,9 @@ use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::Display;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use tycho_types::models::StdAddr;
 
 pub const EMPTY_CELL_BASE64: &str = "te6cckEBAQEAAgAAAEysuc0=";
 
@@ -240,19 +242,7 @@ impl Default for History {
 
 impl History {
     pub fn new() -> Self {
-        let mut address_names = HashMap::new();
-        if let Ok((addr, _)) = tycho_types::models::StdAddr::from_str_ext(
-            "kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil",
-            tycho_types::models::StdAddrFormat::any(),
-        ) {
-            address_names.insert(
-                Addr {
-                    workchain: addr.workchain as i32,
-                    addr: addr.address.0,
-                },
-                "Faucet".to_string(),
-            );
-        }
+        let address_names = Self::build_address_names();
 
         Self {
             conn: None,
@@ -266,20 +256,7 @@ impl History {
     }
 
     pub fn with_conn(conn: Arc<Mutex<Connection>>) -> Self {
-        let mut address_names = HashMap::new();
-        // Set defaultname for the special address
-        if let Ok((addr, _)) = tycho_types::models::StdAddr::from_str_ext(
-            "kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil",
-            tycho_types::models::StdAddrFormat::any(),
-        ) {
-            address_names.insert(
-                Addr {
-                    workchain: addr.workchain as i32,
-                    addr: addr.address.0,
-                },
-                "Faucet".to_string(),
-            );
-        }
+        let address_names = Self::build_address_names();
 
         Self {
             conn: Some(conn),
@@ -290,6 +267,20 @@ impl History {
             msg_to_tx: HashMap::new(),
             address_names,
         }
+    }
+
+    fn build_address_names() -> HashMap<Addr, String> {
+        let mut address_names = HashMap::new();
+        if let Ok(addr) = StdAddr::from_str("kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil") {
+            address_names.insert(
+                Addr {
+                    workchain: addr.workchain as i32,
+                    addr: addr.address.0,
+                },
+                "Faucet".to_string(),
+            );
+        }
+        address_names
     }
 }
 

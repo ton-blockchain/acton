@@ -75,12 +75,6 @@ pub struct GetTracesQuery {
 }
 
 #[derive(Deserialize)]
-pub struct GetTransactionsBySourceRequest {
-    pub source: String,
-    pub limit: Option<usize>,
-}
-
-#[derive(Deserialize)]
 pub struct SetAddressNameRequest {
     pub address: String,
     pub name: String,

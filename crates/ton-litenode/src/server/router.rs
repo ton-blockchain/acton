@@ -50,6 +50,10 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
         .route("/faucet", post(faucet))
         .route("/address-name", get(get_address_name).post(set_address_name))
         .route(
+            "/address-name",
+            get(get_address_name).post(set_address_name),
+        )
+        .route(
             "/state-source",
             get(get_state_source).post(set_state_source),
         )

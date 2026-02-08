@@ -202,11 +202,6 @@ pub(crate) enum Request {
         tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
     },
-    GetTransactionsBySource {
-        source: Addr,
-        limit: usize,
-        resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
-    },
     SetAddressName {
         address: Addr,
         name: String,
@@ -430,23 +425,6 @@ impl LiteNode {
         rx.await?
     }
 
-    pub async fn get_transactions_by_source(
-        &self,
-        source_str: String,
-        limit: usize,
-    ) -> anyhow::Result<Vec<LiteNodeTransaction>> {
-        let source = Self::parse_addr(&source_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetTransactionsBySource {
-                source,
-                limit,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
     pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
         let address = Self::parse_addr(&address_str)?;
         let (resp, rx) = oneshot::channel();
@@ -604,14 +582,6 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::GetTraces { tx_hash, resp } => {
             let res = node.get_traces(&tx_hash);
-            let _ = resp.send(res);
-        }
-        Request::GetTransactionsBySource {
-            source,
-            limit,
-            resp,
-        } => {
-            let res = handle_get_transactions_by_source(node, source, limit);
             let _ = resp.send(res);
         }
         Request::SetAddressName {
