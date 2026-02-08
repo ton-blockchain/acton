@@ -6,11 +6,11 @@ import type { TonClient } from "../api/client"
 type AddressName = string | null
 
 interface AddressBookContextValue {
-  getCachedName: (address: string) => AddressName | undefined
-  fetchName: (address: string) => Promise<AddressName>
-  updateName: (address: string, name: AddressName) => void
-  setAddressName: (address: string, name: string) => Promise<void>
-  version: number
+  readonly getCachedName: (address: string) => AddressName | undefined
+  readonly fetchName: (address: string) => Promise<AddressName>
+  readonly updateName: (address: string, name: AddressName) => void
+  readonly setAddressName: (address: string, name: string) => Promise<void>
+  readonly version: number
 }
 
 const AddressBookContext = createContext<AddressBookContextValue | null>(null)

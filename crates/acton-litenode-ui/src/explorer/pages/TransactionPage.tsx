@@ -8,6 +8,7 @@ import {
   type TransactionInfo,
   TransactionTree,
 } from "@acton/shared-ui"
+import { Address } from "@ton/core"
 import {
   Activity,
   AlertCircle,
@@ -28,20 +29,19 @@ import { Breadcrumbs } from "../components/Breadcrumbs"
 import { normalizeAddress } from "../components/utils"
 import { useAddressBook } from "../hooks/useAddressBook"
 import styles from "./TransactionPage.module.css"
-import { Address } from "@ton/core"
 
 interface TransactionPageProps {
-  client: TonClient
+  readonly client: TonClient
 }
 
 type TabType = "transactions" | "value-flow"
 
 interface ValueFlowItem {
-  address: string
-  before: bigint
-  after: bigint
-  change: bigint
-  fee: bigint
+  readonly address: string
+  readonly before: bigint
+  readonly after: bigint
+  readonly change: bigint
+  readonly fee: bigint
 }
 
 const buildBackendTransactions = (
@@ -75,7 +75,7 @@ const collectSeqnoBounds = (
   let minSeqno = Number.MAX_SAFE_INTEGER
   let maxSeqno = 0
 
-  processed.forEach((t) => {
+  for (const t of processed) {
     const txHash = t.transaction.hash().toString("hex")
     const v3Tx = transactionsMap[txHash]
     const seqno = v3Tx?.mc_block_seqno || 0
@@ -84,13 +84,13 @@ const collectSeqnoBounds = (
       minSeqno = Math.min(minSeqno, seqno)
       maxSeqno = Math.max(maxSeqno, seqno)
     }
-  })
+  }
 
   return { minSeqno, maxSeqno }
 }
 
 export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
-  const { hash } = useParams<{ hash: string }>()
+  const { hash = "" } = useParams<{ hash: string }>()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [traces, setTraces] = useState<TransactionInfo[]>([])
@@ -151,7 +151,6 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
           if (!isActive) return
           setContracts(contractsMap)
 
-          // Fetch Value Flow
           if (addresses.size > 0 && minSeqno !== Number.MAX_SAFE_INTEGER) {
             setLoadingFlow(true)
             const flowItems: ValueFlowItem[] = []
@@ -230,7 +229,8 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
     )
   }
 
-  const traceAddress = traces[0]?.address?.toString() ?? ""
+  const firstTrace = traces[0]
+  const traceAddress = firstTrace?.address?.toString() ?? ""
   const traceAddressDisplay = normalizeAddress(traceAddress)
 
   return (
@@ -245,17 +245,17 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                   path: `/explorer/address/${traceAddressDisplay}`,
                   isAddress: true,
                 },
-                { label: hash || "", isHash: true },
+                { label: hash, isHash: true },
               ]}
             />
             <div className={styles.overviewCard}>
               <div className={styles.overviewHeader}>
                 <div
-                  className={`${styles.status} ${traces[0].transaction.description.type === "generic" && traces[0].transaction.description.computePhase.type === "vm" && traces[0].transaction.description.computePhase.success ? styles.statusSuccess : styles.statusError}`}
+                  className={`${styles.status} ${firstTrace.transaction.description.type === "generic" && firstTrace.transaction.description.computePhase.type === "vm" && firstTrace.transaction.description.computePhase.success ? styles.statusSuccess : styles.statusError}`}
                 >
-                  {traces[0].transaction.description.type === "generic" &&
-                  traces[0].transaction.description.computePhase.type === "vm" &&
-                  traces[0].transaction.description.computePhase.success ? (
+                  {firstTrace.transaction.description.type === "generic" &&
+                  firstTrace.transaction.description.computePhase.type === "vm" &&
+                  firstTrace.transaction.description.computePhase.success ? (
                     <>
                       <CheckCircle2 size={18} /> Confirmed transaction
                     </>
@@ -266,7 +266,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                   )}
                 </div>
                 <div className={styles.value}>
-                  {new Date(traces[0].transaction.now * 1000).toLocaleString()}
+                  {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
                 </div>
               </div>
             </div>

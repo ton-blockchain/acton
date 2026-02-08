@@ -3,17 +3,15 @@ import { useAddressName } from "../hooks/useAddressBook"
 import { formatAddress } from "./utils"
 
 interface AddressLabelProps {
-  address: string
-  shorten?: boolean
-  forceReal?: boolean
-  fallback?: string
-  className?: string
+  readonly address: string
+  readonly shorten?: boolean
+  readonly fallback?: string
+  readonly className?: string
 }
 
 export const AddressLabel: React.FC<AddressLabelProps> = ({
   address,
   shorten = true,
-  forceReal = false,
   fallback = "Unknown",
   className,
 }) => {
@@ -23,6 +21,6 @@ export const AddressLabel: React.FC<AddressLabelProps> = ({
     return <span className={className}>{fallback}</span>
   }
 
-  const label = name || formatAddress(address, shorten, forceReal)
+  const label = name || formatAddress(address, shorten)
   return <span className={className}>{label}</span>
 }

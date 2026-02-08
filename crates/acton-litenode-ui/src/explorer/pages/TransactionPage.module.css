@@ -280,6 +280,27 @@
   font-weight: 500;
 }
 
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: var(--tonscan-bg);
+  border: 1px solid var(--tonscan-border);
+  color: var(--tonscan-text-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-duration-fast);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  width: fit-content;
+  margin-top: var(--spacing-md);
+}
+
+.backButton:hover {
+  background: var(--tonscan-row-hover);
+}
+
 .noSelection {
   display: flex;
   align-items: center;

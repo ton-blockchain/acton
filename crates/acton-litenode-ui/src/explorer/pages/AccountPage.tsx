@@ -2,12 +2,12 @@ import type React from "react"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import type { TonClient } from "../api/client"
+import type { FullAccountState, Transaction } from "../api/types"
 import { AccountInfo } from "../components/AccountInfo"
 import { Breadcrumbs } from "../components/Breadcrumbs"
 import { TransactionList } from "../components/TransactionList"
-import styles from "./AccountPage.module.css"
-import type { FullAccountState, Transaction } from "../api/types"
 import { normalizeAddress } from "../components/utils"
+import styles from "./AccountPage.module.css"
 
 interface AccountPageProps {
   readonly client: TonClient

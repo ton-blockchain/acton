@@ -3,13 +3,13 @@ import { Check, Copy, Edit2, X } from "lucide-react"
 import type React from "react"
 import { useEffect, useState } from "react"
 import type { FullAccountState } from "../api/types"
-import styles from "./AccountInfo.module.css"
 import { useAddressBook, useAddressName } from "../hooks/useAddressBook"
+import styles from "./AccountInfo.module.css"
 import { formatAddress, formatNano } from "./utils"
 
 interface AccountInfoProps {
-  address: string
-  state: FullAccountState
+  readonly address: string
+  readonly state: FullAccountState
 }
 
 export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
@@ -106,12 +106,10 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
                 {customName ? (
                   <span className={styles.customName}>
                     {customName}{" "}
-                    <span className={styles.realAddress}>
-                      ({formatAddress(address, true, true)})
-                    </span>
+                    <span className={styles.realAddress}>({formatAddress(address, true)})</span>
                   </span>
                 ) : (
-                  formatAddress(address, false, true)
+                  formatAddress(address, false)
                 )}
               </div>
               <button type="button" className={styles.iconButton} onClick={handleStartEdit}>
@@ -128,8 +126,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
         <div className={styles.section}>
           <div className={styles.label}>Balance</div>
           <div className={styles.value}>
-            {tonBalance.toLocaleString()} TON{" "}
-            <span className={styles.subValue}>≈ $ {usdBalance}</span>
+            {tonBalance} TON <span className={styles.subValue}>≈ $ {usdBalance}</span>
           </div>
         </div>
         <div className={styles.section}>

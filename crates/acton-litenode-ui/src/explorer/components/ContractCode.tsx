@@ -5,7 +5,7 @@ import { Cell as Cell2, runtime, text } from "ton-assembly"
 import styles from "./ContractCode.module.css"
 
 interface ContractCodeProps {
-  codeBoc: string
+  readonly codeBoc: string
 }
 
 type CodeTab = "decompiled" | "base64" | "hex"

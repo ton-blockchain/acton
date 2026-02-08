@@ -46,11 +46,7 @@ export function formatTimeAgo(utime: number): string {
   return `${day} ${month}, ${time}`
 }
 
-export function formatAddress(
-  address: string,
-  shorten: boolean = true,
-  forceReal: boolean = false,
-): string {
+export function formatAddress(address: string, shorten: boolean = true): string {
   if (!address) return "Unknown"
 
   let displayAddress = address
@@ -62,7 +58,6 @@ export function formatAddress(
 
   if (!shorten) return displayAddress
 
-  // Standard base64 address or workchain:address format
   if (displayAddress.includes(":")) {
     const [workchain, hash] = displayAddress.split(":")
     return `${workchain}:${hash.slice(0, 6)}…${hash.slice(-6)}`

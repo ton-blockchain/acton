@@ -1,19 +1,19 @@
 import { ChevronRight } from "lucide-react"
 import React from "react"
 import { Link } from "react-router-dom"
-import styles from "./Breadcrumbs.module.css"
 import { AddressLabel } from "./AddressLabel"
+import styles from "./Breadcrumbs.module.css"
 import { formatAddress } from "./utils"
 
 export interface BreadcrumbItem {
-  label: string
-  path?: string
-  isAddress?: boolean
-  isHash?: boolean
+  readonly label: string
+  readonly path?: string
+  readonly isAddress?: boolean
+  readonly isHash?: boolean
 }
 
 interface BreadcrumbsProps {
-  items: BreadcrumbItem[]
+  readonly items: BreadcrumbItem[]
 }
 
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {

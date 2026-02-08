@@ -28,10 +28,10 @@ import styles from "./TransactionList.module.css"
 import { formatNano, formatTimeAgo, isSameAddress, parseAddress } from "./utils"
 
 interface TransactionListProps {
-  transactions: Transaction[]
-  accountState: FullAccountState
-  ownerAddress: string
-  onAddressClick?: (addr: string) => void
+  readonly transactions: Transaction[]
+  readonly accountState: FullAccountState
+  readonly ownerAddress: string
+  readonly onAddressClick?: (addr: string) => void
 }
 
 const ITEMS_PER_PAGE = 10
