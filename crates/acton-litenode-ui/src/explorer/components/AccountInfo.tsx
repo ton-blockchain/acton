@@ -1,70 +1,83 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader } from "@acton/shared-ui";
-import { FullAccountState } from "../types";
-import { formatNano, formatAddress, fetchAddressName, updateCachedAddressName, tonClientInstance } from "./utils";
-import styles from "./AccountInfo.module.css";
-import { Copy, Edit2, Check, X } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@acton/shared-ui"
+import { Check, Copy, Edit2, X } from "lucide-react"
+import type React from "react"
+import { useEffect, useState } from "react"
+import type { FullAccountState } from "../types"
+import styles from "./AccountInfo.module.css"
+import {
+  fetchAddressName,
+  formatAddress,
+  formatNano,
+  tonClientInstance,
+  updateCachedAddressName,
+} from "./utils"
 
 interface AccountInfoProps {
-  address: string;
-  state: FullAccountState;
+  address: string
+  state: FullAccountState
 }
 
 export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [customName, setCustomName] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false)
+  const [customName, setCustomName] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (copied) {
-      const timer = setTimeout(() => setCopied(false), 2000);
-      return () => clearTimeout(timer);
+      const timer = setTimeout(() => setCopied(false), 2000)
+      return () => clearTimeout(timer)
     }
-  }, [copied]);
+  }, [copied])
 
   useEffect(() => {
-    fetchAddressName(address).then(name => {
-      setCustomName(name);
-    });
-  }, [address]);
+    fetchAddressName(address).then((name) => {
+      setCustomName(name)
+    })
+  }, [address])
 
   const handleStartEdit = () => {
-    setEditValue(customName || "");
-    setIsEditing(true);
-  };
+    setEditValue(customName || "")
+    setIsEditing(true)
+  }
 
   const handleSave = async () => {
-    if (!tonClientInstance) return;
-    setLoading(true);
+    if (!tonClientInstance) return
+    setLoading(true)
     try {
-      await tonClientInstance.setAddressName(address, editValue);
-      updateCachedAddressName(address, editValue || null);
-      setCustomName(editValue || null);
-      setIsEditing(false);
+      await tonClientInstance.setAddressName(address, editValue)
+      updateCachedAddressName(address, editValue || null)
+      setCustomName(editValue || null)
+      setIsEditing(false)
     } catch (e) {
-      console.error("Failed to save name:", e);
+      console.error("Failed to save name:", e)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const tonBalance = parseFloat(formatNano(state.balance));
-  const usdRate = 1.33; // Mock rate for UI matching
-  const usdBalance = (tonBalance * usdRate).toLocaleString(undefined, {
+  console.log(state.balance)
+  const tonBalance = formatNano(state.balance);
+  const usdRate = 1.33 // Mock rate for UI matching
+  const usdBalance = (state.balance / 1e9 * usdRate).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  });
+  })
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-  };
+    void navigator.clipboard.writeText(address)
+    setCopied(true)
+  }
 
   return (
-    <Card style={{ backgroundColor: "var(--tonscan-card-bg)", border: "1px solid var(--tonscan-border)" }}>
+    <Card
+      style={{
+        backgroundColor: "var(--tonscan-card-bg)",
+        border: "1px solid var(--tonscan-border)",
+      }}
+    >
       <CardHeader>
         <div className={styles.addressTitle}>Address</div>
         <div className={styles.addressHeader}>
@@ -77,9 +90,9 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
                 onChange={(e) => setEditValue(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
-                    void handleSave();
+                    void handleSave()
                   } else if (e.key === "Escape") {
-                    setIsEditing(false);
+                    setIsEditing(false)
                   }
                 }}
                 placeholder="Enter custom name"
@@ -96,7 +109,12 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
             <div className={styles.addressRow}>
               <div className={styles.addressValue}>
                 {customName ? (
-                  <span className={styles.customName}>{customName} <span className={styles.realAddress}>({formatAddress(address, true, true)})</span></span>
+                  <span className={styles.customName}>
+                    {customName}{" "}
+                    <span className={styles.realAddress}>
+                      ({formatAddress(address, true, true)})
+                    </span>
+                  </span>
                 ) : (
                   formatAddress(address, false, true)
                 )}
@@ -115,26 +133,38 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
         <div className={styles.section}>
           <div className={styles.label}>Balance</div>
           <div className={styles.value}>
-            {tonBalance.toLocaleString()} TON <span className={styles.subValue}>≈ $ {usdBalance}</span>
+            {tonBalance.toLocaleString()} TON{" "}
+            <span className={styles.subValue}>≈ $ {usdBalance}</span>
           </div>
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Assets</div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ width: "16px", height: "16px", borderRadius: "50%", backgroundColor: "#22c55e" }}></div>
-            <div className={styles.value}>0.00 USD₮ <span className={styles.subValue}>and more</span></div>
+            <div
+              style={{
+                width: "16px",
+                height: "16px",
+                borderRadius: "50%",
+                backgroundColor: "#22c55e",
+              }}
+            ></div>
+            <div className={styles.value}>
+              0.00 USD₮ <span className={styles.subValue}>and more</span>
+            </div>
           </div>
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Details</div>
           <div className={styles.detailsGrid}>
-            <span className={`${styles.status} ${state.state !== "active" ? styles.statusUninitialized : ""}`}>
+            <span
+              className={`${styles.status} ${state.state !== "active" ? styles.statusUninitialized : ""}`}
+            >
               {state.state}
             </span>
-            <span className={styles.tag}>wallet v4 r2</span>
+            <span className={styles.tag}>unknown</span>
           </div>
         </div>
       </CardContent>
     </Card>
-  );
-};
+  )
+}

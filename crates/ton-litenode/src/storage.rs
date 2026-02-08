@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use tycho_types::models::StdAddr;
+use tycho_types::models::{StdAddr, StdAddrFormat};
 
 pub const EMPTY_CELL_BASE64: &str = "te6cckEBAQEAAgAAAEysuc0=";
 
@@ -271,7 +271,10 @@ impl History {
 
     fn build_address_names() -> HashMap<Addr, String> {
         let mut address_names = HashMap::new();
-        if let Ok(addr) = StdAddr::from_str("kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil") {
+        if let Ok((addr, _)) = StdAddr::from_str_ext(
+            "kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil",
+            StdAddrFormat::any(),
+        ) {
             address_names.insert(
                 Addr {
                     workchain: addr.workchain as i32,

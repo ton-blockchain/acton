@@ -82,8 +82,8 @@
 .realAddress {
   color: var(--tonscan-text-secondary);
   font-weight: 400;
-  font-size: 0.9rem;
-  margin-left: 4px;
+  font-size: var(--font-size-sm);
+  margin-left: var(--spacing-xs);
 }
 
 .actions {

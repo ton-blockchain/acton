@@ -50,6 +50,7 @@
   cursor: pointer;
   padding: var(--spacing-sm) 0;
   transition: color var(--transition-duration-fast);
+  text-transform: uppercase;
 }
 
 .navItem:hover {
@@ -65,46 +66,82 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  margin-left: auto;
+  margin-right: var(--spacing-md);
 }
 
 .searchBox {
-  width: 400px;
-  background-color: var(--tonscan-bg);
-  border: 1px solid var(--tonscan-border);
+  width: 300px;
+  background-color: var(--bg-secondary-color);
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
   padding: var(--spacing-xs) var(--spacing-sm);
   display: flex;
   align-items: center;
+  transition: border-color var(--transition-duration-fast), box-shadow var(--transition-duration-fast);
+}
+
+.searchBox:focus-within {
+  border-color: var(--tonscan-accent);
+  box-shadow: 0 0 0 2px rgba(0, 136, 204, 0.1);
 }
 
 .searchInput {
   width: 100%;
   background: transparent;
   border: none;
-  color: var(--tonscan-text-primary);
+  color: var(--text-primary);
   padding: var(--spacing-xs) var(--spacing-sm);
-  font-family: var(--font-mono);
+  font-family: var(--font-family);
   font-size: var(--font-size-sm);
   outline: none;
 }
 
 .themeButton {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--tonscan-border);
-  background-color: var(--tonscan-card-bg);
-  color: var(--tonscan-text-secondary);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--border-radius-full);
+  border: none;
+  background-color: transparent;
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all var(--transition-duration-fast);
+  padding: 0;
+  overflow: hidden;
 }
 
 .themeButton:hover {
-  background-color: var(--tonscan-row-hover);
-  color: var(--tonscan-text-primary);
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+  border-color: var(--tonscan-accent);
+}
+
+.themeIconWrapper {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+.themeIcon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: all var(--transition-duration-normal) cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+}
+
+.themeIcon.active {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.themeSection {
+  display: flex;
+  align-items: center;
 }
 
 .main {
