@@ -1,7 +1,7 @@
 import { Address } from "@ton/core";
 import { AlertCircle, History, Search, X } from "lucide-react";
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import styles from "./ExplorerIndexPage.module.css";
@@ -13,7 +13,7 @@ export const ExplorerIndexPage: React.FC = () => {
   const [history, setHistory] = useState<string[]>([]);
   const [isFocused, setIsFocused] = useState(false);
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,36 +27,36 @@ export const ExplorerIndexPage: React.FC = () => {
     }
   }, []);
 
-  const addToHistory = (address: string) => {
+  const addToHistory = useCallback((address: string) => {
     const newHistory = [address, ...history.filter((a) => a !== address)].slice(
       0,
       5,
     );
     setHistory(newHistory);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
-  };
+  }, [history]);
 
-  const removeFromHistory = (e: React.MouseEvent, address: string) => {
+  const removeFromHistory = useCallback((e: React.MouseEvent, address: string) => {
     e.stopPropagation();
     const newHistory = history.filter((a) => a !== address);
     setHistory(newHistory);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
-  };
+  }, [history]);
 
-  const handleSearch = (address: string) => {
+  const handleSearch = useCallback((address: string) => {
     const trimmed = address.trim();
     if (!trimmed) return;
 
     try {
       Address.parse(trimmed);
-      setError(null);
+      setError(undefined);
       addToHistory(trimmed);
       setShowHistoryDropdown(false);
-      navigate(`/explorer/address/${trimmed}`);
+      void navigate(`/explorer/address/${trimmed}`);
     } catch {
       setError("Invalid address, only standard internal address is allowed");
     }
-  };
+  }, [addToHistory, navigate]);
 
   return (
     <div className={styles.inputPage}>
@@ -80,7 +80,7 @@ export const ExplorerIndexPage: React.FC = () => {
               value={input}
               onChange={(e) => {
                 setInput(e.target.value);
-                if (error) setError(null);
+                if (error) setError(undefined);
               }}
               onKeyDown={(e) => e.key === "Enter" && handleSearch(input)}
               onFocus={() => {
@@ -99,23 +99,26 @@ export const ExplorerIndexPage: React.FC = () => {
           </div>
 
           {showHistoryDropdown && history.length > 0 && !error && (
-            <ul
+            <div
               className={styles.historyDropdown}
-              onMouseDown={(e) => e.preventDefault()}
             >
               {history.map((addr) => (
-                <li
+                <div
                   key={addr}
                   className={styles.historyItem}
-                  onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
-                  onClick={() => handleSearch(addr)}
                 >
-                  <History
-                    size={16}
-                    className={styles.historyItemIcon}
-                    aria-hidden="true"
-                  />
-                  <span className={styles.historyAddr}>{addr}</span>
+                  <button
+                    type="button"
+                    className={styles.historyItemButton}
+                    onClick={() => handleSearch(addr)}
+                  >
+                    <History
+                      size={16}
+                      className={styles.historyItemIcon}
+                      aria-hidden="true"
+                    />
+                    <span className={styles.historyAddr}>{addr}</span>
+                  </button>
                   <button
                     type="button"
                     className={styles.historyItemDeleteButton}
@@ -124,9 +127,9 @@ export const ExplorerIndexPage: React.FC = () => {
                   >
                     <X size={14} />
                   </button>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
 
           {error && (

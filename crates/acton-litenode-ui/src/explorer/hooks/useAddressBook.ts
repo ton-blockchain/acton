@@ -2,6 +2,7 @@ import { Address } from "@ton/core";
 import type React from "react";
 import {
   createContext,
+  createElement,
   useCallback,
   useContext,
   useEffect,
@@ -12,7 +13,7 @@ import {
 
 import type { TonClient } from "../api/client";
 
-type AddressName = string | null;
+type AddressName = string | null | undefined;
 
 interface AddressBookContextValue {
   readonly getCachedName: (address: string) => AddressName | undefined;
@@ -22,7 +23,7 @@ interface AddressBookContextValue {
   readonly version: number;
 }
 
-const AddressBookContext = createContext<AddressBookContextValue | null>(null);
+const AddressBookContext = createContext<AddressBookContextValue | undefined>(undefined);
 
 const normalizeKey = (address: string) => {
   try {
@@ -56,17 +57,17 @@ export const AddressBookProvider: React.FC<{
   const setAddressName = useCallback(
     async (address: string, name: string) => {
       await client.setAddressName(address, name);
-      updateName(address, name || null);
+      updateName(address, name || undefined);
     },
     [client, updateName],
   );
 
   const fetchName = useCallback(
     async (address: string) => {
-      if (!address) return null;
+      if (!address) return;
       const key = normalizeKey(address);
       if (cacheRef.current.has(key)) {
-        return cacheRef.current.get(key) ?? null;
+        return cacheRef.current.get(key);
       }
       const pending = pendingRef.current.get(key);
       if (pending) return pending;
@@ -78,8 +79,8 @@ export const AddressBookProvider: React.FC<{
           return name;
         } catch (error) {
           console.warn(`Failed to fetch name for ${address}:`, error);
-          updateName(address, null);
-          return null;
+          updateName(address, undefined);
+          return;
         } finally {
           pendingRef.current.delete(key);
         }
@@ -102,10 +103,10 @@ export const AddressBookProvider: React.FC<{
     [fetchName, getCachedName, setAddressName, updateName, version],
   );
 
-  return (
-    <AddressBookContext.Provider value={value}>
-      {children}
-    </AddressBookContext.Provider>
+  return createElement(
+    AddressBookContext.Provider,
+    { value },
+    children,
   );
 };
 
@@ -120,7 +121,7 @@ export const useAddressBook = () => {
 export const useAddressName = (address: string) => {
   const { getCachedName, fetchName, version } = useAddressBook();
   const [name, setName] = useState<AddressName>(
-    () => getCachedName(address) ?? null,
+    () => getCachedName(address),
   );
 
   useEffect(() => {
@@ -132,13 +133,13 @@ export const useAddressName = (address: string) => {
 
   useEffect(() => {
     if (!address) {
-      setName(null);
+      setName(undefined);
       return;
     }
     let isActive = true;
     const cached = getCachedName(address);
     if (cached === undefined) {
-      fetchName(address).then((next) => {
+      void fetchName(address).then((next) => {
         if (isActive) setName(next);
       });
     }

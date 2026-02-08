@@ -49,19 +49,19 @@ interface ValueFlowItem {
 const buildBackendTransactions = (
   transactionsMap: Record<string, V3Transaction>,
 ): BackendTransaction[] => {
-  const findParentLt = (targetLt: string): string | null => {
+  const findParentLt = (targetLt: string): string | undefined => {
     for (const tx of Object.values(transactionsMap)) {
       if (tx.child_transactions?.includes(targetLt)) {
         return tx.lt;
       }
     }
-    return null;
+    return undefined;
   };
 
   return Object.values(transactionsMap).map((tx) => ({
     lt: tx.lt,
     raw_transaction: tx.raw_transaction || "",
-    parent_transaction: findParentLt(tx.lt),
+    parent_transaction: findParentLt(tx.lt) ?? null,
     child_transactions: tx.child_transactions,
     shard_account_before: "",
     shard_account: "",
@@ -99,7 +99,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
   const [contracts, setContracts] = useState<Map<string, ContractData>>(
     new Map(),
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>();
   const [activeTab, setActiveTab] = useState<TabType>("value-flow");
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([]);
   const [loadingFlow, setLoadingFlow] = useState(false);
@@ -116,7 +116,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
 
     const fetchTrace = async () => {
       setLoading(true);
-      setError(null);
+      setError(undefined);
       try {
         const data = await client.getTraces(hash);
 
@@ -151,7 +151,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                 contractsMap.set(addr, {
                   displayName: customName || fmt.formatAddress(displayAddr),
                   address: Address.parse(addr),
-                  letter: String.fromCharCode(nextLetterCode++),
+                  letter: String.fromCodePoint(nextLetterCode++),
                 });
               }),
           );
@@ -238,7 +238,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
         <p className={styles.errorText}>{error}</p>
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => void navigate(-1)}
           className={styles.backButton}
         >
           <ArrowLeft size={16} /> Go Back
@@ -340,7 +340,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                                   <TrendingUp size={14} />
                                 ) : item.change < 0n ? (
                                   <TrendingDown size={14} />
-                                ) : null}
+                                ) : undefined}
                                 {fmt.formatCurrency(item.change)}
                               </div>
                             </div>

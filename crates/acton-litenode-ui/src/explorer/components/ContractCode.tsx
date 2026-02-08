@@ -16,7 +16,7 @@ export const ContractCode: React.FC<ContractCodeProps> = ({ codeBoc }) => {
   const [activeTab, setActiveTab] = useState<CodeTab>("decompiled");
 
   const codeData = useMemo(() => {
-    if (!codeBoc) return null;
+    if (!codeBoc) return;
     try {
       const buf = Buffer.from(codeBoc, "base64");
       const cell = Cell2.fromBoc(buf)[0];

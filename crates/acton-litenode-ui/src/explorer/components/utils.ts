@@ -1,16 +1,16 @@
 import { Address } from "@ton/core";
-export function parseAddress(address: string): Address | null {
-  if (!address) return null;
+export function parseAddress(address: string): Address | undefined {
+  if (!address) return undefined;
   try {
     return Address.parse(address);
   } catch {
-    return null;
+    return undefined;
   }
 }
 
-export function toTestnetAddress(address: string): string | null {
+export function toTestnetAddress(address: string): string | undefined {
   const parsed = parseAddress(address);
-  return parsed ? parsed.toString({ testOnly: true }) : null;
+  return parsed ? parsed.toString({ testOnly: true }) : undefined;
 }
 
 export function normalizeAddress(address: string): string {

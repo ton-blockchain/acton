@@ -118,20 +118,29 @@
 .historyItem {
   display: flex;
   align-items: center;
-  padding: var(--spacing-mds) var(--spacing-md);
-  cursor: pointer;
   transition: background-color var(--transition-duration-fast);
   border-bottom: 1px solid var(--border-color);
   width: 100%;
+}
+
+.historyItemButton {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  padding: var(--spacing-mds) var(--spacing-md);
+  cursor: pointer;
+  background: none;
+  border: none;
   text-align: left;
+  width: 100%;
+}
+
+.historyItemButton:hover {
+  background-color: var(--hover-bg);
 }
 
 .historyItem:last-child {
   border-bottom: none;
-}
-
-.historyItem:hover {
-  background-color: var(--hover-bg);
 }
 
 .historyItemIcon {

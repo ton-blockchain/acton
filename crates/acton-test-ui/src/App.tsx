@@ -92,38 +92,38 @@ export const App: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    fetch("/api/config")
-      .then(res => res.json())
-      .then((data: {project_root: string}) => {
-        setProjectRoot(data.project_root)
+    void fetch("/api/config")
+      .then(async (res) => (await res.json()) as {project_root: string})
+      .then((data) => {
+        setProjectRoot(data.project_root);
       })
-      .catch(err => {
-        console.error("Failed to fetch config", err)
-      })
+      .catch((error) => {
+        console.error("Failed to fetch config", error);
+      });
 
-    fetch("/api/reports")
-      .then(res => res.json())
-      .then((data: TestReport[]) => {
-        setReports(data)
+    void fetch("/api/reports")
+      .then(async (res) => (await res.json()) as TestReport[])
+      .then((data) => {
+        setReports(data);
         if (data.length > 0 && !selectedTest) {
-          const savedTestId = localStorage.getItem("selectedTest")
-          let testToSelect = data[0]
+          const savedTestId = localStorage.getItem("selectedTest");
+          let testToSelect = data[0];
 
           if (savedTestId) {
-            const found = data.find(t => `${t.suite_name}::${t.name}` === savedTestId)
+            const found = data.find((t) => `${t.suite_name}::${t.name}` === savedTestId);
             if (found) {
-              testToSelect = found
+              testToSelect = found;
             }
           }
-          handleSelectTest(testToSelect)
+          handleSelectTest(testToSelect);
         }
-        setLoading(false)
+        setLoading(false);
       })
-      .catch(err => {
-        console.error("Failed to fetch reports", err)
-        setLoading(false)
-      })
-  }, [handleSelectTest, selectedTest])
+      .catch((error) => {
+        console.error("Failed to fetch reports", error);
+        setLoading(false);
+      });
+  }, [handleSelectTest, selectedTest]);
 
   if (loading && reports.length === 0) {
     return <div className={styles.loadingContainer}>Loading...</div>

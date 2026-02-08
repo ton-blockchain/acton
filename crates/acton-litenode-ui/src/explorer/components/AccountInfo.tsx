@@ -16,7 +16,7 @@ interface AccountInfoProps {
 
 export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [customName, setCustomName] = useState<string | null>(null);
+  const [customName, setCustomName] = useState<string | undefined>();
   const [editValue, setEditValue] = useState("");
   const [loading, setLoading] = useState(false);
   const { setAddressName } = useAddressBook();
@@ -32,7 +32,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
   }, [copied]);
 
   useEffect(() => {
-    setCustomName(resolvedName);
+    setCustomName(resolvedName || undefined);
   }, [resolvedName]);
 
   const handleStartEdit = () => {
@@ -44,7 +44,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
     setLoading(true);
     try {
       await setAddressName(address, editValue || "");
-      setCustomName(editValue || null);
+      setCustomName(editValue || undefined);
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to save name:", error);
@@ -92,7 +92,9 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
               <button
                 type="button"
                 className={styles.iconButton}
-                onClick={handleSave}
+                onClick={() => {
+                  void handleSave();
+                }}
                 disabled={loading}
               >
                 <Check size={18} className={styles.saveIcon} />

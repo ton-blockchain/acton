@@ -52,7 +52,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"history" | "contract">("history");
   const [currentPage, setCurrentPage] = useState(1);
-  const [hoveredAddress, setHoveredAddress] = useState<string | null>(null);
+  const [hoveredAddress, setHoveredAddress] = useState<string | undefined>();
 
   const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -146,7 +146,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 const opcode = isIncoming
                   ? tx.in_msg.opcode
                   : tx.out_msgs.find((m) => m.opcode)?.opcode;
-                const displayOpcode = opcode ? opcode : null;
+                const displayOpcode = opcode ?? undefined;
 
                 const isAddressHovered =
                   hoveredAddress && address
@@ -157,7 +157,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   <TableRow
                     key={tx.hash}
                     className={`${styles.row} ${styles.clickableRow}`}
-                    onClick={() => navigate(`/tx/${tx.hash}`)}
+                    onClick={() => {
+                      void navigate(`/tx/${tx.hash}`);
+                    }}
                   >
                     <TableCell className={styles.time}>
                       {formatTimeAgo(tx.utime)}
@@ -186,10 +188,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                             if (address) onAddressClick?.(address);
                           }}
                           onMouseEnter={() =>
-                            address && setHoveredAddress(address)
-                          }
-                          onMouseLeave={() => setHoveredAddress(null)}
-                        >
+                          address && setHoveredAddress(address)
+                        }
+                        onMouseLeave={() => setHoveredAddress(undefined)}
+                      >
                           <AddressLabel
                             address={address}
                             fallback={displayAddressFallback}

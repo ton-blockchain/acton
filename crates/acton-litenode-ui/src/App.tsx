@@ -136,10 +136,10 @@ const HeaderSearch: React.FC = () => {
             if (e.key === "Enter") {
               const val = (e.target as HTMLInputElement).value;
               if (val.length === 64) {
-                navigate(`/tx/${val}`);
+                void navigate(`/tx/${val}`);
               } else {
                 const formatted = toTestnetAddress(val);
-                navigate(`/explorer/address/${formatted ?? val}`);
+                void navigate(`/explorer/address/${formatted ?? val}`);
               }
             }
           }}

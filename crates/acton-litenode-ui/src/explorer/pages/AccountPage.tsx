@@ -18,12 +18,12 @@ interface AccountPageProps {
 export const AccountPage: React.FC<AccountPageProps> = ({ client }) => {
   const { address = "" } = useParams<{ address: string }>();
   const navigate = useNavigate();
-  const [accountState, setAccountState] = useState<FullAccountState | null>(
-    null,
+  const [accountState, setAccountState] = useState<FullAccountState | undefined>(
+
   );
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>();
 
   const formattedAddress = useMemo(() => normalizeAddress(address), [address]);
 
@@ -31,12 +31,12 @@ export const AccountPage: React.FC<AccountPageProps> = ({ client }) => {
     let isActive = true;
     const load = async () => {
       if (!formattedAddress) {
-        setAccountState(null);
+        setAccountState(undefined);
         setTransactions([]);
         return;
       }
       setLoading(true);
-      setError(null);
+      setError(undefined);
       try {
         const [state, txs] = await Promise.all([
           client.getAddressInformation(formattedAddress),
@@ -48,7 +48,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({ client }) => {
       } catch (error_) {
         if (!isActive) return;
         setError(error_ instanceof Error ? error_.message : "An error occurred");
-        setAccountState(null);
+        setAccountState(undefined);
         setTransactions([]);
       } finally {
         if (isActive) setLoading(false);
@@ -64,9 +64,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({ client }) => {
   const handleSearch = (addr: string) => {
     const finalAddr = addr ? normalizeAddress(addr) : "";
     if (finalAddr) {
-      navigate(`/explorer/address/${finalAddr}`);
+      void navigate(`/explorer/address/${finalAddr}`);
     } else {
-      navigate("/explorer");
+      void navigate("/explorer");
     }
   };
 
