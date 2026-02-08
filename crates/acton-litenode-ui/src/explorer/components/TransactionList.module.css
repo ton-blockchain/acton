@@ -1,3 +1,34 @@
+.historyHeaderRow {
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.historyContent {
+  padding: 0;
+}
+
+.addressWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flexSpacer {
+  flex: 1;
+}
+
+.tokenIcon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.nftIcon {
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+}
+
 .tableCard {
   background-color: var(--tonscan-card-bg) !important;
   border: 1px solid var(--tonscan-border) !important;

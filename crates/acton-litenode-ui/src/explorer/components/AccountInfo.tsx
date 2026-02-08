@@ -71,12 +71,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
   }
 
   return (
-    <Card
-      style={{
-        backgroundColor: "var(--tonscan-card-bg)",
-        border: "1px solid var(--tonscan-border)",
-      }}
-    >
+    <Card className={styles.card}>
       <CardHeader>
         <div className={styles.addressTitle}>Address</div>
         <div className={styles.addressHeader}>
@@ -146,15 +141,8 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Assets</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div
-              style={{
-                width: "16px",
-                height: "16px",
-                borderRadius: "50%",
-                backgroundColor: "#22c55e",
-              }}
-            ></div>
+          <div className={styles.assetRow}>
+            <div className={styles.assetIcon}></div>
             <div className={styles.value}>
               0.00 USD₮ <span className={styles.subValue}>and more</span>
             </div>

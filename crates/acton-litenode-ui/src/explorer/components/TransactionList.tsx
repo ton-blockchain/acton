@@ -20,7 +20,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import type React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import type { FullAccountState, Transaction } from "../types"
 import { ContractCode } from "./ContractCode"
@@ -39,7 +39,6 @@ const ITEMS_PER_PAGE = 10
 export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   accountState,
-  ownerAddress,
   onAddressClick,
 }) => {
   const navigate = useNavigate()
@@ -85,13 +84,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           <RefreshCw size={14} /> History
         </button>
         <div className={styles.tab}>
-          <div
-            style={{ width: 14, height: 14, borderRadius: "50%", border: "1px solid currentColor" }}
-          />{" "}
-          Tokens
+          <div className={styles.tokenIcon} /> Tokens
         </div>
         <div className={styles.tab}>
-          <div style={{ width: 14, height: 14, border: "1px solid currentColor" }} /> NFTs
+          <div className={styles.nftIcon} /> NFTs
         </div>
         <button
           type="button"
@@ -100,7 +96,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         >
           <MessageSquare size={14} /> Contract
         </button>
-        <div style={{ flex: 1 }} />
+        <div className={styles.flexSpacer} />
         {activeTab === "history" && (
           <>
             <div className={styles.tab}>
@@ -114,10 +110,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       </div>
 
       {activeTab === "history" ? (
-        <CardContent style={{ padding: 0 }}>
+        <CardContent className={styles.historyContent}>
           <Table>
             <TableHeader>
-              <TableRow style={{ borderBottom: "1px solid var(--tonscan-border)" }}>
+              <TableRow className={styles.historyHeaderRow}>
                 <TableHead className={styles.tableHeader}>Time</TableHead>
                 <TableHead className={styles.tableHeader}>Action</TableHead>
                 <TableHead className={styles.tableHeader}>Address</TableHead>
@@ -184,7 +180,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div className={styles.addressWrapper}>
                         <button
                           type="button"
                           className={`${styles.address} ${isAddressHovered ? styles.addressHighlighted : ""}`}

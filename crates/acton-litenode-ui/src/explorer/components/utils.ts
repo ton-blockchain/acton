@@ -14,7 +14,7 @@ export function setTonClientInstance(client: TonClient) {
 export function formatNano(nano: string | number): string {
   const n = typeof nano === "string" ? BigInt(nano) : BigInt(nano)
   const ton = Number(n) / 1e9
-  return ton.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 9 })
+  return ton.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 5 })
 }
 
 export function formatTime(utime: number): string {

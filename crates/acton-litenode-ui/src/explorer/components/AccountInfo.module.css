@@ -1,3 +1,21 @@
+.card {
+  background-color: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+}
+
+.assetIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #22c55e;
+}
+
+.assetRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .addressTitle {
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);
