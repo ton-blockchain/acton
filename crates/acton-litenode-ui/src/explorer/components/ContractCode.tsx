@@ -46,24 +46,27 @@ export const ContractCode: React.FC<ContractCodeProps> = ({ codeBoc }) => {
   return (
     <div className={styles.container}>
       <div className={styles.tabs}>
-        <div
+        <button
+          type="button"
           className={`${styles.tab} ${activeTab === "decompiled" ? styles.tabActive : ""}`}
           onClick={() => setActiveTab("decompiled")}
         >
           Decompiled
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`${styles.tab} ${activeTab === "base64" ? styles.tabActive : ""}`}
           onClick={() => setActiveTab("base64")}
         >
           Base64
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
           className={`${styles.tab} ${activeTab === "hex" ? styles.tabActive : ""}`}
           onClick={() => setActiveTab("hex")}
         >
           HEX
-        </div>
+        </button>
       </div>
 
       <div className={styles.codeBlock}>

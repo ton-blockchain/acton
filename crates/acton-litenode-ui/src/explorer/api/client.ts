@@ -34,7 +34,7 @@ export class TonClient {
     return data.result
   }
 
-  async getTraces(hash: string): Promise<any> {
+  async getTraces(hash: string): Promise<unknown> {
     const url = this.buildUrl(this.v3BaseUrl, "/traces")
     url.searchParams.append("hash", hash)
     const response = await fetch(url.toString())

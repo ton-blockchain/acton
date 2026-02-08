@@ -122,6 +122,8 @@
   cursor: pointer;
   transition: background-color var(--transition-duration-fast);
   border-bottom: 1px solid var(--border-color);
+  width: 100%;
+  text-align: left;
 }
 
 .historyItem:last-child {

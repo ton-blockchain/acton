@@ -58,10 +58,9 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
     }
   }
 
-  console.log(state.balance)
-  const tonBalance = formatNano(state.balance);
+  const tonBalance = formatNano(state.balance)
   const usdRate = 1.33 // Mock rate for UI matching
-  const usdBalance = (state.balance / 1e9 * usdRate).toLocaleString(undefined, {
+  const usdBalance = ((Number(state.balance) / 1e9) * usdRate).toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
@@ -96,12 +95,20 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
                   }
                 }}
                 placeholder="Enter custom name"
-                autoFocus
               />
-              <button className={styles.iconButton} onClick={handleSave} disabled={loading}>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={handleSave}
+                disabled={loading}
+              >
                 <Check size={18} className={styles.saveIcon} />
               </button>
-              <button className={styles.iconButton} onClick={() => setIsEditing(false)}>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={() => setIsEditing(false)}
+              >
                 <X size={18} className={styles.cancelIcon} />
               </button>
             </div>
@@ -119,10 +126,10 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
                   formatAddress(address, false, true)
                 )}
               </div>
-              <button className={styles.iconButton} onClick={handleStartEdit}>
+              <button type="button" className={styles.iconButton} onClick={handleStartEdit}>
                 <Edit2 size={16} />
               </button>
-              <button className={styles.iconButton} onClick={copyToClipboard}>
+              <button type="button" className={styles.iconButton} onClick={copyToClipboard}>
                 {copied ? <Check size={16} className={styles.saveIcon} /> : <Copy size={16} />}
               </button>
             </div>

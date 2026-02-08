@@ -22,6 +22,8 @@
   cursor: pointer;
   border-radius: calc(var(--border-radius-md) - 2px);
   transition: all var(--transition-duration-fast);
+  background: none;
+  border: none;
 }
 
 .tabActive {

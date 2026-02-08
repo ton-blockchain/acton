@@ -1,6 +1,6 @@
 import { Address } from "@ton/core"
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import type { TonClient } from "./api/client"
 import { AccountInfo } from "./components/AccountInfo"
 import { Breadcrumbs } from "./components/Breadcrumbs"
@@ -24,33 +24,36 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = async (addr: string) => {
-    if (!addr) {
-      setAccountState(null)
-      setTransactions([])
-      return
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      const [state, txs] = await Promise.all([
-        client.getAddressInformation(addr),
-        client.getTransactions(addr),
-      ])
-      setAccountState(state)
-      setTransactions(txs)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "An error occurred")
-      setAccountState(null)
-      setTransactions([])
-    } finally {
-      setLoading(false)
-    }
-  }
+  const fetchData = useCallback(
+    async (addr: string) => {
+      if (!addr) {
+        setAccountState(null)
+        setTransactions([])
+        return
+      }
+      setLoading(true)
+      setError(null)
+      try {
+        const [state, txs] = await Promise.all([
+          client.getAddressInformation(addr),
+          client.getTransactions(addr),
+        ])
+        setAccountState(state)
+        setTransactions(txs)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "An error occurred")
+        setAccountState(null)
+        setTransactions([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [client],
+  )
 
   useEffect(() => {
     fetchData(externalAddress)
-  }, [externalAddress])
+  }, [externalAddress, fetchData])
 
   return (
     <div className={styles.container}>

@@ -36,6 +36,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
 
 .nav {
@@ -78,7 +81,9 @@
   padding: var(--spacing-xs) var(--spacing-sm);
   display: flex;
   align-items: center;
-  transition: border-color var(--transition-duration-fast), box-shadow var(--transition-duration-fast);
+  transition:
+    border-color var(--transition-duration-fast),
+    box-shadow var(--transition-duration-fast);
 }
 
 .searchBox:focus-within {

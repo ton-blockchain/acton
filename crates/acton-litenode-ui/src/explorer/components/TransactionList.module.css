@@ -22,6 +22,10 @@
   gap: var(--spacing-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
 }
 
 .tabActive {
@@ -93,6 +97,8 @@
   border-radius: 4px;
   transition: all var(--transition-duration-fast);
   display: inline-block;
+  background: none;
+  border: none;
 }
 
 .address:hover {

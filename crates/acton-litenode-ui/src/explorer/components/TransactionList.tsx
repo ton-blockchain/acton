@@ -8,14 +8,13 @@ import {
   TableHeader,
   TableRow,
 } from "@acton/shared-ui"
-import { Address, Cell } from "@ton/core"
+import { Address } from "@ton/core"
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   Filter,
   MessageSquare,
   RefreshCw,
@@ -49,14 +48,6 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const [hoveredAddress, setHoveredAddress] = useState<string | null>(null)
   const [addressNames, setAddressNames] = useState<Record<string, string>>({})
 
-  const browsedAddr = useMemo(() => {
-    try {
-      return Address.parse(ownerAddress)
-    } catch {
-      return null
-    }
-  }, [ownerAddress])
-
   const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
@@ -86,12 +77,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   return (
     <Card className={styles.tableCard}>
       <div className={styles.tabs}>
-        <div
+        <button
+          type="button"
           className={`${styles.tab} ${activeTab === "history" ? styles.tabActive : ""}`}
           onClick={() => setActiveTab("history")}
         >
           <RefreshCw size={14} /> History
-        </div>
+        </button>
         <div className={styles.tab}>
           <div
             style={{ width: 14, height: 14, borderRadius: "50%", border: "1px solid currentColor" }}
@@ -101,12 +93,13 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         <div className={styles.tab}>
           <div style={{ width: 14, height: 14, border: "1px solid currentColor" }} /> NFTs
         </div>
-        <div
+        <button
+          type="button"
           className={`${styles.tab} ${activeTab === "contract" ? styles.tabActive : ""}`}
           onClick={() => setActiveTab("contract")}
         >
           <MessageSquare size={14} /> Contract
-        </div>
+        </button>
         <div style={{ flex: 1 }} />
         {activeTab === "history" && (
           <>
@@ -135,9 +128,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             </TableHeader>
             <TableBody>
               {paginatedTransactions.map((tx) => {
-                const inMsg = tx.in_msg
-
-                let isIncoming = false
+                const isIncoming = false
 
                 const inValue = BigInt(tx.in_msg.value || "0")
                 const outValue = tx.out_msgs.reduce(
@@ -145,14 +136,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   BigInt(0),
                 )
 
-                // For "Sent", we show the value we sent out.
-                // For "Received", we show the value that came in.
                 const displayValue = isIncoming ? inValue : outValue
                 const valueStr = formatNano(displayValue.toString())
 
-                // Determine counterparty address:
-                // If incoming: show the sender (source of in_msg)
-                // If outgoing: show the receiver (destination of first out_msg)
                 const address = isIncoming
                   ? tx.in_msg.source?.account_address || ""
                   : tx.out_msgs.find((m) => m.destination?.account_address)?.destination
@@ -199,7 +185,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     </TableCell>
                     <TableCell>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <div
+                        <button
+                          type="button"
                           className={`${styles.address} ${isAddressHovered ? styles.addressHighlighted : ""}`}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -209,7 +196,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                           onMouseLeave={() => setHoveredAddress(null)}
                         >
                           {displayAddress}
-                        </div>
+                        </button>
                         {displayOpcode && <span className={styles.opcode}>{displayOpcode}</span>}
                       </div>
                     </TableCell>
@@ -227,6 +214,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           {totalPages > 1 && (
             <div className={styles.pagination}>
               <button
+                type="button"
                 className={styles.paginationButton}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -237,6 +225,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 Page {currentPage} of {totalPages}
               </span>
               <button
+                type="button"
                 className={styles.paginationButton}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}

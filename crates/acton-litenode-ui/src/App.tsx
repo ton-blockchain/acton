@@ -38,11 +38,25 @@ export const App: React.FC = () => {
         <header className={styles.header}>
           <div className={styles.headerContent}>
             <div className={styles.logoSection}>
-              <div className={styles.logo} onClick={() => (window.location.href = "/")}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <button
+                type="button"
+                className={styles.logo}
+                onClick={() => {
+                  window.location.href = "/"
+                }}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="white"
+                  role="img"
+                  aria-label="Logo"
+                >
+                  <title>Logo</title>
                   <path d="M12 2L2 19h20L12 2zm0 3.8L18.4 17H5.6L12 5.8z" />
                 </svg>
-              </div>
+              </button>
               <nav className={styles.nav}>
                 <div className={`${styles.navItem} ${styles.navItemActive}`}>Explorer</div>
                 <div className={styles.navItem}>TOKENS</div>
@@ -129,7 +143,7 @@ const TonExplorerWrapper: React.FC<{ client: TonClient }> = ({ client }) => {
       if (addr) {
         finalAddr = Address.parse(addr).toString({ testOnly: true })
       }
-    } catch {
+    } catch (_e) {
       // Keep original if not a valid TON address
     }
 

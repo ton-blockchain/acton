@@ -1,12 +1,13 @@
 import { Address } from "@ton/core"
+import type { TonClient } from "../api/client"
 
 // Global cache for address names to avoid flickering and repeated API calls
 const addressNameCache: Record<string, string | null> = {}
 const pendingRequests: Record<string, Promise<string | null>> = {}
 
-export let tonClientInstance: any = null
+export let tonClientInstance: TonClient | null = null
 
-export function setTonClientInstance(client: any) {
+export function setTonClientInstance(client: TonClient) {
   tonClientInstance = client
 }
 
@@ -103,7 +104,7 @@ export function formatAddress(
   let displayAddress = address
   try {
     displayAddress = Address.parse(address).toString({ testOnly: true })
-  } catch (e) {
+  } catch (_e) {
     // If parsing fails, use original address
   }
 

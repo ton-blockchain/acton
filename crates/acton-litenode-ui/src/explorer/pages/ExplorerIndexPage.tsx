@@ -1,5 +1,5 @@
 import { Address } from "@ton/core"
-import { AlertCircle, ArrowRight, History, Search, X } from "lucide-react"
+import { AlertCircle, History, Search, X } from "lucide-react"
 import type React from "react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
@@ -49,7 +49,7 @@ export const ExplorerIndexPage: React.FC = () => {
       addToHistory(trimmed)
       setShowHistoryDropdown(false)
       navigate(`/explorer/address/${trimmed}`)
-    } catch (e) {
+    } catch (_e) {
       setError("Invalid address, only standard internal address is allowed")
     }
   }
@@ -97,22 +97,26 @@ export const ExplorerIndexPage: React.FC = () => {
           {showHistoryDropdown && history.length > 0 && !error && (
             <ul className={styles.historyDropdown} onMouseDown={(e) => e.preventDefault()}>
               {history.map((addr) => (
-                <li
+                <div
                   key={addr}
+                  role="button"
+                  tabIndex={0}
                   className={styles.historyItem}
                   onMouseDown={(e) => e.preventDefault()} // Prevent blur before click
                   onClick={() => handleSearch(addr)}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && handleSearch(addr)}
                 >
                   <History size={16} className={styles.historyItemIcon} aria-hidden="true" />
                   <span className={styles.historyAddr}>{addr}</span>
                   <button
+                    type="button"
                     className={styles.historyItemDeleteButton}
                     onClick={(e) => removeFromHistory(e, addr)}
                     title="Remove from history"
                   >
                     <X size={14} />
                   </button>
-                </li>
+                </div>
               ))}
             </ul>
           )}

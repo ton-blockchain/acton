@@ -1,4 +1,4 @@
-import { ChevronRight, Home } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import React, { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import styles from "./Breadcrumbs.module.css"
@@ -48,18 +48,21 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
       <Link to="/explorer" className={styles.item}>
         <span>Explore</span>
       </Link>
-      {items.map((item, index) => (
-        <React.Fragment key={index}>
-          <ChevronRight size={14} className={styles.separator} />
-          {item.path ? (
-            <Link to={item.path} className={styles.item}>
-              {formatItem(item, index)}
-            </Link>
-          ) : (
-            <span className={`${styles.item} ${styles.current}`}>{formatItem(item, index)}</span>
-          )}
-        </React.Fragment>
-      ))}
+      {items.map((item, index) => {
+        const key = `${item.label}-${index}`
+        return (
+          <React.Fragment key={key}>
+            <ChevronRight size={14} className={styles.separator} />
+            {item.path ? (
+              <Link to={item.path} className={styles.item}>
+                {formatItem(item, index)}
+              </Link>
+            ) : (
+              <span className={`${styles.item} ${styles.current}`}>{formatItem(item, index)}</span>
+            )}
+          </React.Fragment>
+        )
+      })}
     </nav>
   )
 }

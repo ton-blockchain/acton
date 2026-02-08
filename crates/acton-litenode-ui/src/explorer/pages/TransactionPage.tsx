@@ -42,19 +42,18 @@ interface ValueFlowItem {
   fee: bigint
 }
 
-// Интерфейсы для соответствия V3 API Response согласно OpenAPI
 interface V3Transaction {
   hash: string
   lt: string
   raw_transaction?: string
   child_transactions?: string[]
   mc_block_seqno?: number
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface V3Trace {
   transactions: Record<string, V3Transaction>
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface V3TracesResponse {
@@ -217,7 +216,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
       <div className={styles.centered}>
         <AlertCircle className={styles.errorIcon} />
         <p className={styles.errorText}>{error}</p>
-        <button onClick={() => navigate(-1)} className={styles.backButton}>
+        <button type="button" onClick={() => navigate(-1)} className={styles.backButton}>
           <ArrowLeft size={16} /> Go Back
         </button>
       </div>
@@ -233,9 +232,11 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
               items={[
                 {
                   label: traces[0].address
-                    ? Address.parse(traces[0].address!.toString()).toString({ testOnly: true })
+                    ? Address.parse(traces[0].address?.toString() || "").toString({
+                        testOnly: true,
+                      })
                     : "",
-                  path: `/explorer/address/${traces[0].address ? Address.parse(traces[0].address!.toString()).toString({ testOnly: true }) : ""}`,
+                  path: `/explorer/address/${traces[0].address ? Address.parse(traces[0].address?.toString() || "").toString({ testOnly: true }) : ""}`,
                   isAddress: true,
                 },
                 { label: hash || "", isHash: true },
@@ -267,12 +268,14 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
             <div className={styles.tabsContainer}>
               <div className={styles.tabs}>
                 <button
+                  type="button"
                   className={`${styles.tab} ${activeTab === "value-flow" ? styles.tabActive : ""}`}
                   onClick={() => setActiveTab("value-flow")}
                 >
                   <Activity size={16} /> Value Flow
                 </button>
                 <button
+                  type="button"
                   className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
                   onClick={() => setActiveTab("transactions")}
                 >
