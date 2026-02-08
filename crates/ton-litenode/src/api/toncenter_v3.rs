@@ -2,7 +2,6 @@ use crate::storage::{MsgMeta, TraceNode, TransactionInfo};
 use base64::Engine;
 use serde_json::value::Value;
 use std::collections::HashMap;
-use base64::Engine;
 
 pub fn map_traces(tn: &TraceNode) -> Value {
     let mut transactions = HashMap::new();

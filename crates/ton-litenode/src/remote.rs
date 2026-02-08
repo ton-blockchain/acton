@@ -61,7 +61,7 @@ pub fn fetch_remote_shard_account(
         "active" => AccountStatus::Active,
         "frozen" => AccountStatus::Frozen,
         "uninitialized" => AccountStatus::Uninit,
-        _ => AccountStatus::Uninit,
+        _ => AccountStatus::Nonexist,
     };
 
     let balance = u128::try_from(info.balance.to_bigint().unwrap_or_default())?;

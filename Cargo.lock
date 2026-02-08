@@ -3094,7 +3094,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crc",
- "log",
  "num-bigint",
  "serde",
  "tolk-syntax",

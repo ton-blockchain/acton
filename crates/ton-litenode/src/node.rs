@@ -311,7 +311,7 @@ impl Node {
         self.cas.put(exec_result.tx_boc.clone(), tx_hash);
 
         let mut balance_cache = None;
-        let mut status = AccountStatus::Uninit;
+        let mut status = AccountStatus::Nonexist;
         let mut code_hash = None;
         let mut data_hash = None;
         let mut frozen_hash = None;

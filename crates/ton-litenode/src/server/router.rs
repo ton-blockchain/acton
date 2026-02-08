@@ -30,7 +30,6 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
             get(get_extended_address_information),
         )
         .route("/v2/getTransactions", get(get_transactions))
-        .route("/v2/getTransactionsBySource", get(get_transactions_by_source))
         .route("/v2/getBlockHeader", get(get_block_header))
         .route("/v2/getBlockTransactions", get(get_block_transactions))
         .route(
@@ -48,7 +47,10 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
         .nest("/api", api_v2_router)
         .nest("/api", api_v3_router)
         .route("/faucet", post(faucet))
-        .route("/address-name", get(get_address_name).post(set_address_name))
+        .route(
+            "/address-name",
+            get(get_address_name).post(set_address_name),
+        )
         .route(
             "/address-name",
             get(get_address_name).post(set_address_name),

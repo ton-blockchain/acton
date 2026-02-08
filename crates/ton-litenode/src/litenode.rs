@@ -687,41 +687,6 @@ fn handle_get_transactions(
     Ok(full_txs)
 }
 
-fn handle_get_transactions_by_source(
-    node: &Node,
-    source: Addr,
-    limit: usize,
-) -> anyhow::Result<Vec<LiteNodeTransaction>> {
-    let mut result = Vec::new();
-
-    // Iterate over all transactions and find those where in_msg.source == source
-    // In a real node this would be indexed, but for dev node we can scan
-    for tx_meta in node.history.tx_by_hash.values() {
-        if let Some(in_msg_hash) = &tx_meta.in_msg_hash {
-            if let Some(msg_meta) = node.history.msg_by_hash.get(in_msg_hash) {
-                if let Some(src) = &msg_meta.src {
-                    if src == &source {
-                        if let Some(tx_info) = node.get_transaction_by_hash(&tx_meta.tx_hash) {
-                            let tx_boc = node.get_cell(&tx_info.meta.tx_hash).unwrap_or_default();
-                            if let Ok(tx_struct) = convert_to_tx_struct(&tx_info, tx_boc) {
-                                result.push(tx_struct);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if result.len() >= limit {
-            break;
-        }
-    }
-
-    // Sort by LT descending
-    result.sort_by(|a, b| b.transaction_id.lt.cmp(&a.transaction_id.lt));
-
-    Ok(result)
-}
-
 fn handle_run_get_method(
     node: &mut Node,
     address: Addr,
