@@ -65,7 +65,7 @@ impl LiteNodeAccountState {
             data: None,
             last_transaction_id: LiteNodeTransactionId::default(),
             block_id,
-            state: AccountStatus::Uninit,
+            state: AccountStatus::Nonexist,
             sync_utime,
             frozen_hash: None,
         }
