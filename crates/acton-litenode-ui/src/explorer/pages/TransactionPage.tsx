@@ -23,8 +23,10 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import type { TonClient } from "../api/client"
+import type { V3Transaction } from "../api/types"
 import { Breadcrumbs } from "../components/Breadcrumbs"
-import { fetchAddressName, normalizeAddress } from "../components/utils"
+import { normalizeAddress } from "../components/utils"
+import { useAddressBook } from "../hooks/useAddressBook"
 import styles from "./TransactionPage.module.css"
 import {Address} from "@ton/core";
 
@@ -40,24 +42,6 @@ interface ValueFlowItem {
   after: bigint
   change: bigint
   fee: bigint
-}
-
-interface V3Transaction {
-  hash: string
-  lt: string
-  raw_transaction?: string
-  child_transactions?: string[]
-  mc_block_seqno?: number
-  [key: string]: unknown
-}
-
-interface V3Trace {
-  transactions: Record<string, V3Transaction>
-  [key: string]: unknown
-}
-
-interface V3TracesResponse {
-  traces: V3Trace[]
 }
 
 const buildBackendTransactions = (
@@ -76,7 +60,7 @@ const buildBackendTransactions = (
     lt: tx.lt,
     raw_transaction: tx.raw_transaction || "",
     parent_transaction: findParentLt(tx.lt),
-    child_transactions: tx.child_transactions || [],
+    child_transactions: tx.child_transactions,
     shard_account_before: "",
     shard_account: "",
     vm_log_diff: "",
@@ -115,6 +99,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
   const [activeTab, setActiveTab] = useState<TabType>("value-flow")
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
   const [loadingFlow, setLoadingFlow] = useState(false)
+  const { fetchName } = useAddressBook()
 
   const handleContractClick = (address: string) => {
     const formattedAddr = normalizeAddress(address)
@@ -129,7 +114,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
       setLoading(true)
       setError(null)
       try {
-        const data = (await client.getTraces(hash)) as V3TracesResponse
+        const data = await client.getTraces(hash)
 
         if (data.traces && data.traces.length > 0) {
           const trace = data.traces[0]
@@ -155,7 +140,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
               .sort()
               .map(async (addr) => {
                 const displayAddr = normalizeAddress(addr)
-                const customName = await fetchAddressName(addr)
+                const customName = await fetchName(addr)
                 contractsMap.set(addr, {
                   displayName: customName || fmt.formatAddress(displayAddr),
                   address: Address.parse(addr),
@@ -222,7 +207,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
     return () => {
       isActive = false
     }
-  }, [hash, client])
+  }, [client, fetchName, hash])
 
   if (loading) {
     return (

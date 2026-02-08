@@ -2,10 +2,11 @@ import type React from "react"
 import { useEffect, useMemo, useState } from "react"
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom"
 import { TonClient } from "./explorer/api/client"
+import { AddressBookProvider } from "./explorer/hooks/useAddressBook"
+import { AccountPage } from "./explorer/pages/AccountPage"
 import { ExplorerIndexPage } from "./explorer/pages/ExplorerIndexPage"
 import { TransactionPage } from "./explorer/pages/TransactionPage"
-import { TonExplorer } from "./explorer/TonExplorer"
-import { normalizeAddress, setTonClientInstance, toTestnetAddress } from "./explorer/components/utils"
+import { normalizeAddress, toTestnetAddress } from "./explorer/components/utils"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import { Moon, Sun } from "lucide-react"
@@ -19,11 +20,15 @@ export const App: React.FC = () => {
     )
   })
 
-  const client = useMemo(() => new TonClient("http://localhost:3010/api"), [])
-
-  useEffect(() => {
-    setTonClientInstance(client)
-  }, [client])
+  const client = useMemo(
+    () =>
+      new TonClient({
+        v2BaseUrl: "http://localhost:3010/api/v2",
+        v3BaseUrl: "http://localhost:3010/api/v3",
+        addressNameBaseUrl: "http://localhost:3010",
+      }),
+    [],
+  )
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark-theme", theme === "dark")
@@ -32,71 +37,73 @@ export const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <div className={styles.app}>
-        <header className={styles.header}>
-          <div className={styles.headerContent}>
-            <div className={styles.logoSection}>
-              <button
-                type="button"
-                className={styles.logo}
-                onClick={() => {
-                  window.location.href = "/"
-                }}
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="white"
-                  role="img"
-                  aria-label="Logo"
+      <AddressBookProvider client={client}>
+        <div className={styles.app}>
+          <header className={styles.header}>
+            <div className={styles.headerContent}>
+              <div className={styles.logoSection}>
+                <button
+                  type="button"
+                  className={styles.logo}
+                  onClick={() => {
+                    window.location.href = "/"
+                  }}
                 >
-                  <title>Logo</title>
-                  <path d="M12 2L2 19h20L12 2zm0 3.8L18.4 17H5.6L12 5.8z" />
-                </svg>
-              </button>
-              <nav className={styles.nav}>
-                <div className={`${styles.navItem} ${styles.navItemActive}`}>Explorer</div>
-                <div className={styles.navItem}>TOKENS</div>
-              </nav>
-            </div>
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="white"
+                    role="img"
+                    aria-label="Logo"
+                  >
+                    <title>Logo</title>
+                    <path d="M12 2L2 19h20L12 2zm0 3.8L18.4 17H5.6L12 5.8z" />
+                  </svg>
+                </button>
+                <nav className={styles.nav}>
+                  <div className={`${styles.navItem} ${styles.navItemActive}`}>Explorer</div>
+                  <div className={styles.navItem}>TOKENS</div>
+                </nav>
+              </div>
 
-            <HeaderSearch />
+              <HeaderSearch />
 
-            <div className={styles.themeSection}>
-              <button
-                type="button"
-                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                className={styles.themeButton}
-                aria-label="Toggle theme"
-              >
-                <div className={styles.themeIconWrapper}>
-                  <Sun
-                    className={`${styles.themeIcon} ${theme === "light" ? styles.active : ""}`}
-                    size={18}
-                  />
-                  <Moon
-                    className={`${styles.themeIcon} ${theme === "dark" ? styles.active : ""}`}
-                    size={18}
-                  />
-                </div>
-              </button>
+              <div className={styles.themeSection}>
+                <button
+                  type="button"
+                  onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                  className={styles.themeButton}
+                  aria-label="Toggle theme"
+                >
+                  <div className={styles.themeIconWrapper}>
+                    <Sun
+                      className={`${styles.themeIcon} ${theme === "light" ? styles.active : ""}`}
+                      size={18}
+                    />
+                    <Moon
+                      className={`${styles.themeIcon} ${theme === "dark" ? styles.active : ""}`}
+                      size={18}
+                    />
+                  </div>
+                </button>
+              </div>
             </div>
-          </div>
-        </header>
-        <main className={styles.main}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/explorer" replace />} />
-            <Route path="/explorer" element={<ExplorerIndexPage />} />
-            <Route
-              path="/explorer/address/:address"
-              element={<TonExplorerWrapper client={client} />}
-            />
-            <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
-            <Route path="*" element={<Navigate to="/explorer" replace />} />
-          </Routes>
-        </main>
-      </div>
+          </header>
+          <main className={styles.main}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/explorer" replace />} />
+              <Route path="/explorer" element={<ExplorerIndexPage />} />
+              <Route
+                path="/explorer/address/:address"
+                element={<AccountPageWrapper client={client} />}
+              />
+              <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
+              <Route path="*" element={<Navigate to="/explorer" replace />} />
+            </Routes>
+          </main>
+        </div>
+      </AddressBookProvider>
     </BrowserRouter>
   )
 }
@@ -127,7 +134,7 @@ const HeaderSearch: React.FC = () => {
   )
 }
 
-const TonExplorerWrapper: React.FC<{ client: TonClient }> = ({ client }) => {
+const AccountPageWrapper: React.FC<{ client: TonClient }> = ({ client }) => {
   const { address } = useParams<{ address: string }>()
   const navigate = useNavigate()
 
@@ -141,6 +148,6 @@ const TonExplorerWrapper: React.FC<{ client: TonClient }> = ({ client }) => {
   }
 
   return (
-    <TonExplorer client={client} externalAddress={address || ""} onAddressChange={handleSearch} />
+    <AccountPage client={client} externalAddress={address || ""} onAddressChange={handleSearch} />
   )
 }

@@ -1,8 +1,9 @@
 import { ChevronRight } from "lucide-react"
-import React, { useEffect, useState } from "react"
+import React from "react"
 import { Link } from "react-router-dom"
 import styles from "./Breadcrumbs.module.css"
-import { fetchAddressName, formatAddress } from "./utils"
+import { AddressLabel } from "./AddressLabel"
+import { formatAddress } from "./utils"
 
 export interface BreadcrumbItem {
   label: string
@@ -16,29 +17,9 @@ interface BreadcrumbsProps {
 }
 
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
-  const [labels, setLabels] = useState<Record<number, string>>({})
-
-  useEffect(() => {
-    let isActive = true
-    items.forEach((item, index) => {
-      if (item.isAddress) {
-        fetchAddressName(item.label).then((name) => {
-          if (!isActive || !name) return
-          setLabels((prev) => {
-            if (prev[index] === name) return prev
-            return { ...prev, [index]: name }
-          })
-        })
-      }
-    })
-    return () => {
-      isActive = false
-    }
-  }, [items])
-
-  const formatItem = (item: BreadcrumbItem, index: number) => {
+  const formatItem = (item: BreadcrumbItem) => {
     if (item.isAddress) {
-      return labels[index] || formatAddress(item.label)
+      return <AddressLabel address={item.label} />
     }
     if (item.isHash) {
       return formatAddress(item.label)
@@ -58,10 +39,10 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
             <ChevronRight size={14} className={styles.separator} />
             {item.path ? (
               <Link to={item.path} className={styles.item}>
-                {formatItem(item, index)}
+                {formatItem(item)}
               </Link>
             ) : (
-              <span className={`${styles.item} ${styles.current}`}>{formatItem(item, index)}</span>
+              <span className={`${styles.item} ${styles.current}`}>{formatItem(item)}</span>
             )}
           </React.Fragment>
         )

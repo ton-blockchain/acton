@@ -1,66 +1,68 @@
 export interface AccountAddress {
-  "@type": "accountAddress"
-  account_address: string
+  readonly "@type": "accountAddress"
+  readonly account_address: string
 }
 
 export interface TransactionId {
-  "@type": "internal.transactionId"
-  lt: string
-  hash: string
+  readonly "@type": "internal.transactionId"
+  readonly lt: string
+  readonly hash: string
 }
 
 export interface BlockId {
-  "@type": "ton.blockIdExt"
-  workchain: number
-  shard: string
-  seqno: number
-  root_hash: string
-  file_hash: string
+  readonly "@type": "ton.blockIdExt"
+  readonly workchain: number
+  readonly shard: string
+  readonly seqno: number
+  readonly root_hash: string
+  readonly file_hash: string
 }
 
 export interface Message {
-  "@type": "raw.message" | "msg.message"
-  hash?: string
-  opcode?: string
-  source?: AccountAddress
-  destination?: AccountAddress
-  value?: string
-  fwd_fee?: string
-  ihr_fee?: string
-  created_lt?: string
-  body_hash?: string
-  msg_data?: {
-    "@type": "msg.dataRaw"
-    body: string
-    init_state: string
+  readonly "@type": "raw.message" | "msg.message"
+  readonly hash?: string
+  readonly opcode?: string
+  readonly source?: AccountAddress
+  readonly destination?: AccountAddress
+  readonly value?: string
+  readonly fwd_fee?: string
+  readonly ihr_fee?: string
+  readonly created_lt?: string
+  readonly body_hash?: string
+  readonly msg_data?: {
+    readonly "@type": "msg.dataRaw"
+    readonly body: string
+    readonly init_state: string
   }
+  readonly extra_currencies?: readonly unknown[]
 }
 
 export interface Transaction {
-  "@type": "ext.transaction"
-  hash: string
-  address: AccountAddress
-  account: string
-  utime: number
-  data: string
-  success: boolean
-  exit_code: number
-  transaction_id: TransactionId
-  fee: string
-  storage_fee: string
-  other_fee: string
-  in_msg: Message
-  out_msgs: Message[]
+  readonly "@type": "ext.transaction"
+  readonly hash: string
+  readonly address: AccountAddress
+  readonly account: string
+  readonly utime: number
+  readonly data: string
+  readonly success: boolean
+  readonly exit_code: number
+  readonly transaction_id: TransactionId
+  readonly fee: string
+  readonly storage_fee: string
+  readonly other_fee: string
+  readonly in_msg: Message
+  readonly out_msgs: readonly Message[]
 }
 
 export interface FullAccountState {
-  "@type": "raw.fullAccountState"
-  balance: string
-  last_transaction_id: TransactionId
-  block_id: BlockId
-  code: string
-  data: string
-  frozen_hash: string
-  sync_utime: number
-  state: "active" | "uninitialized" | "frozen" | "nonexist"
+  readonly "@type": "raw.fullAccountState"
+  readonly balance: string
+  readonly extra_currencies: readonly unknown[]
+  readonly last_transaction_id: TransactionId
+  readonly block_id: BlockId
+  readonly code: string
+  readonly data: string
+  readonly frozen_hash: string
+  readonly sync_utime: number
+  readonly state: "active" | "uninitialized" | "frozen" | "nonexist"
 }

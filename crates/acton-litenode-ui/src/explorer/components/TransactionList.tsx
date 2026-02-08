@@ -20,19 +20,13 @@ import {
   RefreshCw,
 } from "lucide-react"
 import type React from "react"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import type { FullAccountState, Transaction } from "../types"
+import { AddressLabel } from "./AddressLabel"
 import { ContractCode } from "./ContractCode"
 import styles from "./TransactionList.module.css"
-import {
-  fetchAddressName,
-  formatAddress,
-  formatNano,
-  formatTimeAgo,
-  isSameAddress,
-  parseAddress,
-} from "./utils"
+import { formatNano, formatTimeAgo, isSameAddress, parseAddress } from "./utils"
 
 interface TransactionListProps {
   transactions: Transaction[]
@@ -53,38 +47,12 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const [activeTab, setActiveTab] = useState<"history" | "contract">("history")
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredAddress, setHoveredAddress] = useState<string | null>(null)
-  const [addressNames, setAddressNames] = useState<Record<string, string>>({})
 
   const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   const browsedAddr = useMemo(() => parseAddress(ownerAddress), [ownerAddress])
-
-  useEffect(() => {
-    let isActive = true
-    const addressesToFetch = new Set<string>()
-    paginatedTransactions.forEach((tx) => {
-      const inAddr = tx.in_msg.source?.account_address
-      const outAddr = tx.out_msgs.find((m) => m.destination?.account_address)?.destination
-        ?.account_address
-      if (inAddr) addressesToFetch.add(inAddr)
-      if (outAddr) addressesToFetch.add(outAddr)
-    })
-
-    Array.from(addressesToFetch).forEach((addr) => {
-      fetchAddressName(addr).then((name) => {
-        if (!isActive || !name) return
-        setAddressNames((prev) => {
-          if (prev[addr] === name) return prev
-          return { ...prev, [addr]: name }
-        })
-      })
-    })
-    return () => {
-      isActive = false
-    }
-  }, [paginatedTransactions])
 
   return (
     <Card className={styles.tableCard}>
@@ -168,9 +136,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   : tx.out_msgs.find((m) => m.destination?.account_address)?.destination
                       ?.account_address || ""
 
-                const displayAddress =
-                  addressNames[address] ||
-                  (address ? formatAddress(address) : isIncoming ? "External" : "Contract")
+                const displayAddressFallback = isIncoming ? "External" : "Contract"
 
                 const opcode = isIncoming
                   ? tx.in_msg.opcode
@@ -211,7 +177,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                           onMouseEnter={() => address && setHoveredAddress(address)}
                           onMouseLeave={() => setHoveredAddress(null)}
                         >
-                          {displayAddress}
+                          <AddressLabel
+                            address={address}
+                            fallback={displayAddressFallback}
+                          />
                         </button>
                         {displayOpcode && <span className={styles.opcode}>{displayOpcode}</span>}
                       </div>

@@ -1,20 +1,20 @@
 import type React from "react"
 import { useEffect, useMemo, useState } from "react"
-import type { TonClient } from "./api/client"
-import { AccountInfo } from "./components/AccountInfo"
-import { Breadcrumbs } from "./components/Breadcrumbs"
-import { TransactionList } from "./components/TransactionList"
-import styles from "./TonExplorer.module.css"
-import type { FullAccountState, Transaction } from "./types"
-import { normalizeAddress } from "./components/utils"
+import type { TonClient } from "../api/client"
+import { AccountInfo } from "../components/AccountInfo"
+import { Breadcrumbs } from "../components/Breadcrumbs"
+import { TransactionList } from "../components/TransactionList"
+import styles from "./AccountPage.module.css"
+import type { FullAccountState, Transaction } from "../types"
+import { normalizeAddress } from "../components/utils"
 
-interface TonExplorerProps {
-  client: TonClient
-  externalAddress?: string
-  onAddressChange?: (addr: string) => void
+interface AccountPageProps {
+  readonly client: TonClient
+  readonly externalAddress?: string
+  readonly onAddressChange?: (addr: string) => void
 }
 
-export const TonExplorer: React.FC<TonExplorerProps> = ({
+export const AccountPage: React.FC<AccountPageProps> = ({
   client,
   externalAddress = "",
   onAddressChange,
@@ -29,7 +29,7 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
   useEffect(() => {
     let isActive = true
     const load = async () => {
-      if (!externalAddress) {
+      if (!formattedAddress) {
         setAccountState(null)
         setTransactions([])
         return
@@ -38,8 +38,8 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
       setError(null)
       try {
         const [state, txs] = await Promise.all([
-          client.getAddressInformation(externalAddress),
-          client.getTransactions(externalAddress),
+          client.getAddressInformation(formattedAddress),
+          client.getTransactions(formattedAddress),
         ])
         if (!isActive) return
         setAccountState(state)
@@ -58,7 +58,7 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
     return () => {
       isActive = false
     }
-  }, [externalAddress, client])
+  }, [client, formattedAddress])
 
   return (
     <div className={styles.container}>

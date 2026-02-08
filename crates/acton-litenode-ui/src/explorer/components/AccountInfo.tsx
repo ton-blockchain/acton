@@ -4,13 +4,8 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import type { FullAccountState } from "../types"
 import styles from "./AccountInfo.module.css"
-import {
-  fetchAddressName,
-  formatAddress,
-  formatNano,
-  tonClientInstance,
-  updateCachedAddressName,
-} from "./utils"
+import { useAddressBook, useAddressName } from "../hooks/useAddressBook"
+import { formatAddress, formatNano } from "./utils"
 
 interface AccountInfoProps {
   address: string
@@ -22,6 +17,8 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
   const [customName, setCustomName] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [loading, setLoading] = useState(false)
+  const { setAddressName } = useAddressBook()
+  const resolvedName = useAddressName(address)
 
   const [copied, setCopied] = useState(false)
 
@@ -33,14 +30,8 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
   }, [copied])
 
   useEffect(() => {
-    let isActive = true
-    fetchAddressName(address).then((name) => {
-      if (isActive) setCustomName(name)
-    })
-    return () => {
-      isActive = false
-    }
-  }, [address])
+    setCustomName(resolvedName)
+  }, [resolvedName])
 
   const handleStartEdit = () => {
     setEditValue(customName || "")
@@ -48,11 +39,9 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
   }
 
   const handleSave = async () => {
-    if (!tonClientInstance) return
     setLoading(true)
     try {
-      await tonClientInstance.setAddressName(address, editValue)
-      updateCachedAddressName(address, editValue || null)
+      await setAddressName(address, editValue || "")
       setCustomName(editValue || null)
       setIsEditing(false)
     } catch (e) {
