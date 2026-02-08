@@ -1,62 +1,68 @@
-import { Address } from "@ton/core";
-import { AlertCircle, History, Search, X } from "lucide-react";
-import * as React from "react";
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {Address} from "@ton/core"
+import {AlertCircle, History, Search, X} from "lucide-react"
+import * as React from "react"
+import {useCallback, useEffect, useState} from "react"
+import {useNavigate} from "react-router-dom"
 
-import styles from "./ExplorerIndexPage.module.css";
+import styles from "./ExplorerIndexPage.module.css"
 
-const STORAGE_KEY = "explorer_history";
+const STORAGE_KEY = "explorer_history"
 
 export const ExplorerIndexPage: React.FC = () => {
-  const [input, setInput] = useState("");
-  const [history, setHistory] = useState<string[]>([]);
-  const [isFocused, setIsFocused] = useState(false);
-  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const navigate = useNavigate();
+  const [input, setInput] = useState("")
+  const [history, setHistory] = useState<string[]>([])
+  const [isFocused, setIsFocused] = useState(false)
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const navigate = useNavigate()
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem(STORAGE_KEY);
+    const savedHistory = localStorage.getItem(STORAGE_KEY)
     if (savedHistory) {
       try {
-        setHistory(JSON.parse(savedHistory) as string[]);
+        setHistory(JSON.parse(savedHistory) as string[])
       } catch (error_) {
-        console.error("Failed to parse history", error_);
+        console.error("Failed to parse history", error_)
       }
     }
-  }, []);
+  }, [])
 
-  const addToHistory = useCallback((address: string) => {
-    const newHistory = [address, ...history.filter((a) => a !== address)].slice(
-      0,
-      5,
-    );
-    setHistory(newHistory);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
-  }, [history]);
+  const addToHistory = useCallback(
+    (address: string) => {
+      const newHistory = [address, ...history.filter(a => a !== address)].slice(0, 5)
+      setHistory(newHistory)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory))
+    },
+    [history],
+  )
 
-  const removeFromHistory = useCallback((e: React.MouseEvent, address: string) => {
-    e.stopPropagation();
-    const newHistory = history.filter((a) => a !== address);
-    setHistory(newHistory);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
-  }, [history]);
+  const removeFromHistory = useCallback(
+    (e: React.MouseEvent, address: string) => {
+      e.stopPropagation()
+      const newHistory = history.filter(a => a !== address)
+      setHistory(newHistory)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory))
+    },
+    [history],
+  )
 
-  const handleSearch = useCallback((address: string) => {
-    const trimmed = address.trim();
-    if (!trimmed) return;
+  const handleSearch = useCallback(
+    (address: string) => {
+      const trimmed = address.trim()
+      if (!trimmed) return
 
-    try {
-      Address.parse(trimmed);
-      setError(undefined);
-      addToHistory(trimmed);
-      setShowHistoryDropdown(false);
-      void navigate(`/explorer/address/${trimmed}`);
-    } catch {
-      setError("Invalid address, only standard internal address is allowed");
-    }
-  }, [addToHistory, navigate]);
+      try {
+        Address.parse(trimmed)
+        setError(undefined)
+        addToHistory(trimmed)
+        setShowHistoryDropdown(false)
+        void navigate(`/explorer/address/${trimmed}`)
+      } catch {
+        setError("Invalid address, only standard internal address is allowed")
+      }
+    },
+    [addToHistory, navigate],
+  )
 
   return (
     <div className={styles.inputPage}>
@@ -78,51 +84,42 @@ export const ExplorerIndexPage: React.FC = () => {
               className={styles.input}
               placeholder="Search by address or hash"
               value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                if (error) setError(undefined);
+              onChange={e => {
+                setInput(e.target.value)
+                if (error) setError(undefined)
               }}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch(input)}
+              onKeyDown={e => e.key === "Enter" && handleSearch(input)}
               onFocus={() => {
-                setIsFocused(true);
+                setIsFocused(true)
               }}
               onBlur={() => {
-                setIsFocused(false);
-                setTimeout(() => setShowHistoryDropdown(false), 100);
+                setIsFocused(false)
+                setTimeout(() => setShowHistoryDropdown(false), 100)
               }}
               onClick={() => {
                 if (isFocused) {
-                  setShowHistoryDropdown(true);
+                  setShowHistoryDropdown(true)
                 }
               }}
             />
           </div>
 
           {showHistoryDropdown && history.length > 0 && !error && (
-            <div
-              className={styles.historyDropdown}
-            >
-              {history.map((addr) => (
-                <div
-                  key={addr}
-                  className={styles.historyItem}
-                >
+            <div className={styles.historyDropdown}>
+              {history.map(addr => (
+                <div key={addr} className={styles.historyItem}>
                   <button
                     type="button"
                     className={styles.historyItemButton}
                     onClick={() => handleSearch(addr)}
                   >
-                    <History
-                      size={16}
-                      className={styles.historyItemIcon}
-                      aria-hidden="true"
-                    />
+                    <History size={16} className={styles.historyItemIcon} aria-hidden="true" />
                     <span className={styles.historyAddr}>{addr}</span>
                   </button>
                   <button
                     type="button"
                     className={styles.historyItemDeleteButton}
-                    onClick={(e) => removeFromHistory(e, addr)}
+                    onClick={e => removeFromHistory(e, addr)}
                     title="Remove from history"
                   >
                     <X size={14} />
@@ -145,5 +142,5 @@ export const ExplorerIndexPage: React.FC = () => {
         <span className={styles.createBy}>Powered by TON Litenode</span>
       </footer>
     </div>
-  );
-};
+  )
+}

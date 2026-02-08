@@ -1,6 +1,6 @@
 import * as React from "react"
 
-import {parseSendMode} from "@/components/TransactionView/SendModeViewer/parser";
+import {parseSendMode} from "@/components/TransactionView/SendModeViewer/parser"
 
 import styles from "./SendModeViewer.module.css"
 

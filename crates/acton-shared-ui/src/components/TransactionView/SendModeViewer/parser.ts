@@ -1,4 +1,4 @@
-import {SendModeInfo} from "@/components/TransactionView/SendModeViewer/SendModeViewer";
+import {SendModeInfo} from "@/components/TransactionView/SendModeViewer/SendModeViewer"
 
 export const SEND_MODE_CONSTANTS = {
   0: {name: "SendDefaultMode", description: "Ordinary message (default)."},

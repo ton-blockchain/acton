@@ -43,18 +43,15 @@ export const tolkGrammar = {
     },
     {
       name: "keyword.control",
-      match:
-        String.raw`\b(do|if|try|else|while|break|throw|catch|return|assert|repeat|continue|asm|builtin|match|lazy)\b`,
+      match: String.raw`\b(do|if|try|else|while|break|throw|catch|return|assert|repeat|continue|asm|builtin|match|lazy)\b`,
     },
     {
       name: "keyword.operator",
-      match:
-        String.raw`\+|-|\*|/|%|\?|:|,|;|\(|\)|\[|\]|{|}|=|<|>|!|&|\||\^|==|!=|<=|>=|<<|>>|&&|\|\||~/|\^/|\+=|-=|\*=|/=|%=|&=|\|=|\^=|->|<=>|~>>|\^>>|<<=|>>=|=>|\?\?`,
+      match: String.raw`\+|-|\*|/|%|\?|:|,|;|\(|\)|\[|\]|{|}|=|<|>|!|&|\||\^|==|!=|<=|>=|<<|>>|&&|\|\||~/|\^/|\+=|-=|\*=|/=|%=|&=|\|=|\^=|->|<=>|~>>|\^>>|<<=|>>=|=>|\?\?`,
     },
     {
       name: "keyword.other",
-      match:
-        String.raw`\b(import|export|true|false|null|redef|mutate|tolk|as|is|!is|private|readonly|string|contract)\b`,
+      match: String.raw`\b(import|export|true|false|null|redef|mutate|tolk|as|is|!is|private|readonly|string|contract)\b`,
     },
     {
       name: "keyword.other",
@@ -65,8 +62,7 @@ export const tolkGrammar = {
       match: String.raw`\b[TU]\b`,
     },
     {
-      match:
-        String.raw`\b(val|var)\s+(?:type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|coins|address|int\d+|uint\d+|bits\d+|bytes\d+)\b`,
+      match: String.raw`\b(val|var)\s+(?:type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|coins|address|int\d+|uint\d+|bits\d+|bytes\d+)\b`,
       captures: {
         "1": {name: "storage.modifier"},
       },
@@ -77,8 +73,7 @@ export const tolkGrammar = {
     },
     {
       name: "storage.type",
-      match:
-        String.raw`\b(type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|coins|int\d+|uint\d+|bits\d+|bytes\d+)\b`,
+      match: String.raw`\b(type|enum|int|map|cell|Cell|void|dict|bool|any_address|slice|string|tuple|builder|continuation|never|coins|int\d+|uint\d+|bits\d+|bytes\d+)\b`,
     },
     {
       name: "storage.type",

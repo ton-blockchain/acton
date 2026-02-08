@@ -44,8 +44,8 @@ export function getTransactionOpcode(tx: Transaction): number | undefined {
 
   let opcode = slice.loadUint(32)
   if (inMessage.info.type === "internal" && inMessage.info.bounced && slice.remainingBits >= 32) {
-      opcode = slice.loadUint(32)
-    }
+    opcode = slice.loadUint(32)
+  }
   return opcode
 }
 

@@ -1,8 +1,8 @@
-import path from "node:path";
+import path from "node:path"
 
-import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
+import react from "@vitejs/plugin-react"
+import {defineConfig} from "vite"
+import {nodePolyfills} from "vite-plugin-node-polyfills"
 
 export default defineConfig({
   plugins: [
@@ -30,8 +30,8 @@ export default defineConfig({
       "/api/v2": {
         target: "http://localhost:8081",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/v2/, "/api/v2"),
+        rewrite: path => path.replace(/^\/api\/v2/, "/api/v2"),
       },
     },
   },
-});
+})

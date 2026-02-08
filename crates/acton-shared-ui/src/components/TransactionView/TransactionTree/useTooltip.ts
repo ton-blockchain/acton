@@ -121,7 +121,7 @@ export function useTooltip(): UseTooltipReturn {
       )
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-      const placement = bestPosition.placement as "top" | "bottom" | "left" | "right";
+      const placement = bestPosition.placement as "top" | "bottom" | "left" | "right"
 
       return {
         x: finalX,

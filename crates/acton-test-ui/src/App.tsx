@@ -93,37 +93,37 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     void fetch("/api/config")
-      .then(async (res) => (await res.json()) as {project_root: string})
-      .then((data) => {
-        setProjectRoot(data.project_root);
+      .then(async res => (await res.json()) as {project_root: string})
+      .then(data => {
+        setProjectRoot(data.project_root)
       })
-      .catch((error) => {
-        console.error("Failed to fetch config", error);
-      });
+      .catch(error => {
+        console.error("Failed to fetch config", error)
+      })
 
     void fetch("/api/reports")
-      .then(async (res) => (await res.json()) as TestReport[])
-      .then((data) => {
-        setReports(data);
+      .then(async res => (await res.json()) as TestReport[])
+      .then(data => {
+        setReports(data)
         if (data.length > 0 && !selectedTest) {
-          const savedTestId = localStorage.getItem("selectedTest");
-          let testToSelect = data[0];
+          const savedTestId = localStorage.getItem("selectedTest")
+          let testToSelect = data[0]
 
           if (savedTestId) {
-            const found = data.find((t) => `${t.suite_name}::${t.name}` === savedTestId);
+            const found = data.find(t => `${t.suite_name}::${t.name}` === savedTestId)
             if (found) {
-              testToSelect = found;
+              testToSelect = found
             }
           }
-          handleSelectTest(testToSelect);
+          handleSelectTest(testToSelect)
         }
-        setLoading(false);
+        setLoading(false)
       })
-      .catch((error) => {
-        console.error("Failed to fetch reports", error);
-        setLoading(false);
-      });
-  }, [handleSelectTest, selectedTest]);
+      .catch(error => {
+        console.error("Failed to fetch reports", error)
+        setLoading(false)
+      })
+  }, [handleSelectTest, selectedTest])
 
   if (loading && reports.length === 0) {
     return <div className={styles.loadingContainer}>Loading...</div>

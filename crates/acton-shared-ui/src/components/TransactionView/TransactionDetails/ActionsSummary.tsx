@@ -251,7 +251,8 @@ export function ActionsSummary({
           message.info.type === "internal"
             ? message.info.dest.toString()
             : (message.info.dest?.toString() ?? "External")
-        const value = message.info.type === "internal" ? fmt.formatCurrency(message.info.value.coins) : ""
+        const value =
+          message.info.type === "internal" ? fmt.formatCurrency(message.info.value.coins) : ""
         return {
           title: "Send Message",
           description: `${messageType} → ${destination}`,

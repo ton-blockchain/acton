@@ -1,8 +1,8 @@
 /* eslint-disable unicorn/prefer-spread */
 
-import type { Address } from "@ton/core"
+import type {Address} from "@ton/core"
 import type React from "react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
 import {
   type CustomNodeElementProps,
   type RawNodeDatum,
@@ -107,9 +107,7 @@ export function TransactionTree({
     calculateOptimalPosition,
   } = useTooltip()
 
-  const [selectedTransaction, setSelectedTransaction] = useState<TransactionInfo | undefined>(
-
-  )
+  const [selectedTransaction, setSelectedTransaction] = useState<TransactionInfo | undefined>()
   const triggerRectReference = useRef<DOMRect | undefined>(undefined)
 
   const rootTransactions = useMemo(() => {
@@ -187,7 +185,8 @@ export function TransactionTree({
         totalFees: tx.transaction.totalFees.coins,
       },
       sentTotal: [...tx.transaction.outMessages.values()].reduce(
-        (accumulator: bigint, message) => accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
+        (accumulator: bigint, message) =>
+          accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
         0n,
       ),
     }
@@ -266,10 +265,7 @@ export function TransactionTree({
           contractLetter,
           isSelected,
         },
-        children: [
-          ...tx.children.map(it => convertTransactionToNode(it)),
-          ...externalOutChildren,
-        ],
+        children: [...tx.children.map(it => convertTransactionToNode(it)), ...externalOutChildren],
       } satisfies RawNodeDatum
     }
 
@@ -316,7 +312,7 @@ export function TransactionTree({
       const parentLt = nodeDatum.attributes.parentLt as string
       const parentTx = transactionMap.get(parentLt)
 
-      const externalOutMessage = [...parentTx?.transaction.outMessages.values() ?? []].find(
+      const externalOutMessage = [...(parentTx?.transaction.outMessages.values() ?? [])].find(
         message => message.info.type === "external-out",
       )
       const externalOutDestination =
@@ -324,7 +320,9 @@ export function TransactionTree({
           ? (externalOutMessage.info.dest?.toString() ?? "External")
           : "External"
       const createdLt =
-        externalOutMessage?.info.type === "external-out" ? externalOutMessage.info.createdLt.toString() : ""
+        externalOutMessage?.info.type === "external-out"
+          ? externalOutMessage.info.createdLt.toString()
+          : ""
 
       return (
         <g>

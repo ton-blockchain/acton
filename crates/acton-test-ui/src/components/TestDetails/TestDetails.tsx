@@ -54,43 +54,47 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
   const contractNames = useMemo(() => trace?.contracts ?? [], [trace])
   const {contracts: backendContracts} = useContracts(contractNames)
 
-  const ides: IDEConfig[] = useMemo(() => [
-    {
-      name: "Cursor",
-      icon: <VscCode />,
-      getUrl: t => `cursor://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-    },
-    {
-      name: "Windsurf",
-      icon: <VscCode />,
-      getUrl: t => `windsurf://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-    },
-    {
-      name: "VS Code",
-      icon: <VscCode />,
-      getUrl: t => `vscode://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-    },
-    {
-      name: "VSCodium",
-      icon: <VscCode />,
-      getUrl: t => `vscodium://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-    },
-    {
-      name: "WebStorm",
-      icon: <SiWebstorm />,
-      getUrl: t => `webstorm://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-    },
-    {
-      name: "RustRover",
-      icon: <SiRust />,
-      getUrl: t => `rustrover://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-    },
-    {
-      name: "IntelliJ",
-      icon: <SiIntellijidea />,
-      getUrl: t => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-    },
-  ], [])
+  const ides: IDEConfig[] = useMemo(
+    () => [
+      {
+        name: "Cursor",
+        icon: <VscCode />,
+        getUrl: t => `cursor://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      },
+      {
+        name: "Windsurf",
+        icon: <VscCode />,
+        getUrl: t => `windsurf://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      },
+      {
+        name: "VS Code",
+        icon: <VscCode />,
+        getUrl: t => `vscode://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      },
+      {
+        name: "VSCodium",
+        icon: <VscCode />,
+        getUrl: t => `vscodium://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      },
+      {
+        name: "WebStorm",
+        icon: <SiWebstorm />,
+        getUrl: t => `webstorm://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+      },
+      {
+        name: "RustRover",
+        icon: <SiRust />,
+        getUrl: t =>
+          `rustrover://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+      },
+      {
+        name: "IntelliJ",
+        icon: <SiIntellijidea />,
+        getUrl: t => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+      },
+    ],
+    [],
+  )
 
   const selectedIde = useMemo(() => {
     return ides.find(i => i.name === selectedIdeName) || ides[0]

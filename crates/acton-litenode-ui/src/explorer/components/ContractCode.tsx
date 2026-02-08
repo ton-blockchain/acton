@@ -1,48 +1,48 @@
-import { Buffer } from "node:buffer";
+import {Buffer} from "node:buffer"
 
-import type React from "react";
-import { useMemo, useState } from "react";
-import { Cell as Cell2, runtime, text } from "ton-assembly";
+import type React from "react"
+import {useMemo, useState} from "react"
+import {Cell as Cell2, runtime, text} from "ton-assembly"
 
-import styles from "./ContractCode.module.css";
+import styles from "./ContractCode.module.css"
 
 interface ContractCodeProps {
-  readonly codeBoc: string;
+  readonly codeBoc: string
 }
 
-type CodeTab = "decompiled" | "base64" | "hex";
+type CodeTab = "decompiled" | "base64" | "hex"
 
-export const ContractCode: React.FC<ContractCodeProps> = ({ codeBoc }) => {
-  const [activeTab, setActiveTab] = useState<CodeTab>("decompiled");
+export const ContractCode: React.FC<ContractCodeProps> = ({codeBoc}) => {
+  const [activeTab, setActiveTab] = useState<CodeTab>("decompiled")
 
   const codeData = useMemo(() => {
-    if (!codeBoc) return;
+    if (!codeBoc) return
     try {
-      const buf = Buffer.from(codeBoc, "base64");
-      const cell = Cell2.fromBoc(buf)[0];
-      const decompiled = text.print(runtime.decompileCell(cell));
+      const buf = Buffer.from(codeBoc, "base64")
+      const cell = Cell2.fromBoc(buf)[0]
+      const decompiled = text.print(runtime.decompileCell(cell))
 
       return {
         base64: codeBoc,
         hex: Buffer.from(codeBoc, "base64").toString("hex").toUpperCase(),
         decompiled: decompiled,
-      };
+      }
     } catch (error) {
-      console.error("Failed to process contract code:", error);
+      console.error("Failed to process contract code:", error)
       return {
         base64: codeBoc,
         hex: "Error processing HEX",
         decompiled: "Error: Failed to decompile code.",
-      };
+      }
     }
-  }, [codeBoc]);
+  }, [codeBoc])
 
   if (!codeBoc || !codeData) {
     return (
       <div className={styles.container}>
         <div className={styles.empty}>No code available for this account.</div>
       </div>
-    );
+    )
   }
 
   return (
@@ -77,5 +77,5 @@ export const ContractCode: React.FC<ContractCodeProps> = ({ codeBoc }) => {
         </pre>
       </div>
     </div>
-  );
-};
+  )
+}
