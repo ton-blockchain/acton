@@ -7,7 +7,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@acton/shared-ui"
+} from "@acton/shared-ui";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -17,24 +17,31 @@ import {
   Filter,
   MessageSquare,
   RefreshCw,
-} from "lucide-react"
-import type React from "react"
-import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
-import type { FullAccountState, Transaction } from "../api/types"
-import { AddressLabel } from "./AddressLabel"
-import { ContractCode } from "./ContractCode"
-import styles from "./TransactionList.module.css"
-import { formatNano, formatTimeAgo, isSameAddress, parseAddress } from "./utils"
+} from "lucide-react";
+import type React from "react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import type { FullAccountState, Transaction } from "../api/types";
+
+import { AddressLabel } from "./AddressLabel";
+import { ContractCode } from "./ContractCode";
+import styles from "./TransactionList.module.css";
+import {
+  formatNano,
+  formatTimeAgo,
+  isSameAddress,
+  parseAddress,
+} from "./utils";
 
 interface TransactionListProps {
-  readonly transactions: Transaction[]
-  readonly accountState: FullAccountState
-  readonly ownerAddress: string
-  readonly onAddressClick?: (addr: string) => void
+  readonly transactions: Transaction[];
+  readonly accountState: FullAccountState;
+  readonly ownerAddress: string;
+  readonly onAddressClick?: (addr: string) => void;
 }
 
-const ITEMS_PER_PAGE = 10
+const ITEMS_PER_PAGE = 10;
 
 export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
@@ -42,16 +49,19 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   ownerAddress,
   onAddressClick,
 }) => {
-  const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<"history" | "contract">("history")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [hoveredAddress, setHoveredAddress] = useState<string | null>(null)
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<"history" | "contract">("history");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hoveredAddress, setHoveredAddress] = useState<string | null>(null);
 
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedTransactions = transactions.slice(
+    startIndex,
+    startIndex + ITEMS_PER_PAGE,
+  );
 
-  const browsedAddr = useMemo(() => parseAddress(ownerAddress), [ownerAddress])
+  const browsedAddr = useMemo(() => parseAddress(ownerAddress), [ownerAddress]);
 
   return (
     <Card className={styles.tableCard}>
@@ -97,40 +107,51 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 <TableHead className={styles.tableHeader}>Time</TableHead>
                 <TableHead className={styles.tableHeader}>Action</TableHead>
                 <TableHead className={styles.tableHeader}>Address</TableHead>
-                <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>
+                <TableHead
+                  className={`${styles.tableHeader} ${styles.valueContainer}`}
+                >
                   Value
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedTransactions.map((tx) => {
-                const inMsg = tx.in_msg
-                const inMsgSrc = parseAddress(inMsg.source?.account_address || "")
-                const isIncoming = inMsgSrc && browsedAddr ? !inMsgSrc.equals(browsedAddr) : false
+                const inMsg = tx.in_msg;
+                const inMsgSrc = parseAddress(
+                  inMsg.source?.account_address || "",
+                );
+                const isIncoming =
+                  inMsgSrc && browsedAddr
+                    ? !inMsgSrc.equals(browsedAddr)
+                    : false;
 
-                const inValue = BigInt(tx.in_msg.value || "0")
+                const inValue = BigInt(tx.in_msg.value || "0");
                 const outValue = tx.out_msgs.reduce(
                   (acc, msg) => acc + BigInt(msg.value || "0"),
                   BigInt(0),
-                )
+                );
 
-                const displayValue = isIncoming ? inValue : outValue
-                const valueStr = formatNano(displayValue.toString())
+                const displayValue = isIncoming ? inValue : outValue;
+                const valueStr = formatNano(displayValue.toString());
 
                 const address = isIncoming
                   ? tx.in_msg.source?.account_address || ""
-                  : tx.out_msgs.find((m) => m.destination?.account_address)?.destination
-                      ?.account_address || ""
+                  : tx.out_msgs.find((m) => m.destination?.account_address)
+                      ?.destination?.account_address || "";
 
-                const displayAddressFallback = isIncoming ? "External" : "Contract"
+                const displayAddressFallback = isIncoming
+                  ? "External"
+                  : "Contract";
 
                 const opcode = isIncoming
                   ? tx.in_msg.opcode
-                  : tx.out_msgs.find((m) => m.opcode)?.opcode
-                const displayOpcode = opcode ? opcode : null
+                  : tx.out_msgs.find((m) => m.opcode)?.opcode;
+                const displayOpcode = opcode ? opcode : null;
 
                 const isAddressHovered =
-                  hoveredAddress && address ? isSameAddress(address, hoveredAddress) : false
+                  hoveredAddress && address
+                    ? isSameAddress(address, hoveredAddress)
+                    : false;
 
                 return (
                   <TableRow
@@ -138,7 +159,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     className={`${styles.row} ${styles.clickableRow}`}
                     onClick={() => navigate(`/tx/${tx.hash}`)}
                   >
-                    <TableCell className={styles.time}>{formatTimeAgo(tx.utime)}</TableCell>
+                    <TableCell className={styles.time}>
+                      {formatTimeAgo(tx.utime)}
+                    </TableCell>
                     <TableCell>
                       <div className={styles.action}>
                         {isIncoming ? (
@@ -146,7 +169,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                             className={`${styles.actionIcon} ${styles.statusSuccess}`}
                           />
                         ) : (
-                          <ArrowUpRight className={`${styles.actionIcon} ${styles.statusFailed}`} />
+                          <ArrowUpRight
+                            className={`${styles.actionIcon} ${styles.statusFailed}`}
+                          />
                         )}
                         <span>{isIncoming ? "Received TON" : "Sent TON"}</span>
                       </div>
@@ -157,24 +182,38 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                           type="button"
                           className={`${styles.address} ${isAddressHovered ? styles.addressHighlighted : ""}`}
                           onClick={(e) => {
-                            e.stopPropagation()
-                            if (address) onAddressClick?.(address)
+                            e.stopPropagation();
+                            if (address) onAddressClick?.(address);
                           }}
-                          onMouseEnter={() => address && setHoveredAddress(address)}
+                          onMouseEnter={() =>
+                            address && setHoveredAddress(address)
+                          }
                           onMouseLeave={() => setHoveredAddress(null)}
                         >
-                          <AddressLabel address={address} fallback={displayAddressFallback} />
+                          <AddressLabel
+                            address={address}
+                            fallback={displayAddressFallback}
+                          />
                         </button>
-                        {displayOpcode && <span className={styles.opcode}>{displayOpcode}</span>}
+                        {displayOpcode && (
+                          <span className={styles.opcode}>{displayOpcode}</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className={styles.valueContainer}>
-                      <div className={isIncoming ? styles.valuePositive : styles.valueNegative}>
-                        {isIncoming ? "+" : "-"} {parseFloat(valueStr).toLocaleString()} TON
+                      <div
+                        className={
+                          isIncoming
+                            ? styles.valuePositive
+                            : styles.valueNegative
+                        }
+                      >
+                        {isIncoming ? "+" : "-"}{" "}
+                        {Number.parseFloat(valueStr).toLocaleString()} TON
                       </div>
                     </TableCell>
                   </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>
@@ -195,7 +234,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               <button
                 type="button"
                 className={styles.paginationButton}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={currentPage === totalPages}
               >
                 <ChevronRight size={16} />
@@ -207,5 +248,5 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         <ContractCode codeBoc={accountState.code} />
       )}
     </Card>
-  )
-}
+  );
+};

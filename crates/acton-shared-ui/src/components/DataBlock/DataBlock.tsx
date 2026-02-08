@@ -1,4 +1,5 @@
 import type React from "react"
+
 import styles from "./DataBlock.module.css"
 
 interface DataBlockProps {
@@ -6,6 +7,6 @@ interface DataBlockProps {
   readonly className?: string
 }
 
-export const DataBlock: React.FC<DataBlockProps> = ({ data, className }) => {
+export const DataBlock: React.FC<DataBlockProps> = ({data, className}) => {
   return <div className={`${styles.container} ${className ?? ""}`}>{data}</div>
 }

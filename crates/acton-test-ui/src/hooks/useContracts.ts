@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react"
-import type { BackendContractInfo } from "@acton/shared-ui"
+import {useEffect, useRef, useState} from "react"
+import type {BackendContractInfo} from "@acton/shared-ui"
 
 export function useContracts(contractNames: string[]) {
   const [contracts, setContracts] = useState<Record<string, BackendContractInfo>>({})
@@ -7,29 +7,29 @@ export function useContracts(contractNames: string[]) {
   const fetchedNames = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    const namesToFetch = contractNames.filter((name) => !fetchedNames.current.has(name))
+    const namesToFetch = contractNames.filter(name => !fetchedNames.current.has(name))
 
     if (namesToFetch.length === 0) return
 
     setLoading(true)
 
-    Promise.all(
-      namesToFetch.map((name) =>
+    void Promise.all(
+      namesToFetch.map(name =>
         fetch(`/api/contract/${name}`)
-          .then((res) => {
+          .then(async res => {
             if (!res.ok) throw new Error(`Failed to fetch contract ${name}`)
-            return res.json()
+            return (await res.json()) as BackendContractInfo
           })
-          .then((data) => ({ name, data }))
-          .catch((err) => {
+          .then(data => ({name, data}))
+          .catch(err => {
             console.error(err)
-            return { name, data: null }
+            return {name, data: null}
           }),
       ),
-    ).then((results) => {
-      setContracts((prev) => {
-        const next = { ...prev }
-        for (const { name, data } of results) {
+    ).then(results => {
+      setContracts(prev => {
+        const next = {...prev}
+        for (const {name, data} of results) {
           if (data) {
             next[name] = data
           }
@@ -41,5 +41,5 @@ export function useContracts(contractNames: string[]) {
     })
   }, [contractNames])
 
-  return { contracts, loading }
+  return {contracts, loading}
 }

@@ -1,6 +1,8 @@
-import type { Address, Cell, OutAction, Transaction } from "@ton/core"
-import type { Abi } from "./index"
+import type {Address, Cell, OutAction, Transaction} from "@ton/core"
 
+import type {Abi} from "./index"
+
+// eslint-disable-next-line functional/type-declaration-immutability
 export interface TransactionInfo {
   readonly lt: string
   readonly address: Address | undefined
@@ -8,7 +10,7 @@ export interface TransactionInfo {
   readonly vmLogDiff: string
   readonly executorLogs: string
   readonly actions: Cell | undefined
-  readonly outActions: OutAction[]
+  readonly outActions: readonly OutAction[]
   readonly contractName: string | undefined
   readonly shardAccountBefore: string
   readonly shardAccountAfter: string

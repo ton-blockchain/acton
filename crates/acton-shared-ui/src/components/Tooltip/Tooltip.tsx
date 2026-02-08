@@ -1,11 +1,12 @@
-import { type ReactNode, useMemo, useState } from "react"
+import {type ReactNode, useMemo, useState} from "react"
+
 import styles from "./Tooltip.module.css"
 
 interface TooltipProps {
   readonly children: ReactNode
   readonly content: ReactNode | string
   readonly variant?: "hover" | "positioned"
-  readonly position?: { x: number; y: number }
+  readonly position?: {x: number; y: number}
   readonly placement?: "top" | "bottom" | "right"
   readonly className?: string
 }

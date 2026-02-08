@@ -1,6 +1,8 @@
 import type React from "react"
-import { useCallback, useEffect, useState } from "react"
-import type { ContractData } from "@/types/transaction"
+import {useCallback, useEffect, useState} from "react"
+
+import type {ContractData} from "@/types/transaction"
+
 import styles from "./ContractChip.module.css"
 
 interface ContractChipProps {
@@ -19,8 +21,8 @@ export function ContractChip({
   const [isCopied, setIsCopied] = useState(false)
 
   const handleCopy = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
+    (event: React.MouseEvent) => {
+      event.stopPropagation()
       if (address) {
         navigator.clipboard
           .writeText(address)
@@ -36,8 +38,8 @@ export function ContractChip({
   )
 
   const handleChipClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
+    (event: React.MouseEvent) => {
+      event.stopPropagation()
       if (address && onContractClick) {
         onContractClick(address)
       }
@@ -114,10 +116,10 @@ export function ContractChip({
       )}
       <div
         onClick={handleCopy}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault()
-            handleCopy(e as unknown as React.MouseEvent)
+        onKeyDown={evemt => {
+          if (evemt.key === "Enter" || evemt.key === " ") {
+            evemt.preventDefault()
+            handleCopy(evemt as unknown as React.MouseEvent)
           }
         }}
         className={styles.contractChipCopyButton}

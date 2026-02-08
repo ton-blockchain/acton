@@ -1,24 +1,34 @@
-import type React from "react"
-import { useEffect, useMemo, useState } from "react"
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom"
-import { TonClient } from "./explorer/api/client"
-import { toTestnetAddress } from "./explorer/components/utils"
-import { AddressBookProvider } from "./explorer/hooks/useAddressBook"
-import { AccountPage } from "./explorer/pages/AccountPage"
-import { ExplorerIndexPage } from "./explorer/pages/ExplorerIndexPage"
-import { TransactionPage } from "./explorer/pages/TransactionPage"
-import "@acton/shared-ui/styles/tokens.css"
-import "./index.css"
-import { Moon, Sun } from "lucide-react"
-import styles from "./App.module.css"
+import * as React from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
+
+import { Moon, Sun } from "lucide-react";
+
+import { TonClient } from "./explorer/api/client";
+import { toTestnetAddress } from "./explorer/components/utils";
+import { AddressBookProvider } from "./explorer/hooks/useAddressBook";
+import { AccountPage } from "./explorer/pages/AccountPage";
+import { ExplorerIndexPage } from "./explorer/pages/ExplorerIndexPage";
+import { TransactionPage } from "./explorer/pages/TransactionPage";
+import "@acton/shared-ui/styles/tokens.css";
+import "./index.css";
+import styles from "./App.module.css";
 
 export const App: React.FC = () => {
   const [theme, setTheme] = useState(() => {
     return (
       localStorage.getItem("theme") ||
-      (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-    )
-  })
+      (globalThis.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light")
+    );
+  });
 
   const client = useMemo(
     () =>
@@ -28,12 +38,12 @@ export const App: React.FC = () => {
         addressNameBaseUrl: "http://localhost:3010",
       }),
     [],
-  )
+  );
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark-theme", theme === "dark")
-    localStorage.setItem("theme", theme)
-  }, [theme])
+    document.documentElement.classList.toggle("dark-theme", theme === "dark");
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   return (
     <BrowserRouter>
@@ -46,7 +56,7 @@ export const App: React.FC = () => {
                   type="button"
                   className={styles.logo}
                   onClick={() => {
-                    window.location.href = "/"
+                    globalThis.location.href = "/";
                   }}
                 >
                   <svg
@@ -62,7 +72,9 @@ export const App: React.FC = () => {
                   </svg>
                 </button>
                 <nav className={styles.nav}>
-                  <div className={`${styles.navItem} ${styles.navItemActive}`}>Explorer</div>
+                  <div className={`${styles.navItem} ${styles.navItemActive}`}>
+                    Explorer
+                  </div>
                   <div className={styles.navItem}>TOKENS</div>
                 </nav>
               </div>
@@ -94,19 +106,25 @@ export const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Navigate to="/explorer" replace />} />
               <Route path="/explorer" element={<ExplorerIndexPage />} />
-              <Route path="/explorer/address/:address" element={<AccountPage client={client} />} />
-              <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
+              <Route
+                path="/explorer/address/:address"
+                element={<AccountPage client={client} />}
+              />
+              <Route
+                path="/tx/:hash"
+                element={<TransactionPage client={client} />}
+              />
               <Route path="*" element={<Navigate to="/explorer" replace />} />
             </Routes>
           </main>
         </div>
       </AddressBookProvider>
     </BrowserRouter>
-  )
-}
+  );
+};
 
 const HeaderSearch: React.FC = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
   return (
     <div className={styles.searchSection}>
       <div className={styles.searchBox}>
@@ -116,17 +134,17 @@ const HeaderSearch: React.FC = () => {
           className={styles.searchInput}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
-              const val = (e.target as HTMLInputElement).value
+              const val = (e.target as HTMLInputElement).value;
               if (val.length === 64) {
-                navigate(`/tx/${val}`)
+                navigate(`/tx/${val}`);
               } else {
-                const formatted = toTestnetAddress(val)
-                navigate(`/explorer/address/${formatted ?? val}`)
+                const formatted = toTestnetAddress(val);
+                navigate(`/explorer/address/${formatted ?? val}`);
               }
             }
           }}
         />
       </div>
     </div>
-  )
-}
+  );
+};

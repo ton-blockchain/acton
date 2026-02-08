@@ -1,14 +1,18 @@
-import React, { type JSX, useState } from "react"
-import { FiChevronDown, FiChevronUp } from "react-icons/fi"
-import type { BackendContractInfo } from "@/types"
-import type { ContractData, TransactionInfo } from "@/types/transaction"
-import { fmt } from "@/index"
-import { computeSendMode, getTransactionOpcode } from "@/utils/transaction"
-import { ContractChip } from "../ContractChip/ContractChip"
-import { ExitCodeChip } from "../ExitCodeChip/ExitCodeChip"
-import { OpcodeChip } from "../OpcodeChip/OpcodeChip"
-import { SendModeViewer } from "../SendModeViewer/SendModeViewer"
-import { ActionsSummary } from "./ActionsSummary"
+import * as React from "react"
+import {useState} from "react"
+import {FiChevronDown, FiChevronUp} from "react-icons/fi"
+
+import type {BackendContractInfo} from "@/types"
+import type {ContractData, TransactionInfo} from "@/types/transaction"
+import {fmt} from "@/index"
+import {computeSendMode, getTransactionOpcode} from "@/utils/transaction"
+
+import {ContractChip} from "../ContractChip/ContractChip"
+import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
+import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
+import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
+
+import {ActionsSummary} from "./ActionsSummary"
 import styles from "./TransactionDetails.module.css"
 
 export interface TransactionDetailsProps {
@@ -53,16 +57,17 @@ export function TransactionDetails({
 
   const thisAddress = tx.address
   const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-  let typeAbi = targetContract?.abi?.messages.find((it) => it.opcode === opcode)
+  let typeAbi = targetContract?.abi?.messages.find(it => it.opcode === opcode)
   if (typeAbi === undefined) {
     for (const contract of allContracts) {
-      typeAbi = contract.abi?.messages.find((it) => it.opcode === opcode)
+      typeAbi = contract.abi?.messages.find(it => it.opcode === opcode)
     }
   }
   const opcodeName = typeAbi?.name
 
-  const sentTotal = Array.from(tx.transaction.outMessages.values()).reduce(
-    (acc: bigint, msg: any) => acc + (msg.info.type === "internal" ? msg.info.value.coins : 0n),
+  const sentTotal = [...tx.transaction.outMessages.values()].reduce(
+    (accumulator: bigint, message) =>
+      accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
     0n,
   )
 
@@ -223,9 +228,7 @@ export function TransactionDetails({
       <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Action Phase</div>
         <div className={styles.labeledSectionContent}>
-          {!actionPhase ? (
-            <div className={styles.multiColumnItemValue}>No action phase</div>
-          ) : (
+          {actionPhase ? (
             <div className={styles.multiColumnRow}>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Success</div>
@@ -257,6 +260,8 @@ export function TransactionDetails({
                 </div>
               </div>
             </div>
+          ) : (
+            <div className={styles.multiColumnItemValue}>No action phase</div>
           )}
         </div>
       </div>
@@ -286,14 +291,14 @@ export function TransactionDetails({
 
 function formatDetailedTimestamp(
   timestampInput: number | string | undefined,
-  showShort: boolean = true,
-): JSX.Element | string {
+  showShort = true,
+): React.JSX.Element | string {
   if (timestampInput === undefined) return "—"
 
   const date =
     typeof timestampInput === "string" ? new Date(timestampInput) : new Date(timestampInput * 1000)
 
-  const pad = (num: number): string => num.toString().padStart(2, "0")
+  const pad = (number: number): string => number.toString().padStart(2, "0")
   const monthAbbrs = [
     "Jan",
     "Feb",
@@ -311,13 +316,13 @@ function formatDetailedTimestamp(
 
   const day = date.getDate()
   const monthIndex = date.getMonth()
-  const monthNum = monthIndex + 1
+  const monthNumber = monthIndex + 1
   const year = date.getFullYear()
   const hours = date.getHours()
   const minutes = date.getMinutes()
   const seconds = date.getSeconds()
 
-  const fullPart = `${pad(day)}.${pad(monthNum)}.${year}, ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  const fullPart = `${pad(day)}.${pad(monthNumber)}.${year}, ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
   const shortPart = `${pad(day)} ${monthAbbrs[monthIndex]}, ${pad(hours)}:${pad(minutes)}`
 
   return (

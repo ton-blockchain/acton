@@ -1,5 +1,6 @@
 import type React from "react"
-import { useCallback, useEffect, useState } from "react"
+import {useCallback, useEffect, useState} from "react"
+
 import styles from "./OpcodeChip.module.css"
 
 interface OpcodeChipProps {
@@ -8,7 +9,7 @@ interface OpcodeChipProps {
   readonly showOpcode?: boolean
 }
 
-export const OpcodeChip: React.FC<OpcodeChipProps> = ({ opcode, abiName, showOpcode = false }) => {
+export const OpcodeChip: React.FC<OpcodeChipProps> = ({opcode, abiName, showOpcode = false}) => {
   const [isCopied, setIsCopied] = useState(false)
 
   const displayText = abiName ?? (opcode ? `0x${opcode.toString(16)}` : "Empty")
@@ -16,15 +17,15 @@ export const OpcodeChip: React.FC<OpcodeChipProps> = ({ opcode, abiName, showOpc
   const copyValue = opcode ? `0x${opcode.toString(16)}` : ""
 
   const handleCopy = useCallback(
-    async (e: React.MouseEvent) => {
-      e.stopPropagation()
+    async (event: React.MouseEvent) => {
+      event.stopPropagation()
       if (!copyValue) return
 
       try {
         await navigator.clipboard.writeText(copyValue)
         setIsCopied(true)
-      } catch (err) {
-        console.error("Failed to copy:", err)
+      } catch (error) {
+        console.error("Failed to copy:", error)
       }
     },
     [copyValue],
@@ -45,8 +46,8 @@ export const OpcodeChip: React.FC<OpcodeChipProps> = ({ opcode, abiName, showOpc
         <button
           type="button"
           className={styles.copyButton}
-          onClick={(e) => {
-            handleCopy(e).catch(console.error)
+          onClick={event => {
+            handleCopy(event).catch(console.error)
           }}
           title={`Copy ${copyValue}`}
           aria-label={`Copy opcode ${copyValue}`}

@@ -1,11 +1,12 @@
 import type React from "react"
-import { useEffect, useState } from "react"
-import { createHighlighterCore } from "shiki/core"
-import { createOnigurumaEngine } from "shiki/engine/oniguruma"
+import {useEffect, useState} from "react"
+import {createHighlighterCore} from "shiki/core"
+import {createOnigurumaEngine} from "shiki/engine/oniguruma"
 import vitesseDark from "shiki/themes/vitesse-dark.mjs"
 import vitesseLight from "shiki/themes/vitesse-light.mjs"
+
 import styles from "./CodeSnippet.module.css"
-import { tolkGrammar } from "./tolk-grammar"
+import {tolkGrammar} from "./tolk-grammar"
 
 interface CodeSnippetProps {
   readonly filePath: string
@@ -22,23 +23,23 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
   projectRoot,
   ideOpener,
 }) => {
-  const [snippet, setSnippet] = useState<string | null>(null)
-  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
+  const [snippet, setSnippet] = useState<string | undefined>()
+  const [highlightedHtml, setHighlightedHtml] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | undefined>()
 
   const relativePath =
     projectRoot && filePath.startsWith(projectRoot)
-      ? filePath.substring(projectRoot.length) || filePath
+      ? filePath.slice(projectRoot.length) || filePath
       : filePath
 
   useEffect(() => {
     const loadContent = async () => {
       setLoading(true)
       try {
-        const res = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`)
-        if (!res.ok) throw new Error("Failed to fetch file content")
-        const content = await res.text()
+        const result = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`)
+        if (!result.ok) throw new Error("Failed to fetch file content")
+        const content = await result.text()
 
         const lines = content.split("\n")
         const start = Math.max(0, line - contextLines - 1)
@@ -63,9 +64,9 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
 
         setHighlightedHtml(html)
         setLoading(false)
-      } catch (err: unknown) {
-        console.error(err)
-        setError((err as { message: string }).message)
+      } catch (error: unknown) {
+        console.error(error)
+        setError((error as {message: string}).message)
         setLoading(false)
       }
     }
@@ -73,7 +74,7 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
     void loadContent()
 
     // Listen for theme changes
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         if (mutation.type === "attributes" && mutation.attributeName === "class") {
           void loadContent()
@@ -81,13 +82,13 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
       }
     })
 
-    observer.observe(document.documentElement, { attributes: true })
+    observer.observe(document.documentElement, {attributes: true})
     return () => observer.disconnect()
   }, [filePath, line, contextLines])
 
   if (loading) return <div className={styles.loading}>Loading code snippet...</div>
   if (error) return <div className={styles.error}>Error: {error}</div>
-  if (!snippet || !highlightedHtml) return null
+  if (!snippet || !highlightedHtml) return
 
   const startLine = Math.max(1, line - contextLines)
   const snippetLines = snippet.split("\n")
@@ -104,20 +105,17 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
       </div>
       <div className={styles.codeWrapper}>
         <div className={styles.lineNumbers}>
-          {snippetLines.map((_, i) => (
+          {snippetLines.map((_, index) => (
             <div
-              key={startLine + i}
-              className={`${styles.lineNumber} ${startLine + i === line ? styles.activeLineNumber : ""}`}
+              key={startLine + index}
+              className={`${styles.lineNumber} ${startLine + index === line ? styles.activeLineNumber : ""}`}
             >
-              {startLine + i}
+              {startLine + index}
             </div>
           ))}
         </div>
-        <div
-          className={styles.shikiWrapper}
-          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-        />
-        {startLine + snippetLines.findIndex((_, i) => startLine + i === line) === line && (
+        <div className={styles.shikiWrapper} dangerouslySetInnerHTML={{__html: highlightedHtml}} />
+        {startLine + snippetLines.findIndex((_, index) => startLine + index === line) === line && (
           <div
             className={styles.activeLineOverlay}
             style={{

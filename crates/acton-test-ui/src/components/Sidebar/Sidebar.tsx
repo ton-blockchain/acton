@@ -1,5 +1,5 @@
 import type React from "react"
-import { useMemo, useState } from "react"
+import {useMemo, useState} from "react"
 import {
   FiCheck,
   FiChevronDown,
@@ -12,9 +12,11 @@ import {
   FiSun,
   FiX,
 } from "react-icons/fi"
-import { type TestReport, TestStatus } from "@acton/shared-ui"
-import { AppIcon } from "@acton/shared-ui"
-import { Summary } from "../Summary/Summary"
+import {type TestReport, TestStatus} from "@acton/shared-ui"
+import {AppIcon} from "@acton/shared-ui"
+
+import {Summary} from "../Summary/Summary"
+
 import styles from "./Sidebar.module.css"
 
 interface SidebarProps {
@@ -43,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   )
 
   const toggleSuite = (suiteName: string) => {
-    setCollapsedSuites((prev) => {
+    setCollapsedSuites(prev => {
       const next = new Set(prev)
       if (next.has(suiteName)) {
         next.delete(suiteName)
@@ -55,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   const toggleStatusFilter = (status: TestStatus) => {
-    setStatusFilter((prev) => {
+    setStatusFilter(prev => {
       const next = new Set(prev)
       if (next.has(status)) {
         next.delete(status)
@@ -100,13 +102,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   const getSuiteStatus = (suiteReports: TestReport[]) => {
-    const hasFailed = suiteReports.some((r) => r.status === TestStatus.Failed)
-    const allPassed = suiteReports.every((r) => r.status === TestStatus.Passed)
-    return { hasFailed, allPassed }
+    const hasFailed = suiteReports.some(r => r.status === TestStatus.Failed)
+    const allPassed = suiteReports.every(r => r.status === TestStatus.Passed)
+    return {hasFailed, allPassed}
   }
 
   return (
-    <div className={styles.sidebar} style={width ? { width: `${width}px` } : undefined}>
+    <div className={styles.sidebar} style={width ? {width: `${width}px`} : undefined}>
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.title}>
@@ -145,12 +147,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             placeholder="Filter tests..."
             className={styles.searchInput}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
 
         <div className={styles.filters}>
-          {(Object.values(TestStatus) as TestStatus[]).map((status) => (
+          {(Object.values(TestStatus) as TestStatus[]).map(status => (
             <button
               key={status}
               type="button"
@@ -167,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={styles.content}>
         {Object.entries(filteredSuites).map(([suiteName, suiteReports]) => {
           const isCollapsed = collapsedSuites.has(suiteName)
-          const { hasFailed, allPassed } = getSuiteStatus(suiteReports)
+          const {hasFailed, allPassed} = getSuiteStatus(suiteReports)
 
           return (
             <div key={suiteName} className={styles.suite}>

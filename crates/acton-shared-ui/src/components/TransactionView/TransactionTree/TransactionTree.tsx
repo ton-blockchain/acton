@@ -9,14 +9,17 @@ import {
   Tree,
   type TreeLinkDatum,
 } from "react-d3-tree"
-import type { BackendContractInfo } from "@/types"
-import type { ContractData, TransactionInfo } from "@/types/transaction"
-import { fmt } from "@/index"
-import { getTransactionOpcode } from "@/utils/transaction"
-import { TransactionDetails } from "../TransactionDetails/TransactionDetails"
-import { SmartTooltip } from "./SmartTooltip"
+
+import type {BackendContractInfo} from "@/types"
+import type {ContractData, TransactionInfo} from "@/types/transaction"
+import {fmt} from "@/index"
+import {getTransactionOpcode} from "@/utils/transaction"
+
+import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
+
+import {SmartTooltip} from "./SmartTooltip"
 import styles from "./TransactionTree.module.css"
-import { useTooltip } from "./useTooltip"
+import {useTooltip} from "./useTooltip"
 
 interface TransactionTooltipData {
   readonly fromAddress: string
@@ -40,7 +43,7 @@ interface TransactionTreeProps {
   readonly onContractClick?: (address: string) => void
 }
 
-function TransactionTooltipContent({ data }: { data: TransactionTooltipData }): React.JSX.Element {
+function TransactionTooltipContent({data}: {data: TransactionTooltipData}): React.JSX.Element {
   return (
     <div className={styles.tooltipContent}>
       <div className={styles.tooltipField}>
@@ -105,22 +108,22 @@ export function TransactionTree({
   } = useTooltip()
 
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionInfo | undefined>(
-    undefined,
+
   )
-  const triggerRectRef = useRef<DOMRect | undefined>(undefined)
+  const triggerRectReference = useRef<DOMRect | undefined>(undefined)
 
   const rootTransactions = useMemo(() => {
     return transactions
-      .filter((tx) => !tx.parent)
+      .filter(tx => !tx.parent)
       .sort((a, b) => Number(a.transaction.lt - b.transaction.lt))
   }, [transactions])
 
-  const calculateTreeDimensions = (data: RawNodeDatum): { height: number; width: number } => {
+  const calculateTreeDimensions = (data: RawNodeDatum): {height: number; width: number} => {
     const getDepth = (node: RawNodeDatum, currentDepth = 0): number => {
       if (!node.children || node.children.length === 0) {
         return currentDepth
       }
-      return Math.max(...node.children.map((child) => getDepth(child, currentDepth + 1)))
+      return Math.max(...node.children.map(child => getDepth(child, currentDepth + 1)))
     }
 
     const countNodes = (node: RawNodeDatum): number => {
@@ -164,7 +167,7 @@ export function TransactionTree({
 
   const showTransactionTooltip = (event: React.MouseEvent, tx: TransactionInfo): void => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    triggerRectRef.current = rect
+    triggerRectReference.current = rect
 
     const description = tx.transaction.description
     const computePhase = description.type === "generic" ? description.computePhase : undefined
@@ -183,8 +186,8 @@ export function TransactionTree({
         gasFees: computePhase?.type === "vm" ? computePhase.gasFees : undefined,
         totalFees: tx.transaction.totalFees.coins,
       },
-      sentTotal: Array.from(tx.transaction.outMessages.values()).reduce(
-        (acc: bigint, msg: any) => acc + (msg.info.type === "internal" ? msg.info.value.coins : 0n),
+      sentTotal: [...tx.transaction.outMessages.values()].reduce(
+        (accumulator: bigint, message) => accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
         0n,
       ),
     }
@@ -216,22 +219,22 @@ export function TransactionTree({
       const opcode = getTransactionOpcode(tx.transaction)
 
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
-      let typeAbi = targetContract?.abi?.messages.find((it: any) => it.opcode === opcode)
+      let typeAbi = targetContract?.abi?.messages.find(it => it.opcode === opcode)
       if (typeAbi === undefined) {
         for (const contract of allContracts) {
-          typeAbi = contract.abi?.messages.find((it: any) => it.opcode === opcode)
+          typeAbi = contract.abi?.messages.find(it => it.opcode === opcode)
         }
       }
       const opcodeName = typeAbi?.name
-      const opcodeHex = opcodeName ?? (opcode !== undefined ? `0x${opcode.toString(16)}` : "empty")
+      const opcodeHex = opcodeName ?? (opcode === undefined ? "empty" : `0x${opcode.toString(16)}`)
 
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
 
       const lt = tx.lt
       const isSelected = selectedTransaction?.lt === lt
 
-      const hasExternalOut = Array.from(tx.transaction.outMessages.values()).some((outMsg: any) => {
-        return outMsg.info.type === "external-out"
+      const hasExternalOut = [...tx.transaction.outMessages.values()].some(outMessage => {
+        return outMessage.info.type === "external-out"
       })
 
       const externalOutChildren = hasExternalOut
@@ -243,7 +246,7 @@ export function TransactionTree({
                 parentLt: lt,
               },
               children: [],
-            } as any,
+            },
           ]
         : []
 
@@ -264,7 +267,7 @@ export function TransactionTree({
           isSelected,
         },
         children: [
-          ...tx.children.map((it: any) => convertTransactionToNode(it)),
+          ...tx.children.map(it => convertTransactionToNode(it)),
           ...externalOutChildren,
         ],
       } satisfies RawNodeDatum
@@ -276,7 +279,7 @@ export function TransactionTree({
         attributes: {
           isRoot: "true",
         },
-        children: rootTransactions.map((it) => convertTransactionToNode(it)),
+        children: rootTransactions.map(it => convertTransactionToNode(it)),
       }
     }
 
@@ -289,7 +292,7 @@ export function TransactionTree({
     }
   }, [rootTransactions, contracts, selectedTransaction, allContracts])
 
-  const renderCustomNodeElement = ({ nodeDatum }: CustomNodeElementProps): React.JSX.Element => {
+  const renderCustomNodeElement = ({nodeDatum}: CustomNodeElementProps): React.JSX.Element => {
     if (nodeDatum.attributes?.isRoot === "true") {
       return (
         <g>
@@ -313,12 +316,15 @@ export function TransactionTree({
       const parentLt = nodeDatum.attributes.parentLt as string
       const parentTx = transactionMap.get(parentLt)
 
-      const externalOutMsg = Array.from(parentTx?.transaction.outMessages.values() ?? []).find(
-        (msg: any) => msg.info.type === "external-out",
-      ) as any
-      const externalOutDest = externalOutMsg?.info.dest?.toString() ?? "External"
+      const externalOutMessage = [...parentTx?.transaction.outMessages.values() ?? []].find(
+        message => message.info.type === "external-out",
+      )
+      const externalOutDestination =
+        externalOutMessage?.info.type === "external-out"
+          ? (externalOutMessage.info.dest?.toString() ?? "External")
+          : "External"
       const createdLt =
-        externalOutMsg?.info.type === "external-out" ? externalOutMsg.info.createdLt.toString() : ""
+        externalOutMessage?.info.type === "external-out" ? externalOutMessage.info.createdLt.toString() : ""
 
       return (
         <g>
@@ -355,7 +361,7 @@ export function TransactionTree({
           <foreignObject width="150" height="100" x="-180" y="-40">
             <div className={styles.edgeText}>
               <div className={styles.topText}>
-                <p className={styles.edgeTextTitle}>{externalOutDest}</p>
+                <p className={styles.edgeTextTitle}>{externalOutDestination}</p>
                 <p className={styles.edgeTextContent}>Lt: {createdLt}</p>
               </div>
               <div className={styles.bottonText}>
@@ -413,12 +419,12 @@ export function TransactionTree({
           onClick={() => {
             handleNodeClick(lt)
           }}
-          onKeyDown={(event) => {
+          onKeyDown={event => {
             if (event.key === "Enter" || event.key === " ") {
               handleNodeClick(lt)
             }
           }}
-          onMouseEnter={(event) => {
+          onMouseEnter={event => {
             if (!tx) return
             showTransactionTooltip(event, tx)
           }}
@@ -444,7 +450,7 @@ export function TransactionTree({
           <div
             className={styles.edgeText}
             role="note"
-            onMouseEnter={(event) => {
+            onMouseEnter={event => {
               if (!tx) return
               showTransactionTooltip(event, tx)
             }}
@@ -475,7 +481,7 @@ export function TransactionTree({
     )
   }
 
-  const getDynamicPathClass = ({ target }: TreeLinkDatum): string => {
+  const getDynamicPathClass = ({target}: TreeLinkDatum): string => {
     const attributes = target.data.attributes
     if (attributes?.withInitCode) {
       return `${styles.edgeStyle} ${styles.edgeStyleWithInit}`
@@ -498,47 +504,47 @@ export function TransactionTree({
 
   return (
     <div className={styles.container}>
-      <div className={styles.treeContainer} style={{ height: `${treeDimensions.height}px` }}>
-        <div className={styles.treeWrapper} style={{ width: `${treeDimensions.width}px` }}>
+      <div className={styles.treeContainer} style={{height: `${treeDimensions.height}px`}}>
+        <div className={styles.treeWrapper} style={{width: `${treeDimensions.width}px`}}>
           <Tree
             data={treeData}
             orientation="horizontal"
-            pathFunc={(e) => {
-              const t = e.target.data.attributes ?? {}
+            pathFunc={event => {
+              const t = event.target.data.attributes ?? {}
               return t.isFirst
                 ? "M"
-                    .concat(e.source.y.toString(), ",")
-                    .concat(e.source.x.toString(), "V")
-                    .concat((e.target.x + 10).toString(), "a10 10 0 0 1 10 -10H")
-                    .concat((e.target.y - 18).toString())
+                    .concat(event.source.y.toString(), ",")
+                    .concat(event.source.x.toString(), "V")
+                    .concat((event.target.x + 10).toString(), "a10 10 0 0 1 10 -10H")
+                    .concat((event.target.y - 18).toString())
                 : t.isLast
                   ? "M"
-                      .concat(e.source.y.toString(), ",")
-                      .concat(e.source.x.toString(), "V")
-                      .concat((e.target.x - 10).toString(), "a10 10 0 0 0 10 10H")
-                      .concat((e.target.y - 18).toString())
+                      .concat(event.source.y.toString(), ",")
+                      .concat(event.source.x.toString(), "V")
+                      .concat((event.target.x - 10).toString(), "a10 10 0 0 0 10 10H")
+                      .concat((event.target.y - 18).toString())
                   : "M"
-                      .concat(e.source.y.toString(), ",")
-                      .concat(e.source.x.toString(), "V")
-                      .concat(e.target.x.toString(), "H")
-                      .concat((e.target.y - 18).toString())
+                      .concat(event.source.y.toString(), ",")
+                      .concat(event.source.x.toString(), "V")
+                      .concat(event.target.x.toString(), "H")
+                      .concat((event.target.y - 18).toString())
             }}
-            nodeSize={{ x: 200, y: 120 }}
-            separation={{ siblings: 0.7, nonSiblings: 1 }}
+            nodeSize={{x: 200, y: 120}}
+            separation={{siblings: 0.7, nonSiblings: 1}}
             renderCustomNodeElement={renderCustomNodeElement}
             pathClassFunc={getDynamicPathClass}
-            translate={{ x: 50, y: treeDimensions.height / 2 }}
+            translate={{x: 50, y: treeDimensions.height / 2}}
             zoom={1}
             enableLegacyTransitions={false}
             collapsible={false}
             zoomable={false}
             draggable={false}
-            scaleExtent={{ min: 1, max: 1 }}
+            scaleExtent={{min: 1, max: 1}}
           />
-          {tooltip && triggerRectRef.current && (
+          {tooltip && triggerRectReference.current && (
             <SmartTooltip
               content={tooltip.content}
-              triggerRect={triggerRectRef.current}
+              triggerRect={triggerRectReference.current}
               onMouseEnter={() => {
                 setIsTooltipHovered(true)
               }}
@@ -571,9 +577,9 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
     return "unknown"
   }
 
-  const displayAddress = address.toString({ testOnly: true })
-  const addressStr = address.toString()
-  const meta = contracts.get(addressStr)
+  const displayAddress = address.toString({testOnly: true})
+  const addressString = address.toString()
+  const meta = contracts.get(addressString)
   if (meta) {
     const name = meta.displayName
     if (name !== "Unknown Contract") {

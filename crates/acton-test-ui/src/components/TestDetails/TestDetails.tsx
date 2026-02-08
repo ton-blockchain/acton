@@ -1,18 +1,24 @@
 import path from "node:path"
-import { Address } from "@ton/core"
+
+import {Address} from "@ton/core"
 import type React from "react"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { FiCheck, FiChevronDown, FiCircle, FiMinus, FiX } from "react-icons/fi"
-import { SiIntellijidea, SiRust, SiWebstorm } from "react-icons/si"
-import { VscCode } from "react-icons/vsc"
-import { useContracts } from "../../hooks/useContracts"
-import { type TestReport, TestStatus, type Trace } from "@acton/shared-ui"
-import type { ContractData } from "@acton/shared-ui"
-import { fmt } from "@acton/shared-ui"
-import { processTransactions } from "@acton/shared-ui"
-import { CodeSnippet } from "@acton/shared-ui"
-import { DataBlock } from "@acton/shared-ui"
-import { TransactionTree, ContractChip } from "@acton/shared-ui"
+import {useEffect, useMemo, useRef, useState} from "react"
+import {FiCheck, FiChevronDown, FiCircle, FiMinus, FiX} from "react-icons/fi"
+import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
+import {VscCode} from "react-icons/vsc"
+
+import {type TestReport, TestStatus, type Trace, ContractData} from "@acton/shared-ui"
+import {
+  fmt,
+  processTransactions,
+  CodeSnippet,
+  DataBlock,
+  TransactionTree,
+  ContractChip,
+} from "@acton/shared-ui"
+
+import {useContracts} from "../../hooks/useContracts"
+
 import styles from "./TestDetails.module.css"
 
 interface TestDetailsProps {
@@ -27,7 +33,7 @@ interface IDEConfig {
   readonly getUrl: (test: TestReport) => string
 }
 
-export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace, projectRoot }) => {
+export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoot}) => {
   const [activeTab, setActiveTab] = useState<"info" | "logs" | "transactions">(() => {
     const saved = localStorage.getItem("activeTab")
     if (saved === "vm" || saved === "executor") return "logs"
@@ -46,49 +52,48 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace, projectRo
   const gridDropdownRef = useRef<HTMLDivElement | null>(null)
 
   const contractNames = useMemo(() => trace?.contracts ?? [], [trace])
-  const { contracts: backendContracts } = useContracts(contractNames)
+  const {contracts: backendContracts} = useContracts(contractNames)
 
   const ides: IDEConfig[] = [
     {
       name: "Cursor",
       icon: <VscCode />,
-      getUrl: (t) => `cursor://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      getUrl: t => `cursor://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
     },
     {
       name: "Windsurf",
       icon: <VscCode />,
-      getUrl: (t) => `windsurf://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      getUrl: t => `windsurf://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
     },
     {
       name: "VS Code",
       icon: <VscCode />,
-      getUrl: (t) => `vscode://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      getUrl: t => `vscode://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
     },
     {
       name: "VSCodium",
       icon: <VscCode />,
-      getUrl: (t) => `vscodium://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
+      getUrl: t => `vscodium://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
     },
     {
       name: "WebStorm",
       icon: <SiWebstorm />,
-      getUrl: (t) => `webstorm://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+      getUrl: t => `webstorm://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
     },
     {
       name: "RustRover",
       icon: <SiRust />,
-      getUrl: (t) =>
-        `rustrover://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+      getUrl: t => `rustrover://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
     },
     {
       name: "IntelliJ",
       icon: <SiIntellijidea />,
-      getUrl: (t) => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
+      getUrl: t => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
     },
   ]
 
   const selectedIde = useMemo(() => {
-    return ides.find((i) => i.name === selectedIdeName) || ides[0]
+    return ides.find(i => i.name === selectedIdeName) || ides[0]
   }, [selectedIdeName])
 
   const handleSelectIde = (ide: IDEConfig) => {
@@ -100,7 +105,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace, projectRo
 
   const errorLocation = useMemo(() => {
     if (test.status !== TestStatus.Failed || !test.details) {
-      return { filePath: test.file_path, row: test.row, column: test.column }
+      return {filePath: test.file_path, row: test.row, column: test.column}
     }
 
     const parts = test.details.split(":")
@@ -114,9 +119,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace, projectRo
         path.isAbsolute(filePathRaw) || projectRoot === undefined
           ? filePathRaw
           : path.join(projectRoot, filePathRaw)
-      return { filePath, row: row - 1, column: col - 2 }
+      return {filePath, row: row - 1, column: col - 2}
     }
-    return { filePath: test.file_path, row: test.row, column: test.column }
+    return {filePath: test.file_path, row: test.row, column: test.column}
   }, [test, projectRoot])
 
   useEffect(() => {
@@ -172,7 +177,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace, projectRo
     return path
   }
 
-  const formatDuration = (duration: { secs: number; nanos: number }) => {
+  const formatDuration = (duration: {secs: number; nanos: number}) => {
     const ms = duration.secs * 1000 + duration.nanos / 1000000
     if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
     if (ms < 1000) return `${ms.toFixed(1)}ms`
@@ -423,7 +428,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace, projectRo
                     </button>
                     {isGridIDESelectorOpen && (
                       <div className={styles.gridIdeDropdown}>
-                        {ides.map((ide) => (
+                        {ides.map(ide => (
                           <button
                             key={ide.name}
                             type="button"
@@ -527,7 +532,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({ test, trace, projectRo
 
             {isHeaderIDESelectorOpen && (
               <div className={styles.ideDropdown}>
-                {ides.map((ide) => (
+                {ides.map(ide => (
                   <button
                     key={ide.name}
                     type="button"

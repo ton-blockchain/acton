@@ -2,7 +2,55 @@
   "name": "acton",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "workspaces": [
     "crates/*"
-  ]
+  ],
+  "scripts": {
+    "lint": "bun --filter '*' lint",
+    "lint:fix": "bun --filter '*' lint:fix",
+    "fmt": "bun --filter '*' fmt",
+    "fmt:check": "bun --filter '*' fmt:check",
+    "build": "bun --filter '*' build",
+    "dev:litenode": "bun --filter acton-litenode-ui dev",
+    "dev:test": "bun --filter acton-test-ui dev"
+  },
+  "prettier": {
+    "arrowParens": "avoid",
+    "bracketSpacing": false,
+    "printWidth": 100,
+    "semi": false,
+    "singleQuote": false,
+    "tabWidth": 2,
+    "trailingComma": "all",
+    "useTabs": false,
+    "overrides": [
+      {
+        "files": [
+          "*.yaml",
+          "*.yml"
+        ],
+        "options": {
+          "tabWidth": 2
+        }
+      }
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "eslint": "^9.25.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-import-resolver-typescript": "^4.3.4",
+    "eslint-plugin-functional": "^9.0.1",
+    "eslint-plugin-import-x": "^4.16.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "globals": "^16.0.0",
+    "prettier": "3.4.2",
+    "typescript-eslint": "^8.30.1",
+    "eslint-plugin-unicorn": "^56.0.1"
+  }
 }

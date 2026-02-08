@@ -1,20 +1,21 @@
-import type { Abi } from "@/types"
-import { Tooltip } from "@/index"
+import type {Abi} from "@/types"
+import {Tooltip} from "@/index"
+
 import styles from "./ExitCodeViewer.module.css"
-import { EXIT_CODE_DESCRIPTIONS } from "./error-codes"
+import {EXIT_CODE_DESCRIPTIONS} from "./error-codes"
 
 interface ExitCodeViewerProps {
   readonly exitCode: number | undefined
   readonly abi?: Abi | null
 }
 
-export function ExitCodeChip({ exitCode, abi }: ExitCodeViewerProps) {
+export function ExitCodeChip({exitCode, abi}: ExitCodeViewerProps) {
   if (exitCode === undefined) {
     return <span className={styles.exitCode}>—</span>
   }
 
   const standardDescription = (
-    EXIT_CODE_DESCRIPTIONS as Record<number, { name: string; description: string; phase: string }>
+    EXIT_CODE_DESCRIPTIONS as Record<number, {name: string; description: string; phase: string}>
   )[exitCode] ?? {
     name: "Custom error",
     description: "User defined error",

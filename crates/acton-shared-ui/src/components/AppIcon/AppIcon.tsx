@@ -5,7 +5,7 @@ interface AppIconProps {
   readonly size?: number
 }
 
-export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
+export const AppIcon: React.FC<AppIconProps> = ({theme, size = 28}) => {
   if (theme === "dark") {
     return (
       <svg
@@ -28,7 +28,7 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
           />
           <mask
             id="mask0_18_3209"
-            style={{ maskType: "luminance" }}
+            style={{maskType: "luminance"}}
             maskUnits="userSpaceOnUse"
             x="0"
             y="0"
@@ -91,7 +91,7 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
       role="img"
       aria-label="Acton Tests app icon"
     >
-      <g clip-path="url(#clip0_22_3097)">
+      <g clipPath="url(#clip0_22_3097)">
         <path
           d="M12 1H4C2.34315 1 1 2.34315 1 4V12C1 13.6569 2.34315 15 4 15H12C13.6569 15 15 13.6569 15 12V4C15 2.34315 13.6569 1 12 1Z"
           fill="url(#paint0_linear_22_3097)"
@@ -106,7 +106,7 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
         />
         <mask
           id="mask0_22_3097"
-          style={{ maskType: "luminance" }}
+          style={{maskType: "luminance"}}
           maskUnits="userSpaceOnUse"
           x="0"
           y="0"
@@ -128,7 +128,7 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
         </g>
         <mask
           id="mask1_22_3097"
-          style={{ maskType: "luminance" }}
+          style={{maskType: "luminance"}}
           maskUnits="userSpaceOnUse"
           x="0"
           y="0"
@@ -151,7 +151,7 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
         <path
           d="M8 12.25C10.2091 12.25 12 10.4591 12 8.25C12 6.04086 10.2091 4.25 8 4.25C5.79086 4.25 4 6.04086 4 8.25C4 10.4591 5.79086 12.25 8 12.25Z"
           stroke="white"
-          stroke-opacity="0.18"
+          strokeOpacity="0.18"
         />
       </g>
       <defs>
@@ -163,8 +163,8 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
           y2="15"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="white" />
-          <stop offset="1" stop-color="#E9EAEE" />
+          <stop stopColor="white" />
+          <stop offset="1" stopColor="#E9EAEE" />
         </linearGradient>
         <radialGradient
           id="paint1_radial_22_3097"
@@ -174,9 +174,9 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
           gradientUnits="userSpaceOnUse"
           gradientTransform="translate(5.75 4.5) rotate(45) scale(13.75)"
         >
-          <stop stop-color="white" stop-opacity="0.85" />
-          <stop offset="0.55" stop-color="white" stop-opacity="0.25" />
-          <stop offset="1" stop-color="white" stop-opacity="0" />
+          <stop stopColor="white" stopOpacity="0.85" />
+          <stop offset="0.55" stopColor="white" stopOpacity="0.25" />
+          <stop offset="1" stopColor="white" stopOpacity="0" />
         </radialGradient>
         <radialGradient
           id="paint2_radial_22_3097"
@@ -186,8 +186,8 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
           gradientUnits="userSpaceOnUse"
           gradientTransform="translate(8 8) rotate(90) scale(10.625)"
         >
-          <stop stop-opacity="0" />
-          <stop offset="1" stop-opacity="0.06" />
+          <stop stopOpacity="0" />
+          <stop offset="1" stopOpacity="0.06" />
         </radialGradient>
         <linearGradient
           id="paint3_linear_22_3097"
@@ -197,8 +197,8 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
           y2="12.25"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stop-color="#2B2C31" />
-          <stop offset="1" stop-color="#0B0B0F" />
+          <stop stopColor="#2B2C31" />
+          <stop offset="1" stopColor="#0B0B0F" />
         </linearGradient>
         <radialGradient
           id="paint4_radial_22_3097"
@@ -208,9 +208,9 @@ export const AppIcon: React.FC<AppIconProps> = ({ theme, size = 28 }) => {
           gradientUnits="userSpaceOnUse"
           gradientTransform="translate(6.75 6) rotate(45) scale(7.5)"
         >
-          <stop stop-color="white" stop-opacity="0.22" />
-          <stop offset="0.55" stop-color="white" stop-opacity="0.06" />
-          <stop offset="1" stop-color="white" stop-opacity="0" />
+          <stop stopColor="white" stopOpacity="0.22" />
+          <stop offset="0.55" stopColor="white" stopOpacity="0.06" />
+          <stop offset="1" stopColor="white" stopOpacity="0" />
         </radialGradient>
         <clipPath id="clip0_22_3097">
           <rect width="16" height="16" fill="white" />

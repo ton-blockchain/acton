@@ -1,7 +1,8 @@
-import react from "@vitejs/plugin-react"
-import { defineConfig, type PluginOption } from "vite"
-import { nodePolyfills } from "vite-plugin-node-polyfills"
 import path from "node:path"
+
+import react from "@vitejs/plugin-react"
+import {defineConfig, type PluginOption} from "vite"
+import {nodePolyfills} from "vite-plugin-node-polyfills"
 
 export default defineConfig({
   plugins: [

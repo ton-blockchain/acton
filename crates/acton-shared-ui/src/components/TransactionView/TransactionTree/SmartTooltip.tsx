@@ -1,8 +1,9 @@
-import type React from "react"
-import { useEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
+import * as React from "react"
+import {useEffect, useRef, useState} from "react"
+import {createPortal} from "react-dom"
+
 import styles from "./SmartTooltip.module.css"
-import type { TooltipPosition } from "./useTooltip"
+import type {TooltipPosition} from "./useTooltip"
 
 interface SmartTooltipProps {
   readonly content: React.ReactNode
@@ -80,9 +81,9 @@ export function SmartTooltip({
 }: SmartTooltipProps): React.JSX.Element {
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const bridgeRef = useRef<HTMLDivElement | null>(null)
-  const [position, setPosition] = useState<TooltipPosition>({ x: 0, y: 0, placement: "right" })
+  const [position, setPosition] = useState<TooltipPosition>({x: 0, y: 0, placement: "right"})
   const [isVisible, setIsVisible] = useState(false)
-  const [bridgeRect, setBridgeRect] = useState<DOMRect | undefined>(undefined)
+  const [bridgeRect, setBridgeRect] = useState<DOMRect | undefined>()
 
   useEffect(() => {
     if (!tooltipRef.current) return

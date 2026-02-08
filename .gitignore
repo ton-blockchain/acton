@@ -20,6 +20,8 @@ docs/out
 .DS_Store
 Thumbs.db
 
+**/.eslintcache
+
 *.mnemonic
 wallets.toml
 global.wallets.toml

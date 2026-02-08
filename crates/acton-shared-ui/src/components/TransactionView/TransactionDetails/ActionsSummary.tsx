@@ -1,12 +1,13 @@
-import type { OutAction } from "@ton/core"
+import type {OutAction} from "@ton/core"
 import type React from "react"
-import { useState } from "react"
-import type { ContractData } from "@/types/transaction"
-import { fmt } from "@/index"
-import { DataBlock } from "@/index"
-import { ContractChip } from "../ContractChip/ContractChip"
-import { ReserveModeViewer } from "../ReserveModeViewer/ReserveModeViewer"
-import { SendModeViewer } from "../SendModeViewer/SendModeViewer"
+import {useState} from "react"
+
+import type {ContractData} from "@/types/transaction"
+import {fmt, DataBlock} from "@/index"
+
+import {ContractChip} from "../ContractChip/ContractChip"
+import {ReserveModeViewer} from "../ReserveModeViewer/ReserveModeViewer"
+import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 
 import styles from "./ActionsSummary.module.css"
 
@@ -85,8 +86,8 @@ const renderActionDetails = (
 ): React.JSX.Element | undefined => {
   switch (action.type) {
     case "sendMsg": {
-      const msg = action.outMsg
-      const info = msg.info
+      const message = action.outMsg
+      const info = message.info
 
       return (
         <div className={styles.actionDetails}>
@@ -109,13 +110,21 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>From:</span>
                   <div className={styles.detailValue}>
-                    <ContractChip address={contractAddress} contracts={contracts} onContractClick={onContractClick} />
+                    <ContractChip
+                      address={contractAddress}
+                      contracts={contracts}
+                      onContractClick={onContractClick}
+                    />
                   </div>
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>To:</span>
                   <div className={styles.detailValue}>
-                    <ContractChip address={info.dest.toString()} contracts={contracts} onContractClick={onContractClick} />
+                    <ContractChip
+                      address={info.dest.toString()}
+                      contracts={contracts}
+                      onContractClick={onContractClick}
+                    />
                   </div>
                 </div>
                 <div className={styles.detailRow}>
@@ -137,14 +146,22 @@ const renderActionDetails = (
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>From:</span>
                   <div className={styles.detailValue}>
-                    <ContractChip address={contractAddress} contracts={contracts} onContractClick={onContractClick} />
+                    <ContractChip
+                      address={contractAddress}
+                      contracts={contracts}
+                      onContractClick={onContractClick}
+                    />
                   </div>
                 </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>To:</span>
                   <div className={styles.detailValue}>
                     {info.dest ? (
-                      <ContractChip address={info.dest.toString()} contracts={contracts} onContractClick={onContractClick} />
+                      <ContractChip
+                        address={info.dest.toString()}
+                        contracts={contracts}
+                        onContractClick={onContractClick}
+                      />
                     ) : (
                       "External"
                     )}
@@ -155,7 +172,7 @@ const renderActionDetails = (
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Body:</span>
               <div className={styles.detailValue}>
-                <DataBlock data={msg.body.toBoc().toString("hex")} />
+                <DataBlock data={message.body.toBoc().toString("hex")} />
               </div>
             </div>
           </div>
@@ -213,7 +230,7 @@ export function ActionsSummary({
   contractAddress,
   onContractClick,
 }: ActionsSummaryProps): React.JSX.Element {
-  const [selectedActionIndex, setSelectedActionIndex] = useState<number | undefined>(undefined)
+  const [selectedActionIndex, setSelectedActionIndex] = useState<number | undefined>()
 
   if (actions.length === 0) {
     return (
@@ -225,19 +242,19 @@ export function ActionsSummary({
 
   const getActionSummary = (
     action: OutAction,
-  ): { title: string; description: string; value: string } => {
+  ): {title: string; description: string; value: string} => {
     switch (action.type) {
       case "sendMsg": {
-        const msg = action.outMsg
-        const msgType = msg.info.type === "internal" ? "Internal" : "External"
-        const dest =
-          msg.info.type === "internal"
-            ? msg.info.dest.toString()
-            : (msg.info.dest?.toString() ?? "External")
-        const value = msg.info.type === "internal" ? fmt.formatCurrency(msg.info.value.coins) : ""
+        const message = action.outMsg
+        const messageType = message.info.type === "internal" ? "Internal" : "External"
+        const destination =
+          message.info.type === "internal"
+            ? message.info.dest.toString()
+            : (message.info.dest?.toString() ?? "External")
+        const value = message.info.type === "internal" ? fmt.formatCurrency(message.info.value.coins) : ""
         return {
           title: "Send Message",
-          description: `${msgType} → ${dest}`,
+          description: `${messageType} → ${destination}`,
           value: value,
         }
       }
@@ -280,9 +297,9 @@ export function ActionsSummary({
                 enhancedDescription = (
                   <div className={styles.actionDescriptionWithChip}>
                     <span>Internal → </span>
-                    <ContractChip 
-                      address={info.dest.toString()} 
-                      contracts={contracts} 
+                    <ContractChip
+                      address={info.dest.toString()}
+                      contracts={contracts}
                       onContractClick={onContractClick}
                     />
                   </div>
@@ -297,7 +314,7 @@ export function ActionsSummary({
                 onClick={() => {
                   setSelectedActionIndex(isSelected ? undefined : index)
                 }}
-                onKeyDown={(event) => {
+                onKeyDown={event => {
                   if (event.key === "Enter" || event.key === " ") {
                     setSelectedActionIndex(isSelected ? undefined : index)
                   }
@@ -321,7 +338,12 @@ export function ActionsSummary({
 
       {selectedActionIndex !== undefined && selectedActionIndex < actions.length && (
         <div className={styles.detailsContainer}>
-          {renderActionDetails(actions[selectedActionIndex], contractAddress, contracts, onContractClick)}
+          {renderActionDetails(
+            actions[selectedActionIndex],
+            contractAddress,
+            contracts,
+            onContractClick,
+          )}
         </div>
       )}
     </div>

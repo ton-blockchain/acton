@@ -7,8 +7,8 @@ import {
   type OutAction,
   type Transaction,
 } from "@ton/core"
-import type { BackendTransaction } from "@/types"
-import type { TransactionInfo } from "@/types"
+
+import type {BackendTransaction, TransactionInfo} from "@/types"
 
 const bigintToAddress = (addr: bigint | undefined): Address | undefined => {
   if (addr === undefined) return undefined
@@ -24,14 +24,14 @@ function parseActions(actionsBase64?: string): {
   outActions: OutAction[]
   actionsCell: Cell | undefined
 } {
-  if (!actionsBase64) return { outActions: [], actionsCell: undefined }
+  if (!actionsBase64) return {outActions: [], actionsCell: undefined}
   try {
     const actionsCell = Cell.fromBase64(actionsBase64)
-    const outActions = loadOutList(actionsCell.beginParse()) as OutAction[]
-    return { outActions, actionsCell }
-  } catch (e) {
-    console.error("Failed to parse actions BOC", e)
-    return { outActions: [], actionsCell: undefined }
+    const outActions = loadOutList(actionsCell.beginParse())
+    return {outActions, actionsCell}
+  } catch (error) {
+    console.error("Failed to parse actions BOC", error)
+    return {outActions: [], actionsCell: undefined}
   }
 }
 
@@ -43,20 +43,18 @@ export function getTransactionOpcode(tx: Transaction): number | undefined {
   if (slice.remainingBits < 32) return undefined
 
   let opcode = slice.loadUint(32)
-  if (inMessage.info.type === "internal" && inMessage.info.bounced) {
-    if (slice.remainingBits >= 32) {
+  if (inMessage.info.type === "internal" && inMessage.info.bounced && slice.remainingBits >= 32) {
       opcode = slice.loadUint(32)
     }
-  }
   return opcode
 }
 
 export function processTransactions(transactions: BackendTransaction[]): TransactionInfo[] {
   const visited = new Map<string, TransactionInfo>()
 
-  const txInfos = transactions.map((tx) => {
+  const txInfos = transactions.map(tx => {
     const parsedTx = loadTransaction(Cell.fromBase64(tx.raw_transaction).asSlice())
-    const { outActions, actionsCell } = parseActions(tx.actions)
+    const {outActions, actionsCell} = parseActions(tx.actions)
 
     const info: TransactionInfo = {
       lt: tx.lt,
@@ -85,7 +83,7 @@ export function processTransactions(transactions: BackendTransaction[]): Transac
 
     if (tx.child_transactions) {
       info.children = tx.child_transactions
-        .map((childLt) => visited.get(childLt))
+        .map(childLt => visited.get(childLt))
         .filter((it): it is TransactionInfo => it !== undefined)
     }
   }

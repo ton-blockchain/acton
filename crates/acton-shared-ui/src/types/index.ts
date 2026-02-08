@@ -17,7 +17,7 @@ export interface TestReport {
   readonly file_path: string
   readonly row: number
   readonly column: number
-  readonly duration: { secs: number; nanos: number }
+  readonly duration: {secs: number; nanos: number}
   readonly status: TestStatus
   readonly message?: string
   readonly detailed_message?: string

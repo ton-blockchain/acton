@@ -1,44 +1,45 @@
-import * as React from "react";
-import styles from "./Table.module.css";
+import * as React from "react"
 
-interface TableProps extends React.HTMLAttributes<HTMLTableElement> {}
-export const Table: React.FC<TableProps> = ({ className, ...props }) => (
+import styles from "./Table.module.css"
+
+export type TableProps = Readonly<React.HTMLAttributes<HTMLTableElement>>
+export const Table: React.FC<TableProps> = ({className, ...properties}) => (
   <div className={styles.tableWrapper}>
-    <table className={`${styles.table} ${className ?? ""}`} {...props} />
+    <table className={`${styles.table} ${className ?? ""}`} {...properties} />
   </div>
-);
+)
 
-interface TableHeaderProps extends React.HTMLAttributes<HTMLTableSectionElement> {}
-export const TableHeader: React.FC<TableHeaderProps> = ({ className, ...props }) => (
-  <thead className={`${styles.header} ${className ?? ""}`} {...props} />
-);
+export type TableHeaderProps = Readonly<React.HTMLAttributes<HTMLTableSectionElement>>
+export const TableHeader: React.FC<TableHeaderProps> = ({className, ...properties}) => (
+  <thead className={`${styles.header} ${className ?? ""}`} {...properties} />
+)
 
-interface TableBodyProps extends React.HTMLAttributes<HTMLTableSectionElement> {}
-export const TableBody: React.FC<TableBodyProps> = ({ className, ...props }) => (
-  <tbody className={`${styles.body} ${className ?? ""}`} {...props} />
-);
+export type TableBodyProps = Readonly<React.HTMLAttributes<HTMLTableSectionElement>>
+export const TableBody: React.FC<TableBodyProps> = ({className, ...properties}) => (
+  <tbody className={`${styles.body} ${className ?? ""}`} {...properties} />
+)
 
-interface TableFooterProps extends React.HTMLAttributes<HTMLTableSectionElement> {}
-export const TableFooter: React.FC<TableFooterProps> = ({ className, ...props }) => (
-  <tfoot className={`${styles.footer} ${className ?? ""}`} {...props} />
-);
+export type TableFooterProps = Readonly<React.HTMLAttributes<HTMLTableSectionElement>>
+export const TableFooter: React.FC<TableFooterProps> = ({className, ...properties}) => (
+  <tfoot className={`${styles.footer} ${className ?? ""}`} {...properties} />
+)
 
-interface TableRowProps extends React.HTMLAttributes<HTMLTableRowElement> {}
-export const TableRow: React.FC<TableRowProps> = ({ className, ...props }) => (
-  <tr className={`${styles.row} ${className ?? ""}`} {...props} />
-);
+export type TableRowProps = Readonly<React.HTMLAttributes<HTMLTableRowElement>>
+export const TableRow: React.FC<TableRowProps> = ({className, ...properties}) => (
+  <tr className={`${styles.row} ${className ?? ""}`} {...properties} />
+)
 
-interface TableHeadProps extends React.ThHTMLAttributes<HTMLTableCellElement> {}
-export const TableHead: React.FC<TableHeadProps> = ({ className, ...props }) => (
-  <th className={`${styles.head} ${className ?? ""}`} {...props} />
-);
+export type TableHeadProps = Readonly<React.ThHTMLAttributes<HTMLTableCellElement>>
+export const TableHead: React.FC<TableHeadProps> = ({className, ...properties}) => (
+  <th className={`${styles.head} ${className ?? ""}`} {...properties} />
+)
 
-interface TableCellProps extends React.TdHTMLAttributes<HTMLTableCellElement> {}
-export const TableCell: React.FC<TableCellProps> = ({ className, ...props }) => (
-  <td className={`${styles.cell} ${className ?? ""}`} {...props} />
-);
+export type TableCellProps = Readonly<React.TdHTMLAttributes<HTMLTableCellElement>>
+export const TableCell: React.FC<TableCellProps> = ({className, ...properties}) => (
+  <td className={`${styles.cell} ${className ?? ""}`} {...properties} />
+)
 
-interface TableCaptionProps extends React.HTMLAttributes<HTMLTableCaptionElement> {}
-export const TableCaption: React.FC<TableCaptionProps> = ({ className, ...props }) => (
-  <caption className={`${styles.caption} ${className ?? ""}`} {...props} />
-);
+export type TableCaptionProps = Readonly<React.HTMLAttributes<HTMLTableCaptionElement>>
+export const TableCaption: React.FC<TableCaptionProps> = ({className, ...properties}) => (
+  <caption className={`${styles.caption} ${className ?? ""}`} {...properties} />
+)

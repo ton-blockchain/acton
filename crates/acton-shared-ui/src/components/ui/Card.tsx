@@ -1,32 +1,35 @@
-import * as React from "react";
-import styles from "./Card.module.css";
+import * as React from "react"
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
-export const Card: React.FC<CardProps> = ({ className, ...props }) => (
-  <div className={`${styles.card} ${className ?? ""}`} {...props} />
-);
+import styles from "./Card.module.css"
 
-interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
-export const CardHeader: React.FC<CardHeaderProps> = ({ className, ...props }) => (
-  <div className={`${styles.header} ${className ?? ""}`} {...props} />
-);
+export type CardProps = Readonly<React.HTMLAttributes<HTMLDivElement>>
+export const Card: React.FC<CardProps> = ({className, ...Props}) => (
+  <div className={`${styles.card} ${className ?? ""}`} {...Props} />
+)
 
-interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {}
-export const CardTitle: React.FC<CardTitleProps> = ({ className, ...props }) => (
-  <h3 className={`${styles.title} ${className ?? ""}`} {...props} />
-);
+export type CardHeaderProps = Readonly<React.HTMLAttributes<HTMLDivElement>>
+export const CardHeader: React.FC<CardHeaderProps> = ({className, ...properties}) => (
+  <div className={`${styles.header} ${className ?? ""}`} {...properties} />
+)
 
-interface CardDescriptionProps extends React.HTMLAttributes<HTMLParagraphElement> {}
-export const CardDescription: React.FC<CardDescriptionProps> = ({ className, ...props }) => (
-  <p className={`${styles.description} ${className ?? ""}`} {...props} />
-);
+export type CardTitleProps = Readonly<React.HTMLAttributes<HTMLHeadingElement>>
+export const CardTitle: React.FC<CardTitleProps> = ({className, children, ...properties}) => (
+  <h3 className={`${styles.title} ${className ?? ""}`} {...properties}>
+    {children}
+  </h3>
+)
 
-interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {}
-export const CardContent: React.FC<CardContentProps> = ({ className, ...props }) => (
-  <div className={`${styles.content} ${className ?? ""}`} {...props} />
-);
+export type CardDescriptionProps = Readonly<React.HTMLAttributes<HTMLParagraphElement>>
+export const CardDescription: React.FC<CardDescriptionProps> = ({className, ...properties}) => (
+  <p className={`${styles.description} ${className ?? ""}`} {...properties} />
+)
 
-interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
-export const CardFooter: React.FC<CardFooterProps> = ({ className, ...props }) => (
-  <div className={`${styles.footer} ${className ?? ""}`} {...props} />
-);
+export type CardContentProps = Readonly<React.HTMLAttributes<HTMLDivElement>>
+export const CardContent: React.FC<CardContentProps> = ({className, ...properties}) => (
+  <div className={`${styles.content} ${className ?? ""}`} {...properties} />
+)
+
+export type CardFooterProps = Readonly<React.HTMLAttributes<HTMLDivElement>>
+export const CardFooter: React.FC<CardFooterProps> = ({className, ...properties}) => (
+  <div className={`${styles.footer} ${className ?? ""}`} {...properties} />
+)

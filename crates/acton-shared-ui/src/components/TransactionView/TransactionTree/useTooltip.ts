@@ -1,5 +1,5 @@
 import type React from "react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import {useCallback, useEffect, useRef, useState} from "react"
 
 export interface TooltipPosition {
   readonly x: number
@@ -30,7 +30,7 @@ interface UseTooltipReturn {
 }
 
 export function useTooltip(): UseTooltipReturn {
-  const [tooltip, setTooltip] = useState<TooltipData | undefined>(undefined)
+  const [tooltip, setTooltip] = useState<TooltipData | undefined>()
   const [isTooltipHovered, setIsTooltipHovered] = useState(false)
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const tooltipIdRef = useRef(0)
@@ -77,7 +77,7 @@ export function useTooltip(): UseTooltipReturn {
         },
       ]
 
-      positions.forEach((pos) => {
+      for (const pos of positions) {
         const fitsHorizontally = pos.x >= margin && pos.x + tooltipWidth <= viewport.width - margin
         const fitsVertically = pos.y >= margin && pos.y + tooltipHeight <= viewport.height - margin
 
@@ -105,7 +105,7 @@ export function useTooltip(): UseTooltipReturn {
           distanceFromTop,
           distanceFromBottom,
         )
-      })
+      }
 
       const bestPosition = positions.reduce((best, current) =>
         current.score > best.score ? current : best,
@@ -120,10 +120,13 @@ export function useTooltip(): UseTooltipReturn {
         Math.min(bestPosition.y, viewport.height - tooltipHeight - margin),
       )
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+      const placement = bestPosition.placement as "top" | "bottom" | "left" | "right";
+
       return {
         x: finalX,
         y: finalY,
-        placement: bestPosition.placement as "top" | "bottom" | "left" | "right",
+        placement: placement,
       }
     },
     [],
