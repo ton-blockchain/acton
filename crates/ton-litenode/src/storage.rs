@@ -4,7 +4,6 @@ use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::Display;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
