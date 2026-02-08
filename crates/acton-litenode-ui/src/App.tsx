@@ -6,6 +6,7 @@ import { TonClient } from "./explorer/api/client"
 import { ExplorerIndexPage } from "./explorer/pages/ExplorerIndexPage"
 import { TransactionPage } from "./explorer/pages/TransactionPage"
 import { TonExplorer } from "./explorer/TonExplorer"
+import * as utils from "./explorer/components/utils"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import { Moon, Sun } from "lucide-react"
@@ -22,9 +23,7 @@ export const App: React.FC = () => {
   const client = useMemo(() => new TonClient("http://localhost:3010/api"), [])
 
   useEffect(() => {
-    import("./explorer/components/utils").then((utils) => {
-      utils.setTonClientInstance(client)
-    })
+    utils.setTonClientInstance(client)
   }, [client])
 
   useEffect(() => {

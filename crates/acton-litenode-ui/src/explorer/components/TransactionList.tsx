@@ -20,7 +20,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import type React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import type { FullAccountState, Transaction } from "../types"
 import { ContractCode } from "./ContractCode"
@@ -39,6 +39,7 @@ const ITEMS_PER_PAGE = 10
 export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   accountState,
+  ownerAddress,
   onAddressClick,
 }) => {
   const navigate = useNavigate()
@@ -50,6 +51,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+
+  const browsedAddr = useMemo(() => {
+    try {
+      return Address.parse(ownerAddress)
+    } catch {
+      return null
+    }
+  }, [ownerAddress])
 
   useEffect(() => {
     const addressesToFetch = new Set<string>()
@@ -124,7 +133,22 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             </TableHeader>
             <TableBody>
               {paginatedTransactions.map((tx) => {
-                const isIncoming = false
+                const inMsg = tx.in_msg
+                let isIncoming
+
+                try {
+                  const inMsgSrc = inMsg.source?.account_address
+                    ? Address.parse(inMsg.source.account_address)
+                    : null
+
+                  if (inMsgSrc && browsedAddr && !inMsgSrc.equals(browsedAddr)) {
+                    isIncoming = true
+                  } else {
+                    isIncoming = false
+                  }
+                } catch (e) {
+                  isIncoming = false
+                }
 
                 const inValue = BigInt(tx.in_msg.value || "0")
                 const outValue = tx.out_msgs.reduce(
