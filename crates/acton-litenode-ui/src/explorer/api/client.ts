@@ -1,5 +1,4 @@
-import type { FullAccountState, Transaction } from "../types"
-import type { ApiResponse, V3TracesResponse } from "./types"
+import type { ApiResponse, FullAccountState, Transaction, V3TracesResponse } from "./types"
 
 interface TonClientOptions {
   readonly v2BaseUrl: string
@@ -60,11 +59,7 @@ export class TonClient {
     return new URL(`${fullBase}${path}`)
   }
 
-  private async request<T>(
-    url: URL,
-    errorMessage: string,
-    options?: RequestInit,
-  ): Promise<T> {
+  private async request<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
     const response = await fetch(url.toString(), options)
     const data = (await response.json()) as ApiResponse<T>
     if (!data.ok) throw new Error(data.error || errorMessage)

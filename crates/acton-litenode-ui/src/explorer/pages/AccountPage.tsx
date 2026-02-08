@@ -1,30 +1,27 @@
 import type React from "react"
 import { useEffect, useMemo, useState } from "react"
+import { useNavigate, useParams } from "react-router-dom"
 import type { TonClient } from "../api/client"
 import { AccountInfo } from "../components/AccountInfo"
 import { Breadcrumbs } from "../components/Breadcrumbs"
 import { TransactionList } from "../components/TransactionList"
 import styles from "./AccountPage.module.css"
-import type { FullAccountState, Transaction } from "../types"
+import type { FullAccountState, Transaction } from "../api/types"
 import { normalizeAddress } from "../components/utils"
 
 interface AccountPageProps {
   readonly client: TonClient
-  readonly externalAddress?: string
-  readonly onAddressChange?: (addr: string) => void
 }
 
-export const AccountPage: React.FC<AccountPageProps> = ({
-  client,
-  externalAddress = "",
-  onAddressChange,
-}) => {
+export const AccountPage: React.FC<AccountPageProps> = ({ client }) => {
+  const { address = "" } = useParams<{ address: string }>()
+  const navigate = useNavigate()
   const [accountState, setAccountState] = useState<FullAccountState | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const formattedAddress = useMemo(() => normalizeAddress(externalAddress), [externalAddress])
+  const formattedAddress = useMemo(() => normalizeAddress(address), [address])
 
   useEffect(() => {
     let isActive = true
@@ -60,6 +57,15 @@ export const AccountPage: React.FC<AccountPageProps> = ({
     }
   }, [client, formattedAddress])
 
+  const handleSearch = (addr: string) => {
+    const finalAddr = addr ? normalizeAddress(addr) : ""
+    if (finalAddr) {
+      navigate(`/explorer/address/${finalAddr}`)
+    } else {
+      navigate("/explorer")
+    }
+  }
+
   return (
     <div className={styles.container}>
       {loading && <div className={styles.loading}>Loading...</div>}
@@ -81,7 +87,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
             transactions={transactions}
             accountState={accountState}
             ownerAddress={formattedAddress}
-            onAddressClick={onAddressChange}
+            onAddressClick={handleSearch}
           />
         </>
       )}

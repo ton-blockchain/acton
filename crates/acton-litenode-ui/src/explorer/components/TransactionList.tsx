@@ -8,7 +8,6 @@ import {
   TableHeader,
   TableRow,
 } from "@acton/shared-ui"
-import { Address } from "@ton/core"
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -22,7 +21,7 @@ import {
 import type React from "react"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import type { FullAccountState, Transaction } from "../types"
+import type { FullAccountState, Transaction } from "../api/types"
 import { AddressLabel } from "./AddressLabel"
 import { ContractCode } from "./ContractCode"
 import styles from "./TransactionList.module.css"
@@ -106,21 +105,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             <TableBody>
               {paginatedTransactions.map((tx) => {
                 const inMsg = tx.in_msg
-                let isIncoming
-
-                try {
-                  const inMsgSrc = inMsg.source?.account_address
-                    ? Address.parse(inMsg.source.account_address)
-                    : null
-
-                  if (inMsgSrc && browsedAddr && !inMsgSrc.equals(browsedAddr)) {
-                    isIncoming = true
-                  } else {
-                    isIncoming = false
-                  }
-                } catch (e) {
-                  isIncoming = false
-                }
+                const inMsgSrc = parseAddress(inMsg.source?.account_address || "")
+                const isIncoming = inMsgSrc && browsedAddr ? !inMsgSrc.equals(browsedAddr) : false
 
                 const inValue = BigInt(tx.in_msg.value || "0")
                 const outValue = tx.out_msgs.reduce(
@@ -177,10 +163,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                           onMouseEnter={() => address && setHoveredAddress(address)}
                           onMouseLeave={() => setHoveredAddress(null)}
                         >
-                          <AddressLabel
-                            address={address}
-                            fallback={displayAddressFallback}
-                          />
+                          <AddressLabel address={address} fallback={displayAddressFallback} />
                         </button>
                         {displayOpcode && <span className={styles.opcode}>{displayOpcode}</span>}
                       </div>

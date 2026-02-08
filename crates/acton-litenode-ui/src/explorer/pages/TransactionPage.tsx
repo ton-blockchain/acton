@@ -28,7 +28,7 @@ import { Breadcrumbs } from "../components/Breadcrumbs"
 import { normalizeAddress } from "../components/utils"
 import { useAddressBook } from "../hooks/useAddressBook"
 import styles from "./TransactionPage.module.css"
-import {Address} from "@ton/core";
+import { Address } from "@ton/core"
 
 interface TransactionPageProps {
   client: TonClient

@@ -1,12 +1,12 @@
 import type React from "react"
 import { useEffect, useMemo, useState } from "react"
-import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom"
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from "react-router-dom"
 import { TonClient } from "./explorer/api/client"
 import { AddressBookProvider } from "./explorer/hooks/useAddressBook"
 import { AccountPage } from "./explorer/pages/AccountPage"
 import { ExplorerIndexPage } from "./explorer/pages/ExplorerIndexPage"
 import { TransactionPage } from "./explorer/pages/TransactionPage"
-import { normalizeAddress, toTestnetAddress } from "./explorer/components/utils"
+import { toTestnetAddress } from "./explorer/components/utils"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import { Moon, Sun } from "lucide-react"
@@ -94,10 +94,7 @@ export const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Navigate to="/explorer" replace />} />
               <Route path="/explorer" element={<ExplorerIndexPage />} />
-              <Route
-                path="/explorer/address/:address"
-                element={<AccountPageWrapper client={client} />}
-              />
+              <Route path="/explorer/address/:address" element={<AccountPage client={client} />} />
               <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
               <Route path="*" element={<Navigate to="/explorer" replace />} />
             </Routes>
@@ -131,23 +128,5 @@ const HeaderSearch: React.FC = () => {
         />
       </div>
     </div>
-  )
-}
-
-const AccountPageWrapper: React.FC<{ client: TonClient }> = ({ client }) => {
-  const { address } = useParams<{ address: string }>()
-  const navigate = useNavigate()
-
-  const handleSearch = (addr: string) => {
-    const finalAddr = addr ? normalizeAddress(addr) : ""
-    if (finalAddr) {
-      navigate(`/explorer/address/${finalAddr}`)
-    } else {
-      navigate("/explorer")
-    }
-  }
-
-  return (
-    <AccountPage client={client} externalAddress={address || ""} onAddressChange={handleSearch} />
   )
 }
