@@ -1,17 +1,17 @@
 import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import { defineConfig, type PluginOption } from "vite"
 import { nodePolyfills } from "vite-plugin-node-polyfills"
 import path from "path"
 
 export default defineConfig({
   plugins: [
-    react(),
+    react() as PluginOption,
     nodePolyfills({
       include: ["buffer", "path"],
       globals: {
         Buffer: true,
       },
-    }),
+    }) as PluginOption,
   ],
   resolve: {
     alias: {

@@ -57,9 +57,10 @@ export async function fetchAddressName(address: string): Promise<string | null> 
   }
   
   if (addressNameCache[stdAddr] !== undefined) return addressNameCache[stdAddr];
-  if (pendingRequests[stdAddr]) return pendingRequests[stdAddr];
+  const pending = pendingRequests[stdAddr];
+  if (pending) return pending;
   
-  pendingRequests[stdAddr] = (async () => {
+  const request = (async () => {
     try {
       const name = await tonClientInstance.getAddressName(address);
       addressNameCache[stdAddr] = name;
@@ -73,7 +74,8 @@ export async function fetchAddressName(address: string): Promise<string | null> 
     }
   })();
   
-  return pendingRequests[stdAddr];
+  pendingRequests[stdAddr] = request;
+  return request;
 }
 
 export function updateCachedAddressName(address: string, name: string | null) {

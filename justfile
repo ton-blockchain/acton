@@ -55,8 +55,9 @@ coverage-clean:
     cargo llvm-cov clean
 
 build-ui:
+    bun install
     cd crates/acton-test-ui && bun i && bun run build
-    cd crates/ton-litenode-ui && bun i && bun run build
+    cd crates/acton-litenode-ui && bun i && bun run build
 
 precommit: build-ui build check
 

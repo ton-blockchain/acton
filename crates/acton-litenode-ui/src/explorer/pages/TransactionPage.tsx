@@ -13,7 +13,7 @@ import {
   fmt
 } from "@acton/shared-ui";
 import { Address } from "@ton/core";
-import { Loader2, AlertCircle, CheckCircle2, XCircle, List, Activity, TrendingUp, TrendingDown, MessageSquare } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, XCircle, List, Activity, TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
 import styles from "./TransactionPage.module.css";
 import { ContractCode } from "../components/ContractCode";
 import { fetchAddressName } from "../components/utils";
