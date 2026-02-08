@@ -1,6 +1,6 @@
 Build the specified contract or all contracts
 
-Usage: acton build [OPTIONS] [CONTRACT_ID]
+Usage: acton[EXE] build [OPTIONS] [CONTRACT_ID]
 
 Arguments:
   [CONTRACT_ID]  Contract ID to build (defaults to all if not specified)
