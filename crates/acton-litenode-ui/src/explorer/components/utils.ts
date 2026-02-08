@@ -11,15 +11,36 @@ export function setTonClientInstance(client: TonClient) {
   tonClientInstance = client
 }
 
+export function parseAddress(address: string): Address | null {
+  if (!address) return null
+  try {
+    return Address.parse(address)
+  } catch {
+    return null
+  }
+}
+
+export function toTestnetAddress(address: string): string | null {
+  const parsed = parseAddress(address)
+  return parsed ? parsed.toString({ testOnly: true }) : null
+}
+
+export function normalizeAddress(address: string): string {
+  return toTestnetAddress(address) ?? address
+}
+
+export function isSameAddress(a: string, b: string): boolean {
+  if (!a || !b) return false
+  const parsedA = parseAddress(a)
+  const parsedB = parseAddress(b)
+  if (parsedA && parsedB) return parsedA.equals(parsedB)
+  return a === b
+}
+
 export function formatNano(nano: string | number): string {
   const n = typeof nano === "string" ? BigInt(nano) : BigInt(nano)
   const ton = Number(n) / 1e9
   return ton.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 5 })
-}
-
-export function formatTime(utime: number): string {
-  const date = new Date(utime * 1000)
-  return date.toLocaleString()
 }
 
 export function formatTimeAgo(utime: number): string {

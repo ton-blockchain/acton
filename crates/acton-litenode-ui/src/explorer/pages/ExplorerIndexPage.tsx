@@ -97,7 +97,7 @@ export const ExplorerIndexPage: React.FC = () => {
           {showHistoryDropdown && history.length > 0 && !error && (
             <ul className={styles.historyDropdown} onMouseDown={(e) => e.preventDefault()}>
               {history.map((addr) => (
-                <div
+                <li
                   key={addr}
                   role="button"
                   tabIndex={0}
@@ -116,7 +116,7 @@ export const ExplorerIndexPage: React.FC = () => {
                   >
                     <X size={14} />
                   </button>
-                </div>
+                </li>
               ))}
             </ul>
           )}

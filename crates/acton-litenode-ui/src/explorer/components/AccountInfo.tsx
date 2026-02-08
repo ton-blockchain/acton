@@ -33,9 +33,13 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({ address, state }) => {
   }, [copied])
 
   useEffect(() => {
+    let isActive = true
     fetchAddressName(address).then((name) => {
-      setCustomName(name)
+      if (isActive) setCustomName(name)
     })
+    return () => {
+      isActive = false
+    }
   }, [address])
 
   const handleStartEdit = () => {

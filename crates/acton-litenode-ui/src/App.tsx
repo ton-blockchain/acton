@@ -1,4 +1,3 @@
-import { Address } from "@ton/core"
 import type React from "react"
 import { useEffect, useMemo, useState } from "react"
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom"
@@ -6,7 +5,7 @@ import { TonClient } from "./explorer/api/client"
 import { ExplorerIndexPage } from "./explorer/pages/ExplorerIndexPage"
 import { TransactionPage } from "./explorer/pages/TransactionPage"
 import { TonExplorer } from "./explorer/TonExplorer"
-import * as utils from "./explorer/components/utils"
+import { normalizeAddress, setTonClientInstance, toTestnetAddress } from "./explorer/components/utils"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import { Moon, Sun } from "lucide-react"
@@ -23,7 +22,7 @@ export const App: React.FC = () => {
   const client = useMemo(() => new TonClient("http://localhost:3010/api"), [])
 
   useEffect(() => {
-    utils.setTonClientInstance(client)
+    setTonClientInstance(client)
   }, [client])
 
   useEffect(() => {
@@ -117,12 +116,8 @@ const HeaderSearch: React.FC = () => {
               if (val.length === 64) {
                 navigate(`/tx/${val}`)
               } else {
-                try {
-                  const formatted = Address.parse(val).toString({ testOnly: true })
-                  navigate(`/explorer/address/${formatted}`)
-                } catch {
-                  navigate(`/explorer/address/${val}`)
-                }
+                const formatted = toTestnetAddress(val)
+                navigate(`/explorer/address/${formatted ?? val}`)
               }
             }
           }}
@@ -137,15 +132,7 @@ const TonExplorerWrapper: React.FC<{ client: TonClient }> = ({ client }) => {
   const navigate = useNavigate()
 
   const handleSearch = (addr: string) => {
-    let finalAddr = addr
-    try {
-      if (addr) {
-        finalAddr = Address.parse(addr).toString({ testOnly: true })
-      }
-    } catch (_e) {
-      // Keep original if not a valid TON address
-    }
-
+    const finalAddr = addr ? normalizeAddress(addr) : ""
     if (finalAddr) {
       navigate(`/explorer/address/${finalAddr}`)
     } else {

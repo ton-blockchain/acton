@@ -1,12 +1,12 @@
-import { Address } from "@ton/core"
 import type React from "react"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { TonClient } from "./api/client"
 import { AccountInfo } from "./components/AccountInfo"
 import { Breadcrumbs } from "./components/Breadcrumbs"
 import { TransactionList } from "./components/TransactionList"
 import styles from "./TonExplorer.module.css"
 import type { FullAccountState, Transaction } from "./types"
+import { normalizeAddress } from "./components/utils"
 
 interface TonExplorerProps {
   client: TonClient
@@ -24,9 +24,12 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(
-    async (addr: string) => {
-      if (!addr) {
+  const formattedAddress = useMemo(() => normalizeAddress(externalAddress), [externalAddress])
+
+  useEffect(() => {
+    let isActive = true
+    const load = async () => {
+      if (!externalAddress) {
         setAccountState(null)
         setTransactions([])
         return
@@ -35,25 +38,27 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
       setError(null)
       try {
         const [state, txs] = await Promise.all([
-          client.getAddressInformation(addr),
-          client.getTransactions(addr),
+          client.getAddressInformation(externalAddress),
+          client.getTransactions(externalAddress),
         ])
+        if (!isActive) return
         setAccountState(state)
         setTransactions(txs)
       } catch (e) {
+        if (!isActive) return
         setError(e instanceof Error ? e.message : "An error occurred")
         setAccountState(null)
         setTransactions([])
       } finally {
-        setLoading(false)
+        if (isActive) setLoading(false)
       }
-    },
-    [client],
-  )
+    }
 
-  useEffect(() => {
-    fetchData(externalAddress)
-  }, [externalAddress, fetchData])
+    void load()
+    return () => {
+      isActive = false
+    }
+  }, [externalAddress, client])
 
   return (
     <div className={styles.container}>
@@ -66,24 +71,22 @@ export const TonExplorer: React.FC<TonExplorerProps> = ({
           <Breadcrumbs
             items={[
               {
-                label: externalAddress
-                  ? Address.parse(externalAddress).toString({ testOnly: true })
-                  : "",
+                label: formattedAddress,
                 isAddress: true,
               },
             ]}
           />
-          <AccountInfo address={externalAddress} state={accountState} />
+          <AccountInfo address={formattedAddress} state={accountState} />
           <TransactionList
             transactions={transactions}
             accountState={accountState}
-            ownerAddress={externalAddress}
+            ownerAddress={formattedAddress}
             onAddressClick={onAddressChange}
           />
         </>
       )}
 
-      {!accountState && !loading && !error && externalAddress && (
+      {!accountState && !loading && !error && formattedAddress && (
         <div className={styles.empty}>No data found for this address.</div>
       )}
     </div>

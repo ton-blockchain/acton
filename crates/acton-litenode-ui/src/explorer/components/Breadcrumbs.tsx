@@ -19,18 +19,21 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items }) => {
   const [labels, setLabels] = useState<Record<number, string>>({})
 
   useEffect(() => {
+    let isActive = true
     items.forEach((item, index) => {
       if (item.isAddress) {
         fetchAddressName(item.label).then((name) => {
-          if (name) {
-            setLabels((prev) => {
-              if (prev[index] === name) return prev
-              return { ...prev, [index]: name }
-            })
-          }
+          if (!isActive || !name) return
+          setLabels((prev) => {
+            if (prev[index] === name) return prev
+            return { ...prev, [index]: name }
+          })
         })
       }
     })
+    return () => {
+      isActive = false
+    }
   }, [items])
 
   const formatItem = (item: BreadcrumbItem, index: number) => {

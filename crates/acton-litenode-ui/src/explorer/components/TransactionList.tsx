@@ -25,7 +25,14 @@ import { useNavigate } from "react-router-dom"
 import type { FullAccountState, Transaction } from "../types"
 import { ContractCode } from "./ContractCode"
 import styles from "./TransactionList.module.css"
-import { fetchAddressName, formatAddress, formatNano, formatTimeAgo } from "./utils"
+import {
+  fetchAddressName,
+  formatAddress,
+  formatNano,
+  formatTimeAgo,
+  isSameAddress,
+  parseAddress,
+} from "./utils"
 
 interface TransactionListProps {
   transactions: Transaction[]
@@ -52,15 +59,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
-  const browsedAddr = useMemo(() => {
-    try {
-      return Address.parse(ownerAddress)
-    } catch {
-      return null
-    }
-  }, [ownerAddress])
+  const browsedAddr = useMemo(() => parseAddress(ownerAddress), [ownerAddress])
 
   useEffect(() => {
+    let isActive = true
     const addressesToFetch = new Set<string>()
     paginatedTransactions.forEach((tx) => {
       const inAddr = tx.in_msg.source?.account_address
@@ -72,14 +74,16 @@ export const TransactionList: React.FC<TransactionListProps> = ({
 
     Array.from(addressesToFetch).forEach((addr) => {
       fetchAddressName(addr).then((name) => {
-        if (name) {
-          setAddressNames((prev) => {
-            if (prev[addr] === name) return prev
-            return { ...prev, [addr]: name }
-          })
-        }
+        if (!isActive || !name) return
+        setAddressNames((prev) => {
+          if (prev[addr] === name) return prev
+          return { ...prev, [addr]: name }
+        })
       })
     })
+    return () => {
+      isActive = false
+    }
   }, [paginatedTransactions])
 
   return (
@@ -174,15 +178,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                 const displayOpcode = opcode ? opcode : null
 
                 const isAddressHovered =
-                  hoveredAddress &&
-                  address &&
-                  (() => {
-                    try {
-                      return Address.parse(address).equals(Address.parse(hoveredAddress))
-                    } catch {
-                      return address === hoveredAddress
-                    }
-                  })()
+                  hoveredAddress && address ? isSameAddress(address, hoveredAddress) : false
 
                 return (
                   <TableRow

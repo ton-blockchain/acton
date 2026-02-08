@@ -8,7 +8,6 @@ import {
   type TransactionInfo,
   TransactionTree,
 } from "@acton/shared-ui"
-import { Address } from "@ton/core"
 import {
   Activity,
   AlertCircle,
@@ -25,8 +24,9 @@ import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import type { TonClient } from "../api/client"
 import { Breadcrumbs } from "../components/Breadcrumbs"
-import { fetchAddressName } from "../components/utils"
+import { fetchAddressName, normalizeAddress } from "../components/utils"
 import styles from "./TransactionPage.module.css"
+import {Address} from "@ton/core";
 
 interface TransactionPageProps {
   client: TonClient
@@ -60,6 +60,51 @@ interface V3TracesResponse {
   traces: V3Trace[]
 }
 
+const buildBackendTransactions = (
+  transactionsMap: Record<string, V3Transaction>,
+): BackendTransaction[] => {
+  const findParentLt = (targetLt: string): string | null => {
+    for (const tx of Object.values(transactionsMap)) {
+      if (tx.child_transactions?.includes(targetLt)) {
+        return tx.lt
+      }
+    }
+    return null
+  }
+
+  return Object.values(transactionsMap).map((tx) => ({
+    lt: tx.lt,
+    raw_transaction: tx.raw_transaction || "",
+    parent_transaction: findParentLt(tx.lt),
+    child_transactions: tx.child_transactions || [],
+    shard_account_before: "",
+    shard_account: "",
+    vm_log_diff: "",
+    executor_logs: "",
+  }))
+}
+
+const collectSeqnoBounds = (
+  processed: TransactionInfo[],
+  transactionsMap: Record<string, V3Transaction>,
+) => {
+  let minSeqno = Number.MAX_SAFE_INTEGER
+  let maxSeqno = 0
+
+  processed.forEach((t) => {
+    const txHash = t.transaction.hash().toString("hex")
+    const v3Tx = transactionsMap[txHash]
+    const seqno = v3Tx?.mc_block_seqno || 0
+
+    if (seqno > 0) {
+      minSeqno = Math.min(minSeqno, seqno)
+      maxSeqno = Math.max(maxSeqno, seqno)
+    }
+  })
+
+  return { minSeqno, maxSeqno }
+}
+
 export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
   const { hash } = useParams<{ hash: string }>()
   const navigate = useNavigate()
@@ -72,12 +117,13 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
   const [loadingFlow, setLoadingFlow] = useState(false)
 
   const handleContractClick = (address: string) => {
-    const formattedAddr = Address.parse(address).toString({ testOnly: true })
+    const formattedAddr = normalizeAddress(address)
     window.open(`/explorer/address/${formattedAddr}`)
   }
 
   useEffect(() => {
     if (!hash) return
+    let isActive = true
 
     const fetchTrace = async () => {
       setLoading(true)
@@ -89,56 +135,26 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
           const trace = data.traces[0]
           const transactionsMap = trace.transactions
 
-          // Helper to find parent LT
-          const findParentLt = (targetLt: string): string | null => {
-            for (const tx of Object.values(transactionsMap)) {
-              if (tx.child_transactions?.includes(targetLt)) {
-                return tx.lt
-              }
-            }
-            return null
-          }
-
-          const backendTransactions: BackendTransaction[] = Object.values(transactionsMap).map(
-            (tx) => ({
-              lt: tx.lt,
-              raw_transaction: tx.raw_transaction || "",
-              parent_transaction: findParentLt(tx.lt),
-              child_transactions: tx.child_transactions || [],
-              shard_account_before: "",
-              shard_account: "",
-              vm_log_diff: "",
-              executor_logs: "",
-            }),
-          )
+          const backendTransactions = buildBackendTransactions(transactionsMap)
 
           const processed = processTransactions(backendTransactions)
+          if (!isActive) return
           setTraces(processed)
 
           const contractsMap = new Map<string, ContractData>()
           const addresses = new Set<string>()
-          let minSeqno = Number.MAX_SAFE_INTEGER
-          let maxSeqno = 0
 
           processed.forEach((t) => {
             if (t.address) addresses.add(t.address.toString())
-            // Access mc_block_seqno from the raw V3 transaction data
-            const txHash = t.transaction.hash().toString("hex")
-            const v3Tx = transactionsMap[txHash]
-            const seqno = v3Tx?.mc_block_seqno || 0
-
-            if (seqno > 0) {
-              minSeqno = Math.min(minSeqno, seqno)
-              maxSeqno = Math.max(maxSeqno, seqno)
-            }
           })
+          const { minSeqno, maxSeqno } = collectSeqnoBounds(processed, transactionsMap)
 
           let nextLetterCode = 65
           await Promise.all(
             Array.from(addresses)
               .sort()
               .map(async (addr) => {
-                const displayAddr = Address.parse(addr).toString({ testOnly: true })
+                const displayAddr = normalizeAddress(addr)
                 const customName = await fetchAddressName(addr)
                 contractsMap.set(addr, {
                   displayName: customName || fmt.formatAddress(displayAddr),
@@ -147,6 +163,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                 })
               }),
           )
+          if (!isActive) return
           setContracts(contractsMap)
 
           // Fetch Value Flow
@@ -185,21 +202,26 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
               }),
             )
 
+            if (!isActive) return
             setValueFlow(flowItems.sort((a, b) => a.address.localeCompare(b.address)))
             setLoadingFlow(false)
           }
         } else {
-          setError("Transaction not found or has no trace yet.")
+          if (isActive) setError("Transaction not found or has no trace yet.")
         }
       } catch (e) {
         console.error("Failed to fetch trace:", e)
+        if (!isActive) return
         setError(e instanceof Error ? e.message : "Failed to load transaction trace")
       } finally {
-        setLoading(false)
+        if (isActive) setLoading(false)
       }
     }
 
-    fetchTrace()
+    void fetchTrace()
+    return () => {
+      isActive = false
+    }
   }, [hash, client])
 
   if (loading) {
@@ -223,6 +245,9 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
     )
   }
 
+  const traceAddress = traces[0]?.address?.toString() ?? ""
+  const traceAddressDisplay = normalizeAddress(traceAddress)
+
   return (
     <div className={styles.container}>
       <div className={styles.content}>
@@ -231,12 +256,8 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
             <Breadcrumbs
               items={[
                 {
-                  label: traces[0].address
-                    ? Address.parse(traces[0].address?.toString() || "").toString({
-                        testOnly: true,
-                      })
-                    : "",
-                  path: `/explorer/address/${traces[0].address ? Address.parse(traces[0].address?.toString() || "").toString({ testOnly: true }) : ""}`,
+                  label: traceAddressDisplay,
+                  path: `/explorer/address/${traceAddressDisplay}`,
                   isAddress: true,
                 },
                 { label: hash || "", isHash: true },
