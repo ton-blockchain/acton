@@ -2,8 +2,8 @@ import "@stdlib/gas-payments"
 import "@acton/emulation/network"
 import "@acton/testing/expect"
 import "@acton/testing/transaction_expect"
-import "../contracts/types"
-import "wrappers/MyContract"
+import "@contracts/types"
+import "@wrappers/MyContract"
 
 /// Example test case demonstrating the basic flow
 get fun `test-basic-flow`() {
@@ -24,7 +24,7 @@ fun setupTest() {
     val not_deployer = net.treasury("not_deployer");
 
     // Initialize and deploy the contract with default values
-    val contract = MyContract.fromStorage({ id: 0, counter: 0 });
+    val contract = MyContract.fromStorage({ counter: 0 });
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 

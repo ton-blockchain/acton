@@ -268,7 +268,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         tree: main_tree.tree,
     });
 
-    let dependencies = ton_abi::get_file_dependencies(&contract.src, true)?;
+    let dependencies = ton_abi::get_file_dependencies(&contract.src, true, &acton_config.mappings)?;
     for dep_path_str in &dependencies {
         let dep_path = PathBuf::from(dep_path_str);
         let dep_path = fs::canonicalize(&dep_path).unwrap_or(dep_path);

@@ -376,6 +376,57 @@ fn test_incremental_nested_import_change() {
     );
 }
 
+#[test]
+fn test_incremental_nested_import_change_with_mappings() {
+    let project = ProjectBuilder::new("incr-nested-import")
+        .mapping("@common", "common")
+        .file(
+            "common/base",
+            r"
+            fun baseFunc(): int { return 1; }
+        ",
+        )
+        .file(
+            "common/wrapper",
+            r#"
+            import "@common/base"
+            fun wrapperFunc(): int { return baseFunc(); }
+        "#,
+        )
+        .contract(
+            "main",
+            r#"
+            import "@common/wrapper"
+
+            fun onInternalMessage(in: InMessage) {
+                val x = wrapperFunc();
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    // Modify base common nested import
+    fs::write(
+        project.path().join("common/base.tolk"),
+        r"
+            fun baseFunc(): int { return 2; } // Changed
+        ",
+    )
+    .expect("Write base lib");
+
+    // Should recompile main
+    let second = project.acton().build().run().success();
+    let order = CompilationOrder::from_stdout(&second.get_normalized_stdout());
+
+    assert!(
+        order.contains("main"),
+        "Should recompile main due to nested import change"
+    );
+}
+
 // ========================================
 // Clear Cache Tests
 // ========================================

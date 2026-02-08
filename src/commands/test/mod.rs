@@ -724,7 +724,7 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
 
     let tests = find_all_test(file, &content);
 
-    let abi = contract_abi(content.as_str(), file);
+    let abi = contract_abi(content.as_str(), file, &runner.acton_config.mappings);
 
     let executable_code = inject_locations_into_expect_calls(&content, file);
     let tmp_test_filename = file.to_owned() + ".test.tolk";
@@ -983,7 +983,11 @@ fn run_file_tests(
                     &code_cell.to_boc_b64(false)?,
                     &code_cell.cell_hash()?.to_hex().to_ascii_uppercase(),
                     source_map.clone(),
-                    Some(contract_abi(&content, file_path)),
+                    Some(contract_abi(
+                        &content,
+                        file_path,
+                        &runner.acton_config.mappings,
+                    )),
                 );
             }
         }

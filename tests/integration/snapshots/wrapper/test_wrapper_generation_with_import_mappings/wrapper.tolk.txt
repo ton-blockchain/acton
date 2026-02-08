@@ -4,6 +4,7 @@ import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/message"
+import "@contracts/types"
 
 struct MyContract {
     address: address
@@ -11,10 +12,10 @@ struct MyContract {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun MyContract.fromStorage(toShard: AddressShardingOptions? = null) {
+fun MyContract.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null) {
     val stateInit = ContractState {
         code: build("my_contract"),
-        data: createEmptyCell(),
+        data: storage.toCell(),
     };
     val address = toShard == null
         ? AutoDeployAddress { stateInit }.calculateAddress()
@@ -37,6 +38,18 @@ fun MyContract.deploy(self, from: address, config: SendParams = {}): SendResultL
         value: config.value,
         dest: {
             stateInit: self.stateInit,
+        },
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+}
+
+fun MyContract.sendIncrement(self, from: address, value: int32, config: SendParams = {}): SendResultList {
+    val msg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: Increment {
+            value,
         },
     });
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)

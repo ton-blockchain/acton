@@ -4,31 +4,32 @@ import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/message"
+import "@core_sub/types"
 
-struct MyContract {
+struct Main {
     address: address
     stateInit: ContractState? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun MyContract.fromStorage(toShard: AddressShardingOptions? = null) {
+fun Main.fromStorage(toShard: AddressShardingOptions? = null) {
     val stateInit = ContractState {
-        code: build("my_contract"),
+        code: build("main"),
         data: createEmptyCell(),
     };
     val address = toShard == null
         ? AutoDeployAddress { stateInit }.calculateAddress()
         : AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return MyContract { address, stateInit }
+    return Main { address, stateInit }
 }
 
 /// Creates a contract wrapper instance from the address
-fun MyContract.fromAddress(address: address) {
-    return MyContract { address }
+fun Main.fromAddress(address: address) {
+    return Main { address }
 }
 
 /// Deploys the contract to the blockchain
-fun MyContract.deploy(self, from: address, config: SendParams = {}): SendResultList {
+fun Main.deploy(self, from: address, config: SendParams = {}): SendResultList {
     if (self.stateInit == null) {
         Assert.fail("Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment");
     }
@@ -42,8 +43,20 @@ fun MyContract.deploy(self, from: address, config: SendParams = {}): SendResultL
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
+fun Main.sendPong(self, from: address, value: int, config: SendParams = {}): SendResultList {
+    val msg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: Pong {
+            value,
+        },
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+}
+
 /// Send message to the contract with a custom body cell
-fun MyContract.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {
+fun Main.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {
     val msg = createMessage({
         bounce: config.bounce,
         value: config.value,

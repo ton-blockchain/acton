@@ -10,7 +10,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 use tempfile::TempDir;
 use tycho_types::boc::Boc;
 
@@ -422,10 +422,9 @@ fn generate_tolk_dependency_content(
         .cloned()
         .unwrap_or_default();
     let contract_path = contract.src;
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = chrono::Local::now();
+    let now_seconds = now.timestamp();
+    let now_date = now.format("%Y-%m-%d %H:%M:%S");
 
     format!(
         "{license_header}// Auto-generated dependency code for contract '{dependency_key}'
@@ -438,7 +437,8 @@ fn generate_tolk_dependency_content(
 ///
 /// - Contract: `{dependency_key}`
 /// - Path: `{contract_path}`
-/// - Timestamp: {now}
+/// - Timestamp: {now_seconds}
+/// - Generated on: {now_date}
 @pure
 fun {func_name}(): cell asm \"\"\"
 {asm_code}

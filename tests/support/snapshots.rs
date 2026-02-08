@@ -103,6 +103,12 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
     redactions
         .insert("[DEPLOYED_AT]", regex!(r"Deployed at: .*"))
         .unwrap();
+    redactions
+        .insert(
+            "[GENERATED_ON]",
+            regex!(r"Generated on: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"),
+        )
+        .unwrap();
 
     redactions.redact(&content)
 }

@@ -218,7 +218,7 @@ impl FileBuildCache {
         file_path: &str,
         visited: &mut HashSet<String>,
     ) -> Result<Vec<String>> {
-        let file_deps = ton_abi::get_file_dependencies(file_path, true)
+        let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
         let file_path = fs::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(&file_path));

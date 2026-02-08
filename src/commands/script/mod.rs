@@ -116,9 +116,14 @@ fn run_script_file(
     net: Option<String>,
     explorer: Option<Explorer>,
 ) -> anyhow::Result<()> {
-    let abi = contract_abi(content, file_path);
-
     let acton_config = ActonConfig::load();
+    let mappings = if let Ok(config) = &acton_config {
+        &config.mappings
+    } else {
+        &None
+    };
+    let abi = contract_abi(content, file_path, mappings);
+
     let mut compiler = tolkc::Compiler::new(2);
     if let Ok(config) = &acton_config {
         compiler = compiler.with_mappings(&config.mappings);

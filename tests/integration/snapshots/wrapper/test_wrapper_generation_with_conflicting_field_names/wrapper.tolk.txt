@@ -4,6 +4,7 @@ import "@acton/emulation/network"
 import "@acton/testing/assert"
 import "@acton/testing/expect"
 import "@acton/types/message"
+import "../../contracts/types"
 
 struct MyContract {
     address: address
@@ -37,6 +38,20 @@ fun MyContract.deploy(self, from: address, config: SendParams = {}): SendResultL
         value: config.value,
         dest: {
             stateInit: self.stateInit,
+        },
+    });
+    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+}
+
+fun MyContract.sendMessageWithConflicts(self, from: address, from_: address, config_: int, other: uint32, config: SendParams = {}): SendResultList {
+    val msg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: MessageWithConflicts {
+            from: from_,
+            config: config_,
+            other,
         },
     });
     return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)

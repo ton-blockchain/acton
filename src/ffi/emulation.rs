@@ -113,7 +113,7 @@ fn build_impl(
             &cached_entry.code_boc64,
             &cached_entry.code_hash_hex,
             cached_entry.source_map.clone().unwrap_or_default(),
-            Some(contract_abi(&content, &path)),
+            Some(contract_abi(&content, &path, &ctx.env.config.mappings)),
         );
 
         let code_cell = ArcCell::from_boc_b64(&cached_entry.code_boc64)
@@ -151,7 +151,7 @@ fn build_impl(
                 &success.code_boc64,
                 &success.code_hash_hex,
                 success.source_map.unwrap_or_default(),
-                Some(contract_abi(&content, &path)),
+                Some(contract_abi(&content, &path, &ctx.env.config.mappings)),
             );
             let code_cell = ArcCell::from_boc_b64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")

@@ -1770,12 +1770,12 @@ impl FormatterContext {
         let send_results = self.parse_send_results(items);
         send_results
             .into_iter()
-            .map(|res| {
+            .flat_map(|res| {
                 let tx = res.tx;
                 let code = Self::account_code(&self.accounts, tx.account.to_string());
                 let build = self.build_cache.result_for_code(&code);
 
-                TransactionInfo {
+                Some(TransactionInfo {
                     lt: tx.lt.to_string(),
                     raw_transaction: Boc::encode_base64(to_cell(&tx)),
                     parent_transaction: res.parent_lt.map(|lt| lt.to_string()),
@@ -1793,8 +1793,8 @@ impl FormatterContext {
                         .find_tx_executor_logs(tx.lt)
                         .map(ToString::to_string)
                         .unwrap_or_default(),
-                    actions: None,
-                }
+                    actions: Some(res.actions.to_boc_b64(false).ok()?),
+                })
             })
             .collect()
     }

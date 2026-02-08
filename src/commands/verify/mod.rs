@@ -135,8 +135,11 @@ pub fn verify_cmd(
     }
 
     println!("  {} Collecting source files", "→".blue().bold());
-    let source_files =
-        ton_abi::get_file_dependencies(contract_path.to_string_lossy().as_ref(), true)?;
+    let source_files = ton_abi::get_file_dependencies(
+        contract_path.to_string_lossy().as_ref(),
+        true,
+        &config.mappings,
+    )?;
     println!(
         "  {} Collected {} source file{}",
         "✓".green().bold(),
