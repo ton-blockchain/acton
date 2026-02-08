@@ -16,6 +16,7 @@ import { Address } from "@ton/core";
 import { Loader2, AlertCircle, CheckCircle2, XCircle, List, Activity, TrendingUp, TrendingDown, MessageSquare } from "lucide-react";
 import styles from "./TransactionPage.module.css";
 import { ContractCode } from "../components/ContractCode";
+import { fetchAddressName } from "../components/utils";
 
 interface TransactionPageProps {
   client: TonClient;
@@ -122,14 +123,15 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
           });
 
           let nextLetterCode = 65;
-          Array.from(addresses).sort().forEach(addr => {
+          await Promise.all(Array.from(addresses).sort().map(async addr => {
             const displayAddr = Address.parse(addr).toString({ testOnly: true });
+            const customName = await fetchAddressName(addr);
             contractsMap.set(addr, {
-              displayName: fmt.formatAddress(displayAddr),
+              displayName: customName || fmt.formatAddress(displayAddr),
               address: Address.parse(addr),
               letter: String.fromCharCode(nextLetterCode++)
             });
-          });
+          }));
           setContracts(contractsMap);
 
           // Fetch Value Flow
@@ -211,10 +213,10 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
           <>
             <Breadcrumbs
               items={[
-                { 
-                  label: traces[0].address ? Address.parse(traces[0].address.toString()).toString({ testOnly: true }) : "", 
-                  path: `/?address=${traces[0].address ? Address.parse(traces[0].address.toString()).toString({ testOnly: true }) : ""}`, 
-                  isAddress: true 
+                {
+                  label: traces[0].address ? Address.parse(traces[0].address.toString()).toString({ testOnly: true }) : "",
+                  path: `/?address=${traces[0].address ? Address.parse(traces[0].address.toString()).toString({ testOnly: true }) : ""}`,
+                  isAddress: true
                 },
                 { label: hash || "", isHash: true }
               ]}
@@ -232,40 +234,6 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                   {new Date(traces[0].transaction.now * 1000).toLocaleString()}
                 </div>
               </div>
-
-              <div className={styles.overviewGrid}>
-                <div className={styles.overviewItem}>
-                  <div className={styles.label}>Account</div>
-                  <div className={`${styles.value} ${styles.valueMono}`}>
-                    <a 
-                      href={`/?address=${traces[0].address ? Address.parse(traces[0].address.toString()).toString({ testOnly: true }) : ""}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.link}
-                    >
-                      {traces[0].address ? Address.parse(traces[0].address.toString()).toString({ testOnly: true }) : ""}
-                    </a>
-                  </div>
-                </div>
-                <div className={styles.overviewItem}>
-                  <div className={styles.label}>Value</div>
-                  <div className={styles.value}>
-                    {fmt.formatCurrency(traces[0].transaction.inMessage?.info.type === 'internal' ? traces[0].transaction.inMessage.info.value.coins : 0n)}
-                  </div>
-                </div>
-                <div className={styles.overviewItem}>
-                  <div className={styles.label}>Fees</div>
-                  <div className={styles.value}>
-                    {fmt.formatCurrency(traces[0].transaction.totalFees.coins)}
-                  </div>
-                </div>
-                <div className={styles.overviewItem}>
-                  <div className={styles.label}>Logical Time</div>
-                  <div className={`${styles.value} ${styles.valueMono}`}>
-                    {traces[0].lt}
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div className={styles.tabsContainer}>
@@ -276,7 +244,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                 >
                   <Activity size={16} /> Value Flow
                 </button>
-                <button 
+                <button
                   className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
                   onClick={() => setActiveTab("transactions")}
                 >
@@ -302,9 +270,9 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                         {valueFlow.map((item) => (
                           <div key={item.address} className={styles.flowRow}>
                             <div className={styles.flowCol}>
-                              <ContractChip 
-                                address={item.address} 
-                                contracts={contracts} 
+                              <ContractChip
+                                address={item.address}
+                                contracts={contracts}
                                 onContractClick={handleContractClick}
                               />
                             </div>
@@ -330,10 +298,10 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({ client }) => {
                       .sort((a, b) => Number(BigInt(a.lt) - BigInt(b.lt)))
                       .map((tx) => (
                         <div key={tx.lt} className={styles.detailCard}>
-                          <TransactionDetails 
-                            tx={tx} 
-                            contracts={contracts} 
-                            allContracts={[]} 
+                          <TransactionDetails
+                            tx={tx}
+                            contracts={contracts}
+                            allContracts={[]}
                             onContractClick={handleContractClick}
                           />
                         </div>

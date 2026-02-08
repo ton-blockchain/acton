@@ -3094,6 +3094,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crc",
+ "log",
  "num-bigint",
  "serde",
  "tolk-syntax",
@@ -3144,6 +3145,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-indexer"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "tycho-types",
+]
+
+[[package]]
 name = "ton-litenode"
 version = "0.1.0"
 dependencies = [
@@ -3160,6 +3169,7 @@ dependencies = [
  "tokio",
  "ton-api",
  "ton-executor",
+ "ton-indexer",
  "ton-networks",
  "tonlib-core",
  "tower-http",

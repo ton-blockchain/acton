@@ -65,7 +65,7 @@ impl LiteNodeAccountState {
             data: None,
             last_transaction_id: LiteNodeTransactionId::default(),
             block_id,
-            state: AccountStatus::Nonexist,
+            state: AccountStatus::Uninit,
             sync_utime,
             frozen_hash: None,
         }
@@ -206,6 +206,15 @@ pub(crate) enum Request {
         source: Addr,
         limit: usize,
         resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
+    },
+    SetAddressName {
+        address: Addr,
+        name: String,
+        resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    GetAddressName {
+        address: Addr,
+        resp: oneshot::Sender<anyhow::Result<Option<String>>>,
     },
     SetStateSource {
         source: StateSource,
@@ -438,6 +447,28 @@ impl LiteNode {
         rx.await?
     }
 
+    pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
+        let address = Self::parse_addr(&address_str)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::SetAddressName {
+                address,
+                name,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_address_name(&self, address_str: String) -> anyhow::Result<Option<String>> {
+        let address = Self::parse_addr(&address_str)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressName { address, resp })
+            .await?;
+        rx.await?
+    }
+
     pub async fn set_state_source(&self, source: StateSource) -> anyhow::Result<()> {
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -582,6 +613,18 @@ fn process_loop_request(node: &mut Node, req: Request) {
         } => {
             let res = handle_get_transactions_by_source(node, source, limit);
             let _ = resp.send(res);
+        }
+        Request::SetAddressName {
+            address,
+            name,
+            resp,
+        } => {
+            node.history.address_names.insert(address, name);
+            let _ = resp.send(Ok(()));
+        }
+        Request::GetAddressName { address, resp } => {
+            let res = node.history.address_names.get(&address).cloned();
+            let _ = resp.send(Ok(res));
         }
         Request::SetStateSource { source, resp } => {
             node.state_source = source;

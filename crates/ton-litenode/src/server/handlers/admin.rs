@@ -29,3 +29,23 @@ pub async fn set_state_source(
 ) -> Json<Value> {
     handle_result(node.set_state_source(payload), |_| Value::Null).await
 }
+
+pub async fn set_address_name(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<SetAddressNameRequest>,
+) -> Json<Value> {
+    handle_result(node.set_address_name(payload.address, payload.name), |_| {
+        Value::Null
+    })
+    .await
+}
+
+pub async fn get_address_name(
+    State(node): State<Arc<LiteNode>>,
+    axum::extract::Query(payload): axum::extract::Query<GetAddressNameQuery>,
+) -> Json<Value> {
+    handle_result(node.get_address_name(payload.address), |res| {
+        serde_json::to_value(res).unwrap_or(Value::Null)
+    })
+    .await
+}

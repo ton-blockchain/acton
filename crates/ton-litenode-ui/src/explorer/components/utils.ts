@@ -1,5 +1,15 @@
 import { Address } from "@ton/core";
 
+// Global cache for address names to avoid flickering and repeated API calls
+const addressNameCache: Record<string, string | null> = {};
+const pendingRequests: Record<string, Promise<string | null>> = {};
+
+export let tonClientInstance: any = null;
+
+export function setTonClientInstance(client: any) {
+  tonClientInstance = client;
+}
+
 export function formatNano(nano: string | number): string {
   const n = typeof nano === "string" ? BigInt(nano) : BigInt(nano);
   const ton = Number(n) / 1e9;
@@ -26,8 +36,63 @@ export function formatTimeAgo(utime: number): string {
   return `${day} ${month}, ${time}`;
 }
 
-export function formatAddress(address: string, shorten: boolean = true): string {
+export function getCachedAddressName(address: string): string | null {
+  if (!address) return null;
+  try {
+    const stdAddr = Address.parse(address).toRawString();
+    return addressNameCache[stdAddr] || null;
+  } catch {
+    return addressNameCache[address] || null;
+  }
+}
+
+export async function fetchAddressName(address: string): Promise<string | null> {
+  if (!address || !tonClientInstance) return null;
+  
+  let stdAddr: string;
+  try {
+    stdAddr = Address.parse(address).toRawString();
+  } catch {
+    stdAddr = address;
+  }
+  
+  if (addressNameCache[stdAddr] !== undefined) return addressNameCache[stdAddr];
+  if (pendingRequests[stdAddr]) return pendingRequests[stdAddr];
+  
+  pendingRequests[stdAddr] = (async () => {
+    try {
+      const name = await tonClientInstance.getAddressName(address);
+      addressNameCache[stdAddr] = name;
+      return name;
+    } catch (e) {
+      console.warn(`Failed to fetch name for ${address}:`, e);
+      addressNameCache[stdAddr] = null; // Cache failure to avoid repeated requests
+      return null;
+    } finally {
+      delete pendingRequests[stdAddr];
+    }
+  })();
+  
+  return pendingRequests[stdAddr];
+}
+
+export function updateCachedAddressName(address: string, name: string | null) {
+  try {
+    const stdAddr = Address.parse(address).toRawString();
+    addressNameCache[stdAddr] = name;
+  } catch {
+    addressNameCache[address] = name;
+  }
+}
+
+export function formatAddress(address: string, shorten: boolean = true, forceReal: boolean = false): string {
   if (!address) return "Unknown";
+  
+  // Try to use cached name first
+  if (!forceReal) {
+    const cachedName = getCachedAddressName(address);
+    if (cachedName) return cachedName;
+  }
   
   let displayAddress = address;
   try {

@@ -229,6 +229,7 @@ pub struct History {
     pub tx_by_hash: HashMap<Hash256, TxMeta>,
     pub msg_by_hash: HashMap<Hash256, MsgMeta>,
     pub msg_to_tx: HashMap<Hash256, Hash256>,
+    pub address_names: HashMap<Addr, String>,
 }
 
 impl Default for History {
@@ -239,6 +240,20 @@ impl Default for History {
 
 impl History {
     pub fn new() -> Self {
+        let mut address_names = HashMap::new();
+        if let Ok((addr, _)) = tycho_types::models::StdAddr::from_str_ext(
+            "kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil",
+            tycho_types::models::StdAddrFormat::any(),
+        ) {
+            address_names.insert(
+                Addr {
+                    workchain: addr.workchain as i32,
+                    addr: addr.address.0,
+                },
+                "Faucet".to_string(),
+            );
+        }
+
         Self {
             conn: None,
             blocks: Vec::new(),
@@ -246,10 +261,26 @@ impl History {
             tx_by_hash: HashMap::new(),
             msg_by_hash: HashMap::new(),
             msg_to_tx: HashMap::new(),
+            address_names,
         }
     }
 
     pub fn with_conn(conn: Arc<Mutex<Connection>>) -> Self {
+        let mut address_names = HashMap::new();
+        // Set defaultname for the special address
+        if let Ok((addr, _)) = tycho_types::models::StdAddr::from_str_ext(
+            "kQBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVfil",
+            tycho_types::models::StdAddrFormat::any(),
+        ) {
+            address_names.insert(
+                Addr {
+                    workchain: addr.workchain as i32,
+                    addr: addr.address.0,
+                },
+                "Faucet".to_string(),
+            );
+        }
+
         Self {
             conn: Some(conn),
             blocks: Vec::new(),
@@ -257,6 +288,7 @@ impl History {
             tx_by_hash: HashMap::new(),
             msg_by_hash: HashMap::new(),
             msg_to_tx: HashMap::new(),
+            address_names,
         }
     }
 }

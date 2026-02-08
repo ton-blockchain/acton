@@ -7,7 +7,6 @@
 }
 
 .addressValue {
-  font-family: var(--font-mono);
   font-size: var(--font-size-lg);
   color: var(--tonscan-text-primary);
   word-break: break-all;
@@ -20,20 +19,77 @@
   width: 100%;
 }
 
+.addressRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.editContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.editInput {
+  background: var(--tonscan-bg);
+  border: 1px solid var(--tonscan-border);
+  color: var(--tonscan-text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  flex: 1;
+  outline: none;
+}
+
+.editInput:focus {
+  border-color: var(--tonscan-accent);
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.iconButton:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--tonscan-text);
+}
+
+.saveIcon {
+  color: #22c55e;
+}
+
+.cancelIcon {
+  color: #ef4444;
+}
+
+.customName {
+  color: var(--tonscan-accent);
+  font-weight: 600;
+}
+
+.realAddress {
+  color: var(--tonscan-text-secondary);
+  font-weight: 400;
+  font-size: 0.9rem;
+  margin-left: 4px;
+}
+
 .actions {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-}
-
-.iconButton {
-  color: var(--tonscan-text-secondary);
-  cursor: pointer;
-  transition: color var(--transition-duration-fast);
-}
-
-.iconButton:hover {
-  color: var(--tonscan-text-primary);
 }
 
 .grid {

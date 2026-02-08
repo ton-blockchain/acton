@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from "react";
+import React, {useMemo, useState, useEffect} from "react";
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   CardContent,
 } from "@acton/shared-ui";
 import { Transaction, FullAccountState } from "../types";
-import { formatNano, formatTimeAgo, formatAddress } from "./utils";
+import { formatNano, formatTimeAgo, formatAddress, fetchAddressName } from "./utils";
 import { Address, Cell } from "@ton/core";
 import { ArrowDownLeft, ArrowUpRight, RefreshCw, Calendar, Filter, MessageSquare, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import styles from "./TransactionList.module.css";
@@ -36,6 +36,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const [activeTab, setActiveTab] = useState<"history" | "contract">("history");
   const [currentPage, setCurrentPage] = useState(1);
   const [hoveredAddress, setHoveredAddress] = useState<string | null>(null);
+  const [addressNames, setAddressNames] = useState<Record<string, string>>({});
 
   const browsedAddr = useMemo(() => {
     try {
@@ -48,6 +49,27 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    const addressesToFetch = new Set<string>();
+    paginatedTransactions.forEach(tx => {
+      const inAddr = tx.in_msg.source?.account_address;
+      const outAddr = tx.out_msgs.find(m => m.destination?.account_address)?.destination?.account_address;
+      if (inAddr) addressesToFetch.add(inAddr);
+      if (outAddr) addressesToFetch.add(outAddr);
+    });
+
+    Array.from(addressesToFetch).forEach(addr => {
+      fetchAddressName(addr).then(name => {
+        if (name) {
+          setAddressNames(prev => {
+            if (prev[addr] === name) return prev;
+            return { ...prev, [addr]: name };
+          });
+        }
+      });
+    });
+  }, [paginatedTransactions]);
 
   return (
     <Card className={styles.tableCard}>
@@ -134,7 +156,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   ? (tx.in_msg.source?.account_address || "") 
                   : (tx.out_msgs.find(m => m.destination?.account_address)?.destination?.account_address || "");
                 
-                const displayAddress = address ? formatAddress(address) : (isIncoming ? "External" : "Contract");
+                const displayAddress = addressNames[address] || (address ? formatAddress(address) : (isIncoming ? "External" : "Contract"));
 
                 const opcode = isIncoming ? tx.in_msg.opcode : tx.out_msgs.find(m => m.opcode)?.opcode;
                 const displayOpcode = opcode ? opcode : null;

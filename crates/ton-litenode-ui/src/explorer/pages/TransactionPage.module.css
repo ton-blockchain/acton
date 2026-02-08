@@ -61,18 +61,6 @@
   color: var(--tonscan-error);
 }
 
-.overviewGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-}
-
-.overviewItem {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .label {
   font-size: 12px;
   color: var(--tonscan-text-secondary);
@@ -82,7 +70,7 @@
 
 .value {
   font-size: 14px;
-  color: var(--tonscan-text-primary);
+  color: var(--tonscan-text-secondary);
   font-weight: 500;
   word-break: break-all;
 }

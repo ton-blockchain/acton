@@ -30,6 +30,7 @@ tower-http = { workspace = true, features = ["cors", "trace"] }
 tracing = "0.1"
 owo-colors = { workspace = true }
 rusqlite = { workspace = true }
+ton-indexer = { workspace = true }
 
 [lints]
 workspace = true

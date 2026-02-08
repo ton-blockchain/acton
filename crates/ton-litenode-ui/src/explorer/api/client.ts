@@ -39,10 +39,30 @@ export class TonClient {
     url.searchParams.append("hash", hash);
     const response = await fetch(url.toString());
     const data = await response.json();
-    
+
     if (data.ok === false) throw new Error(data.error || "Failed to fetch traces");
-    
+
     return data.result;
+  }
+
+  async getAddressName(address: string): Promise<string | null> {
+    const url = this.buildUrl(this.v2BaseUrl.replace(/\/api\/v2$/, ""), "/address-name");
+    url.searchParams.append("address", address);
+    const response = await fetch(url.toString());
+    const data = await response.json();
+    if (!data.ok) return null;
+    return data.result;
+  }
+
+  async setAddressName(address: string, name: string): Promise<void> {
+    const url = this.buildUrl(this.v2BaseUrl.replace(/\/api\/v2$/, ""), "/address-name");
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, name }),
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Failed to set address name");
   }
 
   private buildUrl(base: string, path: string): URL {

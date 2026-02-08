@@ -47,6 +47,7 @@ ton-source-map = { path = "crates/ton-source-map" }
 tolkfmt = { path = "crates/tolkfmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-litenode = { path = "crates/ton-litenode" }
+ton-indexer = { path = "crates/ton-indexer" }
 
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }

@@ -20,6 +20,12 @@ export const App: React.FC = () => {
   const client = useMemo(() => new TonClient("http://localhost:3010/api"), []);
 
   useEffect(() => {
+    import("./explorer/components/utils").then(utils => {
+      utils.setTonClientInstance(client);
+    });
+  }, [client]);
+
+  useEffect(() => {
     document.documentElement.classList.toggle("dark-theme", theme === "dark");
     localStorage.setItem("theme", theme);
   }, [theme]);
