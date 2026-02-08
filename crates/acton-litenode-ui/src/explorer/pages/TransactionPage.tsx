@@ -180,8 +180,8 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
                     change: after - before,
                     fee: accountFees,
                   })
-                } catch (error_) {
-                  console.warn(`Failed to fetch flow for ${addr}:`, error_)
+                } catch (error) {
+                  console.warn(`Failed to fetch flow for ${addr}:`, error)
                 }
               }),
             )
@@ -193,10 +193,10 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
         } else {
           if (isActive) setError("Transaction not found or has no trace yet.")
         }
-      } catch (error_) {
-        console.error("Failed to fetch trace:", error_)
+      } catch (error) {
+        console.error("Failed to fetch trace:", error)
         if (!isActive) return
-        setError(error_ instanceof Error ? error_.message : "Failed to load transaction trace")
+        setError(error instanceof Error ? error.message : "Failed to load transaction trace")
       } finally {
         if (isActive) setLoading(false)
       }

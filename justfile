@@ -62,7 +62,10 @@ build-ui:
 check-ui:
     bun run lint
 
-precommit: build-ui build check check-ui
+fmt-ui:
+    bun run fmt
+
+precommit: fmt fmt-ui build build-ui check check-ui
 
 clean:
     cargo clean

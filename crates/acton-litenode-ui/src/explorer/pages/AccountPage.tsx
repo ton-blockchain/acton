@@ -43,9 +43,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         if (!isActive) return
         setAccountState(state)
         setTransactions(txs)
-      } catch (error_) {
+      } catch (error) {
         if (!isActive) return
-        setError(error_ instanceof Error ? error_.message : "An error occurred")
+        setError(error instanceof Error ? error.message : "An error occurred")
         setAccountState(undefined)
         setTransactions([])
       } finally {

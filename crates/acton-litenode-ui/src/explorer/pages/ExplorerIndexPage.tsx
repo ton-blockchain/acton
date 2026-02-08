@@ -21,8 +21,8 @@ export const ExplorerIndexPage: React.FC = () => {
     if (savedHistory) {
       try {
         setHistory(JSON.parse(savedHistory) as string[])
-      } catch (error_) {
-        console.error("Failed to parse history", error_)
+      } catch (error) {
+        console.error("Failed to parse history", error)
       }
     }
   }, [])
