@@ -1,16 +1,23 @@
 [package]
 name = "tolkfmt"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-pretty = "0.12.5"
-tolk-syntax = { path = "../tolk-syntax" }
-tree-sitter = "0.25.10"
-anyhow = "1.0.100"
+pretty = { workspace = true }
+tolk-syntax = { workspace = true }
+tree-sitter = { workspace = true }
+anyhow = { workspace = true }
 
 [dev-dependencies]
-expect-test = "1.5.1"
+expect-test = { workspace = true }
 
 [lints]
 workspace = true

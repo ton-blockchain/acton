@@ -21,7 +21,7 @@ pub fn disasm_cmd(
     opts: FormatOptions,
     address: Option<String>,
     api_key: Option<String>,
-    net: String,
+    net: Option<String>,
     follow_libraries: bool,
 ) -> anyhow::Result<()> {
     if boc_file.is_some() && boc_string.is_some() {
@@ -29,6 +29,8 @@ pub fn disasm_cmd(
             "Cannot provide both <yellow>--string</>/<yellow>-s</> and <yellow>BOC_FILE</> argument"
         ));
     }
+
+    let network = net.as_deref().map(Network::from_str).transpose()?;
 
     let boc_data = if let Some(string) = boc_string {
         string
@@ -60,7 +62,7 @@ pub fn disasm_cmd(
             hex::encode(binary_data)
         }
     } else if let Some(addr) = address {
-        remote::fetch_contract_boc(&addr, api_key.as_deref())?
+        remote::fetch_contract_boc(network.clone(), &addr, api_key.as_deref())?
     } else {
         anyhow::bail!(color_print::cformat!(
             "Either <yellow>--string</>/<yellow>-s</>, <yellow>--address</> or <yellow>BOC_FILE</> argument must be provided, run with <yellow>--help</> for more information"
@@ -77,7 +79,6 @@ pub fn disasm_cmd(
         ));
     };
 
-    let network = Network::from_str(&net)?;
     let disassembler = Disassembler::new();
     let mut final_cell = cell;
 
@@ -91,7 +92,13 @@ pub fn disasm_cmd(
         if instructions.len() == 1
             && let Some(lib_hash) = extract_library_hash_from_instruction(&instructions[0])
         {
-            let client = TonApiClient::new(network, api_key)?;
+            let config = acton_config::config::ActonConfig::load().unwrap_or_default();
+            let custom_networks = config.custom_networks();
+            let client = TonApiClient::new(
+                network.unwrap_or(Network::Testnet),
+                custom_networks,
+                api_key,
+            )?;
             match client.get_library_by_hash(&lib_hash.to_string()) {
                 Ok(lib_cell) => {
                     final_cell = lib_cell;

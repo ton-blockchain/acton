@@ -8,7 +8,7 @@ use tolk_resolver::file_index::SymbolId;
 ///
 /// This is a handle that can be used to retrieve the actual type data from `TypeInterner`.
 /// `TyId`s are cheap to copy and can be used as keys in maps.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub struct TyId(u32);
 
 /// Helper struct for displaying types using an interner.
@@ -118,7 +118,7 @@ impl TypeInterner {
     }
 
     /// Returns a helper object that implements `std::fmt::Display` for the given type ID.
-    pub fn display(&self, id: TyId) -> TyDisplay<'_> {
+    pub const fn display(&self, id: TyId) -> TyDisplay<'_> {
         TyDisplay { id, interner: self }
     }
 
@@ -279,6 +279,11 @@ impl TypeInterner {
     /// Creates an instantiation of a generic type.
     pub fn instantiation(&mut self, inner_ty: TyId, types: Vec<TyId>) -> TyId {
         self.intern(TyData::Instantiation { inner_ty, types })
+    }
+
+    /// Creates a type parameter type.
+    pub fn type_parameter(&mut self, name: String, default_type: Option<TyId>) -> TyId {
+        self.intern(TyData::TypeParameter { name, default_type })
     }
 
     /// when `var v = rhs`, `v` is `unknown` before assignment (before rhs->inferred_type is assigned to it);
@@ -559,10 +564,10 @@ impl TypeInterner {
         let dl = self.data(lhs);
         let dr = self.data(rhs);
 
-        if let TyData::Unknown = dl {
+        if matches!(dl, TyData::Unknown) {
             return true;
         }
-        if let TyData::Never = dr {
+        if matches!(dr, TyData::Never) {
             return true;
         }
 
@@ -694,7 +699,7 @@ impl TypeInterner {
                 }
                 tl.iter()
                     .zip(tr.iter())
-                    .all(|(&el, &er)| self.equals(el, er))
+                    .all(|(&el, &er)| self.can_rhs_be_assigned(el, er))
             }
             (TyData::Struct { def: dl, .. }, TyData::Struct { def: dr, .. }) => {
                 // C<C<int>> = C<CIntAlias>
@@ -737,7 +742,7 @@ impl TypeInterner {
             // - `int as int8 | int16` is NOT ok (ambiguity)
 
             if self.is_primitive_nullable(to) {
-                let or_null = self.get_union_or_null(to).unwrap();
+                let or_null = self.get_union_or_null(to).unwrap_or_default();
                 return from == self.ty_null || self.can_be_casted_with_as_operator(from, or_null);
             }
 
@@ -808,7 +813,8 @@ impl TypeInterner {
             }
             TyData::Union(_) => {
                 if self.is_primitive_nullable(id)
-                    && self.can_hold_tvm_null_instead(self.get_union_or_null(id).unwrap())
+                    && self
+                        .can_hold_tvm_null_instead(self.get_union_or_null(id).unwrap_or_default())
                 {
                     return 1;
                 }
@@ -1059,6 +1065,24 @@ impl TypeInterner {
             return rest_variants[0];
         }
         self.union(rest_variants)
+    }
+
+    pub fn as_nullable_union(&self, ty: TyId) -> Option<(TyId, TyId)> {
+        let TyData::Union(elements) = self.data(ty) else {
+            return None;
+        };
+        if elements.len() != 2 {
+            return None;
+        }
+        let left = elements[0];
+        let right = elements[1];
+        if left == self.ty_null {
+            return Some((right, left));
+        }
+        if right == self.ty_null {
+            return Some((left, right));
+        }
+        None
     }
 }
 

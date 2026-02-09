@@ -14,7 +14,9 @@ The top-level of `Acton.toml` contains the following sections:
 - `[contracts]` — Definition of smart contracts in the project.
 - `[test]` — Configuration for the test runner.
 - `[lint]` — Linter configuration.
+- `[networks]` — Custom network definitions.
 - `[scripts]` — Custom shell commands or scripts.
+- `[mappings]` — Path mappings for Tolk compiler imports.
 
 ---
 
@@ -166,6 +168,26 @@ unused-variable = "allow" # Disable for counter contract only
 
 ---
 
+## `[networks]` Section
+
+Defines custom networks that can be used for deployment, testing, and interaction. Each key is a unique network identifier.
+
+| Field    | Type     | Required | Description                               |
+|:---------|:---------|:---------|:------------------------------------------|
+| `v2-url` | `string` | **Yes**  | The URL for the TonCenter v2 API.         |
+| `v3-url` | `string` | No       | The URL for the TonCenter v3 API.         |
+
+Example:
+```toml
+[networks.my-custom-net]
+v2-url = "https://my-custom-net.com/api/v2"
+v3-url = "https://my-custom-net.com/api/v3"
+```
+
+You can then use this network in commands like `acton test --fork-net custom:my-custom-net`, `acton script --net custom:my-custom-net` or in scripts.
+
+---
+
 ## `[scripts]` Section
 
 Allows defining custom scripts that can be executed via `acton run <name>`.
@@ -176,6 +198,37 @@ Example:
 deploy = "acton script scripts/deploy.tolk"
 check = "acton test --filter=.*_check"
 ```
+
+---
+
+## `[mappings]` Section
+
+Allows defining path aliases for the Tolk compiler, similar to `@stdlib`. These mappings let you import files using logical names instead of relative paths.
+
+| Field   | Type     | Description                                                                        |
+|:--------|:---------|:-----------------------------------------------------------------------------------|
+| `key`   | `string` | The alias prefix (e.g., `@core`). If `@` is omitted (preffered), it will be added. |
+| `value` | `string` | The relative or absolute path the prefix points to.                                |
+
+Example:
+```toml
+[mappings]
+utils = "./libs/utils" # Equivalent to "@utils" and prefered
+"@core" = "./libs/core"
+```
+
+With the above configuration, you can use these mappings in your Tolk source files:
+
+```tolk
+import "@core/math"  // Resolves to ./libs/core/math.tolk
+import "@utils/logic" // Resolves to ./libs/utils/logic.tolk
+```
+
+### Prefix Resolution Rules
+
+- **Exact Match**: Acton matches the first part of the path (before the first slash) against the defined mappings. For example, in `import "@core/math"`, it looks for the `@core` mapping.
+- **Normalization**: If a mapping key doesn't start with `@` (preferred), Acton automatically prepends it.
+- **Relative Paths**: Relative paths in mappings are resolved relative to the project root (where `Acton.toml` is located).
 
 ## Additional Properties
 

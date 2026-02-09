@@ -1,0 +1,23 @@
+[package]
+name = "ton-abi"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+tree-sitter = { workspace = true }
+tolk-syntax = { workspace = true }
+crc = { workspace = true }
+num-bigint = { workspace = true }
+anyhow = { workspace = true }
+tycho-types = { workspace = true }
+serde = { workspace = true }
+
+[lints]
+workspace = true

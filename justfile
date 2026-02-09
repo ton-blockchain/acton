@@ -1,26 +1,25 @@
+CARGO_TEST := `if cargo nextest --version >/dev/null 2>&1; then echo "cargo nextest run"; else echo "cargo test"; fi`
+TEST_SERIAL_ARGS := `if cargo nextest --version >/dev/null 2>&1; then echo "--test-threads 1"; else echo "-- --test-threads 1"; fi`
+
 all: precommit
 
 build:
-    cargo build
-
-build-release:
     cargo build --release
 
-i-test:
-    cargo test --test integration_test
+test-unit:
+    {{ CARGO_TEST }} --workspace --lib --bins \
+        --exclude retrace
 
-d-test:
-    cargo test --test debug_test -- --test-threads 1
+test-serial:
+    # we need test by test execution due to Toncenter rate limit
+    {{ CARGO_TEST }} -p retrace {{ TEST_SERIAL_ARGS }}
 
-test:
-    cargo test -p abi -p dap-client -p emulator -p tolk-syntax -p ton-api -p tvmffi -p vmlogs -p tolkfmt -p tolk-resolver -p tolk-ty \
-    && cargo test -p retrace -- --test-threads 1 \
-    && cargo test -p ton-executor -- --test-threads 1 \
-    && cargo test --lib commands::up::tests \
-    && cargo test --lib config::tests \
-    && cargo test --lib file_build_cache::tests \
-    && just i-test \
-    && just d-test
+test-integration:
+    {{ CARGO_TEST }} --test integration_test
+    # we need test by test execution due to single debug port
+    {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
+
+test: test-unit test-serial test-integration
 
 test-update:
     SNAPSHOTS=overwrite just test
@@ -28,10 +27,16 @@ test-update:
 fmt:
     cargo fmt --all
 
+fmt-check:
+    cargo fmt --all --check
+
 clippy:
     cargo clippy --workspace --all-features --all-targets -- -D warnings
 
-check: fmt clippy test
+check-udeps:
+    cargo +nightly udeps --workspace
+
+check: fmt-check clippy test
 
 coverage-setup:
     cargo install cargo-llvm-cov
@@ -49,12 +54,19 @@ coverage-fmt-html:
 coverage-clean:
     cargo llvm-cov clean
 
+build-ui:
+    bun install
+    cd crates/acton-test-ui && bun i && bun run build
+    cd crates/acton-litenode-ui && bun i && bun run build
+
+check-ui:
+    bun run lint:fix
+
+fmt-ui:
+    bun run fmt
+
+precommit: fmt fmt-ui build build-ui check check-ui
+
 clean:
     cargo clean
     rm -rf crates/acton-test-ui/dist
-
-build-ui:
-    cd crates/acton-test-ui && bun i && bun run build
-
-precommit:
-    just build && just check && just build-ui

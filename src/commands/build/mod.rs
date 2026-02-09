@@ -10,7 +10,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 use tempfile::TempDir;
 use tycho_types::boc::Boc;
 
@@ -122,7 +122,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
         )?;
 
         let (code_boc64, code_hash) =
-            match process_contract(&mut file_cache, contract_config, contract_path) {
+            match process_contract(&mut file_cache, contract_config, contract_path, &config) {
                 Ok((code, hash)) => (code, hash),
                 Err(err) => {
                     failure_count += 1;
@@ -195,6 +195,7 @@ fn process_contract(
     file_cache: &mut FileBuildCache,
     contract_config: &ContractConfig,
     contract_path: &String,
+    acton_config: &ActonConfig,
 ) -> anyhow::Result<(String, String)> {
     let (code_boc64, code_hash) = if contract_path.ends_with(".boc") {
         debug!("Loading BoC file: {contract_path}");
@@ -223,7 +224,8 @@ fn process_contract(
             let compile_start = Instant::now();
             println!("   {} {}", "Compiling".green().bold(), contract_config.name);
 
-            let compilation_result = tolkc::compile(Path::new(contract_path), false);
+            let compiler = tolkc::Compiler::new(2).with_mappings(&acton_config.mappings);
+            let compilation_result = compiler.compile(Path::new(contract_path), false);
             let compile_time = compile_start.elapsed();
 
             match compilation_result {
@@ -420,10 +422,9 @@ fn generate_tolk_dependency_content(
         .cloned()
         .unwrap_or_default();
     let contract_path = contract.src;
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = chrono::Local::now();
+    let now_seconds = now.timestamp();
+    let now_date = now.format("%Y-%m-%d %H:%M:%S");
 
     format!(
         "{license_header}// Auto-generated dependency code for contract '{dependency_key}'
@@ -436,7 +437,8 @@ fn generate_tolk_dependency_content(
 ///
 /// - Contract: `{dependency_key}`
 /// - Path: `{contract_path}`
-/// - Timestamp: {now}
+/// - Timestamp: {now_seconds}
+/// - Generated on: {now_date}
 @pure
 fun {func_name}(): cell asm \"\"\"
 {asm_code}
@@ -452,6 +454,8 @@ fn enable_emulator_debug_mode() -> anyhow::Result<()> {
     let tmp_file_path = tmp_dir.path().join("enable_debug.tolk");
     let mut tmp_file = File::create(&tmp_file_path)?;
     tmp_file.write_all(dummy_contract.as_bytes())?;
-    let _ = tolkc::compile(tmp_file_path.as_ref(), true);
+
+    let compiler = tolkc::Compiler::new(2);
+    let _ = compiler.compile(tmp_file_path.as_ref(), true);
     Ok(())
 }

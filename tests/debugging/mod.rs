@@ -1,4 +1,3 @@
-use abi::{ContractAbi, contract_abi};
 use acton::context::{
     AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx, EmulationsState,
     Env, IoContext, KnownAddresses,
@@ -13,8 +12,6 @@ use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
 use dap_client::DapClient;
-use emulator::emulator::Emulator;
-use emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -22,6 +19,9 @@ use std::time::{Duration, UNIX_EPOCH};
 use std::{fs, thread};
 use tasm::printer::FormatOptions;
 use tolkc::CompilerResult;
+use ton_abi::{ContractAbi, contract_abi};
+use ton_emulator::emulator::Emulator;
+use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
@@ -147,9 +147,16 @@ pub(crate) fn run_script_file(
     debug_port: u16,
     stack: Tuple,
 ) -> anyhow::Result<String> {
-    let abi = contract_abi(content, file_path);
+    let abi = contract_abi(content, file_path, &None);
 
-    match tolkc::compile(Path::new(file_path), true) {
+    let config = ActonConfig::load();
+
+    let mut compiler = tolkc::Compiler::new(2);
+    if let Ok(config) = &config {
+        compiler = compiler.with_mappings(&config.mappings)
+    }
+
+    match compiler.compile(Path::new(file_path), true) {
         CompilerResult::Success(result) => {
             let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
             let data_cell = ArcCell::default();

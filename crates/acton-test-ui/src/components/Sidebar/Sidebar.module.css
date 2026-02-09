@@ -2,18 +2,18 @@
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  background-color: var(--card-bg);
+  background-color: var(--bg-color);
   height: 100vh;
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .header {
-  padding: 16px;
+  padding: var(--spacing-md);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-md);
 }
 
 .headerTop {
@@ -24,193 +24,178 @@
 
 .headerButtons {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-sm);
   align-items: center;
 }
 
-.themeButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-color);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.themeButton:hover {
-  background-color: var(--card-bg);
-  color: var(--color-todo);
-  border-color: var(--color-todo);
-}
-
+.themeButton,
 .collapseButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-color);
+  border-radius: var(--border-radius-sm);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    border-color 0.2s;
 }
 
+.themeButton:hover,
 .collapseButton:hover {
-  background-color: var(--card-bg);
-  color: var(--color-todo);
-  border-color: var(--color-todo);
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
 }
 
 .title {
-  font-weight: 700;
-  font-size: 1.1rem;
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.95rem;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacing-sm);
 }
 
 .searchContainer {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .searchIcon {
   position: absolute;
-  left: 10px;
+  left: var(--spacing-mds);
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
+  pointer-events: none;
 }
 
 .searchInput {
   width: 100%;
-  padding: 8px 8px 8px 32px;
+  height: 36px;
+  padding: 0 var(--spacing-sm) 0 36px;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 0.9rem;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-sm);
   outline: none;
-  background-color: var(--bg-color);
+  background-color: transparent;
   color: var(--text-primary);
-  transition: border-color 0.2s;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
 }
 
 .searchInput:focus {
-  border-color: var(--link-color);
+  border-color: var(--text-muted);
+  box-shadow: 0 0 0 2px var(--bg-secondary-color);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
 }
 
 .filters {
   display: flex;
-  gap: 8px;
-  padding-bottom: 4px;
+  gap: var(--spacing-xss);
+  background-color: var(--bg-secondary-color);
+  padding: var(--spacing-xss);
+  border-radius: var(--border-radius-sm);
+  width: 100%;
 }
 
 .filterButton {
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  height: 28px;
   padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--bg-color);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
   cursor: pointer;
   color: var(--text-muted);
-  transition: all 0.2s;
 }
 
 .filterButton:hover {
-  border-color: var(--text-secondary);
+  color: var(--text-secondary);
+  background-color: var(--hover-bg);
 }
 
 .filterButton.activeFilter {
-  border-color: currentColor;
-  background-color: var(--card-bg);
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .filterButton.passed.activeFilter {
-  background-color: var(--color-passed-bg);
-  color: var(--color-passed-text);
-  border-color: var(--color-passed);
+  color: var(--color-passed);
 }
 
 .filterButton.failed.activeFilter {
-  background-color: var(--color-failed-bg);
-  color: var(--color-failed-text);
-  border-color: var(--color-failed);
+  color: var(--color-failed);
 }
 
 .filterButton.skipped.activeFilter {
-  background-color: var(--color-skipped-bg);
-  color: var(--color-skipped-text);
-  border-color: var(--color-skipped);
+  color: var(--color-skipped);
 }
 
 .filterButton.todo.activeFilter {
-  background-color: var(--color-todo-bg);
-  color: var(--color-todo-text);
-  border-color: var(--color-todo);
+  color: var(--color-todo);
 }
 
 .content {
   flex: 1;
   overflow-y: auto;
-  padding-bottom: 20px;
+  padding: var(--spacing-sm);
 }
 
 .suite {
-  border-bottom: 1px solid var(--divider-color);
+  margin-bottom: var(--spacing-xs);
 }
 
 .suiteHeader {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 10px 16px;
+  padding: var(--spacing-xs) var(--spacing-sm);
   border: none;
   background: none;
   cursor: pointer;
   text-align: left;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  transition: background-color 0.2s;
-  gap: 8px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  border-radius: var(--border-radius-sm);
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+  gap: var(--spacing-sm);
 }
 
 .suiteHeader:hover {
   background-color: var(--hover-bg);
 }
 
-.suiteFailed .suiteName {
-  color: var(--color-failed);
-}
-
-.testFailed .testName {
-  color: var(--color-failed);
-}
-
 .suiteToggle {
   display: flex;
   align-items: center;
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
 }
 
 .suiteIcon {
   display: flex;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .suiteName {
@@ -221,57 +206,51 @@
 }
 
 .suiteCount {
-  font-size: 0.75rem;
-  padding: 2px 6px;
-  background-color: var(--bg-color);
-  border-radius: 10px;
+  font-size: var(--font-size-xs);
   color: var(--text-muted);
 }
 
 .testList {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  padding-left: 12px;
 }
 
 .testItem {
   display: flex;
   align-items: center;
-  padding: 6px 16px 6px 44px;
+  padding: var(--spacing-xs) var(--spacing-sm);
   border: none;
   background: none;
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  font-size: 0.9rem;
-  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
   width: 100%;
-  transition: background-color 0.2s;
+  border-radius: var(--border-radius-sm);
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .testItem:hover {
   background-color: var(--hover-bg);
+  color: var(--text-primary);
 }
 
 .testItem.selected {
-  background-color: var(--color-todo-bg);
-  color: var(--color-todo-text);
-  position: relative;
-}
-
-.testItem.selected::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background-color: var(--color-todo);
+  background-color: var(--bg-secondary-color);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
 }
 
 .testStatusIcon {
   display: flex;
   align-items: center;
-  margin-right: 10px;
+  margin-right: var(--spacing-sm);
   font-size: 0.85rem;
 }
 

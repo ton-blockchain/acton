@@ -1,11 +1,11 @@
 use crate::commands::common::error_fmt;
-use abi::{ContractAbi, TypeAbi};
 use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use owo_colors::OwoColorize;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use ton_abi::{ContractAbi, TypeAbi};
 
 struct WrapperModel {
     project_root: PathBuf,
@@ -18,6 +18,7 @@ struct WrapperModel {
     message_paths: Vec<PathBuf>,
     wrapper_path: PathBuf,
     test_path: PathBuf,
+    mappings: Option<BTreeMap<String, String>>,
 }
 
 fn build_model(
@@ -52,8 +53,9 @@ fn build_model(
         .map_err(|e| anyhow!("Failed to read contract file: {e}"))?;
 
     let contract_path_str = contract_path.to_str().unwrap_or_default();
-    let mut abi = abi::contract_abi(&content, contract_path_str);
-    let handled_messages = abi::extract_handled_messages(&content, contract_path_str);
+    let mut abi = ton_abi::contract_abi(&content, contract_path_str, &config.mappings);
+    let handled_messages =
+        ton_abi::extract_handled_messages(&content, contract_path_str, &config.mappings);
 
     let file_stem = contract_path
         .file_stem()
@@ -127,6 +129,7 @@ fn build_model(
         message_paths,
         wrapper_path,
         test_path,
+        mappings: config.mappings.clone(),
     })
 }
 
@@ -307,18 +310,19 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     let proot = &model.project_root;
     let root = &model.wrapper_path;
     let contract = &model.contract_name;
+    let mappings = &model.mappings;
 
     let mut code = String::new();
 
     code.push_str("import \"@stdlib/gas-payments\"\n");
-    code.push_str(&import_stdlib(proot, root, ".acton/build/build"));
-    code.push_str(&import_stdlib(proot, root, ".acton/emulation/network"));
-    code.push_str(&import_stdlib(proot, root, ".acton/testing/assert"));
-    code.push_str(&import_stdlib(proot, root, ".acton/testing/expect"));
-    code.push_str(&import_stdlib(proot, root, ".acton/types/message"));
+    code.push_str(&import_stdlib("build/build"));
+    code.push_str(&import_stdlib("emulation/network"));
+    code.push_str(&import_stdlib("testing/assert"));
+    code.push_str(&import_stdlib("testing/expect"));
+    code.push_str(&import_stdlib("types/message"));
 
     if let Some(types_path) = types_file_path {
-        let types_import = get_relative_import(proot, root, types_path);
+        let types_import = get_import_path(proot, root, types_path, mappings);
         code.push_str(&gen_import_path(types_import));
     }
 
@@ -326,7 +330,7 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
         && Some(storage_path) != types_file_path
     {
         // add storage file import only if it different from types file
-        let storage_import = get_relative_import(proot, root, storage_path);
+        let storage_import = get_import_path(proot, root, storage_path, mappings);
         code.push_str(&gen_import_path(storage_import));
     }
 
@@ -343,7 +347,7 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
             continue;
         }
 
-        let types_import = get_relative_import(proot, root, messages_path);
+        let types_import = get_import_path(proot, root, messages_path, mappings);
         code.push_str(&gen_import_path(types_import));
     }
 
@@ -492,12 +496,13 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
         .iter()
         .map(|f| {
             let type_name =
-                if let abi::BaseTypeInfo::Cell { inner: Some(inner) } = &f.type_info.base {
+                if let ton_abi::BaseTypeInfo::Cell { inner: Some(inner) } = &f.type_info.base {
                     &inner.human_readable
                 } else {
                     &f.type_info.human_readable
                 };
-            format!("{}: {}", f.name, type_name)
+            let name = normalize_param_name(&f.name);
+            format!("{}: {}", name, type_name)
         })
         .collect::<Vec<_>>()
         .join(", ");
@@ -521,13 +526,17 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
     } else {
         code.push_str(&format!("        body: {} {{\n", message_type.name));
         for field in &fields {
-            if let abi::BaseTypeInfo::Cell { inner: Some(_) } = &field.type_info.base {
+            let param_name = normalize_param_name(&field.name);
+
+            if let ton_abi::BaseTypeInfo::Cell { inner: Some(_) } = &field.type_info.base {
                 code.push_str(&format!(
                     "            {}: {}.toCell(),\n",
-                    field.name, field.name
+                    field.name, param_name
                 ));
-            } else {
+            } else if field.name == param_name {
                 code.push_str(&format!("            {},\n", field.name));
+            } else {
+                code.push_str(&format!("            {}: {},\n", field.name, param_name));
             }
         }
         code.push_str("        },\n");
@@ -538,6 +547,14 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
     code.push_str("}\n");
 
     code
+}
+
+fn normalize_param_name(name: &str) -> String {
+    if name == "from" || name == "config" {
+        format!("{}_", name)
+    } else {
+        name.to_owned()
+    }
 }
 
 fn generate_send_any_method(contract_name: &str) -> String {
@@ -559,7 +576,7 @@ fn generate_send_any_method(contract_name: &str) -> String {
     code
 }
 
-fn generate_get_method(contract_name: &str, get_method: &abi::GetMethod) -> String {
+fn generate_get_method(contract_name: &str, get_method: &ton_abi::GetMethod) -> String {
     let mut code = String::new();
     let method_name = &get_method.name;
 
@@ -568,7 +585,7 @@ fn generate_get_method(contract_name: &str, get_method: &abi::GetMethod) -> Stri
         .iter()
         .map(|p| {
             let type_name =
-                if let abi::BaseTypeInfo::Cell { inner: Some(inner) } = &p.type_info.base {
+                if let ton_abi::BaseTypeInfo::Cell { inner: Some(inner) } = &p.type_info.base {
                     &inner.human_readable
                 } else {
                     &p.type_info.human_readable
@@ -603,7 +620,7 @@ fn generate_get_method(contract_name: &str, get_method: &abi::GetMethod) -> Stri
                 "    return net.runGetMethod(self.address, \"{method_name}\")\n"
             ));
         } else if args.len() == 1 {
-            let arg_name = if let abi::BaseTypeInfo::Cell { inner: Some(_) } =
+            let arg_name = if let ton_abi::BaseTypeInfo::Cell { inner: Some(_) } =
                 &get_method.parameters[0].type_info.base
             {
                 format!("{}.toCell()", args[0])
@@ -619,7 +636,7 @@ fn generate_get_method(contract_name: &str, get_method: &abi::GetMethod) -> Stri
                 .parameters
                 .iter()
                 .map(|p| {
-                    if let abi::BaseTypeInfo::Cell { inner: Some(_) } = &p.type_info.base {
+                    if let ton_abi::BaseTypeInfo::Cell { inner: Some(_) } = &p.type_info.base {
                         format!("{}.toCell()", p.name)
                     } else {
                         p.name.clone()
@@ -643,20 +660,17 @@ fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) ->
     let proot = &model.project_root;
     let root = &model.test_path;
     let contract = &model.contract_name;
+    let mappings = &model.mappings;
 
     let mut code = String::new();
 
     code.push_str("import \"@stdlib/gas-payments\"\n");
-    code.push_str(&import_stdlib(proot, root, ".acton/emulation/network"));
-    code.push_str(&import_stdlib(proot, root, ".acton/testing/expect"));
-    code.push_str(&import_stdlib(
-        proot,
-        root,
-        ".acton/testing/transaction_expect",
-    ));
+    code.push_str(&import_stdlib("emulation/network"));
+    code.push_str(&import_stdlib("testing/expect"));
+    code.push_str(&import_stdlib("testing/transaction_expect"));
 
     if let Some(types_path) = types_file_override {
-        let types_import = get_relative_import(proot, root, types_path);
+        let types_import = get_import_path(proot, root, types_path, mappings);
         code.push_str(&gen_import_path(types_import));
     }
 
@@ -671,11 +685,11 @@ fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) ->
             continue;
         }
 
-        let types_import = get_relative_import(proot, root, messages_path);
+        let types_import = get_import_path(proot, root, messages_path, mappings);
         code.push_str(&gen_import_path(types_import));
     }
 
-    let wrapper_import = get_relative_import(proot, root, &model.wrapper_path);
+    let wrapper_import = get_import_path(proot, root, &model.wrapper_path, mappings);
     code.push_str(&gen_import_path(wrapper_import));
     code.push('\n');
 
@@ -687,9 +701,8 @@ fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) ->
     format!("{}\n", code.trim())
 }
 
-fn import_stdlib(project_root: &Path, where_: &Path, path: &str) -> String {
-    let types_import = get_relative_import(project_root, where_, Path::new(path));
-    gen_import_path(types_import)
+fn import_stdlib(path: &str) -> String {
+    gen_import_path(PathBuf::from("@acton").join(path))
 }
 
 fn gen_import_path(path: PathBuf) -> String {
@@ -709,6 +722,74 @@ fn get_relative_import(project_root: &Path, where_: &Path, what: &Path) -> PathB
 
     let relative_path = pathdiff::diff_paths(&what_abs_path, where_abs_dir);
     relative_path.unwrap_or(what_abs_path)
+}
+
+fn get_import_path(
+    project_root: &Path,
+    where_: &Path,
+    what: &Path,
+    mappings: &Option<BTreeMap<String, String>>,
+) -> PathBuf {
+    if let Some(mapped_import) = resolve_mapped_import(project_root, what, mappings) {
+        return mapped_import;
+    }
+
+    get_relative_import(project_root, where_, what)
+}
+
+fn resolve_mapped_import(
+    project_root: &Path,
+    what: &Path,
+    mappings: &Option<BTreeMap<String, String>>,
+) -> Option<PathBuf> {
+    let mappings = mappings.as_ref()?;
+    let what_abs = normalize_abs_path(project_root, what);
+
+    let mut best_match = None;
+
+    for (key, value) in mappings {
+        let mapping_abs = normalize_abs_path(project_root, Path::new(value));
+
+        if !what_abs.starts_with(&mapping_abs) {
+            continue;
+        }
+
+        let Ok(relative_path) = what_abs.strip_prefix(&mapping_abs) else {
+            continue;
+        };
+
+        let key = if key.starts_with('@') {
+            key.clone()
+        } else {
+            format!("@{key}")
+        };
+
+        let mut import_path = PathBuf::from(key);
+        if !relative_path.as_os_str().is_empty() {
+            import_path = import_path.join(relative_path);
+        }
+
+        let score = mapping_abs.components().count();
+        if best_match
+            .as_ref()
+            .map(|(best_score, _)| score > *best_score)
+            .unwrap_or(true)
+        {
+            best_match = Some((score, import_path));
+        }
+    }
+
+    best_match.map(|(_, path)| path)
+}
+
+fn normalize_abs_path(project_root: &Path, path: &Path) -> PathBuf {
+    let abs_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        project_root.join(path)
+    };
+
+    abs_path.canonicalize().unwrap_or(abs_path)
 }
 
 fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
@@ -740,7 +821,7 @@ fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
             .map(|f| {
                 let default_value = get_default_value(&f.type_info.human_readable);
                 match &f.type_info.base {
-                    abi::BaseTypeInfo::Cell { inner: Some(inner) } => {
+                    ton_abi::BaseTypeInfo::Cell { inner: Some(inner) } => {
                         let default_value = get_default_value(&inner.human_readable);
                         format!(" {}: {}.toCell()", f.name, default_value)
                     }
@@ -769,13 +850,15 @@ fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
 
 fn get_default_value(type_name: &str) -> &str {
     match type_name {
-        "int" | "int64" | "int32" | "int16" | "int8" => "0",
-        "uint" | "uint64" | "uint32" | "uint16" | "uint8" => "0",
+        _ if type_name.starts_with("int") => "0",
+        _ if type_name.starts_with("uint") => "0",
         "coins" => "0",
         "bool" => "false",
         "address" => "address(\"EQD__________________________________________0vo\")",
+        "any_address" => "address(\"EQD__________________________________________0vo\")",
         "cell" => "createEmptyCell()",
         "slice" => "createEmptySlice()",
+        _ if type_name.starts_with("map<") => "createEmptyMap()",
         _ => "null",
     }
 }

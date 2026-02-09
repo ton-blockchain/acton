@@ -22,12 +22,12 @@ pub struct ResolvedImport {
 
 impl ResolvedImport {
     /// Returns AST node of this import.
-    pub fn import(&self) -> &Import {
+    pub const fn import(&self) -> &Import {
         &self.import
     }
 
     /// Return `FileId` which is imported.
-    pub fn target(&self) -> Option<FileId> {
+    pub const fn target(&self) -> Option<FileId> {
         self.target
     }
 }
@@ -55,27 +55,27 @@ pub struct ProjectIndex {
 
 impl ProjectIndex {
     /// Creates a new builder for `ProjectIndex`.
-    pub fn builder(file_db: &'_ FileDb, root_path: PathBuf) -> ProjectIndexBuilder<'_> {
+    pub const fn builder(file_db: &'_ FileDb, root_path: PathBuf) -> ProjectIndexBuilder<'_> {
         ProjectIndexBuilder::new(file_db, root_path)
     }
 
-    pub fn files(&self) -> &FxHashMap<FileId, Arc<FileIndex>> {
+    pub const fn files(&self) -> &FxHashMap<FileId, Arc<FileIndex>> {
         &self.files
     }
 
-    pub fn imports(&self) -> &FxHashMap<FileId, Vec<ResolvedImport>> {
+    pub const fn imports(&self) -> &FxHashMap<FileId, Vec<ResolvedImport>> {
         &self.imports
     }
 
-    pub fn path_to_file_id(&self) -> &HashMap<PathBuf, FileId> {
+    pub const fn path_to_file_id(&self) -> &HashMap<PathBuf, FileId> {
         &self.path_to_file_id
     }
 
-    pub fn resolved_uses(&self) -> &FxHashMap<FileId, Arc<FileResolveIndex>> {
+    pub const fn resolved_uses(&self) -> &FxHashMap<FileId, Arc<FileResolveIndex>> {
         &self.resolved_uses
     }
 
-    pub fn dependents(&self) -> &FxHashMap<FileId, Vec<FileId>> {
+    pub const fn dependents(&self) -> &FxHashMap<FileId, Vec<FileId>> {
         &self.dependents
     }
 
@@ -95,7 +95,7 @@ impl ProjectIndex {
         self.resolved_uses.get(&file_id)
     }
 
-    pub fn global_symbols(&self) -> &HashMap<Arc<str>, Vec<SymbolId>> {
+    pub const fn global_symbols(&self) -> &HashMap<Arc<str>, Vec<SymbolId>> {
         &self.global_symbols
     }
 
@@ -213,7 +213,7 @@ pub struct ProjectIndexBuilder<'a> {
 }
 
 impl<'a> ProjectIndexBuilder<'a> {
-    pub fn new(file_db: &'a FileDb, root_path: PathBuf) -> Self {
+    pub const fn new(file_db: &'a FileDb, root_path: PathBuf) -> Self {
         Self {
             file_db,
             root_path,

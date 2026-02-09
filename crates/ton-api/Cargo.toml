@@ -1,16 +1,24 @@
 [package]
 name = "ton-api"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-anyhow = "1.0"
-reqwest = { version = "0.12", features = ["blocking", "json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-urlencoding = "2.1"
-num-bigint = "0.4.6"
-tycho-types = "0.3.0"
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+urlencoding = { workspace = true }
+num-bigint = { workspace = true }
+tycho-types = { workspace = true }
+ton-networks = { workspace = true }
 
 [lints]
 workspace = true

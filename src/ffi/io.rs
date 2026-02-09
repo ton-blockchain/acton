@@ -1,8 +1,8 @@
 use crate::context::Context;
-use emulator::{extension, register_ext_methods};
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvmffi::from_stack::FromStack;
 use tvmffi::stack::{Tuple, TupleItem};

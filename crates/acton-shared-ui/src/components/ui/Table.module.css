@@ -1,0 +1,55 @@
+.tableWrapper {
+  position: relative;
+  width: 100%;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  caption-side: bottom;
+  font-size: var(--font-size-sm);
+  border-collapse: collapse;
+}
+
+.header {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.body tr:last-child {
+  border-bottom: 0;
+}
+
+.footer {
+  border-top: 1px solid var(--border-color);
+  background-color: var(--bg-secondary-color);
+  font-weight: var(--font-weight-medium);
+}
+
+.row {
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color var(--transition-duration-fast);
+}
+
+.row:hover {
+  background-color: var(--hover-bg);
+}
+
+.head {
+  height: 3rem;
+  padding: 0 var(--spacing-md);
+  text-align: left;
+  vertical-align: middle;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.cell {
+  padding: var(--spacing-md);
+  vertical-align: middle;
+}
+
+.caption {
+  margin-top: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}

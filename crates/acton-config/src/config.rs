@@ -4,22 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-#[derive(clap::ValueEnum, Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Network {
-    Mainnet,
-    Testnet,
-}
-
-impl std::fmt::Display for Network {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Network::Mainnet => write!(f, "mainnet"),
-            Network::Testnet => write!(f, "testnet"),
-        }
-    }
-}
+use std::sync::Arc;
+pub use ton_networks::{CustomNetworkUrls, Network};
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone)]
 pub enum Explorer {
@@ -52,6 +38,13 @@ pub enum ContractDependency {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct CustomNetworkConfig {
+    pub v2_url: String,
+    pub v3_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActonConfig {
     pub package: PackageConfig,
     pub contracts: Option<ContractsConfig>,
@@ -63,6 +56,8 @@ pub struct ActonConfig {
     pub wallets: Option<WalletsConfig>,
     #[serde(skip)] // we build libraries manually
     pub libraries: Option<LibrariesConfig>,
+    pub mappings: Option<BTreeMap<String, String>>,
+    pub networks: Option<BTreeMap<String, CustomNetworkConfig>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -231,6 +226,8 @@ impl Default for ActonConfig {
             wallets: None,
             libraries: None,
             scripts: None,
+            mappings: None,
+            networks: None,
         }
     }
 }
@@ -307,7 +304,7 @@ impl ActonConfig {
 
         // Merge wallets from different sources
         // Order of importance (later overrides earlier):
-        // 1. Global ~/.acton/wallets/global.wallets.toml
+        // 1. Global ~/.config/acton/wallets/global.wallets.toml
         // 2. Local wallets.toml
 
         let mut merged_wallets = BTreeMap::new();
@@ -411,6 +408,26 @@ impl ActonConfig {
     pub fn get_library(&self, name: &str) -> Option<&LibraryConfig> {
         self.libraries.as_ref()?.libraries.get(name)
     }
+
+    #[must_use]
+    pub fn custom_networks(&self) -> std::collections::HashMap<String, CustomNetworkUrls> {
+        let mut result = std::collections::HashMap::new();
+        if let Some(networks) = &self.networks {
+            for (name, config) in networks {
+                result.insert(
+                    name.clone(),
+                    CustomNetworkUrls {
+                        v2_url: Arc::from(config.v2_url.trim_end_matches("/")),
+                        v3_url: config
+                            .v3_url
+                            .as_ref()
+                            .map(|s| Arc::from(s.trim_end_matches("/"))),
+                    },
+                );
+            }
+        }
+        result
+    }
 }
 
 #[must_use]
@@ -422,7 +439,8 @@ pub fn global_wallets_path() -> Option<PathBuf> {
 
     Some(
         PathBuf::from(home)
-            .join(".acton")
+            .join(".config")
+            .join("acton")
             .join("wallets")
             .join("global.wallets.toml"),
     )
@@ -437,7 +455,8 @@ pub fn global_libraries_path() -> Option<PathBuf> {
 
     Some(
         PathBuf::from(home)
-            .join(".acton")
+            .join(".config")
+            .join("acton")
             .join("libraries")
             .join("global.libraries.toml"),
     )
@@ -748,5 +767,24 @@ keys = { mnemonic = "word1 word2 word3" }
         assert_eq!(direct.keys.mnemonic, Some("word1 word2 word3".to_string()));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_mappings_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[mappings]
+core = "./core"
+utils = "/usr/local/lib/tolk/utils"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let mappings = config.mappings.as_ref().unwrap();
+        assert_eq!(mappings.get("core").unwrap(), "./core");
+        assert_eq!(mappings.get("utils").unwrap(), "/usr/local/lib/tolk/utils");
     }
 }

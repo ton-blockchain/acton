@@ -1,17 +1,24 @@
 [package]
 name = "tolk-macros"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [lib]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.105"
-quote = "1.0.43"
-syn = { version = "2.0.114", features = ["derive", "parsing", "extra-traits", "full"] }
-itertools = "0.14.0"
-heck = "0.5.0"
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+itertools = { workspace = true }
+heck = { workspace = true }
 
 [lints]
 workspace = true

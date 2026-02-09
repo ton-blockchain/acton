@@ -50,7 +50,7 @@ fn test_wallet_new_global() {
         .run()
         .success();
 
-    let global_wallets_dir = home_path.join(".acton").join("wallets");
+    let global_wallets_dir = home_path.join(".config").join("acton").join("wallets");
     let global_config = global_wallets_dir.join("global.wallets.toml");
     let global_mnemonic_file = global_wallets_dir.join("global-wallet.mnemonic");
 

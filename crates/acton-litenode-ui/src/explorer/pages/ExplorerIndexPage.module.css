@@ -1,0 +1,199 @@
+.inputPage {
+  padding: var(--spacing-lg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--tonscan-bg);
+  color: var(--text-primary);
+}
+
+.centeredInputContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 0 var(--spacing-lg) var(--spacing-2xl);
+  margin-top: -100px;
+}
+
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.logoTitle {
+  font-size: 2.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.inputCard {
+  width: 100%;
+  max-width: 720px;
+  position: relative;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--tonscan-card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: var(--spacing-xs);
+  transition:
+    border-color var(--transition-duration-fast) ease,
+    box-shadow var(--transition-duration-fast) ease;
+  position: relative;
+}
+
+.inputWrapper.focused {
+  border-color: var(--tonscan-accent);
+  box-shadow: 0 0 0 3px rgba(0, 136, 204, 0.2);
+}
+
+.inputWrapper.inputError {
+  border-color: var(--color-failed);
+}
+
+.inputWrapper.inputError.focused {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.searchIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--spacing-sm);
+  color: var(--text-secondary);
+}
+
+.input {
+  flex-grow: 1;
+  border: none;
+  background-color: transparent;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  outline: none;
+  padding: var(--spacing-mds) 0;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.errorMessage {
+  color: var(--color-failed);
+  font-size: var(--font-size-sm);
+  margin-top: var(--spacing-sm);
+  margin-left: var(--spacing-mds);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.errorIcon {
+  flex-shrink: 0;
+}
+
+.historyDropdown {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-sm) 0 0 0;
+  position: absolute;
+  width: 100%;
+  background-color: var(--tonscan-card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  transition: background-color var(--transition-duration-fast);
+  border-bottom: 1px solid var(--border-color);
+  width: 100%;
+}
+
+.historyItemButton {
+  display: flex;
+  align-items: center;
+  flex-grow: 1;
+  padding: var(--spacing-mds) var(--spacing-md);
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+}
+
+.historyItemButton:hover {
+  background-color: var(--hover-bg);
+}
+
+.historyItem:last-child {
+  border-bottom: none;
+}
+
+.historyItemIcon {
+  margin-right: var(--spacing-mds);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.historyAddr {
+  flex-grow: 1;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.historyItemDeleteButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius-sm);
+  margin-left: var(--spacing-sm);
+}
+
+.historyItemDeleteButton:hover {
+  background-color: var(--hover-bg);
+  color: var(--color-failed);
+}
+
+.footer {
+  padding: var(--spacing-2xl) 0;
+  display: flex;
+  justify-content: center;
+}
+
+.createBy {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+  .logoTitle {
+    font-size: var(--font-size-xl);
+  }
+
+  .centeredInputContainer {
+    margin-top: 0;
+  }
+}

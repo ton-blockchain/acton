@@ -1,17 +1,21 @@
 [package]
 name = "tolk-analysis"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-tolk-syntax = { path = "../tolk-syntax" }
-tolk-resolver = { path = "../tolk-resolver" }
-tolk-ty = { path = "../tolk-ty" }
-tolk-macros = { path = "../tolk-macros" }
-tree-sitter = "0.25.10"
-serde = { version = "1.0.228", features = ["derive"] }
-rustc-hash = "2.1.1"
-bitflags = "2.9.4"
+tolk-syntax = { workspace = true }
+tolk-resolver = { workspace = true }
+tolk-ty = { workspace = true }
+rustc-hash = { workspace = true }
+bitflags = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,0 +1,380 @@
+========================================================================
+If smartcast to non nullable value
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value != null) {
+        value;
+//!     ^ int
+    }
+
+    value;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value backward
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (null != value) {
+        value;
+//!     ^ int
+    }
+
+    value;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to nullable value
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value == null) {
+        value
+//!     ^ null
+    }
+
+    value;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to nullable value backward
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (null == value) {
+        value;
+//!     ^ null
+    }
+
+    value;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with else branch
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value != null) {
+        value;
+//!     ^ int
+    } else {
+        value;
+//!     ^ null
+    }
+
+    value;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with return
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value != null) {
+        value;
+//!     ^ int
+        return;
+    }
+
+    value;
+//! ^ null
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to nullable value with return
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value == null) {
+        value;
+//!     ^ null
+        return;
+    }
+
+    value;
+//! ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with && and return
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+    val value2 = cond ? 10 : null;
+
+    if (value != null && value2 != null) {
+        value;
+//!     ^ int
+        value2;
+//!     ^ int
+        return;
+    }
+
+    value;
+//! ^ int?
+    value2;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with || and return
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+    val value2 = cond ? 10 : null;
+
+    if (value == null || value2 == null) {
+        value;
+//!     ^ int?
+        value2;
+//!     ^ int?
+        return;
+    }
+
+    value;
+//! ^ int
+    value2;
+//! ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with && and inline check
+========================================================================
+fun foo(value: int): bool { return true }
+
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value != null && value != null) {
+//!                      ^ int
+        value;
+//!     ^ int
+        return;
+    }
+
+    value;
+//! ^ null
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with || and inline check
+========================================================================
+fun foo(value: int): bool { return true }
+
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+
+    if (value == null || value != null) {
+//!                      ^ int
+        value;
+//!     ^ int?
+        return;
+    }
+
+    value;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with && and else
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+    val value2 = cond ? 10 : null;
+
+    if (value != null && value2 != null) {
+        value;
+//!     ^ int
+        value2;
+//!     ^ int
+    } else {
+        value;
+//!     ^ int?
+        value2;
+//!     ^ int?
+    }
+
+    value;
+//! ^ int?
+    value2;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+If smartcast to non nullable value with || and else
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+    val value2 = cond ? 10 : null;
+
+    if (value == null || value2 == null) {
+        value;
+//!     ^ int?
+        value2;
+//!     ^ int?
+    } else {
+        value;
+//!     ^ int
+        value2;
+//!     ^ int
+    }
+
+    value;
+//! ^ int?
+    value2;
+//! ^ int?
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Nested if smartcasts to non nullable value
+========================================================================
+fun main(cond: bool) {
+    val value = cond ? 10 : null;
+    val value2 = cond ? 10 : null;
+
+    if (value == null) {
+        if (value2 != null) {
+            value;
+//!         ^ null
+            value2;
+//!         ^ int
+        } else {
+            value;
+//!         ^ null
+            value2;
+//!         ^ null
+        }
+        return;
+    } else {
+        value;
+//!     ^ int
+        value2;
+//!     ^ int?
+
+        if (value2 == null) {
+            value;
+//!         ^ int
+            value2;
+//!         ^ null
+            return;
+        } else {
+            value;
+//!         ^ int
+            value2;
+//!         ^ int
+        }
+    }
+
+    value;
+//! ^ int
+    value2;
+//! ^ int
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assign smartcast
+========================================================================
+fun main(): void {
+    val name: int | slice = 10;
+//!     ^ int | slice
+
+    name;
+//! ^ int
+
+    name = "";
+//! ^ int | slice
+
+    name;
+//! ^ slice
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assign smartcast with tuple
+========================================================================
+fun main(): void {
+    val [name: int | slice] = [10];
+//!      ^ int | slice
+
+    name;
+//! ^ int
+
+    name = "";
+//! ^ int | slice
+
+    name;
+//! ^ slice
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Assign smartcast with tensor
+========================================================================
+fun main(): void {
+    val (
+        name: int | slice,
+//!     ^ int | slice
+        other: slice?
+//!     ^ slice?
+    ) = (10, null);
+
+    name;
+//! ^ int
+    other;
+//! ^ null
+
+    name = "";
+//! ^ int | slice
+    other = "";
+//! ^ slice?
+
+    name;
+//! ^ slice
+    other;
+//! ^ slice
+}
+------------------------------------------------------------------------
+ok

@@ -22,14 +22,10 @@ use crate::debugger::dap::DapTransport;
 use crate::debugger::debug_context::DebugContext;
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
-use abi::{ContractAbi, contract_abi};
+use crate::formatter::FormatterContext;
 use acton_config::config::{ActonConfig, ContractDependency, DependencyKind};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::anyhow;
-use emulator::emulator::Emulator;
-use emulator::world_state::{
-    AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
-};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
 use num_traits::ToPrimitive;
@@ -41,6 +37,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
+use ton_abi::{ContractAbi, contract_abi};
+use ton_emulator::emulator::Emulator;
+use ton_emulator::world_state::{
+    AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
+};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
@@ -59,8 +60,8 @@ mod coverage;
 mod instrumentation;
 pub mod mutation;
 mod profiling;
-mod reporting;
-mod trace;
+pub mod reporting;
+pub mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -248,7 +249,7 @@ impl<'a> TestRunner<'a> {
         let mut emulator = Emulator::new(verbosity, config_b64)?;
         let state = match &self.config.fork_net {
             Some(net) => AccountsState::Remote(RemoteAccountState::new(
-                net.to_string(),
+                net.clone(),
                 self.config.fork_block_number,
                 self.config.api_key.clone(),
                 self.remote_cache.clone(),
@@ -275,7 +276,7 @@ impl<'a> TestRunner<'a> {
                 build_override: self.mutation_overrides.clone(),
                 explorer: None,
                 api_key: self.config.api_key.clone(),
-                fork_net: self.config.fork_net.as_ref().map(ToString::to_string),
+                fork_net: self.config.fork_net.clone(),
                 running_id: test.name.clone(),
             },
             io: IoContext {
@@ -304,7 +305,7 @@ impl<'a> TestRunner<'a> {
             },
             debug: DebugCtx::Disabled,
             is_broadcasting: false,
-            network: self.config.fork_net.as_ref().map(ToString::to_string),
+            network: self.config.fork_net.clone(),
         };
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
@@ -527,10 +528,22 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     {
         let reports = reports.lock().expect("cannot lock mutex").clone();
         let trace_dir = config.save_test_trace.clone();
+        let project_root = std::env::current_dir().unwrap_or_default();
+        let project_root = fs::canonicalize(project_root)
+            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default())
+            .to_string_lossy()
+            .to_string();
+        let project_root = if project_root.ends_with(std::path::MAIN_SEPARATOR) {
+            project_root
+        } else {
+            format!("{}{}", project_root, std::path::MAIN_SEPARATOR)
+        };
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        rt.block_on(async { start_ui_server(reports, trace_dir, config.ui_port).await })?;
+        rt.block_on(async {
+            start_ui_server(reports, trace_dir, project_root, config.ui_port).await
+        })?;
     }
 
     if let Some(filter) = &config.filter
@@ -670,6 +683,7 @@ fn compile_test_file(
     file_cache: &mut FileBuildCache,
     file: &str,
     need_debug_info: bool,
+    acton_config: &ActonConfig,
 ) -> anyhow::Result<tolkc::CompilerResult> {
     let cache_entry = file_cache.get(file, need_debug_info, 0, "1.2".to_string());
     if let Some(cache_entry) = cache_entry {
@@ -682,7 +696,9 @@ fn compile_test_file(
             },
         ));
     }
-    let compilation_result = tolkc::compile(Path::new(&file), need_debug_info);
+
+    let compiler = tolkc::Compiler::new(0).with_mappings(&acton_config.mappings);
+    let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
         tolkc::CompilerResult::Success(result) => {
             let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.2".to_string());
@@ -708,7 +724,7 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
 
     let tests = find_all_test(file, &content);
 
-    let abi = contract_abi(content.as_str(), file);
+    let abi = contract_abi(content.as_str(), file, &runner.acton_config.mappings);
 
     let executable_code = inject_locations_into_expect_calls(&content, file);
     let tmp_test_filename = file.to_owned() + ".test.tolk";
@@ -719,8 +735,12 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
     let need_debug_info =
         config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
     let now = Instant::now();
-    let compilation_result =
-        compile_test_file(runner.file_build_cache, &tmp_test_filename, need_debug_info)?;
+    let compilation_result = compile_test_file(
+        runner.file_build_cache,
+        &tmp_test_filename,
+        need_debug_info,
+        &runner.acton_config,
+    )?;
     debug!("Test file '{file}' compilation time: {:?}", now.elapsed());
 
     match compilation_result {
@@ -796,6 +816,9 @@ fn run_file_tests(
             gas_limit: test.gas_limit,
             status: TestStatus::Passed,
             message: None,
+            detailed_message: None,
+            failed_transactions: None,
+            failed_transaction_context: None,
             details: None,
             abi: abi.clone(),
             source_map: source_map.clone(),
@@ -899,15 +922,47 @@ fn run_file_tests(
         } else {
             test_report.status = TestStatus::Failed;
 
+            let formatter = FormatterContext {
+                contract_abi: abi.clone(),
+                accounts: accounts.clone(),
+                build_cache: runner.build_cache.clone(),
+                emulations: runner.emulations.clone(),
+                known_addresses: runner.known_addresses.clone(),
+                known_code_cells: runner.known_code_cells.clone(),
+                backtrace: runner.config.backtrace.as_ref().map(ToString::to_string),
+                fork_net: None,
+                network: None,
+                api_key: None,
+            };
+
             if let Some(failure) = &assert_failure {
                 test_report.message = failure.message();
                 test_report.details = failure.location();
+                test_report.detailed_message =
+                    Some(formatter.format_detailed_assert_failure(failure, abi));
+
+                if let AssertFailure::TransactionNotFound(tx_failure)
+                | AssertFailure::TransactionIsFound(tx_failure) = failure
+                {
+                    test_report.failed_transactions =
+                        Some(formatter.parse_failed_transactions(&tx_failure.txs));
+                    test_report.failed_transaction_context =
+                        Some(formatter.get_failed_transaction_context(tx_failure, abi));
+                }
             } else if expected_exit_code != 0 {
                 test_report.message = Some(format!(
                     "Expected exit_code={expected_exit_code}, got={exit_code}"
                 ));
+                if let GetMethodResult::Success(result) = &get_result {
+                    test_report.detailed_message =
+                        Some(formatter.format_detailed_exit_code(&test_report, result, exit_code));
+                }
             } else {
                 test_report.message = Some(format!("exit_code={exit_code}"));
+                if let GetMethodResult::Success(result) = &get_result {
+                    test_report.detailed_message =
+                        Some(formatter.format_detailed_exit_code(&test_report, result, exit_code));
+                }
             }
 
             failed += 1;
@@ -928,7 +983,11 @@ fn run_file_tests(
                     &code_cell.to_boc_b64(false)?,
                     &code_cell.cell_hash()?.to_hex().to_ascii_uppercase(),
                     source_map.clone(),
-                    Some(contract_abi(&content, file_path)),
+                    Some(contract_abi(
+                        &content,
+                        file_path,
+                        &runner.acton_config.mappings,
+                    )),
                 );
             }
         }

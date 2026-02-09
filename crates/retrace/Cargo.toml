@@ -1,20 +1,27 @@
 [package]
 name = "retrace"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-ton-executor = { path = "../ton-executor" }
-vmlogs = { path = "../vmlogs" }
-
-tycho-types = "0.3.0"
-num-bigint = "0.4.6"
-anyhow = "1.0.100"
-tokio = { version = "1.41", features = ["full"] }
-reqwest = { version = "0.12", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-base64 = "0.22"
+ton-executor = { workspace = true }
+vmlogs = { workspace = true }
+tycho-types = { workspace = true }
+num-bigint = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64 = { workspace = true }
+ton-networks = { workspace = true }
 
 [lints]
 workspace = true

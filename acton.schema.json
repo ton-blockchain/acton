@@ -33,6 +33,24 @@
         }
       }
     },
+    "networks": {
+      "type": "object",
+      "description": "Custom network configurations",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["v2-url", "v3-url"],
+        "properties": {
+          "v2-url": {
+            "type": "string",
+            "description": "The URL for the TonCenter API v2"
+          },
+          "v3-url": {
+            "type": "string",
+            "description": "The URL for the TonCenter API v3"
+          }
+        }
+      }
+    },
     "test": {
       "type": "object",
       "description": "Default settings for the test runner",
@@ -207,6 +225,13 @@
             "description": "Path where the compiled .boc should be saved"
           }
         }
+      }
+    },
+    "mappings": {
+      "type": "object",
+      "description": "Path mappings for Tolk compiler imports (e.g., 'core' = './foo/core' maps to '@core/...')",
+      "additionalProperties": {
+        "type": "string"
       }
     },
     "scripts": {

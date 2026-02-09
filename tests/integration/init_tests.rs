@@ -111,7 +111,7 @@ fn test_init_symlinks_global_wallets_if_already_initialized() {
 
     let home_temp = tempfile::TempDir::new().unwrap();
     let home_path = home_temp.path();
-    let global_wallets_dir = home_path.join(".acton").join("wallets");
+    let global_wallets_dir = home_path.join(".config").join("acton").join("wallets");
     fs::create_dir_all(&global_wallets_dir).unwrap();
     let global_config = global_wallets_dir.join("global.wallets.toml");
     fs::write(
@@ -381,7 +381,7 @@ fn test_init_project_symlinks_global_wallets() {
     let home_temp = tempfile::TempDir::new().unwrap();
     let home_path = home_temp.path();
 
-    let global_wallets_dir = home_path.join(".acton").join("wallets");
+    let global_wallets_dir = home_path.join(".config").join("acton").join("wallets");
     fs::create_dir_all(&global_wallets_dir).unwrap();
     let global_config = global_wallets_dir.join("global.wallets.toml");
     fs::write(

@@ -43,6 +43,7 @@ Session.vim
 *.mnemonic
 wallets.toml
 global.wallets.toml
+global.libraries.toml
 
 # coverage
 lcov.info
@@ -207,6 +208,14 @@ pub fn new_cmd(
         "acton script scripts/deploy.tolk --broadcast --net testnet".to_owned(),
     );
     config.scripts = Some(scripts);
+
+    let mut mappings = BTreeMap::new();
+    mappings.insert("acton".to_owned(), ".acton".to_owned());
+    mappings.insert("contracts".to_owned(), "contracts".to_owned());
+    mappings.insert("tests".to_owned(), "tests".to_owned());
+    mappings.insert("wrappers".to_owned(), "tests/wrappers".to_owned());
+    mappings.insert("gen".to_owned(), "gen".to_owned());
+    config.mappings = Some(mappings);
 
     config.save()?;
 

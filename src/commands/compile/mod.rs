@@ -1,5 +1,6 @@
 use crate::commands::common::error_fmt;
 use crate::file_build_cache::FileBuildCache;
+use acton_config::config;
 use anyhow::anyhow;
 use log::info;
 use owo_colors::OwoColorize;
@@ -42,6 +43,8 @@ pub fn compile_cmd(
 
     let mut file_cache = FileBuildCache::new(None)?;
 
+    let acton_config = config::ActonConfig::load().ok();
+
     let need_debug_info = source_map.is_some();
     if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.2".to_string()) {
         let elapsed = start_time.elapsed();
@@ -65,7 +68,13 @@ pub fn compile_cmd(
 
     let compile_start = Instant::now();
     let with_debug_info = source_map.is_some();
-    let compilation_result = tolkc::compile(Path::new(path), with_debug_info);
+
+    let mut compiler = tolkc::Compiler::new(2);
+    if let Some(acton_config) = &acton_config {
+        compiler = compiler.with_mappings(&acton_config.mappings)
+    }
+
+    let compilation_result = compiler.compile(Path::new(path), with_debug_info);
     let compile_time = compile_start.elapsed();
 
     match compilation_result {

@@ -1,12 +1,18 @@
 #![allow(unsafe_code)]
+use dunce::canonicalize;
 use include_dir::{Dir, include_dir};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::ffi::{CStr, CString, c_char};
-use std::fs::{canonicalize, read_to_string};
-use std::io::Error;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
+use std::ffi::{CStr, CString, c_char, c_int};
+use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use ton_source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
+
+thread_local! {
+    static CURRENT_MAPPINGS: RefCell<FxHashMap<String, String>> = RefCell::new(FxHashMap::default());
+}
 
 /// Compiles passed file with Tolk compiler.
 ///
@@ -35,6 +41,22 @@ pub fn compile_fast(path: &Path, debug: bool) -> CompilerResult {
     Compiler::new(0).compile(path, debug)
 }
 
+#[repr(u32)]
+enum FsReadCallbackKind {
+    Realpath = 0,
+    ReadFile = 1,
+}
+
+impl From<c_int> for FsReadCallbackKind {
+    fn from(value: c_int) -> Self {
+        if value == 0 {
+            return FsReadCallbackKind::Realpath;
+        }
+
+        FsReadCallbackKind::ReadFile
+    }
+}
+
 /// Simple wrapper over C++ implemented Tolk compiler.
 pub struct Compiler {
     /// Level of optimizations, 0 – no optimizations, 2 – all optimizations.
@@ -45,23 +67,53 @@ pub struct Compiler {
     pub with_src_line_comments: bool,
     /// Other experimental options.
     pub experimental_options: String,
+    /// Mappings for paths (e.g. "@core" -> "/path/to/core")
+    pub mappings: FxHashMap<String, String>,
 }
 
 impl Compiler {
     #[must_use]
-    pub const fn new(opt_level: i64) -> Self {
+    pub fn new(opt_level: i64) -> Self {
         Self {
             opt_level,
             with_stack_comments: false,
             with_src_line_comments: false,
             experimental_options: String::new(),
+            mappings: FxHashMap::default(),
         }
+    }
+
+    /// Sets mapping that will be used to resolve imports paths.
+    ///
+    /// For example:
+    ///
+    /// - `@root`: `foo/bar/`
+    ///
+    /// `import "@root/baz"` will be resolved to `foo/bar/baz`
+    pub fn with_mappings(mut self, mappings: &Option<BTreeMap<String, String>>) -> Self {
+        if let Some(mappings) = mappings {
+            self.mappings = mappings
+                .iter()
+                .map(|(key, value)| {
+                    if key.starts_with('@') {
+                        (key.clone(), value.clone())
+                    } else {
+                        (format!("@{key}"), value.clone())
+                    }
+                })
+                .collect();
+        }
+        self
     }
 
     /// Compiles passed file with Tolk compiler.
     ///
     /// Returns successful result with `code_boc64` or error with `message`.
     pub fn compile(&self, path: &Path, with_debug_info: bool) -> CompilerResult {
+        CURRENT_MAPPINGS.with(|m| {
+            *m.borrow_mut() = self.mappings.clone();
+        });
+
         let config = serde_json::to_string(&CompilerConfig {
             entrypoint_file_name: path.to_string_lossy().to_string(),
             optimization_level: self.opt_level,
@@ -80,23 +132,44 @@ impl Compiler {
                 dest_contents: *mut *mut c_char,
                 dest_error: *mut *mut c_char,
             ) {
-                fn realpath(path: PathBuf) -> Result<String, Error> {
-                    if path.is_absolute() {
-                        let abs_path = canonicalize(path)?;
-                        return Ok(abs_path.to_string_lossy().into_owned());
+                fn realpath(path_str: &str) -> Result<PathBuf, String> {
+                    if Path::new(path_str).is_absolute() {
+                        return canonicalize(path_str).map_err(|e| e.to_string());
                     }
 
-                    if path.starts_with("@stdlib/") {
-                        return Ok(path.to_string_lossy().to_string());
+                    if path_str.starts_with("@stdlib/") || path_str.starts_with("@fiftlib/") {
+                        return Ok(PathBuf::from(path_str));
                     }
 
-                    let abs_path = canonicalize(path)?;
-                    Ok(abs_path.to_string_lossy().into_owned())
+                    if path_str.starts_with('@') {
+                        let (prefix, suffix) = match path_str.find('/') {
+                            Some(pos) => (&path_str[..pos], &path_str[pos + 1..]),
+                            None => (path_str, ""),
+                        };
+
+                        let mut resolved = None;
+                        CURRENT_MAPPINGS.with(|mappings| {
+                            let mappings = mappings.borrow();
+                            if let Some(target) = mappings.get(prefix) {
+                                let cur_mapped_path = Path::new(target).join(suffix);
+
+                                resolved =
+                                    Some(canonicalize(cur_mapped_path).map_err(|e| e.to_string()));
+                            }
+                        });
+
+                        if let Some(res) = resolved {
+                            return res;
+                        }
+
+                        return Err(format!("Unknown path mapping '{prefix}'"));
+                    }
+
+                    canonicalize(path_str).map_err(|e| e.to_string())
                 }
 
-                match kind {
-                    0 => {
-                        let mut relative_path = String::new();
+                match FsReadCallbackKind::from(kind) {
+                    FsReadCallbackKind::Realpath => {
                         // SAFETY: `data_ptr` is valid not-null pointer
                         let relative_path_raw = unsafe {
                             CStr::from_ptr(data_ptr)
@@ -104,23 +177,19 @@ impl Compiler {
                                 .expect("Invalid UTF-8 in relative path")
                         };
 
-                        relative_path.push_str(relative_path_raw);
-
-                        if !relative_path_raw.ends_with(".tolk") {
-                            relative_path += ".tolk";
-                        }
-
-                        let result = realpath(
-                            relative_path
-                                .parse()
-                                .expect("Failed to parse relative path"),
-                        );
+                        let result = if relative_path_raw.ends_with(".tolk") {
+                            realpath(relative_path_raw)
+                        } else {
+                            let mut path = String::with_capacity(relative_path_raw.len() + 5);
+                            path.push_str(relative_path_raw);
+                            path.push_str(".tolk");
+                            realpath(&path)
+                        };
 
                         let abs_path = match result {
                             Ok(abs_path) => abs_path,
                             Err(err) => {
-                                let raw_str = CString::new(err.to_string())
-                                    .expect("Failed to create C string");
+                                let raw_str = CString::new(err).expect("Failed to create C string");
                                 // SAFETY: `dest_error` is valid not-null pointer
                                 unsafe {
                                     *dest_error = raw_str.into_raw();
@@ -129,12 +198,14 @@ impl Compiler {
                             }
                         };
 
-                        let raw_str = CString::new(abs_path)
-                            .expect("Failed to create C string from absolute path");
+                        let raw_str = CString::new(
+                            abs_path.to_str().expect("Invalid UTF-8 in absolute path"),
+                        )
+                        .expect("Failed to create C string from absolute path");
                         // SAFETY: `dest_contents` is valid not-null pointer
                         unsafe { *dest_contents = raw_str.into_raw() }
                     }
-                    1 => {
+                    FsReadCallbackKind::ReadFile => {
                         // SAFETY: `data_ptr` is valid not-null pointer
                         let file_path = unsafe {
                             CStr::from_ptr(data_ptr)
@@ -142,8 +213,7 @@ impl Compiler {
                                 .expect("Invalid UTF-8 in file path")
                         };
 
-                        let content = if file_path.contains("@stdlib/") {
-                            let filename = file_path.strip_prefix("@stdlib/").unwrap_or(file_path);
+                        let content = if let Some(filename) = file_path.strip_prefix("@stdlib/") {
                             if let Some(content) =
                                 read_stdlib_file(filename).map(ToString::to_string)
                             {
@@ -154,13 +224,10 @@ impl Compiler {
                                 )
                                 .expect("Failed to create C string");
                                 // SAFETY: `dest_error` is valid not-null pointer
-                                unsafe {
-                                    *dest_error = raw_str.into_raw();
-                                }
+                                unsafe { *dest_error = raw_str.into_raw() };
                                 return;
                             }
-                        } else if file_path.contains("@fiftlib/") {
-                            let filename = file_path.strip_prefix("@fiftlib/").unwrap_or(file_path);
+                        } else if let Some(filename) = file_path.strip_prefix("@fiftlib/") {
                             if let Some(content) =
                                 read_fift_stdlib_file(filename).map(ToString::to_string)
                             {
@@ -171,9 +238,7 @@ impl Compiler {
                                 )
                                 .expect("Failed to create C string");
                                 // SAFETY: `dest_error` is valid not-null pointer
-                                unsafe {
-                                    *dest_error = raw_str.into_raw();
-                                }
+                                unsafe { *dest_error = raw_str.into_raw() };
                                 return;
                             }
                         } else {
@@ -183,9 +248,7 @@ impl Compiler {
                                     let raw_str = CString::new(error.to_string())
                                         .expect("Failed to create C string from error");
                                     // SAFETY: `dest_error` is valid not-null pointer
-                                    unsafe {
-                                        *dest_error = raw_str.into_raw();
-                                    }
+                                    unsafe { *dest_error = raw_str.into_raw() };
                                     return;
                                 }
                             }
@@ -196,7 +259,6 @@ impl Compiler {
                         // SAFETY: `dest_contents` is valid not-null pointer
                         unsafe { *dest_contents = raw_str.into_raw() }
                     }
-                    _ => {}
                 }
             }
 

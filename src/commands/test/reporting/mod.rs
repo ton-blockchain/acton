@@ -1,10 +1,11 @@
 use crate::commands::test::TestDescriptor;
+use crate::commands::test::trace::TransactionInfo;
 use crate::context::{AssertFailure, BuildCache, EmulationsState, KnownAddresses};
-use abi::ContractAbi;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
+use ton_abi::ContractAbi;
 use ton_executor::get::GetMethodResult;
 use ton_source_map::SourceMap;
 use tycho_types::models::ShardAccount;
@@ -31,19 +32,27 @@ pub struct TestExecutionContext {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct FailedTransactionContext {
+    pub from_address: Option<String>,
+    pub to_address: Option<String>,
+    pub params: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct TestReport {
     pub name: String,
     pub suite_name: String,
     pub file_path: String,
     pub row: usize,
     pub column: usize,
-    #[serde(skip)]
     pub duration: Duration,
     #[serde(skip)]
     pub gas_limit: Option<u64>,
     pub status: TestStatus,
     pub message: Option<String>,
-    #[serde(skip)]
+    pub detailed_message: Option<String>,
+    pub failed_transactions: Option<Vec<TransactionInfo>>,
+    pub failed_transaction_context: Option<FailedTransactionContext>,
     pub details: Option<String>,
     #[serde(skip)]
     pub abi: ContractAbi,

@@ -15,8 +15,6 @@
       │     __throw                            at [ACTON_LIB]/emulation/network[LINE]
       │     impl.runGetMethodById<int,tuple>   at [ACTON_LIB]/emulation/network[LINE]
       │     net.runGetMethod<int,tuple>        at tests/test.test[LINE]
-      │     createMessage<void>                at [ACTON_LIB]/emulation/network[LINE]
-      │     net.treasury                       at tests/test.test[LINE]
       └─ Cannot run method of contract without code
 
  ✗ 1 failed in 1 file

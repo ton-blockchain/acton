@@ -1,0 +1,233 @@
+.historyHeaderRow {
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.historyContent {
+  padding: 0;
+}
+
+.tokensContent {
+  padding: 0;
+}
+
+.addressWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flexSpacer {
+  flex: 1;
+}
+
+.tokenIcon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.nftIcon {
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+}
+
+.tableCard {
+  background-color: var(--tonscan-card-bg) !important;
+  border: 1px solid var(--tonscan-border) !important;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--spacing-lg);
+  padding: 0 var(--spacing-lg);
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.tab {
+  padding: var(--spacing-md) 0;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+
+.tabActive {
+  color: var(--tonscan-accent);
+  border-bottom-color: var(--tonscan-accent);
+}
+
+.tableHeader {
+  color: var(--tonscan-text-secondary) !important;
+  text-transform: uppercase;
+  font-size: var(--font-size-xs) !important;
+  letter-spacing: 0.05em;
+}
+
+.row {
+  border-bottom: 1px solid var(--tonscan-border) !important;
+}
+
+.row:hover {
+  background-color: var(--tonscan-row-hover) !important;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.txLinkCell {
+  width: 40px;
+  padding-right: 16px !important;
+}
+
+.txLink {
+  color: var(--tonscan-text-secondary);
+  opacity: 0;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.row:hover .txLink {
+  opacity: 1;
+}
+
+.time {
+  color: var(--tonscan-text-secondary);
+  white-space: nowrap;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--tonscan-text-primary);
+}
+
+.actionIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.address {
+  color: var(--tonscan-accent);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all var(--transition-duration-fast);
+  display: inline-block;
+  background: none;
+  border: none;
+}
+
+.address:hover {
+  text-decoration: underline;
+  background-color: rgba(0, 136, 204, 0.1);
+}
+
+.addressHighlighted {
+  background-color: rgba(0, 136, 204, 0.2);
+}
+
+.opcode {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--tonscan-text-secondary);
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--tonscan-border);
+}
+
+.valueContainer {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+th.valueContainer {
+  display: table-cell;
+  vertical-align: middle;
+}
+
+.valuePositive {
+  color: var(--tonscan-success);
+  font-weight: var(--font-weight-medium);
+}
+
+.valueNegative {
+  color: var(--tonscan-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.tokenValue {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.statusIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.statusSuccess {
+  color: var(--tonscan-success);
+}
+
+.statusFailed {
+  color: var(--tonscan-error);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--tonscan-border);
+}
+
+.paginationButton {
+  background: transparent;
+  border: 1px solid var(--tonscan-border);
+  color: var(--tonscan-text-primary);
+  padding: var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition-duration-fast);
+}
+
+.paginationButton:hover:not(:disabled) {
+  background-color: var(--tonscan-row-hover);
+}
+
+.paginationButton:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.paginationInfo {
+  font-size: var(--font-size-sm);
+  color: var(--tonscan-text-secondary);
+}

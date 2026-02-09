@@ -231,6 +231,8 @@ struct SearchParams {
     to: address? = null
     /// Source address of the transaction.
     from: address? = null
+    /// Value of the message in nanotons.
+    value: coins? = null,
     /// Exit code of the transaction.
     exitCode: int32? = null
     /// Whether the transaction is succesfull (both compute and action phase).

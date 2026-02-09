@@ -1,15 +1,23 @@
 [package]
 name = "tvmffi"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-num-bigint = "0.4.6"
-num-traits = "0.2.19"
-tonlib-core = "0.26.2"
-anyhow = "1.0.100"
-thiserror = "2.0.17"
-tycho-types = {version =  "0.3.0", features = ["bigint"] }
+num-bigint = { workspace = true }
+tonlib-core = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tycho-types = { workspace = true }
 
 [lints]
 workspace = true

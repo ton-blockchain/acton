@@ -1,17 +1,24 @@
 [package]
 name = "tasm"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-num-bigint = "0.4"
-num-traits = "0.2.19"
-tycho-types = { version = "0.3.0", features = ["bigint"] }
-smallvec = "1.15.1"
-anyhow = "1.0.100"
-ton-source-map = { path = "../ton-source-map" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+tycho-types = { workspace = true }
+smallvec = { workspace = true }
+anyhow = { workspace = true }
+ton-source-map = { workspace = true }
 
 [lints]
 workspace = true

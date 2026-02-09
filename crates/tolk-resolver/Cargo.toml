@@ -1,17 +1,27 @@
 [package]
 name = "tolk-resolver"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-tolk-syntax = { path = "../tolk-syntax" }
-tree-sitter = "0.25.10"
-anyhow = "1.0.100"
-dashmap = "7.0.0-rc2"
-log = "0.4.29"
-smol_str = "0.3.5"
-rustc-hash = "2.1.1"
+tolk-syntax = { workspace = true }
+tree-sitter = { workspace = true }
+anyhow = { workspace = true }
+dashmap = { workspace = true }
+log = { workspace = true }
+smol_str = { workspace = true }
+rustc-hash = { workspace = true }
 
 [dev-dependencies]
-expect-test = "1.5.0"
-tempfile = "3.10.1"
+expect-test = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

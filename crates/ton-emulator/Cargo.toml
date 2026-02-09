@@ -1,0 +1,27 @@
+[package]
+name = "ton-emulator"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+tvmffi = { workspace = true }
+ton-executor = { workspace = true }
+tycho-types = { workspace = true }
+serde = { workspace = true }
+tonlib-core = { workspace = true }
+anyhow = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+reqwest = { workspace = true }
+ton-networks = { workspace = true }
+acton-config = { workspace = true }
+
+[lints]
+workspace = true

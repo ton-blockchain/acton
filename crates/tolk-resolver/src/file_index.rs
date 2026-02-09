@@ -60,7 +60,7 @@ impl Span {
     ///
     /// `LocalDefId.local` represents byte offset, so we need a length
     /// to build a span.
-    pub fn from_def_id(id: LocalDefId, length: u32) -> Self {
+    pub const fn from_def_id(id: LocalDefId, length: u32) -> Self {
         Self {
             start: id.local,
             end: id.local + length,
@@ -68,27 +68,27 @@ impl Span {
     }
 
     /// Checks if the given byte offset is within this span.
-    pub fn contains(&self, offset: usize) -> bool {
+    pub const fn contains(&self, offset: usize) -> bool {
         self.start() <= offset && offset <= self.end()
     }
 
     /// Returns the start offset as a `usize`.
-    pub fn start(&self) -> usize {
+    pub const fn start(&self) -> usize {
         self.start as usize
     }
 
     /// Returns the end offset as a `usize`.
-    pub fn end(&self) -> usize {
+    pub const fn end(&self) -> usize {
         self.end as usize
     }
 
     /// Returns length of this span.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.end as usize - self.start as usize
     }
 
     /// Returns true if span length equals to zero.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.start == self.end
     }
 }
@@ -214,7 +214,7 @@ pub enum SymbolKind {
 
 impl Symbol {
     /// Returns `true` if this declaration defines a type (struct, enum, or alias).
-    pub fn is_type(&self) -> bool {
+    pub const fn is_type(&self) -> bool {
         matches!(
             self.kind,
             SymbolKind::TypeAlias { .. } | SymbolKind::Struct { .. } | SymbolKind::Enum { .. }

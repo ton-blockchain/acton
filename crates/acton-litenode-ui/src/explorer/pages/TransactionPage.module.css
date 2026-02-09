@@ -1,0 +1,330 @@
+.container {
+  padding: var(--spacing-lg) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--tonscan-text);
+}
+
+.hash {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--tonscan-text-secondary);
+  word-break: break-all;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  flex: 1;
+  min-height: 0;
+}
+
+.overviewCard {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.overviewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.statusSuccess {
+  color: var(--tonscan-success);
+}
+
+.statusError {
+  color: var(--tonscan-error);
+}
+
+.label {
+  font-size: 12px;
+  color: var(--tonscan-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.value {
+  font-size: 14px;
+  color: var(--tonscan-text-secondary);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.valueMono {
+  font-family: var(--font-mono);
+}
+
+.link {
+  color: var(--tonscan-accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.tabsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--tonscan-border);
+  padding-bottom: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px;
+  color: var(--tonscan-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.tabActive {
+  color: var(--tonscan-accent);
+  border-bottom-color: var(--tonscan-accent);
+}
+
+.tabContent {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.detailsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailCard {
+  background: var(--tonscan-card-bg);
+  padding: 0;
+  margin-bottom: var(--spacing-sm);
+}
+
+.transactionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.txListItem {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.txListHeader {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.txListBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--tonscan-text-secondary);
+}
+
+.treeSection {
+  width: 100%;
+  min-height: 400px;
+  padding-top: 20px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--tonscan-text-primary);
+}
+
+.valueFlowContainer {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.flowList {
+  display: flex;
+  flex-direction: column;
+}
+
+.flowHeader {
+  display: flex;
+  background: var(--tonscan-row-hover);
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--tonscan-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tonscan-text-secondary);
+  text-transform: uppercase;
+}
+
+.flowRow {
+  display: flex;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--tonscan-border);
+  align-items: center;
+}
+
+.flowRow:last-child {
+  border-bottom: none;
+}
+
+.flowCol {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+}
+
+.changeValue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.contractHeader {
+  padding: 20px;
+  border-bottom: 1px solid var(--tonscan-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detailsSection {
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  overflow: auto;
+  padding: 20px;
+}
+
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 16px;
+  color: var(--tonscan-text-secondary);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  width: 32px;
+  height: 32px;
+}
+
+.errorIcon {
+  color: var(--tonscan-error);
+  width: 48px;
+  height: 48px;
+}
+
+.errorText {
+  color: var(--tonscan-error);
+  font-weight: 500;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: var(--tonscan-bg);
+  border: 1px solid var(--tonscan-border);
+  color: var(--tonscan-text-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-duration-fast);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  width: fit-content;
+  margin-top: var(--spacing-md);
+}
+
+.backButton:hover {
+  background: var(--tonscan-row-hover);
+}
+
+.noSelection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--tonscan-text-secondary);
+  text-align: center;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1024px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .detailsSection {
+    height: 500px;
+  }
+}

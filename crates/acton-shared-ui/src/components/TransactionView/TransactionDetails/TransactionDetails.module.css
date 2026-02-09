@@ -1,0 +1,206 @@
+.transactionDetailsContainer {
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+  position: relative;
+  line-height: 1.6;
+}
+
+.detailRow {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.detailRow:last-child {
+  border-bottom: none;
+}
+
+.detailLabel {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  padding: var(--spacing-xs) var(--spacing-mds);
+  width: 160px;
+  flex-shrink: 0;
+  vertical-align: top;
+  font-size: 0.8125rem;
+  border-right: 1px solid var(--border-color);
+  box-sizing: border-box;
+}
+
+.detailValue {
+  padding: var(--spacing-xs) var(--spacing-mds);
+  color: var(--text-primary);
+  word-break: break-all;
+  font-size: 0.8125rem;
+  flex-grow: 1;
+  box-sizing: border-box;
+}
+
+.timestampValue {
+  font-size: 0.8125rem;
+}
+
+.timestampDetailSecondary {
+  color: var(--text-secondary);
+}
+
+.labeledSectionRow {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.labeledSectionRow:last-child {
+  border-bottom: none;
+}
+
+.labeledSectionTitle {
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  padding: var(--spacing-xs) var(--spacing-mds);
+  width: 160px;
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  border-right: 1px solid var(--border-color);
+  box-sizing: border-box;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+}
+
+.labeledSectionContent {
+  padding: var(--spacing-xs) var(--spacing-mds);
+  flex-grow: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  overflow: visible;
+  min-width: 0;
+  width: 100%;
+}
+
+.multiColumnRow {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.multiColumnItem {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  word-break: break-all;
+  gap: 2px;
+}
+
+.multiColumnItemTitle {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.multiColumnItemValue {
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  word-break: break-word;
+  gap: var(--spacing-xs);
+  display: flex;
+}
+
+.booleanTrue {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-passed);
+}
+
+.booleanFalse {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-failed);
+}
+
+.numberValue {
+  font-size: 0.8125rem;
+}
+
+.actionsToggleButton {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  margin-left: var(--spacing-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.actionsToggleButton:hover {
+  color: var(--text-primary);
+}
+
+.actionsToggleText {
+  margin-left: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+@media (max-width: 768px) {
+  .detailRow,
+  .labeledSectionRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detailLabel,
+  .labeledSectionTitle {
+    width: 100%;
+    border-right: none;
+    padding-bottom: 4px;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: left;
+  }
+
+  .detailValue,
+  .labeledSectionContent {
+    width: 100%;
+    box-sizing: border-box;
+    padding-top: 4px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .multiColumnRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .multiColumnItem {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .multiColumnItem:last-child {
+    border-bottom: none;
+  }
+
+  .multiColumnItemTitle {
+    white-space: normal;
+  }
+}

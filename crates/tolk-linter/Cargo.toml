@@ -1,22 +1,32 @@
 [package]
 name = "tolk-linter"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-tolk-syntax = { path = "../tolk-syntax" }
-tolk-resolver = { path = "../tolk-resolver" }
-tolk-ty = { path = "../tolk-ty" }
-tolk-analysis = { path = "../tolk-analysis" }
-tolk-macros = { path = "../tolk-macros" }
-acton-config = { path = "../acton-config" }
-tree-sitter = "0.25.10"
-serde = { version = "1.0.228", features = ["derive"] }
-thiserror = "2.0.18"
-log = "0.4.29"
-rustc-hash = "2.1.1"
-memchr = "2.7.6"
-heck = "0.5.0"
+tolk-syntax = { workspace = true }
+tolk-resolver = { workspace = true }
+tolk-ty = { workspace = true }
+tolk-analysis = { workspace = true }
+tolk-macros = { workspace = true }
+acton-config = { workspace = true }
+tree-sitter = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+rustc-hash = { workspace = true }
+memchr = { workspace = true }
+heck = { workspace = true }
 
 [features]
 profile_rules = []
+
+[lints]
+workspace = true

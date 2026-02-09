@@ -1,12 +1,12 @@
 extern crate core;
 
 use crate::ast::camel_case_detector::check_camel_globals;
-use crate::ast::deprecated_symbol_use;
+use crate::ast::{deprecated_symbol_use, no_bounce_handler};
 use crate::rules::ast::{
     field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,
     unused_import, unused_variable, write_only_variable,
 };
-use rules::diagnostic::Diagnostic;
+use rules::diagnostic::{Diagnostic, Severity};
 pub use rules::*;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
@@ -16,7 +16,7 @@ use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, NameUse, Resolved};
 use tolk_syntax::{
-    Expr, ExprStmt, Ident, InstanceArg, SourceFile, TopLevel, TypeIdent, Walker, walk_ast,
+    Call, Expr, ExprStmt, Ident, InstanceArg, SourceFile, TopLevel, TypeIdent, Walker, walk_ast,
 };
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
@@ -154,10 +154,10 @@ impl<'a> Checker<'a> {
             match level {
                 acton_config::config::LintLevel::Allow => return,
                 acton_config::config::LintLevel::Warn => {
-                    diagnostic.severity = rules::diagnostic::Severity::Warning;
+                    diagnostic.severity = Severity::Warning;
                 }
                 acton_config::config::LintLevel::Deny => {
-                    diagnostic.severity = rules::diagnostic::Severity::Error;
+                    diagnostic.severity = Severity::Error;
                 }
             }
         }
@@ -269,6 +269,7 @@ impl<'a> Checker<'a> {
             file_id,
             resolve_index,
             current_inference: None,
+            current_decl: None,
         };
 
         walk_ast(&mut walker, file);
@@ -323,6 +324,7 @@ struct CheckerWalker<'a, 'b> {
     file_id: FileId,
     resolve_index: Option<Arc<FileResolveIndex>>,
     current_inference: Option<&'b InferenceResult>,
+    current_decl: Option<SymbolId>,
 }
 
 impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
@@ -330,18 +332,24 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
 
     fn visit_top_level(&mut self, top_level: &TopLevel<'file>) -> Self::Result {
         let prev_inference = self.current_inference;
+        let prev_decl = self.current_decl;
 
         if let Some(file_info) = self.checker.file_db.get_by_id(self.file_id)
             && let Some(symbol) = file_info.find_declaration(top_level)
-            && let Some(file_body_types) = self.checker.body_types.get(&self.file_id)
-            && let Some(inference) = file_body_types.get(&symbol.id)
         {
-            self.current_inference = Some(inference);
+            self.current_decl = Some(symbol.id);
+
+            if let Some(file_body_types) = self.checker.body_types.get(&self.file_id)
+                && let Some(inference) = file_body_types.get(&symbol.id)
+            {
+                self.current_inference = Some(inference);
+            }
         }
 
         self.walk_top_level(top_level);
 
         self.current_inference = prev_inference;
+        self.current_decl = prev_decl;
     }
 
     fn walk_source_file(&mut self, source_file: &'file SourceFile) -> Self::Result {
@@ -408,6 +416,14 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         if let Some(value) = node.value() {
             self.visit_expr(&value);
         }
+    }
+
+    fn walk_call(&mut self, node: &Call<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::NoBounceHandler,
+            no_bounce_handler::check_call_expr(self.checker, self.file_id, node, self.current_decl)
+        )
     }
 
     fn default_result(&self) -> Self::Result {}

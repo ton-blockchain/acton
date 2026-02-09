@@ -1,13 +1,20 @@
 [package]
 name = "tolk-syntax"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-tree-sitter = "0.25.10"
-tree-sitter-tolk = "0.0.5"
-anyhow = "1.0.100"
-memchr = "2.7.6"
+tree-sitter = { workspace = true }
+tree-sitter-tolk = { workspace = true }
+anyhow = { workspace = true }
+memchr = { workspace = true }
 
 [lints]
 workspace = true

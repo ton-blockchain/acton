@@ -1,0 +1,36 @@
+[package]
+name = "ton-litenode"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ton-executor = { workspace = true }
+ton-networks = { workspace = true }
+ton-api = { workspace = true }
+acton-config = { workspace = true }
+tycho-types = { workspace = true }
+tvmffi = { workspace = true }
+tonlib-core = { workspace = true }
+crc = { workspace = true }
+hex = { workspace = true }
+anyhow = { workspace = true }
+base64 = { workspace = true }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+axum = { workspace = true }
+tower-http = { workspace = true, features = ["cors", "trace"] }
+tracing = "0.1"
+owo-colors = { workspace = true }
+rusqlite = { workspace = true }
+ton-indexer = { workspace = true }
+
+[lints]
+workspace = true

@@ -166,6 +166,26 @@ When using `.boc` files:
 - Dependencies can still reference this contract
 - Useful for third-party contracts or cross-platform builds
 
+### Path Mappings
+
+You can define path aliases for the Tolk compiler in the `[mappings]` section. These are useful for importing library code without using complex relative paths.
+
+```toml
+[mappings]
+core = "./libs/core"
+utils = "./libs/utils"
+```
+
+In Tolk code:
+```tolk
+import "@core/math.tolk"
+```
+
+Mappings follow these rules:
+1. **Normalization**: Any mapping key missing the `@` prefix will have it added automatically.
+2. **Resolution**: Mappings are resolved relative to the project root with Acton.toml.
+3. **Exact Match**: When importing, the first part of the path (before the first slash) is used to look up the mapping. For example, `import "@core/math.tolk"` will look for a mapping named `@core`.
+
 ## Dependency Graph Visualization
 
 Generate a visual representation of contract dependencies:

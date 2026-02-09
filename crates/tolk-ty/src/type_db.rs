@@ -7,7 +7,7 @@ use tolk_resolver::file_index::{
     FileId, OptionalSyntaxNodeSpanExt, Span, Symbol, SymbolId, SymbolKind,
 };
 use tolk_resolver::project_index::ProjectIndex;
-use tolk_resolver::resolve_index::Resolved;
+use tolk_resolver::resolve_index::{LocalDefKind, Resolved};
 use tolk_syntax::{
     AstNode, FunCallableType, FunctionLike, HasName, Method, NullableType, TensorType, TupleType,
     Type, TypeIdent, TypeInstantiatedTs, UnionType, match_parents,
@@ -34,10 +34,11 @@ pub struct EnumMember {
     pub span: Span,
 }
 
-/// Describes the initial type inference context where we infer types for all
-/// top-level definitions. When inferring types for top-level definitions, the main task
-/// is to convert the AST representation of a type into the canonical [`TyId`] form,
-/// which is an interned version of the [`TyData`].
+/// Describes the initial type inference context.
+///
+/// In it, we infer types for all top-level definitions. When inferring types for top-level
+/// definitions, the main task is to convert the AST representation of a type into the
+/// canonical [`TyId`] form, which is an interned version of the [`TyData`].
 ///
 /// [`TypeInterner`] is used to intern all types during analysis and subsequent
 /// type inference inside function bodies.
@@ -56,7 +57,9 @@ pub struct TypeDb<'a> {
     pub top_level_types: FxHashMap<SymbolId, TyId>,
     /// Stores all receiver types for methods by their [`SymbolId`].
     pub receiver_types: FxHashMap<SymbolId, TyId>,
-
+    /// Stores call graph
+    pub call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
+    pub inverted_call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
     /// Caches types by the AST node ID that represents a [`Type`].
     type_lower_cache: FxHashMap<usize, TyId>,
     /// Keeps track of definitions that have already been processed or are currently
@@ -77,6 +80,8 @@ impl<'a> TypeDb<'a> {
             intrn: type_interner,
             file_db,
             project_index,
+            inverted_call_graph: FxHashMap::default(),
+            call_graph: FxHashMap::default(),
             type_lower_cache: FxHashMap::default(),
             top_level_types: FxHashMap::default(),
             receiver_types: FxHashMap::default(),
@@ -102,6 +107,9 @@ impl<'a> TypeDb<'a> {
 
         if !self.currently_lowering.insert(symbol_id) {
             // Cycle detected or already lowering
+            if let Some(&ty) = self.top_level_types.get(&symbol_id) {
+                return Some(ty);
+            }
             return None;
         }
 
@@ -210,8 +218,10 @@ impl<'a> TypeDb<'a> {
         }
 
         // like `type int = builtin` from stdlib
-        if let SymbolKind::TypeAlias { is_builtin: true } = &symbol.kind {
-            return self.as_primitive_type(&symbol.name);
+        if matches!(&symbol.kind, SymbolKind::TypeAlias { is_builtin: true }) {
+            let ty = self.as_primitive_type(&symbol.name)?;
+            self.top_level_types.insert(symbol_id, ty);
+            return Some(ty);
         }
 
         let file_index = self.project_index.get_file_index(file_id)?;
@@ -393,7 +403,17 @@ impl<'a> TypeDb<'a> {
             .find_use(file_id, type_ident.0.start_byte())?;
         let symbol_id = match name_use.resolved {
             Resolved::Global(global) => global,
-            Resolved::Local(_) | Resolved::Unresolved => return None,
+            Resolved::Local(local) => {
+                if let Some(resolved) = self.project_index.get_resolved_uses(file_id)
+                    && let Some(resolved) = resolved.find_local(local)
+                    && matches!(resolved.kind, LocalDefKind::TypeParameter)
+                {
+                    // TODO: default type
+                    return Some(self.intrn.type_parameter(resolved.name.to_string(), None));
+                }
+                return None;
+            }
+            Resolved::Unresolved => return None,
         };
         self.get_top_level_type(None, symbol_id)
     }

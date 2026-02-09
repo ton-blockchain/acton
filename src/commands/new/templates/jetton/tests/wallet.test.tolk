@@ -1,15 +1,16 @@
-import "wrappers/JettonMinter"
-import "wrappers/JettonWallet"
-import "../.acton/build/build"
 // Acton library imports
-import "../.acton/emulation/network"
-import "../.acton/testing/expect"
-import "../.acton/testing/transaction_expect"
-import "../.acton/types/message"
+import "@acton/build/build"
+import "@acton/emulation/network"
+import "@acton/testing/expect"
+import "@acton/testing/transaction_expect"
+import "@acton/types/message"
 // Jetton contract imports
-import "../contracts/errors"
-import "../contracts/messages"
-import "../contracts/storage"
+import "@contracts/errors"
+import "@contracts/messages"
+import "@contracts/storage"
+// Wrappers for contracts
+import "@wrappers/JettonMinter"
+import "@wrappers/JettonWallet"
 
 fun userWallet(minter: JettonMinter, userAddress: address): JettonWallet {
     val address = minter.getWalletAddress(userAddress);

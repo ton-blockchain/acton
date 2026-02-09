@@ -13,7 +13,7 @@ use tolk_resolver::resolve_index::{LocalDefId, NameUse};
 use tolk_syntax::AstNode;
 
 #[derive(Debug)]
-pub struct ExprFlow {
+pub(crate) struct ExprFlow {
     pub out_flow: FlowContext,
 
     // only calculated inside `if`, left of `&&`, etc. — there this expression is immediate condition, empty otherwise
@@ -22,7 +22,11 @@ pub struct ExprFlow {
 }
 
 impl ExprFlow {
-    pub fn new(out_flow: FlowContext, true_flow: FlowContext, false_flow: FlowContext) -> ExprFlow {
+    pub(crate) const fn new(
+        out_flow: FlowContext,
+        true_flow: FlowContext,
+        false_flow: FlowContext,
+    ) -> ExprFlow {
         ExprFlow {
             out_flow,
             true_flow,
@@ -30,20 +34,20 @@ impl ExprFlow {
         }
     }
 
-    pub fn create(out_flow: FlowContext, clone_flow_for_condition: bool) -> ExprFlow {
+    pub(crate) fn create(out_flow: FlowContext, clone_flow_for_condition: bool) -> ExprFlow {
         let (true_flow, false_flow) = if clone_flow_for_condition {
             (out_flow.clone(), out_flow.clone())
         } else {
             (FlowContext::default(), FlowContext::default())
         };
-        Self::new(out_flow.clone(), true_flow, false_flow)
+        Self::new(out_flow, true_flow, false_flow)
     }
 }
 
 /// UnreachableKind is a reason of why control flow is unreachable or interrupted
 /// example: `return;` interrupts control flow
 /// example: `if (true) ... else ...` inside "else" flow is unreachable because it can't happen
-pub enum UnreachableKind {
+pub(crate) enum UnreachableKind {
     #[allow(dead_code)]
     Unknown, // no definite info or not unreachable
     CantHappen,
@@ -56,14 +60,14 @@ pub enum UnreachableKind {
 
 /// FactsAboutExpr represents "everything known about SinkExpression at a given execution point"
 /// remember, that indices/fields are also expressions, `t.1 = 2` or `u.id = 2` also store such facts
-#[derive(Debug, Clone, PartialEq)]
-pub struct FactsAboutExpr {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FactsAboutExpr {
     /// originally declared type or smart cast (Unknown if no info)
     pub expr_type: TyId,
 }
 
 impl FactsAboutExpr {
-    pub fn new(expr_type: TyId) -> FactsAboutExpr {
+    pub(crate) const fn new(expr_type: TyId) -> FactsAboutExpr {
         FactsAboutExpr { expr_type }
     }
 }
@@ -73,7 +77,7 @@ impl FactsAboutExpr {
 /// and returns "output" FlowContext (representing a state AFTER execution of a statement)
 /// on branching, like if/else, input context is cloned, two contexts for each branch calculated, and merged to a result
 #[derive(Debug, Default)]
-pub struct FlowContext {
+pub(crate) struct FlowContext {
     /// all local vars plus (optionally) indices/fields of tensors/tuples/objects
     known_facts: FxHashMap<SinkExpr, FactsAboutExpr>,
     /// if execution can't reach this point (after `return`, for example)
@@ -88,7 +92,7 @@ impl Clone for FlowContext {
 }
 
 impl FlowContext {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             known_facts: FxHashMap::default(),
             uses: Vec::new(),
@@ -96,7 +100,7 @@ impl FlowContext {
         }
     }
 
-    pub fn from(other: &FlowContext) -> FlowContext {
+    pub(crate) fn from(other: &FlowContext) -> FlowContext {
         Self {
             known_facts: other.known_facts.clone(),
             uses: other.uses.clone(),
@@ -104,7 +108,7 @@ impl FlowContext {
         }
     }
 
-    pub fn is_unreachable(&self) -> bool {
+    pub(crate) const fn is_unreachable(&self) -> bool {
         self.unreachable
     }
 
@@ -126,11 +130,11 @@ impl FlowContext {
 
     //+ CHECKED
     /// get the resulting type of variable or struct field
-    pub fn smart_cast_or_original(
+    pub(crate) fn smart_cast_or_original(
         &self,
         s_expr: SinkExpr,
         originally_declared_type: TyId,
-        intrn: &mut TypeInterner,
+        intrn: &TypeInterner,
     ) -> TyId {
         let Some(facts) = self.known_facts.get(&s_expr) else {
             return originally_declared_type;
@@ -150,7 +154,7 @@ impl FlowContext {
     /// example: `local_var = rhs`
     /// example: `f(mutate obj.field)`
     /// example: `if (t.0 != null)`, in true_flow `t.0` assigned to "not-null of current", in false_flow to null
-    pub fn register_known_type(&mut self, expr: SinkExpr, ty: TyId) {
+    pub(crate) fn register_known_type(&mut self, expr: SinkExpr, ty: TyId) {
         // having index_path = (some bytes filled in the end),
         // calc index_mask: replace every filled byte with 0xFF
         // example: `t.0.1`, index_path = (1<<8) + 2, index_mask = 0xFFFF
@@ -170,7 +174,7 @@ impl FlowContext {
     }
 
     /// mark control flow unreachable / interrupted
-    pub fn mark_unreachable(&mut self, reason: UnreachableKind) {
+    pub(crate) const fn mark_unreachable(&mut self, reason: UnreachableKind) {
         self.unreachable = true;
 
         // currently we don't save why control flow became unreachable (it's not obvious how, there may be consequent reasons),
@@ -181,7 +185,7 @@ impl FlowContext {
     /// "merge" two data-flow contexts occurs on control flow rejoins (if/else branches merging, for example)
     /// it's generating a new context that describes "knowledge that definitely outcomes from these two"
     /// example: in one branch x is `int`, in x is `null`, result is `int?` unless any of them is unreachable
-    pub fn merge_flow(&self, c2: &FlowContext, int: &mut TypeInterner) -> FlowContext {
+    pub(crate) fn merge_flow(&self, c2: &FlowContext, int: &mut TypeInterner) -> FlowContext {
         if !self.unreachable && c2.unreachable {
             return c2.merge_flow(self, int);
         }
@@ -228,7 +232,7 @@ impl FlowContext {
 /// These are NOT sink expressions: `globalVar`, `f()`, `f().1`
 /// Note, that globals are NOT sink: don't encourage to use a global twice, it costs gas, better assign it to a local.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct SinkExpr {
+pub(crate) struct SinkExpr {
     /// smart casts and data flow applies only to locals
     pub def: LocalDefId,
     /// 0 for just `v`; for `v.N` it's (N+1), for `v.N.M` it's (N+1) + (M+1)<<8, etc.
@@ -262,7 +266,7 @@ impl Display for SinkExpr {
 }
 
 impl SinkExpr {
-    pub fn from_def(name: SmolStr, def: LocalDefId, index_path: u64) -> Self {
+    pub(crate) const fn from_def(name: SmolStr, def: LocalDefId, index_path: u64) -> Self {
         Self {
             def,
             name,
@@ -285,6 +289,7 @@ pub struct InferenceContext<'db, 'a> {
     pub return_types: Vec<TyId>,
     pub inferred_return_type: Option<TyId>,
     pub decl_start: u32,
+    pub caller_function: Option<SymbolId>,
     pub call_stack: VecDeque<SymbolId>,
     pub computed_methods: FxHashMap<MethodKey, Option<MethodCallCandidate>>,
 }
@@ -305,6 +310,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
             return_types: Vec::new(),
             inferred_return_type: None,
             decl_start: 0,
+            caller_function: None,
             call_stack,
             computed_methods: FxHashMap::default(),
         }
@@ -367,7 +373,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
         self.type_db.top_level_types.insert(symbol_id, ty);
     }
 
-    pub fn get_top_level_type(&mut self, symbol_id: SymbolId) -> Option<TyId> {
+    pub fn get_top_level_type(&self, symbol_id: SymbolId) -> Option<TyId> {
         self.type_db.top_level_types.get(&symbol_id).cloned()
     }
 

@@ -1,15 +1,21 @@
 [package]
 name = "dap-client"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-dap = { version = "0.4.1-alpha1", features = ["client"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0.100"
-log = "0.4"
-crossbeam-channel = "0.5.15"
+dap = { workspace = true, features = ["client"] }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+crossbeam-channel = { workspace = true }
 
 [lints]
 workspace = true

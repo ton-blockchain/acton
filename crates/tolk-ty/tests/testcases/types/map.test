@@ -1,0 +1,41 @@
+========================================================================
+Variable declaration
+========================================================================
+import "@stdlib/tvm-dicts";
+
+struct Map<K, V> {
+    data: dict,
+}
+
+fun emptyMap<K, V>() {
+    return Map<K, V> { data: null };
+}
+
+fun Map<K, V>.set(self, key: K, value: V) {}
+
+fun Map<int32, int>.set(mutate self, key: int, value: int) {
+    self.data.iDictSetBuilder(32, key, beginCell().storeInt(value, 257));
+}
+
+fun Map<int32, int>.has(mutate self, key: int) {
+    return self.data.iDictGet(32, key).1;
+}
+
+fun main() {
+    var map =
+//!     ^ Map<int32, int>
+        emptyMap<int32, int>();
+//!     ^ () -> Map<K, V>
+    map.set(1, 10);
+//!     ^ (Map<int32, int>, int, int) -> void
+
+    if (map.has(1)) {
+//          ^ (Map<int32, int>, int) -> bool
+        return;
+    }
+
+    throw 2;
+}
+------------------------------------------------------------------------
+type inference error at offset 429: expected Map<int32, int>, got unknown
+type inference error at offset 469: expected () -> Map<K, V>, got unknown

@@ -244,6 +244,7 @@ impl Executor {
     pub fn set_config(&self, config_b64: &str) -> anyhow::Result<bool> {
         let config_cstr = CString::new(config_b64).context("config contains null bytes")?;
 
+        // SAFETY: `transaction_emulator_set_config` is safe function
         let result =
             unsafe { transaction_emulator_set_config(self.inner.as_ptr(), config_cstr.as_ptr()) };
 

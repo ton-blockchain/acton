@@ -20,7 +20,7 @@ use tolk_resolver::file_index::SymbolId;
 /// each next shape kind is more specific than another;
 /// e.g., between `T.copy` and `int.copy` we choose the second;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ShapeKind {
+pub(crate) enum ShapeKind {
     GenericT,     // T
     Union,        // U|V, T?
     Primitive,    // int, slice, address, ...
@@ -32,13 +32,13 @@ pub enum ShapeKind {
 /// e.g., between `Container<T>` and `T` we choose the first;
 /// e.g., between `map<int8, V>` and `map<K, map<K, K>>` we choose the second;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ShapeScore {
+pub(crate) struct ShapeScore {
     pub kind: ShapeKind,
     pub depth: i32,
 }
 
 impl ShapeScore {
-    pub fn is_shape_better_than(&self, other: &ShapeScore) -> bool {
+    pub(crate) fn is_shape_better_than(&self, other: &ShapeScore) -> bool {
         match self.kind.cmp(&other.kind) {
             Ordering::Greater => true,
             Ordering::Less => false,
@@ -49,7 +49,7 @@ impl ShapeScore {
 
 /// calculate score for a receiver;
 /// note: it's an original receiver, with generics, not an instantiated one
-pub fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeScore {
+pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeScore {
     let unwrapped = interner.unwrap_alias(id);
     let data = interner.data(unwrapped);
     match data {
@@ -131,7 +131,7 @@ fn can_substitute_to_reach_actual(pattern: TyId, actual: TyId, type_db: &mut Typ
 /// example: `map<int,V>` dominates `map<K,V>`;
 /// example: `map<K, map<K,K>>` dominates `map<K, map<K,V>>` dominates `map<K1, map<K2,V>>`;
 /// example: `map<int,V>` and `map<K,slice>` are not comparable;
-pub fn is_more_specific_generic(type_a: TyId, type_b: TyId, type_db: &mut TypeDb) -> bool {
+pub(crate) fn is_more_specific_generic(type_a: TyId, type_b: TyId, type_db: &mut TypeDb) -> bool {
     // exists θ: θ(B)=A && not exists φ: φ(A)=B
     can_substitute_to_reach_actual(type_b, type_a, type_db)
         && !can_substitute_to_reach_actual(type_a, type_b, type_db)
@@ -139,7 +139,7 @@ pub fn is_more_specific_generic(type_a: TyId, type_b: TyId, type_db: &mut TypeDb
 
 /// the main "overload resolution" entrypoint: given `obj.method()`, find best applicable methods;
 /// if there are many (no one is better than others), a caller side will emit "ambiguous call"
-pub fn resolve_methods_for_call(
+pub(crate) fn resolve_methods_for_call(
     provided_receiver: TyId,
     called_name: &str,
     type_db: &mut TypeDb,
@@ -276,7 +276,7 @@ pub fn resolve_methods_for_call(
     viable
 }
 
-pub fn choose_only_method_to_call(
+pub(crate) fn choose_only_method_to_call(
     provided_receiver: TyId,
     called_name: &str,
     type_db: &mut TypeDb,

@@ -9,13 +9,8 @@ use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
 use crate::wallets;
 use crate::{ffi, stdlib};
-use abi::{ContractAbi, contract_abi};
 use acton_config::config::{ActonConfig, Explorer};
 use anyhow::anyhow;
-use emulator::emulator::Emulator;
-use emulator::world_state::{
-    AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
-};
 use log::error;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
@@ -23,7 +18,12 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::time::UNIX_EPOCH;
+use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
+use ton_emulator::emulator::Emulator;
+use ton_emulator::world_state::{
+    AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
+};
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
@@ -116,9 +116,20 @@ fn run_script_file(
     net: Option<String>,
     explorer: Option<Explorer>,
 ) -> anyhow::Result<()> {
-    let abi = contract_abi(content, file_path);
+    let acton_config = ActonConfig::load();
+    let mappings = if let Ok(config) = &acton_config {
+        &config.mappings
+    } else {
+        &None
+    };
+    let abi = contract_abi(content, file_path, mappings);
 
-    match tolkc::compile(Path::new(file_path), debug) {
+    let mut compiler = tolkc::Compiler::new(2);
+    if let Ok(config) = &acton_config {
+        compiler = compiler.with_mappings(&config.mappings);
+    }
+
+    match compiler.compile(Path::new(file_path), debug) {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
             let data_cell = ArcCell::default();
@@ -190,6 +201,7 @@ fn execute_script(
     };
 
     let config_b64: Option<&str> = None;
+    let fork_net = fork_net.as_deref().map(Network::from_str).transpose()?;
 
     let mut emulator = Emulator::new(verbosity, config_b64)?;
     let resolver = match &fork_net {
@@ -212,7 +224,8 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
-    let open_wallets = wallets::open_wallets(&config, net.as_deref(), broadcast)?;
+    let network = net.as_deref().map(Network::from_str).transpose()?;
+    let open_wallets = wallets::open_wallets(&config, network.as_ref(), broadcast)?;
 
     let mut ctx = Context {
         env: Env {
@@ -251,7 +264,7 @@ fn execute_script(
         },
         debug: DebugCtx::Disabled,
         is_broadcasting: broadcast,
-        network: net,
+        network,
     };
 
     if debug {

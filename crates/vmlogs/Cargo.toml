@@ -1,11 +1,18 @@
 [package]
 name = "vmlogs"
-version = "0.1.0"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-thiserror = "2.0.17"
-winnow = "0.7.13"
+thiserror = { workspace = true }
+winnow = { workspace = true }
 
 [lints]
 workspace = true

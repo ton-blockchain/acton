@@ -1,4 +1,3 @@
-use abi;
 use acton_config::config::ActonConfig;
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
@@ -13,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 use tolkc::compiler::CompilerResultSuccess;
+use ton_abi;
 use ton_source_map::SourceMap;
 
 const CACHE_SCHEMA_VERSION: u32 = 2;
@@ -218,7 +218,7 @@ impl FileBuildCache {
         file_path: &str,
         visited: &mut HashSet<String>,
     ) -> Result<Vec<String>> {
-        let file_deps = abi::get_file_dependencies(file_path, true)
+        let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
         let file_path = fs::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(&file_path));

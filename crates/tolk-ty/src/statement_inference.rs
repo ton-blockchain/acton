@@ -6,7 +6,7 @@ use tolk_resolver::AstNodeSpanExt;
 use tolk_syntax::*;
 
 impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
-    pub fn process_stmt(&mut self, v: Stmt<'t>, flow: FlowContext) -> FlowContext {
+    pub(crate) fn process_stmt(&mut self, v: Stmt<'t>, flow: FlowContext) -> FlowContext {
         match v {
             Stmt::ExprStmt(expr_stmt) => self.process_expr_stmt(expr_stmt, flow),
             Stmt::Block(block_stmt) => self.process_block_stmt(block_stmt, flow),
@@ -34,7 +34,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
     }
 
     //+ CHECKED
-    pub fn process_block_stmt(&mut self, v: Block<'t>, flow: FlowContext) -> FlowContext {
+    pub(crate) fn process_block_stmt(&mut self, v: Block<'t>, flow: FlowContext) -> FlowContext {
         let mut next_flow = flow;
         for stmt in v.stmts() {
             next_flow = self.process_stmt(stmt, next_flow);
@@ -155,7 +155,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
     }
 
     //+ CHECKED
-    pub fn process_return_stmt(&mut self, v: Return<'t>, flow: FlowContext) -> FlowContext {
+    pub(crate) fn process_return_stmt(&mut self, v: Return<'t>, flow: FlowContext) -> FlowContext {
         let expr = v.expr();
 
         let mut flow = if let Some(expr) = expr {
@@ -177,7 +177,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
     }
 
     //+ CHECKED
-    pub fn process_throw_stmt(&mut self, v: Throw<'t>, flow: FlowContext) -> FlowContext {
+    pub(crate) fn process_throw_stmt(&mut self, v: Throw<'t>, flow: FlowContext) -> FlowContext {
         // in C++ version we handle both possible expressions:
         // throw 0
         // throw (1, arg)
@@ -200,7 +200,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
     }
 
     //+ CHECKED
-    fn process_break_stmt(&mut self, _: Break, flow: FlowContext) -> FlowContext {
+    const fn process_break_stmt(&self, _: Break, flow: FlowContext) -> FlowContext {
         // for now there is no break statement in Tolk
         let mut flow = flow;
         flow.mark_unreachable(UnreachableKind::Break);
@@ -208,7 +208,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
     }
 
     //+ CHECKED
-    fn process_continue_stmt(&mut self, _: Continue, flow: FlowContext) -> FlowContext {
+    const fn process_continue_stmt(&self, _: Continue, flow: FlowContext) -> FlowContext {
         // for now there is no continue statement in Tolk
         let mut flow = flow;
         flow.mark_unreachable(UnreachableKind::Continue);

@@ -1,7 +1,6 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
 use crate::wallets::open_wallets;
-use acton_config::config;
 use acton_config::config::{ActonConfig, global_libraries_path};
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Local};
@@ -72,7 +71,8 @@ pub fn publish_cmd(
         contract_id = Some(contract_key.clone());
 
         println!("  {} Compiling contract", "→".blue().bold());
-        let compilation_result = tolkc::compile(Path::new(&contract_path), false);
+        let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings);
+        let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
         match compilation_result {
             CompilerResult::Success(result) => {
@@ -135,7 +135,7 @@ pub fn publish_cmd(
     );
 
     let wallet_name = select_wallet(wallet_name, &config)?;
-    let mut wallets = open_wallets(&config, Some(network.as_str()), true)?;
+    let mut wallets = open_wallets(&config, Some(&network), true)?;
     let wallet = wallets
         .remove(&wallet_name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
@@ -196,8 +196,10 @@ pub fn publish_cmd(
         }
     }
 
-    let api_client = TonApiClient::new(network.clone(), api_key)?;
-    let (seqno, need_state_init) = wallet.seqno(network.as_str())?;
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
@@ -285,8 +287,10 @@ pub fn fetch_cmd(
     net: String,
     json: bool,
 ) -> anyhow::Result<()> {
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
     let network = Network::from_str(&net)?;
-    let client = TonApiClient::new(network, api_key)?;
+    let client = TonApiClient::new(network, custom_networks, api_key)?;
 
     if !json {
         println!("  {} Fetching library: {}", "→".blue().bold(), hash);
@@ -308,7 +312,7 @@ pub fn fetch_cmd(
             FormatOptions::default(),
             None,
             None,
-            net,
+            Some(net),
             false,
         )?;
     } else {
@@ -362,8 +366,9 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
         .get(&lib_name)
         .ok_or_else(|| anyhow!(error_fmt::library_not_found(&config, &lib_name)))?;
 
+    let custom_networks = config.custom_networks();
     let network = Network::from_str(&lib.network.to_string())?;
-    let api_client = TonApiClient::new(network, api_key)?;
+    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
 
     let mut balance_u128: Option<u128> = None;
     let mut remaining_seconds: Option<u128> = None;
@@ -465,7 +470,7 @@ pub fn topup_cmd(
 
     let wallet_name = select_wallet(wallet_name, &config)?;
     let network = Network::from_str(&lib.network.to_string())?;
-    let mut wallets = open_wallets(&config, Some(network.as_str()), true)?;
+    let mut wallets = open_wallets(&config, Some(&network), true)?;
     let wallet = wallets
         .remove(&wallet_name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
@@ -477,7 +482,7 @@ pub fn topup_cmd(
         wallet
             .wallet
             .address
-            .to_base64_url_flags(true, lib.network == config::Network::Testnet)
+            .to_base64_url_flags(true, lib.network == Network::Testnet)
             .dimmed()
     );
 
@@ -527,8 +532,10 @@ pub fn topup_cmd(
         }
     }
 
-    let api_client = TonApiClient::new(network.clone(), api_key)?;
-    let (seqno, need_state_init) = wallet.seqno(network.as_str())?;
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
@@ -712,7 +719,7 @@ fn save_library(
     } else {
         let options = vec![
             "Local (libraries.toml)",
-            "Global (~/.acton/libraries/global.libraries.toml)",
+            "Global (~/.config/acton/libraries/global.libraries.toml)",
         ];
         let selection = Select::new("Save library info to:", options).prompt()?;
         selection.starts_with("Global")
@@ -820,7 +827,14 @@ fn compile_librarian_with_duration(duration: u64) -> anyhow::Result<ArcCell> {
     let tmp_file_path = tmp_dir.path().join("librarian.tolk");
     let mut tmp_file = File::create(&tmp_file_path)?;
     tmp_file.write_all(content.as_bytes())?;
-    let compilation_result = tolkc::compile(tmp_file_path.as_ref(), true);
+
+    let acton_config = ActonConfig::load();
+    let mut compiler = tolkc::Compiler::new(2);
+    if let Ok(config) = &acton_config {
+        compiler = compiler.with_mappings(&config.mappings);
+    }
+
+    let compilation_result = compiler.compile(tmp_file_path.as_ref(), true);
     match compilation_result {
         CompilerResult::Success(result) => Ok(ArcCell::from_boc_b64(&result.code_boc64)?),
         CompilerResult::Error(err) => {

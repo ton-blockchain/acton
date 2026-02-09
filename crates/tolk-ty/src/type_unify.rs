@@ -7,7 +7,7 @@ use crate::types::TyData;
 ///
 /// Besides function returns, it's also used for ternary `return cond ? 1 : null` and `match` expression.
 /// If types can't be unified (a function returns int and cell, for example), `unify()` returns false, handled outside.
-pub struct TypeInferringUnifyStrategy {
+pub(crate) struct TypeInferringUnifyStrategy {
     unified_result: Option<TyId>,
 }
 
@@ -18,14 +18,14 @@ impl Default for TypeInferringUnifyStrategy {
 }
 
 impl TypeInferringUnifyStrategy {
-    pub fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             unified_result: None,
         }
     }
 
     /// this function calculates lca or currently stored result and next
-    pub fn unify_with(
+    pub(crate) fn unify_with(
         &mut self,
         next: TyId,
         dest_hint: Option<TyId>,
@@ -62,7 +62,7 @@ impl TypeInferringUnifyStrategy {
         self.unified_result = Some(combined);
     }
 
-    pub fn get_result(&self, type_interner: &TypeInterner) -> TyId {
+    pub(crate) fn get_result(&self, type_interner: &TypeInterner) -> TyId {
         self.unified_result.unwrap_or(type_interner.ty_unknown)
     }
 }

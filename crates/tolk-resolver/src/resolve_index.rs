@@ -56,7 +56,7 @@ pub struct LocalDefId {
 
 impl LocalDefId {
     /// Creates a new `LocalDefId`.
-    pub fn new(file_id: FileId, local: u32) -> Self {
+    pub const fn new(file_id: FileId, local: u32) -> Self {
         Self { file_id, local }
     }
 }
@@ -135,5 +135,9 @@ impl FileResolveIndex {
         self.uses
             .iter()
             .filter(move |u| matches!(u.resolved, Resolved::Global(id) if id == symbol_id))
+    }
+
+    pub fn find_local(&self, local_id: LocalDefId) -> Option<&LocalDef> {
+        self.locals.iter().find(move |u| u.id == local_id)
     }
 }

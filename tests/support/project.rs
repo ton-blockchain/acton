@@ -13,6 +13,7 @@ pub(crate) struct ProjectBuilder {
     files: Vec<(String, String)>,
     raw_files: Vec<(String, String)>,
     scripts: Vec<(String, String)>,
+    mappings: Vec<(String, String)>,
     test_config: Option<TestConfig>,
     license: Option<String>,
     create_acton_toml: bool,
@@ -69,6 +70,7 @@ impl ProjectBuilder {
             files: Vec::new(),
             raw_files: Vec::new(),
             scripts: Vec::new(),
+            mappings: Vec::new(),
             test_config: None,
             license: Some("MIT".to_string()),
             create_acton_toml: true,
@@ -95,6 +97,11 @@ impl ProjectBuilder {
 
     pub(crate) fn script_config(mut self, name: &str, command: &str) -> Self {
         self.scripts.push((name.to_string(), command.to_string()));
+        self
+    }
+
+    pub(crate) fn mapping(mut self, prefix: &str, target: &str) -> Self {
+        self.mappings.push((prefix.to_string(), target.to_string()));
         self
     }
 
@@ -383,6 +390,7 @@ impl ProjectBuilder {
                 &self.name,
                 &self.contracts,
                 &self.scripts,
+                &self.mappings,
                 &self.test_config,
                 &self.license,
             );
@@ -414,6 +422,7 @@ impl ProjectBuilder {
         name: &str,
         contracts: &[ContractDef],
         scripts: &[(String, String)],
+        mappings: &[(String, String)],
         test_config: &Option<TestConfig>,
         license: &Option<String>,
     ) {
@@ -501,6 +510,14 @@ version = "0.1.0"
                 toml_content.push_str(&format!("output = \"{output}\"\n"));
             }
 
+            toml_content.push('\n');
+        }
+
+        if !mappings.is_empty() {
+            toml_content.push_str("[mappings]\n");
+            for (prefix, target) in mappings {
+                toml_content.push_str(&format!("\"{prefix}\" = \"{target}\"\n"));
+            }
             toml_content.push('\n');
         }
 

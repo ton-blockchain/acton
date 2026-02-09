@@ -1,5 +1,4 @@
 use crate::commands::test::TestRunner;
-use abi::ContractAbi;
 use chrono;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use owo_colors::OwoColorize;
@@ -7,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
+use ton_abi::ContractAbi;
 
 pub(super) fn collect_profile(runner: &TestRunner, abi: &ContractAbi) -> anyhow::Result<()> {
     let mut gas_per_opcode = HashMap::new();

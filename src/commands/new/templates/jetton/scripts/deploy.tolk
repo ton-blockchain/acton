@@ -1,9 +1,10 @@
-import "../.acton/io"
-import "../.acton/fmt"
-import "../.acton/env"
-import "../.acton/build/build"
-import "../.acton/emulation/network"
-import "../tests/wrappers/JettonMinter"
+import "@acton/io"
+import "@acton/fmt"
+import "@acton/env"
+import "@acton/build/build"
+import "@acton/emulation/network"
+
+import "@wrappers/JettonMinter"
 
 const ONCHAIN_CONTENT_PREFIX = 0x00
 const SNAKE_PREFIX = 0x00

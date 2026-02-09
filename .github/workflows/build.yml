@@ -16,6 +16,10 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  SCCACHE_GHA_ENABLED: true
+  RUSTC_WRAPPER: sccache
+
 jobs:
   build-macos:
     runs-on: macos-latest
@@ -135,6 +139,7 @@ jobs:
         env:
           RUSTC_WRAPPER: sccache
         run: |
+          bun install
           just build-ui
           cargo build --release --bin acton
 
@@ -273,6 +278,7 @@ jobs:
         env:
           RUSTC_WRAPPER: sccache
         run: |
+          bun install
           just build-ui
           cargo build --release --bin acton
 
@@ -290,7 +296,7 @@ jobs:
           path: target/release/acton
 
   build-linux:
-    runs-on: ubicloud-standard-2
+    runs-on: ubuntu-latest
     if: true
 
     outputs:
@@ -310,7 +316,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Cache Cargo registry + git + target
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -339,7 +345,7 @@ jobs:
 
       - name: Cache TON build directory
         id: cache-ton-build
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: ton-repo/build
           key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -347,7 +353,7 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -355,7 +361,7 @@ jobs:
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
         id: cache-ton-deps
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: |
             ton-repo/openssl_3
@@ -365,7 +371,7 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-
 
       - name: Cache ccache
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -374,7 +380,7 @@ jobs:
       - name: Init submodules for build
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
-          git submodule update --init --recursive
+          cd ton-repo && git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -405,37 +411,47 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
 
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+        env:
+          SCCACHE_VERSION: v0.13.0
+        with:
+          version: ${{ env.SCCACHE_VERSION }}
+
       - name: Build acton binary
         env:
           CC: gcc
           CXX: g++
         run: |
+          bun install
           just build-ui
           cargo build --profile release-size --bin acton
 
       - name: Test acton binary
         run: |
-          ./target/release/acton --help
+          ./target/release-size/acton --help
 
-      - name: Upload acton binary as artifact
-        uses: actions/upload-artifact@v4
+#      - name: Upload acton binary as artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: acton-linux-binary
+#          path: target/release-size/acton
+
+      - name: Install cargo-llvm-cov and nextest
+        uses: taiki-e/install-action@v2
         with:
-          name: acton-linux-binary
-          path: target/release/acton
-
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+          tool: cargo-llvm-cov,nextest
 
       - name: Run tests and generate coverage
         run: |
           rustup component add llvm-tools-preview
           just coverage-html
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: target/llvm-cov/html
+#      - name: Upload coverage report
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: coverage-report
+#          path: target/llvm-cov/html
 
       - name: Run formatter and linter
         run: |
@@ -498,7 +514,7 @@ jobs:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
         run: |
           gh release delete canary -y || true
-          
+
           gh api \
             repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
             -X DELETE || true

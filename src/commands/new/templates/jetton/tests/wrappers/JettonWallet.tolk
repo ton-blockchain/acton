@@ -1,9 +1,9 @@
-import "../../.acton/emulation/network"
-import "../../.acton/testing/expect"
-import "../../.acton/build/build"
+import "@acton/emulation/network"
+import "@acton/testing/expect"
+import "@acton/build/build"
 
-import "../../contracts/messages"
-import "../../contracts/storage"
+import "@contracts/messages"
+import "@contracts/storage"
 
 struct JettonWallet {
     address: address

@@ -1,14 +1,23 @@
 [package]
 name = "tolkc"
-version = "0.1.0"
 description = "Tolk compiler crate"
-edition = "2024"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-ton-source-map = { path = "../ton-source-map" }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-include_dir = { version = "0.7.4" }
+ton-source-map = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+include_dir = { workspace = true }
+rustc-hash = { workspace = true }
+dunce = { workspace = true }
 
 [lints]
 workspace = true

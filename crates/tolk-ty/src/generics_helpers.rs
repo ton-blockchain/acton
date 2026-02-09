@@ -5,21 +5,21 @@ use rustc_hash::FxHashMap;
 
 /// Stores the mapping of generic parameter names to their actual types.
 #[derive(Debug, Clone, Default)]
-pub struct GenericsSubstitutions {
+pub(crate) struct GenericsSubstitutions {
     pub mapping: FxHashMap<String, TyId>,
 }
 
 impl GenericsSubstitutions {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
-    pub fn set_type_t(&mut self, name: String, ty: TyId) {
+    pub(crate) fn set_type_t(&mut self, name: String, ty: TyId) {
         self.mapping.entry(name).or_insert(ty);
     }
 
     #[allow(dead_code)]
-    pub fn get_substitution(&self, name: &str) -> Option<TyId> {
+    pub(crate) fn get_substitution(&self, name: &str) -> Option<TyId> {
         self.mapping.get(name).copied()
     }
 }
@@ -28,7 +28,7 @@ impl GenericsSubstitutions {
 /// purpose: having `f<T>(value: T)` and call `f(5)`, deduce T = int
 /// while analyzing a call, arguments are handled one by one, by `auto_deduce_from_argument()`
 /// note, that manually specified substitutions like `f<int>(5)` are NOT handled by this class, it's not deducing
-pub struct GenericSubstitutionsDeducing {
+pub(crate) struct GenericSubstitutionsDeducing {
     pub substitutions: GenericsSubstitutions,
 }
 
@@ -39,7 +39,7 @@ impl Default for GenericSubstitutionsDeducing {
 }
 
 impl GenericSubstitutionsDeducing {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             substitutions: GenericsSubstitutions::new(),
         }
@@ -52,7 +52,7 @@ impl GenericSubstitutionsDeducing {
     /// - `a` does not affect, it doesn't depend on generic Ts
     /// - next condition: param_type = `T1`, arg_type = `int`, deduce T1 = int
     /// - next condition: param_type = `(T1, T2)` = `(int, T2)`, arg_type = `(int, slice)`, deduce T2 = slice
-    pub fn consider_next_condition(
+    pub(crate) fn consider_next_condition(
         &mut self,
         param_ty: TyId,
         arg_ty: TyId,
@@ -77,7 +77,7 @@ impl GenericSubstitutionsDeducing {
             (TyData::Union(p_variants), TyData::Union(a_variants)) => {
                 // `arg: T1 | T2` called as `f(intOrBuilder)` => T1 is int, T2 is builder
                 // `arg: int | T1` called as `f(builderOrIntOrSlice)` => T1 is builder|slice
-                let mut a_sub_p = a_variants.clone();
+                let mut a_sub_p = a_variants;
                 let mut p_generic = Vec::new();
                 let mut is_sub_correct = true;
 
@@ -209,7 +209,7 @@ impl GenericSubstitutionsDeducing {
         }
     }
 
-    pub fn auto_deduce_from_argument(
+    pub(crate) fn auto_deduce_from_argument(
         &mut self,
         param_ty: TyId,
         arg_ty: TyId,
@@ -219,13 +219,17 @@ impl GenericSubstitutionsDeducing {
         self.replace_ts_with_currently_deduced(param_ty, interner)
     }
 
-    pub fn replace_ts_with_currently_deduced(&self, ty: TyId, interner: &mut TypeInterner) -> TyId {
+    pub(crate) fn replace_ts_with_currently_deduced(
+        &self,
+        ty: TyId,
+        interner: &mut TypeInterner,
+    ) -> TyId {
         let mut substitutor = TypeSubstitutor::new(interner);
         substitutor.substitute(ty, &self.substitutions.mapping)
     }
 
     #[allow(dead_code)]
-    pub fn flush(self) -> GenericsSubstitutions {
+    pub(crate) fn flush(self) -> GenericsSubstitutions {
         self.substitutions
     }
 }
