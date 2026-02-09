@@ -285,12 +285,14 @@ pub fn process_txs_and_search_params(
     let raw_aborted = params_reader.pop();
     let raw_success = params_reader.pop();
     let raw_exit_code = params_reader.pop();
+    let raw_msg_value = params_reader.pop();
     let raw_from = params_reader.pop();
     let raw_to = params_reader.pop();
 
     let mut params = TransactionNotFoundParams {
         to: Default::default(),
         from: None,
+        value: None,
         exit_code: None,
         success: None,
         aborted: None,
@@ -350,6 +352,13 @@ pub fn process_txs_and_search_params(
             params.aborted = None;
         } else if let TupleItem::Int(num) = raw_aborted {
             params.aborted = Some(num == BigInt::from(-1));
+        }
+    }
+    if let Some(raw_msg_value) = raw_msg_value {
+        if raw_msg_value == TupleItem::Null {
+            params.value = None;
+        } else if let TupleItem::Int(num) = raw_msg_value {
+            params.value = Some(num);
         }
     }
     if let Some(raw_from) = raw_from {

@@ -697,6 +697,13 @@ fn find_transaction_by_params_impl(
                 return false;
             }
 
+            if let Some(expected_value) = &params.value
+                && (*expected_value) != info.value.tokens.into()
+            {
+                // Message value mismatch
+                return false;
+            }
+
             if let Some(expected_from_addr) = &params.from
                 && (*expected_from_addr) != info.src
             {

@@ -1633,6 +1633,9 @@ impl FormatterContext {
                 }
             ));
         }
+        if let Some(value) = &assert_failure.params.value {
+            params.push(format!("  value={value}",));
+        }
         if let Some(deploy) = assert_failure.params.deploy {
             params.push(format!(
                 "  deploy={}",

@@ -51,6 +51,7 @@ pub struct FailAssertFailure {
 pub struct TransactionNotFoundParams {
     pub to: Option<IntAddr>,
     pub from: Option<IntAddr>,
+    pub value: Option<BigInt>,
     pub exit_code: Option<u32>,
     pub success: Option<bool>,
     pub aborted: Option<bool>,
