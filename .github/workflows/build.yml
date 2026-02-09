@@ -404,6 +404,18 @@ jobs:
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
+      - name: Upload libs artifacts 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: libemulator.a
+          path: objs/libemulator.a
+
+      - name: Upload libs artifacts 2
+        uses: actions/upload-artifact@v4
+        with:
+          name: libtolk.a
+          path: objs/libtolk.a
+
       - name: Detect architecture
         id: detect-arch
         run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
@@ -430,12 +442,6 @@ jobs:
       - name: Test acton binary
         run: |
           ./target/release-size/acton --help
-
-#      - name: Upload acton binary as artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: acton-linux-binary
-#          path: target/release-size/acton
 
       - name: Install cargo-llvm-cov and nextest
         uses: taiki-e/install-action@v2
