@@ -15,6 +15,8 @@ import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import styles from "./App.module.css"
 
+const HOST = process.env.HOST || "http://localhost:3010"
+
 export const App: React.FC = () => {
   const [theme, setTheme] = useState(() => {
     return (
@@ -26,9 +28,9 @@ export const App: React.FC = () => {
   const client = useMemo(
     () =>
       new TonClient({
-        v2BaseUrl: "http://localhost:3010/api/v2",
-        v3BaseUrl: "http://localhost:3010/api/v3",
-        addressNameBaseUrl: "http://localhost:3010",
+        v2BaseUrl: `${HOST}/api/v2`,
+        v3BaseUrl: `${HOST}/api/v3`,
+        addressNameBaseUrl: HOST,
       }),
     [],
   )

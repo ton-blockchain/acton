@@ -111,13 +111,13 @@ export class TonClient {
   }
 
   async getAddressName(address: string): Promise<string | undefined> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/address-name")
+    const url = this.buildUrl(this.addressNameBaseUrl, "/admin/address-name")
     url.searchParams.append("address", address)
     return this.request(url, "Failed to fetch address name")
   }
 
   async setAddressName(address: string, name: string): Promise<void> {
-    const url = this.buildUrl(this.addressNameBaseUrl, "/address-name")
+    const url = this.buildUrl(this.addressNameBaseUrl, "/admin/address-name")
     await this.request<null>(url, "Failed to set address name", {
       method: "POST",
       headers: {"Content-Type": "application/json"},

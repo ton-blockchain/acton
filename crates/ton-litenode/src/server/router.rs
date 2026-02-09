@@ -49,13 +49,13 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
     Router::new()
         .nest("/api", api_v2_router)
         .nest("/api", api_v3_router)
-        .route("/faucet", post(faucet))
+        .route("/admin/faucet", post(faucet))
         .route(
-            "/address-name",
+            "/admin/address-name",
             get(get_address_name).post(set_address_name),
         )
         .route(
-            "/state-source",
+            "/admin/state-source",
             get(get_state_source).post(set_state_source),
         )
         .layer(cors)
