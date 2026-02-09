@@ -54,6 +54,9 @@
   padding: var(--spacing-sm) 0;
   transition: color var(--transition-duration-fast);
   text-transform: uppercase;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
 }
 
 .navItem:hover {

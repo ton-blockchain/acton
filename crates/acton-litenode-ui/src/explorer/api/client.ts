@@ -40,27 +40,35 @@ export class TonClient {
     return this.request(url, "Failed to fetch transactions")
   }
 
-  async getJettonMasters(address?: string[]): Promise<JettonMaster[]> {
-    if (!address || address.length === 0) return []
+  async getJettonMasters(address?: string[], limit = 100, offset = 0): Promise<JettonMaster[]> {
+    if (address && address.length > 0) {
+      const results = await Promise.all(
+        address.map(async addr => {
+          const singleUrl = this.buildUrl(this.v3BaseUrl, "/jetton/masters")
+          singleUrl.searchParams.append("address", addr)
+          try {
+            const response = await this.request<{jetton_masters: JettonMaster[]}>(
+              singleUrl,
+              "Failed to fetch jetton master",
+            )
+            return response.jetton_masters
+          } catch (error) {
+            console.error(`Failed to fetch jetton master for ${addr}`, error)
+            return []
+          }
+        }),
+      )
+      return results.flat()
+    }
 
-    const results = await Promise.all(
-      address.map(async addr => {
-        const url = this.buildUrl(this.v3BaseUrl, "/jetton/masters")
-        url.searchParams.append("address", addr)
-        try {
-          const response = await this.request<{jetton_masters: JettonMaster[]}>(
-            url,
-            "Failed to fetch jetton master",
-          )
-          return response.jetton_masters
-        } catch (error) {
-          console.error(`Failed to fetch jetton master for ${addr}`, error)
-          return []
-        }
-      }),
+    const url = this.buildUrl(this.v3BaseUrl, "/jetton/masters")
+    url.searchParams.append("limit", limit.toString())
+    url.searchParams.append("offset", offset.toString())
+    const response = await this.request<{jetton_masters: JettonMaster[]}>(
+      url,
+      "Failed to fetch jetton masters",
     )
-
-    return results.flat()
+    return response.jetton_masters
   }
 
   async getJettonWallets(
