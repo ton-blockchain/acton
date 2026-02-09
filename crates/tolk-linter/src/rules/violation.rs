@@ -1,6 +1,5 @@
 use crate::ast::{
-    deprecated_symbol_use, field_init_can_be_folded, mutable_variable_can_be_immutable,
-    pure_function_call_unused, unused_import, unused_variable, write_only_variable,
+    camel_case_detector, deprecated_symbol_use, field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused, unused_import, unused_variable, write_only_variable
 };
 use serde::Serialize;
 use std::fmt::Display;
@@ -58,6 +57,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E005") => write_only_variable::WriteOnlyVariable,
         (Tolk, "E006") => unused_import::UnusedImport,
         (Tolk, "E007") => pure_function_call_unused::PureFunctionCallUnused,
+        (Tolk, "E008") => camel_case_detector::CamelCaseDetector,
         _ => return None,
     })
 }

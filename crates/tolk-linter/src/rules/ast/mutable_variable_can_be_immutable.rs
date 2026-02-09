@@ -82,6 +82,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
                 edits: vec![Edit {
                     span: Span::from_syntax(&kind_node),
                     replacement: "val".to_string(),
+                    file_id: None,
                 }],
                 applicability: Applicability::Auto,
             });

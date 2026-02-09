@@ -1,5 +1,6 @@
 extern crate core;
 
+use crate::ast::camel_case_detector::check_camel_globals;
 use crate::ast::deprecated_symbol_use;
 use crate::rules::ast::{
     field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,
@@ -13,7 +14,7 @@ use std::sync::Arc;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
-use tolk_resolver::{AstNodeSpanExt, Resolved};
+use tolk_resolver::{AstNodeSpanExt, NameUse, Resolved};
 use tolk_syntax::{
     Expr, ExprStmt, Ident, InstanceArg, SourceFile, TopLevel, TypeIdent, Walker, walk_ast,
 };
@@ -28,6 +29,26 @@ mod rules;
 #[cfg(feature = "profile_rules")]
 pub use profiling::Profiler;
 use tolk_analysis::{AnalysisDb, FileUseFacts};
+
+#[cfg(feature = "profile_rules")]
+macro_rules! run_rule {
+    ($checker:expr, $rule:expr, $body:expr) => {{
+        if $checker.should_run($rule) {
+            let start = std::time::Instant::now();
+            let _ = $body;
+            $checker.profiler.record($rule, start.elapsed());
+        }
+    }};
+}
+
+#[cfg(not(feature = "profile_rules"))]
+macro_rules! run_rule {
+    ($checker:expr, $rule:expr, $body:expr) => {{
+        if $checker.should_run($rule) {
+            let _ = $body;
+        }
+    }};
+}
 
 pub struct Checker<'a> {
     pub file_db: &'a FileDb,
@@ -124,6 +145,10 @@ impl<'a> Checker<'a> {
             .unwrap_or(true) // default to run
     }
 
+    pub fn run_once(&mut self) {
+        run_rule!(self, Rule::CamelCaseDetector, check_camel_globals(self));
+    }
+
     pub fn emit_diagnostic(&mut self, rule: Rule, mut diagnostic: Diagnostic) {
         if let Some(level) = self.settings.get(&rule) {
             match level {
@@ -179,6 +204,18 @@ impl<'a> Checker<'a> {
             .resolved_uses
             .get(&file_id)
             .cloned()
+    }
+
+    pub fn get_all_symbol_global_usages(
+        &self,
+        symbol_id: &SymbolId,
+    ) -> impl Iterator<Item = &NameUse> {
+        self.type_db
+            .project_index
+            .resolved_uses
+            .iter()
+            .map(|v| v.1.global_usages_of(*symbol_id))
+            .flatten()
     }
 
     pub fn use_facts(&mut self, file_id: FileId) -> Option<Arc<FileUseFacts>> {

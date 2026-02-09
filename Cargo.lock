@@ -2935,6 +2935,7 @@ name = "tolk-linter"
 version = "0.1.0"
 dependencies = [
  "acton-config",
+ "heck",
  "log",
  "memchr",
  "rustc-hash",

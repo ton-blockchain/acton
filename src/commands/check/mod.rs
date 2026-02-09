@@ -192,10 +192,10 @@ fn check_contract(
 
     let lint_settings = Checker::build_settings(acton_config, Some(contract_id));
 
-    check_file(&root, file_db, fix, json, lint_settings)
+    check_root_file(&root, file_db, fix, json, lint_settings)
 }
 
-fn check_file(
+fn check_root_file(
     root: &Path,
     file_db: &FileDb,
     fix: bool,
@@ -259,14 +259,17 @@ fn check_file(
     let files_to_check = index.reachable_files(file_info.id());
 
     for file_to_check in &files_to_check {
+        let Some(file_to_infer) = file_db.get_by_id(*file_to_check) else {
+            continue;
+        };
         let mut file_body_types = HashMap::new();
 
-        for decl in file_info.source().top_levels() {
-            let Some(index_decl) = file_info.find_declaration(&decl) else {
+        for decl in file_to_infer.source().top_levels() {
+            let Some(index_decl) = file_to_infer.find_declaration(&decl) else {
                 continue;
             };
 
-            let res = infer(&mut type_db, file_info.id(), index_decl.id, &decl);
+            let res = infer(&mut type_db, file_to_infer.id(), index_decl.id, &decl);
             file_body_types.insert(index_decl.id, res);
         }
 
@@ -278,11 +281,15 @@ fn check_file(
     let now = Instant::now();
     let mut checker = Checker::new(file_db, &mut type_db, &body_types).with_settings(lint_settings);
 
+    // locals by file -> file_db -> project_index -> by usage
+    // globals one time
+    checker.run_once();
+
     for file_to_check in files_to_check {
         let Some(info) = file_db.get_by_id(file_to_check) else {
             continue;
         };
-        if !file_info.is_workspace_file() {
+        if !info.is_workspace_file() {
             // we don't want to check non-workspace files
             continue;
         }
@@ -424,12 +431,15 @@ fn emit_diagnostics(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Res
         }
         cs_diag = cs_diag.with_labels(labels);
 
+        // this is diagnostic header printed, with yellow
         term::emit(&mut writer.lock(), &config, &files, &cs_diag)?;
 
         for fix in &diag.fixes {
             let mut labels = vec![];
+            // print edit message (help in green) per edit
             for edit in &fix.edits {
-                let cs_file_id = *file_id_map.get(&diag.file_id).unwrap_or(&0);
+                let edit_file_id = edit.file_id.unwrap_or(diag.file_id);
+                let cs_file_id = *file_id_map.get(&edit_file_id).unwrap_or(&0);
                 labels.push(
                     Label::primary(cs_file_id, edit.span.start()..edit.span.end())
                         .with_message(&edit.replacement),
@@ -468,7 +478,13 @@ fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Result<(
         *fixed_diags_by_file.entry(file_path.clone()).or_default() += 1;
 
         for edit in &fix.edits {
-            fixes_by_file.entry(file_path.clone()).or_default().push((
+            let edit_file_id = edit.file_id.unwrap_or(diag.file_id);
+            let edit_file_info = file_db.get_by_id(edit_file_id).ok_or_else(|| {
+                anyhow::anyhow!("File info not found for edit file_id {}", edit_file_id)
+            })?;
+            let edit_file_path = edit_file_info.index().path.to_string_lossy().to_string();
+
+            fixes_by_file.entry(edit_file_path).or_default().push((
                 edit.span.start as usize,
                 edit.span.end as usize,
                 edit.replacement.clone(),
@@ -505,7 +521,14 @@ fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Result<(
             let relative_path = pathdiff::diff_paths(&file_path, &current_dir)
                 .unwrap_or_else(|| PathBuf::from(&file_path));
 
-            if fixed_issues == total_issues {
+            if total_issues == 0 {
+                println!(
+                    "Applied {} {} to {}",
+                    applied_fixes,
+                    if applied_fixes == 1 { "fix" } else { "fixes" },
+                    relative_path.display().cyan(),
+                );
+            } else if fixed_issues == total_issues {
                 println!("Fixed all issues in {}", relative_path.display().cyan());
             } else {
                 let remaining = total_issues - fixed_issues;
@@ -575,10 +598,19 @@ fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value 
     for fix in &diag.fixes {
         let mut edits_json = Vec::new();
         for edit in &fix.edits {
-            if let Some(range) = create_range_json(source, &edit.span) {
+            let edit_file_id = edit.file_id.unwrap_or(diag.file_id);
+            let edit_source = file_db
+                .get_by_id(edit_file_id)
+                .map(|info| info.source().source.clone())
+                .unwrap_or_else(|| source.into());
+            if let Some(range) = create_range_json(edit_source.as_ref(), &edit.span) {
                 edits_json.push(serde_json::json!({
                     "range": range,
-                    "newText": &edit.replacement
+                    "newText": &edit.replacement,
+                    "file": file_db
+                        .get_by_id(edit_file_id)
+                        .map(|info| info.index().path.to_string_lossy().to_string())
+                        .unwrap_or_else(|| file_path.clone())
                 }));
             }
         }
