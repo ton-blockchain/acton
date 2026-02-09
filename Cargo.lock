@@ -3018,6 +3018,7 @@ dependencies = [
 name = "tolkc"
 version = "0.1.0"
 dependencies = [
+ "dunce",
  "include_dir",
  "rustc-hash",
  "serde",
@@ -3147,7 +3148,15 @@ dependencies = [
 name = "ton-indexer"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "base64",
+ "crc",
+ "num-bigint",
+ "serde_json",
+ "sha2",
+ "ton-executor",
+ "tonlib-core",
+ "tvmffi",
  "tycho-types",
 ]
 

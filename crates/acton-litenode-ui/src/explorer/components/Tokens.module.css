@@ -1,0 +1,87 @@
+.container {
+  padding: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.walletItem {
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  cursor: pointer;
+  transition: background-color var(--transition-duration-fast);
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.walletItem:hover {
+  background-color: var(--tonscan-row-hover);
+}
+
+.walletItem:last-child {
+  border-bottom: none;
+}
+
+.jettonImage {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--tonscan-bg-secondary);
+}
+
+.jettonInfoMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.jettonName {
+  font-weight: 600;
+  color: var(--tonscan-text-primary);
+  font-size: 1rem;
+}
+
+.jettonBalanceRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.875rem;
+}
+
+.balanceValue {
+  color: var(--tonscan-text-primary);
+}
+
+.jettonSymbol {
+  color: var(--tonscan-text-secondary);
+}
+
+.priceInfo {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.priceValue {
+  font-weight: 500;
+  color: var(--tonscan-text-primary);
+  font-size: 0.875rem;
+}
+
+.totalValue {
+  font-size: 0.75rem;
+  color: var(--tonscan-text-secondary);
+}
+
+.empty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+}

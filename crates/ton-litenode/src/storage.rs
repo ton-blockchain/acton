@@ -105,6 +105,30 @@ impl AccountMeta {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JettonMasterMeta {
+    pub address: Addr,
+    pub admin_address: Addr,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+    pub jetton_content: serde_json::Value,
+    pub jetton_wallet_code_hash: Hash256,
+    pub last_transaction_lt: Lt,
+    pub mintable: bool,
+    pub total_supply: u128,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JettonWalletMeta {
+    pub address: Addr,
+    pub balance: u128,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+    pub jetton_address: Addr,
+    pub last_transaction_lt: Lt,
+    pub owner_address: Addr,
+}
+
 pub struct LatestState {
     pub accounts: HashMap<Addr, AccountMeta>,
 }
@@ -231,6 +255,8 @@ pub struct History {
     pub msg_by_hash: HashMap<Hash256, MsgMeta>,
     pub msg_to_tx: HashMap<Hash256, Hash256>,
     pub address_names: HashMap<Addr, String>,
+    pub jetton_masters: HashMap<Addr, JettonMasterMeta>,
+    pub jetton_wallets: HashMap<Addr, JettonWalletMeta>,
 }
 
 impl Default for History {
@@ -251,6 +277,8 @@ impl History {
             msg_by_hash: HashMap::new(),
             msg_to_tx: HashMap::new(),
             address_names,
+            jetton_masters: HashMap::new(),
+            jetton_wallets: HashMap::new(),
         }
     }
 
@@ -265,6 +293,8 @@ impl History {
             msg_by_hash: HashMap::new(),
             msg_to_tx: HashMap::new(),
             address_names,
+            jetton_masters: HashMap::new(),
+            jetton_wallets: HashMap::new(),
         }
     }
 

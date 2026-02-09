@@ -1,5 +1,6 @@
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::remote::{RemoteProvider, fetch_remote_shard_account};
+use crate::storage::{self, JettonMasterMeta};
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
     LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
@@ -445,7 +446,208 @@ impl Node {
 
         self.apply_commit(pending)?;
 
+        self.detect_jetton_masters(&dst)?;
+        self.detect_jetton_wallets(&dst)?;
+
         Ok((block_meta, tx_meta))
+    }
+
+    fn detect_jetton_wallets(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        let Some(meta) = self.latest.accounts.get(addr) else {
+            return Ok(());
+        };
+
+        if meta.status != AccountStatus::Active {
+            return Ok(());
+        }
+
+        let Some(code_hash) = meta.code_hash else {
+            return Ok(());
+        };
+        let Some(data_hash) = meta.data_hash else {
+            return Ok(());
+        };
+
+        let Some(code_boc) = self.cas.get(&code_hash) else {
+            return Ok(());
+        };
+        let Some(data_boc) = self.cas.get(&data_hash) else {
+            return Ok(());
+        };
+
+        let code = Boc::decode(&code_boc)?;
+        let data = Boc::decode(&data_boc)?;
+
+        if let Some(wallet_data) =
+            ton_indexer::jettons::get_jetton_wallet_data(addr.to_string(), code, data)
+        {
+            let wallet_meta = storage::JettonWalletMeta {
+                address: *addr,
+                balance: wallet_data.balance.to_str_radix(10).parse().unwrap_or(0),
+                code_hash,
+                data_hash,
+                jetton_address: self
+                    .parse_addr_internal(&wallet_data.jetton_master_address)
+                    .unwrap_or(*addr),
+                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
+                owner_address: self
+                    .parse_addr_internal(&wallet_data.owner_address)
+                    .unwrap_or(*addr),
+            };
+
+            self.history.jetton_wallets.insert(*addr, wallet_meta);
+        }
+
+        Ok(())
+    }
+
+    fn detect_jetton_masters(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        let Some(meta) = self.latest.accounts.get(addr) else {
+            return Ok(());
+        };
+
+        if meta.status != AccountStatus::Active {
+            return Ok(());
+        }
+
+        let Some(code_hash) = meta.code_hash else {
+            return Ok(());
+        };
+        let Some(data_hash) = meta.data_hash else {
+            return Ok(());
+        };
+
+        let Some(code_boc) = self.cas.get(&code_hash) else {
+            return Ok(());
+        };
+        let Some(data_boc) = self.cas.get(&data_hash) else {
+            return Ok(());
+        };
+
+        let code = Boc::decode(&code_boc)?;
+        let data = Boc::decode(&data_boc)?;
+
+        if let Some(jetton_data) =
+            ton_indexer::jettons::get_jetton_data(addr.to_string(), code, data)
+        {
+            let wallet_code_hash = Hash256(*jetton_data.jetton_wallet_code.repr_hash().as_array());
+            let jetton_content =
+                ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content);
+
+            let master_meta = JettonMasterMeta {
+                address: *addr,
+                admin_address: self
+                    .parse_addr_internal(&jetton_data.admin_address)
+                    .unwrap_or(*addr),
+                code_hash,
+                data_hash,
+                jetton_content,
+                jetton_wallet_code_hash: wallet_code_hash,
+                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
+                mintable: jetton_data.mintable,
+                total_supply: jetton_data
+                    .total_supply
+                    .to_str_radix(10)
+                    .parse()
+                    .unwrap_or(0),
+            };
+
+            self.history.jetton_masters.insert(*addr, master_meta);
+        }
+
+        Ok(())
+    }
+
+    pub fn get_jetton_masters(
+        &self,
+        address: Option<Addr>,
+        admin_address: Option<Addr>,
+        limit: usize,
+        offset: usize,
+    ) -> anyhow::Result<Vec<JettonMasterMeta>> {
+        let mut masters: Vec<_> = self
+            .history
+            .jetton_masters
+            .values()
+            .filter(|m| {
+                if let Some(addr) = address
+                    && m.address != addr
+                {
+                    return false;
+                }
+                if let Some(addr) = admin_address
+                    && m.admin_address != addr
+                {
+                    return false;
+                }
+                true
+            })
+            .cloned()
+            .collect();
+
+        masters.sort_by_key(|m| m.address);
+
+        let start = offset.min(masters.len());
+        let end = (start + limit).min(masters.len());
+
+        Ok(masters[start..end].to_vec())
+    }
+
+    pub fn get_jetton_wallets(
+        &self,
+        address: Option<Addr>,
+        owner_address: Option<Addr>,
+        jetton_address: Option<Addr>,
+        exclude_zero_balance: bool,
+        limit: usize,
+        offset: usize,
+    ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
+        let mut wallets: Vec<_> = self
+            .history
+            .jetton_wallets
+            .values()
+            .filter(|w| {
+                if let Some(addr) = address
+                    && w.address != addr
+                {
+                    return false;
+                }
+                if let Some(addr) = owner_address
+                    && w.owner_address != addr
+                {
+                    return false;
+                }
+                if let Some(addr) = jetton_address
+                    && w.jetton_address != addr
+                {
+                    return false;
+                }
+                if exclude_zero_balance && w.balance == 0 {
+                    return false;
+                }
+                true
+            })
+            .cloned()
+            .collect();
+
+        wallets.sort_by_key(|w| w.address);
+
+        let start = offset.min(wallets.len());
+        let end = (start + limit).min(wallets.len());
+
+        Ok(wallets[start..end].to_vec())
+    }
+
+    fn parse_addr_internal(&self, s: &str) -> Option<Addr> {
+        let (int_addr, _) = tycho_types::models::StdAddr::from_str_ext(
+            s,
+            tycho_types::models::StdAddrFormat::any(),
+        )
+        .ok()?;
+        Some(Addr {
+            workchain: int_addr.workchain as i32,
+            addr: int_addr.address.0,
+        })
     }
 
     fn apply_commit(&mut self, pending: PendingCommit) -> anyhow::Result<()> {

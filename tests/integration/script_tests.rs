@@ -783,8 +783,12 @@ keys = { mnemonic-file = "mnemonic.txt" }
 "#;
     fs::write(project.path().join("wallets.toml"), wallets_toml).unwrap();
 
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
     project
         .acton()
+        .env("HOME", home_path.to_str().unwrap())
         .script("scripts/deploy.tolk")
         .broadcast()
         .verify_network("testnet")

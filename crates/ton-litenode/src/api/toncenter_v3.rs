@@ -1,7 +1,51 @@
-use crate::storage::{MsgMeta, TraceNode, TransactionInfo};
+use crate::storage::{JettonMasterMeta, JettonWalletMeta, MsgMeta, TraceNode, TransactionInfo};
 use base64::Engine;
 use serde_json::value::Value;
 use std::collections::HashMap;
+
+#[allow(clippy::ptr_arg)]
+pub fn map_jetton_masters(masters: &Vec<JettonMasterMeta>) -> Value {
+    serde_json::json!({
+        "address_book": {},
+        "metadata": {},
+        "jetton_masters": masters.iter().map(map_jetton_master).collect::<Vec<_>>()
+    })
+}
+
+fn map_jetton_master(m: &JettonMasterMeta) -> Value {
+    serde_json::json!({
+        "address": m.address.to_string(),
+        "admin_address": m.admin_address.to_string(),
+        "code_hash": m.code_hash.to_hex(),
+        "data_hash": m.data_hash.to_hex(),
+        "jetton_content": m.jetton_content,
+        "jetton_wallet_code_hash": m.jetton_wallet_code_hash.to_hex(),
+        "last_transaction_lt": m.last_transaction_lt.to_string(),
+        "mintable": m.mintable,
+        "total_supply": m.total_supply.to_string(),
+    })
+}
+
+#[allow(clippy::ptr_arg)]
+pub fn map_jetton_wallets(wallets: &Vec<JettonWalletMeta>) -> Value {
+    serde_json::json!({
+        "address_book": {},
+        "metadata": {},
+        "jetton_wallets": wallets.iter().map(map_jetton_wallet).collect::<Vec<_>>()
+    })
+}
+
+fn map_jetton_wallet(w: &JettonWalletMeta) -> Value {
+    serde_json::json!({
+        "address": w.address.to_string(),
+        "balance": w.balance.to_string(),
+        "code_hash": w.code_hash.to_hex(),
+        "data_hash": w.data_hash.to_hex(),
+        "jetton": w.jetton_address.to_string(),
+        "last_transaction_lt": w.last_transaction_lt.to_string(),
+        "owner": w.owner_address.to_string(),
+    })
+}
 
 pub fn map_traces(tn: &TraceNode) -> Value {
     let mut transactions = HashMap::new();

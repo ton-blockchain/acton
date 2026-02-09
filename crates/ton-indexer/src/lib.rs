@@ -1,3 +1,5 @@
+pub mod jettons;
+
 use base64::Engine;
 use tycho_types::cell::HashBytes;
 

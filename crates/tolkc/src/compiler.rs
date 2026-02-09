@@ -1,11 +1,12 @@
 #![allow(unsafe_code)]
+use dunce::canonicalize;
 use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{CStr, CString, c_char, c_int};
-use std::fs::{canonicalize, read_to_string};
+use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use ton_source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
 

@@ -171,3 +171,33 @@ export interface V3Message {
     readonly body: string
   }
 }
+
+export interface JettonMaster {
+  readonly address: string
+  readonly admin_address: string
+  readonly code_hash: string
+  readonly data_hash: string
+  readonly jetton_content: {
+    readonly uri?: string
+    readonly name?: string
+    readonly description?: string
+    readonly image?: string
+    readonly symbol?: string
+    readonly decimals?: string
+    readonly [key: string]: unknown
+  }
+  readonly jetton_wallet_code_hash: string
+  readonly last_transaction_lt: string
+  readonly mintable: boolean
+  readonly total_supply: string
+}
+
+export interface JettonWallet {
+  readonly address: string
+  readonly balance: string
+  readonly code_hash: string
+  readonly data_hash: string
+  readonly jetton: string
+  readonly last_transaction_lt: string
+  readonly owner: string
+}

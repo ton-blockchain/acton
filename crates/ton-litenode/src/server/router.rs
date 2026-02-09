@@ -41,7 +41,10 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
         .route("/v2/shards", get(get_shards))
         .route("/v2/lookupBlock", get(lookup_block));
 
-    let api_v3_router = Router::new().route("/v3/traces", get(get_traces));
+    let api_v3_router = Router::new()
+        .route("/v3/traces", get(get_traces))
+        .route("/v3/jetton/masters", get(get_jetton_masters))
+        .route("/v3/jetton/wallets", get(get_jetton_wallets));
 
     Router::new()
         .nest("/api", api_v2_router)

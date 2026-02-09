@@ -1,12 +1,13 @@
 import type React from "react"
 import {useEffect, useMemo, useState} from "react"
-import {useNavigate, useParams} from "react-router-dom"
+import {useLocation, useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
-import type {FullAccountState, Transaction} from "../api/types"
+import type {FullAccountState, JettonMaster, JettonWallet, Transaction} from "../api/types"
 import {AccountInfo} from "../components/AccountInfo"
+import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
-import {TransactionList} from "../components/TransactionList"
+import {AccountDetails} from "../components/AccountDetails"
 import {normalizeAddress} from "../components/utils"
 
 import styles from "./AccountPage.module.css"
@@ -18,8 +19,11 @@ interface AccountPageProps {
 export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const {address = ""} = useParams<{address: string}>()
   const navigate = useNavigate()
+  const location = useLocation()
   const [accountState, setAccountState] = useState<FullAccountState | undefined>()
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [jettonMaster, setJettonMaster] = useState<JettonMaster | undefined>()
+  const [jettonWallets, setJettonWallets] = useState<JettonWallet[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
 
@@ -31,23 +35,31 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
       if (!formattedAddress) {
         setAccountState(undefined)
         setTransactions([])
+        setJettonMaster(undefined)
+        setJettonWallets([])
         return
       }
       setLoading(true)
       setError(undefined)
       try {
-        const [state, txs] = await Promise.all([
+        const [state, txs, masters, wallets] = await Promise.all([
           client.getAddressInformation(formattedAddress),
           client.getTransactions(formattedAddress),
+          client.getJettonMasters([formattedAddress]),
+          client.getJettonWallets([formattedAddress]),
         ])
         if (!isActive) return
         setAccountState(state)
         setTransactions(txs)
+        setJettonMaster(masters[0])
+        setJettonWallets(wallets)
       } catch (error) {
         if (!isActive) return
         setError(error instanceof Error ? error.message : "An error occurred")
         setAccountState(undefined)
         setTransactions([])
+        setJettonMaster(undefined)
+        setJettonWallets([])
       } finally {
         if (isActive) setLoading(false)
       }
@@ -68,6 +80,10 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     }
   }
 
+  const handleTabChange = (tab: string) => {
+    void navigate(`${location.pathname}#${tab}`, {replace: true})
+  }
+
   return (
     <div className={styles.container}>
       {loading && <div className={styles.loading}>Loading...</div>}
@@ -84,12 +100,75 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
               },
             ]}
           />
-          <AccountInfo address={formattedAddress} state={accountState} />
-          <TransactionList
+          <div className={styles.topSection}>
+            <AccountInfo address={formattedAddress} state={accountState} />
+            {jettonMaster && (
+              <div className={styles.jettonInfo}>
+                <div className={styles.jettonHeader}>
+                  {jettonMaster.jetton_content.image && (
+                    <img
+                      src={jettonMaster.jetton_content.image}
+                      alt={jettonMaster.jetton_content.name}
+                      className={styles.jettonImage}
+                    />
+                  )}
+                  <div className={styles.jettonTitle}>
+                    <div className={styles.jettonName}>
+                      {jettonMaster.jetton_content.name || "Unknown Jetton"}
+                    </div>
+                    <div className={styles.jettonSymbol}>
+                      {jettonMaster.jetton_content.symbol &&
+                        `$${jettonMaster.jetton_content.symbol}`}{" "}
+                      Jetton master
+                    </div>
+                  </div>
+                </div>
+                {jettonMaster.jetton_content.description && (
+                  <div className={styles.jettonDescription}>
+                    {jettonMaster.jetton_content.description}
+                  </div>
+                )}
+                <div className={styles.jettonDetails}>
+                  <div className={styles.jettonRow}>
+                    <span className={styles.jettonLabel}>Total supply</span>
+                    <span className={styles.jettonValue}>
+                      {(
+                        Number(jettonMaster.total_supply) /
+                        10 ** Number(jettonMaster.jetton_content.decimals || 9)
+                      ).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className={styles.jettonRow}>
+                    <span className={styles.jettonLabel}>Admin</span>
+                    <span
+                      className={styles.jettonValue}
+                      onClick={() => {
+                        if (jettonMaster) handleSearch(jettonMaster.admin_address)
+                      }}
+                      onKeyDown={e => {
+                        if ((e.key === "Enter" || e.key === " ") && jettonMaster) {
+                          handleSearch(jettonMaster.admin_address)
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <AddressLabel address={jettonMaster.admin_address} />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <AccountDetails
             transactions={transactions}
             accountState={accountState}
             ownerAddress={formattedAddress}
+            jettonWallets={jettonWallets}
+            client={client}
             onAddressClick={handleSearch}
+            activeTabHash={location.hash.replace("#", "")}
+            onTabChange={handleTabChange}
           />
         </>
       )}

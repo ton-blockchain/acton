@@ -39,7 +39,9 @@ impl Hash256 {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, PartialEq, Eq, Hash, Debug, Serialize, Deserialize, PartialOrd, Ord, Default,
+)]
 pub struct Addr {
     pub workchain: i32,
     pub addr: [u8; 32],

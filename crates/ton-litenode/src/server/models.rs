@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Deserialize)]
@@ -83,4 +83,22 @@ pub struct SetAddressNameRequest {
 #[derive(Deserialize)]
 pub struct GetAddressNameQuery {
     pub address: String,
+}
+
+#[derive(Deserialize)]
+pub struct GetJettonMastersRequest {
+    pub address: Option<String>,
+    pub admin_address: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct GetJettonWalletsRequest {
+    pub address: Option<String>,
+    pub owner_address: Option<String>,
+    pub jetton_address: Option<String>,
+    pub exclude_zero_balance: Option<bool>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }

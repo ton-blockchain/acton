@@ -1,4 +1,11 @@
-import type {ApiResponse, FullAccountState, Transaction, V3TracesResponse} from "./types"
+import type {
+  ApiResponse,
+  FullAccountState,
+  JettonMaster,
+  JettonWallet,
+  Transaction,
+  V3TracesResponse,
+} from "./types"
 
 interface TonClientOptions {
   readonly v2BaseUrl: string
@@ -31,6 +38,52 @@ export class TonClient {
     url.searchParams.append("address", address)
     url.searchParams.append("limit", limit.toString())
     return this.request(url, "Failed to fetch transactions")
+  }
+
+  async getJettonMasters(address?: string[]): Promise<JettonMaster[]> {
+    if (!address || address.length === 0) return []
+
+    const results = await Promise.all(
+      address.map(async addr => {
+        const url = this.buildUrl(this.v3BaseUrl, "/jetton/masters")
+        url.searchParams.append("address", addr)
+        try {
+          const response = await this.request<{jetton_masters: JettonMaster[]}>(
+            url,
+            "Failed to fetch jetton master",
+          )
+          return response.jetton_masters
+        } catch (error) {
+          console.error(`Failed to fetch jetton master for ${addr}`, error)
+          return []
+        }
+      }),
+    )
+
+    return results.flat()
+  }
+
+  async getJettonWallets(owner_address?: string[]): Promise<JettonWallet[]> {
+    if (!owner_address || owner_address.length === 0) return []
+
+    const results = await Promise.all(
+      owner_address.map(async addr => {
+        const url = this.buildUrl(this.v3BaseUrl, "/jetton/wallets")
+        url.searchParams.append("owner_address", addr)
+        try {
+          const response = await this.request<{jetton_wallets: JettonWallet[]}>(
+            url,
+            "Failed to fetch jetton wallets",
+          )
+          return response.jetton_wallets
+        } catch (error) {
+          console.error(`Failed to fetch jetton wallets for ${addr}`, error)
+          return []
+        }
+      }),
+    )
+
+    return results.flat()
   }
 
   async getTraces(hash: string): Promise<V3TracesResponse> {

@@ -202,6 +202,22 @@ pub(crate) enum Request {
         tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
     },
+    GetJettonMasters {
+        address: Option<Addr>,
+        admin_address: Option<Addr>,
+        limit: usize,
+        offset: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonMasterMeta>>>,
+    },
+    GetJettonWallets {
+        address: Option<Addr>,
+        owner_address: Option<Addr>,
+        jetton_address: Option<Addr>,
+        exclude_zero_balance: bool,
+        limit: usize,
+        offset: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonWalletMeta>>>,
+    },
     SetAddressName {
         address: Addr,
         name: String,
@@ -425,6 +441,57 @@ impl LiteNode {
         rx.await?
     }
 
+    pub async fn get_jetton_masters(
+        &self,
+        address: Option<String>,
+        admin_address: Option<String>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
+        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let admin_address = admin_address.map(|s| Self::parse_addr(&s)).transpose()?;
+
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetJettonMasters {
+                address,
+                admin_address,
+                limit: limit.unwrap_or(10),
+                offset: offset.unwrap_or(0),
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_jetton_wallets(
+        &self,
+        address: Option<String>,
+        owner_address: Option<String>,
+        jetton_address: Option<String>,
+        exclude_zero_balance: Option<bool>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
+        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let jetton_address = jetton_address.map(|s| Self::parse_addr(&s)).transpose()?;
+
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetJettonWallets {
+                address,
+                owner_address,
+                jetton_address,
+                exclude_zero_balance: exclude_zero_balance.unwrap_or(false),
+                limit: limit.unwrap_or(10),
+                offset: offset.unwrap_or(0),
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
         let address = Self::parse_addr(&address_str)?;
         let (resp, rx) = oneshot::channel();
@@ -582,6 +649,35 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::GetTraces { tx_hash, resp } => {
             let res = node.get_traces(&tx_hash);
+            let _ = resp.send(res);
+        }
+        Request::GetJettonMasters {
+            address,
+            admin_address,
+            limit,
+            offset,
+            resp,
+        } => {
+            let res = node.get_jetton_masters(address, admin_address, limit, offset);
+            let _ = resp.send(res);
+        }
+        Request::GetJettonWallets {
+            address,
+            owner_address,
+            jetton_address,
+            exclude_zero_balance,
+            limit,
+            offset,
+            resp,
+        } => {
+            let res = node.get_jetton_wallets(
+                address,
+                owner_address,
+                jetton_address,
+                exclude_zero_balance,
+                limit,
+                offset,
+            );
             let _ = resp.send(res);
         }
         Request::SetAddressName {

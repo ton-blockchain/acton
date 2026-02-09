@@ -60,7 +60,7 @@ build-ui:
     cd crates/acton-litenode-ui && bun i && bun run build
 
 check-ui:
-    bun run lint
+    bun run lint:fix
 
 fmt-ui:
     bun run fmt

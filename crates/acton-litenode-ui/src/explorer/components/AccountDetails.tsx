@@ -14,38 +14,66 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Coins,
   Filter,
   MessageSquare,
   RefreshCw,
 } from "lucide-react"
 import type React from "react"
-import {useMemo, useState} from "react"
+import {useMemo, useState, useEffect} from "react"
 import {useNavigate} from "react-router-dom"
 
-import type {FullAccountState, Transaction} from "../api/types"
+import type {FullAccountState, JettonWallet, Transaction} from "../api/types"
+import {TonClient} from "../api/client"
 
 import {AddressLabel} from "./AddressLabel"
 import {ContractCode} from "./ContractCode"
-import styles from "./TransactionList.module.css"
+import {Tokens} from "./Tokens"
+import styles from "./AccountDetails.module.css"
 import {formatNano, formatTimeAgo, isSameAddress, parseAddress} from "./utils"
 
-interface TransactionListProps {
+type Tabs = "history" | "contract" | "tokens"
+
+interface AccountDetailsProps {
   readonly transactions: Transaction[]
   readonly accountState: FullAccountState
   readonly ownerAddress: string
+  readonly jettonWallets: JettonWallet[]
+  readonly client: TonClient
   readonly onAddressClick?: (addr: string) => void
+  readonly activeTabHash?: string
+  readonly onTabChange?: (tab: Tabs) => void
 }
 
 const ITEMS_PER_PAGE = 10
 
-export const TransactionList: React.FC<TransactionListProps> = ({
+export const AccountDetails: React.FC<AccountDetailsProps> = ({
   transactions,
   accountState,
   ownerAddress,
+  jettonWallets,
+  client,
   onAddressClick,
+  activeTabHash,
+  onTabChange,
 }) => {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<"history" | "contract">("history")
+  const [activeTab, setActiveTab] = useState<Tabs>("history")
+
+  useEffect(() => {
+    if (
+      activeTabHash &&
+      (activeTabHash === "history" || activeTabHash === "contract" || activeTabHash === "tokens")
+    ) {
+      setActiveTab(activeTabHash)
+    }
+  }, [activeTabHash])
+
+  const handleTabClick = (tab: Tabs) => {
+    setActiveTab(tab)
+    onTabChange?.(tab)
+  }
+
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredAddress, setHoveredAddress] = useState<string | undefined>()
 
@@ -61,20 +89,24 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         <button
           type="button"
           className={`${styles.tab} ${activeTab === "history" ? styles.tabActive : ""}`}
-          onClick={() => setActiveTab("history")}
+          onClick={() => handleTabClick("history")}
         >
           <RefreshCw size={14} /> History
         </button>
-        <div className={styles.tab}>
-          <div className={styles.tokenIcon} /> Tokens
-        </div>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "tokens" ? styles.tabActive : ""}`}
+          onClick={() => handleTabClick("tokens")}
+        >
+          <Coins size={14} /> Tokens
+        </button>
         <div className={styles.tab}>
           <div className={styles.nftIcon} /> NFTs
         </div>
         <button
           type="button"
           className={`${styles.tab} ${activeTab === "contract" ? styles.tabActive : ""}`}
-          onClick={() => setActiveTab("contract")}
+          onClick={() => handleTabClick("contract")}
         >
           <MessageSquare size={14} /> Contract
         </button>
@@ -206,6 +238,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({
               </button>
             </div>
           )}
+        </CardContent>
+      ) : activeTab === "tokens" ? (
+        <CardContent className={styles.tokensContent}>
+          <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
         </CardContent>
       ) : (
         <ContractCode codeBoc={accountState.code} />

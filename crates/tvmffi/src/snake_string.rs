@@ -14,20 +14,29 @@
 //!         cell("remaining 48 bytes")
 //! ```
 use crate::stack::{Tuple, TupleItem};
-use tonlib_core::cell::{ArcCell, CellBuilder};
+use tonlib_core::cell::{ArcCell, CellBuilder, CellParser};
 
 impl Tuple {
-    /// Parse a snake string from a tuple slice.
+    /// Parse a snake string from a cell.
     ///
     /// If the slice is not a snake string, returns `None`.
     /// This is tricky since we cannot be sure that the slice is a snake string and
     /// not some other data with 8-bit encoding that forms a valid UTF-8 string.
     #[must_use]
     pub fn parse_snake_string(cell: &ArcCell) -> Option<String> {
-        let mut all_bits = Vec::new();
-
         let mut parser = cell.parser();
-        let bits_to_load = cell.bit_len();
+        Self::parse_snake_string_slice(&mut parser)
+    }
+
+    /// Parse a snake string from a cell slice (parser).
+    ///
+    /// If the slice is not a snake string, returns `None`.
+    /// This is tricky since we cannot be sure that the slice is a snake string and
+    /// not some other data with 8-bit encoding that forms a valid UTF-8 string.
+    #[must_use]
+    pub fn parse_snake_string_slice(parser: &mut CellParser) -> Option<String> {
+        let mut all_bits = Vec::new();
+        let bits_to_load = parser.remaining_bits();
         if !bits_to_load.is_multiple_of(8) {
             // this is most likely not a snake string
             return None;
