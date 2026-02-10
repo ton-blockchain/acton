@@ -11,31 +11,35 @@ use tolk_resolver::file_index::FileId;
 use tolk_resolver::{Resolved, Symbol, SymbolId};
 
 /// ### What it does
-/// Checks for variables and parameters that are declared but never used.
+/// Checks identifier naming style and suggests consistent casing.
 ///
 /// ### Why is this bad?
-/// Unused variables and parameters clutter the code and can be a sign of a bug.
+/// Inconsistent naming makes code harder to read and maintain.
+/// This rule enforces:
+/// - `camelCase` for variables, functions, methods, and struct fields
+/// - `UpperCamelCase` for structs, enums, enum members, and type aliases
+/// - `SCREAMING_SNAKE_CASE` for constants
 ///
 /// ### Example
 /// ```tolk
-/// fun main() {
-///     val x = 1;
-///     println("hello");
+/// struct low_struct {
+///     TheBad: int
 /// }
+///
+/// const iAmConst_variable = 1
+///
+/// fun BadFunctionName() {}
 /// ```
 ///
 /// Use instead:
 /// ```tolk
-/// fun main() {
-///     println("hello");
+/// struct LowStruct {
+///     theBad: int
 /// }
-/// ```
-/// Or prefix with an underscore if the variable is intentionally unused:
-/// ```tolk
-/// fun main() {
-///     val _x = 1;
-///     println("hello");
-/// }
+///
+/// const I_AM_CONST_VARIABLE = 1
+///
+/// fun badFunctionName() {}
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
