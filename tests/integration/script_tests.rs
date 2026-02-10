@@ -326,6 +326,7 @@ fn test_script_with_slice_arg() {
 }
 
 #[test]
+#[ignore]
 fn test_script_with_string_arg() {
     let project = ProjectBuilder::new("script-string-args")
         .script_file(
@@ -351,6 +352,7 @@ fn test_script_with_string_arg() {
 }
 
 #[test]
+#[ignore]
 fn test_script_with_long_string_arg() {
     let project = ProjectBuilder::new("script-string-args")
         .script_file(

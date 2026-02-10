@@ -62,7 +62,7 @@ Step 5 (step_over):
      15|         First => {
      16|             return 10
   Variables:
-    lazyS = 
+    lazyS = [BOC_HEX]
 
 Step 6 (step_over):
   Bytecode position: 306E260F04B863D25800CD228B1B660B576B37DE0AF4210B3EA8A34D8407F710:80
@@ -76,7 +76,7 @@ Step 6 (step_over):
      15|         First => {
      16|             return 10
   Variables:
-    lazyS = 
+    lazyS = [BOC_HEX]
 
 Step 7 (step_over):
   Bytecode position: 306E260F04B863D25800CD228B1B660B576B37DE0AF4210B3EA8A34D8407F710:80
@@ -90,7 +90,7 @@ Step 7 (step_over):
      15|         First => {
      16|             return 10
   Variables:
-    lazyS = 
+    lazyS = [BOC_HEX]
 
 Step 8 (step_over):
   Bytecode position: 306E260F04B863D25800CD228B1B660B576B37DE0AF4210B3EA8A34D8407F710:80
@@ -104,7 +104,7 @@ Step 8 (step_over):
      17|         }
      18|         Second => {
   Variables:
-    lazyS = 
+    lazyS = [BOC_HEX]
 
 Step 9 (step_over):
   Bytecode position: 306E260F04B863D25800CD228B1B660B576B37DE0AF4210B3EA8A34D8407F710:160
@@ -132,7 +132,7 @@ Step 10 (step_over):
      20|         }
      21|         else => {
   Variables:
-    lazyS = 
+    lazyS = [BOC_HEX]
 
 Step 11 (step_over):
   Bytecode position: 306E260F04B863D25800CD228B1B660B576B37DE0AF4210B3EA8A34D8407F710:256
