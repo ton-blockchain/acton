@@ -11,6 +11,7 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
+use tolkc::abi::ContractABI;
 use tolkc::compiler::CompilerResultSuccess;
 use ton_abi;
 use ton_source_map::SourceMap;
@@ -23,6 +24,7 @@ pub struct CacheEntry {
     pub code_hash_hex: String,
     pub fift_code: String,
     pub source_map: Option<SourceMap>,
+    pub abi: Option<ContractABI>,
     pub dependencies_hash: String,
     pub timestamp: u64,
     pub schema_version: u32,
@@ -172,6 +174,7 @@ impl FileBuildCache {
             code_hash_hex: result.code_hash_hex.clone(),
             fift_code: result.fift_code.clone(),
             source_map: result.source_map.clone(),
+            abi: result.abi.clone(),
             dependencies_hash,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -437,6 +440,7 @@ mod tests {
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
             source_map: None,
+            abi: None,
         };
 
         cache.put(

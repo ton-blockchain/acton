@@ -694,6 +694,7 @@ fn compile_test_file(
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
                 source_map: cache_entry.source_map,
+                abi: cache_entry.abi,
             },
         ));
     }

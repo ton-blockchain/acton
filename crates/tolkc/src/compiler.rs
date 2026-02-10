@@ -1,4 +1,5 @@
 #![allow(unsafe_code)]
+use crate::abi::ContractABI;
 use dunce::canonicalize;
 use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
@@ -292,6 +293,7 @@ impl Compiler {
                         high_level: source_map,
                         debug_marks,
                     }),
+                    abi: result.abi,
                 })
             }
             Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
@@ -331,10 +333,12 @@ pub struct CompilerResultSuccess {
     pub code_boc64: String,
     pub code_hash_hex: String,
     pub source_map: Option<SourceMap>,
+    pub abi: Option<ContractABI>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum CompilerInternalResult {
     Success(CompilerInternalResultSuccess),
     Error(CompilerResultError),
@@ -352,6 +356,8 @@ pub struct CompilerInternalResultSuccess {
     pub debug_mark_base64: String,
     #[serde(rename = "sourceMap")]
     pub source_map: Option<HighLevelSourceMap>,
+    #[serde(rename = "abiJson")]
+    pub abi: Option<ContractABI>,
 }
 
 #[derive(Debug, Deserialize)]
