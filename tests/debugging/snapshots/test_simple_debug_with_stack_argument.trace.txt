@@ -74,7 +74,7 @@ Step 6 (step_in):
       6|     return result;
       7| }
   Variables:
-    '1 = 42
+    g_result = 42
 
 Step 7 (step_in):
   Bytecode position: 7FA1EDF814258BB98715F1B724D6266444BDE50664EDD6B5BC9113777AEFC186:56

@@ -5,22 +5,22 @@
 import "../ffi/ffi"
 
 /// Build a contract with a specified name and optional path.
-/// 
+///
 /// If path is ommited, Acton will search for a contract with the given name in the Acton.toml file.
 /// If no contract with the given name is found, test will fail.
-/// 
+///
 /// Example:
-/// 
+///
 /// ```tolk
 /// val cell = build("jetton-wallet");
 /// ```
-/// 
+///
 /// If you want to build a contract from a specific path, provide the path as the second argument.
-/// 
+///
 /// Example:
 /// ```tolk
 /// val cell = build("jetton-wallet", "contracts/jetton-wallet-contract.tolk");
 /// ```
 ///
 /// Note that the path should be absolute or relative to the root project directory with Acton.toml.
-fun build(name: slice, path: slice = ""): cell asm "6 EXTCALL"
+fun build(name: string, path: string = ""): cell asm "6 EXTCALL"

@@ -146,7 +146,7 @@ type OutAction =
     | OutActionChangeLibrary
 
 /// Returns the kind of the out action as a string.
-fun OutAction.kind(self): slice {
+fun OutAction.kind(self): string {
     match (self) {
         OutActionSendMessage => {
             return "send-message";
@@ -179,7 +179,7 @@ type OutActionList = tuple
 /// println(action.kind());
 /// ```
 fun OutActionList.at(self, i: int): OutAction {
-    val rawAction = self.get<tuple>(i);
+    val rawAction = self.get(i) as tuple;
     return OutAction.fromTuple(rawAction);
 }
 
@@ -311,7 +311,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
 // Implementation details
 
 fun LibRef.fromTuple(data: tuple): LibRef {
-    val tag = data.get<int>(0);
+    val tag = data.get(0) as int;
     if (tag == 0) {
         return LibRefHash.fromTuple(data);
     } else if (tag == 1) {
@@ -326,7 +326,7 @@ fun OutAction.fromTuple(data: tuple): OutAction {
     } else if (data.size() == 3) {
         return OutActionSendMessage.fromTuple(data);
     } else if (data.size() == 4) {
-        val third = data.get<int>(2);
+        val third = data.get(2) as int;
         if (third == 0 || third == 1) {
             return OutActionChangeLibrary.fromTuple(data);
         }

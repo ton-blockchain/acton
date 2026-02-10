@@ -46,7 +46,7 @@ pub fn compile_cmd(
     let acton_config = config::ActonConfig::load().ok();
 
     let need_debug_info = source_map.is_some();
-    if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.2".to_string()) {
+    if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.3".to_string()) {
         let elapsed = start_time.elapsed();
         info!("Compile {path} from file cache (.acton/cache) in {elapsed:?}");
 
@@ -84,7 +84,7 @@ pub fn compile_cmd(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
             );
 
-            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.2".to_string())
+            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.3".to_string())
                 && !json
             {
                 eprintln!("Warning: Failed to cache compilation result: {e}");

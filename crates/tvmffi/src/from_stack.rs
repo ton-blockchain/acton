@@ -36,6 +36,7 @@ impl FromStack for TupleItem {
 impl FromStack for String {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
         match item {
+            TupleItem::Cell(cell) => Tuple::parse_snake_string(&cell).ok_or(ArgError::CellParse),
             TupleItem::Slice(slice) => Tuple::parse_snake_string(&slice).ok_or(ArgError::CellParse),
             _ => Err(ArgError::TypeMismatch {
                 expected: "Slice(String)",

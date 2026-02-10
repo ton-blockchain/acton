@@ -20,6 +20,7 @@
 /// expect(balances.get(userAddress)).toEqual(ton("50"));
 /// ```
 
+import "@stdlib/reflection"
 import "assert"
 import "../fmt"
 import "../ffi/ffi"
@@ -37,10 +38,10 @@ struct Expectation<T> {
     /// The value to be expected.
     private value: T
     /// The type of the value to be expected.
-    private valueType: slice
+    private valueType: string
     /// The location of the expectation to be printed in the error message.
     /// This field is set by the test framework and should not be set manually.
-    private location: slice = ""
+    private location: string = ""
 }
 
 /// Internal function to create a new expectation for the given value.
@@ -51,7 +52,7 @@ struct Expectation<T> {
 /// ```tolk
 /// expect(10).toEqual(10);
 /// ```
-fun Expectation<T>.create(value: T, valueType: slice, location: slice = "") {
+fun Expectation<T>.create(value: T, valueType: string, location: string = "") {
     return Expectation<T> {
         value,
         valueType,
@@ -522,8 +523,8 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
 /// Optional location can be provided to specify the location of the expectation to
 /// be printed in the error message. You likely don't want to set this manually,
 /// as the location will be automatically set by the test framework.
-fun expect<T>(value: T, location: slice = "") {
-    return Expectation<T>.create(value, value.typeNameOfObject(), location);
+fun expect<T>(value: T, location: string = "") {
+    return Expectation<T>.create(value, reflect.typeNameOfObject(value), location);
 }
 
 /// Sets the expected exit code for the test.
@@ -560,13 +561,13 @@ fun ffi.nan(): int
 /// Internal helper function for comparison assertions.
 ///
 /// Don't use this function directly. Use comparison methods instead.
-fun ffi.assertComparison<V1, V2>(left: V1, right: V2, op: slice, message: slice, location: slice) {
+fun ffi.assertComparison<V1, V2>(left: V1, right: V2, op: string, message: string, location: string) {
     if (
         !ffi.assertBin(
             op,
-            left.typeNameOfObject(),
+            reflect.typeNameOfObject(left),
             left.toTuple(),
-            right.typeNameOfObject(),
+            reflect.typeNameOfObject(right),
             right.toTuple(),
             message,
             location

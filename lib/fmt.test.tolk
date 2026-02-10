@@ -71,8 +71,17 @@ get fun `test-format-struct-with-nested-double-int`() {
 }
 
 get fun `test-format-struct-with-very-nested-`() {
-    val expectedType = fs.readFile("lib/testdata/nested_type_fmt.txt");
-    expect(format1("{}", VeryNested {})).toEqual(expectedType);
+    val formatted = format1("{}", VeryNested { });
+    expect(formatted).toEqual("""VeryNested {
+    a: 3,
+    nested: VeryNested1 {
+        a: 4,
+        nested: DoubleInt {
+            a: 0,
+            b: 1
+        }
+    }
+}""");
 }
 
 get fun `test-format-message`() {
@@ -89,7 +98,27 @@ get fun `test-format-message`() {
 
     val inMsg = tx.messages.load().inMsg;
     if (inMsg is Value<Cell<MessageRelaxedGeneric>>) {
-        val expectedType = fs.readFile("lib/testdata/message_type_fmt.txt");
-        expect(format1("{}", inMsg.value.load())).toEqual(expectedType);
+        var loaded = inMsg.value.load();
+        loaded.info.createdLt = 0;
+        loaded.info.createdAt = 0;
+        expect(format1("{}", loaded)).toEqual("""MessageRelaxedGeneric {
+    info: IntMsgInfoRelaxed {
+        ihrDisabled: true,
+        bounce: false,
+        bounced: false,
+        src: kQAKIOo5BYX6HLXvPp8Ct55dApFwnI0qWrx55yyF/aI9Kyw0,
+        dest: kQCaMdGt9cG70iD0tRb+8Dvt8QqRPDgRrLFHP4wanVjLn9No (counter),
+        value: CurrencyCollection {
+            grams: 1999900000,
+            other: null
+        },
+        extraFlags: 0,
+        fwdFee: 0,
+        createdLt: 0,
+        createdAt: 0
+    },
+    init: null,
+    body: null
+}""");
     }
 }

@@ -1,5 +1,4 @@
 Error: In missing:
 
-fatal: Failed to locate /contracts/missing_file.tolk: [NOT_FOUND]
-
+Failed to locate /contracts/missing_file.tolk: [NOT_FOUND]
 Build failed with 1 error

@@ -20,6 +20,8 @@ src = ".jetton/contracts/jetton-wallet-contract.tolk"
 depends = []
 
 [test]
+exclude = ["src/commands/new/templates/**"]
+
 [test.mutation]
 
 [networks.localnet]
