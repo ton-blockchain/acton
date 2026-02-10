@@ -73,6 +73,14 @@ impl Tuple {
             BigInt::ZERO
         }));
     }
+
+    pub fn equal_to(&self, other: &Self) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        self.iter().zip(other.iter()).all(|(a, b)| a.equal_to(b))
+    }
 }
 
 impl Deref for Tuple {
@@ -110,6 +118,21 @@ pub enum TupleItem {
         type_name: String,
         inner: Tuple,
     },
+}
+
+impl TupleItem {
+    fn equal_to(&self, other: &Self) -> bool {
+        // Since strings can be build in different cells, we need to compare string values.
+        if let TupleItem::Cell(left) | TupleItem::Slice(left) = self
+            && let TupleItem::Cell(right) | TupleItem::Slice(right) = other
+            && let Some(left_str) = Tuple::parse_snake_string(left)
+            && let Some(right_str) = Tuple::parse_snake_string(right)
+        {
+            return left_str == right_str;
+        }
+
+        self == other
+    }
 }
 
 impl TupleItem {

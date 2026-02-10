@@ -38,14 +38,14 @@ fun vm.setC5(cell: cell): void
 /// Generic helper to get a single config parameter.
 fun vm.getConfigParam<T>(index: int): T {
     var c7 = vm.getC7();
-    var params: tuple = c7.get(0);
+    var params = c7.get(0) as tuple;
     return params.get(index);
 }
 
 /// Generic helper to overwrite a single config parameter.
 fun vm.setConfigParam<T>(value: T, index: int) {
     var c7 = vm.getC7();
-    var params: tuple = c7.get(0);
+    var params = c7.get(0) as tuple;
     params.set(value, index);
     c7.set(params, 0);
     vm.setC7(c7);
@@ -59,7 +59,7 @@ const CONFIG_ROOT_INDEX = 9
 /// The config root is a dictionary containing blockchain configuration parameters.
 fun vm.setConfigRootDict(root: dict) {
     var c7 = vm.getC7();
-    var params: tuple = c7.get(0);
+    var params = c7.get(0) as tuple;
 
     params.set(root, CONFIG_ROOT_INDEX);
     c7.set(params, 0);
@@ -74,7 +74,7 @@ const CONFIG_UNPACKED_INDEX = 14
 /// The unpacked config contains a tuple of configuration values extracted from the config dictionary.
 fun vm.setConfigUnpacked(values: tuple) {
     var c7 = vm.getC7();
-    var params: tuple = c7.get(0);
+    var params = c7.get(0) as tuple;
 
     params.set(values, CONFIG_UNPACKED_INDEX);
     c7.set(params, 0);
@@ -92,7 +92,7 @@ fun vm.setConfigUnpacked(values: tuple) {
 /// ```
 fun vm.getConfigUnpacked() {
     var c7 = vm.getC7();
-    var params: tuple = c7.get(0);
+    var params = c7.get(0) as tuple;
 
     return params.get(CONFIG_UNPACKED_INDEX) as tuple;
 }
@@ -114,7 +114,7 @@ fun vm.setLogicalTime(logicalTime: int) {
 
 /// Override the original balance of the contract.
 fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null) {
-    vm.setConfigParam([balance, extraCurrencies], 7);
+    vm.setConfigParam(tuple [balance, extraCurrencies], 7);
 }
 
 /// Register a new library for current test.
@@ -128,18 +128,18 @@ fun vm.registerLibrary(cell: cell) {
 /// ```tolk
 /// val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 /// ```
-fun vm.convertAddress(addr: slice): address {
+fun vm.convertAddress(addr: string): address {
     val cell = ffi.convertAddress(addr);
     return cell.beginParse() as address;
 }
 
-fun vm.cellFromHex(cellHex: slice): cell {
+fun vm.cellFromHex(cellHex: string): cell {
     return ffi.cellFromHex(cellHex);
 }
 
 fun ffi.registerLibrary(cell: cell): void
     asm "18 EXTCALL"
-fun ffi.convertAddress(addr: slice): cell
+fun ffi.convertAddress(addr: string): cell
     asm "19 EXTCALL"
-fun ffi.cellFromHex(cellHex: slice): cell
+fun ffi.cellFromHex(cellHex: string): cell
     asm "20 EXTCALL"

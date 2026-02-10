@@ -33,7 +33,7 @@
 </tspan>
     <tspan x="10px" y="118px"><tspan>    </tspan><tspan class="dimmed">}</tspan><tspan>,</tspan>
 </tspan>
-    <tspan x="10px" y="136px"><tspan>    tags: </tspan><tspan class="fg-green">"tag1"</tspan><tspan>,</tspan>
+    <tspan x="10px" y="136px"><tspan>    tags: [</tspan><tspan class="dimmed">[BOC_HEX]</tspan><tspan>, </tspan><tspan class="dimmed">[BOC_HEX]</tspan><tspan>],</tspan>
 </tspan>
     <tspan x="10px" y="154px"><tspan>    maybe_val: </tspan><tspan class="fg-yellow">42</tspan>
 </tspan>
@@ -49,7 +49,7 @@
 </tspan>
     <tspan x="10px" y="262px"><tspan>    </tspan><tspan class="dimmed">}</tspan><tspan>,</tspan>
 </tspan>
-    <tspan x="10px" y="280px"><tspan>    tags: </tspan><tspan class="fg-green">"empty"</tspan><tspan>,</tspan>
+    <tspan x="10px" y="280px"><tspan>    tags: [</tspan><tspan class="dimmed">[BOC_HEX]</tspan><tspan>, </tspan><tspan class="dimmed">[BOC_HEX]</tspan><tspan>],</tspan>
 </tspan>
     <tspan x="10px" y="298px"><tspan>    maybe_val: </tspan><tspan class="bold">null</tspan>
 </tspan>

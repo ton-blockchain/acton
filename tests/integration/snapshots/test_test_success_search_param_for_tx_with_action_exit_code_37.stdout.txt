@@ -23,7 +23,7 @@
         with:
           success=true
           exit_code=0
-      └─ at ./tests/test.test[LINE]
+      └─ at tests/test.test[LINE]
 
  ✗ 1 failed in 1 file
 

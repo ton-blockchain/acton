@@ -14,7 +14,7 @@
             1,
             2
         )
-      └─ at ./tests/counter.test[LINE]
+      └─ at tests/counter.test[LINE]
   ✓ should-reset-counter [TIME]
 
  ✓ 1 passed, ✗ 1 failed in 1 file

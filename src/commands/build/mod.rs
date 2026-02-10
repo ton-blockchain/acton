@@ -214,7 +214,7 @@ fn process_contract(
             }
         }
     } else {
-        let cached_result = file_cache.get(contract_path, false, 2, "1.2".to_string());
+        let cached_result = file_cache.get(contract_path, false, 2, "1.3".to_string());
 
         if let Some(cached_result) = cached_result {
             debug!("Cache hit, use cached result for '{contract_path}'");
@@ -231,7 +231,7 @@ fn process_contract(
             match compilation_result {
                 tolkc::CompilerResult::Success(result) => {
                     if let Err(e) =
-                        file_cache.put(contract_path, &result, false, 2, "1.2".to_string())
+                        file_cache.put(contract_path, &result, false, 2, "1.3".to_string())
                     {
                         eprintln!(
                             "Warning: Failed to cache compilation result for {}: {}",

@@ -36,7 +36,7 @@ impl TeamCityReporter {
             && let Some(ref assert_failure) = exec.assert_failure
         {
             if let Some(location) = assert_failure.location() {
-                details = location;
+                details = location.format_full();
             }
 
             match assert_failure {

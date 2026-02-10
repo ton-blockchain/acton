@@ -10,7 +10,7 @@ stdout | [ROOT]/tests/first_test.test.tolk > test_first
 First test output
 
 FAIL test_second_fail: expect(<actual>).toEqual(<expected>)
-  ./tests/second_test.test[LINE]
+  tests/second_test.test[LINE]
 
 stdout | [ROOT]/tests/second_test.test.tolk > test_second_fail
 This test will fail

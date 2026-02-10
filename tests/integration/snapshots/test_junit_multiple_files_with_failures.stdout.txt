@@ -15,7 +15,7 @@
             1,
             2
         )
-      └─ at ./tests/utils.test[LINE]
+      └─ at tests/utils.test[LINE]
 
  > tests/wallet.test.tolk (2 tests)
   ✓ wallet_balance [TIME]

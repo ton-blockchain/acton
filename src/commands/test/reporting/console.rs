@@ -376,10 +376,8 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
         }
     }
 
-    if let Some(location) = &failure.location()
-        && !location.is_empty()
-    {
-        println!("      {} at {}", "└─".dimmed(), location.dimmed());
+    if let Some(location) = &failure.location() {
+        println!("      {} at {}", "└─".dimmed(), location.format().dimmed());
     }
 }
 

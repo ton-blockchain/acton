@@ -3,7 +3,7 @@ use crate::commands::common::error_fmt;
 use crate::commands::test::coverage::{
     collect_coverage, generate_lcov_file, generate_text_file, print_coverage_summary,
 };
-use crate::commands::test::instrumentation::inject_locations_into_expect_calls;
+use crate::commands::test::instrumentation::prepare_test_file;
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
 use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
@@ -132,7 +132,7 @@ impl<'a> TestRunner<'a> {
                 };
 
                 let Some(cached) =
-                    cache.get(&contract_info.src, config.debug, 2, "1.2".to_string())
+                    cache.get(&contract_info.src, config.debug, 2, "1.3".to_string())
                 else {
                     warn!("No build cache for contract {}", &contract_info.src);
                     continue;
@@ -685,7 +685,7 @@ fn compile_test_file(
     need_debug_info: bool,
     acton_config: &ActonConfig,
 ) -> anyhow::Result<tolkc::CompilerResult> {
-    let cache_entry = file_cache.get(file, need_debug_info, 0, "1.2".to_string());
+    let cache_entry = file_cache.get(file, need_debug_info, 0, "1.3".to_string());
     if let Some(cache_entry) = cache_entry {
         return Ok(tolkc::CompilerResult::Success(
             tolkc::compiler::CompilerResultSuccess {
@@ -701,7 +701,7 @@ fn compile_test_file(
     let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
         tolkc::CompilerResult::Success(result) => {
-            let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.2".to_string());
+            let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.3".to_string());
             match cache_result {
                 Ok(()) => {}
                 Err(err) => {
@@ -726,7 +726,7 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
 
     let abi = contract_abi(content.as_str(), file, &runner.acton_config.mappings);
 
-    let executable_code = inject_locations_into_expect_calls(&content, file);
+    let executable_code = prepare_test_file(&content);
     let tmp_test_filename = file.to_owned() + ".test.tolk";
 
     fs::write(&tmp_test_filename, executable_code)?;
@@ -820,6 +820,7 @@ fn run_file_tests(
             failed_transactions: None,
             failed_transaction_context: None,
             details: None,
+            location: None,
             abi: abi.clone(),
             source_map: source_map.clone(),
             backtrace: runner.config.backtrace.as_ref().map(ToString::to_string),
@@ -937,7 +938,8 @@ fn run_file_tests(
 
             if let Some(failure) = &assert_failure {
                 test_report.message = failure.message();
-                test_report.details = failure.location();
+                test_report.details = failure.location().map(|l| l.format_full());
+                test_report.location = failure.location();
                 test_report.detailed_message =
                     Some(formatter.format_detailed_assert_failure(failure, abi));
 

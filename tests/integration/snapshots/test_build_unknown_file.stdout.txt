@@ -9,8 +9,7 @@
 
  > tests/test.test.tolk (1 test)
   ✗ foo [TIME]
-    └─ Error: Compilation failed: fatal: Failed to locate unknown.tolk: [NOT_FOUND]
-
+    └─ Error: Compilation failed: Failed to locate unknown.tolk: [NOT_FOUND]
 
  ✗ 1 failed in 1 file
 

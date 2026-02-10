@@ -7,7 +7,7 @@ use std::path::Path;
 use std::time::Duration;
 use ton_abi::ContractAbi;
 use ton_executor::get::GetMethodResult;
-use ton_source_map::SourceMap;
+use ton_source_map::{SourceLocation, SourceMap};
 use tycho_types::models::ShardAccount;
 
 pub(super) mod console;
@@ -54,6 +54,7 @@ pub struct TestReport {
     pub failed_transactions: Option<Vec<TransactionInfo>>,
     pub failed_transaction_context: Option<FailedTransactionContext>,
     pub details: Option<String>,
+    pub location: Option<SourceLocation>,
     #[serde(skip)]
     pub abi: ContractAbi,
     #[serde(skip)]
