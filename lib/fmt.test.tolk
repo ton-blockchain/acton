@@ -89,7 +89,7 @@ get fun `test-format-message`() {
 
     val inMsg = tx.messages.load().inMsg;
     if (inMsg is Value<Cell<MessageRelaxedGeneric>>) {
-        val expectedType = fs.readFile("lib/testdata/message_type_fmt.txt");
+        val expectedType = fs.readFile("lib/testdata/message_type_fmt.txt")!;
         expect(format1("{}", inMsg.value.load())).toEqual(expectedType);
     }
 }
