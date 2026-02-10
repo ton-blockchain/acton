@@ -2,7 +2,6 @@ use crate::common::{assert_ui, strip_ansi};
 use crate::regex;
 use snapbox::IntoData;
 use snapbox::filter::Filter;
-use std::path;
 use std::path::Path;
 
 pub(crate) fn normalize_output(stdout: &str, project_path: &Path) -> String {
