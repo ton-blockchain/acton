@@ -54,18 +54,16 @@ impl Violation for NameCaseChecker {
 }
 
 enum CaseRules {
-    LowerCamelCase,
-    UpperCamelCase,
-    ScreamingSnakeCase,
+    LowerCamel,
+    UpperCamel,
+    ScreamingSnake,
 }
 
 fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId, case: CaseRules) {
     let (correct_case, case_name) = match case {
-        CaseRules::LowerCamelCase => (symbol.name.to_lower_camel_case(), "camelCase"),
-        CaseRules::UpperCamelCase => (symbol.name.to_upper_camel_case(), "UpperCamelCase"),
-        CaseRules::ScreamingSnakeCase => {
-            (symbol.name.to_shouty_snake_case(), "SCREAMING_SNAKE_CASE")
-        }
+        CaseRules::LowerCamel => (symbol.name.to_lower_camel_case(), "camelCase"),
+        CaseRules::UpperCamel => (symbol.name.to_upper_camel_case(), "UpperCamelCase"),
+        CaseRules::ScreamingSnake => (symbol.name.to_shouty_snake_case(), "SCREAMING_SNAKE_CASE"),
     };
 
     if symbol.name == correct_case.clone().into() {
@@ -207,11 +205,7 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
 
     for symbol_ids in globals.values() {
         for symbol_id in symbol_ids {
-            let symbol = checker
-                .type_db
-                .project_index
-                .resolve_symbol(*symbol_id)
-                .unwrap();
+            let symbol = checker.type_db.project_index.resolve_symbol(*symbol_id)?;
 
             let symbol_def_file_id = symbol_id.file_id;
             let definition_info = checker.file_db.get_by_id(symbol_def_file_id)?;
@@ -225,26 +219,20 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
                 | tolk_resolver::SymbolKind::Function { .. }
                 | tolk_resolver::SymbolKind::StructField
                 | tolk_resolver::SymbolKind::Method { .. }
-                | tolk_resolver::SymbolKind::GetMethod { .. } => check_case(
-                    symbol,
-                    checker,
-                    symbol_def_file_id,
-                    CaseRules::LowerCamelCase,
-                ),
+                | tolk_resolver::SymbolKind::GetMethod { .. } => {
+                    check_case(symbol, checker, symbol_def_file_id, CaseRules::LowerCamel)
+                }
                 tolk_resolver::SymbolKind::Struct { .. }
                 | tolk_resolver::SymbolKind::Enum { .. }
                 | tolk_resolver::SymbolKind::EnumMember
-                | tolk_resolver::SymbolKind::TypeAlias { .. } => check_case(
-                    symbol,
-                    checker,
-                    symbol_def_file_id,
-                    CaseRules::UpperCamelCase,
-                ),
+                | tolk_resolver::SymbolKind::TypeAlias { .. } => {
+                    check_case(symbol, checker, symbol_def_file_id, CaseRules::UpperCamel)
+                }
                 tolk_resolver::SymbolKind::Constant => check_case(
                     symbol,
                     checker,
                     symbol_def_file_id,
-                    CaseRules::ScreamingSnakeCase,
+                    CaseRules::ScreamingSnake,
                 ),
             }
         }
