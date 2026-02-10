@@ -73,14 +73,24 @@ impl SourceLocation {
         format!(
             "{}:{}:{}",
             Self::normalize_path(&self.file),
-            self.line + 1,
-            self.column + 2
+            self.line,
+            self.column,
+        )
+    }
+
+    #[must_use]
+    pub fn format_full(&self) -> String {
+        format!(
+            "{}:{}:{}",
+            Self::normalize_temp_name(&self.file),
+            self.line,
+            self.column
         )
     }
 
     #[must_use]
     pub fn normalize_path(file: &str) -> String {
-        let normalized = file.replace(".test.tolk.test.tolk", ".test.tolk");
+        let normalized = Self::normalize_temp_name(file);
 
         if let Ok(cwd) = std::env::current_dir() {
             let file_path = Path::new(&normalized);
@@ -96,6 +106,34 @@ impl SourceLocation {
         }
 
         normalized
+    }
+
+    fn normalize_temp_name(file: &str) -> String {
+        file.replace(".test.tolk.test.tolk", ".test.tolk")
+    }
+
+    pub fn parse(s: &str) -> anyhow::Result<Option<Self>> {
+        if s.is_empty() {
+            return Ok(None);
+        }
+
+        let parts = s.split(':').collect::<Vec<_>>();
+        if parts.len() != 3 {
+            anyhow::bail!("invalid source location, expected file:line:col, got {s}");
+        }
+
+        let file = parts[0].to_owned();
+        let line = parts[1].parse::<i64>()?;
+        let column = parts[2].parse::<i64>()?;
+
+        Ok(Some(SourceLocation {
+            file,
+            line,
+            column,
+            end_line: line,
+            end_column: column,
+            length: 0,
+        }))
     }
 }
 

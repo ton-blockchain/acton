@@ -42,7 +42,7 @@ Step 4 (step_in):
      10|     return my_sum(foo, foo);
      11| }
   Variables:
-    '0 = 300
+    g_foo = 300
 
 Step 5 (step_in):
   Bytecode position: AFCE1CC439093AC964045012040EF51114C2675346D0555E6DCBB65AB1D0CD1D:80

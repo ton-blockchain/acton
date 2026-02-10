@@ -248,7 +248,7 @@ fn test_real_counter_contract_step_in() -> anyhow::Result<()> {
         executor.step_in()?;
         executor.step_in()?;
 
-        for _ in 0..57 {
+        for _ in 0..50 {
             executor.step_over()?;
         }
         Ok(())

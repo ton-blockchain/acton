@@ -58,8 +58,8 @@ impl JUnitReporter {
                     status.set_message(escape_xml(message).as_str());
                 }
                 status.set_type("AssertionError");
-                if let Some(ref details) = test.details {
-                    status.set_description(format!("at {}", details.as_str()));
+                if let Some(ref location) = test.location {
+                    status.set_description(format!("at {}", location.format_full().as_str()));
                 }
                 status
             }

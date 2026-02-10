@@ -3,7 +3,7 @@ use crate::commands::common::error_fmt;
 use crate::commands::test::coverage::{
     collect_coverage, generate_lcov_file, generate_text_file, print_coverage_summary,
 };
-use crate::commands::test::instrumentation::inject_locations_into_expect_calls;
+use crate::commands::test::instrumentation::prepare_test_file;
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
 use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
@@ -37,6 +37,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
+use tolk_syntax::{AstNode, HasName};
 use ton_abi::{ContractAbi, contract_abi};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
@@ -132,7 +133,7 @@ impl<'a> TestRunner<'a> {
                 };
 
                 let Some(cached) =
-                    cache.get(&contract_info.src, config.debug, 2, "1.2".to_string())
+                    cache.get(&contract_info.src, config.debug, 2, "1.3".to_string())
                 else {
                     warn!("No build cache for contract {}", &contract_info.src);
                     continue;
@@ -685,7 +686,7 @@ fn compile_test_file(
     need_debug_info: bool,
     acton_config: &ActonConfig,
 ) -> anyhow::Result<tolkc::CompilerResult> {
-    let cache_entry = file_cache.get(file, need_debug_info, 0, "1.2".to_string());
+    let cache_entry = file_cache.get(file, need_debug_info, 0, "1.3".to_string());
     if let Some(cache_entry) = cache_entry {
         return Ok(tolkc::CompilerResult::Success(
             tolkc::compiler::CompilerResultSuccess {
@@ -701,7 +702,7 @@ fn compile_test_file(
     let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
         tolkc::CompilerResult::Success(result) => {
-            let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.2".to_string());
+            let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.3".to_string());
             match cache_result {
                 Ok(()) => {}
                 Err(err) => {
@@ -726,7 +727,7 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
 
     let abi = contract_abi(content.as_str(), file, &runner.acton_config.mappings);
 
-    let executable_code = inject_locations_into_expect_calls(&content, file);
+    let executable_code = prepare_test_file(&content);
     let tmp_test_filename = file.to_owned() + ".test.tolk";
 
     fs::write(&tmp_test_filename, executable_code)?;
@@ -820,6 +821,7 @@ fn run_file_tests(
             failed_transactions: None,
             failed_transaction_context: None,
             details: None,
+            location: None,
             abi: abi.clone(),
             source_map: source_map.clone(),
             backtrace: runner.config.backtrace.as_ref().map(ToString::to_string),
@@ -937,7 +939,8 @@ fn run_file_tests(
 
             if let Some(failure) = &assert_failure {
                 test_report.message = failure.message();
-                test_report.details = failure.location();
+                test_report.details = failure.location().map(|l| l.format_full());
+                test_report.location = failure.location();
                 test_report.detailed_message =
                     Some(formatter.format_detailed_assert_failure(failure, abi));
 
@@ -1062,46 +1065,33 @@ pub struct TestDescriptor {
 }
 
 fn find_all_test(file_path: &str, content: &str) -> Vec<TestDescriptor> {
-    let Ok(tree) = tolk_syntax::parse(content) else {
+    let Ok(file) = tolk_syntax::parse(content) else {
         return vec![];
     };
-    let root_node = tree.root_node();
-    let mut cursor = root_node.walk();
 
-    root_node
-        .children(&mut cursor)
-        .filter_map(|child| {
-            if child.kind() == "get_method_declaration" {
-                let name_node = child.child_by_field_name("name")?;
-                let raw_name = name_node
-                    .utf8_text(content.as_bytes())
-                    .map(ToString::to_string)
-                    .ok()?;
+    file.get_methods()
+        .filter_map(|method| {
+            let name_node = method.name()?;
+            let name = name_node.normalized_name(content).to_owned();
 
-                let name = raw_name.trim_matches('`').to_string();
+            // get fun `test-foo`() or get fun test_foo() or get fun `test foo`()
+            if name.starts_with("test-") || name.starts_with("test_") || name.starts_with("test ") {
+                let id = i32::from(CRC16.checksum(name.as_bytes())) | 0x1_00_00;
+                let test_annotations = annotations::find_test_annotations(content, method);
 
-                // get fun `test-foo`() or get fun test_foo() or get fun `test foo`()
-                if name.starts_with("test-")
-                    || name.starts_with("test_")
-                    || name.starts_with("test ")
-                {
-                    let id = i32::from(CRC16.checksum(name.as_bytes())) | 0x1_00_00;
-                    let test_annotations = annotations::find_test_annotations(content, child);
-
-                    return Some(TestDescriptor {
-                        id,
-                        name,
-                        annotations: test_annotations.annotations,
-                        expected_exit_code: test_annotations.expected_exit_code,
-                        gas_limit: test_annotations.gas_limit,
-                        todo_description: test_annotations.todo_description,
-                        pos: Pos {
-                            row: name_node.start_position().row,
-                            column: name_node.start_position().column,
-                            uri: file_path.to_owned(),
-                        },
-                    });
-                }
+                return Some(TestDescriptor {
+                    id,
+                    name,
+                    annotations: test_annotations.annotations,
+                    expected_exit_code: test_annotations.expected_exit_code,
+                    gas_limit: test_annotations.gas_limit,
+                    todo_description: test_annotations.todo_description,
+                    pos: Pos {
+                        row: name_node.syntax().start_position().row,
+                        column: name_node.syntax().start_position().column,
+                        uri: file_path.to_owned(),
+                    },
+                });
             }
 
             None

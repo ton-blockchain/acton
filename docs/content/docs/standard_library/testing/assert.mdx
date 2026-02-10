@@ -34,7 +34,7 @@ Assert.consumesLessThan2(fun(a: int, b: int) {
 const ASSERTION_FAILED = 567
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L26" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L27" />
 
 ## `Assert`
 
@@ -58,12 +58,12 @@ Example:
 expect(10).toEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L43" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L44" />
 
 ## `Assert.equal`
 
 ```tolk
-fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "")
+fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: string = "")
 ```
 
 Asserts that two values are equal. If not, throws `ASSERTION_FAILED`.
@@ -75,12 +75,12 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L53" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L54" />
 
 ## `Assert.notEqual`
 
 ```tolk
-fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "")
+fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: string = "", location: string = "")
 ```
 
 Asserts that two values are NOT equal. If they are, throws `ASSERTION_FAILED`.
@@ -92,12 +92,12 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L77" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L78" />
 
 ## `Assert.fail`
 
 ```tolk
-fun Assert.fail(message: slice = "", location: slice = ""): never
+fun Assert.fail(message: string = "", location: string = ""): never
 ```
 
 Fails the test with the given optional message.
@@ -106,7 +106,7 @@ Optional message can be provided to describe the failure.
 Optional location can be provided to specify the location of the failure to
 be printed in the error message.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L98" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L99" />
 
 ## `Assert.consumesLessThan`
 
@@ -129,7 +129,7 @@ If you need to pass arguments to the function, you can use the `consumesLessThan
 `consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
 but accept arguments.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L117" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L118" />
 
 ## `Assert.consumesLessThan1`
 
@@ -151,7 +151,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L138" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L139" />
 
 ## `Assert.consumesLessThan2`
 
@@ -180,7 +180,7 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L161" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L162" />
 
 ## `Assert.consumesLessThan3`
 
@@ -212,12 +212,12 @@ get fun test_gas_consumption() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L191" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L192" />
 
 ## `Assert.failWalletNotFound`
 
 ```tolk
-fun Assert.failWalletNotFound(wallet_name: slice, location: slice = ""): never
+fun Assert.failWalletNotFound(walletName: string, location: string = ""): never
 ```
 
 Fails the test with wallet not found error.
@@ -227,12 +227,12 @@ It provides detailed information about available wallets and instructions on how
 
 NOT FOR PUBLIC USE.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L211" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L212" />
 
 ## `Assert.equalDecimal`
 
 ```tolk
-fun Assert.equalDecimal(left: int, right: int, decimals: int, message: slice = "", location: slice = "")
+fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "", location: string = "")
 ```
 
 Asserts that two values are equal as decimals with given precision.
@@ -244,5 +244,5 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L224" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L225" />
 

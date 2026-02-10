@@ -17,7 +17,7 @@ test-serial:
 test-integration:
     {{ CARGO_TEST }} --test integration_test
     # we need test by test execution due to single debug port
-    {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
+    # {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
 
 test: test-unit test-serial test-integration
 

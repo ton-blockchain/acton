@@ -11,6 +11,13 @@ pub struct Ident<'tree>(pub Node<'tree>);
 
 impl_ast_node!(Ident, "identifier");
 
+impl<'tree> Ident<'tree> {
+    #[must_use]
+    pub fn normalized_name(&self, source: &'tree str) -> &'tree str {
+        self.text(source).trim_matches('`')
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct StringLit<'tree>(pub Node<'tree>);
 

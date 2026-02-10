@@ -51,9 +51,9 @@ struct (0x0ec3c86d) OutActionSendMessage {
     /// Mode of the send message. See `SEND_MODE_*` constants.
     mode: uint8
     /// Message to send.
-    /// 
+    ///
     /// To load the actual message, use [OutActionSendMessage.loadMessage] method.
-    out_msg: cell
+    outMsg: cell
 }
 ```
 
@@ -137,7 +137,7 @@ if (action is OutActionSendMessage) {
 struct (0xad4de08e) OutActionSetCode {
     prev: Cell<OutList>
     /// New code to set.
-    new_code: cell
+    newCode: cell
 }
 ```
 
@@ -182,7 +182,7 @@ Represents change library action.
 ```tolk
 struct (0b0) LibRefHash {
     /// Hash of the library.
-    lib_hash: bits256
+    libHash: bits256
 }
 ```
 
@@ -206,7 +206,7 @@ Represents library reference as a cell reference.
 ## `OutAction.kind`
 
 ```tolk
-fun OutAction.kind(self): slice
+fun OutAction.kind(self): string
 ```
 
 Returns the kind of the out action as a string.

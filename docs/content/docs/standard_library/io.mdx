@@ -48,12 +48,12 @@ println(Data {
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L38" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L39" />
 
 ## `println1`
 
 ```tolk
-fun println1<T>(fmt: slice, value: T): void
+fun println1<T>(fmt: string, value: T): void
 ```
 
 Prints the given value to the standard output formatted according to format string.
@@ -67,12 +67,12 @@ Format supports following format soecifiers:
 - `{:x}` — formats a number as hexadecimal without `0x` prefix
 - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L52" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L53" />
 
 ## `eprintln`
 
 ```tolk
-fun eprintln(str: slice): void
+fun eprintln(str: string): void
 ```
 
 Prints the given slice string to the standard error output.
@@ -82,5 +82,5 @@ Example:
 eprintln("Something went wrong");
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L62" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/io.tolk#L63" />
 

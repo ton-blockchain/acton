@@ -20,8 +20,8 @@
             1,
             2
         )
-      └─ at ./tests/utils_test.test[LINE]
-##teamcity[testFailed name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='./tests/utils_test.test[LINE]']
+      └─ at tests/utils_test.test[LINE]
+##teamcity[testFailed name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='[ROOT]/tests/utils_test.test[LINE]']
 ##teamcity[testFinished name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] parentNodeId='suite_utils_test.test.tolk']
 ##teamcity[testSuiteFinished name='utils_test.test.tolk' nodeId='suite_utils_test.test.tolk']
 

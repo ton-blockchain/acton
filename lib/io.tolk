@@ -20,6 +20,7 @@
 /// eprintln("Critical failure in setup!");
 /// ```
 
+import "@stdlib/reflection"
 import "fmt"
 import "ffi/ffi"
 
@@ -36,7 +37,7 @@ import "ffi/ffi"
 /// });
 /// ```
 fun println<T>(value: T): void {
-    ffi.println(value.typeNameOfObject(), value.toTuple());
+    ffi.println(reflect.typeNameOfObject(value), value.toTuple());
 }
 
 /// Prints the given value to the standard output formatted according to format string.
@@ -49,7 +50,7 @@ fun println<T>(value: T): void {
 /// Format supports following format soecifiers:
 /// - `{:x}` — formats a number as hexadecimal without `0x` prefix
 /// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
-fun println1<T>(fmt: slice, value: T): void {
+fun println1<T>(fmt: string, value: T): void {
     println(format1(fmt, value))
 }
 
@@ -59,11 +60,11 @@ fun println1<T>(fmt: slice, value: T): void {
 /// ```tolk
 /// eprintln("Something went wrong");
 /// ```
-fun eprintln(str: slice): void {
+fun eprintln(str: string): void {
     ffi.eprintln(str);
 }
 
-fun ffi.println(typeName: slice, str: tuple): void
+fun ffi.println(typeName: string, str: tuple): void
     asm "1 EXTCALL"
-fun ffi.eprintln(str: slice): void
+fun ffi.eprintln(str: string): void
     asm "2 EXTCALL"

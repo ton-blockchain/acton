@@ -15,7 +15,7 @@ fn test_skip_annotation_string_literal() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom("skip")
+            @test("skip")
             get fun `test-skipped-string`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -44,7 +44,7 @@ fn test_skip_annotation_object_literal() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ skip: true })
+            @test({ skip: true })
             get fun `test-skipped-object`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -73,7 +73,7 @@ fn test_todo_annotation_string_literal() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom("todo")
+            @test("todo")
             get fun `test-todo-string`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -102,7 +102,7 @@ fn test_todo_annotation_with_description() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ todo: "Implement this later" })
+            @test({ todo: "Implement this later" })
             get fun `test-todo-described`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -131,7 +131,7 @@ fn test_todo_annotation_boolean() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ todo: true })
+            @test({ todo: true })
             get fun `test-todo-boolean`() {
                 expect(1).toEqual(2); // This should not run
             }
@@ -151,7 +151,7 @@ fn test_todo_annotation_boolean() {
         .assert_contains("TODO");
 }
 
-/// Test @custom({ `gas_limit`: 100 }) annotation
+/// Test @test({ `gas_limit`: 100 }) annotation
 #[test]
 fn test_gas_limit_annotation() {
     ProjectBuilder::new("gas-limit")
@@ -161,7 +161,7 @@ fn test_gas_limit_annotation() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ gas_limit: 100 })
+            @test({ gas_limit: 100 })
             get fun `test-gas-limit-exceeded`() {
                 // This loop should exceed the gas limit
                 var i = 0;
@@ -186,7 +186,7 @@ fn test_gas_limit_annotation() {
         .assert_contains("Gas limit exceeded");
 }
 
-/// Test @custom({ `fail_with`: 42 }) annotation
+/// Test @test({ `fail_with`: 42 }) annotation
 #[test]
 fn test_fail_with_annotation() {
     ProjectBuilder::new("fail-with")
@@ -196,7 +196,7 @@ fn test_fail_with_annotation() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ fail_with: 42 })
+            @test({ fail_with: 42 })
             get fun `test-expected-failure`() {
                 throw 42; // This is expected
             }
@@ -215,7 +215,7 @@ fn test_fail_with_annotation() {
         .assert_not_contains("Expected exit_code");
 }
 
-/// Test @custom({ `fail_with`: 42 }) annotation with wrong exit code
+/// Test @test({ `fail_with`: 42 }) annotation with wrong exit code
 #[test]
 fn test_fail_with_annotation_wrong_code() {
     ProjectBuilder::new("fail-with-wrong")
@@ -225,7 +225,7 @@ fn test_fail_with_annotation_wrong_code() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ fail_with: 42 })
+            @test({ fail_with: 42 })
             get fun `test-wrong-exit-code`() {
                 throw 99; // Expected 42, got 99
             }
@@ -250,7 +250,7 @@ fn test_multiple_annotations() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ skip: true, gas_limit: 1000, fail_with: 10 })
+            @test({ skip: true, gas_limit: 1000, fail_with: 10 })
             get fun `test-multiple-annotations`() {
                 // This should be skipped, so these annotations don't matter
                 throw 10;
@@ -282,12 +282,12 @@ fn test_annotations_with_filter() {
             r#"
             import "../../lib/testing/expect"
 
-            @custom({ skip: true })
+            @test({ skip: true })
             get fun `test-skipped-1`() {
                 expect(1).toEqual(2);
             }
 
-            @custom({ skip: true })
+            @test({ skip: true })
             get fun `test-skipped-2`() {
                 expect(1).toEqual(2);
             }

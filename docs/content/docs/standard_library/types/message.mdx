@@ -60,12 +60,12 @@ if (action is OutActionSendMessage) {
 ## `MessageRelaxedGeneric.loadOpcode`
 
 ```tolk
-fun MessageRelaxedGeneric.loadOpcode(self, skip_bounce: bool = false): int?
+fun MessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int?
 ```
 
 Loads the opcode of the message.
 
-If skip_bounce is true, the 0xFFFFFFFF prefix is skipped.
+If skipBounce is true, the 0xFFFFFFFF prefix is skipped.
 
 Example:
 ```tolk
@@ -99,12 +99,12 @@ later manually (for example to load the opcode).
 ## `ExtMessageRelaxedGeneric.loadOpcode`
 
 ```tolk
-fun ExtMessageRelaxedGeneric.loadOpcode(self, skip_bounce: bool = false): int?
+fun ExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int?
 ```
 
 Loads the opcode of the message.
 
-If skip_bounce is true, the 0xFFFFFFFF prefix is skipped.
+If skipBounce is true, the 0xFFFFFFFF prefix is skipped.
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L77" />
 
@@ -194,16 +194,16 @@ Note that if message type mismatch, loading will fail with exit code 63.
 
 ```tolk
 struct (0b0) IntMsgInfoRelaxed {
-    ihr_disabled: bool
+    ihrDisabled: bool
     bounce: bool
     bounced: bool
     src: any_address
     dest: address
     value: CurrencyCollection
-    extra_flags: varuint16
-    fwd_fee: coins
-    created_lt: uint64
-    created_at: uint32
+    extraFlags: varuint16
+    fwdFee: coins
+    createdLt: uint64
+    createdAt: uint32
 }
 ```
 
@@ -217,8 +217,8 @@ Represents common message info for internal relaxed message.
 struct (0b11) ExtMsgInfoRelaxed {
     src: address
     dest: any_address
-    created_lt: uint64
-    created_at: uint32
+    createdLt: uint64
+    createdAt: uint32
 }
 ```
 
@@ -305,6 +305,7 @@ ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
 ## `Message`
 
 ```tolk
+@overflow1023_policy("suppress")
 struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
     info: TInfo
     init: Maybe<Either<StateInit, Cell<StateInit>>>
@@ -320,5 +321,21 @@ struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
 fun Message<TBody, TInfo>.loadBody(self): TBody
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L226" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L227" />
+
+## `implMsg`
+
+```tolk
+struct implMsg
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L234" />
+
+## `implMsg.loadOpcode`
+
+```tolk
+fun implMsg.loadOpcode(body: slice, skipBounce: bool)
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L236" />
 

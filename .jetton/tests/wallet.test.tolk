@@ -156,7 +156,7 @@ get fun `test minter admin can change content`() {
     val initial_content = minter.getContent();
 
     // Create new content
-    val new_content = beginCell().storeUint(1, 1).storeSlice("https://totally_new_jetton.org/content.json").endCell();
+    val new_content = beginCell().storeUint(1, 1).storeSlice("https://totally_new_jetton.org/content.json".beginParse()).endCell();
 
     // Change content as admin
     val change_result = minter.sendChangeContent(deployer.address, new_content);

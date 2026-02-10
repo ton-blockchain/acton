@@ -133,10 +133,10 @@ fn test_global_var() {
 #[test]
 fn test_global_var_with_annotations() {
     check(
-        "@deprecated\n@custom(42)\nglobal x: int;",
+        "@deprecated\n@test(42)\nglobal x: int;",
         expect![[r#"
                 @deprecated
-                @custom(42)
+                @test(42)
                 global x: int"#]],
     );
 }
@@ -695,9 +695,9 @@ fn test_annotation_with_arguments() {
 #[test]
 fn test_annotation_with_multiple_arguments() {
     check(
-        "@custom(1, \"hello\", true)\nfun foo() {}",
+        "@test(1, \"hello\", true)\nfun foo() {}",
         expect![[r#"
-                @custom(1, "hello", true)
+                @test(1, "hello", true)
                 fun foo() {}"#]],
     );
 }

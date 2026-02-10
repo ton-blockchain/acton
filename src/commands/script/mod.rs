@@ -314,10 +314,8 @@ fn print_script_result(ctx: &mut Context<'_>, result: ScriptResult) {
                     let highlighted_message = FormatterContext::highlight_actual_expected(&message);
                     eprintln!("{} {}", "Error:".bright_red(), highlighted_message);
 
-                    if let Some(location) = &failure.location
-                        && !location.is_empty()
-                    {
-                        println!("{} at {}", "└─".dimmed(), location.dimmed());
+                    if let Some(location) = &failure.location {
+                        println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                     }
                 } else {
                     if let Some(message) = &assert_failure.message() {
@@ -332,10 +330,8 @@ fn print_script_result(ctx: &mut Context<'_>, result: ScriptResult) {
                         println!("{}", "└─".dimmed());
                     }
 
-                    if let Some(location) = &assert_failure.location()
-                        && !location.is_empty()
-                    {
-                        println!("{} at {}", "└─".dimmed(), location.dimmed());
+                    if let Some(location) = &assert_failure.location() {
+                        println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                     }
                 }
             }
@@ -418,7 +414,7 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<Tup
         VmStackValue::Continuation(_) => {
             Err(anyhow!("Continuation not supported in script arguments"))
         }
-        VmStackValue::String(s) => Ok(TupleItem::Slice(string_to_slice(s)?)),
+        VmStackValue::String(s) => Ok(TupleItem::Cell(string_to_slice(s)?)),
         VmStackValue::Unknown => Err(anyhow!("Unknown stack value type")),
     }
 }

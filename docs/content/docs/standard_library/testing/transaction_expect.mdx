@@ -54,7 +54,7 @@ expect(txs).toHaveSuccessfulDeploy({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L48" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L49" />
 
 ## `Expectation<SendResultList>.toHaveSuccessfulTx`
 
@@ -65,7 +65,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: Se
 Expect the transaction list to have a successful transaction.
 
 Transaction is considered as "successful" if exit code is 0, but exit code
-can be overridden by the `exit_code` parameter.
+can be overridden by the `exitCode` parameter.
 
 Example:
 ```tolk
@@ -75,7 +75,7 @@ expect(txs).toHaveSuccessfulTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L77" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L78" />
 
 ## `Expectation<SendResultList>.toHaveTx`
 
@@ -93,7 +93,7 @@ expect(txs).toHaveTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L105" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L106" />
 
 ## `Expectation<SendResultList>.toNotHaveTx`
 
@@ -111,7 +111,7 @@ expect(txs).toNotHaveTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L129" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L130" />
 
 ## `Expectation<SendResultList>.toHaveBouncedTx`
 
@@ -129,7 +129,7 @@ expect(txs).toHaveBouncedTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L153" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L154" />
 
 ## `Expectation<SendResultList>.toHaveFailedTx`
 
@@ -149,7 +149,7 @@ expect(txs).toHaveFailedTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L180" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L181" />
 
 ## `Expectation<SendResultList>.toHaveAllSuccessfulTxs`
 
@@ -165,7 +165,7 @@ val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
 expect(results).toHaveAllSuccessfulTxs();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L209" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L210" />
 
 ## `Expectation<SendResultList>.toEmitExternalMessage`
 
@@ -180,7 +180,7 @@ Example:
 expect(txs).toEmitExternalMessage<IncreaseCounter>();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L233" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L234" />
 
 ## `Expectation<SendResult>.toConsumeLessThan`
 
@@ -196,5 +196,13 @@ val result = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
 expect(result.at(0)).toConsumeLessThan(1000);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L269" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L270" />
+
+## `T.getDeclaredPackPrefix`
+
+```tolk
+fun T.getDeclaredPackPrefix()
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L280" />
 

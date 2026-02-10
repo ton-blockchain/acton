@@ -21,9 +21,9 @@ println1("Gas used: {}", gas);
 // Inspect account status change
 val description = tx.description.load();
 if (description is TransOrd) {
-    val compute = description.compute_ph;
+    val compute = description.computePh;
     if (compute is TrComputeVm) {
-        println1("VM exit code: {}", compute.exit_code);
+        println1("VM exit code: {}", compute.exitCode);
     }
 }
 ```
@@ -66,7 +66,7 @@ struct (0b11) NonExisting
 
 ```tolk
 struct DepthBalanceInfo {
-    split_depth: uint8, // #<= 30
+    splitDepth: uint8, // #<= 30
     balance: CurrencyCollection
 }
 ```
@@ -80,27 +80,27 @@ Represents depth and balance information for split accounts.
 ```tolk
 struct (0b0111) Transaction {
     /// Account address as 256-bit hash.
-    account_addr: bits256,
+    accountAddr: bits256,
     /// Logical time of the transaction.
     lt: uint64,
     /// Hash of the previous transaction.
-    prev_trans_hash: bits256,
+    prevTransHash: bits256,
     /// Logical time of the previous transaction.
-    prev_trans_lt: uint64,
+    prevTransLt: uint64,
     /// Current time (Unix timestamp).
     now: uint32,
     /// Number of outgoing messages.
-    outmsg_cnt: uint15,
+    outmsgCnt: uint15,
     /// Account status before transaction.
-    orig_status: AccountStatus,
+    origStatus: AccountStatus,
     /// Account status after transaction.
-    end_status: AccountStatus,
+    endStatus: AccountStatus,
     /// In and out messages.
     messages: Cell<TransactionMessages>,
     /// Total fees collected.
-    total_fees: CurrencyCollection,
+    totalFees: CurrencyCollection,
     /// State update information.
-    state_update: Cell<HashUpdate<Account>>,
+    stateUpdate: Cell<HashUpdate<Account>>,
     /// Transaction description.
     description: Cell<TransactionDescr>
 }
@@ -177,9 +177,9 @@ Return address of account of this transaction.
 ```tolk
 struct TransactionMessages {
     /// In message.
-    in_msg: Maybe<Cell<MessageRelaxedGeneric>>,
+    inMsg: Maybe<Cell<MessageRelaxedGeneric>>,
     /// Out messages.
-    out_msgs: map<uint15, Cell<MessageRelaxedGeneric>>
+    outMsgs: map<uint15, Cell<MessageRelaxedGeneric>>
 }
 ```
 
@@ -190,13 +190,13 @@ struct TransactionMessages {
 ```tolk
 struct (0b0100) MerkleUpdate<X> {
     /// Old hash.
-    old_hash: bits256,
+    oldHash: bits256,
     /// New hash.
-    new_hash: bits256,
+    newHash: bits256,
     /// Old depth.
-    old_depth: uint16,
+    oldDepth: uint16,
     /// New depth.
-    new_depth: uint16,
+    newDepth: uint16,
     /// Old value.
     old: X,
     /// New value.
@@ -213,9 +213,9 @@ Represents merkle update for proof-of-work.
 ```tolk
 struct (0b01110010) HashUpdate<X> {
     /// Old hash.
-    old_hash: bits256,
+    oldHash: bits256,
     /// New hash.
-    new_hash: bits256
+    newHash: bits256
 }
 ```
 
@@ -228,11 +228,11 @@ Represents simple hash update.
 ```tolk
 struct (0b0011) MerkleProof<X> {
     /// Virtual hash.
-    virtual_hash: bits256,
+    virtualHash: bits256,
     /// Depth.
     depth: uint16,
     /// Virtual root.
-    virtual_root: X
+    virtualRoot: X
 }
 ```
 
@@ -245,11 +245,11 @@ Represents merkle proof.
 ```tolk
 struct TrStoragePhase {
     /// Storage fees collected.
-    storage_fees_collected: coins,
+    storageFeesCollected: coins,
     /// Storage fees due (if any).
-    storage_fees_due: Maybe<coins>,
+    storageFeesDue: Maybe<coins>,
     /// Account status change.
-    status_change: AccStatusChange
+    statusChange: AccStatusChange
 }
 ```
 
@@ -288,7 +288,7 @@ struct (0b11) AccDeleted
 ```tolk
 struct TrCreditPhase {
     /// Due fees collected (if any).
-    due_fees_collected: Maybe<coins>,
+    dueFeesCollected: Maybe<coins>,
     /// Credit amount.
     credit: CurrencyCollection
 }
@@ -315,9 +315,9 @@ Represents compute phase of transaction processing.
 ```tolk
 struct (0b1) TrComputeVm {
     success: bool,
-    msg_state_used: bool,
-    account_activated: bool,
-    gas_fees: coins,
+    msgStateUsed: bool,
+    accountActivated: bool,
+    gasFees: coins,
     data: Cell<TrComputeVmRef>
 }
 ```
@@ -328,15 +328,15 @@ struct (0b1) TrComputeVm {
 
 ```tolk
 struct TrComputeVmRef {
-    gas_used: VarUint7,
-    gas_limit: VarUint7,
-    gas_credit: Maybe<VarUint3>,
+    gasUsed: VarUint7,
+    gasLimit: VarUint7,
+    gasCredit: Maybe<VarUint3>,
     mode: int8,
-    exit_code: int32,
-    exit_arg: Maybe<int32>,
-    vm_steps: uint32,
-    vm_init_state_hash: bits256,
-    vm_final_state_hash: bits256
+    exitCode: int32,
+    exitArg: Maybe<int32>,
+    vmSteps: uint32,
+    vmInitStateHash: bits256,
+    vmFinalStateHash: bits256
 }
 ```
 
@@ -382,18 +382,18 @@ struct (0b110) CSkipSuspended
 struct TrActionPhase {
     success: bool,
     valid: bool,
-    no_funds: bool,
-    status_change: AccStatusChange,
-    total_fwd_fees: Maybe<coins>,
-    total_action_fees: Maybe<coins>,
-    result_code: int32,
-    result_arg: Maybe<int32>,
-    tot_actions: uint16,
-    spec_actions: uint16,
-    skipped_actions: uint16,
-    msgs_created: uint16,
-    action_list_hash: bits256,
-    tot_msg_size: StorageUsed
+    noFunds: bool,
+    statusChange: AccStatusChange,
+    totalFwdFees: Maybe<coins>,
+    totalActionFees: Maybe<coins>,
+    resultCode: int32,
+    resultArg: Maybe<int32>,
+    totActions: uint16,
+    specActions: uint16,
+    skippedActions: uint16,
+    msgsCreated: uint16,
+    actionListHash: bits256,
+    totMsgSize: StorageUsed
 }
 ```
 
@@ -415,8 +415,8 @@ Represents bounce phase of transaction processing.
 
 ```tolk
 struct (0b01) TrBounceNofunds {
-    msg_size: StorageUsed,
-    req_fwd_fees: coins
+    msgSize: StorageUsed,
+    reqFwdFees: coins
 }
 ```
 
@@ -426,9 +426,9 @@ struct (0b01) TrBounceNofunds {
 
 ```tolk
 struct (0b1) TrBounceOk {
-    msg_size: StorageUsed,
-    msg_fees: coins,
-    fwd_fees: coins
+    msgSize: StorageUsed,
+    msgFees: coins,
+    fwdFees: coins
 }
 ```
 
@@ -439,10 +439,10 @@ struct (0b1) TrBounceOk {
 ```tolk
 @overflow1023_policy("suppress")
 struct (0b0000) TransOrd {
-    credit_first: bool,
-    storage_ph: Maybe<TrStoragePhase>,
-    credit_ph: Maybe<TrCreditPhase>,
-    compute_ph: TrComputePhase,
+    creditFirst: bool,
+    storagePh: Maybe<TrStoragePhase>,
+    creditPh: Maybe<TrCreditPhase>,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     bounce: Maybe<TrBouncePhase>,
@@ -458,7 +458,7 @@ Represents ordinary transaction description.
 
 ```tolk
 struct (0b0001) TransStorage {
-    storage_ph: TrStoragePhase
+    storagePh: TrStoragePhase
 }
 ```
 
@@ -471,9 +471,9 @@ Represents storage transaction description.
 ```tolk
 @overflow1023_policy("suppress")
 struct (0b001) TransTickTock {
-    is_tock: bool,
-    storage_ph: TrStoragePhase,
-    compute_ph: TrComputePhase,
+    isTock: bool,
+    storagePh: TrStoragePhase,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     destroyed: bool
@@ -488,10 +488,10 @@ Represents tick-tock transaction description.
 
 ```tolk
 struct SplitMergeInfo {
-    cur_shard_pfx_len: uint8, // ## 6
-    acc_split_depth: uint8,   // ## 6
-    this_addr: bits256,
-    sibling_addr: bits256
+    curShardPfxLen: uint8, // ## 6
+    accSplitDepth: uint8,   // ## 6
+    thisAddr: bits256,
+    siblingAddr: bits256
 }
 ```
 
@@ -504,9 +504,9 @@ Represents split-merge information.
 ```tolk
 @overflow1023_policy("suppress")
 struct (0b0100) TransSplitPrepare {
-    split_info: SplitMergeInfo,
-    storage_ph: Maybe<TrStoragePhase>,
-    compute_ph: TrComputePhase,
+    splitInfo: SplitMergeInfo,
+    storagePh: Maybe<TrStoragePhase>,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     destroyed: bool
@@ -521,8 +521,8 @@ Represents split prepare transaction description.
 
 ```tolk
 struct (0b0101) TransSplitInstall {
-    split_info: SplitMergeInfo,
-    prepare_transaction: Cell<Transaction>,
+    splitInfo: SplitMergeInfo,
+    prepareTransaction: Cell<Transaction>,
     installed: bool
 }
 ```
@@ -535,8 +535,8 @@ Represents split install transaction description.
 
 ```tolk
 struct (0b0110) TransMergePrepare {
-    split_info: SplitMergeInfo,
-    storage_ph: TrStoragePhase,
+    splitInfo: SplitMergeInfo,
+    storagePh: TrStoragePhase,
     aborted: bool
 }
 ```
@@ -550,11 +550,11 @@ Represents merge prepare transaction description.
 ```tolk
 @overflow1023_policy("suppress")
 struct (0b0111) TransMergeInstall {
-    split_info: SplitMergeInfo,
-    prepare_transaction: Cell<Transaction>,
-    storage_ph: Maybe<TrStoragePhase>,
-    credit_ph: Maybe<TrCreditPhase>,
-    compute_ph: TrComputePhase,
+    splitInfo: SplitMergeInfo,
+    prepareTransaction: Cell<Transaction>,
+    storagePh: Maybe<TrStoragePhase>,
+    creditPh: Maybe<TrCreditPhase>,
+    computePh: TrComputePhase,
     action: Maybe<Cell<TrActionPhase>>,
     aborted: bool,
     destroyed: bool
@@ -624,7 +624,7 @@ Represents storage extra information.
 
 ```tolk
 struct (0b001) StorageExtraDict {
-    dict_hash: uint256
+    dictHash: uint256
 }
 ```
 
@@ -637,11 +637,11 @@ struct StorageInfo {
     /// Storage used.
     used: StorageUsed,
     /// Storage extra information.
-    storage_extra: StorageExtraInfo,
+    storageExtra: StorageExtraInfo,
     /// Last paid time.
-    last_paid: uint32,
+    lastPaid: uint32,
     /// Due payment (optional).
-    due_payment: Maybe<coins>
+    duePayment: Maybe<coins>
 }
 ```
 
@@ -666,7 +666,7 @@ struct (0b1) AccountInfo {
     /// Account address.
     addr: address,
     /// Storage statistics.
-    storage_stat: StorageInfo,
+    storageStat: StorageInfo,
     /// Account storage.
     storage: AccountStorage
 }
@@ -679,7 +679,7 @@ struct (0b1) AccountInfo {
 ```tolk
 struct AccountStorage {
     /// Last transaction logical time.
-    last_trans_lt: uint64,
+    lastTransLt: uint64,
     /// Account balance.
     balance: CurrencyCollection,
     /// Account state.

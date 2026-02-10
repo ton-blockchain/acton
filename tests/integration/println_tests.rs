@@ -18,7 +18,7 @@ fn test_println_formatting() {
                 s: Simple,
                 addr: address,
                 opt: int?,
-                str: slice,
+                str: string,
             }
 
             fun main() {
@@ -74,13 +74,13 @@ fn test_println_tuples_and_tensors() {
 
                 // 2. Tuples
                 println([1, 2, 3, 4, 5]);
-                
+
                 // 3. Nested tuples and tensors
                 println((
                     (1, 2),
                     [3, 4]
                 ));
-                
+
                 println([
                     [1, 2, 3],
                     [4, 5, 6]
@@ -115,7 +115,7 @@ fn test_println_nesting_complex() {
 
             struct Outer {
                 inner: Inner,
-                tags: [slice, slice],
+                tags: [string, string],
                 maybe_val: int?,
             }
 

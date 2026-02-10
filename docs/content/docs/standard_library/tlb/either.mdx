@@ -7,6 +7,28 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 
 ## Definitions
 
+## `Either<X, Y>.left`
+
+```tolk
+@inline
+fun Either<X, Y>.left(value: X)
+```
+
+Left contructor
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L4" />
+
+## `Either<X, Y>.right`
+
+```tolk
+@inline
+fun Either<X, Y>.right(value: Y)
+```
+
+Right contructor
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L10" />
+
 ## `EitherLeft`
 
 ```tolk
@@ -15,7 +37,7 @@ struct (0b0) EitherLeft<X> {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L3" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L15" />
 
 ## `EitherRight`
 
@@ -25,5 +47,5 @@ struct (0b1) EitherRight<X> {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L7" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L19" />
 

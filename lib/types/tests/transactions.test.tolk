@@ -61,7 +61,7 @@ get fun `test-load-transaction-body`() {
     expect(body).toEqual(IncreaseCounter { increaseBy: 100 });
 }
 
-@custom({ fail_with: 63 })
+@test({ fail_with: 63 })
 get fun `test-fail-to-load-transaction-body`() {
     val (counter, deployer) = setupTest();
 
@@ -84,7 +84,7 @@ get fun `test-load-transaction-body-after-find-transaction`() {
     expect(body).toEqual(IncreaseCounter { increaseBy: 100 });
 }
 
-@custom({ fail_with: 63 })
+@test({ fail_with: 63 })
 get fun `test-fail-to-load-transaction-body-after-find-transaction`() {
     val (counter, deployer) = setupTest();
 

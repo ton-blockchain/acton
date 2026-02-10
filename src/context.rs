@@ -11,7 +11,7 @@ use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSucce
 use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
-use ton_source_map::SourceMap;
+use ton_source_map::{SourceLocation, SourceMap};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
 use tonlib_core::wallet::ton_wallet::TonWallet;
@@ -28,7 +28,7 @@ pub struct AssertBinFailure {
     pub right: Tuple,
     pub right_type: String,
     pub message: Option<String>,
-    pub location: Option<String>,
+    pub location: Option<SourceLocation>,
 }
 
 impl AssertBinFailure {
@@ -44,7 +44,7 @@ impl AssertBinFailure {
 #[derive(Debug, Clone)]
 pub struct FailAssertFailure {
     pub message: Option<String>,
-    pub location: Option<String>,
+    pub location: Option<SourceLocation>,
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +67,7 @@ pub struct TransactionNotFoundParams {
 #[derive(Debug, Clone)]
 pub struct TransactionGenericAssertFailure {
     pub message: Option<String>,
-    pub location: Option<String>,
+    pub location: Option<SourceLocation>,
     pub txs: TupleItem,
     pub parsed_txs: Vec<Transaction>,
     pub params: TransactionNotFoundParams,
@@ -76,7 +76,7 @@ pub struct TransactionGenericAssertFailure {
 #[derive(Debug, Clone)]
 pub struct WalletNotFoundFailure {
     pub wallet_name: String,
-    pub location: Option<String>,
+    pub location: Option<SourceLocation>,
 }
 
 #[derive(Debug, Clone)]
@@ -101,7 +101,7 @@ impl AssertFailure {
     }
 
     #[must_use]
-    pub fn location(&self) -> Option<String> {
+    pub fn location(&self) -> Option<SourceLocation> {
         match self {
             AssertFailure::Bin(arg) => arg.location.clone(),
             AssertFailure::Fail(arg) => arg.location.clone(),

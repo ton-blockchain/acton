@@ -64,7 +64,7 @@ fun setupTest() {
     return (counter, deployer)
 }
 
-// SLOT_1: @custom({gas_limit: 100})
+// SLOT_1: @test({gas_limit: 100})
 get fun `test-should-increase-counter`() {
     val (counter, deployer) = setupTest();
 
@@ -77,7 +77,7 @@ get fun `test-should-increase-counter`() {
     // SLOT_6: eprintln("error output")
 }
 
-// SLOT_3: @custom({fail_with: 100})
+// SLOT_3: @test({fail_with: 100})
 get fun `test-should-reset-counter`() {
     // SLOT_4: if (true) { throw 9 }
     val (counter, deployer) = setupTest();
