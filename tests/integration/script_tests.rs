@@ -136,8 +136,8 @@ fn test_script_with_tuple_args() {
             import "../../lib/io"
 
             fun main(t: tuple) {
-                val a: int = t.get(0);
-                val b: int = t.get(1);
+                val a = t.get(0) as int;
+                val b = t.get(1) as int;
                 println("Tuple A:");
                 println(a);
                 println("Tuple B:");
@@ -1028,7 +1028,7 @@ fn test_script_env_vars() {
                     println1("bool: {}", b);
                 }
 
-                val s = env<slice>("TEST_SLICE");
+                val s = env<string>("TEST_SLICE");
                 if (s != null) {
                     println1("slice: {}", s);
                 }
@@ -1161,8 +1161,8 @@ fn test_script_env_or_vars() {
                 val b = envOr<bool>("TEST_BOOL", false);
                 println1("bool: {}", b);
 
-                val s = envOr<slice>("TEST_SLICE", "default");
-                println1("slice: {}", s);
+                val s = envOr<string>("TEST_SLICE", "default");
+                println1("string: {}", s);
 
                 val a = envOr<address>("TEST_ADDRESS", address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
                 println1("address: {}", a);
@@ -1178,7 +1178,7 @@ fn test_script_env_or_vars() {
         .success()
         .assert_contains("int: 42")
         .assert_contains("bool: false")
-        .assert_contains("slice: default")
+        .assert_contains("string: default")
         .assert_contains("address: kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD");
 }
 

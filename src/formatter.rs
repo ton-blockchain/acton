@@ -1149,6 +1149,19 @@ impl FormatterContext {
                     return if colorize { s.yellow().to_string() } else { s };
                 }
 
+                if type_name == "string"
+                    && let TupleItem::Cell(cell) | TupleItem::Slice(cell) = &items[0]
+                    && let Some(string) = Tuple::parse_snake_string(cell)
+                {
+                    if root {
+                        // for `println("hello")` show `hello`
+                        return string;
+                    }
+
+                    let s = format!("\"{string}\"");
+                    return if colorize { s.green().to_string() } else { s };
+                }
+
                 if let TupleItem::Slice(_) = &items[0] {
                     return self.format_internal(&items[0], root, colorize);
                 }
@@ -1163,16 +1176,6 @@ impl FormatterContext {
             TupleItem::Slice(cell) => {
                 if cell.bit_len() == 0 && cell.references().is_empty() {
                     return "empty slice".to_owned();
-                }
-
-                if let Some(string) = Tuple::parse_snake_string(cell) {
-                    if root {
-                        // for `println("hello")` show `hello`
-                        return string;
-                    }
-
-                    let s = format!("\"{string}\"");
-                    return if colorize { s.green().to_string() } else { s };
                 }
 
                 self.format_slice(cell)

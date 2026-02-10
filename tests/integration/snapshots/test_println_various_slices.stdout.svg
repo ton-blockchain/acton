@@ -8,6 +8,7 @@
       line-height: 18px;
     }
     .bold { font-weight: bold; }
+    .dimmed { opacity: 0.7; }
     tspan {
       font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
       white-space: pre;
@@ -24,7 +25,7 @@
 </tspan>
     <tspan x="10px" y="64px"><tspan>[BOC_HEX]</tspan>
 </tspan>
-    <tspan x="10px" y="82px"><tspan>empty</tspan>
+    <tspan x="10px" y="82px"><tspan>(</tspan><tspan class="dimmed">[BOC_HEX]</tspan><tspan>, empty slice)</tspan>
 </tspan>
     <tspan x="10px" y="100px">
 </tspan>

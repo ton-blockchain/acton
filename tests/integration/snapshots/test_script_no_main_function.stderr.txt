@@ -1,2 +1,1 @@
-Error: Cannot compile script file fatal: the contract has no entrypoint; forgot `fun onInternalMessage(...)`?
-
+Error: Cannot compile script file the contract has no entrypoint; forgot `fun onInternalMessage(...)`?

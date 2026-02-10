@@ -88,7 +88,7 @@ fun cell.__env(name: string): cell? {
 }
 
 fun T.__env(name: string): T? {
-    Assert.fail(format1("env() supports only int, bool, slice, address and cell types, but got ", reflect.typeNameOf<T>()));
+    Assert.fail(format1("env() supports only int, bool, slice, address and cell types, but got {}", reflect.typeNameOf<T>()));
 }
 
 fun ffi.envInt(name: string): int?

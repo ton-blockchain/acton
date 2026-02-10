@@ -10,14 +10,14 @@ const ONCHAIN_CONTENT_PREFIX = 0x00
 const SNAKE_PREFIX = 0x00
 
 struct JettonInfo {
-    name: slice,
-    description: slice,
-    symbol: slice,
-    image: slice,
+    name: string,
+    description: string,
+    symbol: string,
+    image: string,
 }
 
-fun slice.toSnakeString(self): cell {
-    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self).endCell()
+fun string.toSnakeString(self): cell {
+    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self.beginParse()).endCell()
 }
 
 fun buildOnchainMetadata(info: JettonInfo): cell {
@@ -35,10 +35,10 @@ fun buildOnchainMetadata(info: JettonInfo): cell {
 
 fun main() {
     val content = buildOnchainMetadata({
-        name: envOr<slice>("JETTON_NAME", "SomeJetton"),
-        description: envOr<slice>("JETTON_DESCRIPTION", "Sone jetton"),
-        symbol: envOr<slice>("JETTON_SYMBOL", "JTTT"),
-        image: envOr<slice>("JETTON_IMAGE", "https://ton.org/download/ton_symbol.svg"),
+        name: envOr<string>("JETTON_NAME", "SomeJetton"),
+        description: envOr<string>("JETTON_DESCRIPTION", "Sone jetton"),
+        symbol: envOr<string>("JETTON_SYMBOL", "JTTT"),
+        image: envOr<string>("JETTON_IMAGE", "https://ton.org/download/ton_symbol.svg"),
     });
 
     val supply = envOr<int>("JETTON_SUPPLY", 1000000000);
