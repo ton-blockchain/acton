@@ -1,7 +1,7 @@
 use crate::ast::{
     camel_case_detector, deprecated_symbol_use, field_init_can_be_folded,
-    mutable_variable_can_be_immutable, no_bounce_handler, pure_function_call_unused,
-    unused_import, unused_variable, write_only_variable,
+    mutable_variable_can_be_immutable, no_bounce_handler, pure_function_call_unused, unused_import,
+    unused_variable, write_only_variable,
 };
 use serde::Serialize;
 use std::fmt::Display;
@@ -60,7 +60,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E006") => unused_import::UnusedImport,
         (Tolk, "E007") => pure_function_call_unused::PureFunctionCallUnused,
         (Tolk, "E008") => no_bounce_handler::NoBounceHandler,
-        (Tolk, "E009") => camel_case_detector::CamelCaseDetector,
+        (Tolk, "S001") => camel_case_detector::NameCaseChecker,
         _ => return None,
     })
 }

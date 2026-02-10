@@ -438,7 +438,7 @@ fn emit_diagnostics(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Res
             let mut labels = vec![];
             // print edit message (help in green) per edit
             for edit in &fix.edits {
-                let edit_file_id = edit.file_id.unwrap_or(diag.file_id);
+                let edit_file_id = edit.file_id;
                 let cs_file_id = *file_id_map.get(&edit_file_id).unwrap_or(&0);
                 labels.push(
                     Label::primary(cs_file_id, edit.span.start()..edit.span.end())
@@ -478,7 +478,7 @@ fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Result<(
         *fixed_diags_by_file.entry(file_path.clone()).or_default() += 1;
 
         for edit in &fix.edits {
-            let edit_file_id = edit.file_id.unwrap_or(diag.file_id);
+            let edit_file_id = edit.file_id;
             let edit_file_info = file_db.get_by_id(edit_file_id).ok_or_else(|| {
                 anyhow::anyhow!("File info not found for edit file_id {}", edit_file_id)
             })?;
@@ -598,7 +598,7 @@ fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value 
     for fix in &diag.fixes {
         let mut edits_json = Vec::new();
         for edit in &fix.edits {
-            let edit_file_id = edit.file_id.unwrap_or(diag.file_id);
+            let edit_file_id = edit.file_id;
             let edit_source = file_db
                 .get_by_id(edit_file_id)
                 .map(|info| info.source().source.clone())

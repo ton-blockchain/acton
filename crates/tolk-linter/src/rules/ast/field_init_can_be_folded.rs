@@ -107,7 +107,7 @@ fn fire_diagnostic(
             edits: vec![Edit {
                 span: argument.span(),
                 replacement: key_name,
-                file_id: None,
+                file_id,
             }],
             applicability: Applicability::Auto,
         }],

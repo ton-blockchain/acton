@@ -1,6 +1,6 @@
 extern crate core;
 
-use crate::ast::camel_case_detector::check_camel_globals;
+use crate::ast::camel_case_detector::check_name_cases;
 use crate::ast::{deprecated_symbol_use, no_bounce_handler};
 use crate::rules::ast::{
     field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,
@@ -146,7 +146,7 @@ impl<'a> Checker<'a> {
     }
 
     pub fn run_once(&mut self) {
-        run_rule!(self, Rule::CamelCaseDetector, check_camel_globals(self));
+        run_rule!(self, Rule::NameCaseChecker, check_name_cases(self));
     }
 
     pub fn emit_diagnostic(&mut self, rule: Rule, mut diagnostic: Diagnostic) {
@@ -206,16 +206,12 @@ impl<'a> Checker<'a> {
             .cloned()
     }
 
-    pub fn get_all_symbol_global_usages(
-        &self,
-        symbol_id: &SymbolId,
-    ) -> impl Iterator<Item = &NameUse> {
+    pub fn global_usages_of(&self, symbol_id: SymbolId) -> impl Iterator<Item = &NameUse> {
         self.type_db
             .project_index
             .resolved_uses
-            .iter()
-            .map(|v| v.1.global_usages_of(*symbol_id))
-            .flatten()
+            .values()
+            .flat_map(move |v| v.global_usages_of(symbol_id))
     }
 
     pub fn use_facts(&mut self, file_id: FileId) -> Option<Arc<FileUseFacts>> {
