@@ -1883,10 +1883,8 @@ impl FormatterContext {
             _ => {}
         }
 
-        if let Some(location) = &failure.location()
-            && !location.is_empty()
-        {
-            writeln!(result, "at {location}").ok();
+        if let Some(location) = &failure.location() {
+            writeln!(result, "at {}", location.format()).ok();
         }
 
         result.trim().to_string()

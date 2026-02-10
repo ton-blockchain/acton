@@ -12,7 +12,7 @@
     └─ Error: expect(actual).toEqualDecimal(expected)
        Actual:   1.5
        Expected: 1.6
-      └─ at ./tests/test.test[LINE]
+      └─ at tests/test.test[LINE]
 
  ✗ 1 failed in 1 file
 

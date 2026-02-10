@@ -21,7 +21,7 @@
         with:
           success=true
           exit_code=0
-      └─ at ./tests/counter.test[LINE]
+      └─ at tests/counter.test[LINE]
   ✗ should-reset-counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
@@ -35,7 +35,7 @@
         with:
           success=true
           exit_code=0
-      └─ at ./tests/counter.test[LINE]
+      └─ at tests/counter.test[LINE]
 
  ✗ 2 failed in 1 file
 

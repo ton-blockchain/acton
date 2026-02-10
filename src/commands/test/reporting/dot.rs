@@ -78,8 +78,8 @@ impl DotReporter {
                     println!("{} {}: {}", "FAIL".red().bold(), test.name, message);
                 }
 
-                if let Some(details) = &test.details {
-                    println!("  {}", details.dimmed());
+                if let Some(location) = &test.location {
+                    println!("  {}", location.format().dimmed());
                 }
             }
 

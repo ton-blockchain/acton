@@ -523,8 +523,9 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
 /// Optional location can be provided to specify the location of the expectation to
 /// be printed in the error message. You likely don't want to set this manually,
 /// as the location will be automatically set by the test framework.
-fun expect<T>(value: T, location: string = "") {
-    return Expectation<T>.create(value, reflect.typeNameOfObject(value), location);
+fun expect<T>(value: T, loc: SourceLocation = reflect.sourceLocation()) {
+    val locString = format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
+    return Expectation<T>.create(value, reflect.typeNameOfObject(value), locString);
 }
 
 /// Sets the expected exit code for the test.

@@ -314,10 +314,8 @@ fn print_script_result(ctx: &mut Context<'_>, result: ScriptResult) {
                     let highlighted_message = FormatterContext::highlight_actual_expected(&message);
                     eprintln!("{} {}", "Error:".bright_red(), highlighted_message);
 
-                    if let Some(location) = &failure.location
-                        && !location.is_empty()
-                    {
-                        println!("{} at {}", "└─".dimmed(), location.dimmed());
+                    if let Some(location) = &failure.location {
+                        println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                     }
                 } else {
                     if let Some(message) = &assert_failure.message() {
@@ -332,10 +330,8 @@ fn print_script_result(ctx: &mut Context<'_>, result: ScriptResult) {
                         println!("{}", "└─".dimmed());
                     }
 
-                    if let Some(location) = &assert_failure.location()
-                        && !location.is_empty()
-                    {
-                        println!("{} at {}", "└─".dimmed(), location.dimmed());
+                    if let Some(location) = &assert_failure.location() {
+                        println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                     }
                 }
             }

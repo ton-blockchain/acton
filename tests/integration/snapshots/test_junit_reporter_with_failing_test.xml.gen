@@ -5,10 +5,10 @@
             <property name="file.path" value="[ROOT]/tests/counter.test.tolk"/>
         </properties>
         <testcase name="test-should-increase-counter" classname="counter.test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/counter.test[LINE]</failure>
+            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]</failure>
         </testcase>
         <testcase name="test-should-reset-counter" classname="counter.test.tolk" [TIME]>
-            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at ./tests/counter.test[LINE]</failure>
+            <failure message="expect(&amp;lt;actual&amp;gt;).toHaveSuccessfulTx(&amp;lt;expected&amp;gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]</failure>
         </testcase>
     </testsuite>
 </testsuites>
