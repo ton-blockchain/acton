@@ -289,7 +289,7 @@ impl Emulator {
         Ok(message_cell)
     }
 
-    fn compute_in_msg_fwd_fee(
+    pub(crate) fn compute_in_msg_fwd_fee(
         config: &Dict<u32, Cell>,
         message: &RelaxedMessage<'_>,
         is_masterchain: bool,
