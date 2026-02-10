@@ -42,11 +42,11 @@ fn assert_bin_impl(
     let left = left.unwrap_single();
     let right = right.unwrap_single();
 
-    if operator == "==" && left == right {
+    if operator == "==" && left.equal_to(&right) {
         stack.push_bool(true);
         return Ok(());
     }
-    if operator == "!=" && left != right {
+    if operator == "!=" && !left.equal_to(&right) {
         stack.push_bool(true);
         return Ok(());
     }
