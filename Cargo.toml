@@ -183,6 +183,7 @@ comfy-table = { workspace = true } # coverage table
 tree-sitter = { workspace = true } # tolk parser
 clap = { workspace = true } # CLI
 anyhow = { workspace = true }
+dunce = { workspace = true }
 
 # test filtering
 regex = { workspace = true }

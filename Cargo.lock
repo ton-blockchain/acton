@@ -21,6 +21,7 @@ dependencies = [
  "dap",
  "dap-client",
  "dotenvy",
+ "dunce",
  "fern",
  "flate2",
  "fs2",

@@ -224,10 +224,11 @@ impl FileBuildCache {
         let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
-        let file_path = fs::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(&file_path));
+        let file_path =
+            dunce::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(&file_path));
         let contracts = self.config.contracts.clone().unwrap_or_default().contracts;
         let Some((_, contract_info)) = contracts.iter().find(|(_, config)| {
-            fs::canonicalize(&config.src).unwrap_or_else(|_| PathBuf::from(&config.src))
+            dunce::canonicalize(&config.src).unwrap_or_else(|_| PathBuf::from(&config.src))
                 == file_path
         }) else {
             return Ok(file_deps);

@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 use crate::abi::ContractABI;
-use dunce::canonicalize;
+use dunce;
 use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -135,7 +135,7 @@ impl Compiler {
             ) {
                 fn realpath(path_str: &str) -> Result<PathBuf, String> {
                     if Path::new(path_str).is_absolute() {
-                        return canonicalize(path_str).map_err(|e| e.to_string());
+                        return dunce::canonicalize(path_str).map_err(|e| e.to_string());
                     }
 
                     if path_str.starts_with("@stdlib/") || path_str.starts_with("@fiftlib/") {
@@ -154,8 +154,9 @@ impl Compiler {
                             if let Some(target) = mappings.get(prefix) {
                                 let cur_mapped_path = Path::new(target).join(suffix);
 
-                                resolved =
-                                    Some(canonicalize(cur_mapped_path).map_err(|e| e.to_string()));
+                                resolved = Some(
+                                    dunce::canonicalize(cur_mapped_path).map_err(|e| e.to_string()),
+                                );
                             }
                         });
 
@@ -166,7 +167,7 @@ impl Compiler {
                         return Err(format!("Unknown path mapping '{prefix}'"));
                     }
 
-                    canonicalize(path_str).map_err(|e| e.to_string())
+                    dunce::canonicalize(path_str).map_err(|e| e.to_string())
                 }
 
                 match FsReadCallbackKind::from(kind) {

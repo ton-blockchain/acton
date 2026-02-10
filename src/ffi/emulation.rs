@@ -63,7 +63,7 @@ fn build_impl(
             debug!("Found contract with info: {found_contract:?}");
             name = found_contract.name; // use actual name instead of id
             path = found_contract.src;
-            path = fs::canonicalize(&path)
+            path = dunce::canonicalize(&path)
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or(path);
         } else {
