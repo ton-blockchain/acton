@@ -34,6 +34,7 @@ dependencies = [
  "inquire",
  "keyring",
  "log",
+ "nacl",
  "num-bigint",
  "num-traits",
  "opener",
