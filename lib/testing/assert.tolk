@@ -20,6 +20,7 @@
 /// ```
 
 import "@stdlib/gas-payments"
+import "@stdlib/reflection"
 import "../fmt"
 import "../ffi/ffi"
 
@@ -50,13 +51,13 @@ struct Assert
 ///
 /// This is a low-level function. Expectation API provides a higher-level interface
 /// with automatic location tracking.
-fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
+fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: string = "") {
     if (
     !ffi.assertBin(
         "==",
-        left.typeNameOfObject(),
+        reflect.typeNameOfObject(left),
         left.toTuple(),
-        right.typeNameOfObject(),
+        reflect.typeNameOfObject(right),
         right.toTuple(),
         message,
         location
@@ -74,13 +75,13 @@ fun Assert.equal<V1, V2>(left: V1, right: V2, message: slice = "", location: sli
 ///
 /// This is a low-level function. Expectation API provides a higher-level interface
 /// with automatic location tracking.
-fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: slice = "") {
+fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: string = "", location: string = "") {
     if (
     !ffi.assertBin(
         "!=",
-        left.typeNameOfObject(),
+        reflect.typeNameOfObject(left),
         left.toTuple(),
-        right.typeNameOfObject(),
+        reflect.typeNameOfObject(right),
         right.toTuple(),
         message,
         location
@@ -95,7 +96,7 @@ fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: slice = "", location: 
 /// Optional message can be provided to describe the failure.
 /// Optional location can be provided to specify the location of the failure to
 /// be printed in the error message.
-fun Assert.fail(message: slice = "", location: slice = ""): never {
+fun Assert.fail(message: string = "", location: string = ""): never {
     ffi.assertFail(message, location);
     throw ASSERTION_FAILED;
 }
@@ -208,7 +209,7 @@ fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
 /// It provides detailed information about available wallets and instructions on how to add them.
 ///
 /// NOT FOR PUBLIC USE.
-fun Assert.failWalletNotFound(walletName: slice, location: slice = ""): never {
+fun Assert.failWalletNotFound(walletName: string, location: string = ""): never {
     ffi.failWalletNotFound(walletName, location);
     throw ASSERTION_FAILED;
 }
@@ -221,7 +222,7 @@ fun Assert.failWalletNotFound(walletName: slice, location: slice = ""): never {
 ///
 /// This is a low-level function. Expectation API provides a higher-level interface
 /// with automatic location tracking.
-fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: slice = "", location: slice = "") {
+fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "", location: string = "") {
     if (
         !ffi.assertDecimal(
             location,
@@ -249,31 +250,30 @@ fun ffi.assertConsumedLess(start: int, end: int, expected: int) {
 ///
 /// NOT FOR PUBLIC USE.
 fun ffi.assertBin<V1, V2>(
-    op: slice,
-    leftName: slice,
+    op: string,
+    leftName: string,
     left: V1,
-    rightName: slice,
+    rightName: string,
     right: V2,
-    message: slice = "",
-    location: slice = "",
+    message: string = "",
+    location: string = "",
 ): bool
     asm "101 EXTCALL"
 
 /// Internal function to fail the test with the given message and location.
 ///
 /// NOT FOR PUBLIC USE.
-fun ffi.assertFail(message: slice = "", location: slice = ""): bool
+fun ffi.assertFail(message: string = "", location: string = ""): bool
     asm "100 EXTCALL"
 
 /// Internal function to fail when wallet is not found.
 ///
 /// NOT FOR PUBLIC USE.
-fun ffi.failWalletNotFound(walletName: slice, location: slice = ""): bool
+fun ffi.failWalletNotFound(walletName: string, location: string = ""): bool
     asm "105 EXTCALL"
 
-fun ffi.assertDecimal<T>(location: slice, message: slice, decimals: int, right: T, left: T): bool
+fun ffi.assertDecimal<T>(location: string, message: string, decimals: int, right: T, left: T): bool
     asm "106 EXTCALL"
 
-fun ffi.typeNameByOpcode(id: int): slice?
+fun ffi.typeNameByOpcode(id: int): string?
     asm "14 EXTCALL"
-

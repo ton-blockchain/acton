@@ -19,6 +19,7 @@
 /// ```
 
 import "@stdlib/gas-payments"
+import "@stdlib/reflection"
 import "../build/build"
 import "../ffi/ffi"
 import "../fmt"
@@ -71,7 +72,7 @@ type ExtOutList = tuple
 /// Note that if message is not a given type, loading will fail with exit code 63.
 /// If you want to handle this case, use [ExtOutList.atOrNull] instead.
 fun ExtOutList.at<Msg>(self, index: int): ExtMessageRelaxed<Msg> {
-    val cell = self.get<cell>(index) as Cell<ExtMessageRelaxed<Msg>>;
+    val cell = self.get(index) as cell as Cell<ExtMessageRelaxed<Msg>>;
     return cell.load();
 }
 
@@ -81,7 +82,7 @@ fun ExtOutList.at<Msg>(self, index: int): ExtMessageRelaxed<Msg> {
 /// Note that if message is not a given type, this method will return null instead
 /// of throwing an exception. Use [ExtOutList.at] if you don't want to handle null case.
 fun ExtOutList.atOrNull<Msg>(self, index: int): ExtMessageRelaxed<Msg>? {
-    val cell = self.get<cell>(index) as Cell<ExtMessageRelaxed<Msg>>;
+    val cell = self.get(index) as cell as Cell<ExtMessageRelaxed<Msg>>;
     try {
         return cell.load();
     } catch (e) {
@@ -99,7 +100,7 @@ fun ExtOutList.atOrNull<Msg>(self, index: int): ExtMessageRelaxed<Msg>? {
 ///
 /// To get parsed message, use [OutMessages.at] method.
 fun OutMessages.atCell(self, index: int): cell {
-    return self.get<cell>(index);
+    return self.get(index) as cell;
 }
 
 /// Returns the out message at the given index as a parsed message of given type.
@@ -108,13 +109,13 @@ fun OutMessages.atCell(self, index: int): cell {
 ///
 /// If actual message body has a different type, loading will fail.
 fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
-    val cell = self.get<cell>(index) as Cell<MessageRelaxed<Msg>>;
+    val cell = self.get(index) as cell as Cell<MessageRelaxed<Msg>>;
     try {
         return cell.load();
     } catch (e) {
         if (e == 63) {
             // prefix mismatch
-            val cellGeneric = self.get<cell>(index) as Cell<MessageRelaxedGeneric>;
+            val cellGeneric = self.get(index) as cell as Cell<MessageRelaxedGeneric>;
             val msg = cellGeneric.load();
 
             val opcode = msg.loadOpcode();
@@ -126,8 +127,8 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
 
             Assert.fail(format4(
                 "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
-                Msg.typeName(),
-                Msg.getDeclaredPackPrefix(),
+                reflect.typeNameOf<Msg>(),
+                reflect.serializationPrefixOf<Msg>(),
                 opcodeTypeName == null ? "" : opcodeTypeName,
                 opcode
             ));
@@ -171,7 +172,7 @@ type SendResultList = tuple
 
 /// Returns the send result at the given index.
 fun SendResultList.at(self, index: int): SendResult {
-    val tuple = self.get<tuple>(index);
+    val tuple = self.get(index) as tuple;
     return SendResult.fromTuple(tuple);
 }
 
@@ -276,14 +277,14 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>
         return false;
     }
 
-    if (TBody.getDeclaredPackPrefix() != null) {
+    if (reflect.serializationPrefixOf<TBody>() != null) {
         val body = self.loadBody();
         if (body.remainingBitsCount() < TBody.getDeclaredPackPrefixLen()) {
             return false;
         }
 
         val prefix = body.preloadUint(TBody.getDeclaredPackPrefixLen());
-        if (prefix != TBody.getDeclaredPackPrefix()) {
+        if (prefix != reflect.serializationPrefixOf<TBody>()) {
             return false;
         }
     }
@@ -508,10 +509,10 @@ struct Treasury {
 ///     // ...
 /// }
 /// ```
-fun net.treasury(name: slice): Treasury {
+fun net.treasury(name: string): Treasury {
     val stateInit: ContractState = {
         code: __treasuryCode(),
-        data: beginCell().storeSlice(name).endCell(),
+        data: beginCell().storeSlice(name.beginParse()).endCell(),
     };
 
     val deployer = address("0:0000000000000000000000000000000000000000000000000000000000000000");
@@ -557,7 +558,7 @@ struct Wallet {
 ///    println1("Deployed counter to {}", counter.address);
 /// }
 /// ```
-fun net.wallet(name: slice): Wallet {
+fun net.wallet(name: string): Wallet {
     if (ffi.isBroadcasting()) {
         val addressCell = ffi.getWalletByName(name);
         if (addressCell == null) {
@@ -678,7 +679,7 @@ fun net.disableBroadcast(): void {
 /// ```
 ///
 /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.
-fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: slice, args: Args? = null): Ret {
+fun net.runGetMethod<Ret, Args = tuple>(addr: address, name: string, args: Args? = null): Ret {
     val methodId = (crc16(name) & 0xffff) | 0x10000;
     return impl.runGetMethodById(addr, methodId, name, args)
 }
@@ -764,7 +765,7 @@ fun net.waitForTransaction(
 /// val address = net.randomAddress("random_user");
 /// val masterchain_address = net.randomAddress("random_user", -1);
 /// ```
-fun net.randomAddress(name: slice? = null, wc: int = 0): address {
+fun net.randomAddress(name: string? = null, wc: int = 0): address {
     var builder = beginCell();
     builder.storeUint(0b10, 2);
     builder.storeUint(0b0, 1);
@@ -796,7 +797,7 @@ fun net.randomAddress(name: slice? = null, wc: int = 0): address {
 /// ```tolk
 /// net.registerAddress(address, "my_address");
 /// ```
-fun net.registerAddress(addr: address, name: slice) {
+fun net.registerAddress(addr: address, name: string) {
     ffi.registerAddress(addr.toCell(), name);
 }
 
@@ -809,7 +810,7 @@ fun net.registerAddress(addr: address, name: slice) {
 /// ```tolk
 /// net.registerCodeCell(code, "my_code");
 /// ```
-fun net.registerCodeCell(code: cell, name: slice) {
+fun net.registerCodeCell(code: cell, name: string) {
     ffi.registerCodeCell(code, name);
 }
 
@@ -860,14 +861,14 @@ fun net.getAccountStorageFee(addr: address, seconds: int) {
 /// Load library from the real blockchain by hash.
 ///
 /// Returns null if library is not found.
-fun net.loadLibrary(hash: slice): cell? {
+fun net.loadLibrary(hash: string): cell? {
     return ffi.loadLibrary(hash)
 }
 
 /// Load library from the real blockchain by hash and register it in current blockchain.
 ///
 /// Returns false if library is not found.
-fun net.fetchAndRegisterLibrary(hash: slice): bool {
+fun net.fetchAndRegisterLibrary(hash: string): bool {
     val cell = net.loadLibrary(hash);
     if (cell == null) {
         return false
@@ -1031,7 +1032,7 @@ fun net.getConfig(): Config {
 /// ```tolk
 /// val crc = crc16("hello");
 /// ```
-fun crc16(data: slice): int asm "13 EXTCALL"
+fun crc16(data: string): int asm "13 EXTCALL"
 
 fun tuple.fromTuple(data: tuple): tuple {
     return data;
@@ -1039,7 +1040,7 @@ fun tuple.fromTuple(data: tuple): tuple {
 
 struct impl
 
-fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: slice, args: Args? = null): Ret {
+fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: string, args: Args? = null): Ret {
     if (!net.isDeployed(addr)) {
         throw CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT;
     }
@@ -1050,7 +1051,7 @@ fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: slice
     }
 
     val argsToSend = args == null ? createEmptyTuple() : args.toTuple();
-    val res = ffi.runGetMethod(addr.toCell(), code, id, name, Ret.typeName(), argsToSend);
+    val res = ffi.runGetMethod(addr.toCell(), code, id, name, reflect.typeNameOf<Ret>(), argsToSend);
     if (res == null) {
         // actual error will be processed by test framework, just halt execution
         throw 0
@@ -1059,7 +1060,7 @@ fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: slice
         return Ret.fromTuple(res);
     } catch (e) {
         if (e == 7) {
-            Assert.fail(format3("Get method '{}' returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.", name, res, Ret.typeName()))
+            Assert.fail(format3("Get method '{}' returned '{}' that cannot be deserialized to '{}'. Make sure you passed all parameters to the get method.", name, res, reflect.typeNameOf<Ret>()))
         }
 
         throw e
@@ -1072,18 +1073,18 @@ fun __treasuryCode(): cell asm """
 
 fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): SendResultList? asm "9 EXTCALL"
 fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
-fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: slice, returnType: slice, args: tuple): tuple? asm "8 EXTCALL"
+fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: string, returnType: string, args: tuple): tuple? asm "8 EXTCALL"
 fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
-fun ffi.registerAddress(address: cell, name: slice): void asm "15 EXTCALL"
-fun ffi.registerCodeCell(cell: cell, name: slice): void asm "16 EXTCALL"
+fun ffi.registerAddress(address: cell, name: string): void asm "15 EXTCALL"
+fun ffi.registerCodeCell(cell: cell, name: string): void asm "16 EXTCALL"
 fun ffi.findTransactionByParams(txs: tuple, params: tuple): cell? asm "10 EXTCALL"
-fun ffi.failToFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "103 EXTCALL"
-fun ffi.failToNotFindTransactionByParams(location: slice, message: slice, txs: tuple, params: tuple): tuple? asm "104 EXTCALL"
+fun ffi.failToFindTransactionByParams(location: string, message: string, txs: tuple, params: tuple): tuple? asm "103 EXTCALL"
+fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: tuple, params: tuple): tuple? asm "104 EXTCALL"
 fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
-fun ffi.loadLibrary(hash: slice): cell? asm "21 EXTCALL"
+fun ffi.loadLibrary(hash: string): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
-fun ffi.getWalletByName(name: slice): cell? asm "24 EXTCALL"
+fun ffi.getWalletByName(name: string): cell? asm "24 EXTCALL"
 fun ffi.waitForTransaction(addr: cell, messageBodyHash: cell, quiet: bool, attempts: int, sleepDuration: int): bool asm "25 EXTCALL"
 fun ffi.enableBroadcast(): void asm "26 EXTCALL"
 fun ffi.disableBroadcast(): void asm "27 EXTCALL"

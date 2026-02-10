@@ -132,7 +132,7 @@ impl<'a> TestRunner<'a> {
                 };
 
                 let Some(cached) =
-                    cache.get(&contract_info.src, config.debug, 2, "1.2".to_string())
+                    cache.get(&contract_info.src, config.debug, 2, "1.3".to_string())
                 else {
                     warn!("No build cache for contract {}", &contract_info.src);
                     continue;
@@ -685,7 +685,7 @@ fn compile_test_file(
     need_debug_info: bool,
     acton_config: &ActonConfig,
 ) -> anyhow::Result<tolkc::CompilerResult> {
-    let cache_entry = file_cache.get(file, need_debug_info, 0, "1.2".to_string());
+    let cache_entry = file_cache.get(file, need_debug_info, 0, "1.3".to_string());
     if let Some(cache_entry) = cache_entry {
         return Ok(tolkc::CompilerResult::Success(
             tolkc::compiler::CompilerResultSuccess {
@@ -701,7 +701,7 @@ fn compile_test_file(
     let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
         tolkc::CompilerResult::Success(result) => {
-            let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.2".to_string());
+            let cache_result = file_cache.put(file, result, need_debug_info, 0, "1.3".to_string());
             match cache_result {
                 Ok(()) => {}
                 Err(err) => {

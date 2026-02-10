@@ -19,6 +19,7 @@
 /// expect(msgBody.amount).toEqual(ton("10"));
 /// ```
 
+import "@stdlib/reflection"
 import "assert"
 import "expect"
 import "../fmt"
@@ -79,8 +80,8 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 Assert.fail(
                     format4(
                         "Out action is a send message, but it cannot be load as a `{}` (opcode: 0x{:x}) since body has opcode 0x{:x}{}",
-                        Msg.typeName(),
-                        Msg.getDeclaredPackPrefix(),
+                        reflect.typeNameOf<Msg>(),
+                        reflect.serializationPrefixOf<Msg>(),
                         opcode,
                         opcodeTypeName == null ? "" : format1(" ({})", opcodeTypeName),
                     ),
@@ -101,11 +102,11 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
 
 struct expectImpl
 
-fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: slice) {
+fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string) {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
-            Msg.typeName(),
+            reflect.typeNameOf<Msg>(),
             exitCode
         ),
         location
