@@ -34,7 +34,14 @@ fn mnemonic_new_impl(_ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()
     let words = new_mnemonic()?;
     let mut items = Tuple::empty();
     for word in &words {
-        items.push_string(word);
+        // Tolk `string` = Cell with a ref to a snake-string cell
+        let mut snake = CellBuilder::new();
+        snake.store_bits(word.len() * 8, word.as_bytes())?;
+        let snake_cell = snake.build()?;
+
+        let mut wrapper = CellBuilder::new();
+        wrapper.store_reference(&snake_cell.into())?;
+        items.push(TupleItem::Cell(wrapper.build()?.into()));
     }
     stack.push(TupleItem::Tuple(items));
     Ok(())
@@ -49,9 +56,11 @@ fn mnemonic_to_key_pair_impl(
     let word_strings: Vec<String> = words
         .iter()
         .map(|item| match item {
-            TupleItem::Slice(cell) => Tuple::parse_snake_string(cell)
-                .ok_or_else(|| anyhow::anyhow!("cannot parse mnemonic word from slice")),
-            _ => anyhow::bail!("expected slice items in mnemonic tuple"),
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
+                Tuple::parse_snake_string(cell)
+                    .ok_or_else(|| anyhow::anyhow!("cannot parse string from cell"))
+            }
+            _ => anyhow::bail!("expected string items in mnemonic tuple"),
         })
         .collect::<anyhow::Result<Vec<String>>>()?;
     let word_strs: Vec<&str> = word_strings.iter().map(String::as_str).collect();

@@ -1,5 +1,3 @@
-import "../testing/assert"
-
 /// Module for cryptographic operations.
 ///
 /// This module provides functions for generating mnemonics, deriving key pairs,
@@ -18,6 +16,9 @@ import "../testing/assert"
 /// val randomBytes = crypto.getSecureRandomBytes(32);
 /// ```
 
+import "../ffi/ffi"
+import "../testing/assert"
+
 struct crypto
 
 /// Represents an Ed25519 key pair.
@@ -31,17 +32,22 @@ struct KeyPair {
     publicKey: int;
 }
 
+// With an assumption, that the length of an array is exactly 24
+type Mnemonic = array<string>
+
 /// Generates a new random BIP39-compatible mnemonic phrase.
 ///
-/// Returns a tuple of 24 English words that can be used to derive a key pair
+/// Returns an array of 24 English words that can be used to derive a key pair
 /// via [crypto.mnemonicToKeyPair].
 ///
 /// Example:
 /// ```tolk
-/// val words = crypto.mnemonicNew();
-/// // words is a tuple of 24 strings
+/// val words = crypto.createMnemonic();
+/// // words is an array of 24 strings
 /// ```
-fun crypto.mnemonicNew(): tuple asm "401 EXTCALL";
+fun crypto.createMnemonic(): Mnemonic {
+    return ffi.createMnemonic();
+}
 
 /// Derives an Ed25519 [KeyPair] from a mnemonic phrase.
 ///
@@ -55,15 +61,13 @@ fun crypto.mnemonicNew(): tuple asm "401 EXTCALL";
 /// // kp.privateKey — 32-byte seed
 /// // kp.publicKey  — 32-byte public key
 /// ```
-fun crypto.mnemonicToKeyPair(words: tuple): KeyPair {
-    val raw: tuple = crypto.__mnemonicToKeyPair(words);
+fun Mnemonic.toKeyPair(self): KeyPair {
+    val [privateKey, publicKey] = ffi.__mnemonicToKeyPair(self);
     return KeyPair {
-        privateKey: raw.get(0),
-        publicKey: raw.get(1),
+        privateKey,
+        publicKey,
     };
 }
-
-fun crypto.__mnemonicToKeyPair(words: tuple): tuple asm "402 EXTCALL";
 
 /// Signs a cell by hashing it and then signing the hash.
 ///
@@ -83,7 +87,7 @@ fun crypto.sign(privateKey: int, data: cell): slice {
 /// Signs a raw 256-bit hash with the given private key using Ed25519.
 ///
 /// Returns a 512-bit (64-byte) Ed25519 signature as a slice.
-/// The `privateKey` must be a 32-byte seed as returned in [KeyPair.privateKey].
+/// The `privateKey` must be a 32-byte seed as int
 ///
 /// Example:
 /// ```tolk
@@ -91,7 +95,9 @@ fun crypto.sign(privateKey: int, data: cell): slice {
 /// val hash = myCell.hash();
 /// val signature = crypto.rawSign(kp.privateKey, hash);
 /// ```
-fun crypto.rawSign(privateKey: int, data: int): slice asm "403 EXTCALL";
+fun crypto.rawSign(privateKey: int, data: int): slice {
+    return ffi.rawSign(privateKey, data);
+}
 
 /// Generates cryptographically secure random bytes.
 ///
@@ -102,21 +108,16 @@ fun crypto.rawSign(privateKey: int, data: int): slice asm "403 EXTCALL";
 /// val randomBytes = crypto.getSecureRandomBytes(32);
 /// ```
 fun crypto.getSecureRandomBytes(bytesNum: uint16): slice {
-    if(bytesNum >= 128) {
+    if (bytesNum >= 128) {
         Assert.fail("getSecureRandomBytes expects bytesNum less than 128");
-        // Unreachable
-        throw 1;
     }
-    return crypto.__getSecureRandomBytes(bytesNum);
+    return ffi.__getSecureRandomBytes(bytesNum);
 }
-
-fun crypto.__getSecureRandomBytes(bytesNum: uint16): slice asm "400 EXTCALL"
-
 
 /// Generates fast (non-cryptographic) deterministic random bytes using a seed.
 ///
 /// If `seed` is not provided, the current blockchain time is used.
-/// The maximum `bytesNum` is 127; values >= 128 will throw error code 7.
+/// The maximum `bytesNum` is 127; values >= 128 will throw an error
 ///
 /// Same seed always produces the same output, which is useful for reproducible tests.
 ///
@@ -130,10 +131,8 @@ fun crypto.getFastRandomBytes(bytesNum: uint16, seed: int? = null): slice {
     }
     random.initializeBy(seed);
     // In this case bytes won't fit in one slice
-    if(bytesNum >= 128) {
+    if (bytesNum >= 128) {
         Assert.fail("getFastRandomBytes expects bytesNum less than 128");
-        // Unreachable
-        throw 1;
     }
 
     var res = beginCell();
@@ -145,3 +144,8 @@ fun crypto.getFastRandomBytes(bytesNum: uint16, seed: int? = null): slice {
     }
     return res.toSlice();
 }
+
+fun ffi.createMnemonic(): Mnemonic asm "401 EXTCALL"
+fun ffi.__mnemonicToKeyPair(words: Mnemonic): [int, int] asm "402 EXTCALL";
+fun ffi.__getSecureRandomBytes(bytesNum: uint16): slice asm "400 EXTCALL"
+fun ffi.rawSign(privateKey: int, data: int): slice asm "403 EXTCALL";

@@ -1,14 +1,15 @@
 import "crypto"
+import "../io"
 import "../testing/expect"
 
 get fun `test-mnemonic-new-returns-24-words`() {
-    val words = crypto.mnemonicNew();
-    expect(words).toHaveLength(24);
+    val words = crypto.createMnemonic();
+    expect(words.size()).toEqual(24);
 }
 
 get fun `test-mnemonic-to-key-pair-and-sign`() {
-    val words = crypto.mnemonicNew();
-    val kp = crypto.mnemonicToKeyPair(words);
+    val words = crypto.createMnemonic();
+    val kp = words.toKeyPair();
 
     // privateKey and publicKey must be non-zero
     expect(kp.privateKey).toNotEqual(0);
