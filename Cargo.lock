@@ -3202,6 +3202,7 @@ name = "ton-source-map"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "pathdiff",
  "serde",
  "tycho-types",
 ]

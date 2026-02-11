@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::Path;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
@@ -92,17 +91,10 @@ impl SourceLocation {
     pub fn normalize_path(file: &str) -> String {
         let normalized = Self::normalize_temp_name(file);
 
-        if let Ok(cwd) = std::env::current_dir() {
-            let file_path = Path::new(&normalized);
-
-            if let Ok(relative) = file_path.strip_prefix(&cwd) {
-                let relative_str = relative.to_string_lossy();
-                if relative_str.len() < normalized.len()
-                    || normalized.starts_with(cwd.to_string_lossy().as_ref())
-                {
-                    return relative_str.to_string();
-                }
-            }
+        if let Ok(cwd) = std::env::current_dir()
+            && let Some(relative) = pathdiff::diff_paths(&normalized, cwd)
+        {
+            return relative.display().to_string();
         }
 
         normalized

@@ -428,7 +428,7 @@ fn send_message_debug(
         .expect("Cannot send response");
 
     let msg_cell = Emulator::patch_message(
-        &ctx.chain.world_state.get_config(),
+        ctx.chain.world_state.get_config(),
         msg_cell.clone(),
         src_addr,
     )?;

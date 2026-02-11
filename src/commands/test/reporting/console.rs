@@ -4,7 +4,7 @@ use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
 use crate::{exit_codes, retrace};
 use owo_colors::OwoColorize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
 use ton_source_map::SourceLocation;
 
@@ -117,15 +117,14 @@ impl TestReporter for ConsoleReporter {
 
     fn on_suite_started(
         &mut self,
-        _file_path: &Path,
+        file_path: &Path,
         tests: &[TestDescriptor],
     ) -> anyhow::Result<()> {
         self.count_suites += 1;
 
-        let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-        let relative_path = Path::new(_file_path)
-            .strip_prefix(&cwd)
-            .unwrap_or_else(|_| Path::new(_file_path));
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let relative = pathdiff::diff_paths(file_path, cwd);
+        let relative_path = relative.unwrap_or_else(|| file_path.to_owned());
 
         println!(
             " {} {} {}",
