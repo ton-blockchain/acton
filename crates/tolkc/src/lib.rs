@@ -17,6 +17,7 @@
 //! }
 //! ```
 
+pub mod abi;
 pub mod compiler;
 
 pub use compiler::{Compiler, CompilerInternalResult, CompilerResult, compile, compile_fast};

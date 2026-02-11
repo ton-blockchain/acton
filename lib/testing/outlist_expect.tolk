@@ -35,7 +35,9 @@ import "../types/out_actions"
 /// expect(out_actions).toBeNonEmpty();
 /// ```
 fun Expectation<OutActionList>.toBeNonEmpty(self) {
-    expect(self.value.size(), self.location).toNotEqual(0);
+    val value = self.value.size();
+    val expectation = Expectation<int>.create(value, reflect.typeNameOfObject(value), self.location);
+    expectation.toNotEqual(0);
 }
 
 /// Expect the out action list to be empty.
@@ -46,7 +48,9 @@ fun Expectation<OutActionList>.toBeNonEmpty(self) {
 /// expect(out_actions).toBeEmpty();
 /// ```
 fun Expectation<OutActionList>.toBeEmpty(self) {
-    expect(self.value.size(), self.location).toEqual(0);
+    val value = self.value.size();
+    val expectation = Expectation<int>.create(value, reflect.typeNameOfObject(value), self.location);
+    expectation.toEqual(0);
 }
 
 /// Expect the out action at the given index to be a send message.

@@ -11,6 +11,7 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
+use tolkc::abi::ContractABI;
 use tolkc::compiler::CompilerResultSuccess;
 use ton_abi;
 use ton_source_map::SourceMap;
@@ -23,6 +24,7 @@ pub struct CacheEntry {
     pub code_hash_hex: String,
     pub fift_code: String,
     pub source_map: Option<SourceMap>,
+    pub abi: Option<ContractABI>,
     pub dependencies_hash: String,
     pub timestamp: u64,
     pub schema_version: u32,
@@ -172,6 +174,7 @@ impl FileBuildCache {
             code_hash_hex: result.code_hash_hex.clone(),
             fift_code: result.fift_code.clone(),
             source_map: result.source_map.clone(),
+            abi: result.abi.clone(),
             dependencies_hash,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -221,10 +224,11 @@ impl FileBuildCache {
         let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
-        let file_path = fs::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(&file_path));
+        let file_path =
+            dunce::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(&file_path));
         let contracts = self.config.contracts.clone().unwrap_or_default().contracts;
         let Some((_, contract_info)) = contracts.iter().find(|(_, config)| {
-            fs::canonicalize(&config.src).unwrap_or_else(|_| PathBuf::from(&config.src))
+            dunce::canonicalize(&config.src).unwrap_or_else(|_| PathBuf::from(&config.src))
                 == file_path
         }) else {
             return Ok(file_deps);
@@ -437,6 +441,7 @@ mod tests {
             code_boc64: "test_boc".to_string(),
             code_hash_hex: "test_hash".to_string(),
             source_map: None,
+            abi: None,
         };
 
         cache.put(

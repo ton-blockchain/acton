@@ -1,6 +1,7 @@
 # Acton project directories
 .acton/
-/objs/
+/objs
+/build
 
 # Rust build artifacts
 target/
@@ -12,25 +13,23 @@ Cargo.lock
 *.swp
 *.swo
 
+# Docs
 docs/.astro
 docs/.source
 docs/out
 
+# Frontend
 **/dist
 **/node_modules
 **/target
-toncenter-*.json
+**/.eslintcache
 
 # OS files
 .DS_Store
 Thumbs.db
 
-**/.eslintcache
-
 gen/
 *.mnemonic
 wallets.toml
 global.wallets.toml
-
-crates/acton-test-ui/node_modules
-crates/acton-test-ui/dist
+toncenter-*.json

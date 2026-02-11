@@ -1,5 +1,6 @@
 #![allow(unsafe_code)]
-use dunce::canonicalize;
+use crate::abi::ContractABI;
+use dunce;
 use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -134,7 +135,7 @@ impl Compiler {
             ) {
                 fn realpath(path_str: &str) -> Result<PathBuf, String> {
                     if Path::new(path_str).is_absolute() {
-                        return canonicalize(path_str).map_err(|e| e.to_string());
+                        return dunce::canonicalize(path_str).map_err(|e| e.to_string());
                     }
 
                     if path_str.starts_with("@stdlib/") || path_str.starts_with("@fiftlib/") {
@@ -153,8 +154,9 @@ impl Compiler {
                             if let Some(target) = mappings.get(prefix) {
                                 let cur_mapped_path = Path::new(target).join(suffix);
 
-                                resolved =
-                                    Some(canonicalize(cur_mapped_path).map_err(|e| e.to_string()));
+                                resolved = Some(
+                                    dunce::canonicalize(cur_mapped_path).map_err(|e| e.to_string()),
+                                );
                             }
                         });
 
@@ -165,7 +167,7 @@ impl Compiler {
                         return Err(format!("Unknown path mapping '{prefix}'"));
                     }
 
-                    canonicalize(path_str).map_err(|e| e.to_string())
+                    dunce::canonicalize(path_str).map_err(|e| e.to_string())
                 }
 
                 match FsReadCallbackKind::from(kind) {
@@ -292,6 +294,7 @@ impl Compiler {
                         high_level: source_map,
                         debug_marks,
                     }),
+                    abi: result.abi,
                 })
             }
             Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
@@ -331,10 +334,12 @@ pub struct CompilerResultSuccess {
     pub code_boc64: String,
     pub code_hash_hex: String,
     pub source_map: Option<SourceMap>,
+    pub abi: Option<ContractABI>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum CompilerInternalResult {
     Success(CompilerInternalResultSuccess),
     Error(CompilerResultError),
@@ -352,6 +357,8 @@ pub struct CompilerInternalResultSuccess {
     pub debug_mark_base64: String,
     #[serde(rename = "sourceMap")]
     pub source_map: Option<HighLevelSourceMap>,
+    #[serde(rename = "abiJson")]
+    pub abi: Option<ContractABI>,
 }
 
 #[derive(Debug, Deserialize)]

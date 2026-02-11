@@ -26,6 +26,7 @@ use crate::formatter::FormatterContext;
 use acton_config::config::{ActonConfig, ContractDependency, DependencyKind};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::anyhow;
+use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
 use num_traits::ToPrimitive;
@@ -411,7 +412,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
             anyhow::bail!("Test file must end with {}", ".test.tolk".yellow());
         }
         vec![
-            fs::canonicalize(&path)
+            dunce::canonicalize(&path)
                 .unwrap_or_else(|_| PathBuf::from(&path))
                 .to_string_lossy()
                 .to_string(),
@@ -530,7 +531,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         let reports = reports.lock().expect("cannot lock mutex").clone();
         let trace_dir = config.save_test_trace.clone();
         let project_root = std::env::current_dir().unwrap_or_default();
-        let project_root = fs::canonicalize(project_root)
+        let project_root = dunce::canonicalize(project_root)
             .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default())
             .to_string_lossy()
             .to_string();
@@ -694,6 +695,7 @@ fn compile_test_file(
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
                 source_map: cache_entry.source_map,
+                abi: cache_entry.abi,
             },
         ));
     }
@@ -776,7 +778,7 @@ fn run_file_tests(
     abi: &ContractAbi,
     source_map: &SourceMap,
 ) -> anyhow::Result<TestStats> {
-    let abs_file_path = fs::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(file_path));
+    let abs_file_path = dunce::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(file_path));
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
         let regex = match Regex::new(pattern) {
             Ok(r) => r,

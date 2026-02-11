@@ -25,23 +25,23 @@ fun buildOnchainMetadata(info: JettonInfo): cell {
 
     var dict = createEmptyMap<uint256, cell>();
 
-    dict.set(stringSha256("name"), info.name.toSnakeString());
-    dict.set(stringSha256("description"), info.description.toSnakeString());
-    dict.set(stringSha256("symbol"), info.symbol.toSnakeString());
-    dict.set(stringSha256("image"), info.image.toSnakeString());
+    dict.set("name".sha256(), info.name.toSnakeString());
+    dict.set("description".sha256(), info.description.toSnakeString());
+    dict.set("symbol".sha256(), info.symbol.toSnakeString());
+    dict.set("image".sha256(), info.image.toSnakeString());
 
     return beginCell().storeUint(ONCHAIN_CONTENT_PREFIX, 8).storeDict(dict.toLowLevelDict()).endCell()
 }
 
 fun main() {
     val content = buildOnchainMetadata({
-        name: envOr<string>("JETTON_NAME", "SomeJetton"),
-        description: envOr<string>("JETTON_DESCRIPTION", "Sone jetton"),
-        symbol: envOr<string>("JETTON_SYMBOL", "JTTT"),
-        image: envOr<string>("JETTON_IMAGE", "https://ton.org/download/ton_symbol.svg"),
+        name: env<string>("JETTON_NAME") ?? "SomeJetton",
+        description: env<string>("JETTON_DESCRIPTION") ?? "Sone jetton",
+        symbol: env<string>("JETTON_SYMBOL") ?? "JTTT",
+        image: env<string>("JETTON_IMAGE") ?? "https://ton.org/download/ton_symbol.svg",
     });
 
-    val supply = envOr<int>("JETTON_SUPPLY", 1000000000);
+    val supply = env<int>("JETTON_SUPPLY") ?? 1000000000;
 
     val deployer = net.wallet("deployer");
     val minter = JettonMinter.fromStorage({

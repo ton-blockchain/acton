@@ -27,7 +27,14 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
     let assert1 = assert_ui();
     let mut redactions = assert1.redactions().clone();
 
-    let tmp_dir = project_path.to_string_lossy().to_string();
+    let mut tmp_dir = project_path.to_string_lossy().to_string();
+    if cfg!(windows) {
+        // since Windows uses backslashes `\` as separators,
+        // while snapshots use Unix paths and slashes `/`,
+        // we will explicitly replace Windows separators with Unix separators in this case
+        tmp_dir = tmp_dir.replace("\\", "/");
+    }
+
     let lib_dir = Path::new(tmp_dir.as_str()).parent().unwrap().join("lib");
     redactions.insert("[ROOT]", tmp_dir.clone()).unwrap();
     redactions.insert("[ACTON_LIB]", lib_dir.clone()).unwrap();
