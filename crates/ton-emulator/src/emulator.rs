@@ -108,7 +108,7 @@ impl Emulator {
         libs: &Dict<HashBytes, LibDescr>,
         from: Option<IntAddr>,
     ) -> anyhow::Result<SendMessageResult> {
-        let msg_cell = Self::patch_message(state, message, from)?;
+        let msg_cell = Self::patch_message(state.get_config(), message, from)?;
         let msg_b64 = Boc::encode_base64(&msg_cell);
         let msg = msg_cell
             .parse::<Message<'_>>()
@@ -245,7 +245,7 @@ impl Emulator {
     }
 
     pub fn patch_message(
-        state: &WorldState,
+        config: &Dict<u32, Cell>,
         message_cell: Cell,
         src_addr: Option<IntAddr>,
     ) -> anyhow::Result<Cell> {
@@ -276,8 +276,7 @@ impl Emulator {
             if let RelaxedMsgInfo::Int(info) = &message.info {
                 // Forwarding prices are selected by destination workchain.
                 let is_masterchain = info.dst.is_masterchain();
-                let fwd_fee =
-                    Self::compute_in_msg_fwd_fee(state.get_config(), &message, is_masterchain)?;
+                let fwd_fee = Self::compute_in_msg_fwd_fee(config, &message, is_masterchain)?;
                 if let RelaxedMsgInfo::Int(info) = &mut message.info {
                     info.fwd_fee = fwd_fee;
                 }
@@ -297,8 +296,7 @@ impl Emulator {
         let message_cell = to_cell(message)?;
         let root_bits = u64::from(message_cell.bit_len());
         let mut stats = message_cell
-            .as_slice()
-            .context("Failed to parse message cell for forwarding fee calculation")?
+            .as_slice_allow_exotic()
             .compute_unique_stats(usize::MAX)
             .context("Failed to compute message stats for forwarding fee calculation")?;
 
