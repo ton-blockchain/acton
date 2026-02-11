@@ -56,10 +56,8 @@ fn mnemonic_to_key_pair_impl(
     let word_strings: Vec<String> = words
         .iter()
         .map(|item| match item {
-            TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
-                Tuple::parse_snake_string(cell)
-                    .ok_or_else(|| anyhow::anyhow!("cannot parse string from cell"))
-            }
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => Tuple::parse_snake_string(cell)
+                .ok_or_else(|| anyhow::anyhow!("cannot parse string from cell")),
             _ => anyhow::bail!("expected string items in mnemonic tuple"),
         })
         .collect::<anyhow::Result<Vec<String>>>()?;
