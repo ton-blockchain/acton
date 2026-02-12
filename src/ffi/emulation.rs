@@ -38,8 +38,8 @@ use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, St
 use tycho_types::dict::Dict;
 use tycho_types::models::{
     AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr,
-    LibDescr, MsgInfo, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount,
-    SkippedComputePhase, Transaction, TxInfo,
+    LibDescr, MsgInfo, OrdinaryTxInfo, OptionalAccount, RelaxedMessage, RelaxedMsgInfo,
+    ShardAccount, SkippedComputePhase, Transaction, TxInfo,
 };
 
 extension!(build in (Context) with (path: String, name: String) using build_impl);
@@ -1414,6 +1414,62 @@ fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     Ok(())
 }
 
+extension!(get_shard_account in (Context) with (addr: TupleItem) using get_shard_account_impl);
+fn get_shard_account_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    addr: TupleItem,
+) -> anyhow::Result<()> {
+    let addr_cell = match addr {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
+        _ => anyhow::bail!("Expected address as Cell or Slice"),
+    };
+
+    let raw_addr = cell_address_to_raw(addr_cell).context("Failed to decode address")?;
+    let shard_account = ctx.chain.world_state.get_account(&raw_addr);
+    let shard_account_cell = ArcCell::from_boc(&Boc::encode(to_cell(&shard_account)))
+        .map_err(|e| anyhow::anyhow!("Failed to encode shard account: {e}"))?;
+    stack.push(TupleItem::Cell(shard_account_cell));
+    Ok(())
+}
+
+extension!(set_shard_account in (Context) with (shard_account: TupleItem, addr: TupleItem) using set_shard_account_impl);
+fn set_shard_account_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    shard_account: TupleItem,
+    addr: TupleItem,
+) -> anyhow::Result<()> {
+    let addr_cell = match addr {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
+        _ => anyhow::bail!("Expected address as Cell or Slice"),
+    };
+    let raw_addr = cell_address_to_raw(addr_cell).context("Failed to decode address")?;
+    let shard_account = match shard_account {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
+            let shard_account_boc = cell
+                .to_boc(false)
+                .context("Failed to encode shard account to BoC")?;
+            let shard_account_cell =
+                Boc::decode(shard_account_boc).context("Failed to decode shard account BoC")?;
+            shard_account_cell
+                .parse::<ShardAccount>()
+                .context("Failed to parse shard account")?
+        }
+        TupleItem::Null => ShardAccount {
+            account: Lazy::new(&OptionalAccount(None))
+                .context("Failed to create empty shard account")?,
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        },
+        _ => anyhow::bail!("Expected shard account as Cell or Slice"),
+    };
+
+    ctx.chain.world_state.update_account(&raw_addr, &shard_account);
+    Ok(())
+}
+
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         6 => build,
@@ -1441,5 +1497,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         30 => send_single_message,
         31 => get_config,
         32 => set_config,
+        33 => get_shard_account,
+        34 => set_shard_account,
     });
 }

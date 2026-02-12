@@ -435,5 +435,12 @@ struct AccountStorage {
     state: AccountStatus
 }
 
+/// Represents a shard account state.
+struct ShardAccount {
+    account: Cell<Account>,
+    lastTransHash: uint256,
+    lastTransLt: uint64,
+}
+
 /// Represents a list of transactions.
 type TransactionList = tuple

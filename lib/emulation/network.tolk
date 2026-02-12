@@ -936,6 +936,88 @@ fun net.balance(of: address): coins {
     return state.storage.balance.grams
 }
 
+/// Returns the account state for an address in emulation.
+///
+/// The returned value is either `AccountInfo` for an existing account
+/// or `AccountNone` if the account does not exist.
+///
+/// Example:
+/// ```tolk
+/// val acc = net.getAccount(addr);
+/// if (acc is AccountInfo) {
+///     println("Account exists");
+/// }
+/// ```
+fun net.getAccount(addr: address): Account {
+    val shard = net.getShardAccount(addr);
+    return shard!!.account.load();
+}
+
+
+/// Sets the account state for an address in emulation.
+///
+/// If the account already exists, preserves `lastTransHash` and `lastTransLt`
+/// from the existing shard account. Otherwise, initializes them to zero.
+///
+/// Example:
+/// ```tolk
+/// val acc = net.getAccount(addr);
+/// net.setAccount(addr, acc);
+/// ```
+fun net.setAccount(addr: address, acc: Account) {
+    val shardAcc = net.getShardAccount(addr);
+    var lastTransHash = 0;
+    var lastTransLt = 0;
+    if (shardAcc != null) {
+        lastTransHash = shardAcc.lastTransHash;
+        lastTransLt = shardAcc.lastTransLt;
+    }
+    val newShardAcc = ShardAccount {
+        account: acc.toCell(),
+        lastTransHash,
+        lastTransLt,
+    };
+    net.setShardAccount(addr, newShardAcc);
+}
+
+/// Returns the shard account state for an address in emulation.
+///
+/// The returned shard account can represent an uninitialized account.
+///
+/// Example:
+/// ```tolk
+/// val shard = net.getShardAccount(addr);
+/// if (shard != null) {
+///     println1("Last LT: {}", shard.lastTransLt);
+/// }
+/// ```
+fun net.getShardAccount(addr: address): ShardAccount? {
+    val rawRes = ffi.getShardAccount(addr);
+    if (rawRes == null) {
+        return null;
+    }
+    return ShardAccount.fromCell(rawRes);
+}
+
+/// Sets the shard account state for an address in emulation.
+///
+/// Pass `null` to reset the account to an empty state.
+///
+/// Example:
+/// ```tolk
+/// val shard = net.getShardAccount(addr);
+/// if (shard != null) {
+///     net.setShardAccount(addr, shard);
+/// }
+/// ```
+fun net.setShardAccount(addr: address, account: ShardAccount?): void {
+    if (account == null) {
+        ffi.setShardAccount(addr, null);
+        return;
+    }
+    ffi.setShardAccount(addr, account.toCell());
+}
+
 /// Sets the blockchain configuration.
 ///
 /// This function updates the entire blockchain configuration with a new configuration dict.
@@ -1092,3 +1174,5 @@ fun ffi.setNow(now: int): void asm "28 EXTCALL"
 fun ffi.getNow(): int asm "29 EXTCALL"
 fun ffi.getConfig(): dict asm "31 EXTCALL"
 fun ffi.setConfig(config: dict): bool asm "32 EXTCALL"
+fun ffi.getShardAccount(addr: address): cell? asm "33 EXTCALL";
+fun ffi.setShardAccount(addr: address, account: cell?): void asm "34 EXTCALL";

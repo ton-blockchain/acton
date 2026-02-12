@@ -82,4 +82,46 @@ get fun getParam() {
             .success()
             .assert_passed(1);
     }
+
+    #[test]
+    fn test_get_shard_account() {
+        ProjectBuilder::new("simple")
+            .contract("simple", SIMPLE_CONTRACT)
+            .test_file_from_path("test", "tests/ffi/shard_account.test.tolk")
+            .build()
+            .acton()
+            .test()
+            .filter("test get shard account")
+            .run()
+            .success()
+            .assert_passed(1);
+    }
+
+    #[test]
+    fn test_set_and_get_shard_account() {
+        ProjectBuilder::new("simple")
+            .contract("simple", SIMPLE_CONTRACT)
+            .test_file_from_path("test", "tests/ffi/shard_account.test.tolk")
+            .build()
+            .acton()
+            .test()
+            .filter("test set and get shard account")
+            .run()
+            .success()
+            .assert_passed(1);
+    }
+
+    #[test]
+    fn test_reset_shard_account() {
+        ProjectBuilder::new("simple")
+            .contract("simple", SIMPLE_CONTRACT)
+            .test_file_from_path("test", "tests/ffi/shard_account.test.tolk")
+            .build()
+            .acton()
+            .test()
+            .filter("test reset shard account")
+            .run()
+            .success()
+            .assert_passed(1);
+    }
 }
