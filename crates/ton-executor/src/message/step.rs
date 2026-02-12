@@ -46,7 +46,7 @@
 use super::create_emulator;
 use crate::config::DEFAULT_CONFIG;
 use crate::message::types::{EmulationInternalParams, EmulationResult, RunTransactionArgs};
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, EXT_METHOD_STACK_ALL_ITEMS, ExtMethodCallback};
 use anyhow::Context;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
@@ -210,6 +210,16 @@ impl StepExecutor {
         ctx: &mut Ctx,
         callback: ExtMethodCallback<Ctx>,
     ) -> anyhow::Result<()> {
+        self.register_ext_method_with_stack_items(id, ctx, callback, EXT_METHOD_STACK_ALL_ITEMS)
+    }
+
+    pub fn register_ext_method_with_stack_items<Ctx>(
+        &mut self,
+        id: i32,
+        ctx: &mut Ctx,
+        callback: ExtMethodCallback<Ctx>,
+        stack_items_count: u8,
+    ) -> anyhow::Result<()> {
         if !self.ext_methods.insert(id) {
             anyhow::bail!("Extension method with id {id} already registered");
         }
@@ -224,6 +234,7 @@ impl StepExecutor {
                     unsafe extern "C" fn(*mut Ctx, *const i8) -> *const i8,
                     unsafe extern "C" fn(*mut c_void, *const i8) -> *const i8,
                 >(callback),
+                c_int::from(stack_items_count),
             );
         };
 
@@ -232,13 +243,14 @@ impl StepExecutor {
 }
 
 impl BaseExecutor for StepExecutor {
-    fn register_ext_method<Ctx>(
+    fn register_ext_method_with_stack_items<Ctx>(
         &mut self,
         id: i32,
         ctx: &mut Ctx,
         callback: ExtMethodCallback<Ctx>,
+        stack_items_count: u8,
     ) -> anyhow::Result<()> {
-        self.register_ext_method(id, ctx, callback)
+        self.register_ext_method_with_stack_items(id, ctx, callback, stack_items_count)
     }
 }
 

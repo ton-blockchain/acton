@@ -50,7 +50,7 @@ pub mod types;
 use core::ffi::{c_char, c_int, c_void};
 pub use types::*;
 
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, EXT_METHOD_STACK_ALL_ITEMS, ExtMethodCallback};
 use anyhow::Context;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString};
@@ -190,6 +190,16 @@ impl GetExecutor {
         ctx: &mut Ctx,
         callback: ExtMethodCallback<Ctx>,
     ) -> anyhow::Result<()> {
+        self.register_ext_method_with_stack_items(id, ctx, callback, EXT_METHOD_STACK_ALL_ITEMS)
+    }
+
+    pub fn register_ext_method_with_stack_items<Ctx>(
+        &mut self,
+        id: i32,
+        ctx: &mut Ctx,
+        callback: ExtMethodCallback<Ctx>,
+        stack_items_count: u8,
+    ) -> anyhow::Result<()> {
         if !self.ext_methods.insert(id) {
             anyhow::bail!("Extension method with id {id} already registered");
         }
@@ -204,6 +214,7 @@ impl GetExecutor {
                     unsafe extern "C" fn(*mut Ctx, *const i8) -> *const i8,
                     unsafe extern "C" fn(*mut c_void, *const i8) -> *const i8,
                 >(callback),
+                c_int::from(stack_items_count),
             );
         };
 
@@ -212,13 +223,14 @@ impl GetExecutor {
 }
 
 impl BaseExecutor for GetExecutor {
-    fn register_ext_method<Ctx>(
+    fn register_ext_method_with_stack_items<Ctx>(
         &mut self,
         id: i32,
         ctx: &mut Ctx,
         callback: ExtMethodCallback<Ctx>,
+        stack_items_count: u8,
     ) -> anyhow::Result<()> {
-        self.register_ext_method(id, ctx, callback)
+        self.register_ext_method_with_stack_items(id, ctx, callback, stack_items_count)
     }
 }
 
@@ -237,6 +249,7 @@ unsafe extern "C" {
         id: c_int,
         ctx: *mut c_void,
         callback: ExtMethodCallback<c_void>,
+        stack_items_count: c_int,
     ) -> *const c_char;
 
     pub(crate) fn tvm_emulator_set_gas_limit(tvm_emulator: *mut c_void, gas_limit: i64) -> bool;

@@ -115,9 +115,9 @@ fn raw_sign_impl(
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        400 => get_secure_random_bytes,
-        401 => mnemonic_new,
-        402 => mnemonic_to_key_pair,
-        403 => raw_sign,
+        400 => get_secure_random_bytes : 1,
+        401 => mnemonic_new : 0,
+        402 => mnemonic_to_key_pair : 1,
+        403 => raw_sign : 2,
     });
 }

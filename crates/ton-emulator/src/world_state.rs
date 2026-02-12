@@ -9,6 +9,7 @@ use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use num_traits::cast::ToPrimitive;
 use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::env;
@@ -17,12 +18,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 use ton_executor::{DEFAULT_CONFIG, DEFAULT_CONFIG_DICT};
 use ton_networks::Network;
+use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellFamily, HashBytes, Lazy};
+use tycho_types::dict;
 use tycho_types::models::{
     Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
     StorageInfo,
 };
-use tycho_types::{boc, dict};
 
 /// Represents the source of the world state.
 ///
@@ -324,7 +326,7 @@ impl WorldState {
         }
 
         let config_str = config_b64.unwrap_or(DEFAULT_CONFIG);
-        let config = boc::Boc::decode_base64(config_str)
+        let config = Boc::decode_base64(config_str)
             .ok()
             .and_then(|cell| {
                 let mut slice = cell.as_slice_allow_exotic();
@@ -351,6 +353,21 @@ impl WorldState {
     #[must_use]
     pub fn get_config(&self) -> Arc<dict::Dict<u32, Cell>> {
         self.config.clone()
+    }
+
+    /// Returns a  blockchain configuration as base64 encoded string.
+    #[must_use]
+    pub fn get_config_b64(&self) -> Cow<'_, str> {
+        if self.config == *DEFAULT_CONFIG_DICT {
+            return Cow::Borrowed(DEFAULT_CONFIG);
+        }
+        Cow::Owned(
+            self.config
+                .root()
+                .clone()
+                .map(Boc::encode_base64)
+                .expect("Config has no root"),
+        )
     }
 
     /// Sets the blockchain configuration.

@@ -132,9 +132,24 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
 
 #[macro_export]
 macro_rules! register_ext_methods {
+    (@register_one $executor:expr, $ctx:expr, $id:expr => $fname:ident, $stack_items_count:expr) => {
+        $executor
+            .register_ext_method_with_stack_items($id, ($ctx), $fname, $stack_items_count)
+            .expect(&format!("cannot register extension with id: {}", $id));
+    };
+    (@register_one $executor:expr, $ctx:expr, $id:expr => $fname:ident) => {
+        $executor
+            .register_ext_method($id, ($ctx), $fname)
+            .expect(&format!("cannot register extension with id: {}", $id));
+    };
     ($executor:expr, $ctx:expr, { $($id:expr => $fname:ident),+ $(,)? }) => {{
         $(
-            $executor.register_ext_method($id, ($ctx), $fname).expect(&format!("cannot register extension with id: {}", $id));
+            $crate::register_ext_methods!(@register_one $executor, $ctx, $id => $fname);
+        )+
+    }};
+    ($executor:expr, $ctx:expr, { $($id:expr => $fname:ident : $stack_items_count:expr),+ $(,)? }) => {{
+        $(
+            $crate::register_ext_methods!(@register_one $executor, $ctx, $id => $fname, $stack_items_count);
         )+
     }};
 }

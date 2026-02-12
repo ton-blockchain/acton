@@ -14,6 +14,6 @@ fn read_file_impl(_ctx: &mut Context, stack: &mut Tuple, path: String) -> anyhow
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        3 => read_file,
+        3 => read_file : 1,
     });
 }

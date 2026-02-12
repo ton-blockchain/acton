@@ -240,15 +240,15 @@ fn confirm_impl(
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        1 => println,
-        2 => eprintln,
-        200 => format1,
-        201 => format2,
-        202 => format3,
-        203 => format4,
-        204 => format5,
-        205 => prompt,
-        206 => select,
-        207 => confirm,
+        1 => println : 2,
+        2 => eprintln : 1,
+        200 => format1 : 3,
+        201 => format2 : 5,
+        202 => format3 : 7,
+        203 => format4 : 9,
+        204 => format5 : 11,
+        205 => prompt : 2,
+        206 => select : 2,
+        207 => confirm : 3,
     });
 }

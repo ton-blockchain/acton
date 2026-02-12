@@ -101,10 +101,10 @@ fn env_cell_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow:
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        50 => env_int,
-        51 => env_bool,
-        52 => env_slice,
-        53 => env_address,
-        54 => env_cell,
+        50 => env_int : 1,
+        51 => env_bool : 1,
+        52 => env_slice : 1,
+        53 => env_address : 1,
+        54 => env_cell : 1,
     });
 }

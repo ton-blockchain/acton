@@ -43,6 +43,8 @@ impl Serialize for ExecutorVerbosity {
 pub type ExtMethodCallback<Ctx = c_void> =
     unsafe extern "C" fn(ctx: *mut Ctx, stack: *const c_char) -> *const c_char;
 
+pub const EXT_METHOD_STACK_ALL_ITEMS: u8 = u8::MAX;
+
 /// Base trait for all TON executors.
 ///
 /// Provides common functionality shared between standard and step-by-step executors.
@@ -62,5 +64,20 @@ pub trait BaseExecutor {
         id: i32,
         ctx: &mut Ctx,
         cb: ExtMethodCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        self.register_ext_method_with_stack_items(id, ctx, cb, EXT_METHOD_STACK_ALL_ITEMS)
+    }
+
+    /// Registers extension method with explicit number of stack items.
+    ///
+    /// `stack_items_count` defines how many top stack items are passed to callback:
+    /// - `0..=254` — exact number of top items (clamped by current stack depth)
+    /// - `255` — pass all stack items
+    fn register_ext_method_with_stack_items<Ctx>(
+        &mut self,
+        id: i32,
+        ctx: &mut Ctx,
+        cb: ExtMethodCallback<Ctx>,
+        stack_items_count: u8,
     ) -> anyhow::Result<()>;
 }
