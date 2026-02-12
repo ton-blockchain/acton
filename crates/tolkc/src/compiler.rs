@@ -23,8 +23,11 @@ thread_local! {
 ///
 /// ## Example
 ///
-/// ```
-/// let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
+/// ```no_run
+/// use std::path::Path;
+///
+/// let tmp_test_filename = "file.tolk";
+/// let compilation_result = tolkc::compile(Path::new(&tmp_test_filename), false);
 /// match compilation_result {
 ///     tolkc::CompilerResult::Success(result) => {
 ///         // ... use result.code_boc64

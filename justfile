@@ -9,6 +9,7 @@ build:
 test-unit:
     {{ CARGO_TEST }} --workspace --lib --bins \
         --exclude retrace
+    {{ CARGO_TEST }} --workspace --doc
 
 test-serial:
     # we need test by test execution due to Toncenter rate limit

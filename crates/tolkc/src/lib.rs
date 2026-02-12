@@ -2,7 +2,7 @@
 //!
 //! ## Example
 //!
-//! ```
+//! ```no_run
 //! use std::path::Path;
 //!
 //! let tmp_test_filename = "file.tolk";
