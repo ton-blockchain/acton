@@ -2,9 +2,10 @@ use acton_config::config::ActonConfig;
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
 use log::debug;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -34,7 +35,7 @@ pub struct CacheEntry {
 pub struct FileBuildCache {
     cache_dir: PathBuf,
     config: ActonConfig,
-    entries: HashMap<String, CacheEntry>,
+    entries: FxHashMap<String, CacheEntry>,
     _lock_file: File,
 }
 
@@ -87,14 +88,14 @@ impl FileBuildCache {
 
         Ok(Self {
             cache_dir: tmp_dir.path().to_path_buf(),
-            entries: HashMap::new(),
+            entries: FxHashMap::default(),
             config,
             _lock_file: lock_file,
         })
     }
 
-    fn load_cache(cache_dir: &Path) -> Result<HashMap<String, CacheEntry>> {
-        let mut entries = HashMap::new();
+    fn load_cache(cache_dir: &Path) -> Result<FxHashMap<String, CacheEntry>> {
+        let mut entries = FxHashMap::default();
 
         if !cache_dir.exists() {
             return Ok(entries);

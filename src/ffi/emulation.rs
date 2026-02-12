@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use ton_abi::contract_abi;
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
@@ -88,7 +89,7 @@ fn build_impl(
         return Ok(());
     }
 
-    if let Some(cached) = ctx.build.build_cache.built.get(&path) {
+    if let Some(cached) = ctx.build.build_cache.built.get(Path::new(&path)) {
         let elapsed = start_time.elapsed();
         info!("Build {path} from memory cache in {elapsed:?}");
 
@@ -109,11 +110,11 @@ fn build_impl(
         let content = fs::read_to_string(&path).unwrap_or_default();
         ctx.build.build_cache.memoize(
             &name,
-            &path,
+            Path::new(&path),
             &cached_entry.code_boc64,
             &cached_entry.code_hash_hex,
-            cached_entry.source_map.clone().unwrap_or_default(),
-            Some(contract_abi(&content, &path, &ctx.env.config.mappings)),
+            cached_entry.source_map.clone().unwrap_or_default().into(),
+            Some(contract_abi(&content, &path, &ctx.env.config.mappings).into()),
         );
 
         let code_cell = ArcCell::from_boc_b64(&cached_entry.code_boc64)
@@ -147,11 +148,11 @@ fn build_impl(
             let content = fs::read_to_string(&path).unwrap_or_default();
             ctx.build.build_cache.memoize(
                 &name,
-                &path,
+                Path::new(&path),
                 &success.code_boc64,
                 &success.code_hash_hex,
-                success.source_map.unwrap_or_default(),
-                Some(contract_abi(&content, &path, &ctx.env.config.mappings)),
+                success.source_map.unwrap_or_default().into(),
+                Some(contract_abi(&content, &path, &ctx.env.config.mappings).into()),
             );
             let code_cell = ArcCell::from_boc_b64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
@@ -500,8 +501,8 @@ fn send_message_debug(
     };
 
     let shard_account_after = &result.shard_account;
-    let shard_account_cell =
-        Boc::decode_base64(shard_account_after).context("Failed to decode shard account BoC")?;
+    let shard_account_cell = Boc::decode_base64(shard_account_after.as_ref())
+        .context("Failed to decode shard account BoC")?;
     let shard_account: ShardAccount = shard_account_cell
         .parse()
         .context("Failed to load shard account from cell")?;
@@ -510,8 +511,8 @@ fn send_message_debug(
         .world_state
         .update_account(&int_message.dst.to_string(), &shard_account);
 
-    let tx_cell =
-        Boc::decode_base64(&result.transaction).context("Failed to decode transaction BoC")?;
+    let tx_cell = Boc::decode_base64(result.transaction.as_ref())
+        .context("Failed to decode transaction BoC")?;
     let transaction: Transaction = tx_cell
         .parse()
         .context("Failed to load transaction from cell")?;
@@ -533,7 +534,7 @@ fn send_message_debug(
         shard_account,
         out_messages,
         vm_log: result.vm_log,
-        executor_logs: String::new(),
+        executor_logs: Arc::default(),
         actions: result.actions,
         code,
         externals: vec![],

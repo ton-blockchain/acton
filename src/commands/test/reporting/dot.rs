@@ -59,7 +59,7 @@ impl DotReporter {
         println!();
         println!(
             "{}",
-            format!("{} | {} > {}", label, test.file_path, test.name).dimmed()
+            format!("{} | {} > {}", label, test.file_path.display(), test.name).dimmed()
         );
 
         let lines: Vec<&str> = content.trim().lines().collect();

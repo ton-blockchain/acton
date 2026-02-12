@@ -1,6 +1,7 @@
 use crate::common::ExecutorVerbosity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Result of a get-method execution.
 #[derive(Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -16,19 +17,19 @@ pub struct GetMethodResultSuccess {
     /// Whether the execution was successful (always true in this variant).
     pub success: bool,
     /// Base64 encoded stack `BoC`.
-    pub stack: String,
+    pub stack: Arc<str>,
     /// Gas consumed during execution (as a string).
     pub gas_used: String,
     /// VM exit code.
     pub vm_exit_code: i32,
     /// Virtual Machine execution logs.
-    pub vm_log: String,
+    pub vm_log: Arc<str>,
     /// Base64 encoded missing library hash (if any).
     pub missing_library: Option<String>,
 
     #[serde(skip)]
     /// Base64 encoded code of contract.
-    pub code: String,
+    pub code: Arc<str>,
 }
 
 /// Get-method execution error details.
@@ -37,7 +38,7 @@ pub struct GetMethodResultError {
     /// Whether the execution was successful (always false in this variant).
     pub success: bool,
     /// Error message.
-    pub error: String,
+    pub error: Arc<str>,
 }
 
 /// Arguments for running a get-method.

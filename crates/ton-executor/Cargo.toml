@@ -11,10 +11,11 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-serde = { workspace = true }
+serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 hex = { workspace = true }
+tycho-types = { workspace = true }
 
 [build-dependencies]
 pkg-config = { workspace = true }

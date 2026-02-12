@@ -382,7 +382,7 @@ pub(crate) fn find_final_actions(
         return (Vec::new(), None);
     };
 
-    let Ok(actions_cell) = Boc::decode_base64(actions_b64) else {
+    let Ok(actions_cell) = Boc::decode_base64(actions_b64.as_ref()) else {
         return (Vec::new(), None);
     };
 
@@ -450,13 +450,13 @@ pub(crate) fn compute_final_data(
     tycho_types::models::Transaction,
     ComputeInfo,
 )> {
-    let shard_account_cell = Boc::decode_base64(&res.shard_account)?;
+    let shard_account_cell = Boc::decode_base64(res.shard_account.as_ref())?;
     let shard_account: ShardAccount = shard_account_cell.parse()?;
     let end_balance = shard_account
         .load_account()?
         .map_or(Tokens::ZERO, |a| a.balance.tokens);
 
-    let emulated_tx_cell = Boc::decode_base64(&res.transaction)?;
+    let emulated_tx_cell = Boc::decode_base64(res.transaction.as_ref())?;
     let emulated_tx: tycho_types::models::Transaction = emulated_tx_cell.parse()?;
 
     let in_msg = emulated_tx

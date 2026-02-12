@@ -22,6 +22,7 @@ num-traits = { workspace = true }
 reqwest = { workspace = true }
 ton-networks = { workspace = true }
 acton-config = { workspace = true }
+rustc-hash = "2.1.1"
 
 [lints]
 workspace = true

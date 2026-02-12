@@ -173,7 +173,7 @@ impl StepGetExecutor {
         match result {
             GetMethodResult::Success(success) => {
                 Ok(GetMethodResult::Success(GetMethodResultSuccess {
-                    code: code.to_string(),
+                    code: code.into(),
                     ..success
                 }))
             }

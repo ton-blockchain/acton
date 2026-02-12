@@ -8,6 +8,7 @@ use crate::{ComputeInfo, find_base_tx_by_hash, methods};
 use base64::Engine;
 use base64::engine::general_purpose;
 use std::collections::HashMap;
+use std::sync::Arc;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
 pub use ton_networks::Network;
@@ -337,7 +338,7 @@ fn emulate_previous_transactions(
             }
         };
         // since we change state at each transaction we need to save new state as current one
-        shard_account = Boc::decode_base64(&res.shard_account)?.parse()?;
+        shard_account = Boc::decode_base64(res.shard_account.as_ref())?.parse()?;
         balance = shard_account
             .load_account()?
             .map_or(Tokens::ZERO, |a| a.balance.tokens);
@@ -352,7 +353,7 @@ fn emulate(
     shard_account: &ShardAccount,
     libs: Option<&Cell>,
     rand_seed: [u8; 32],
-) -> anyhow::Result<(EmulationResult, String)> {
+) -> anyhow::Result<(EmulationResult, Arc<str>)> {
     let Some(in_msg) = &tx.in_msg else {
         anyhow::bail!("No in_message was found in transaction")
     };

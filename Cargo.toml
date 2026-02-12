@@ -245,6 +245,7 @@ similar = { workspace = true }
 # actin check
 codespan-reporting = { workspace = true }
 tracing-subscriber = "0.3.22"
+rustc-hash = "2.1.1"
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }
@@ -297,3 +298,6 @@ workspace = true
 
 [features]
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
+
+#[profile.release]
+#debug = "full"

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::sync::Arc;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, Load};
 use tycho_types::dict::{Dict, RawDict};
@@ -165,8 +166,8 @@ pub struct EntryContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub event_function: Option<String>,
-    pub containing_function: String,
+    pub event_function: Option<Arc<str>>,
+    pub containing_function: Arc<str>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

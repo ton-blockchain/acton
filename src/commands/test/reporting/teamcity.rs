@@ -5,7 +5,7 @@ use crate::formatter::FormatterContext;
 use std::path::Path;
 
 pub(crate) struct TeamCityReporter {
-    formatter: Option<FormatterContext>,
+    formatter: Option<FormatterContext<'static>>,
 }
 
 impl TeamCityReporter {
@@ -141,7 +141,7 @@ impl TestReporter for TeamCityReporter {
     fn on_test_started(&mut self, test: &TestReport) -> anyhow::Result<()> {
         let test_name = self.escape_name(&test.name);
         let suite_name = self.escape_name(&extract_suite_name(Path::new(&test.file_path)));
-        let location = format!("{}:{}", test.file_path, test.name);
+        let location = format!("{}:{}", test.file_path.display(), test.name);
 
         println!(
             "##teamcity[testStarted name='{test_name}' nodeId='test_{test_name}' parentNodeId='suite_{suite_name}' locationHint='tolk_qn://{location}']"

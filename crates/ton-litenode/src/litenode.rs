@@ -8,6 +8,7 @@ use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
 use ton_executor::DEFAULT_CONFIG;
@@ -114,7 +115,7 @@ pub struct LiteNodeRunGetMethodResult {
     pub gas_used: u64,
     pub stack: BocBytes,
     pub exit_code: i32,
-    pub vm_log: String,
+    pub vm_log: Arc<str>,
     pub block_id: LiteNodeBlockId,
     pub last_transaction_id: LiteNodeTransactionId,
 }
@@ -847,7 +848,7 @@ fn handle_run_get_method(
     match res {
         GetMethodResult::Success(s) => {
             let stack_bytes = base64::engine::general_purpose::STANDARD
-                .decode(&s.stack)
+                .decode(s.stack.as_ref())
                 .unwrap_or_default();
             Ok(LiteNodeRunGetMethodResult {
                 gas_used: s.gas_used.parse().unwrap_or(0),

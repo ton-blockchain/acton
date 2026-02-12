@@ -4,6 +4,7 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 #[derive(Debug, Clone)]
@@ -27,7 +28,7 @@ impl Default for JUnitConfig {
 
 #[derive(Debug)]
 struct JUnitTestSuite {
-    name: String,
+    name: Arc<str>,
     file_path: PathBuf,
     tests: Vec<TestReport>,
     stats: TestSuiteStats,
@@ -36,8 +37,8 @@ struct JUnitTestSuite {
 
 pub(crate) struct JUnitReporter {
     config: JUnitConfig,
-    suites: BTreeMap<String, JUnitTestSuite>,
-    current_suite: Option<String>,
+    suites: BTreeMap<Arc<str>, JUnitTestSuite>,
+    current_suite: Option<Arc<str>>,
 }
 
 impl JUnitReporter {

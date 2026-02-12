@@ -133,7 +133,7 @@ impl GetExecutor {
             GetInternalResult::Success { output } => match output {
                 GetMethodResult::Success(output) => {
                     Ok(GetMethodResult::Success(GetMethodResultSuccess {
-                        code: args.code.clone(),
+                        code: args.code.clone().into(),
                         ..output
                     }))
                 }

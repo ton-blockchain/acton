@@ -13,8 +13,11 @@ use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
 use dap_client::DapClient;
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 use std::{fs, thread};
 use tasm::printer::FormatOptions;
@@ -179,16 +182,17 @@ pub(crate) fn run_script_file(
             fs::write("out.disasm.fif", result.fift_code)?;
             fs::write("out.boc", code_cell.to_boc(false)?)?;
 
-            let (script_result, ctx, formatter) = execute_script(
+            let source_map = result.source_map.unwrap_or_default();
+            let (script_result, io, formatter) = execute_script(
                 &code_cell,
                 &data_cell,
-                &abi,
-                &result.source_map.unwrap_or_default(),
+                abi.into(),
+                source_map.into(),
                 debug_port,
                 ExecutorVerbosity::FullLocationStackVerbose,
                 stack,
             )?;
-            get_script_result(script_result, ctx, formatter)
+            get_script_result(script_result, io, formatter)
         }
         CompilerResult::Error(error) => {
             anyhow::bail!("Cannot compile script file {}", error.message)
@@ -196,15 +200,15 @@ pub(crate) fn run_script_file(
     }
 }
 
-fn execute_script(
-    code_cell: &ArcCell,
-    data_cell: &ArcCell,
-    abi: &ContractAbi,
-    source_map: &SourceMap,
+fn execute_script<'a>(
+    code_cell: &'a ArcCell,
+    data_cell: &'a ArcCell,
+    abi: Arc<ContractAbi>,
+    source_map: Arc<SourceMap>,
     debug_port: u16,
     verbosity: ExecutorVerbosity,
     stack: Tuple,
-) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext)> {
+) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext<'a>)> {
     let dest_address = contract_address(code_cell)?;
 
     let now = std::time::SystemTime::now();
@@ -235,7 +239,7 @@ fn execute_script(
     let mut file_build_cache =
         FileBuildCache::dummy().expect("Failed to create file cache for script execution");
     let mut known_addresses = KnownAddresses::new();
-    let mut known_code_cell = HashMap::new();
+    let mut known_code_cell = FxHashMap::default();
     let mut emulations = EmulationsState::new();
 
     let mut assert_failure = None;
@@ -246,7 +250,7 @@ fn execute_script(
     let mut ctx = Context {
         env: Env {
             config: &config,
-            abi,
+            abi: abi.clone(),
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets: BTreeMap::new(),
@@ -254,7 +258,7 @@ fn execute_script(
             explorer: None,
             fork_net: None,
             api_key: None,
-            running_id: "script".to_owned(),
+            running_id: "script".into(),
         },
         io: IoContext {
             stdout_buffer: String::new(),
@@ -294,7 +298,7 @@ fn execute_script(
         transport,
         AnyExecutor::Get(executor.clone()),
         source_map,
-        "main".to_string(),
+        "main".into(),
     );
 
     ctx.debug = DebugCtx::new(&mut dbg_ctx);
@@ -304,8 +308,21 @@ fn execute_script(
     ctx.debug.ctx().process_incoming_requests(true)?;
 
     let result = executor.finish(&params.code)?;
-    let formatter = FormatterContext::from_context(&ctx);
-    let io = ctx.io;
+    let Context { io, .. } = ctx;
+
+    let formatter = FormatterContext {
+        contract_abi: abi,
+        accounts: Cow::Owned(world_state.get_accounts().clone()),
+        build_cache: Cow::Owned(build_cache.clone()),
+        emulations: Cow::Owned(emulations.clone()),
+        known_addresses: Cow::Owned(known_addresses.clone()),
+        known_code_cells: Cow::Owned(known_code_cell.clone()),
+        backtrace: None,
+        fork_net: None,
+        network: None,
+        api_key: None,
+    };
+
     Ok((result, io, formatter))
 }
 

@@ -13,10 +13,12 @@ use acton_config::config::{ActonConfig, Explorer};
 use anyhow::anyhow;
 use log::error;
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
@@ -138,8 +140,8 @@ fn run_script_file(
                 &code_cell,
                 &data_cell,
                 stack,
-                &abi,
-                &result.source_map.unwrap_or_default(),
+                Arc::new(abi),
+                result.source_map.unwrap_or_default().into(),
                 debug,
                 debug_port,
                 ExecutorVerbosity::FullLocationStackVerbose,
@@ -167,8 +169,8 @@ fn execute_script(
     code_cell: &ArcCell,
     data_cell: &ArcCell,
     stack: Tuple,
-    abi: &ContractAbi,
-    source_map: &SourceMap,
+    abi: Arc<ContractAbi>,
+    source_map: Arc<SourceMap>,
     debug: bool,
     debug_port: u16,
     verbosity: ExecutorVerbosity,
@@ -217,7 +219,7 @@ fn execute_script(
     let mut build_cache = BuildCache::new();
     let mut file_build_cache = FileBuildCache::new(None)?;
     let mut known_addresses = KnownAddresses::new();
-    let mut known_code_cell = HashMap::new();
+    let mut known_code_cell = FxHashMap::default();
     let mut emulations = EmulationsState::new();
 
     let mut assert_failure = None;
@@ -238,7 +240,7 @@ fn execute_script(
             explorer,
             fork_net,
             api_key,
-            running_id: "script".to_owned(),
+            running_id: "script".into(),
         },
         io: IoContext {
             stdout_buffer: String::new(),
@@ -278,7 +280,7 @@ fn execute_script(
             transport,
             AnyExecutor::Get(executor.clone()),
             source_map,
-            "main".to_string(),
+            "main".into(),
         );
 
         ctx.debug = DebugCtx::new(&mut dbg_ctx);

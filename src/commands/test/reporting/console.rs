@@ -4,6 +4,7 @@ use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
 use crate::{exit_codes, retrace};
 use owo_colors::OwoColorize;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
 use ton_source_map::SourceLocation;
@@ -204,12 +205,12 @@ impl TestReporter for ConsoleReporter {
 
             let formatter = FormatterContext {
                 contract_abi: test.abi.clone(),
-                accounts: exec.accounts.clone(),
-                build_cache: exec.build_cache.clone(),
-                emulations: exec.emulations.clone(),
-                known_addresses: exec.known_addresses.clone(),
-                known_code_cells: exec.known_code_cells.clone(),
-                backtrace: test.backtrace.clone(),
+                accounts: Cow::Borrowed(&exec.accounts),
+                build_cache: Cow::Borrowed(&exec.build_cache),
+                emulations: Cow::Borrowed(&exec.emulations),
+                known_addresses: Cow::Borrowed(&exec.known_addresses),
+                known_code_cells: Cow::Borrowed(&exec.known_code_cells),
+                backtrace: test.backtrace,
                 fork_net: None,
                 network: None,
                 api_key: None,
@@ -250,7 +251,7 @@ impl TestReporter for ConsoleReporter {
 fn process_test_fail(
     test: &TestReport,
     exec: &TestExecutionContext,
-    fmt: FormatterContext,
+    fmt: FormatterContext<'_>,
     result: &GetMethodResultSuccess,
 ) {
     if test.gas_limit.is_some_and(|limit| exec.gas_used > limit) {
@@ -284,7 +285,7 @@ fn process_test_fail(
     }
 }
 
-fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext) {
+fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext<'_>) {
     if let Some(message) = &failure.message() {
         if message.is_empty() {
             println!("    {}", "└─".dimmed());
@@ -335,7 +336,7 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionNotFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, &test.abi);
+        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
         let tx_tree = fmt.format(&failure.txs);
 
         let diff_output = format!(
@@ -351,7 +352,7 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 
     if let AssertFailure::TransactionIsFound(failure) = &failure {
-        let params = fmt.format_search_transaction_parameters(failure, &test.abi);
+        let params = fmt.format_search_transaction_parameters(failure, test.abi.clone());
         let tx_tree = fmt.format(&failure.txs);
 
         let from_to = if failure.params.from.is_none() && failure.params.to.is_none() {

@@ -5,12 +5,16 @@ use crate::context::{
     to_cell,
 };
 use crate::retrace::{ExecutedAction, InstalledActions};
-use crate::{exit_codes, retrace};
+use crate::{context, exit_codes, retrace};
+use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
+use std::sync::Arc;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
 use ton_source_map::{DebugLocation, SourceLocation};
@@ -47,29 +51,29 @@ struct TransactionNode {
 
 /// Context for formatting `TupleItems` with rich information
 #[derive(Debug, Clone)]
-pub struct FormatterContext {
-    pub contract_abi: ContractAbi,
-    pub accounts: HashMap<String, ShardAccount>,
-    pub build_cache: BuildCache,
-    pub emulations: EmulationsState,
-    pub known_addresses: KnownAddresses,
-    pub known_code_cells: HashMap<String, String>,
-    pub backtrace: Option<String>,
+pub struct FormatterContext<'a> {
+    pub contract_abi: Arc<ContractAbi>,
+    pub accounts: Cow<'a, FxHashMap<String, ShardAccount>>,
+    pub build_cache: Cow<'a, BuildCache>,
+    pub emulations: Cow<'a, EmulationsState>,
+    pub known_addresses: Cow<'a, KnownAddresses>,
+    pub known_code_cells: Cow<'a, FxHashMap<String, String>>,
+    pub backtrace: Option<BacktraceMode>,
     pub fork_net: Option<Network>,
-    pub api_key: Option<String>,
+    pub api_key: Option<Cow<'a, str>>,
     pub network: Option<Network>,
 }
 
-impl FormatterContext {
+impl<'a> FormatterContext<'a> {
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            contract_abi: ContractAbi::default(),
-            accounts: HashMap::new(),
-            build_cache: BuildCache::new(),
-            emulations: EmulationsState::new(),
-            known_addresses: KnownAddresses::new(),
-            known_code_cells: HashMap::new(),
+            contract_abi: Arc::new(ContractAbi::default()),
+            accounts: Cow::Owned(FxHashMap::default()),
+            build_cache: Cow::Owned(BuildCache::new()),
+            emulations: Cow::Owned(EmulationsState::new()),
+            known_addresses: Cow::Owned(KnownAddresses::new()),
+            known_code_cells: Cow::Owned(FxHashMap::default()),
             backtrace: None,
             fork_net: None,
             network: None,
@@ -79,18 +83,18 @@ impl FormatterContext {
 
     /// Create formatter context from the main Context
     #[must_use]
-    pub fn from_context(ctx: &crate::context::Context) -> Self {
+    pub fn from_context<'b: 'a>(ctx: &'b context::Context<'a>) -> Self {
         Self {
             contract_abi: ctx.env.abi.clone(),
-            accounts: ctx.chain.world_state.get_accounts().clone(),
-            build_cache: ctx.build.build_cache.clone(),
-            emulations: ctx.chain.emulations.clone(),
-            known_addresses: ctx.build.known_addresses.clone(),
-            known_code_cells: ctx.build.known_code_cells.clone(),
-            backtrace: ctx.build.backtrace.clone(),
+            accounts: Cow::Borrowed(ctx.chain.world_state.get_accounts()),
+            build_cache: Cow::Borrowed(ctx.build.build_cache),
+            emulations: Cow::Borrowed(ctx.chain.emulations),
+            known_addresses: Cow::Borrowed(ctx.build.known_addresses),
+            known_code_cells: Cow::Borrowed(ctx.build.known_code_cells),
+            backtrace: ctx.build.backtrace,
             fork_net: ctx.env.fork_net.clone(),
             network: ctx.network.clone(),
-            api_key: ctx.env.api_key.clone(),
+            api_key: ctx.env.api_key.as_deref().map(Cow::Borrowed),
         }
     }
 
@@ -1379,7 +1383,7 @@ impl FormatterContext {
     }
 }
 
-impl FormatterContext {
+impl<'a> FormatterContext<'a> {
     #[must_use]
     pub fn format_tuple_diff(
         &self,
@@ -1597,7 +1601,7 @@ impl FormatterContext {
     pub fn format_search_transaction_parameters(
         &self,
         assert_failure: &TransactionGenericAssertFailure,
-        abi: &ContractAbi,
+        abi: Arc<ContractAbi>,
     ) -> Vec<String> {
         let mut params = vec![];
         if let Some(opcode) = assert_failure.params.opcode {
@@ -1722,7 +1726,7 @@ impl FormatterContext {
     }
 
     #[must_use]
-    pub fn account_code(accounts: &HashMap<String, ShardAccount>, addr: String) -> Option<Cell> {
+    pub fn account_code(accounts: &FxHashMap<String, ShardAccount>, addr: String) -> Option<Cell> {
         let account = accounts.get(&addr);
         let state = account?.account.load().ok()?.0?.state;
         match state {
@@ -1736,7 +1740,7 @@ impl FormatterContext {
     pub fn get_failed_transaction_context(
         &self,
         failure: &TransactionGenericAssertFailure,
-        abi: &ContractAbi,
+        abi: Arc<ContractAbi>,
     ) -> FailedTransactionContext {
         let from_address = failure.params.from.as_ref().map(|addr| match addr {
             IntAddr::Std(addr) => addr.display_base64(false).to_string(),
@@ -1783,7 +1787,7 @@ impl FormatterContext {
 
                 Some(TransactionInfo {
                     lt: tx.lt.to_string(),
-                    raw_transaction: Boc::encode_base64(to_cell(&tx)),
+                    raw_transaction: Boc::encode_base64(to_cell(&tx)).into(),
                     parent_transaction: res.parent_lt.map(|lt| lt.to_string()),
                     dest_contract_info: build.map(|(_, info)| info.name),
                     child_transactions: res.children_ids.iter().map(ToString::to_string).collect(),
@@ -1797,9 +1801,9 @@ impl FormatterContext {
                     executor_logs: self
                         .emulations
                         .find_tx_executor_logs(tx.lt)
-                        .map(ToString::to_string)
+                        .map(Arc::from)
                         .unwrap_or_default(),
-                    actions: Some(res.actions.to_boc_b64(false).ok()?),
+                    actions: Some(res.actions.to_boc_b64(false).ok()?.into()),
                 })
             })
             .collect()
@@ -1809,7 +1813,7 @@ impl FormatterContext {
     pub fn format_detailed_assert_failure(
         &self,
         failure: &AssertFailure,
-        abi: &ContractAbi,
+        abi: Arc<ContractAbi>,
     ) -> String {
         let mut result = String::new();
 

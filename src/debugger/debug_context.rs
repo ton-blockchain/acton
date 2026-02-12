@@ -17,6 +17,7 @@ use dap::types::{
 use log::debug;
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use ton_source_map::{BytecodeLocation, DebugLocation, EntryContextDescription, SourceMap};
 use tvmffi::stack::TupleItem;
@@ -51,10 +52,10 @@ pub enum StepMode {
 pub enum StepKind {
     UnmappedAdvance,
     Mapped,
-    SyntheticEnterFunction(String),
-    SyntheticAfterFunctionCall(String),
-    SyntheticEnterInlined(String),
-    SyntheticLeaveInlined(String),
+    SyntheticEnterFunction(Arc<str>),
+    SyntheticAfterFunctionCall(Arc<str>),
+    SyntheticEnterInlined(Arc<str>),
+    SyntheticLeaveInlined(Arc<str>),
 }
 
 #[derive(Debug, Clone)]
@@ -67,14 +68,14 @@ pub struct DebugStep {
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
-    pub function_name: String,
+    pub function_name: Arc<str>,
     pub loc: DebugLocation,
     pub pos: BytecodeLocation,
 }
 
 pub struct Stepper {
     pub executors: Vec<AnyExecutor>,
-    pub source_maps: Vec<SourceMap>,
+    pub source_maps: Vec<Arc<SourceMap>>,
     pub current_executor_id: usize,
     pub buffers: Vec<VecDeque<DebugStep>>,
     buffer: VecDeque<DebugStep>,
@@ -85,7 +86,7 @@ pub struct Stepper {
     thread_id: i64,
     callstacks: Vec<Vec<CallFrame>>,
     callstack: Vec<CallFrame>,
-    root_function_name: String,
+    root_function_name: Arc<str>,
     root_frame_added: bool,
 }
 
@@ -93,9 +94,9 @@ impl Stepper {
     #[must_use]
     pub fn new(
         executor: AnyExecutor,
-        source_map: SourceMap,
+        source_map: Arc<SourceMap>,
         thread_id: i64,
-        root_function_name: String,
+        root_function_name: Arc<str>,
     ) -> Self {
         Stepper {
             executors: vec![executor],
@@ -115,7 +116,7 @@ impl Stepper {
         }
     }
 
-    pub fn push_executor(&mut self, executor: AnyExecutor, source_map: SourceMap) {
+    pub fn push_executor(&mut self, executor: AnyExecutor, source_map: Arc<SourceMap>) {
         self.executors.push(executor);
         self.source_maps.push(source_map);
         self.buffers.push(self.buffer.clone());
@@ -176,7 +177,7 @@ impl Stepper {
                     .clone()
                     .context
                     .event_function
-                    .unwrap_or_else(|| loc.context.containing_function.to_owned())
+                    .unwrap_or_else(|| loc.context.containing_function.clone())
                     .clone();
 
                 let step = match loc.context.event.as_deref() {
@@ -191,7 +192,7 @@ impl Stepper {
                             loc.clone()
                                 .context
                                 .event_function
-                                .unwrap_or_else(|| loc.context.containing_function.to_owned())
+                                .unwrap_or_else(|| loc.context.containing_function.clone())
                                 .clone(),
                         ),
                         loc: Some(loc),
@@ -320,8 +321,8 @@ pub struct DebugContext {
     pub performing_step: Option<StepMode>,
     pub breakpoints: HashMap<PathBuf, Vec<BreakpointInfo>>,
     pub next_breakpoint_id: i64,
-    pub formatter_context: FormatterContext,
-    pub test_name: String,
+    pub formatter_context: FormatterContext<'static>,
+    pub test_name: Arc<str>,
 }
 
 impl DebugContext {
@@ -329,10 +330,10 @@ impl DebugContext {
     pub fn new(
         transport: DapTransport,
         executor: AnyExecutor,
-        source_map: &SourceMap,
-        test_name: String,
+        source_map: Arc<SourceMap>,
+        test_name: Arc<str>,
     ) -> DebugContext {
-        let stepper = Stepper::new(executor, source_map.clone(), 1, test_name.clone());
+        let stepper = Stepper::new(executor, source_map, 1, test_name.clone());
         DebugContext {
             stepper,
             transport,
@@ -366,7 +367,7 @@ impl DebugContext {
         &mut self,
         id: i64,
         executor: AnyExecutor,
-        source_map: Option<SourceMap>,
+        source_map: Option<Arc<SourceMap>>,
         name: String,
         stop_on_entry: bool,
     ) -> anyhow::Result<()> {
@@ -688,18 +689,18 @@ impl DebugContext {
             .replace(".test.tolk.test.tolk", ".test.tolk")
     }
 
-    fn get_root_function_name(&self, thread_id: i64) -> String {
+    fn get_root_function_name(&self, thread_id: i64) -> Arc<str> {
         if thread_id == 1 {
             self.test_name.clone()
         } else {
-            "onInternalMessage".to_string()
+            "onInternalMessage".into()
         }
     }
 
     fn create_stack_frame(
         &self,
         loc: &DebugLocation,
-        function_name: String,
+        function_name: Arc<str>,
         pos: &BytecodeLocation,
     ) -> StackFrame {
         let file_path = Self::normalize_path(&loc.loc.file.to_string());
@@ -733,7 +734,7 @@ impl DebugContext {
         };
 
         StackFrame {
-            name: function_name,
+            name: function_name.to_string(),
             line,
             column,
             end_line,
@@ -1024,7 +1025,7 @@ impl DebugContext {
     }
 }
 
-fn skip_inlined_function(stepper: &mut Stepper, func_name: &String) -> bool {
+fn skip_inlined_function(stepper: &mut Stepper, func_name: &Arc<str>) -> bool {
     let mut depth = 1;
 
     loop {
@@ -1057,7 +1058,7 @@ fn skip_inlined_function(stepper: &mut Stepper, func_name: &String) -> bool {
     }
 }
 
-fn skip_function(stepper: &mut Stepper, func_name: &String) -> bool {
+fn skip_function(stepper: &mut Stepper, func_name: &Arc<str>) -> bool {
     let mut depth = 1;
 
     loop {

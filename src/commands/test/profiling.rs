@@ -5,10 +5,11 @@ use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use ton_abi::ContractAbi;
 
-pub(super) fn collect_profile(runner: &TestRunner, abi: &ContractAbi) -> anyhow::Result<()> {
+pub(super) fn collect_profile(runner: &TestRunner, abi: Arc<ContractAbi>) -> anyhow::Result<()> {
     let mut gas_per_opcode = HashMap::new();
 
     for result in runner.emulations.messages() {

@@ -48,6 +48,7 @@
 
 use crate::world_state::WorldState;
 use anyhow::Context;
+use std::sync::Arc;
 use std::time::SystemTime;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{
@@ -146,14 +147,14 @@ impl Emulator {
             EmulationResult::Error(err) => return Ok(SendMessageResult::Error(err)),
         };
 
-        let shard_account_after = Boc::decode_base64(&result.shard_account)?
+        let shard_account_after = Boc::decode_base64(result.shard_account.as_ref())?
             .parse::<ShardAccount>()
             .context("Failed to parse shard account")?;
 
         // Since state was updated, we need to update it in world state too.
         state.update_account(&dst_addr, &shard_account_after);
 
-        let transaction = Boc::decode_base64(&result.transaction)?
+        let transaction = Boc::decode_base64(result.transaction.as_ref())?
             .parse::<Transaction>()
             .context("Failed to parse transaction")?;
 
@@ -245,7 +246,7 @@ impl Emulator {
     }
 
     pub fn patch_message(
-        config: &Dict<u32, Cell>,
+        config: Arc<Dict<u32, Cell>>,
         message_cell: Cell,
         src_addr: Option<IntAddr>,
     ) -> anyhow::Result<Cell> {
@@ -289,7 +290,7 @@ impl Emulator {
     }
 
     pub(crate) fn compute_in_msg_fwd_fee(
-        config: &Dict<u32, Cell>,
+        config: Arc<Dict<u32, Cell>>,
         message: &RelaxedMessage<'_>,
         is_masterchain: bool,
     ) -> anyhow::Result<Tokens> {
@@ -403,7 +404,7 @@ pub enum SendMessageResult {
 #[derive(Clone, Debug)]
 pub struct SendMessageResultSuccess {
     /// Base64-encoded transaction `BoC`.
-    pub raw_transaction: String,
+    pub raw_transaction: Arc<str>,
     /// The parsed transaction object.
     pub transaction: Transaction,
     /// Logical time of the parent transaction, if any.
@@ -417,11 +418,11 @@ pub struct SendMessageResultSuccess {
     /// Cells of outgoing messages produced by this transaction.
     pub out_messages: Vec<Cell>,
     /// VM execution log.
-    pub vm_log: String,
+    pub vm_log: Arc<str>,
     /// High-level executor logs.
-    pub executor_logs: String,
+    pub executor_logs: Arc<str>,
     /// Base64-encoded outgoing actions `BoC`.
-    pub actions: Option<String>,
+    pub actions: Option<Arc<str>>,
     /// The code cell used for this transaction.
     pub code: Option<Cell>,
     /// External outgoing messages produced by this transaction.

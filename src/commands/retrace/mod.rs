@@ -38,10 +38,13 @@ pub fn retrace_cmd(
             Ok(result) => {
                 if let Some(logs_dir) = &logs_dir {
                     std::fs::create_dir_all(logs_dir)?;
-                    std::fs::write(format!("{logs_dir}/vm.log"), &result.emulated_tx.vm_logs)?;
+                    std::fs::write(
+                        format!("{logs_dir}/vm.log"),
+                        result.emulated_tx.vm_logs.as_ref(),
+                    )?;
                     std::fs::write(
                         format!("{logs_dir}/executor.log"),
-                        &result.emulated_tx.executor_logs,
+                        result.emulated_tx.executor_logs.as_ref(),
                     )?;
                     println!("{} Logs saved to {}", "Success:".green(), logs_dir);
                 }

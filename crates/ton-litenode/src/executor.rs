@@ -103,10 +103,10 @@ impl TvmExecutor for TvmEmulatorAdapter {
         // 3. Process output
         match res {
             EmulationResult::Success(s) => {
-                let tx_boc = STANDARD.decode(&s.transaction)?;
-                let new_account_boc = Some(STANDARD.decode(&s.shard_account)?);
+                let tx_boc = STANDARD.decode(s.transaction.as_ref())?;
+                let new_account_boc = Some(STANDARD.decode(s.shard_account.as_ref())?);
 
-                let tx_cell = Boc::decode_base64(&s.transaction)?;
+                let tx_cell = Boc::decode_base64(s.transaction.as_ref())?;
                 let tx = tx_cell.parse::<Transaction>()?;
 
                 let out_msgs_boc = tx

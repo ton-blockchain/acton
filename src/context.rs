@@ -2,9 +2,13 @@ use crate::debugger::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
+use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
 use owo_colors::OwoColorize;
-use std::collections::{BTreeMap, HashMap};
+use rustc_hash::FxHashMap;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -159,7 +163,7 @@ See https://i582.github.io/acton/docs/scripting/setup-wallets/ for more informat
 
 #[derive(Debug, Clone)]
 pub struct BuildCache {
-    pub built: HashMap<String, CompilationResult>,
+    pub built: FxHashMap<PathBuf, CompilationResult>,
 }
 
 impl Default for BuildCache {
@@ -172,18 +176,18 @@ impl BuildCache {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            built: HashMap::new(),
+            built: FxHashMap::default(),
         }
     }
 
     pub fn memoize(
         &mut self,
         name: &str,
-        path: &str,
+        path: &Path,
         code: &str,
         code_hash: &str,
-        source_map: SourceMap,
-        abi: Option<ContractAbi>,
+        source_map: Arc<SourceMap>,
+        abi: Option<Arc<ContractAbi>>,
     ) {
         self.built.insert(
             path.to_owned(),
@@ -198,7 +202,7 @@ impl BuildCache {
     }
 
     #[must_use]
-    pub fn result_for_code(&self, code: &Option<Cell>) -> Option<(String, CompilationResult)> {
+    pub fn result_for_code(&self, code: &Option<Cell>) -> Option<(PathBuf, CompilationResult)> {
         let Some(code) = code else { return None };
         let code_hash = code.repr_hash().to_string().to_uppercase();
         self.built
@@ -213,8 +217,8 @@ pub struct CompilationResult {
     pub name: String,
     pub code_boc64: String,
     pub code_hash: String,
-    pub source_map: SourceMap,
-    pub abi: Option<ContractAbi>,
+    pub source_map: Arc<SourceMap>,
+    pub abi: Option<Arc<ContractAbi>>,
 }
 
 #[derive(Debug, Clone)]
@@ -224,7 +228,7 @@ pub struct KnownAddress {
 
 #[derive(Debug, Clone)]
 pub struct KnownAddresses {
-    pub addresses: HashMap<IntAddr, KnownAddress>,
+    pub addresses: FxHashMap<IntAddr, KnownAddress>,
 }
 
 impl Default for KnownAddresses {
@@ -237,7 +241,7 @@ impl KnownAddresses {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            addresses: HashMap::new(),
+            addresses: FxHashMap::default(),
         }
     }
 }
@@ -251,7 +255,7 @@ pub struct Emulations {
 
 #[derive(Clone, Debug)]
 pub struct EmulationsState {
-    pub results: HashMap<String, Emulations>,
+    pub results: FxHashMap<String, Emulations>,
 }
 
 impl Default for EmulationsState {
@@ -264,7 +268,7 @@ impl EmulationsState {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            results: HashMap::new(),
+            results: FxHashMap::default(),
         }
     }
 
@@ -367,7 +371,7 @@ impl Wallet {
 
 pub struct Env<'a> {
     pub config: &'a ActonConfig,
-    pub abi: &'a ContractAbi,
+    pub abi: Arc<ContractAbi>,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
@@ -375,7 +379,7 @@ pub struct Env<'a> {
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
     pub api_key: Option<String>,
-    pub running_id: String,
+    pub running_id: Arc<str>,
 }
 
 pub struct Context<'a> {
@@ -412,9 +416,9 @@ pub struct BuildContext<'a> {
     pub build_cache: &'a mut BuildCache,
     pub file_build_cache: &'a mut FileBuildCache,
     pub known_addresses: &'a mut KnownAddresses,
-    pub known_code_cells: &'a mut HashMap<String, String>,
+    pub known_code_cells: &'a mut FxHashMap<String, String>,
     pub need_debug_info: bool,
-    pub backtrace: Option<String>,
+    pub backtrace: Option<BacktraceMode>,
 }
 
 pub enum DebugCtx<'a> {

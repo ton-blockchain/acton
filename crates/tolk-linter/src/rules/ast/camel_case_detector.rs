@@ -66,7 +66,7 @@ fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId
         CaseRules::ScreamingSnake => (symbol.name.to_shouty_snake_case(), "SCREAMING_SNAKE_CASE"),
     };
 
-    if symbol.name == correct_case.clone().into() {
+    if symbol.name.as_bytes() == correct_case.as_bytes() {
         return;
     }
 
@@ -146,12 +146,9 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
             continue;
         }
 
-        let resolved_local_by_file = checker
-            .type_db
-            .project_index
-            .get_resolved_uses(file_info_iter.id())?;
+        let resolve_index = checker.resolve_index_for(file_info_iter.id())?;
 
-        for local_def in resolved_local_by_file.locals.iter() {
+        for local_def in resolve_index.locals.iter() {
             let name = local_def.name.clone();
             if name.starts_with("_") {
                 // don't check explicitly unused symbols
@@ -161,13 +158,11 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
 
             // TODO: check type for params
             let cameled = name.to_lower_camel_case();
-            let name = name.clone().to_string();
-
-            if cameled == name {
+            if cameled.as_bytes() == name.as_bytes() {
                 continue;
             }
 
-            let usages = resolved_local_by_file.local_usages_of(local_def.id);
+            let usages = resolve_index.local_usages_of(local_def.id);
             let mut edits = vec![];
             // we need the definition itself too
             edits.push(Edit {
@@ -210,41 +205,34 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
     // globals
     let globals = checker.type_db.project_index.global_symbols();
 
-    for symbol_ids in globals.values() {
-        for symbol_id in symbol_ids {
-            let symbol = checker.type_db.project_index.resolve_symbol(*symbol_id)?;
+    for &symbol_id in globals.values().flatten() {
+        let file_info = checker.file_db.get_by_id(symbol_id.file_id)?;
+        if file_info.is_stdlib_file() {
+            continue;
+        }
 
-            let symbol_def_file_id = symbol_id.file_id;
-            let definition_info = checker.file_db.get_by_id(symbol_def_file_id)?;
+        let symbol = checker.type_db.project_index.resolve_symbol(symbol_id)?;
 
-            if definition_info.is_stdlib_file() {
+        match &symbol.kind {
+            tolk_resolver::SymbolKind::GetMethod { .. } => {
+                // Since the get method name defines the method ID and there are names from TEPs in snake case (e.g. `get_wallet_info`),
+                // we cannot warn about the get method names
                 continue;
             }
-
-            match &symbol.kind {
-                tolk_resolver::SymbolKind::GetMethod { .. } => {
-                    // Since the get method name defines the method ID and there are names from TEPs in snake case (e.g. `get_wallet_info`),
-                    // we cannot warn about the get method names
-                    continue;
-                }
-                tolk_resolver::SymbolKind::GlobalVariable
-                | tolk_resolver::SymbolKind::Function { .. }
-                | tolk_resolver::SymbolKind::StructField
-                | tolk_resolver::SymbolKind::Method { .. } => {
-                    check_case(symbol, checker, symbol_def_file_id, CaseRules::LowerCamel)
-                }
-                tolk_resolver::SymbolKind::Struct { .. }
-                | tolk_resolver::SymbolKind::Enum { .. }
-                | tolk_resolver::SymbolKind::EnumMember
-                | tolk_resolver::SymbolKind::TypeAlias { .. } => {
-                    check_case(symbol, checker, symbol_def_file_id, CaseRules::UpperCamel)
-                }
-                tolk_resolver::SymbolKind::Constant => check_case(
-                    symbol,
-                    checker,
-                    symbol_def_file_id,
-                    CaseRules::ScreamingSnake,
-                ),
+            tolk_resolver::SymbolKind::GlobalVariable
+            | tolk_resolver::SymbolKind::Function { .. }
+            | tolk_resolver::SymbolKind::StructField
+            | tolk_resolver::SymbolKind::Method { .. } => {
+                check_case(symbol, checker, file_info.id(), CaseRules::LowerCamel)
+            }
+            tolk_resolver::SymbolKind::Struct { .. }
+            | tolk_resolver::SymbolKind::Enum { .. }
+            | tolk_resolver::SymbolKind::EnumMember
+            | tolk_resolver::SymbolKind::TypeAlias { .. } => {
+                check_case(symbol, checker, file_info.id(), CaseRules::UpperCamel)
+            }
+            tolk_resolver::SymbolKind::Constant => {
+                check_case(symbol, checker, file_info.id(), CaseRules::ScreamingSnake)
             }
         }
     }

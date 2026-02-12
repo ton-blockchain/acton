@@ -7,6 +7,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use ton_source_map::{EntryContextDescription, SourceMap};
 use tycho_types::boc::Boc;
 use vmlogs::parser::{VmStack, VmStackValue};
@@ -84,16 +85,16 @@ pub(super) fn collect_coverage(emulations: &EmulationsState, build_cache: &Build
     Coverage { files }
 }
 
-struct SourceMapAndLogs<'a> {
-    source_map: SourceMap,
-    logs: &'a String,
+struct SourceMapAndLogs {
+    source_map: Arc<SourceMap>,
+    logs: Arc<str>,
 }
 
 /// Collects all source maps and logs that will then be used for coverage calculation.
-fn collect_source_data<'a>(
-    emulations: &'a EmulationsState,
-    build_cache: &'a BuildCache,
-) -> Vec<SourceMapAndLogs<'a>> {
+fn collect_source_data(
+    emulations: &EmulationsState,
+    build_cache: &BuildCache,
+) -> Vec<SourceMapAndLogs> {
     let mut data: Vec<SourceMapAndLogs> = vec![];
     for message in emulations.messages() {
         let Some(build_result) = build_cache.result_for_code(&message.code) else {
@@ -101,13 +102,13 @@ fn collect_source_data<'a>(
         };
 
         let source_map = build_result.1.source_map;
-        let logs = &message.vm_log;
+        let logs = message.vm_log.clone();
 
         data.push(SourceMapAndLogs { source_map, logs });
     }
 
     for get_result in emulations.get_methods() {
-        let Ok(code) = Boc::decode_base64(&get_result.code) else {
+        let Ok(code) = Boc::decode_base64(get_result.code.as_ref()) else {
             continue;
         };
         let Some(build_result) = build_cache.result_for_code(&Some(code)) else {
@@ -115,7 +116,7 @@ fn collect_source_data<'a>(
         };
 
         let source_map = build_result.1.source_map;
-        let logs = &get_result.vm_log;
+        let logs = get_result.vm_log.clone();
 
         data.push(SourceMapAndLogs { source_map, logs });
     }
@@ -123,7 +124,7 @@ fn collect_source_data<'a>(
 }
 
 /// Builds execution traces by source code.
-fn build_high_level_traces(data: &Vec<SourceMapAndLogs>) -> Vec<HighLevelTrace> {
+fn build_high_level_traces(data: &[SourceMapAndLogs]) -> Vec<HighLevelTrace> {
     data.iter()
         .map(|SourceMapAndLogs { source_map, logs }| {
             let trace = Trace::new(logs, Some(1_000_000));

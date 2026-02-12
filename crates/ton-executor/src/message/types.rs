@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Result of a transaction emulation.
 #[derive(Deserialize, Debug, Clone)]
@@ -11,13 +12,13 @@ pub enum EmulationResult {
 #[derive(Deserialize, Debug, Clone)]
 pub struct RunTransactionResultSuccess {
     /// Base64 encoded transaction `BoC`.
-    pub transaction: String,
+    pub transaction: Arc<str>,
     /// Base64 encoded updated shard account `BoC`.
-    pub shard_account: String,
+    pub shard_account: Arc<str>,
     /// Virtual Machine execution logs.
-    pub vm_log: String,
+    pub vm_log: Arc<str>,
     /// Base64 encoded actions `BoC` (if any).
-    pub actions: Option<String>,
+    pub actions: Option<Arc<str>>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -83,7 +84,7 @@ impl Default for RunTransactionArgs {
 pub(crate) enum EmulationInternalResult {
     Success {
         output: EmulationResult,
-        logs: String,
+        logs: Arc<str>,
     },
     Fail {
         #[allow(dead_code)] // used only for decoding

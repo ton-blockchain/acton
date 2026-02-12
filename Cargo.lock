@@ -47,6 +47,7 @@ dependencies = [
  "regex",
  "reqwest",
  "retrace",
+ "rustc-hash",
  "semver",
  "serde",
  "serde_json",
@@ -3129,6 +3130,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "reqwest",
+ "rustc-hash",
  "serde",
  "ton-executor",
  "ton-networks",
@@ -3146,6 +3148,7 @@ dependencies = [
  "pkg-config",
  "serde",
  "serde_json",
+ "tycho-types",
 ]
 
 [[package]]
