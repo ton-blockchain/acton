@@ -778,7 +778,7 @@ fn run_file_tests(
     runner: &mut TestRunner,
     file_path: &str,
     tests: Vec<TestDescriptor>,
-    code_cell: &ArcCell,
+    code: &ArcCell,
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
@@ -804,7 +804,7 @@ fn run_file_tests(
         .reporter_manager
         .on_suite_started(&file_path, &filtered_tests)?;
 
-    let dest_address = contract_address(code_cell)?;
+    let dest_address = contract_address(code)?;
 
     let mut passed = 0;
     let mut failed = 0;
@@ -841,7 +841,7 @@ fn run_file_tests(
 
         runner.reporter_manager.on_test_started(&test_report)?;
 
-        if test.annotations.contains(&"todo".to_string()) {
+        if test.annotations.contains(&TestAnnotation::Todo) {
             test_report.status = TestStatus::Todo;
             test_report.details = test.todo_description.clone();
             runner.reporter_manager.on_test_finished(&test_report)?;
@@ -849,7 +849,7 @@ fn run_file_tests(
             continue;
         }
 
-        if test.annotations.contains(&"skip".to_string()) {
+        if test.annotations.contains(&TestAnnotation::Skip) {
             test_report.status = TestStatus::Skipped;
             runner.reporter_manager.on_test_finished(&test_report)?;
             skipped += 1;
@@ -857,13 +857,9 @@ fn run_file_tests(
         }
 
         let start_time = Instant::now();
-        let result = match runner.execute_test(
-            test,
-            code_cell,
-            &dest_address,
-            abi.clone(),
-            source_map.clone(),
-        ) {
+        let result =
+            runner.execute_test(test, code, &dest_address, abi.clone(), source_map.clone());
+        let result = match result {
             Ok(result) => result,
             Err(err) => {
                 eprintln!(
@@ -995,8 +991,8 @@ fn run_file_tests(
                 runner.build_cache.memoize(
                     &test.name,
                     &file_path,
-                    &code_cell.to_boc_b64(false)?,
-                    &code_cell.cell_hash()?.to_hex().to_ascii_uppercase(),
+                    &code.to_boc_b64(false)?,
+                    &code.cell_hash()?.to_hex().to_ascii_uppercase(),
                     source_map.clone(),
                     Some(
                         contract_abi(
@@ -1068,11 +1064,17 @@ pub struct Pos {
     pub uri: String,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum TestAnnotation {
+    Todo,
+    Skip,
+}
+
 #[derive(Debug)]
 pub struct TestDescriptor {
     pub id: i32,
     pub name: Arc<str>,
-    pub annotations: Vec<String>,
+    pub annotations: Vec<TestAnnotation>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
     pub todo_description: Option<String>,

@@ -1,8 +1,9 @@
+use crate::commands::test::TestAnnotation;
 use tolk_syntax::{AstNode, Expr, GetMethod, HasAnnotations, HasName, ObjectLit};
 
 #[derive(Debug, Default)]
 pub(super) struct TestAnnotations {
-    pub annotations: Vec<String>,
+    pub annotations: Vec<TestAnnotation>,
     pub expected_exit_code: Option<i32>,
     pub gas_limit: Option<u64>,
     pub todo_description: Option<String>,
@@ -36,10 +37,10 @@ pub(super) fn find_test_annotations(content: &str, child: GetMethod<'_>) -> Test
             match arg {
                 Expr::StringLit(arg) => match arg.content(content) {
                     "skip" => {
-                        annotations.push("skip".to_owned());
+                        annotations.push(TestAnnotation::Skip);
                     }
                     "todo" => {
-                        annotations.push("todo".to_owned());
+                        annotations.push(TestAnnotation::Todo);
                     }
                     _ => {}
                 },
@@ -90,7 +91,7 @@ fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotati
                 });
 
                 if is_true {
-                    annotations.push("skip".to_owned());
+                    annotations.push(TestAnnotation::Skip);
                 }
                 continue;
             }
@@ -98,11 +99,11 @@ fn parse_annotation_object(content: &str, object: ObjectLit<'_>) -> TestAnnotati
                 if let Some(value) = key_value.value() {
                     match value {
                         Expr::StringLit(s) => {
-                            annotations.push("todo".to_owned());
+                            annotations.push(TestAnnotation::Todo);
                             todo_description = Some(s.content(content).to_string());
                         }
                         Expr::BoolLit(b) if b.value() => {
-                            annotations.push("todo".to_owned());
+                            annotations.push(TestAnnotation::Todo);
                             todo_description = Some("TODO".to_string());
                         }
                         _ => {}
