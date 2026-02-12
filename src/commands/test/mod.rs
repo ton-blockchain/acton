@@ -40,8 +40,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
-use tolk_syntax::{AstNode, HasName};
-use ton_abi::{ContractAbi, contract_abi};
+use tolk_syntax::{AstNode, HasName, SourceFile};
+use ton_abi::{ContractAbi, contract_abi, contract_abi_with_file};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
@@ -721,20 +721,26 @@ fn compile_test_file(
     Ok(compilation_result)
 }
 
-fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<TestStats> {
-    let content = match fs::read_to_string(file) {
+fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result<TestStats> {
+    let content = match fs::read_to_string(filepath) {
         Ok(content) => content,
         Err(err) => {
-            return Err(anyhow!("Error reading file '{file}': {err}"));
+            return Err(anyhow!("Error reading file '{filepath}': {err}"));
         }
     };
 
-    let tests = find_all_test(file, &content);
+    let file = tolk_syntax::parse(&content);
+    let tests = find_all_test(filepath, &file, &content);
 
-    let abi = contract_abi(content.as_str(), file, &runner.acton_config.mappings);
+    let abi = contract_abi_with_file(
+        content.as_str(),
+        filepath,
+        &file,
+        &runner.acton_config.mappings,
+    );
 
-    let executable_code = prepare_test_file(&content);
-    let tmp_test_filename = file.to_owned() + ".test.tolk";
+    let executable_code = prepare_test_file(&file, &content);
+    let tmp_test_filename = filepath.to_owned() + ".test.tolk";
 
     fs::write(&tmp_test_filename, executable_code)?;
 
@@ -750,12 +756,15 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
         &runner.acton_config,
     )?;
     let _ = fs::remove_file(&tmp_test_filename);
-    debug!("Test file '{file}' compilation time: {:?}", now.elapsed());
+    debug!(
+        "Test file '{filepath}' compilation time: {:?}",
+        now.elapsed()
+    );
 
     let result = match compilation_result {
         tolkc::CompilerResult::Success(result) => result,
         tolkc::CompilerResult::Error(error) => {
-            let normalized_filepath = error.message.replace(&tmp_test_filename, file);
+            let normalized_filepath = error.message.replace(&tmp_test_filename, filepath);
             let trimmed_message = normalized_filepath.trim();
             anyhow::bail!(trimmed_message.to_string())
         }
@@ -765,7 +774,7 @@ fn run_tests_for_file(runner: &mut TestRunner, file: &str) -> anyhow::Result<Tes
     let source_map = result.source_map.unwrap_or_default();
     let stats = run_file_tests(
         runner,
-        file,
+        filepath,
         tests,
         &code_cell,
         Arc::new(abi),
@@ -1081,8 +1090,12 @@ pub struct TestDescriptor {
     pub pos: Pos,
 }
 
-fn find_all_test(file_path: &str, content: &str) -> Vec<TestDescriptor> {
-    let Ok(file) = tolk_syntax::parse(content) else {
+fn find_all_test(
+    file_path: &str,
+    file: &anyhow::Result<SourceFile>,
+    content: &str,
+) -> Vec<TestDescriptor> {
+    let Ok(file) = file else {
         return vec![];
     };
 

@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tolk_syntax::SourceFile;
 
 fn resolve_mapped_path(import_path: &str, mappings: &Option<BTreeMap<String, String>>) -> String {
     if import_path.starts_with("@stdlib/") || import_path.starts_with("@fiftlib/") {
@@ -240,12 +241,24 @@ pub fn contract_abi(
     file_path: &str,
     mappings: &Option<BTreeMap<String, String>>,
 ) -> ContractAbi {
+    let file = tolk_syntax::parse(content);
+    contract_abi_with_file(content, file_path, &file, mappings)
+}
+
+#[must_use]
+pub fn contract_abi_with_file(
+    content: &str,
+    file_path: &str,
+    file: &anyhow::Result<SourceFile>,
+    mappings: &Option<BTreeMap<String, String>>,
+) -> ContractAbi {
     let contract_name = get_contract_name_from_file_path(file_path);
 
-    let Ok(tree) = tolk_syntax::parse(content) else {
+    let Ok(file) = file else {
         return ContractAbi::default();
     };
-    let root_node = tree.root_node();
+
+    let root_node = file.root_node();
 
     let files = collect_imported_files(&root_node, content, file_path, mappings);
 

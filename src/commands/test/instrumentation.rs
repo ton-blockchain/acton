@@ -1,11 +1,11 @@
 use tolk_syntax::{HasName, SourceFile};
 
-pub(super) fn prepare_test_file(content: &str) -> String {
-    let Ok(file) = tolk_syntax::parse(content) else {
-        return String::new();
+pub(super) fn prepare_test_file(file: &anyhow::Result<SourceFile>, content: &str) -> String {
+    let Ok(file) = file else {
+        return format!("{content}\n\nfun main() {{}}");
     };
 
-    if has_entry_function(&file, content) {
+    if has_entry_function(file, content) {
         // very unlikely
         return content.to_owned();
     }
