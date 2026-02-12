@@ -927,13 +927,13 @@ fn run_file_tests(
             test_report.status = TestStatus::Failed;
 
             let formatter = FormatterContext {
-                contract_abi: abi.clone(),
-                accounts: accounts.clone(),
-                build_cache: runner.build_cache.clone(),
-                emulations: runner.emulations.clone(),
-                known_addresses: runner.known_addresses.clone(),
-                known_code_cells: runner.known_code_cells.clone(),
-                backtrace: runner.config.backtrace.as_ref().map(ToString::to_string),
+                contract_abi: std::borrow::Cow::Borrowed(abi),
+                accounts: std::borrow::Cow::Borrowed(&accounts),
+                build_cache: std::borrow::Cow::Borrowed(&runner.build_cache),
+                emulations: std::borrow::Cow::Borrowed(&runner.emulations),
+                known_addresses: std::borrow::Cow::Borrowed(&runner.known_addresses),
+                known_code_cells: std::borrow::Cow::Borrowed(&runner.known_code_cells),
+                backtrace: runner.config.backtrace.map(|b| std::borrow::Cow::Owned(b.to_string())),
                 fork_net: None,
                 network: None,
                 api_key: None,

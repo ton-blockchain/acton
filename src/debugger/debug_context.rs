@@ -320,7 +320,7 @@ pub struct DebugContext {
     pub performing_step: Option<StepMode>,
     pub breakpoints: HashMap<PathBuf, Vec<BreakpointInfo>>,
     pub next_breakpoint_id: i64,
-    pub formatter_context: FormatterContext,
+    pub formatter_context: FormatterContext<'static>,
     pub test_name: String,
 }
 

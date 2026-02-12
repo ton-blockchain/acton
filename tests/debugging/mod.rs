@@ -179,11 +179,12 @@ pub(crate) fn run_script_file(
             fs::write("out.disasm.fif", result.fift_code)?;
             fs::write("out.boc", code_cell.to_boc(false)?)?;
 
+            let source_map = result.source_map.unwrap_or_default();
             let (script_result, ctx, formatter) = execute_script(
                 &code_cell,
                 &data_cell,
                 &abi,
-                &result.source_map.unwrap_or_default(),
+                &source_map,
                 debug_port,
                 ExecutorVerbosity::FullLocationStackVerbose,
                 stack,
@@ -196,15 +197,15 @@ pub(crate) fn run_script_file(
     }
 }
 
-fn execute_script(
-    code_cell: &ArcCell,
-    data_cell: &ArcCell,
-    abi: &ContractAbi,
-    source_map: &SourceMap,
+fn execute_script<'a>(
+    code_cell: &'a ArcCell,
+    data_cell: &'a ArcCell,
+    abi: &'a ContractAbi,
+    source_map: &'a SourceMap,
     debug_port: u16,
     verbosity: ExecutorVerbosity,
     stack: Tuple,
-) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext)> {
+) -> anyhow::Result<(GetMethodResult, IoContext, FormatterContext<'a>)> {
     let dest_address = contract_address(code_cell)?;
 
     let now = std::time::SystemTime::now();

@@ -203,13 +203,13 @@ impl TestReporter for ConsoleReporter {
             };
 
             let formatter = FormatterContext {
-                contract_abi: test.abi.clone(),
-                accounts: exec.accounts.clone(),
-                build_cache: exec.build_cache.clone(),
-                emulations: exec.emulations.clone(),
-                known_addresses: exec.known_addresses.clone(),
-                known_code_cells: exec.known_code_cells.clone(),
-                backtrace: test.backtrace.clone(),
+                contract_abi: std::borrow::Cow::Borrowed(&test.abi),
+                accounts: std::borrow::Cow::Borrowed(&exec.accounts),
+                build_cache: std::borrow::Cow::Borrowed(&exec.build_cache),
+                emulations: std::borrow::Cow::Borrowed(&exec.emulations),
+                known_addresses: std::borrow::Cow::Borrowed(&exec.known_addresses),
+                known_code_cells: std::borrow::Cow::Borrowed(&exec.known_code_cells),
+                backtrace: test.backtrace.as_deref().map(std::borrow::Cow::Borrowed),
                 fork_net: None,
                 network: None,
                 api_key: None,
@@ -250,7 +250,7 @@ impl TestReporter for ConsoleReporter {
 fn process_test_fail(
     test: &TestReport,
     exec: &TestExecutionContext,
-    fmt: FormatterContext,
+    fmt: FormatterContext<'_>,
     result: &GetMethodResultSuccess,
 ) {
     if test.gas_limit.is_some_and(|limit| exec.gas_used > limit) {
@@ -284,7 +284,7 @@ fn process_test_fail(
     }
 }
 
-fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext) {
+fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext<'_>) {
     if let Some(message) = &failure.message() {
         if message.is_empty() {
             println!("    {}", "└─".dimmed());

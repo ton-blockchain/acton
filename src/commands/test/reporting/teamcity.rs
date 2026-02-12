@@ -5,7 +5,7 @@ use crate::formatter::FormatterContext;
 use std::path::Path;
 
 pub(crate) struct TeamCityReporter {
-    formatter: Option<FormatterContext>,
+    formatter: Option<FormatterContext<'static>>,
 }
 
 impl TeamCityReporter {

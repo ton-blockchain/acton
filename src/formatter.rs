@@ -5,10 +5,11 @@ use crate::context::{
     to_cell,
 };
 use crate::retrace::{ExecutedAction, InstalledActions};
-use crate::{exit_codes, retrace};
+use crate::{context, exit_codes, retrace};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use ton_abi::{ContractAbi, TypeAbi};
@@ -47,29 +48,29 @@ struct TransactionNode {
 
 /// Context for formatting `TupleItems` with rich information
 #[derive(Debug, Clone)]
-pub struct FormatterContext {
-    pub contract_abi: ContractAbi,
-    pub accounts: HashMap<String, ShardAccount>,
-    pub build_cache: BuildCache,
-    pub emulations: EmulationsState,
-    pub known_addresses: KnownAddresses,
-    pub known_code_cells: HashMap<String, String>,
-    pub backtrace: Option<String>,
+pub struct FormatterContext<'a> {
+    pub contract_abi: Cow<'a, ContractAbi>,
+    pub accounts: Cow<'a, HashMap<String, ShardAccount>>,
+    pub build_cache: Cow<'a, BuildCache>,
+    pub emulations: Cow<'a, EmulationsState>,
+    pub known_addresses: Cow<'a, KnownAddresses>,
+    pub known_code_cells: Cow<'a, HashMap<String, String>>,
+    pub backtrace: Option<Cow<'a, str>>,
     pub fork_net: Option<Network>,
-    pub api_key: Option<String>,
+    pub api_key: Option<Cow<'a, str>>,
     pub network: Option<Network>,
 }
 
-impl FormatterContext {
+impl<'a> FormatterContext<'a> {
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            contract_abi: ContractAbi::default(),
-            accounts: HashMap::new(),
-            build_cache: BuildCache::new(),
-            emulations: EmulationsState::new(),
-            known_addresses: KnownAddresses::new(),
-            known_code_cells: HashMap::new(),
+            contract_abi: Cow::Owned(ContractAbi::default()),
+            accounts: Cow::Owned(HashMap::new()),
+            build_cache: Cow::Owned(BuildCache::new()),
+            emulations: Cow::Owned(EmulationsState::new()),
+            known_addresses: Cow::Owned(KnownAddresses::new()),
+            known_code_cells: Cow::Owned(HashMap::new()),
             backtrace: None,
             fork_net: None,
             network: None,
@@ -79,18 +80,18 @@ impl FormatterContext {
 
     /// Create formatter context from the main Context
     #[must_use]
-    pub fn from_context(ctx: &crate::context::Context) -> Self {
+    pub fn from_context<'b: 'a>(ctx: &'b context::Context<'a>) -> Self {
         Self {
-            contract_abi: ctx.env.abi.clone(),
-            accounts: ctx.chain.world_state.get_accounts().clone(),
-            build_cache: ctx.build.build_cache.clone(),
-            emulations: ctx.chain.emulations.clone(),
-            known_addresses: ctx.build.known_addresses.clone(),
-            known_code_cells: ctx.build.known_code_cells.clone(),
-            backtrace: ctx.build.backtrace.clone(),
+            contract_abi: Cow::Borrowed(ctx.env.abi),
+            accounts: Cow::Borrowed(ctx.chain.world_state.get_accounts()),
+            build_cache: Cow::Borrowed(ctx.build.build_cache),
+            emulations: Cow::Borrowed(ctx.chain.emulations),
+            known_addresses: Cow::Borrowed(ctx.build.known_addresses),
+            known_code_cells: Cow::Borrowed(ctx.build.known_code_cells),
+            backtrace: ctx.build.backtrace.as_deref().map(Cow::Borrowed),
             fork_net: ctx.env.fork_net.clone(),
             network: ctx.network.clone(),
-            api_key: ctx.env.api_key.clone(),
+            api_key: ctx.env.api_key.as_deref().map(Cow::Borrowed),
         }
     }
 
@@ -1379,7 +1380,7 @@ impl FormatterContext {
     }
 }
 
-impl FormatterContext {
+impl<'a> FormatterContext<'a> {
     #[must_use]
     pub fn format_tuple_diff(
         &self,
