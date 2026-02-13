@@ -478,6 +478,8 @@ enum Commands {
     },
     #[command(about = "Check Tolk files in the project for errors")]
     Check {
+        #[arg(help = "Contract id (from Acton.toml) or path to a .tolk file")]
+        target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes")]
         fix: bool,
         #[arg(long, help = "Output results as JSON")]
@@ -1379,11 +1381,12 @@ fn main() {
             ),
         },
         Commands::Check {
+            target,
             fix,
             json,
             explain,
             list_lint_rules,
-        } => check_cmd(fix, json, explain, list_lint_rules),
+        } => check_cmd(fix, json, explain, list_lint_rules, target),
         Commands::Up {
             version,
             canary,

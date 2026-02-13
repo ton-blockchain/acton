@@ -1,4 +1,6 @@
+use crate::commands::common::error_fmt;
 use acton_config::config::{ActonConfig, ContractConfig};
+use anyhow::anyhow;
 use globset::{Glob, GlobSetBuilder};
 use owo_colors::OwoColorize;
 use serde_json;
@@ -26,6 +28,7 @@ pub fn check_cmd(
     json: bool,
     explain: Option<String>,
     list_lint_rules: bool,
+    target: Option<String>,
 ) -> anyhow::Result<()> {
     if list_lint_rules {
         let rules: Vec<_> = tolk_linter::Linter::Tolk
@@ -113,19 +116,34 @@ pub fn check_cmd(
 
     let mut all_diagnostics = Vec::new();
 
-    for (contract_id, contract) in contracts {
-        let contract_diagnostics =
-            check_contract(contract_id, contract, &file_db, fix, json, &config)?;
-        all_diagnostics.extend(contract_diagnostics);
-    }
-
-    for file in files {
-        let Some(name) = file.file_name() else {
-            continue;
-        };
-        if name.to_string_lossy().ends_with(".test.tolk") {
-            let contract_diagnostics = check_test_file(&file, &file_db, fix, json, &config)?;
+    if let Some(target) = target {
+        if target.ends_with(".tolk") {
+            let contract_diagnostics =
+                check_test_file(Path::new(&target), &file_db, fix, json, &config)?;
             all_diagnostics.extend(contract_diagnostics);
+        } else {
+            let contract = config
+                .get_contract(&target)
+                .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &target)))?;
+            let contract_diagnostics =
+                check_contract(&target, contract, &file_db, fix, json, &config)?;
+            all_diagnostics.extend(contract_diagnostics);
+        }
+    } else {
+        for (contract_id, contract) in contracts {
+            let contract_diagnostics =
+                check_contract(contract_id, contract, &file_db, fix, json, &config)?;
+            all_diagnostics.extend(contract_diagnostics);
+        }
+
+        for file in files {
+            let Some(name) = file.file_name() else {
+                continue;
+            };
+            if name.to_string_lossy().ends_with(".test.tolk") {
+                let contract_diagnostics = check_test_file(&file, &file_db, fix, json, &config)?;
+                all_diagnostics.extend(contract_diagnostics);
+            }
         }
     }
 
