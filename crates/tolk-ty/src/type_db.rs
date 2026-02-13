@@ -417,9 +417,18 @@ impl<'a> TypeDb<'a> {
     }
 
     fn resolve_type_identifier(&mut self, type_ident: &TypeIdent, file_id: FileId) -> Option<TyId> {
-        let name_use = self
+        let Some(name_use) = self
             .project_index
-            .find_use(file_id, type_ident.0.start_byte())?;
+            .find_use(file_id, type_ident.0.start_byte())
+        else {
+            let resolved_index = self.project_index.get_resolved_uses(file_id)?;
+            let local = resolved_index.find_local_at(type_ident.0.start_byte())?;
+            if matches!(local.kind, LocalDefKind::TypeParameter) {
+                // TODO: default type
+                return Some(self.intrn.type_parameter(local.name.to_string(), None));
+            }
+            return None;
+        };
         let symbol_id = match name_use.resolved {
             Resolved::Global(global) => global,
             Resolved::Local(local) => {
@@ -526,30 +535,38 @@ impl<'a> TypeDb<'a> {
         let inner_ty = self.lower_type(file_id, &Type::TypeIdent(name_node));
 
         let types = args_list.types();
-        let tys = types.map(|t| self.lower_type(file_id, &t)).collect();
+        let tys = types
+            .map(|t| self.lower_type(file_id, &t))
+            .collect::<Vec<_>>();
+
+        let non_generic = tys.iter().all(|t| !self.intrn.has_generics(*t));
 
         if let TyData::GenericTypeWithTs { inner_ty, .. } = self.intrn.data(inner_ty) {
-            if let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
-                return Some(
-                    self.intrn
-                        .struct_instantiation(*def, name.clone(), *def, tys),
-                );
+            if non_generic {
+                if let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
+                    return Some(
+                        self.intrn
+                            .struct_instantiation(*def, name.clone(), *def, tys),
+                    );
+                }
+
+                if let TyData::TypeAlias {
+                    def,
+                    name,
+                    inner_ty,
+                    ..
+                } = self.intrn.data(*inner_ty)
+                {
+                    return Some(self.intrn.type_alias_instantiation(
+                        *def,
+                        name.clone(),
+                        *inner_ty,
+                        tys,
+                    ));
+                }
             }
 
-            if let TyData::TypeAlias {
-                def,
-                name,
-                inner_ty,
-                ..
-            } = self.intrn.data(*inner_ty)
-            {
-                return Some(self.intrn.type_alias_instantiation(
-                    *def,
-                    name.clone(),
-                    *inner_ty,
-                    tys,
-                ));
-            }
+            return Some(self.intrn.generic_type_with_ts(*inner_ty, tys));
         }
 
         Some(self.intrn.generic_type_with_ts(inner_ty, tys))

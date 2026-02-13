@@ -4,7 +4,7 @@
 //! `FileIndex`es and tracks the relationships between files through imports.
 
 use crate::file_db::FileDb;
-use crate::file_index::{FileId, FileIndex, Import, Symbol, SymbolId, SymbolKind};
+use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
 use rustc_hash::FxHashMap;
 use std::collections::{HashMap, VecDeque};
@@ -79,6 +79,28 @@ impl ProjectIndex {
         &self.dependents
     }
 
+    /// Returns a list of all file IDs that directly import the given file.
+    pub fn direct_dependents(&self, file_id: FileId) -> Vec<FileId> {
+        let Some(file) = self.files.get(&file_id) else {
+            // very unlikely and likely a bug
+            return Vec::new();
+        };
+        let is_common = file.source_kind == FileSource::Stdlib
+            && file.path.file_name().is_some_and(|n| n == "common.tolk");
+
+        if is_common {
+            // all files depend on common.tolk
+            return self.files.keys().cloned().collect();
+        }
+
+        let mut result = vec![file_id]; // include the file itself
+        if let Some(dependents) = self.dependents.get(&file_id) {
+            result.extend(dependents);
+        }
+
+        result
+    }
+
     pub fn stdlib_path(&self) -> Option<&Path> {
         self.stdlib_path.as_deref()
     }
@@ -130,6 +152,25 @@ impl ProjectIndex {
             match &d.kind {
                 SymbolKind::Struct { fields, .. } => fields.iter().find(|f| f.id == symbol_id),
                 SymbolKind::Enum { members } => members.iter().find(|f| f.id == symbol_id),
+                _ => None,
+            }
+        })
+    }
+
+    pub fn find_symbol_at(&self, file_id: FileId, offset: usize) -> Option<&Symbol> {
+        let file = self.files().get(&file_id)?;
+        file.decls.iter().find_map(|d| {
+            if d.name_span.contains(offset) {
+                return Some(d);
+            }
+
+            match &d.kind {
+                SymbolKind::Struct { fields, .. } => {
+                    fields.iter().find(|f| f.name_span.contains(offset))
+                }
+                SymbolKind::Enum { members } => {
+                    members.iter().find(|f| f.name_span.contains(offset))
+                }
                 _ => None,
             }
         })
