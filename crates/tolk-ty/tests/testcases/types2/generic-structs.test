@@ -12,7 +12,7 @@ fun main() {
 //!                ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 54: expected Foo<int>, got Foo
+ok
 
 ========================================================================
 Generic struct with single field and union type instantiation
@@ -28,7 +28,7 @@ fun main() {
 //!                       ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 54: expected Foo<int | bool>, got Foo
+ok
 
 ========================================================================
 Generic struct with single field: deduce primitive type from alias
@@ -49,8 +49,7 @@ fun main() {
 //!     ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 79: expected IntFoo, got Foo
-type inference error at offset 164: expected int, got T
+ok
 
 ========================================================================
 Generic struct match
