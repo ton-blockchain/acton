@@ -556,9 +556,6 @@ impl<'a> TypeDb<'a> {
             .text(file_id, inst.span())
             .unwrap_or_default()
             .to_string();
-        if text.contains("Generic") {
-            println!()
-        }
 
         let inner_ty = self.lower_type(file_id, &Type::TypeIdent(name_node));
 
