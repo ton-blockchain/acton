@@ -2,6 +2,7 @@ use crate::type_interner::{TyId, TypeInterner};
 use crate::types::{AddressKind, TyData};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
+use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{
     FileId, OptionalSyntaxNodeSpanExt, Span, Symbol, SymbolId, SymbolKind,
@@ -9,8 +10,8 @@ use tolk_resolver::file_index::{
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::resolve_index::{LocalDefKind, Resolved};
 use tolk_syntax::{
-    AstNode, FunCallableType, FunctionLike, HasName, Method, NullableType, TensorType, TupleType,
-    Type, TypeIdent, TypeInstantiatedTs, UnionType, match_parents,
+    AstNode, FunCallableType, FunctionLike, HasGenericParams, HasName, Method, NullableType,
+    TensorType, TupleType, Type, TypeIdent, TypeInstantiatedTs, UnionType, match_parents,
 };
 use tolk_syntax::{HasTreeSitterKind, ast};
 
@@ -354,8 +355,26 @@ impl<'a> TypeDb<'a> {
                     }
                     _ => self.intrn.ty_unknown,
                 };
+
                 let name = symbol.name.clone();
-                Some(self.intrn.type_alias(symbol.id, name, inner))
+                let alias_ty = self.intrn.type_alias(symbol.id, name, inner);
+
+                if let Some(type_parameters) = a.type_parameters() {
+                    let type_params = type_parameters
+                        .parameters()
+                        .map(|p| {
+                            let name = p
+                                .name()
+                                .and_then(|n| self.file_db.text_of(file_id, &n))
+                                .unwrap_or_else(|| "unknown".into());
+                            self.intrn.type_parameter(name.to_string(), None)
+                        })
+                        .collect::<Vec<_>>();
+
+                    return Some(self.intrn.generic_type_with_ts(alias_ty, type_params));
+                }
+
+                Some(alias_ty)
             }
             _ => None,
         }
@@ -532,6 +551,15 @@ impl<'a> TypeDb<'a> {
         let name_node = inst.name()?;
         let args_list = inst.arguments()?;
 
+        let text = self
+            .file_db
+            .text(file_id, inst.span())
+            .unwrap_or_default()
+            .to_string();
+        if text.contains("Generic") {
+            println!()
+        }
+
         let inner_ty = self.lower_type(file_id, &Type::TypeIdent(name_node));
 
         let types = args_list.types();
@@ -541,7 +569,8 @@ impl<'a> TypeDb<'a> {
 
         let non_generic = tys.iter().all(|t| !self.intrn.has_generics(*t));
 
-        if let TyData::GenericTypeWithTs { inner_ty, .. } = self.intrn.data(inner_ty) {
+        let inner_data = self.intrn.data(inner_ty);
+        if let TyData::GenericTypeWithTs { inner_ty, .. } = inner_data {
             if non_generic {
                 if let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
                     return Some(
@@ -567,6 +596,9 @@ impl<'a> TypeDb<'a> {
             }
 
             return Some(self.intrn.generic_type_with_ts(*inner_ty, tys));
+        }
+        if matches!(inner_data, TyData::Struct { .. } | TyData::TypeAlias { .. }) {
+            return Some(inner_ty);
         }
 
         Some(self.intrn.generic_type_with_ts(inner_ty, tys))

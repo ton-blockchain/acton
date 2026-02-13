@@ -118,7 +118,6 @@ fun main() {
 ok
 
 ========================================================================
-@only
 Generic method call
 ========================================================================
 struct Cell2<T> {
@@ -131,7 +130,7 @@ fun Cell2<T>.load2(self, options: UnpackOptions = {}): T
 
 fun main() {
     val cell: Cell2<int>;
-//!     ^ Cell2
+//!     ^ Cell2<int>
     val res = cell.load2();
 //!     ^ int
 }

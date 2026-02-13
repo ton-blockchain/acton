@@ -1360,6 +1360,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 let mut deducer = GenericSubstitutionsDeducing::new();
                 deducer.auto_deduce_from_argument(struct_ty, obj_type, self.intrn());
 
+                if self.const_intrn().has_generics(inferred_type) {
+                    let mut substitutor = TypeSubstitutor::new(self.intrn());
+                    inferred_type =
+                        substitutor.substitute(inferred_type, &deducer.substitutions.mapping)
+                }
+
                 if let Some(s_expr) = self.extract_sink_expression(Expr::DotAccess(v)) {
                     inferred_type =
                         flow.smart_cast_or_original(s_expr, inferred_type, self.intrn());
@@ -2162,7 +2168,16 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
         }
 
-        let result_ty = explicit_ty.unwrap_or_else(|| self.intrn().struct_ty(def_id, struct_name));
+        let result_ty = if let Some(explicit_ty) = explicit_ty {
+            if self.const_intrn().has_generics(explicit_ty) {
+                let mut substitutor = TypeSubstitutor::new(self.intrn());
+                substitutor.substitute(explicit_ty, &deducing_ts.substitutions.mapping)
+            } else {
+                explicit_ty
+            }
+        } else {
+            self.intrn().struct_ty(def_id, struct_name)
+        };
 
         self.ctx.set_node_type(&v, result_ty);
         ExprFlow::create(flow, as_cond)

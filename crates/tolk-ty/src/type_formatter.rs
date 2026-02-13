@@ -1,5 +1,6 @@
 use crate::type_interner::{TyId, TypeInterner};
 use crate::types::*;
+use std::sync::Arc;
 
 pub(crate) struct TypeFormatter<'a> {
     interner: &'a TypeInterner,
@@ -62,9 +63,19 @@ impl<'a> TypeFormatter<'a> {
                 let parts = elements.iter().map(|t| self.format(*t)).collect::<Vec<_>>();
                 parts.join(" | ")
             }
-            TyData::Struct { name, .. } => name.to_string(),
+            TyData::Struct { name, args, .. } => {
+                if let Some(value) = self.format_with_type_args(name, args) {
+                    return value;
+                }
+                name.to_string()
+            }
+            TyData::TypeAlias { name, args, .. } => {
+                if let Some(value) = self.format_with_type_args(name, args) {
+                    return value;
+                }
+                name.to_string()
+            }
             TyData::Enum { name, .. } => name.to_string(),
-            TyData::TypeAlias { name, .. } => name.to_string(),
             TyData::TypeParameter { name, .. } => name.clone(),
             TyData::GenericTypeWithTs { inner_ty, types } => {
                 let a = types
@@ -76,6 +87,18 @@ impl<'a> TypeFormatter<'a> {
             }
             TyData::Auto => "auto".to_string(),
         }
+    }
+
+    fn format_with_type_args(&self, name: &Arc<str>, args: &Option<Vec<TyId>>) -> Option<String> {
+        if let Some(args) = args {
+            let type_args = args
+                .iter()
+                .map(|arg| self.format(*arg))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Some(format!("{}<{}>", name.to_string(), type_args));
+        }
+        None
     }
 }
 

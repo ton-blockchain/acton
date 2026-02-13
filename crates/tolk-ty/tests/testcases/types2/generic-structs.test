@@ -71,6 +71,7 @@ fun getResponse(success: bool): Response<int, slice> {
 
 fun main() {
     var r = getResponse(true);
+//!     ^ Response<int, slice>
 
     match (r) {
         Ok => { r; }
@@ -80,8 +81,8 @@ fun main() {
     }
 }
 ------------------------------------------------------------------------
-type inference error at offset 364: expected Ok<int>, got Ok
-type inference error at offset 412: expected Err<slice>, got Err
+type inference error at offset 395: expected Ok<int>, got Ok<T>
+type inference error at offset 443: expected Err<slice>, got Err<T>
 
 ========================================================================
 Generic struct is
