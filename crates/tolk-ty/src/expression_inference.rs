@@ -1336,6 +1336,11 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
         }
 
+        // Wrapper<T>.foo
+        if let Some(Expr::Instantiation(_)) = v.obj() {
+            is_static_call = true;
+        }
+
         // check for field access (`user.id`), when obj is a struct
         if let TyData::Struct { def, .. } = self.intrn().data(obj_type) {
             let def_id = *def;
@@ -2259,9 +2264,9 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                         self.ctx.set_node_type(&v, func_ty);
                     }
                 }
-
-                return ExprFlow::create(flow, as_cond);
             }
+
+            return ExprFlow::create(flow, as_cond);
         }
 
         if let Some(ty) = self.ctx.type_db.convert_instantiated(&v, self.ctx.file_id) {
