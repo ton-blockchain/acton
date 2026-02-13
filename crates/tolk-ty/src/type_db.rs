@@ -198,7 +198,7 @@ impl<'a> TypeDb<'a> {
                         } else {
                             let type_parameters = type_parameters
                                 .iter()
-                                .map(|p| self.intrn.type_parameter(p.to_string(), None))
+                                .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
                                 .collect();
                             Some(self.intrn.generic_type_with_ts(base_ty, type_parameters))
                         }

@@ -58,6 +58,20 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
         }
     }
 
+    for (&symbol_file_id, types) in checker.body_types {
+        if symbol_file_id != file_id {
+            continue;
+        }
+
+        for inference in types.values() {
+            for name_use in &inference.resolved_refs {
+                if let Resolved::Global(symbol_id) = name_use.resolved {
+                    used_files.insert(symbol_id.file_id);
+                }
+            }
+        }
+    }
+
     for resolved_import in imports {
         let Some(target_id) = resolved_import.target() else {
             continue;

@@ -19,7 +19,7 @@ use tolk_syntax::{
     AsCast, Assign, AstNode, Bin, BoolLit, Call, DotAccess, DotAccessField, Expr, HasGenericParams,
     HasName, Ident, Instantiation, IsType, Lambda, Lazy, Match, MatchArmBody, MatchPattern,
     NotNull, NullLit, NumberLit, ObjectLit, Paren, SetAssign, StringLit, Tensor, Ternary, TopLevel,
-    Tuple, Unary, Underscore, VarDecl, VarDeclPattern,
+    Tuple, Type, Unary, Underscore, VarDecl, VarDeclPattern,
 };
 
 impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
@@ -1336,6 +1336,11 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
         }
 
+        // Wrapper<T>.foo
+        if let Some(Expr::Instantiation(_)) = v.obj() {
+            is_static_call = true;
+        }
+
         // check for field access (`user.id`), when obj is a struct
         if let TyData::Struct { def, .. } = self.intrn().data(obj_type) {
             let def_id = *def;
@@ -1513,8 +1518,18 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // v is `globalF(args)` / `globalF<int>(args)` / `obj.method(args)` / `local_var(args)` / `getF()(args)`
         let mut self_obj: Option<Expr<'t>> = None; // for `obj.method()`, obj will be here (but for `Point.create()`, no obj exists)
         let mut fun_ref: Option<SymbolId> = None;
+        let mut instantiation_types: Option<Vec<Type<'t>>> = None;
 
-        if let Expr::Ident(ident) = callee {
+        let actual_callee = if let Expr::Instantiation(inst) = callee {
+            instantiation_types = inst
+                .instantiation_ts()
+                .map(|t| t.types().collect::<Vec<_>>());
+            inst.expr().unwrap_or(callee)
+        } else {
+            callee
+        };
+
+        if let Expr::Ident(ident) = actual_callee {
             flow = self.infer_reference(ident, flow, false).out_flow;
 
             if let Some(resolved) = self.ctx.get_resolved_node(&ident) {
@@ -1524,7 +1539,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     // Local variable call (lambda?) - handled below via inferred type
                 }
             }
-        } else if let Expr::DotAccess(dot) = callee {
+        } else if let Expr::DotAccess(dot) = actual_callee {
             flow = self
                 .infer_dot_access(
                     dot,
@@ -1536,7 +1551,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 )
                 .out_flow;
         } else {
-            flow = self.infer_expr(callee, flow, false, None).out_flow;
+            flow = self.infer_expr(actual_callee, flow, false, None).out_flow;
 
             if let Some(resolved) = self.ctx.get_resolved_node(&callee) {
                 if let Resolved::Global(id) = resolved.resolved {
@@ -1550,7 +1565,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // callee must have "callable" inferred type
         let f_callable = self
             .ctx
-            .get_node_type(&callee)
+            .get_node_type(&actual_callee)
             .map(|t| self.const_intrn().unwrap_alias(t))
             .and_then(|t| self.return_type_or_none(t));
         let Some(f_callable) = f_callable else {
@@ -1606,12 +1621,33 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             // something strange if we cannot resolve reference
             return ExprFlow::create(flow, as_cond);
         };
-        let parameters = match &declaration.kind {
-            SymbolKind::Function { parameters, .. } => parameters,
-            SymbolKind::Method { parameters, .. } => parameters,
-            SymbolKind::GetMethod { parameters, .. } => parameters,
+        let (parameters, type_parameters) = match &declaration.kind {
+            SymbolKind::Function {
+                parameters,
+                type_parameters,
+                ..
+            } => (parameters, type_parameters),
+            SymbolKind::Method {
+                parameters,
+                type_parameters,
+                ..
+            } => (parameters, type_parameters),
+            SymbolKind::GetMethod {
+                parameters,
+                type_parameters,
+                ..
+            } => (parameters, type_parameters),
             _ => return ExprFlow::create(flow, as_cond),
         };
+
+        if let Some(instantiation_types) = instantiation_types {
+            for (type_parameter, ty) in type_parameters.iter().zip(instantiation_types) {
+                let ty = self.ctx.type_db.lower_type(self.ctx.file_id, &ty);
+                deducing_ts
+                    .substitutions
+                    .set_type_t(type_parameter.name.to_string(), ty)
+            }
+        }
 
         // let receiver_ty = self.ctx.type_db.receiver_types.get(&fun_ref);
 
@@ -2259,9 +2295,9 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                         self.ctx.set_node_type(&v, func_ty);
                     }
                 }
-
-                return ExprFlow::create(flow, as_cond);
             }
+
+            return ExprFlow::create(flow, as_cond);
         }
 
         if let Some(ty) = self.ctx.type_db.convert_instantiated(&v, self.ctx.file_id) {

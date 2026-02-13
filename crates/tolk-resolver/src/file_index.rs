@@ -168,6 +168,11 @@ pub struct Parameter {
     pub is_mutate: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct TypeParameter {
+    pub name: Arc<str>,
+}
+
 /// Distinguishes between different kinds of top-level declarations.
 #[derive(Debug, Clone)]
 pub enum SymbolKind {
@@ -178,6 +183,7 @@ pub enum SymbolKind {
         /// Whether the function has an explicit return type.
         has_return_type: bool,
         parameters: Vec<Parameter>,
+        type_parameters: Vec<TypeParameter>,
     },
     /// A method defined on a type.
     Method {
@@ -188,19 +194,21 @@ pub enum SymbolKind {
         /// Whether the method is an instance method.
         is_instance: bool,
         parameters: Vec<Parameter>,
+        type_parameters: Vec<TypeParameter>,
     },
     /// A GET-method (for TON smart contracts).
     GetMethod {
         /// Whether the method has an explicit return type.
         has_return_type: bool,
         parameters: Vec<Parameter>,
+        type_parameters: Vec<TypeParameter>,
     },
     /// A struct definition.
     Struct {
         /// Fields of the struct.
         fields: Vec<Symbol>,
         is_generic: bool,
-        type_parameters: Vec<Arc<str>>,
+        type_parameters: Vec<TypeParameter>,
     },
     /// A field within a struct.
     StructField,
@@ -217,7 +225,7 @@ pub enum SymbolKind {
     TypeAlias {
         /// When `type slice = builtin`
         is_builtin: bool,
-        type_parameters: Vec<Arc<str>>,
+        type_parameters: Vec<TypeParameter>,
     },
 }
 
@@ -460,6 +468,7 @@ impl FileIndex {
                                     is_mutate: p.mutate(),
                                 })
                                 .collect(),
+                            type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
                         body_span,
@@ -506,6 +515,7 @@ impl FileIndex {
                                     is_mutate: p.mutate(),
                                 })
                                 .collect(),
+                            type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
                         body_span,
@@ -528,6 +538,7 @@ impl FileIndex {
                                     is_mutate: p.mutate(),
                                 })
                                 .collect(),
+                            type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
                         body_span,
@@ -575,13 +586,15 @@ impl FileIndex {
     fn extract_type_parameters<'a, Node: HasGenericParams<'a>>(
         file: &ast::SourceFile,
         decl: Node,
-    ) -> Vec<Arc<str>> {
+    ) -> Vec<TypeParameter> {
         decl.type_parameters()
             .map(|tp| {
                 tp.parameters()
                     .flat_map(|p| {
                         let name_ident = p.name()?;
-                        Some(Arc::from(name_ident.text(&file.source)))
+                        Some(TypeParameter {
+                            name: Arc::from(name_ident.text(&file.source)),
+                        })
                     })
                     .collect::<Vec<_>>()
             })
