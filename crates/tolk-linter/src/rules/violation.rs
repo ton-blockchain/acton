@@ -1,6 +1,6 @@
 use crate::ast::{
-    name_case_checker, deprecated_symbol_use, field_init_can_be_folded,
-    mutable_variable_can_be_immutable, no_bounce_handler, pure_function_call_unused, unused_import,
+    deprecated_symbol_use, field_init_can_be_folded, mutable_variable_can_be_immutable,
+    name_case_checker, no_bounce_handler, pure_function_call_unused, unused_import,
     unused_variable, write_only_variable,
 };
 use serde::Serialize;

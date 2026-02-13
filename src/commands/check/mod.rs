@@ -4,14 +4,12 @@ use anyhow::anyhow;
 use globset::{Glob, GlobSetBuilder};
 use owo_colors::OwoColorize;
 use serde_json;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::time::Instant;
-use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, Severity};
-use tolk_linter::{Checker, Tolk};
+use tolk_linter::Checker;
+use tolk_linter::diagnostic::{Annotation, Diagnostic, Severity};
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::Span;
 use tolk_resolver::project_index::ProjectIndex;
@@ -19,9 +17,14 @@ use tolk_resolver::symbol_resolver::resolve;
 use tolk_ty::TypeDb;
 use tolk_ty::TypeInterner;
 use tolk_ty::infer;
-use tolkc::Compiler;
-use tree_sitter::Point;
 use walkdir::WalkDir;
+
+mod check_explain;
+mod check_list;
+mod compiler;
+mod fix;
+mod json;
+mod pos;
 
 pub fn check_cmd(
     fix: bool,
@@ -31,71 +34,13 @@ pub fn check_cmd(
     target: Option<String>,
 ) -> anyhow::Result<()> {
     if list_lint_rules {
-        let rules: Vec<_> = tolk_linter::Linter::Tolk
-            .all_rules()
-            .map(|r| {
-                serde_json::json!({
-                    "name": r.name(),
-                    "description": r.explanation().unwrap_or_default(),
-                })
-            })
-            .collect();
-        println!("{}", serde_json::to_string_pretty(&rules)?);
-        return Ok(());
+        return check_list::check_list_cmd();
     }
-
     if let Some(code) = explain {
-        if let Ok(tolk_rules) = Tolk::from_str(&code)
-            && let Some(rule) = tolk_rules.rules().next()
-        {
-            if let Some(explanation) = rule.explanation() {
-                println!("{}", explanation);
-            } else {
-                println!("No explanation available for rule {}", code);
-            }
-        } else {
-            anyhow::bail!("Unknown rule code: {}", code);
-        }
-        return Ok(());
+        return check_explain::check_explain_cmd(&code);
     }
 
     let config = ActonConfig::load()?;
-
-    let contracts = match config.contracts() {
-        Some(contracts) => contracts,
-        None => {
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "success": true,
-                        "diagnostics": [],
-                    })
-                );
-            } else {
-                println!(
-                    "No contracts found in Acton.toml. Run {} first or add contracts manually.",
-                    "acton init".yellow()
-                );
-            }
-            return Ok(());
-        }
-    };
-
-    if contracts.is_empty() {
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({
-                    "success": true,
-                    "diagnostics": [],
-                })
-            );
-        } else {
-            println!("No contracts to check.");
-        }
-        return Ok(());
-    }
 
     let cwd = std::env::current_dir()?;
 
@@ -130,9 +75,10 @@ pub fn check_cmd(
             all_diagnostics.extend(contract_diagnostics);
         }
     } else {
+        let contracts = config.contracts().cloned().unwrap_or_default();
         for (contract_id, contract) in contracts {
             let contract_diagnostics =
-                check_contract(contract_id, contract, &file_db, fix, json, &config)?;
+                check_contract(&contract_id, &contract, &file_db, fix, json, &config)?;
             all_diagnostics.extend(contract_diagnostics);
         }
 
@@ -150,12 +96,12 @@ pub fn check_cmd(
     if json {
         let json_output = serde_json::json!({
             "success": true,
-            "diagnostics": all_diagnostics.iter().map(|d| diagnostic_to_json(d, &file_db)).collect::<Vec<_>>()
+            "diagnostics": all_diagnostics.iter().map(|d| json::diagnostic_to_json(d, &file_db)).collect::<Vec<_>>()
         });
         println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else {
         let shown_diagnostics = if fix {
-            filter_fixed_diagnostics(&all_diagnostics)
+            fix::filter_fixed_diagnostics(&all_diagnostics)
         } else {
             all_diagnostics
         };
@@ -216,18 +162,11 @@ fn check_contract(
         return Ok(vec![]);
     }
 
-    let root = PathBuf::from(&config.src).canonicalize()?;
-    let current_dir = std::env::current_dir().unwrap_or_default();
-    let relative_root = pathdiff::diff_paths(&root, &current_dir).unwrap_or_else(|| root.clone());
-
     if !json {
-        println!(
-            "Checking {} ({})",
-            config.name,
-            relative_root.display().cyan()
-        );
+        println!("    {} {}", "Checking".green().bold(), config.name,);
     }
 
+    let root = PathBuf::from(&config.src).canonicalize()?;
     let lint_settings = Checker::build_settings(acton_config, Some(contract_id));
 
     check_root_file(&root, file_db, fix, json, lint_settings, acton_config)
@@ -246,9 +185,9 @@ fn check_test_file(
 
     if !json {
         println!(
-            "Checking {} ({})",
-            file.file_name().unwrap_or_default().to_string_lossy(),
-            relative_root.display().cyan()
+            "    {} {}",
+            "Checking".green().bold(),
+            relative_root.display()
         );
     }
 
@@ -266,21 +205,20 @@ fn check_root_file(
     acton_config: &ActonConfig,
 ) -> anyhow::Result<Vec<Diagnostic>> {
     let file_info = file_db.process(root)?;
+    let file_source = file_info.source().source.clone();
 
     let mut all_diagnostics = vec![];
 
     let has_compiler_errors =
-        check_with_compiler(root, file_db, acton_config, &mut all_diagnostics)?;
+        compiler::check_with_compiler(root, file_db, acton_config, &mut all_diagnostics)?;
 
     let parse_errors = file_info.source().errors();
 
     if has_compiler_errors {
         // don't possibly duplicate parsing errors if we have compiler errors
         for parse_error in parse_errors {
-            let start_byte =
-                byte_offset_from_point(&parse_error.span.start, &file_info.source().source);
-            let end_byte =
-                byte_offset_from_point(&parse_error.span.end, &file_info.source().source);
+            let start_byte = pos::byte_offset_from_point(&parse_error.span.start, &file_source);
+            let end_byte = pos::byte_offset_from_point(&parse_error.span.end, &file_source);
 
             let diagnostic = Diagnostic {
                 file_id: file_info.id(),
@@ -381,7 +319,7 @@ fn check_root_file(
 
     if !json {
         let diagnostics_to_show = if fix {
-            filter_fixed_diagnostics(&diagnostics)
+            fix::filter_fixed_diagnostics(&diagnostics)
         } else {
             diagnostics.clone()
         };
@@ -389,107 +327,10 @@ fn check_root_file(
     }
 
     if fix && !json {
-        apply_fixes(file_db, &diagnostics)?;
+        fix::apply_fixes(file_db, &diagnostics)?;
     }
 
     Ok(diagnostics)
-}
-
-fn check_with_compiler(
-    root: &Path,
-    file_db: &FileDb,
-    acton_config: &ActonConfig,
-    all_diagnostics: &mut Vec<Diagnostic>,
-) -> anyhow::Result<bool> {
-    let now = Instant::now();
-
-    let compiler = Compiler::new(2).with_mappings(&acton_config.mappings);
-    let compiler_errors = compiler.check(root)?;
-    log::debug!(
-        "Run compiler check took {:?}, found {} errors in {}",
-        now.elapsed(),
-        compiler_errors.len(),
-        root.display()
-    );
-
-    let has_compiler_errors = compiler_errors.is_empty();
-
-    for compiler_error in compiler_errors {
-        let file_info = match file_db.process(Path::new(&compiler_error.range.file_name)) {
-            Ok(file_id) => file_id,
-            Err(error) => {
-                log::warn!("Cannot process file for compiler error {error}");
-                continue;
-            }
-        };
-
-        let start_byte = byte_offset_from_point(
-            &Point {
-                row: compiler_error.range.start_line_no - 1,
-                column: compiler_error.range.start_char_no - 1,
-            },
-            &file_info.source().source,
-        );
-        let end_byte = byte_offset_from_point(
-            &Point {
-                row: compiler_error.range.end_line_no - 1,
-                column: compiler_error.range.end_char_no - 1,
-            },
-            &file_info.source().source,
-        );
-
-        let diagnostic = Diagnostic {
-            file_id: file_info.id(),
-            severity: Severity::Error,
-            code: None,
-            name: "compiler-error",
-            message: compiler_error.message.clone(),
-            annotations: vec![Annotation {
-                span: Span {
-                    start: start_byte as u32,
-                    end: end_byte as u32,
-                },
-                message: None,
-                is_primary: true,
-                tags: vec![],
-            }],
-            fixes: vec![],
-            help: None,
-        };
-        all_diagnostics.push(diagnostic);
-    }
-    Ok(has_compiler_errors)
-}
-
-fn filter_fixed_diagnostics(diagnostics: &[Diagnostic]) -> Vec<Diagnostic> {
-    diagnostics
-        .iter()
-        .filter(|d| {
-            !d.fixes
-                .iter()
-                .any(|f| f.applicability == Applicability::Auto)
-        })
-        .cloned()
-        .collect()
-}
-
-fn byte_offset_from_point(point: &Point, source: &str) -> usize {
-    let lines: Vec<&str> = source.lines().collect();
-    let mut offset = 0;
-
-    // Add bytes for complete lines before the target row
-    for i in 0..point.row {
-        if i < lines.len() {
-            offset += lines[i].len() + 1; // +1 for newline
-        }
-    }
-
-    // Add bytes for characters in the current line
-    if point.row < lines.len() {
-        offset += point.column;
-    }
-
-    offset
 }
 
 fn emit_diagnostics(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Result<()> {
@@ -590,215 +431,6 @@ fn emit_diagnostics(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Res
     }
 
     Ok(())
-}
-
-fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Result<()> {
-    let mut fixes_by_file: BTreeMap<String, Vec<(usize, usize, String)>> = BTreeMap::new();
-    let mut total_diags_by_file: HashMap<String, usize> = HashMap::new();
-    let mut fixed_diags_by_file: HashMap<String, usize> = HashMap::new();
-
-    for diag in diagnostics {
-        let file_info = file_db
-            .get_by_id(diag.file_id)
-            .ok_or_else(|| anyhow::anyhow!("File info not found for file_id {}", diag.file_id))?;
-
-        let file_path = file_info.index().path.to_string_lossy().to_string();
-
-        *total_diags_by_file.entry(file_path.clone()).or_default() += 1;
-
-        if diag.fixes.is_empty() {
-            continue;
-        }
-
-        // For now, apply only the first fix for each diagnostic
-        let fix = &diag.fixes[0];
-        *fixed_diags_by_file.entry(file_path.clone()).or_default() += 1;
-
-        for edit in &fix.edits {
-            let edit_file_id = edit.file_id;
-            let edit_file_info = file_db.get_by_id(edit_file_id).ok_or_else(|| {
-                anyhow::anyhow!("File info not found for edit file_id {}", edit_file_id)
-            })?;
-            let edit_file_path = edit_file_info.index().path.to_string_lossy().to_string();
-
-            fixes_by_file.entry(edit_file_path).or_default().push((
-                edit.span.start as usize,
-                edit.span.end as usize,
-                edit.replacement.clone(),
-            ));
-        }
-    }
-
-    let current_dir = std::env::current_dir().unwrap_or_default();
-
-    for (file_path, mut fixes) in fixes_by_file {
-        let content = fs::read_to_string(&file_path)?;
-        let total_issues = *total_diags_by_file.get(&file_path).unwrap_or(&0);
-        let fixed_issues = *fixed_diags_by_file.get(&file_path).unwrap_or(&0);
-
-        // sort fixes by start position in reverse order (to avoid offset issues when multiple fixes)
-        fixes.sort_by(|a, b| b.0.cmp(&a.0));
-
-        let mut new_content = content.clone();
-        let mut applied_fixes = 0;
-
-        for (start, end, replacement) in fixes {
-            let start_char = byte_to_char_index(&content, start);
-            let end_char = byte_to_char_index(&content, end);
-
-            if start_char <= content.len() && end_char <= content.len() && start_char <= end_char {
-                new_content.replace_range(start_char..end_char, &replacement);
-                applied_fixes += 1;
-            }
-        }
-
-        if applied_fixes > 0 {
-            fs::write(&file_path, new_content)?;
-
-            let relative_path = pathdiff::diff_paths(&file_path, &current_dir)
-                .unwrap_or_else(|| PathBuf::from(&file_path));
-
-            if total_issues == 0 {
-                println!(
-                    "Applied {} {} to {}",
-                    applied_fixes,
-                    if applied_fixes == 1 { "fix" } else { "fixes" },
-                    relative_path.display().cyan(),
-                );
-            } else if fixed_issues == total_issues {
-                println!("Fixed all issues in {}", relative_path.display().cyan());
-            } else {
-                let remaining = total_issues - fixed_issues;
-                println!(
-                    "Applied {} {} to {}, {} {} remaining",
-                    fixed_issues,
-                    if fixed_issues == 1 { "fix" } else { "fixes" },
-                    relative_path.display().cyan(),
-                    remaining,
-                    if remaining == 1 { "issue" } else { "issues" }
-                );
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn byte_to_char_index(s: &str, byte_index: usize) -> usize {
-    s.char_indices()
-        .nth(byte_index)
-        .map(|(i, _)| i)
-        .unwrap_or(byte_index)
-}
-
-fn create_range_json(source: &str, span: &Span) -> Option<serde_json::Value> {
-    if let (Some((start_line, start_col)), Some((end_line, end_col))) = (
-        byte_to_line_col(source, span.start as usize),
-        byte_to_line_col(source, span.end as usize),
-    ) {
-        Some(serde_json::json!({
-            "start": {"line": start_line, "character": start_col},
-            "end": {"line": end_line, "character": end_col}
-        }))
-    } else {
-        None
-    }
-}
-
-fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value {
-    let file_info = file_db
-        .get_by_id(diag.file_id)
-        .expect("File info should exist for diagnostic");
-    let file_path = file_info.index().path.to_string_lossy().to_string();
-    let source = file_info.source().source.as_ref();
-
-    let severity = match diag.severity {
-        Severity::Info => "info",
-        Severity::Warning => "warning",
-        Severity::Error => "error",
-        Severity::Fatal => "error",
-        Severity::Help => "info",
-    };
-
-    let mut annotations_json = Vec::new();
-    for annotation in &diag.annotations {
-        if let Some(range) = create_range_json(source, &annotation.span) {
-            annotations_json.push(serde_json::json!({
-                "range": range,
-                "message": annotation.message,
-                "is_primary": annotation.is_primary
-            }));
-        }
-    }
-
-    let mut fixes_json = Vec::new();
-    for fix in &diag.fixes {
-        let mut edits_json = Vec::new();
-        for edit in &fix.edits {
-            let edit_file_id = edit.file_id;
-            let edit_source = file_db
-                .get_by_id(edit_file_id)
-                .map(|info| info.source().source.clone())
-                .unwrap_or_else(|| source.into());
-            if let Some(range) = create_range_json(edit_source.as_ref(), &edit.span) {
-                edits_json.push(serde_json::json!({
-                    "range": range,
-                    "newText": &edit.replacement,
-                    "file": file_db
-                        .get_by_id(edit_file_id)
-                        .map(|info| info.index().path.to_string_lossy().to_string())
-                        .unwrap_or_else(|| file_path.clone())
-                }));
-            }
-        }
-        let applicability = match fix.applicability {
-            Applicability::Auto => "auto",
-            Applicability::Manual => "manual",
-        };
-        fixes_json.push(serde_json::json!({
-            "message": &fix.message,
-            "edits": edits_json,
-            "applicability": applicability
-        }));
-    }
-
-    serde_json::json!({
-        "file": file_path,
-        "severity": severity,
-        "name": &diag.name,
-        "code": &diag.code,
-        "message": &diag.message,
-        "annotations": annotations_json,
-        "fixes": fixes_json,
-        "source": "tolk"
-    })
-}
-
-fn byte_to_line_col(source: &str, byte_offset: usize) -> Option<(u32, u32)> {
-    let mut line = 0u32;
-    let mut col = 0u32;
-    let mut current_byte = 0usize;
-
-    for (i, ch) in source.char_indices() {
-        if i >= byte_offset {
-            return Some((line, col));
-        }
-
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += 1;
-        }
-        current_byte = i;
-    }
-
-    // If we reach the end, return the last position
-    if current_byte < byte_offset && byte_offset <= source.len() {
-        Some((line, col + (byte_offset - current_byte) as u32))
-    } else {
-        None
-    }
 }
 
 fn find_files(root: &Path) -> anyhow::Result<Vec<PathBuf>> {
