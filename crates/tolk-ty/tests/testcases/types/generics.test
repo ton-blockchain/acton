@@ -16,14 +16,13 @@ Type instantiation with several arguments
 struct Generic<T, U, W> {}
 
 fun main() {
-    val a: Generic<int, slice, bool> {};
+    val a: Generic<int, slice, bool>;
     //! ^ Generic<int, slice, bool>
 }
 ------------------------------------------------------------------------
 ok
 
 ========================================================================
-@only
 Type instantiation with other generic
 ========================================================================
 struct Generic<T> {}

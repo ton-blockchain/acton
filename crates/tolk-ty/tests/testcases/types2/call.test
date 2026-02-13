@@ -93,3 +93,46 @@ fun main() {
 }
 ------------------------------------------------------------------------
 ok
+
+========================================================================
+Method call on alias
+========================================================================
+type ForwardPayloadRemainder = RemainingBitsAndRefs
+
+fun ForwardPayloadRemainder.checkIsCorrectTlbEither(self): cell {}
+
+struct (0x178d4519) InternalTransferStep {
+    forwardPayload: ForwardPayloadRemainder
+}
+
+fun main() {
+    val internalTransferMsg = InternalTransferStep {};
+    val res = internalTransferMsg
+        .forwardPayload
+    //!  ^ ForwardPayloadRemainder
+        .checkIsCorrectTlbEither();
+      res;
+  //! ^ cell
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Generic method call
+========================================================================
+struct Cell2<T> {
+    private readonly tvmCell: cell
+}
+
+@pure
+fun Cell2<T>.load2(self, options: UnpackOptions = {}): T
+    builtin
+
+fun main() {
+    val cell: Cell2<int>;
+//!     ^ Cell2<int>
+    val res = cell.load2();
+//!     ^ int
+}
+------------------------------------------------------------------------
+ok
