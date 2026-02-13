@@ -551,12 +551,6 @@ impl<'a> TypeDb<'a> {
         let name_node = inst.name()?;
         let args_list = inst.arguments()?;
 
-        let text = self
-            .file_db
-            .text(file_id, inst.span())
-            .unwrap_or_default()
-            .to_string();
-
         let inner_ty = self.lower_type(file_id, &Type::TypeIdent(name_node));
 
         let types = args_list.types();
