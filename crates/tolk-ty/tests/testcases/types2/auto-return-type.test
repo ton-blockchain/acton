@@ -102,17 +102,16 @@ fun main() {
     val res =
 //!     ^ slice
         test<slice>("hello");
-//!     ^ (T) -> T
+//!     ^ (slice) -> slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 76: expected slice, got unknown
-type inference error at offset 106: unknown type
+ok
 
 ========================================================================
 Auto return type: cyclic reference TODO
 ========================================================================
 fun test<T>(arg: T) {
-//! ^ (T) -> unknown
+//! ^ (T) -> int | auto
     if (arg) {
         return 10;
     }
@@ -121,9 +120,9 @@ fun test<T>(arg: T) {
 
 fun main() {
     val res =
-//!     ^ unknown
-        test<slice>("hello");
-//!     ^ (T) -> unknown
+//!     ^ int | auto
+          test<slice>("hello");
+//!       ^ (slice) -> int | auto
 }
 ------------------------------------------------------------------------
-type inference error at offset 165: unknown type
+ok
