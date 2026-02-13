@@ -3,9 +3,9 @@ extern crate core;
 use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{deprecated_symbol_use, no_bounce_handler};
 use crate::rules::ast::{
-    field_init_can_be_folded, method_can_be_static, mutable_variable_can_be_immutable,
-    pure_function_call_unused, unused_import, unused_variable, used_ignored_identifier,
-    write_only_variable,
+    field_init_can_be_folded, message_entity_naming, method_can_be_static,
+    mutable_variable_can_be_immutable, pure_function_call_unused, unused_import, unused_variable,
+    used_ignored_identifier, write_only_variable,
 };
 use rules::diagnostic::{Diagnostic, Severity};
 pub use rules::*;
@@ -367,6 +367,11 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         );
         run_rule!(
             self.checker,
+            Rule::MessageShouldBeNamed,
+            message_entity_naming::check_file_for_message_name(self.checker, self.file_id)
+        );
+        run_rule!(
+            self.checker,
             Rule::MethodCanBeStatic,
             method_can_be_static::check_file(self.checker, self.file_id)
         );
@@ -431,6 +436,19 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
             Rule::NoBounceHandler,
             no_bounce_handler::check_call_expr(self.checker, self.file_id, node, self.current_decl)
         );
+
+        if let Some(inference) = self.current_inference {
+            run_rule!(
+                self.checker,
+                Rule::CreateMessageInlineSend,
+                message_entity_naming::check_call_for_inline_send(
+                    self.checker,
+                    self.file_id,
+                    node,
+                    inference
+                )
+            );
+        }
 
         if let Some(callee) = node.callee() {
             self.visit_expr(&callee);

@@ -487,10 +487,12 @@ impl<'tree> Call<'tree> {
     }
 
     #[must_use]
-    pub fn callee_qualifier(&self) -> Option<Node<'tree>> {
+    pub fn callee_qualifier(&self) -> Option<Expr<'tree>> {
         let callee = self.callee()?;
         match callee {
-            Expr::DotAccess(dot_access) => dot_access.0.child_by_field_name("obj"),
+            Expr::DotAccess(dot_access) => {
+                Expr::try_from_node(dot_access.0.child_by_field_name("obj")?).ok()
+            }
             _ => None,
         }
     }

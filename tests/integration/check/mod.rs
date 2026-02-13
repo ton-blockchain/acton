@@ -2,6 +2,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 mod deprecated_tests;
+mod message_entity_naming_tests;
 mod method_can_be_static_tests;
 mod mutable_variable_can_be_immutable_tests;
 mod success_tests;

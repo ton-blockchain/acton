@@ -1,5 +1,6 @@
 pub mod deprecated_symbol_use;
 pub mod field_init_can_be_folded;
+pub mod message_entity_naming;
 pub mod method_can_be_static;
 pub mod mutable_variable_can_be_immutable;
 pub mod name_case_checker;
