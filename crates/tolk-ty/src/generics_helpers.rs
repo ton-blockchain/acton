@@ -139,7 +139,7 @@ impl GenericSubstitutionsDeducing {
                 }
             }
             (
-                TyData::Instantiation {
+                TyData::GenericTypeWithTs {
                     inner_ty: p_inner,
                     types: p_args,
                 },
@@ -147,7 +147,8 @@ impl GenericSubstitutionsDeducing {
             ) => {
                 // `arg: Wrapper<T>` called as `f(wrappedInt)` => T is int
                 // In Rust version, we check if arg_unwrapped is also an instantiation or a struct/alias that is an instantiation
-                match interner.data(arg_ty).clone() {
+                let aaaa = interner.data(arg_ty).clone();
+                match aaaa {
                     TyData::Struct {
                         def: a_def,
                         args: Some(a_args),
@@ -178,7 +179,7 @@ impl GenericSubstitutionsDeducing {
                             }
                         }
                     }
-                    TyData::Instantiation {
+                    TyData::GenericTypeWithTs {
                         inner_ty: a_inner,
                         types: a_args,
                     } => {
