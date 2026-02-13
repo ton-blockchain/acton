@@ -1,8 +1,8 @@
-import "../network"
+import "../../lib/emulation/network"
 import "contracts/types"
-import "../../build/build"
-import "../../testing/expect"
-import "../../testing/transaction_expect"
+import "../../lib/build/build"
+import "../../lib/testing/expect"
+import "../../lib/testing/transaction_expect"
 
 struct Counter {
     address: address

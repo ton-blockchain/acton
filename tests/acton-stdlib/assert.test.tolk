@@ -1,4 +1,4 @@
-import "assert"
+import "../../lib/testing/assert"
 
 get fun `test-consume less with lambda`() {
     Assert.consumesLessThan1(fun (a: int) {

@@ -1,9 +1,9 @@
-import "../message"
+import "../../../lib/types/message"
 import "contracts/types"
-import "../../build/build"
-import "../../emulation/network"
-import "../../testing/expect"
-import "../../testing/transaction_expect"
+import "../../../lib/build/build"
+import "../../../lib/emulation/network"
+import "../../../lib/testing/expect"
+import "../../../lib/testing/transaction_expect"
 
 struct Counter {
     address: address
