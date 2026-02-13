@@ -789,7 +789,7 @@ fn normalize_abs_path(project_root: &Path, path: &Path) -> PathBuf {
         project_root.join(path)
     };
 
-    abs_path.canonicalize().unwrap_or(abs_path)
+    dunce::canonicalize(&abs_path).unwrap_or(abs_path)
 }
 
 fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {

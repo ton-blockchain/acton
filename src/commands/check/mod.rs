@@ -147,7 +147,7 @@ fn find_stdlib() -> anyhow::Result<PathBuf> {
         );
     }
 
-    Ok(path_to_stdlib.canonicalize()?)
+    Ok(dunce::canonicalize(path_to_stdlib)?)
 }
 
 fn find_acton_stdlib() -> anyhow::Result<PathBuf> {
@@ -159,7 +159,7 @@ fn find_acton_stdlib() -> anyhow::Result<PathBuf> {
         );
     }
 
-    Ok(path_to_acton.canonicalize()?)
+    Ok(dunce::canonicalize(path_to_acton)?)
 }
 
 fn check_contract(
@@ -179,7 +179,7 @@ fn check_contract(
         println!("    {} {}", "Checking".green().bold(), config.name,);
     }
 
-    let root = PathBuf::from(&config.src).canonicalize()?;
+    let root = dunce::canonicalize(PathBuf::from(&config.src))?;
     let lint_settings = Checker::build_settings(acton_config, Some(contract_id));
 
     check_root_file(&root, file_db, fix, json, lint_settings, acton_config)
@@ -192,7 +192,7 @@ fn check_test_file(
     json: bool,
     acton_config: &ActonConfig,
 ) -> anyhow::Result<Vec<Diagnostic>> {
-    let root = file.canonicalize()?;
+    let root = dunce::canonicalize(file)?;
     let current_dir = std::env::current_dir().unwrap_or_default();
     let relative_root = pathdiff::diff_paths(&root, &current_dir).unwrap_or_else(|| root.clone());
 

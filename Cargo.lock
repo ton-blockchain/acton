@@ -3003,6 +3003,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dashmap",
+ "dunce",
  "expect-test",
  "log",
  "rustc-hash",
@@ -3026,6 +3027,7 @@ dependencies = [
 name = "tolk-ty"
 version = "0.1.0"
 dependencies = [
+ "dunce",
  "log",
  "rustc-hash",
  "smol_str",
@@ -3116,6 +3118,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "crc",
+ "dunce",
  "num-bigint",
  "serde",
  "tolk-syntax",

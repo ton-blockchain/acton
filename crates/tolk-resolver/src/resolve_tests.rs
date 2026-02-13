@@ -1303,7 +1303,7 @@ mod tests {
                         pos += c.len_utf8() as u32;
                     }
                     std::fs::write(&full_path, &clean_target_content).unwrap();
-                    target_abs_path = Some(full_path.canonicalize().unwrap());
+                    target_abs_path = Some(dunce::canonicalize(full_path).unwrap());
                 } else {
                     std::fs::write(&full_path, content).unwrap();
                 }
@@ -1313,10 +1313,9 @@ mod tests {
 
             let stdlib_path = PathBuf::from("../../crates/tolkc/assets/tolk-stdlib");
             let file_db = FileDb::new(stdlib_path.clone(), None);
-            let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join(stdlib_path)
-                .canonicalize()
-                .unwrap();
+
+            let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(stdlib_path);
+            let stdlib_path = dunce::canonicalize(stdlib_path).unwrap();
 
             let mut project_index =
                 crate::project_index::ProjectIndex::builder(&file_db, target_abs_path.clone())

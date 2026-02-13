@@ -16,6 +16,7 @@ tolk-resolver = { workspace = true }
 log = { workspace = true }
 smol_str = { workspace = true }
 rustc-hash = { workspace = true }
+dunce = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.8"

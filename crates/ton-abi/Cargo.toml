@@ -18,6 +18,7 @@ num-bigint = { workspace = true }
 anyhow = { workspace = true }
 tycho-types = { workspace = true }
 serde = { workspace = true }
+dunce = { workspace = true }
 
 [lints]
 workspace = true
