@@ -196,8 +196,7 @@ fun main() {
 //!     ^ slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 44: expected int, got T
-type inference error at offset 88: expected slice, got T
+ok
 
 ========================================================================
 Generic instance method with T receiver
@@ -211,8 +210,7 @@ fun main() {
 //!     ^ slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 48: expected int, got T
-type inference error at offset 91: expected slice, got T
+ok
 
 ========================================================================
 Generic instance method with T? receiver
@@ -226,8 +224,7 @@ fun main() {
 //!     ^ slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 49: expected int, got T
-type inference error at offset 92: expected slice, got T
+ok
 
 ========================================================================
 Generic static method with single argument and T receiver
@@ -239,7 +236,7 @@ fun main() {
 //!     ^ int | slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 55: expected int | slice, got T | slice
+ok
 
 ========================================================================
 Generic instance method with single argument and T receiver
@@ -251,7 +248,7 @@ fun main() {
 //!     ^ int | slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 61: expected int | slice, got T | slice
+ok
 
 ========================================================================
 Generic struct with single field: deduce primitive type
@@ -267,7 +264,7 @@ fun main() {
 //!           ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 54: expected Foo<int>, got Foo
+ok
 
 ========================================================================
 Generic struct with single field and short init: deduce primitive type
@@ -284,7 +281,7 @@ fun main() {
 //!           ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 74: expected Foo<int>, got Foo
+type inference error at offset 74: expected Foo<int>, got Foo<T>
 type inference error at offset 113: expected int, got T
 
 ========================================================================
@@ -301,7 +298,7 @@ fun main() {
         Foo {}
 }
 ------------------------------------------------------------------------
-type inference error at offset 80: expected Foo<never>, got Foo
+type inference error at offset 80: expected Foo<never>, got Foo<T>
 
 ========================================================================
 Generic struct with several never default types and single type deduced
@@ -322,8 +319,8 @@ fun main() {
         Foo { other: 10 };
 }
 ------------------------------------------------------------------------
-type inference error at offset 103: expected Foo<never, never>, got Foo
-type inference error at offset 162: expected Foo<never, int>, got Foo
+type inference error at offset 103: expected Foo<never, never>, got Foo<T, U>
+type inference error at offset 162: expected Foo<never, int>, got Foo<T, int>
 
 ========================================================================
 Generic struct with other struct default type
@@ -347,6 +344,6 @@ fun main() {
         } };
 }
 ------------------------------------------------------------------------
-type inference error at offset 110: expected Foo<Bar>, got Foo
+type inference error at offset 110: expected Foo<Bar>, got Foo<unknown>
 type inference error at offset 157: unknown type
 type inference error at offset 198: unknown type

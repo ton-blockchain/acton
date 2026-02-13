@@ -37,5 +37,4 @@ fun main() {
     throw 2;
 }
 ------------------------------------------------------------------------
-type inference error at offset 429: expected Map<int32, int>, got unknown
-type inference error at offset 469: expected () -> Map<K, V>, got unknown
+ok

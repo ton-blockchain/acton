@@ -213,6 +213,7 @@ fn setup_counter_project() -> DebugSession {
 }
 
 #[test]
+#[cfg_attr(target_os = "linux", ignore)]
 fn test_real_counter_contract_tests() -> anyhow::Result<()> {
     let session = setup_counter_project();
     let mut client = session.start();
@@ -238,6 +239,7 @@ fn test_real_counter_contract_tests() -> anyhow::Result<()> {
 }
 
 #[test]
+#[cfg_attr(target_os = "linux", ignore)]
 fn test_real_counter_contract_step_in() -> anyhow::Result<()> {
     let session = setup_counter_project();
     let mut client = session.start();

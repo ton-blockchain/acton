@@ -50,7 +50,13 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
     let use_facts = checker.use_facts(file_id)?;
 
     for local in &resolved_index.locals {
-        if !matches!(local.kind, LocalDefKind::Var { is_mutable: true }) {
+        if !matches!(
+            local.kind,
+            LocalDefKind::Var {
+                is_mutable: true,
+                ..
+            }
+        ) {
             // not a mutable variable
             continue;
         }

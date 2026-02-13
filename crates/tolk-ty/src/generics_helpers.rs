@@ -66,10 +66,9 @@ impl GenericSubstitutionsDeducing {
             return;
         }
 
-        match (
-            interner.data(param_ty).clone(),
-            interner.data(arg_ty).clone(),
-        ) {
+        let param_data = interner.data(param_ty).clone();
+        let arg_data = interner.data(arg_ty).clone();
+        match (param_data, arg_data.clone()) {
             (TyData::TypeParameter { name, .. }, _) => {
                 // `(arg: T)` called as `f([1, 2])` => T is [int, int]
                 self.substitutions.set_type_t(name, arg_ty);
@@ -139,7 +138,7 @@ impl GenericSubstitutionsDeducing {
                 }
             }
             (
-                TyData::Instantiation {
+                TyData::GenericTypeWithTs {
                     inner_ty: p_inner,
                     types: p_args,
                 },
@@ -147,14 +146,14 @@ impl GenericSubstitutionsDeducing {
             ) => {
                 // `arg: Wrapper<T>` called as `f(wrappedInt)` => T is int
                 // In Rust version, we check if arg_unwrapped is also an instantiation or a struct/alias that is an instantiation
-                match interner.data(arg_ty).clone() {
+                match arg_data {
                     TyData::Struct {
                         def: a_def,
                         args: Some(a_args),
                         ..
                     } => {
-                        if let TyData::Struct { def: p_def, .. } =
-                            interner.data(interner.unwrap_alias(p_inner))
+                        let p_data = interner.data(interner.unwrap_alias(p_inner));
+                        if let TyData::Struct { def: p_def, .. } = p_data
                             && *p_def == a_def
                             && p_args.len() == a_args.len()
                         {
@@ -178,7 +177,7 @@ impl GenericSubstitutionsDeducing {
                             }
                         }
                     }
-                    TyData::Instantiation {
+                    TyData::GenericTypeWithTs {
                         inner_ty: a_inner,
                         types: a_args,
                     } => {

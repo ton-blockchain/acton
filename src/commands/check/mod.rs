@@ -108,7 +108,9 @@ pub fn check_cmd(
         });
         println!("{}", serde_json::to_string_pretty(&json_output)?);
     } else {
-        fix::apply_fixes(&file_db, &all_diagnostics)?;
+        if fix {
+            fix::apply_fixes(&file_db, &all_diagnostics)?;
+        }
 
         let shown_diagnostics = if fix {
             fix::filter_fixed_diagnostics(&all_diagnostics)

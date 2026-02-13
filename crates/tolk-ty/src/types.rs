@@ -41,8 +41,10 @@ pub enum TyData {
         /// The default type if provided (as `T = int`).
         default_type: Option<TyId>,
     },
-    /// An instantiation of a generic type (e.g. `Tuple<int, int>`).
-    Instantiation {
+    /// `Wrapper<T>` when T is a generic (a struct is not ready to instantiate).
+    /// `Wrapper<int>` is NOT here, it's an instantiated struct. Here is only when type arguments contain generics.
+    /// Example: `type WrapperAlias<T> = Wrapper<T>`, then `Wrapper<T>` (underlying type of alias) is here.
+    GenericTypeWithTs {
         inner_ty: TyId,
         types: Vec<TyId>,
     },

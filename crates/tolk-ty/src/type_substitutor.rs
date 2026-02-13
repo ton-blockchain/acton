@@ -116,7 +116,7 @@ impl<'a> TypeSubstitutor<'a> {
                 }
                 self.interner.intern(TyData::Func { params, return_ty })
             }
-            TyData::Instantiation {
+            TyData::GenericTypeWithTs {
                 inner_ty: old_inner,
                 types: ref old_types,
             } => {
@@ -133,8 +133,37 @@ impl<'a> TypeSubstitutor<'a> {
                 if !changed {
                     return id;
                 }
+
+                let non_generic = types.iter().all(|t| !self.interner.has_generics(*t));
+
+                if non_generic {
+                    match self.interner.data(inner_ty) {
+                        TyData::Struct { def, name, .. } => {
+                            return self.interner.struct_instantiation(
+                                *def,
+                                name.clone(),
+                                *def,
+                                types,
+                            );
+                        }
+                        TyData::TypeAlias {
+                            def,
+                            name,
+                            inner_ty,
+                            ..
+                        } => {
+                            return self.interner.type_alias_instantiation(
+                                *def,
+                                name.clone(),
+                                *inner_ty,
+                                types,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
                 self.interner
-                    .intern(TyData::Instantiation { inner_ty, types })
+                    .intern(TyData::GenericTypeWithTs { inner_ty, types })
             }
             TyData::Struct {
                 def,

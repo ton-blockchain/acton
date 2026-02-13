@@ -1341,6 +1341,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // check for field access (`user.id`), when obj is a struct
         if let TyData::Struct { def, .. } = self.intrn().data(obj_type) {
             let def_id = *def;
+            let struct_ty = self
+                .ctx
+                .type_db
+                .get_top_level_type(None, def_id)
+                .unwrap_or_default();
+
             if let Some(field_def) = self.ctx.type_db.find_struct_field(def_id, &field_name) {
                 self.ctx.set_resolved(NameUse {
                     decl: self.ctx.decl_start,
@@ -1350,6 +1356,15 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     resolved: Resolved::Global(field_def.id),
                 });
                 let mut inferred_type = field_def.declared_type;
+
+                let mut deducer = GenericSubstitutionsDeducing::new();
+                deducer.auto_deduce_from_argument(struct_ty, obj_type, self.intrn());
+
+                if self.const_intrn().has_generics(inferred_type) {
+                    let mut substitutor = TypeSubstitutor::new(self.intrn());
+                    inferred_type =
+                        substitutor.substitute(inferred_type, &deducer.substitutions.mapping)
+                }
 
                 if let Some(s_expr) = self.extract_sink_expression(Expr::DotAccess(v)) {
                     inferred_type =
@@ -1425,7 +1440,11 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
             if let Some(fun_ref) = fun_ref {
                 let typ = self.ctx.get_top_level_type(fun_ref);
-                if let Some(typ) = typ {
+                if let Some(mut typ) = typ {
+                    if self.const_intrn().has_generics(typ) {
+                        let mut substitutor = TypeSubstitutor::new(self.intrn());
+                        typ = substitutor.substitute(typ, &substituted_ts.mapping)
+                    }
                     self.ctx.set_node_type(&v, typ);
                 }
                 self.ctx.set_resolved(NameUse {
@@ -2026,11 +2045,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // either by lhs hint `var u: User = { ... }, or by explicitly provided ref `User { ... }`
         let mut struct_def_id = None;
         let mut struct_name = None;
+        let mut explicit_ty = None;
 
         // `User { ... }` / `UserAlias { ... }` / `Wrapper { ... }` / `Wrapper<int> { ... }`
         if let Some(type_node) = v.typ() {
-            let explicit_ty = self.lower(Some(type_node));
-            let unwrapped = self.const_intrn().unwrap_alias(explicit_ty);
+            let explicit_type = self.lower(Some(type_node));
+            let unwrapped = self.const_intrn().unwrap_alias(explicit_type);
 
             match self.const_intrn().data(unwrapped) {
                 TyData::Struct { name, def, .. } => {
@@ -2038,7 +2058,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     struct_def_id = Some(*def);
                     struct_name = Some(name.clone());
                 }
-                TyData::Instantiation { inner_ty, .. } => {
+                TyData::GenericTypeWithTs { inner_ty, .. } => {
                     if let TyData::Struct { name, def, .. } = self.const_intrn().data(*inner_ty) {
                         // if `type WAlias<T> = Wrapper<T>`, here `Wrapper` (generic struct)
                         struct_def_id = Some(*def);
@@ -2047,6 +2067,8 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 }
                 _ => {}
             }
+
+            explicit_ty = Some(explicit_type);
 
             // example: `var v: Ok<int> = Ok { ... }`, now struct_ref is "Ok<T>", take "Ok<int>" from hint
             let is_generic = struct_def_id.is_some_and(|id| self.ctx.type_db.is_struct_generic(id));
@@ -2089,7 +2111,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     }
                     struct_def_id = found_def;
                 }
-                TyData::Instantiation { inner_ty, .. } => {
+                TyData::GenericTypeWithTs { inner_ty, .. } => {
                     if let TyData::Struct { name, def, .. } = self.const_intrn().data(*inner_ty) {
                         struct_def_id = Some(*def);
                         struct_name = Some(name.clone());
@@ -2109,8 +2131,6 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // so, we have struct_ref, so we can check field names and infer values
         // if it's a generic struct, we need to deduce Ts by field values, like for a function call
         let mut deducing_ts = GenericSubstitutionsDeducing::new();
-
-        let result_ty = self.intrn().struct_ty(def_id, struct_name);
 
         for arg in v.arguments() {
             let Some(name_node) = arg.name() else {
@@ -2151,6 +2171,17 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 flow = self.infer_expr(val, flow, false, None).out_flow;
             }
         }
+
+        let result_ty = if let Some(explicit_ty) = explicit_ty {
+            if self.const_intrn().has_generics(explicit_ty) {
+                let mut substitutor = TypeSubstitutor::new(self.intrn());
+                substitutor.substitute(explicit_ty, &deducing_ts.substitutions.mapping)
+            } else {
+                explicit_ty
+            }
+        } else {
+            self.intrn().struct_ty(def_id, struct_name)
+        };
 
         self.ctx.set_node_type(&v, result_ty);
         ExprFlow::create(flow, as_cond)
