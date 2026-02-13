@@ -950,7 +950,7 @@ fun net.balance(of: address): coins {
 /// ```
 fun net.getAccount(addr: address): Account {
     val shard = net.getShardAccount(addr);
-    return shard!!.account.load();
+    return shard!.account.load();
 }
 
 
