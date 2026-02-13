@@ -96,7 +96,7 @@ impl<'a> TypeFormatter<'a> {
                 .map(|arg| self.format(*arg))
                 .collect::<Vec<_>>()
                 .join(", ");
-            return Some(format!("{}<{}>", name.to_string(), type_args));
+            return Some(format!("{name}<{type_args}>"));
         }
         None
     }
