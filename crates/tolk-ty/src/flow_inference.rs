@@ -423,7 +423,7 @@ impl InferenceResult {
         }
     }
 
-    /// Retrieves the type of an expression at the given span.
+    /// Retrieves the type of expression at the given span.
     pub fn type_of(&self, span: Span) -> Option<TyId> {
         self.expression_types.get(&span).cloned()
     }

@@ -30,13 +30,13 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust
         run: rustup toolchain install
 
       - name: Cache sccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/sccache
           key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
@@ -44,7 +44,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Cache Cargo registry + git + target
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -73,7 +73,7 @@ jobs:
 
       - name: Cache TON build directory
         id: cache-ton-build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ton-repo/build
           key: ton-build-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
@@ -81,15 +81,16 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         id: cache-ton-deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ton-repo/openssl_3
@@ -99,7 +100,8 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
@@ -151,7 +153,7 @@ jobs:
           ./target/release/acton --help
 
       - name: Upload acton binary as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: acton-macos-binary
           path: target/release/acton
@@ -168,13 +170,13 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust
         run: rustup toolchain install
 
       - name: Cache sccache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/sccache
           key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
@@ -182,7 +184,7 @@ jobs:
             ${{ runner.os }}-sccache-
 
       - name: Cache Cargo registry + git + target
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -212,7 +214,7 @@ jobs:
 
       - name: Cache TON build directory
         id: cache-ton-build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ton-repo/build
           key: ton-build-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
@@ -220,15 +222,16 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         id: cache-ton-deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ton-repo/openssl_3
@@ -238,7 +241,8 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ steps.ton-commit.outputs.commit }}
@@ -290,7 +294,7 @@ jobs:
           ./target/release/acton --help
 
       - name: Upload acton binary as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: acton-macos-x86_64-binary
           path: target/release/acton
@@ -310,13 +314,13 @@ jobs:
           large-packages: false
 
       - name: Check out Acton repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust
         run: rustup toolchain install
 
       - name: Cache Cargo registry + git + target
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -345,7 +349,7 @@ jobs:
 
       - name: Cache TON build directory
         id: cache-ton-build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ton-repo/build
           key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -353,15 +357,19 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-
 
+      - name: Check cache hit
+        run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
+
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         id: cache-ton-deps
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ton-repo/openssl_3
@@ -371,7 +379,8 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: actions/cache@v5
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -431,11 +440,11 @@ jobs:
         run: |
           ./target/release-size/acton --help
 
-#      - name: Upload acton binary as artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: acton-linux-binary
-#          path: target/release-size/acton
+      #      - name: Upload acton binary as artifact
+      #        uses: actions/upload-artifact@v6
+      #        with:
+      #          name: acton-linux-binary
+      #          path: target/release-size/acton
 
       - name: Install cargo-llvm-cov and nextest
         uses: taiki-e/install-action@v2
@@ -456,10 +465,10 @@ jobs:
           ./target/release-size/acton test tests/acton-stdlib
 
 #      - name: Upload coverage report
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: coverage-report
-#          path: target/llvm-cov/html
+#        uses: actions/upload-artifact@v6
+      #        with:
+      #          name: coverage-report
+      #          path: target/llvm-cov/html
 
       - name: Run formatter and linter
         run: |
@@ -467,28 +476,28 @@ jobs:
           just clippy
 
   create-canary-release:
-    needs: [ build-macos, build-macos-intel, build-linux ]
+    needs: [build-macos, build-macos-intel, build-linux]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master'
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download macOS binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: acton-macos-binary
           path: binaries/macos/
 
       - name: Download macOS x86_64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: acton-macos-x86_64-binary
           path: binaries/macos-x86_64/
 
       - name: Download Linux binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: acton-linux-binary
           path: binaries/linux/

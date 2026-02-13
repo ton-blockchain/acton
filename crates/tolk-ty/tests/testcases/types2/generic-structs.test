@@ -12,7 +12,7 @@ fun main() {
 //!                ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 54: expected Foo<int>, got Foo
+ok
 
 ========================================================================
 Generic struct with single field and union type instantiation
@@ -28,7 +28,7 @@ fun main() {
 //!                       ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 54: expected Foo<int | bool>, got Foo
+ok
 
 ========================================================================
 Generic struct with single field: deduce primitive type from alias
@@ -49,8 +49,7 @@ fun main() {
 //!     ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 79: expected IntFoo, got Foo
-type inference error at offset 164: expected int, got T
+ok
 
 ========================================================================
 Generic struct match
@@ -71,6 +70,7 @@ fun getResponse(success: bool): Response<int, slice> {
 
 fun main() {
     var r = getResponse(true);
+//!     ^ Response<int, slice>
 
     match (r) {
         Ok => { r; }
@@ -80,8 +80,8 @@ fun main() {
     }
 }
 ------------------------------------------------------------------------
-type inference error at offset 364: expected Ok<int>, got Ok
-type inference error at offset 412: expected Err<slice>, got Err
+type inference error at offset 395: expected Ok<int>, got Ok<T>
+type inference error at offset 443: expected Err<slice>, got Err<T>
 
 ========================================================================
 Generic struct is

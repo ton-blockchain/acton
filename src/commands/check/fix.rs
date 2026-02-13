@@ -1,4 +1,3 @@
-use crate::commands::check::pos;
 use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -7,16 +6,16 @@ use tolk_linter::diagnostic::{Applicability, Diagnostic};
 use tolk_resolver::FileDb;
 
 pub(super) fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyhow::Result<()> {
-    let mut fixes_by_file: BTreeMap<String, Vec<(usize, usize, String)>> = BTreeMap::new();
-    let mut total_diags_by_file: HashMap<String, usize> = HashMap::new();
-    let mut fixed_diags_by_file: HashMap<String, usize> = HashMap::new();
+    let mut fixes_by_file: BTreeMap<PathBuf, Vec<(usize, usize, String)>> = BTreeMap::new();
+    let mut total_diags_by_file: HashMap<PathBuf, usize> = HashMap::new();
+    let mut fixed_diags_by_file: HashMap<PathBuf, usize> = HashMap::new();
 
     for diag in diagnostics {
         let file_info = file_db
             .get_by_id(diag.file_id)
             .ok_or_else(|| anyhow::anyhow!("File info not found for file_id {}", diag.file_id))?;
 
-        let file_path = file_info.index().path.to_string_lossy().to_string();
+        let file_path = &file_info.index().path;
 
         *total_diags_by_file.entry(file_path.clone()).or_default() += 1;
 
@@ -26,6 +25,10 @@ pub(super) fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyho
 
         // For now, apply only the first fix for each diagnostic
         let fix = &diag.fixes[0];
+        if fix.applicability != Applicability::Auto {
+            continue;
+        }
+
         *fixed_diags_by_file.entry(file_path.clone()).or_default() += 1;
 
         for edit in &fix.edits {
@@ -33,11 +36,11 @@ pub(super) fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyho
             let edit_file_info = file_db.get_by_id(edit_file_id).ok_or_else(|| {
                 anyhow::anyhow!("File info not found for edit file_id {}", edit_file_id)
             })?;
-            let edit_file_path = edit_file_info.index().path.to_string_lossy().to_string();
+            let edit_file_path = edit_file_info.index().path.clone();
 
             fixes_by_file.entry(edit_file_path).or_default().push((
-                edit.span.start as usize,
-                edit.span.end as usize,
+                edit.span.start(),
+                edit.span.end(),
                 edit.replacement.clone(),
             ));
         }
@@ -46,22 +49,21 @@ pub(super) fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyho
     let current_dir = std::env::current_dir().unwrap_or_default();
 
     for (file_path, mut fixes) in fixes_by_file {
-        let content = fs::read_to_string(&file_path)?;
-        let total_issues = *total_diags_by_file.get(&file_path).unwrap_or(&0);
-        let fixed_issues = *fixed_diags_by_file.get(&file_path).unwrap_or(&0);
-
         // sort fixes by start position in reverse order (to avoid offset issues when multiple fixes)
-        fixes.sort_by(|a, b| b.0.cmp(&a.0));
+        fixes.sort_by(|(a_start, _, _), (b_start, _, _)| b_start.cmp(a_start));
 
-        let mut new_content = content.clone();
+        let content = fs::read_to_string(&file_path)?;
+        let mut new_content = content;
         let mut applied_fixes = 0;
 
         for (start, end, replacement) in fixes {
-            let start_char = pos::byte_to_char_index(&content, start);
-            let end_char = pos::byte_to_char_index(&content, end);
-
-            if start_char <= content.len() && end_char <= content.len() && start_char <= end_char {
-                new_content.replace_range(start_char..end_char, &replacement);
+            if start <= new_content.len()
+                && end <= new_content.len()
+                && start <= end
+                && new_content.is_char_boundary(start)
+                && new_content.is_char_boundary(end)
+            {
+                new_content.replace_range(start..end, &replacement);
                 applied_fixes += 1;
             }
         }
@@ -71,6 +73,9 @@ pub(super) fn apply_fixes(file_db: &FileDb, diagnostics: &[Diagnostic]) -> anyho
 
             let relative_path = pathdiff::diff_paths(&file_path, &current_dir)
                 .unwrap_or_else(|| PathBuf::from(&file_path));
+
+            let total_issues = *total_diags_by_file.get(&file_path).unwrap_or(&0);
+            let fixed_issues = *fixed_diags_by_file.get(&file_path).unwrap_or(&0);
 
             if total_issues == 0 {
                 println!(

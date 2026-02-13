@@ -14,8 +14,8 @@ use crate::resolve_index::{
 use std::collections::HashMap;
 use std::sync::Arc;
 use tolk_syntax::{
-    AstNode, Constant, Enum, FuncBody, FunctionLike, GlobalVar, HasGenericParams, HasName,
-    InstanceArg, Struct, TypeAlias, VarKind, Walker, ast,
+    AstNode, Constant, Enum, EnumMember, FuncBody, FunctionLike, GlobalVar, HasGenericParams,
+    HasName, InstanceArg, Struct, StructField, TypeAlias, VarKind, Walker, ast,
 };
 use tree_sitter::Node;
 
@@ -330,7 +330,14 @@ impl<'a> SymbolResolver<'a> {
                     let name_str = name.text(self.file_content()).to_string();
                     self.check_redeclaration(&name_str, "var_declaration");
                     let is_mutable = matches!(kind, VarKind::Var);
-                    self.add_symbol(&name.0, name_str, LocalDefKind::Var { is_mutable });
+                    self.add_symbol(
+                        &name.0,
+                        name_str,
+                        LocalDefKind::Var {
+                            is_mutable,
+                            has_type: var_decl.typ().is_some(),
+                        },
+                    );
                 }
 
                 if let Some(typ) = var_decl.typ() {
@@ -408,6 +415,17 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
             self.walk_struct_body(&body);
         }
         self.exit_scope();
+        self.exit_scope();
+        self.default_result()
+    }
+
+    fn walk_struct_field(&mut self, node: &StructField<'tree>) -> Self::Result {
+        if let Some(typ) = node.typ() {
+            self.visit_type(&typ);
+        }
+        if let Some(default) = node.default() {
+            self.visit_expr(&default);
+        }
         self.default_result()
     }
 
@@ -420,6 +438,13 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
         }
         if let Some(body) = node.body() {
             self.walk_enum_body(&body);
+        }
+        self.default_result()
+    }
+
+    fn walk_enum_member(&mut self, node: &EnumMember<'tree>) -> Self::Result {
+        if let Some(default) = node.default() {
+            self.visit_expr(&default);
         }
         self.default_result()
     }
@@ -559,7 +584,9 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
                 &name.0,
                 name_str,
                 LocalDefKind::Param {
+                    has_type: node.typ().is_some(),
                     is_mutable: node.mutate(),
+                    is_self: false,           // there is no self parameters in lambdas
                     in_asm_or_builtin: false, // lambda cannot be assembly or builtin
                 },
             );
@@ -592,12 +619,15 @@ impl<'tree> Walker<'tree> for SymbolResolver<'_> {
     fn walk_parameter(&mut self, node: &ast::Parameter<'tree>, in_common: bool) -> Self::Result {
         if let Some(name) = node.name() {
             let name_str = name.text(self.file_content()).to_string();
+            let is_self = name_str == "self";
             self.check_redeclaration(&name_str, "parameter_declaration");
             self.add_symbol(
                 &name.0,
                 name_str,
                 LocalDefKind::Param {
+                    has_type: node.typ().is_some(),
                     is_mutable: node.mutate(),
+                    is_self,
                     in_asm_or_builtin: !in_common,
                 },
             );

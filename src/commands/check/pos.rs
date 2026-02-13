@@ -17,13 +17,6 @@ pub(super) fn byte_offset_from_point(point: &Point, source: &str) -> usize {
     offset
 }
 
-pub(super) fn byte_to_char_index(s: &str, byte_index: usize) -> usize {
-    s.char_indices()
-        .nth(byte_index)
-        .map(|(i, _)| i)
-        .unwrap_or(byte_index)
-}
-
 pub(super) fn byte_to_line_col(source: &str, byte_offset: usize) -> Option<(u32, u32)> {
     let mut line = 0u32;
     let mut col = 0u32;

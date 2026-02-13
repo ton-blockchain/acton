@@ -38,7 +38,7 @@ use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, St
 use tycho_types::dict::Dict;
 use tycho_types::models::{
     AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr,
-    LibDescr, MsgInfo, OrdinaryTxInfo, OptionalAccount, RelaxedMessage, RelaxedMsgInfo,
+    LibDescr, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
     ShardAccount, SkippedComputePhase, Transaction, TxInfo,
 };
 
@@ -1465,10 +1465,11 @@ fn set_shard_account_impl(
         _ => anyhow::bail!("Expected shard account as Cell or Slice"),
     };
 
-    ctx.chain.world_state.update_account(&raw_addr, &shard_account);
+    ctx.chain
+        .world_state
+        .update_account(&raw_addr, &shard_account);
     Ok(())
 }
-
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {

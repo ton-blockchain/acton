@@ -245,6 +245,8 @@ ok
 ========================================================================
 Null literal type inference
 ========================================================================
+type null = builtin;
+
 fun main() {
     val data = null;
     //! ^ null
@@ -394,7 +396,7 @@ fun main() {
 ok
 
 ========================================================================
-Cyclic dependency with Cell in struct TODO
+Cyclic dependency with Cell in struct
 ========================================================================
 struct SwapStep {
     nextStep: Cell<SwapStep>?
@@ -409,4 +411,4 @@ fun main() {
 //!     ^ SwapStep
 }
 ------------------------------------------------------------------------
-type inference error at offset 172: expected SwapStep, got T
+ok

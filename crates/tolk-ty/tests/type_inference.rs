@@ -224,6 +224,11 @@ fn test_types_funcs() {
 }
 
 #[test]
+fn test_types_generics() {
+    run_tests_from_file(&get_test_path("generics.test"));
+}
+
+#[test]
 #[ignore]
 fn test_types_map() {
     run_tests_from_file(&get_test_path("map.test"));
