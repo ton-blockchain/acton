@@ -478,7 +478,7 @@ enum Commands {
     },
     #[command(about = "Check Tolk files in the project for errors")]
     Check {
-        #[arg(help = "Contract id (from Acton.toml) or path to a .tolk file")]
+        #[arg(help = "Contract ID to check or path to a .tolk file")]
         target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes")]
         fix: bool,
