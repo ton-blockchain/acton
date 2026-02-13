@@ -359,6 +359,9 @@ jobs:
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-
 
+      - name: Check cache hit
+        run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
+
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
         id: cache-ton-deps
         uses: actions/cache@v5
