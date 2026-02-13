@@ -196,8 +196,7 @@ fun main() {
 //!     ^ slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 44: expected int, got T
-type inference error at offset 88: expected slice, got T
+ok
 
 ========================================================================
 Generic instance method with T receiver
@@ -237,7 +236,7 @@ fun main() {
 //!     ^ int | slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 55: expected int | slice, got T | slice
+ok
 
 ========================================================================
 Generic instance method with single argument and T receiver

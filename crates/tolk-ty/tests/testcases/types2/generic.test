@@ -8,7 +8,7 @@ fun main() {
 //!     ^ int
 }
 ------------------------------------------------------------------------
-type inference error at offset 45: expected int, got unknown
+ok
 
 ========================================================================
 Generic function with no arguments: explicit two type arguments and union type
@@ -20,7 +20,7 @@ fun main() {
 //!     ^ int | slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 52: expected int | slice, got unknown
+ok
 
 ========================================================================
 Generic function with no arguments: explicit two type arguments and tuple type
@@ -32,7 +32,7 @@ fun main() {
 //!     ^ [int, slice]
 }
 ------------------------------------------------------------------------
-type inference error at offset 53: expected [int, slice], got unknown
+ok
 
 ========================================================================
 Generic function with no arguments: explicit two type arguments and tuple type 2
@@ -44,7 +44,7 @@ fun main() {
 //!     ^ [int | slice, slice]
 }
 ------------------------------------------------------------------------
-type inference error at offset 57: expected [int | slice, slice], got unknown
+ok
 
 ========================================================================
 Generic function with no arguments: explicit two type arguments and tensor type
@@ -56,7 +56,7 @@ fun main() {
 //!     ^ (int, slice)
 }
 ------------------------------------------------------------------------
-type inference error at offset 53: expected (int, slice), got unknown
+ok
 
 ========================================================================
 Generic function with no arguments: explicit two type arguments and function type
@@ -71,8 +71,7 @@ fun main() {
 //!     ^ slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 55: expected (int) -> slice, got unknown
-type inference error at offset 118: expected slice, got unknown
+ok
 
 ========================================================================
 Generic function with single arguments: explicit struct type
@@ -93,9 +92,7 @@ fun main() {
         });
 }
 ------------------------------------------------------------------------
-type inference error at offset 81: expected Foo, got unknown
-type inference error at offset 122: unknown type
-type inference error at offset 163: unknown type
+ok
 
 ========================================================================
 Generic method toCell
@@ -126,3 +123,41 @@ fun name(f: int) {
 }
 ------------------------------------------------------------------------
 type inference error at offset 128: unknown type
+
+========================================================================
+Generic method as right hand of ternary inside other generic function call
+========================================================================
+struct MinterStorage {
+    totalSupply: coins
+    adminAddress: address?
+    nextAdminAddress: address?
+    metadataUri: string
+}
+
+fun MinterStorage.load() {
+    return MinterStorage.fromCell(contract.getData())
+}
+
+fun main() {
+    val st = MinterStorage.load();
+    //! ^ MinterStorage
+}
+------------------------------------------------------------------------
+ok
+
+========================================================================
+Call static method on generic instantiation
+========================================================================
+struct Generic<T> {
+}
+
+fun Generic<T>.foo() {
+    return Generic<T> {}
+}
+
+fun main() {
+    val st = Generic<int>.foo();
+    //! ^ Generic<int>
+}
+------------------------------------------------------------------------
+ok

@@ -9,8 +9,9 @@ use tolk_resolver::file_index::{
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::resolve_index::{LocalDefKind, Resolved};
 use tolk_syntax::{
-    AstNode, FunCallableType, FunctionLike, HasGenericParams, HasName, Method, NullableType,
-    TensorType, TupleType, Type, TypeIdent, TypeInstantiatedTs, UnionType, match_parents,
+    AstChildren, AstNode, Expr, FunCallableType, FunctionLike, HasGenericParams, HasName,
+    Instantiation, Method, NullableType, TensorType, TupleType, Type, TypeIdent,
+    TypeInstantiatedTs, UnionType, match_parents,
 };
 use tolk_syntax::{HasTreeSitterKind, ast};
 
@@ -548,11 +549,33 @@ impl<'a> TypeDb<'a> {
         file_id: FileId,
     ) -> Option<TyId> {
         let name_node = inst.name()?;
-        let args_list = inst.arguments()?;
+        let args_list = inst.arguments()?.types();
 
+        self.convert_instantiated_base(file_id, name_node, args_list)
+    }
+
+    pub(crate) fn convert_instantiated(
+        &mut self,
+        inst: &Instantiation,
+        file_id: FileId,
+    ) -> Option<TyId> {
+        let Expr::Ident(name_node) = inst.expr()? else {
+            return None;
+        };
+        let args_list = inst.instantiation_ts()?.types();
+
+        self.convert_instantiated_base(file_id, TypeIdent(name_node.syntax()), args_list)
+    }
+
+    fn convert_instantiated_base(
+        &mut self,
+        file_id: FileId,
+        name_node: TypeIdent,
+        args_list: AstChildren<Type>,
+    ) -> Option<TyId> {
         let inner_ty = self.lower_type(file_id, &Type::TypeIdent(name_node));
 
-        let types = args_list.types();
+        let types = args_list;
         let tys = types
             .map(|t| self.lower_type(file_id, &t))
             .collect::<Vec<_>>();
