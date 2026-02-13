@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, SourceFile, ast};
+use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, ast};
 use tree_sitter::Node;
 
 /// Represents a byte range in the source code.
@@ -573,7 +573,7 @@ impl FileIndex {
     }
 
     fn extract_type_parameters<'a, Node: HasGenericParams<'a>>(
-        file: &SourceFile,
+        file: &ast::SourceFile,
         decl: Node,
     ) -> Vec<Arc<str>> {
         decl.type_parameters()

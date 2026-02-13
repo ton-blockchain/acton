@@ -78,8 +78,8 @@ dependencies = [
  "ton-source-map",
  "tonlib-core",
  "tower-http",
- "tracing-subscriber",
  "tower-lsp",
+ "tracing-subscriber",
  "tree-sitter",
  "tvmffi",
  "tycho-types",
@@ -2350,7 +2350,7 @@ version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b838eba278d213a8beaf485bd313fd580ca4505a00d5871caeb1457c55322cae"
 dependencies = [
- "bitflags",
+ "bitflags 2.9.4",
  "fallible-iterator",
  "fallible-streaming-iterator",
  "hashlink",
