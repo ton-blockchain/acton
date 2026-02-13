@@ -47,6 +47,7 @@ dependencies = [
  "regex",
  "reqwest",
  "retrace",
+ "ring",
  "rustc-hash",
  "semver",
  "serde",
