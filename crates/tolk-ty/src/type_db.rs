@@ -2,7 +2,6 @@ use crate::type_interner::{TyId, TypeInterner};
 use crate::types::{AddressKind, TyData};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
-use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{
     FileId, OptionalSyntaxNodeSpanExt, Span, Symbol, SymbolId, SymbolKind,
