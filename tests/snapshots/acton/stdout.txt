@@ -1,6 +1,6 @@
 TON blockchain development tool
 
-Usage: acton <COMMAND>
+Usage: acton[EXE] <COMMAND>
 
 Commands:
   init         Initialize a new project in the current directory
@@ -17,6 +17,7 @@ Commands:
   check        Check Tolk files in the project for errors
   retrace      Retrace a transaction by its hash
   library      Manage TON libraries
+  litenode     Manage lightweight TON node
   fmt          Format Tolk source files
   up           Manage Acton versions
   completions  Generate shell completions for selected shell

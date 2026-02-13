@@ -1,0 +1,214 @@
+.card {
+  background-color: var(--tonscan-card-bg);
+  border: 1px solid var(--tonscan-border);
+}
+
+.assetIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #22c55e;
+}
+
+.assetIconImage {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.moreLink {
+  color: var(--tonscan-accent);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  margin-left: 4px;
+}
+
+.moreLink:hover {
+  text-decoration: underline;
+}
+
+.assetRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addressTitle {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--spacing-xs);
+}
+
+.addressValue {
+  font-size: var(--font-size-lg);
+  color: var(--tonscan-text-primary);
+  word-break: break-all;
+}
+
+.addressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.addressRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.editContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.editInput {
+  background: var(--tonscan-bg);
+  border: 1px solid var(--tonscan-border);
+  color: var(--tonscan-text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  flex: 1;
+  outline: none;
+}
+
+.editInput:focus {
+  border-color: var(--tonscan-accent);
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.iconButton:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--tonscan-text);
+}
+
+.saveIcon {
+  color: #22c55e;
+}
+
+.cancelIcon {
+  color: #ef4444;
+}
+
+.customName {
+  color: var(--tonscan-accent);
+  font-weight: 600;
+}
+
+.realAddress {
+  color: var(--tonscan-text-secondary);
+  font-weight: 400;
+  font-size: var(--font-size-sm);
+  margin-left: var(--spacing-xs);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-xl);
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--tonscan-border);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.label {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--tonscan-text-primary);
+}
+
+.subValue {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xss) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: capitalize;
+  background-color: rgba(48, 209, 88, 0.1);
+  color: var(--tonscan-success);
+}
+
+.statusUninitialized {
+  background-color: rgba(160, 160, 160, 0.1);
+  color: var(--tonscan-text-secondary);
+}
+
+.detailsGrid {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.tag {
+  background-color: #1a1a1a;
+  color: var(--tonscan-text-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+}
+
+.tooltip {
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-text);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  min-width: unset;
+  width: max-content;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tooltip::before,
+.tooltip::after {
+  display: none;
+}

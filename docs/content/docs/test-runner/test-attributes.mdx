@@ -3,23 +3,23 @@ title: "Test Attributes"
 description: "Learn how to use test attributes to control test behavior, skip tests, and set expectations"
 ---
 
-Test runner supports various attributes that allow you to control test behavior, set expectations, and organize your test suite. Attributes are specified using the `@custom` annotation syntax and can be applied to any test function.
+Test runner supports various attributes that allow you to control test behavior, set expectations, and organize your test suite. Attributes are specified using the `@test` annotation syntax and can be applied to any test function.
 
-## The @custom Annotation
+## The @test Annotation
 
-Test attributes are specified using the `@custom` annotation. You can use it in two ways:
+Test attributes are specified using the `@test` annotation. You can use it in two ways:
 
 ### String Literals
 
 For simple attributes like `skip` and `todo`:
 
 ```tolk
-@custom("skip")
+@test("skip")
 get fun `test-should-be-skipped`() {
     // This test will be skipped
 }
 
-@custom("todo")
+@test("todo")
 get fun `test-not-implemented-yet`() {
     // This test will be marked as TODO
 }
@@ -30,12 +30,12 @@ get fun `test-not-implemented-yet`() {
 For attributes that require parameters:
 
 ```tolk
-@custom({ fail_with: 42 })
+@test({ fail_with: 42 })
 get fun `test-expects-exit-code-42`() {
     // This test expects exit code 42
 }
 
-@custom({ gas_limit: 1000 })
+@test({ gas_limit: 1000 })
 get fun `test-with-gas-limit`() {
     // This test will fail if it uses more than 1000 gas
 }
@@ -44,7 +44,7 @@ get fun `test-with-gas-limit`() {
 You can combine multiple attributes in a single object:
 
 ```tolk
-@custom({
+@test({
     fail_with: 13,
     gas_limit: 5000
 })
@@ -63,14 +63,14 @@ Skips the test execution. The test won't run but will be counted in the test sum
 
 **Syntax:**
 ```tolk
-@custom("skip")
+@test("skip")
 // or
-@custom({ skip: true })
+@test({ skip: true })
 ```
 
 **Example:**
 ```tolk
-@custom("skip")
+@test("skip")
 get fun `test-broken-for-now`() {
     expect(1 + 1).toEqual(3); // This won't execute
 }
@@ -87,22 +87,22 @@ Marks the test as a work-in-progress item. The test won't run and will be counte
 
 **Syntax:**
 ```tolk
-@custom("todo")
+@test("todo")
 // or
-@custom({ todo: true })
+@test({ todo: true })
 // or
-@custom({ todo: "Custom description" })
+@test({ todo: "Custom description" })
 ```
 
 **Examples:**
 
 ```tolk
-@custom("todo")
+@test("todo")
 get fun `test-new-feature`() {
     // Will show "TODO" as description
 }
 
-@custom({ todo: "Waiting for API changes" })
+@test({ todo: "Waiting for API changes" })
 get fun `test-depends-on-external-api`() {
     // Will show custom description
 }
@@ -120,12 +120,12 @@ Sets the expected exit code for the test. By default, tests expect exit code 0 (
 
 **Syntax:**
 ```tolk
-@custom({ fail_with: <number> })
+@test({ fail_with: <number> })
 ```
 
 **Example:**
 ```tolk
-@custom({ fail_with: 42 })
+@test({ fail_with: 42 })
 get fun `test-expects-failure`() {
     throw 42; // Test will pass because it expects exit code 42
 }
@@ -142,12 +142,12 @@ Sets a maximum gas limit for the test. If the test consumes more gas than specif
 
 **Syntax:**
 ```tolk
-@custom({ gas_limit: <number> })
+@test({ gas_limit: <number> })
 ```
 
 **Example:**
 ```tolk
-@custom({ gas_limit: 1000 })
+@test({ gas_limit: 1000 })
 get fun `test-efficient-algorithm`() {
     // If this test uses more than 1000 gas, it will fail
     val result = expensive_computation();

@@ -31,7 +31,7 @@ val network = select("Choose network:", ["Mainnet", "Testnet", "Local"]);
 ## `prompt`
 
 ```tolk
-fun prompt(message: slice, placeholder: slice = ""): slice
+fun prompt(message: string, placeholder: string = ""): string
 ```
 
 Prompts the user for input.
@@ -50,7 +50,7 @@ println(format1("Hello {}", name));
 ## `select`
 
 ```tolk
-fun select(message: slice, variants: tuple): slice
+fun select(message: string, variants: tuple): string
 ```
 
 Prompts the user to select an option from a list of variants.
@@ -66,7 +66,7 @@ println(format1("Hello {}", name));
 ## `confirm`
 
 ```tolk
-fun confirm(message: slice, default: bool, help_message: slice): bool
+fun confirm(message: string, default: bool, helpMessage: string): bool
 ```
 
 Prompts the user to confirm an action.

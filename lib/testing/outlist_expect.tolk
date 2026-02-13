@@ -19,6 +19,7 @@
 /// expect(msgBody.amount).toEqual(ton("10"));
 /// ```
 
+import "@stdlib/reflection"
 import "assert"
 import "expect"
 import "../fmt"
@@ -34,7 +35,9 @@ import "../types/out_actions"
 /// expect(out_actions).toBeNonEmpty();
 /// ```
 fun Expectation<OutActionList>.toBeNonEmpty(self) {
-    expect(self.value.size(), self.location).toNotEqual(0);
+    val value = self.value.size();
+    val expectation = Expectation<int>.create(value, reflect.typeNameOfObject(value), self.location);
+    expectation.toNotEqual(0);
 }
 
 /// Expect the out action list to be empty.
@@ -45,7 +48,9 @@ fun Expectation<OutActionList>.toBeNonEmpty(self) {
 /// expect(out_actions).toBeEmpty();
 /// ```
 fun Expectation<OutActionList>.toBeEmpty(self) {
-    expect(self.value.size(), self.location).toEqual(0);
+    val value = self.value.size();
+    val expectation = Expectation<int>.create(value, reflect.typeNameOfObject(value), self.location);
+    expectation.toEqual(0);
 }
 
 /// Expect the out action at the given index to be a send message.
@@ -79,8 +84,8 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
                 Assert.fail(
                     format4(
                         "Out action is a send message, but it cannot be load as a `{}` (opcode: 0x{:x}) since body has opcode 0x{:x}{}",
-                        Msg.typeName(),
-                        Msg.getDeclaredPackPrefix(),
+                        reflect.typeNameOf<Msg>(),
+                        reflect.serializationPrefixOf<Msg>(),
                         opcode,
                         opcodeTypeName == null ? "" : format1(" ({})", opcodeTypeName),
                     ),
@@ -101,11 +106,11 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
 
 struct expectImpl
 
-fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: slice) {
+fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string) {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
-            Msg.typeName(),
+            reflect.typeNameOf<Msg>(),
             exitCode
         ),
         location

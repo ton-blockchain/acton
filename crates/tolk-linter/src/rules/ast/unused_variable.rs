@@ -67,6 +67,9 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
             // parameters of assembly or builtin functions is always implicitly used
             continue;
         }
+        if matches!(local.kind, LocalDefKind::TypeParameter) {
+            continue;
+        }
 
         let Some(facts) = use_facts.per_local.get(&local.id) else {
             continue;
@@ -115,6 +118,7 @@ fn fire_diagnostic(
                 edits: vec![Edit {
                     span: Span::from_syntax(&ident.0),
                     replacement: format!("_{}", name),
+                    file_id,
                 }],
                 applicability: Applicability::Auto,
             });

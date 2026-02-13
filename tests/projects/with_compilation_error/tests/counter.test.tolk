@@ -2,9 +2,6 @@ import "../../../../lib/build/build"
 import "../../../../lib/emulation/network"
 import "../../../../lib/testing/expect"
 import "../../../../lib/testing/transaction_expect"
-import "../../../../lib/types/message"
-import "../../../../lib/types/out_actions"
-import "../../../../lib/vm/vm"
 
 import "../contracts/messages"
 

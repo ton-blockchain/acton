@@ -10,14 +10,14 @@ const ONCHAIN_CONTENT_PREFIX = 0x00
 const SNAKE_PREFIX = 0x00
 
 struct JettonInfo {
-    name: slice,
-    description: slice,
-    symbol: slice,
-    image: slice,
+    name: string,
+    description: string,
+    symbol: string,
+    image: string,
 }
 
-fun slice.toSnakeString(self): cell {
-    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self).endCell()
+fun string.toSnakeString(self): cell {
+    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self.beginParse()).endCell()
 }
 
 fun buildOnchainMetadata(info: JettonInfo): cell {
@@ -25,23 +25,23 @@ fun buildOnchainMetadata(info: JettonInfo): cell {
 
     var dict = createEmptyMap<uint256, cell>();
 
-    dict.set(stringSha256("name"), info.name.toSnakeString());
-    dict.set(stringSha256("description"), info.description.toSnakeString());
-    dict.set(stringSha256("symbol"), info.symbol.toSnakeString());
-    dict.set(stringSha256("image"), info.image.toSnakeString());
+    dict.set("name".sha256(), info.name.toSnakeString());
+    dict.set("description".sha256(), info.description.toSnakeString());
+    dict.set("symbol".sha256(), info.symbol.toSnakeString());
+    dict.set("image".sha256(), info.image.toSnakeString());
 
     return beginCell().storeUint(ONCHAIN_CONTENT_PREFIX, 8).storeDict(dict.toLowLevelDict()).endCell()
 }
 
 fun main() {
     val content = buildOnchainMetadata({
-        name: envOr<slice>("JETTON_NAME", "SomeJetton"),
-        description: envOr<slice>("JETTON_DESCRIPTION", "Sone jetton"),
-        symbol: envOr<slice>("JETTON_SYMBOL", "JTTT"),
-        image: envOr<slice>("JETTON_IMAGE", "https://ton.org/download/ton_symbol.svg"),
+        name: env<string>("JETTON_NAME") ?? "SomeJetton",
+        description: env<string>("JETTON_DESCRIPTION") ?? "Sone jetton",
+        symbol: env<string>("JETTON_SYMBOL") ?? "JTTT",
+        image: env<string>("JETTON_IMAGE") ?? "https://ton.org/download/ton_symbol.svg",
     });
 
-    val supply = envOr<int>("JETTON_SUPPLY", 1000000000);
+    val supply = env<int>("JETTON_SUPPLY") ?? 1000000000;
 
     val deployer = net.wallet("deployer");
     val minter = JettonMinter.fromStorage({

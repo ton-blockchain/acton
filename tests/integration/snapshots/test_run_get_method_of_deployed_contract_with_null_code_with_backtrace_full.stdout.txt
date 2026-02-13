@@ -10,10 +10,10 @@
  > tests/test.test.tolk (1 test)
   ✗ foo [TIME]
     └─ exit_code=679
-      ├─ at [ACTON_LIB]/emulation/network[LINE]
-      │     __throw                            at [ACTON_LIB]/emulation/network[LINE]
-      │     __throw                            at [ACTON_LIB]/emulation/network[LINE]
-      │     impl.runGetMethodById<int,tuple>   at [ACTON_LIB]/emulation/network[LINE]
+      ├─ at ../lib/emulation/network[LINE]
+      │     __throw                            at ../lib/emulation/network[LINE]
+      │     __throw                            at ../lib/emulation/network[LINE]
+      │     impl.runGetMethodById<int,tuple>   at ../lib/emulation/network[LINE]
       │     net.runGetMethod<int,tuple>        at tests/test.test[LINE]
       └─ Cannot run method of contract without code
 

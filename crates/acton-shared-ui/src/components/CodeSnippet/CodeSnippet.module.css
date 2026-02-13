@@ -1,0 +1,106 @@
+.container {
+  margin-top: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  background-color: var(--bg-color);
+}
+
+.header {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--bg-secondary-color);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.filePath {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.codeWrapper {
+  display: flex;
+  overflow-x: auto;
+  position: relative;
+}
+
+.lineNumbers {
+  padding: var(--spacing-sm) 0;
+  background-color: var(--bg-secondary-color);
+  border-right: 1px solid var(--border-color);
+  text-align: right;
+  min-width: 40px;
+  user-select: none;
+  z-index: 2;
+}
+
+.lineNumber {
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  line-height: 1.5rem;
+}
+
+.activeLineNumber {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.shikiWrapper {
+  flex: 1;
+  z-index: 1;
+}
+
+.shikiWrapper :global(pre) {
+  margin: 0 !important;
+  padding: var(--spacing-sm) 0 !important;
+  background-color: transparent !important;
+  font-family: var(--font-mono) !important;
+  font-size: var(--font-size-xs) !important;
+}
+
+.shikiWrapper :global(code) {
+  display: block;
+}
+
+.shikiWrapper :global(.line) {
+  padding: 0 var(--spacing-md);
+  min-height: 1.5rem;
+  line-height: 1.5rem;
+}
+
+.activeLineOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background-color: var(--color-failed-bg);
+  pointer-events: none;
+  z-index: 0;
+  border-left: 2px solid var(--color-failed);
+}
+
+.loading,
+.error {
+  padding: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.error {
+  color: var(--color-failed);
+}

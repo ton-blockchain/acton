@@ -2,6 +2,7 @@ use crate::formatter::FormatterContext;
 use owo_colors::OwoColorize;
 use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
+use std::str::FromStr;
 use tycho_types::boc::Boc;
 use tycho_types::models::{IntAddr, OutAction, RelaxedMsgInfo};
 
@@ -25,22 +26,25 @@ pub fn retrace_cmd(
         .build()?;
 
     let networks = if let Some(net_str) = net {
-        vec![parse_network(&net_str)?]
+        vec![Network::from_str(&net_str)?]
     } else {
         vec![Network::Mainnet, Network::Testnet]
     };
 
     let mut last_error = None;
     for network in networks {
-        let retrace_future = retrace(network, &hash, HashMap::new());
+        let retrace_future = retrace(network.clone(), &hash, HashMap::new());
         match rt.block_on(retrace_future) {
             Ok(result) => {
                 if let Some(logs_dir) = &logs_dir {
                     std::fs::create_dir_all(logs_dir)?;
-                    std::fs::write(format!("{logs_dir}/vm.log"), &result.emulated_tx.vm_logs)?;
+                    std::fs::write(
+                        format!("{logs_dir}/vm.log"),
+                        result.emulated_tx.vm_logs.as_ref(),
+                    )?;
                     std::fs::write(
                         format!("{logs_dir}/executor.log"),
-                        &result.emulated_tx.executor_logs,
+                        result.emulated_tx.executor_logs.as_ref(),
                     )?;
                     println!("{} Logs saved to {}", "Success:".green(), logs_dir);
                 }
@@ -57,14 +61,6 @@ pub fn retrace_cmd(
         anyhow::bail!("Failed to retrace transaction in any network: {e}");
     }
     anyhow::bail!("Failed to retrace transaction");
-}
-
-fn parse_network(net: &str) -> anyhow::Result<Network> {
-    match net.to_lowercase().as_str() {
-        "mainnet" => Ok(Network::Mainnet),
-        "testnet" => Ok(Network::Testnet),
-        _ => anyhow::bail!("Unknown network: {net}. Supported: mainnet, testnet"),
-    }
 }
 
 fn print_retrace_result(

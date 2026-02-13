@@ -1,4 +1,4 @@
-@import "./styles/variables.module.css";
+@import "@acton/shared-ui/styles/tokens.css";
 
 * {
   box-sizing: border-box;
@@ -25,6 +25,6 @@ a {
 }
 
 pre {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono), monospace;
   margin: 0;
 }

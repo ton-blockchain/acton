@@ -1,14 +1,22 @@
+use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
+use crate::commands::test::trace::TransactionInfo;
 use crate::context::{
-    BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
+    AssertFailure, BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
+    to_cell,
 };
 use crate::retrace::{ExecutedAction, InstalledActions};
-use crate::{exit_codes, retrace};
+use crate::{context, exit_codes, retrace};
+use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashMap;
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
+use std::sync::Arc;
 use ton_abi::{ContractAbi, TypeAbi};
+use ton_api::Network;
 use ton_source_map::{DebugLocation, SourceLocation};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
@@ -43,29 +51,29 @@ struct TransactionNode {
 
 /// Context for formatting `TupleItems` with rich information
 #[derive(Debug, Clone)]
-pub struct FormatterContext {
-    pub contract_abi: ContractAbi,
-    pub accounts: HashMap<String, ShardAccount>,
-    pub build_cache: BuildCache,
-    pub emulations: EmulationsState,
-    pub known_addresses: KnownAddresses,
-    pub known_code_cells: HashMap<String, String>,
-    pub backtrace: Option<String>,
-    pub fork_net: Option<String>,
-    pub api_key: Option<String>,
-    pub network: Option<String>,
+pub struct FormatterContext<'a> {
+    pub contract_abi: Arc<ContractAbi>,
+    pub accounts: Cow<'a, FxHashMap<String, ShardAccount>>,
+    pub build_cache: Cow<'a, BuildCache>,
+    pub emulations: Cow<'a, EmulationsState>,
+    pub known_addresses: Cow<'a, KnownAddresses>,
+    pub known_code_cells: Cow<'a, FxHashMap<String, String>>,
+    pub backtrace: Option<BacktraceMode>,
+    pub fork_net: Option<Network>,
+    pub api_key: Option<Cow<'a, str>>,
+    pub network: Option<Network>,
 }
 
-impl FormatterContext {
+impl<'a> FormatterContext<'a> {
     #[must_use]
     pub fn empty() -> Self {
         Self {
-            contract_abi: ContractAbi::default(),
-            accounts: HashMap::new(),
-            build_cache: BuildCache::new(),
-            emulations: EmulationsState::new(),
-            known_addresses: KnownAddresses::new(),
-            known_code_cells: HashMap::new(),
+            contract_abi: Arc::new(ContractAbi::default()),
+            accounts: Cow::Owned(FxHashMap::default()),
+            build_cache: Cow::Owned(BuildCache::new()),
+            emulations: Cow::Owned(EmulationsState::new()),
+            known_addresses: Cow::Owned(KnownAddresses::new()),
+            known_code_cells: Cow::Owned(FxHashMap::default()),
             backtrace: None,
             fork_net: None,
             network: None,
@@ -75,18 +83,18 @@ impl FormatterContext {
 
     /// Create formatter context from the main Context
     #[must_use]
-    pub fn from_context(ctx: &crate::context::Context) -> Self {
+    pub fn from_context<'b: 'a>(ctx: &'b context::Context<'a>) -> Self {
         Self {
             contract_abi: ctx.env.abi.clone(),
-            accounts: ctx.chain.world_state.get_accounts().clone(),
-            build_cache: ctx.build.build_cache.clone(),
-            emulations: ctx.chain.emulations.clone(),
-            known_addresses: ctx.build.known_addresses.clone(),
-            known_code_cells: ctx.build.known_code_cells.clone(),
-            backtrace: ctx.build.backtrace.clone(),
+            accounts: Cow::Borrowed(ctx.chain.world_state.get_accounts()),
+            build_cache: Cow::Borrowed(ctx.build.build_cache),
+            emulations: Cow::Borrowed(ctx.chain.emulations),
+            known_addresses: Cow::Borrowed(ctx.build.known_addresses),
+            known_code_cells: Cow::Borrowed(ctx.build.known_code_cells),
+            backtrace: ctx.build.backtrace,
             fork_net: ctx.env.fork_net.clone(),
             network: ctx.network.clone(),
-            api_key: ctx.env.api_key.clone(),
+            api_key: ctx.env.api_key.as_deref().map(Cow::Borrowed),
         }
     }
 
@@ -109,8 +117,8 @@ impl FormatterContext {
     }
 
     fn address_to_string(&self, address: &TonAddress) -> String {
-        let need_mainnet_address = self.fork_net.as_deref() == Some("mainnet")
-            || self.network.as_deref() == Some("mainnet");
+        let need_mainnet_address =
+            self.fork_net == Some(Network::Mainnet) || self.network == Some(Network::Mainnet);
         address.to_base64_std_flags(false, !need_mainnet_address)
     }
 
@@ -1145,6 +1153,19 @@ impl FormatterContext {
                     return if colorize { s.yellow().to_string() } else { s };
                 }
 
+                if type_name == "string"
+                    && let TupleItem::Cell(cell) | TupleItem::Slice(cell) = &items[0]
+                    && let Some(string) = Tuple::parse_snake_string(cell)
+                {
+                    if root {
+                        // for `println("hello")` show `hello`
+                        return string;
+                    }
+
+                    let s = format!("\"{string}\"");
+                    return if colorize { s.green().to_string() } else { s };
+                }
+
                 if let TupleItem::Slice(_) = &items[0] {
                     return self.format_internal(&items[0], root, colorize);
                 }
@@ -1159,16 +1180,6 @@ impl FormatterContext {
             TupleItem::Slice(cell) => {
                 if cell.bit_len() == 0 && cell.references().is_empty() {
                     return "empty slice".to_owned();
-                }
-
-                if let Some(string) = Tuple::parse_snake_string(cell) {
-                    if root {
-                        // for `println("hello")` show `hello`
-                        return string;
-                    }
-
-                    let s = format!("\"{string}\"");
-                    return if colorize { s.green().to_string() } else { s };
                 }
 
                 self.format_slice(cell)
@@ -1372,7 +1383,7 @@ impl FormatterContext {
     }
 }
 
-impl FormatterContext {
+impl<'a> FormatterContext<'a> {
     #[must_use]
     pub fn format_tuple_diff(
         &self,
@@ -1590,7 +1601,7 @@ impl FormatterContext {
     pub fn format_search_transaction_parameters(
         &self,
         assert_failure: &TransactionGenericAssertFailure,
-        abi: &ContractAbi,
+        abi: Arc<ContractAbi>,
     ) -> Vec<String> {
         let mut params = vec![];
         if let Some(opcode) = assert_failure.params.opcode {
@@ -1628,6 +1639,9 @@ impl FormatterContext {
                     "false".red().to_string()
                 }
             ));
+        }
+        if let Some(value) = &assert_failure.params.value {
+            params.push(format!("  value={value}",));
         }
         if let Some(deploy) = assert_failure.params.deploy {
             params.push(format!(
@@ -1712,7 +1726,7 @@ impl FormatterContext {
     }
 
     #[must_use]
-    pub fn account_code(accounts: &HashMap<String, ShardAccount>, addr: String) -> Option<Cell> {
+    pub fn account_code(accounts: &FxHashMap<String, ShardAccount>, addr: String) -> Option<Cell> {
         let account = accounts.get(&addr);
         let state = account?.account.load().ok()?.0?.state;
         match state {
@@ -1721,6 +1735,226 @@ impl FormatterContext {
             AccountState::Frozen(_) => None,
         }
     }
+
+    #[must_use]
+    pub fn get_failed_transaction_context(
+        &self,
+        failure: &TransactionGenericAssertFailure,
+        abi: Arc<ContractAbi>,
+    ) -> FailedTransactionContext {
+        let from_address = failure.params.from.as_ref().map(|addr| match addr {
+            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
+            _ => addr.to_string(),
+        });
+        let to_address = failure.params.to.as_ref().map(|addr| match addr {
+            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
+            _ => addr.to_string(),
+        });
+        let params = self
+            .format_search_transaction_parameters(failure, abi)
+            .into_iter()
+            .map(|p| {
+                let p = strip_ansi_codes(&p);
+                let p = p.trim();
+                if let Some((k, v)) = p.split_once('=') {
+                    (k.trim().to_string(), v.trim().to_string())
+                } else {
+                    (p.to_string(), String::new())
+                }
+            })
+            .collect();
+
+        FailedTransactionContext {
+            from_address,
+            to_address,
+            params,
+        }
+    }
+
+    #[must_use]
+    pub fn parse_failed_transactions(&self, txs: &TupleItem) -> Vec<TransactionInfo> {
+        let TupleItem::TypedTuple { inner: items, .. } = txs else {
+            return vec![];
+        };
+
+        let send_results = self.parse_send_results(items);
+        send_results
+            .into_iter()
+            .flat_map(|res| {
+                let tx = res.tx;
+                let code = Self::account_code(&self.accounts, tx.account.to_string());
+                let build = self.build_cache.result_for_code(&code);
+
+                Some(TransactionInfo {
+                    lt: tx.lt.to_string(),
+                    raw_transaction: Boc::encode_base64(to_cell(&tx)).into(),
+                    parent_transaction: res.parent_lt.map(|lt| lt.to_string()),
+                    dest_contract_info: build.map(|(_, info)| info.name),
+                    child_transactions: res.children_ids.iter().map(ToString::to_string).collect(),
+                    shard_account_before: String::new(),
+                    shard_account: String::new(),
+                    vm_log_diff: self
+                        .emulations
+                        .find_tx_logs(tx.lt)
+                        .map(vmlogs::convert_to_diff_logs)
+                        .unwrap_or_default(),
+                    executor_logs: self
+                        .emulations
+                        .find_tx_executor_logs(tx.lt)
+                        .map(Arc::from)
+                        .unwrap_or_default(),
+                    actions: Some(res.actions.to_boc_b64(false).ok()?.into()),
+                })
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn format_detailed_assert_failure(
+        &self,
+        failure: &AssertFailure,
+        abi: Arc<ContractAbi>,
+    ) -> String {
+        let mut result = String::new();
+
+        if let Some(message) = &failure.message()
+            && !message.is_empty()
+        {
+            let highlighted_message = Self::highlight_actual_expected(message);
+            let clean_message = strip_ansi_codes(&highlighted_message);
+            writeln!(result, "Error: {clean_message}").ok();
+        }
+
+        match failure {
+            AssertFailure::Bin(bin_failure) if bin_failure.operator == "==" => {
+                let diff = self.format_tuple_diff(
+                    &bin_failure.left,
+                    &bin_failure.right,
+                    &bin_failure.left_type,
+                    &bin_failure.right_type,
+                );
+                writeln!(result, "{}", strip_ansi_codes(&diff)).ok();
+            }
+            AssertFailure::Bin(bin_failure) if bin_failure.operator == "!=" => {
+                let value = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
+                writeln!(result, "Values are equal but expected to be different:").ok();
+                writeln!(result, "  {}", strip_ansi_codes(&value)).ok();
+            }
+            AssertFailure::Bin(bin_failure) if bin_failure.is_ord() => {
+                let left = self.format_tuple_value(&bin_failure.left, &bin_failure.left_type, 0);
+                let right = self.format_tuple_value(&bin_failure.right, &bin_failure.right_type, 0);
+                writeln!(result, "Actual:   {}", strip_ansi_codes(&left)).ok();
+                writeln!(result, "Expected: {}", strip_ansi_codes(&right)).ok();
+            }
+            AssertFailure::TransactionNotFound(tx_failure) => {
+                let params = self.format_search_transaction_parameters(tx_failure, abi);
+                let tx_tree = self.format(&tx_failure.txs);
+                writeln!(result, "{}", strip_ansi_codes(&tx_tree)).ok();
+                writeln!(
+                    result,
+                    "Cannot find transaction from {} to {}",
+                    self.format_address(&tx_failure.txs, &tx_failure.params.from),
+                    self.format_address(&tx_failure.txs, &tx_failure.params.to)
+                )
+                .ok();
+                writeln!(result, "with:").ok();
+                for param in params {
+                    writeln!(result, "  {}", strip_ansi_codes(&param)).ok();
+                }
+            }
+            AssertFailure::TransactionIsFound(tx_failure) => {
+                let params = self.format_search_transaction_parameters(tx_failure, abi);
+                let tx_tree = self.format(&tx_failure.txs);
+                writeln!(result, "{}", strip_ansi_codes(&tx_tree)).ok();
+                let from_to = if tx_failure.params.from.is_none() && tx_failure.params.to.is_none()
+                {
+                    "".to_string()
+                } else {
+                    format!(
+                        " from {} to {}",
+                        self.format_address(&tx_failure.txs, &tx_failure.params.from),
+                        self.format_address(&tx_failure.txs, &tx_failure.params.to)
+                    )
+                };
+                writeln!(result, "Unexpected transaction{from_to}").ok();
+                if !params.is_empty() {
+                    writeln!(result, "with:").ok();
+                    for param in params {
+                        writeln!(result, "  {}", strip_ansi_codes(&param)).ok();
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if let Some(location) = &failure.location() {
+            writeln!(result, "at {}", location.format()).ok();
+        }
+
+        result.trim().to_string()
+    }
+
+    #[must_use]
+    pub fn format_detailed_exit_code(
+        &self,
+        test: &TestReport,
+        result: &ton_executor::get::GetMethodResultSuccess,
+        exit_code: i32,
+    ) -> String {
+        let mut output = String::new();
+        writeln!(output, "exit_code={exit_code}").ok();
+
+        let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.source_map);
+
+        if let Some(info) = &exit_code_info {
+            if let Some(loc) = &info.loc {
+                writeln!(
+                    output,
+                    "at {}:{}:{}",
+                    SourceLocation::normalize_path(&loc.file),
+                    loc.line + 1,
+                    loc.column + 2
+                )
+                .ok();
+
+                let backtrace_lines = Self::format_backtrace(&info.backtrace);
+                if !backtrace_lines.is_empty() {
+                    writeln!(output, "Backtrace:").ok();
+                    for line in backtrace_lines {
+                        writeln!(output, "  {}", strip_ansi_codes(&line)).ok();
+                    }
+                }
+            }
+
+            if !info.description.is_empty() {
+                writeln!(output, "Description: {}", info.description).ok();
+            }
+        }
+
+        if let Some(info) = exit_codes::find(exit_code) {
+            if exit_code_info.is_none() {
+                writeln!(output, "Description: {}", info.description).ok();
+            }
+            writeln!(output, "Phase: {}", info.phase).ok();
+        }
+
+        output.trim().to_string()
+    }
+}
+
+fn strip_ansi_codes(s: &str) -> String {
+    let mut result = String::new();
+    let mut in_escape = false;
+    for ch in s.chars() {
+        if ch == '\x1b' {
+            in_escape = true;
+        } else if in_escape && ch == 'm' {
+            in_escape = false;
+        } else if !in_escape {
+            result.push(ch);
+        }
+    }
+    result
 }
 
 /// Calculate visible length of a string (excluding ANSI escape codes)

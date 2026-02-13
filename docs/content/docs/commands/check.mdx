@@ -1,0 +1,36 @@
+---
+title: "Checking Tolk contracts"
+description: "Lint Tolk files and contracts"
+icon: CheckCircle
+---
+
+The `acton check` command runs the Tolk linter on your project. By default, it checks all contracts from `Acton.toml` and any `*.test.tolk` files in the workspace.
+
+## Usage
+
+```bash
+acton check
+acton check <contract-id>
+acton check <path-to-file.tolk>
+```
+
+## Options
+
+| Option             | Type   | Description                          |
+|:-------------------|:-------|:-------------------------------------|
+| `--fix`            | Flag   | Automatically apply available fixes. |
+| `--json`           | Flag   | Output results as JSON.              |
+| `--explain <CODE>` | String | Explain a rule.                      |
+
+## Examples
+
+```bash
+# Check the whole project
+acton check
+
+# Check a specific contract by id from Acton.toml
+acton check counter
+
+# Check a single file
+acton check counter.tolk
+```

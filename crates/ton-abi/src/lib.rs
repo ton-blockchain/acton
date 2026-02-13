@@ -2,9 +2,39 @@ pub mod abi_serde;
 
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use tolk_syntax::SourceFile;
+
+fn resolve_mapped_path(import_path: &str, mappings: &Option<BTreeMap<String, String>>) -> String {
+    if import_path.starts_with("@stdlib/") || import_path.starts_with("@fiftlib/") {
+        return import_path.to_string();
+    }
+
+    if let Some(rest) = import_path.strip_prefix('@') {
+        let (prefix_without_at, path) = rest.split_once('/').unwrap_or((rest, ""));
+
+        if let Some(mappings) = mappings {
+            // Try both with and without @ prefix in the mappings keys
+            let mapping = mappings
+                .get(prefix_without_at)
+                .or_else(|| mappings.get(&format!("@{}", prefix_without_at)));
+
+            if let Some(mapping) = mapping {
+                let mapped_path =
+                    add_tolk_extension_if_needed_to_path(Path::new(mapping).join(path));
+                return mapped_path
+                    .canonicalize() // since for now we don't support custom Acton.toml path, it's safe
+                    .unwrap_or(mapped_path)
+                    .to_string_lossy()
+                    .to_string();
+            }
+        }
+    }
+    import_path.to_string()
+}
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -166,7 +196,11 @@ struct FileInfo {
     tree: tree_sitter::Tree,
 }
 
-pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> anyhow::Result<Vec<String>> {
+pub fn get_file_dependencies(
+    file_path: &str,
+    include_itself: bool,
+    mappings: &Option<BTreeMap<String, String>>,
+) -> anyhow::Result<Vec<String>> {
     if file_path.ends_with(".boc") {
         if include_itself {
             return Ok(vec![file_path.to_owned()]);
@@ -186,7 +220,7 @@ pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> anyhow::R
     };
 
     let root_node = tree.root_node();
-    let files = collect_imported_files(&root_node, &content, file_path);
+    let files = collect_imported_files(&root_node, &content, file_path, mappings);
 
     let mut dependencies: Vec<String> = files
         .into_iter()
@@ -202,15 +236,31 @@ pub fn get_file_dependencies(file_path: &str, include_itself: bool) -> anyhow::R
 }
 
 #[must_use]
-pub fn contract_abi(content: &str, file_path: &str) -> ContractAbi {
+pub fn contract_abi(
+    content: &str,
+    file_path: &str,
+    mappings: &Option<BTreeMap<String, String>>,
+) -> ContractAbi {
+    let file = tolk_syntax::parse(content);
+    contract_abi_with_file(content, file_path, &file, mappings)
+}
+
+#[must_use]
+pub fn contract_abi_with_file(
+    content: &str,
+    file_path: &str,
+    file: &anyhow::Result<SourceFile>,
+    mappings: &Option<BTreeMap<String, String>>,
+) -> ContractAbi {
     let contract_name = get_contract_name_from_file_path(file_path);
 
-    let Ok(tree) = tolk_syntax::parse(content) else {
+    let Ok(file) = file else {
         return ContractAbi::default();
     };
-    let root_node = tree.root_node();
 
-    let files = collect_imported_files(&root_node, content, file_path);
+    let root_node = file.root_node();
+
+    let files = collect_imported_files(&root_node, content, file_path, mappings);
 
     let mut abi_info = AbiInfo {
         get_methods: Vec::new(),
@@ -244,13 +294,17 @@ pub fn contract_abi(content: &str, file_path: &str) -> ContractAbi {
 }
 
 #[must_use]
-pub fn extract_handled_messages(content: &str, file_path: &str) -> Vec<String> {
+pub fn extract_handled_messages(
+    content: &str,
+    file_path: &str,
+    mappings: &Option<BTreeMap<String, String>>,
+) -> Vec<String> {
     let Ok(tree) = tolk_syntax::parse(content) else {
         return Vec::new();
     };
 
     let root_node = tree.root_node();
-    let files = collect_imported_files(&root_node, content, file_path);
+    let files = collect_imported_files(&root_node, content, file_path, mappings);
 
     let mut handled_messages = Vec::new();
 
@@ -324,6 +378,7 @@ fn collect_imported_files(
     root_node: &tree_sitter::Node<'_>,
     content: &str,
     file_path: &str,
+    mappings: &Option<BTreeMap<String, String>>,
 ) -> Vec<FileInfo> {
     let mut files = Vec::new();
     let mut processed = HashSet::new();
@@ -338,7 +393,14 @@ fn collect_imported_files(
     });
     processed.insert(file_path.to_string());
 
-    collect_imported_files_recursive(root_node, content, file_path, &mut files, &mut processed);
+    collect_imported_files_recursive(
+        root_node,
+        content,
+        file_path,
+        &mut files,
+        &mut processed,
+        mappings,
+    );
 
     files
 }
@@ -349,6 +411,7 @@ fn collect_imported_files_recursive(
     file_path: &str,
     files: &mut Vec<FileInfo>,
     processed: &mut HashSet<String>,
+    mappings: &Option<BTreeMap<String, String>>,
 ) {
     let mut cursor = node.walk();
     for child in node
@@ -364,9 +427,10 @@ fn collect_imported_files_recursive(
             .unwrap_or("")
             .to_string();
 
-        let import_path = import_path_text.trim_matches('"');
+        let import_path1 = import_path_text.trim_matches('"');
+        let import_path = resolve_mapped_path(import_path1, mappings);
 
-        let resolved_path = resolve_import_path(file_path, import_path);
+        let resolved_path = resolve_import_path(file_path, &import_path);
         let Some(resolved) = resolved_path else {
             continue;
         };
@@ -389,6 +453,7 @@ fn collect_imported_files_recursive(
                 &resolved,
                 files,
                 processed,
+                mappings,
             );
 
             files.push(FileInfo {
@@ -402,6 +467,11 @@ fn collect_imported_files_recursive(
 }
 
 fn resolve_import_path(base_file: &str, import_path: &str) -> Option<String> {
+    if Path::new(import_path).is_absolute() {
+        // path can be absolute after mappings
+        return Some(import_path.to_owned());
+    }
+
     let import_path = add_tolk_extension_if_needed(import_path.to_string());
 
     let base_path = Path::new(base_file).parent()?;
@@ -430,6 +500,13 @@ fn add_tolk_extension_if_needed(path: String) -> String {
         return path;
     }
     format!("{path}.tolk")
+}
+
+fn add_tolk_extension_if_needed_to_path(path: PathBuf) -> PathBuf {
+    if path.extension() == Some(OsStr::new("tolk")) {
+        return path;
+    }
+    path.with_extension("tolk")
 }
 
 fn merge_abi_info(target: &mut AbiInfo, source: AbiInfo) {
@@ -879,7 +956,7 @@ fun onInternalMessage() {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk");
+        let abi = contract_abi(code, "test.tolk", &None);
 
         assert_eq!(abi.name, "test");
         assert!(abi.entry_point.is_some());
@@ -900,7 +977,7 @@ get fun custom_method(): int {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk");
+        let abi = contract_abi(code, "test.tolk", &None);
 
         assert_eq!(abi.get_methods.len(), 1);
         assert_eq!(abi.get_methods[0].name, "custom_method");
@@ -937,7 +1014,7 @@ get fun custom_id(): int {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk");
+        let abi = contract_abi(code, "test.tolk", &None);
 
         assert_eq!(abi.get_methods.len(), 5);
 
@@ -988,7 +1065,7 @@ struct (0b1010) BinaryData {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk");
+        let abi = contract_abi(code, "test.tolk", &None);
 
         assert_eq!(abi.types.len(), 5);
         assert_eq!(abi.messages.len(), 3); // Only structs with pack_prefix
@@ -1035,7 +1112,7 @@ fun regular_function() {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk");
+        let abi = contract_abi(code, "test.tolk", &None);
 
         assert!(abi.entry_point.is_some());
         assert!(abi.external_entry_point.is_some());
@@ -1078,7 +1155,7 @@ get fun large_id(): int {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk");
+        let abi = contract_abi(code, "test.tolk", &None);
 
         assert_eq!(abi.get_methods.len(), 3);
 
@@ -1127,7 +1204,7 @@ get fun main_method(): int {
 }
 "#;
 
-        let abi = contract_abi(main_content, "main.tolk");
+        let abi = contract_abi(main_content, "main.tolk", &None);
 
         let _ = fs::remove_file(import_path);
 

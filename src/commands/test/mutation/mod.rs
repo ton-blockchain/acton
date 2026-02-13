@@ -253,7 +253,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     };
     let main_tree = tolk_syntax::parse(&main_content)?;
     let main_path = PathBuf::from(&contract.src);
-    let main_path = fs::canonicalize(&main_path).unwrap_or(main_path);
+    let main_path = dunce::canonicalize(&main_path).unwrap_or(main_path);
 
     let main_relative_path = if main_path.starts_with(&project_root) {
         main_path.strip_prefix(&project_root)?.to_path_buf()
@@ -268,10 +268,10 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         tree: main_tree.tree,
     });
 
-    let dependencies = ton_abi::get_file_dependencies(&contract.src, true)?;
+    let dependencies = ton_abi::get_file_dependencies(&contract.src, true, &acton_config.mappings)?;
     for dep_path_str in &dependencies {
         let dep_path = PathBuf::from(dep_path_str);
-        let dep_path = fs::canonicalize(&dep_path).unwrap_or(dep_path);
+        let dep_path = dunce::canonicalize(&dep_path).unwrap_or(dep_path);
 
         if !dep_path.starts_with(&project_root) {
             continue;

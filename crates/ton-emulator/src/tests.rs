@@ -1,12 +1,74 @@
 #![cfg(test)]
-use crate::WorldState;
+use crate::emulator::Emulator;
+use crate::{AccountsState, LocalAccountsState, WorldState};
+use anyhow::Context;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::models::config::{BlockchainConfigParams, MsgForwardPrices};
+use tycho_types::models::{
+    CurrencyCollection, IntAddr, OwnedRelaxedMessage, RelaxedIntMsgInfo, RelaxedMessage,
+    RelaxedMsgInfo,
+};
+use tycho_types::num::Tokens;
+use tycho_types::prelude::HashBytes;
+
+fn new_world_state() -> anyhow::Result<WorldState> {
+    WorldState::new(AccountsState::Local(LocalAccountsState::new()), None)
+}
+
+fn to_cell<T: Store + ?Sized>(obj: &T) -> anyhow::Result<Cell> {
+    let mut builder = CellBuilder::new();
+    obj.store_into(&mut builder, Cell::empty_context())?;
+    Ok(builder.build()?)
+}
+
+fn int_addr(workchain: i8, byte: u8) -> IntAddr {
+    IntAddr::from((workchain, HashBytes([byte; 32])))
+}
+
+fn body_with_u32(value: u32) -> anyhow::Result<Cell> {
+    let mut builder = CellBuilder::new();
+    builder.store_u32(value)?;
+    Ok(builder.build()?)
+}
+
+fn make_internal_relaxed_message(
+    src: Option<IntAddr>,
+    dst: IntAddr,
+    body: Cell,
+) -> OwnedRelaxedMessage {
+    OwnedRelaxedMessage {
+        info: RelaxedMsgInfo::Int(RelaxedIntMsgInfo {
+            src,
+            dst,
+            value: CurrencyCollection::ZERO,
+            ..Default::default()
+        }),
+        init: None,
+        body: body.into(),
+        layout: None,
+    }
+}
+
+fn expected_in_msg_fwd_fee(
+    message: &RelaxedMessage<'_>,
+    prices: &MsgForwardPrices,
+) -> anyhow::Result<Tokens> {
+    let message_cell = to_cell(message)?;
+    let root_bits = u64::from(message_cell.bit_len());
+    let mut stats = message_cell
+        .as_slice()
+        .context("Failed to parse message cell in test")?
+        .compute_unique_stats(usize::MAX)
+        .context("Failed to compute message stats in test")?;
+    stats.bit_count = stats.bit_count.saturating_sub(root_bits);
+
+    let total = prices.compute_fwd_fee(stats);
+    Ok(total.saturating_sub(prices.get_first_part(total)))
+}
 
 #[test]
 fn test_get_config() -> anyhow::Result<()> {
-    let state = WorldState::new(
-        crate::AccountsState::Local(crate::LocalAccountsState::new()),
-        None,
-    )?;
+    let state = new_world_state()?;
 
     let config = state.get_config();
     let version = config.get(8).expect("No version").expect("Has value");
@@ -20,6 +82,92 @@ fn test_get_config() -> anyhow::Result<()> {
 
     let root = config.root().clone().expect("Config has no root");
     assert!(!root.repr_hash().is_zero());
+
+    Ok(())
+}
+
+#[test]
+fn compute_in_msg_fwd_fee_matches_forward_prices_formula() -> anyhow::Result<()> {
+    let state = new_world_state()?;
+    let message = make_internal_relaxed_message(
+        Some(int_addr(0, 0x11)),
+        int_addr(0, 0x22),
+        body_with_u32(0xdead_beef)?,
+    );
+    let message_cell = to_cell(&message)?;
+    let parsed = message_cell.parse::<RelaxedMessage<'_>>()?;
+
+    let actual = Emulator::compute_in_msg_fwd_fee(state.get_config(), &parsed, false)?;
+
+    let config_root = state
+        .get_config()
+        .root()
+        .clone()
+        .context("Config must have root")?;
+    let prices = BlockchainConfigParams::from_raw(config_root).get_msg_forward_prices(false)?;
+    let expected = expected_in_msg_fwd_fee(&parsed, &prices)?;
+
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
+#[test]
+fn compute_in_msg_fwd_fee_excludes_root_bits() -> anyhow::Result<()> {
+    let state = new_world_state()?;
+
+    let msg_small = make_internal_relaxed_message(
+        Some(int_addr(0, 0x01)),
+        int_addr(0, 0x02),
+        Cell::empty_cell(),
+    );
+    let msg_large = make_internal_relaxed_message(
+        Some(int_addr(0, 0x01)),
+        int_addr(0, 0x02),
+        body_with_u32(0x1234_5678)?,
+    );
+
+    let msg_small_cell = to_cell(&msg_small)?;
+    let msg_large_cell = to_cell(&msg_large)?;
+    assert_ne!(msg_small_cell.bit_len(), msg_large_cell.bit_len());
+
+    let small = msg_small_cell.parse::<RelaxedMessage<'_>>()?;
+    let large = msg_large_cell.parse::<RelaxedMessage<'_>>()?;
+    let small_fee = Emulator::compute_in_msg_fwd_fee(state.get_config(), &small, false)?;
+    let large_fee = Emulator::compute_in_msg_fwd_fee(state.get_config(), &large, false)?;
+
+    assert_eq!(small_fee, large_fee);
+    Ok(())
+}
+
+#[test]
+fn compute_in_msg_fwd_fee_uses_workchain_specific_prices() -> anyhow::Result<()> {
+    let state = new_world_state()?;
+    let message = make_internal_relaxed_message(
+        Some(int_addr(0, 0xaa)),
+        int_addr(-1, 0xbb),
+        body_with_u32(0xabcd_ef01)?,
+    );
+    let message_cell = to_cell(&message)?;
+    let parsed = message_cell.parse::<RelaxedMessage<'_>>()?;
+
+    let sc_fee = Emulator::compute_in_msg_fwd_fee(state.get_config(), &parsed, false)?;
+    let mc_fee = Emulator::compute_in_msg_fwd_fee(state.get_config(), &parsed, true)?;
+
+    let config_root = state
+        .get_config()
+        .root()
+        .clone()
+        .context("Config must have root")?;
+    let config = BlockchainConfigParams::from_raw(config_root);
+
+    let sc_prices = config.get_msg_forward_prices(false)?;
+    let mc_prices = config.get_msg_forward_prices(true)?;
+    assert_eq!(sc_fee, expected_in_msg_fwd_fee(&parsed, &sc_prices)?);
+    assert_eq!(mc_fee, expected_in_msg_fwd_fee(&parsed, &mc_prices)?);
+
+    if sc_prices != mc_prices {
+        assert_ne!(sc_fee, mc_fee);
+    }
 
     Ok(())
 }

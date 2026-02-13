@@ -481,7 +481,11 @@ fn test_library_info_no_libraries() {
 fn test_library_info_global() {
     let project = ProjectBuilder::new("library-info-global").build();
     let home_temp = tempfile::TempDir::new().unwrap();
-    let global_libs_dir = home_temp.path().join(".acton").join("libraries");
+    let global_libs_dir = home_temp
+        .path()
+        .join(".config")
+        .join("acton")
+        .join("libraries");
     fs::create_dir_all(&global_libs_dir).expect("Create global libs dir");
 
     let toml_content = r#"[libraries.global-lib]

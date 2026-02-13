@@ -13,10 +13,12 @@ use acton_config::config::{ActonConfig, Explorer};
 use anyhow::anyhow;
 use log::error;
 use owo_colors::OwoColorize;
+use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
@@ -116,9 +118,14 @@ fn run_script_file(
     net: Option<String>,
     explorer: Option<Explorer>,
 ) -> anyhow::Result<()> {
-    let abi = contract_abi(content, file_path);
-
     let acton_config = ActonConfig::load();
+    let mappings = if let Ok(config) = &acton_config {
+        &config.mappings
+    } else {
+        &None
+    };
+    let abi = contract_abi(content, file_path, mappings);
+
     let mut compiler = tolkc::Compiler::new(2);
     if let Ok(config) = &acton_config {
         compiler = compiler.with_mappings(&config.mappings);
@@ -133,8 +140,8 @@ fn run_script_file(
                 &code_cell,
                 &data_cell,
                 stack,
-                &abi,
-                &result.source_map.unwrap_or_default(),
+                Arc::new(abi),
+                result.source_map.unwrap_or_default().into(),
                 debug,
                 debug_port,
                 ExecutorVerbosity::FullLocationStackVerbose,
@@ -162,8 +169,8 @@ fn execute_script(
     code_cell: &ArcCell,
     data_cell: &ArcCell,
     stack: Tuple,
-    abi: &ContractAbi,
-    source_map: &SourceMap,
+    abi: Arc<ContractAbi>,
+    source_map: Arc<SourceMap>,
     debug: bool,
     debug_port: u16,
     verbosity: ExecutorVerbosity,
@@ -196,6 +203,7 @@ fn execute_script(
     };
 
     let config_b64: Option<&str> = None;
+    let fork_net = fork_net.as_deref().map(Network::from_str).transpose()?;
 
     let mut emulator = Emulator::new(verbosity, config_b64)?;
     let resolver = match &fork_net {
@@ -211,14 +219,15 @@ fn execute_script(
     let mut build_cache = BuildCache::new();
     let mut file_build_cache = FileBuildCache::new(None)?;
     let mut known_addresses = KnownAddresses::new();
-    let mut known_code_cell = HashMap::new();
+    let mut known_code_cell = FxHashMap::default();
     let mut emulations = EmulationsState::new();
 
     let mut assert_failure = None;
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
-    let open_wallets = wallets::open_wallets(&config, net.as_deref(), broadcast)?;
+    let network = net.as_deref().map(Network::from_str).transpose()?;
+    let open_wallets = wallets::open_wallets(&config, network.as_ref(), broadcast)?;
 
     let mut ctx = Context {
         env: Env {
@@ -231,7 +240,7 @@ fn execute_script(
             explorer,
             fork_net,
             api_key,
-            running_id: "script".to_owned(),
+            running_id: "script".into(),
         },
         io: IoContext {
             stdout_buffer: String::new(),
@@ -257,7 +266,7 @@ fn execute_script(
         },
         debug: DebugCtx::Disabled,
         is_broadcasting: broadcast,
-        network: net,
+        network,
     };
 
     if debug {
@@ -271,7 +280,7 @@ fn execute_script(
             transport,
             AnyExecutor::Get(executor.clone()),
             source_map,
-            "main".to_string(),
+            "main".into(),
         );
 
         ctx.debug = DebugCtx::new(&mut dbg_ctx);
@@ -307,10 +316,8 @@ fn print_script_result(ctx: &mut Context<'_>, result: ScriptResult) {
                     let highlighted_message = FormatterContext::highlight_actual_expected(&message);
                     eprintln!("{} {}", "Error:".bright_red(), highlighted_message);
 
-                    if let Some(location) = &failure.location
-                        && !location.is_empty()
-                    {
-                        println!("{} at {}", "└─".dimmed(), location.dimmed());
+                    if let Some(location) = &failure.location {
+                        println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                     }
                 } else {
                     if let Some(message) = &assert_failure.message() {
@@ -325,10 +332,8 @@ fn print_script_result(ctx: &mut Context<'_>, result: ScriptResult) {
                         println!("{}", "└─".dimmed());
                     }
 
-                    if let Some(location) = &assert_failure.location()
-                        && !location.is_empty()
-                    {
-                        println!("{} at {}", "└─".dimmed(), location.dimmed());
+                    if let Some(location) = &assert_failure.location() {
+                        println!("{} at {}", "└─".dimmed(), location.format().dimmed());
                     }
                 }
             }
@@ -411,7 +416,7 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<Tup
         VmStackValue::Continuation(_) => {
             Err(anyhow!("Continuation not supported in script arguments"))
         }
-        VmStackValue::String(s) => Ok(TupleItem::Slice(string_to_slice(s)?)),
+        VmStackValue::String(s) => Ok(TupleItem::Cell(string_to_slice(s)?)),
         VmStackValue::Unknown => Err(anyhow!("Unknown stack value type")),
     }
 }

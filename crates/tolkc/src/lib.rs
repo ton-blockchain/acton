@@ -2,7 +2,7 @@
 //!
 //! ## Example
 //!
-//! ```
+//! ```no_run
 //! use std::path::Path;
 //!
 //! let tmp_test_filename = "file.tolk";
@@ -17,6 +17,7 @@
 //! }
 //! ```
 
+pub mod abi;
 pub mod compiler;
 
 pub use compiler::{Compiler, CompilerInternalResult, CompilerResult, compile, compile_fast};

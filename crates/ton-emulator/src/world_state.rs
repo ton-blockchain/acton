@@ -5,24 +5,29 @@
 //! TON network (mainnet or testnet).
 
 use crate::remote;
+use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use num_traits::cast::ToPrimitive;
+use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::env;
 use std::rc::Rc;
 use std::str::FromStr;
-use ton_executor::DEFAULT_CONFIG;
-use tycho_types::boc;
+use std::sync::Arc;
+use ton_executor::{DEFAULT_CONFIG, DEFAULT_CONFIG_DICT};
+use ton_networks::Network;
 use tycho_types::cell::{Cell, CellFamily, HashBytes, Lazy};
 use tycho_types::models::{
     Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
     StorageInfo,
 };
+use tycho_types::{boc, dict};
 
 /// Represents the source of the world state.
 ///
 /// It can either be purely local or partially remote (forked from a network).
+#[allow(clippy::large_enum_variant)]
 pub enum AccountsState {
     /// Purely local state, stored in memory.
     Local(LocalAccountsState),
@@ -62,7 +67,7 @@ impl AccountsState {
 
     /// Returns a reference to the underlying map of accounts.
     #[must_use]
-    pub const fn accounts(&self) -> &HashMap<String, ShardAccount> {
+    pub const fn accounts(&self) -> &FxHashMap<String, ShardAccount> {
         match self {
             Self::Local(r) => &r.accounts,
             Self::Remote(r) => &r.accounts,
@@ -72,7 +77,7 @@ impl AccountsState {
 
 /// A purely local implementation of the world state.
 pub struct LocalAccountsState {
-    pub accounts: HashMap<String, ShardAccount>,
+    pub accounts: FxHashMap<String, ShardAccount>,
 }
 
 impl Default for LocalAccountsState {
@@ -86,7 +91,7 @@ impl LocalAccountsState {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            accounts: HashMap::new(),
+            accounts: FxHashMap::default(),
         }
     }
 
@@ -148,13 +153,14 @@ impl RemoteSnapshotCache {
 /// A state implementation that fetches missing accounts from a remote network.
 pub struct RemoteAccountState {
     /// Local cache and overrides for accounts.
-    pub accounts: HashMap<String, ShardAccount>,
+    pub accounts: FxHashMap<String, ShardAccount>,
     /// The network to fork from (e.g., "mainnet", "testnet").
-    pub fork_net: String,
+    pub fork_net: Network,
     /// Optional block number to pin the state to.
     pub fork_block_number: Option<u64>,
     /// Optional API key for `TonCenter`.
     pub api_key: Option<String>,
+    pub acton_config: Option<ActonConfig>,
     /// Cache for less network queries in subsequent tests.
     cache: RemoteSnapshotCache,
 }
@@ -163,16 +169,17 @@ impl RemoteAccountState {
     /// Creates a new remote state for the given network.
     #[must_use]
     pub fn new(
-        fork_net: String,
+        fork_net: Network,
         fork_block_number: Option<u64>,
         api_key: Option<String>,
         cache: RemoteSnapshotCache,
     ) -> Self {
         Self {
-            accounts: HashMap::new(),
+            accounts: FxHashMap::default(),
             fork_net,
             fork_block_number,
             api_key,
+            acton_config: ActonConfig::load().ok(),
             cache,
         }
     }
@@ -213,7 +220,7 @@ impl RemoteAccountState {
         // return cached version if it already resolved earlier in current suite
         let cache_key = RemoteCacheKey {
             fork_block_number: self.fork_block_number,
-            fork_net: self.fork_net.clone(),
+            fork_net: self.fork_net.to_string(),
             address: address.to_owned(),
         };
         if let Some(cached) = self.cache.get(&cache_key) {
@@ -226,7 +233,18 @@ impl RemoteAccountState {
             .clone()
             .or_else(|| env::var("TONCENTER_API_KEY").ok());
 
-        let info = remote::get_account_info(self.fork_block_number, address, network, api_key)?;
+        let mut custom_networks = HashMap::new();
+        if let Some(config) = &self.acton_config {
+            custom_networks = config.custom_networks()
+        }
+
+        let info = remote::get_account_info(
+            self.fork_block_number,
+            address,
+            network,
+            api_key,
+            custom_networks,
+        )?;
 
         let balance = info
             .balance
@@ -288,18 +306,29 @@ pub struct WorldState {
     /// List of registered global library cells.
     libraries: Vec<Cell>,
     /// Blockchain configuration
-    config: tycho_types::dict::Dict<u32, Cell>,
+    config: Arc<dict::Dict<u32, Cell>>,
 }
 
 impl WorldState {
     /// Creates a new `WorldState` instance with the given initial state.
     pub fn new(accounts_state: AccountsState, config_b64: Option<&str>) -> anyhow::Result<Self> {
+        if config_b64.is_none() {
+            // fast path
+            return Ok(Self {
+                accounts_state,
+                current_lt: 0,
+                current_now: 0,
+                libraries: vec![],
+                config: DEFAULT_CONFIG_DICT.clone(),
+            });
+        }
+
         let config_str = config_b64.unwrap_or(DEFAULT_CONFIG);
         let config = boc::Boc::decode_base64(config_str)
             .ok()
             .and_then(|cell| {
                 let mut slice = cell.as_slice_allow_exotic();
-                tycho_types::dict::Dict::load_from_root_ext(&mut slice, Cell::empty_context()).ok()
+                dict::Dict::load_from_root_ext(&mut slice, Cell::empty_context()).ok()
             })
             .ok_or_else(|| anyhow::anyhow!("Corrupted blockchain config for world state"))?;
 
@@ -308,25 +337,25 @@ impl WorldState {
             current_lt: 0,
             current_now: 0,
             libraries: vec![],
-            config,
+            config: Arc::new(config),
         })
     }
 
     /// Returns a reference to the map of accounts currently in the world state.
     #[must_use]
-    pub const fn get_accounts(&self) -> &HashMap<String, ShardAccount> {
+    pub const fn get_accounts(&self) -> &FxHashMap<String, ShardAccount> {
         self.accounts_state.accounts()
     }
 
     /// Returns a reference to the blockchain configuration.
     #[must_use]
-    pub const fn get_config(&self) -> &tycho_types::dict::Dict<u32, Cell> {
-        &self.config
+    pub fn get_config(&self) -> Arc<dict::Dict<u32, Cell>> {
+        self.config.clone()
     }
 
     /// Sets the blockchain configuration.
-    pub fn set_config(&mut self, config: tycho_types::dict::Dict<u32, Cell>) {
-        self.config = config;
+    pub fn set_config(&mut self, config: dict::Dict<u32, Cell>) {
+        self.config = Arc::new(config);
     }
 
     /// Checks if an account is deployed.

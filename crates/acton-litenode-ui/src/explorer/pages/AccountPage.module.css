@@ -1,0 +1,119 @@
+.container {
+  padding: var(--spacing-lg) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.loading {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--tonscan-text-secondary);
+}
+
+.error {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--tonscan-error);
+  color: var(--tonscan-error);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+}
+
+.empty {
+  text-align: center;
+  padding: var(--spacing-xl);
+  color: var(--tonscan-text-secondary);
+  background-color: var(--tonscan-card-bg);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--tonscan-border);
+}
+
+.topSection {
+  display: flex;
+  gap: var(--spacing-lg);
+  align-items: stretch;
+}
+
+.topSection > :first-child {
+  flex: 1;
+}
+
+.jettonInfo {
+  flex: 1;
+  background-color: var(--tonscan-card-bg);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--tonscan-border);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.jettonHeader {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.jettonTitle {
+}
+
+.jettonImage {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.jettonName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--tonscan-text-primary);
+}
+
+.jettonSymbol {
+  font-size: 0.875rem;
+  color: var(--tonscan-text-secondary);
+}
+
+.jettonDescription {
+  font-size: 0.875rem;
+  color: var(--tonscan-text-secondary);
+  line-height: 1.4;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.jettonDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.jettonRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) 0;
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.jettonLabel {
+  color: var(--tonscan-text-secondary);
+  font-size: 0.875rem;
+}
+
+.jettonValue {
+  color: var(--tonscan-text-primary);
+  font-weight: 500;
+}
+
+.jettonValue[onClick] {
+  cursor: pointer;
+  color: var(--tonscan-link);
+}
+
+.jettonValue[onClick]:hover {
+  text-decoration: underline;
+}

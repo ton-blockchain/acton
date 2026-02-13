@@ -31,6 +31,7 @@ use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
 use owo_colors::OwoColorize;
 use std::fs::OpenOptions;
+use std::str::FromStr;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
 use ton_source_map::SourceMap;
@@ -195,7 +196,7 @@ enum Commands {
             help = "Fork from network for remote account resolution",
             help_heading = "Remote"
         )]
-        fork_net: Option<Network>,
+        fork_net: Option<String>,
         #[arg(
             long,
             help = "Block sequence number to fork from (for historical state)",
@@ -323,7 +324,7 @@ enum Commands {
             help = "Fork from network for remote account resolution",
             help_heading = "Remote"
         )]
-        fork_net: Option<Network>,
+        fork_net: Option<String>,
         #[arg(
             long,
             help = "Block sequence number to fork from (for historical state)",
@@ -351,7 +352,7 @@ enum Commands {
             help = "Network to use for broadcasting",
             help_heading = "Broadcasting"
         )]
-        net: Option<Network>,
+        net: Option<String>,
 
         #[arg(
             value_enum,
@@ -416,6 +417,8 @@ enum Commands {
         fift: Option<String>,
         #[arg(long, help = "Output source map to file (enables debug compilation)")]
         source_map: Option<String>,
+        #[arg(long, help = "Output ABI to file")]
+        abi: Option<String>,
         #[arg(long, help = "Clear compilation cache before running")]
         clear_cache: bool,
     },
@@ -443,12 +446,8 @@ enum Commands {
         address: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
-        #[arg(
-            long,
-            help = "Network to use for fetching from blockchain",
-            default_value = "mainnet"
-        )]
-        net: Network,
+        #[arg(long, help = "Network to use for fetching from blockchain")]
+        net: Option<String>,
         #[arg(
             long,
             help = "Follow library references and disassemble the actual library code instead of showing library hash"
@@ -465,7 +464,7 @@ enum Commands {
         #[arg(long, help = "Deployed contract address (prompts if not provided)")]
         address: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
-        net: Network,
+        net: String,
         #[arg(
             long,
             help = "Wallet from Acton.toml to use for verification (defaults to the only one if single wallet configured)"
@@ -480,6 +479,8 @@ enum Commands {
     },
     #[command(about = "Check Tolk files in the project for errors")]
     Check {
+        #[arg(help = "Contract ID to check or path to a .tolk file")]
+        target: Option<String>,
         #[arg(long, help = "Automatically apply available fixes")]
         fix: bool,
         #[arg(long, help = "Output results as JSON")]
@@ -497,7 +498,7 @@ enum Commands {
         #[arg(help = "Transaction hash in hex format to retrace")]
         hash: String,
         #[arg(long, help = "Network to use")]
-        net: Option<Network>,
+        net: Option<String>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
         #[arg(
@@ -516,6 +517,14 @@ enum Commands {
     Library {
         #[command(subcommand)]
         command: LibraryCommand,
+    },
+    #[command(
+        about = "Manage lightweight TON node",
+        after_help = example_litenode_usage()
+    )]
+    Litenode {
+        #[command(subcommand)]
+        command: LitenodeCommand,
     },
     #[command(
         about = "Format Tolk source files",
@@ -582,6 +591,30 @@ enum Commands {
 }
 
 #[derive(Subcommand, Clone)]
+pub enum LitenodeCommand {
+    #[command(about = "Start the lightweight TON node")]
+    Start {
+        #[arg(long, default_value_t = 3000)]
+        port: u16,
+        #[arg(long, help = "Fork from network for remote account resolution")]
+        fork_net: Option<String>,
+        #[arg(long, help = "TonCenter API key for blockchain queries")]
+        api_key: Option<String>,
+        #[arg(long, help = "Path to SQLite database for persistent storage")]
+        db_path: Option<String>,
+    },
+    #[command(about = "Request TON from faucet")]
+    Airdrop {
+        #[arg(help = "Address to receive TON")]
+        address: String,
+        #[arg(long, short, help = "Amount of TON to request", default_value = "100")]
+        amount: f64,
+        #[arg(long, short, help = "LiteNode server port", default_value_t = 3000)]
+        port: u16,
+    },
+}
+
+#[derive(Subcommand, Clone)]
 pub enum LibraryCommand {
     #[command(about = "Publish a library to the blockchain")]
     Publish {
@@ -599,7 +632,7 @@ pub enum LibraryCommand {
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
-        net: Network,
+        net: String,
         #[arg(long, help = "Amount of TON to send for publication")]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -624,7 +657,7 @@ pub enum LibraryCommand {
         )]
         output: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
-        net: Network,
+        net: String,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
@@ -656,6 +689,26 @@ pub enum LibraryCommand {
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
     },
+}
+
+fn example_litenode_usage() -> StyledStr {
+    format_examples(
+        &[
+            (
+                "Start the lightweight TON node on default port 3000",
+                "acton litenode start",
+            ),
+            (
+                "Request 100 TON from faucet to specified address",
+                "acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM",
+            ),
+            (
+                "Request specific amount of TON from faucet",
+                "acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 50",
+            ),
+        ],
+        "",
+    )
 }
 
 fn example_test_usage() -> StyledStr {
@@ -1151,7 +1204,7 @@ fn main() {
             api_key,
             verbose,
             logs_dir,
-        } => retrace_cmd(hash, net.map(|n| n.to_string()), api_key, verbose, logs_dir),
+        } => retrace_cmd(hash, net, api_key, verbose, logs_dir),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,
@@ -1183,11 +1236,11 @@ fn main() {
             debug,
             debug_port,
             clear_cache,
-            fork_net.map(|n| n.to_string()),
+            fork_net,
             api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
             fork_block_number,
             broadcast,
-            net.map(|n| n.to_string()),
+            net,
             explorer,
         ),
         Commands::Build {
@@ -1204,9 +1257,19 @@ fn main() {
             boc,
             fift,
             source_map,
+            abi,
             clear_cache,
         } => {
-            let result = compile_cmd(&path, json, base64_only, boc, fift, source_map, clear_cache);
+            let result = compile_cmd(
+                &path,
+                json,
+                base64_only,
+                boc,
+                fift,
+                source_map,
+                abi,
+                clear_cache,
+            );
             if json {
                 if let Err(err) = result {
                     println!(
@@ -1245,7 +1308,7 @@ fn main() {
                 },
                 address,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net.to_string(),
+                net,
                 follow_libraries,
             ),
             Err(err) => Err(err),
@@ -1261,7 +1324,7 @@ fn main() {
         } => verify_cmd(
             contract_id,
             address,
-            net.to_string(),
+            net,
             wallet,
             compiler_version,
             dry_run,
@@ -1285,7 +1348,7 @@ fn main() {
                 duration,
                 wallet,
                 api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                net.to_string(),
+                net,
                 amount,
                 yes,
                 local,
@@ -1304,7 +1367,7 @@ fn main() {
                     disasm,
                     api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     output,
-                    net.to_string(),
+                    net,
                     json,
                 );
                 if json {
@@ -1333,11 +1396,12 @@ fn main() {
             ),
         },
         Commands::Check {
+            target,
             fix,
             json,
             explain,
             list_lint_rules,
-        } => check_cmd(fix, json, explain, list_lint_rules),
+        } => check_cmd(fix, json, explain, list_lint_rules, target),
         Commands::Up {
             version,
             canary,
@@ -1372,6 +1436,41 @@ fn main() {
             rt.block_on(ls_cmd(port, stdio, log_file, no_log))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
+        Commands::Litenode { command } => match command {
+            LitenodeCommand::Start {
+                port,
+                fork_net,
+                api_key,
+                db_path,
+            } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::litenode::litenode_start_cmd(
+                        port,
+                        db_path,
+                        fork_net,
+                        api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
+                    )
+                    .await
+                })
+            }
+            LitenodeCommand::Airdrop {
+                address,
+                amount,
+                port,
+            } => {
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::litenode::litenode_airdrop_cmd(&address, amount, port).await
+                })
+            }
+        },
     };
 
     if let Err(err) = result {
@@ -1454,7 +1553,7 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
-    fork_net: Option<Network>,
+    fork_net: Option<String>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
     save_test_trace: Option<String>,
@@ -1495,7 +1594,7 @@ fn create_test_config(
             junit_merge,
             snapshot,
             baseline_snapshot,
-            fork_net,
+            fork_net.and_then(|n| Network::from_str(&n).ok()),
             api_key,
             fork_block_number,
             save_test_trace,
@@ -1525,7 +1624,6 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
-        fork_net,
         api_key,
         fork_block_number,
         save_test_trace,
@@ -1536,5 +1634,6 @@ fn create_test_config(
         fail_fast: fail_fast.unwrap_or(false),
         ui,
         ui_port,
+        fork_net: fork_net.and_then(|n| Network::from_str(&n).ok()),
     }
 }

@@ -32,51 +32,51 @@ struct vm
 
 Holds the methods to change the VM state.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L21" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L20" />
 
 ## `vm.getC7`
 
 ```tolk
 fun vm.getC7(): tuple
-    asm "c7 PUSHCTR";
+    asm "c7 PUSHCTR"
 ```
 
 Read control register C7.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L24" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L23" />
 
 ## `vm.setC7`
 
 ```tolk
 fun vm.setC7(c7: tuple): void
-    asm "c7 POPCTR";
+    asm "c7 POPCTR"
 ```
 
 Write a new value to control register C7.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L28" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L27" />
 
 ## `vm.getC5`
 
 ```tolk
 fun vm.getC5(): cell
-    asm "c5 PUSHCTR";
+    asm "c5 PUSHCTR"
 ```
 
 Read control register C5.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L32" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L31" />
 
 ## `vm.setC5`
 
 ```tolk
 fun vm.setC5(cell: cell): void
-    asm "c5 POPCTR";
+    asm "c5 POPCTR"
 ```
 
 Write a new value to control register C5.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L36" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L35" />
 
 ## `vm.getConfigParam`
 
@@ -86,7 +86,7 @@ fun vm.getConfigParam<T>(index: int): T
 
 Generic helper to get a single config parameter.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L40" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L39" />
 
 ## `vm.setConfigParam`
 
@@ -96,7 +96,67 @@ fun vm.setConfigParam<T>(value: T, index: int)
 
 Generic helper to overwrite a single config parameter.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L47" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L46" />
+
+## `CONFIG_ROOT_INDEX`
+
+```tolk
+const CONFIG_ROOT_INDEX = 9
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L54" />
+
+## `vm.setConfigRootDict`
+
+```tolk
+fun vm.setConfigRootDict(root: dict)
+```
+
+Set the blockchain configuration root dictionary.
+
+This function allows you to override the configuration root dictionary (parameter 9) in the VM state.
+The config root is a dictionary containing blockchain configuration parameters.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L60" />
+
+## `CONFIG_UNPACKED_INDEX`
+
+```tolk
+const CONFIG_UNPACKED_INDEX = 14
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L69" />
+
+## `vm.setConfigUnpacked`
+
+```tolk
+fun vm.setConfigUnpacked(values: tuple)
+```
+
+Set the unpacked configuration parameters tuple.
+
+This function allows you to override the unpacked configuration parameters (parameter 14) in the VM state.
+The unpacked config contains a tuple of configuration values extracted from the config dictionary.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L75" />
+
+## `vm.getConfigUnpacked`
+
+```tolk
+fun vm.getConfigUnpacked()
+```
+
+Get the unpacked configuration parameters tuple.
+
+Retrieves the unpacked configuration parameters (parameter 14) from the current VM state.
+Returns a tuple of configuration values.
+
+Example:
+```tolk
+val unpacked = vm.getConfigUnpacked();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L93" />
 
 ## `vm.setTime`
 
@@ -106,7 +166,7 @@ fun vm.setTime(now: int)
 
 Override `blockchain.now()` for deterministic testing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L56" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L101" />
 
 ## `vm.setBlockLogicalTime`
 
@@ -116,7 +176,7 @@ fun vm.setBlockLogicalTime(blockLogicalTime: int)
 
 Override the **block** logical time.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L61" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L106" />
 
 ## `vm.setLogicalTime`
 
@@ -126,7 +186,7 @@ fun vm.setLogicalTime(logicalTime: int)
 
 Override the **transaction** logical time.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L66" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L111" />
 
 ## `vm.setOriginalBalance`
 
@@ -136,7 +196,7 @@ fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null)
 
 Override the original balance of the contract.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L71" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L116" />
 
 ## `vm.registerLibrary`
 
@@ -146,12 +206,12 @@ fun vm.registerLibrary(cell: cell)
 
 Register a new library for current test.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L76" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L121" />
 
 ## `vm.convertAddress`
 
 ```tolk
-fun vm.convertAddress(addr: slice): address
+fun vm.convertAddress(addr: string): address
 ```
 
 Convert a slice with string representation of address to an address type.
@@ -161,13 +221,13 @@ Example:
 val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L86" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L131" />
 
 ## `vm.cellFromHex`
 
 ```tolk
-fun vm.cellFromHex(cell_hex: slice): cell
+fun vm.cellFromHex(cellHex: string): cell
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L91" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L136" />
 

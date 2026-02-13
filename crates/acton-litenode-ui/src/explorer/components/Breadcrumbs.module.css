@@ -1,0 +1,35 @@
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--tonscan-text-secondary);
+  margin-bottom: 16px;
+}
+
+.item {
+  color: var(--tonscan-accent);
+  text-decoration: none;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.item:hover {
+  text-decoration: underline;
+}
+
+.separator {
+  color: var(--tonscan-text-secondary);
+  opacity: 0.5;
+}
+
+.current {
+  color: var(--tonscan-text-primary);
+  font-weight: 500;
+  cursor: default;
+}
+
+.current:hover {
+  text-decoration: none;
+}

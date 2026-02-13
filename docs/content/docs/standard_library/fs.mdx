@@ -40,7 +40,7 @@ Namespace for file system operations.
 ## `fs.readFile`
 
 ```tolk
-fun fs.readFile(path: slice): slice? asm "3 EXTCALL"
+fun fs.readFile(path: string): string? asm "3 EXTCALL"
 ```
 
 Reads the entire contents of a file at the given path as a string slice

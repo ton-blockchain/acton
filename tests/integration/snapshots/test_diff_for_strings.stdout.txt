@@ -14,7 +14,7 @@
             hello,
             world
         )
-      └─ at ./tests/simple.test[LINE]
+      └─ at tests/simple.test[LINE]
 
  ✗ 1 failed in 1 file
 

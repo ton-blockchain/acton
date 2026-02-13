@@ -10,7 +10,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::time::{Instant, SystemTime};
+use std::time::Instant;
 use tempfile::TempDir;
 use tycho_types::boc::Boc;
 
@@ -214,7 +214,7 @@ fn process_contract(
             }
         }
     } else {
-        let cached_result = file_cache.get(contract_path, false, 2, "1.2".to_string());
+        let cached_result = file_cache.get(contract_path, false, 2, "1.3".to_string());
 
         if let Some(cached_result) = cached_result {
             debug!("Cache hit, use cached result for '{contract_path}'");
@@ -231,7 +231,7 @@ fn process_contract(
             match compilation_result {
                 tolkc::CompilerResult::Success(result) => {
                     if let Err(e) =
-                        file_cache.put(contract_path, &result, false, 2, "1.2".to_string())
+                        file_cache.put(contract_path, &result, false, 2, "1.3".to_string())
                     {
                         eprintln!(
                             "Warning: Failed to cache compilation result for {}: {}",
@@ -422,10 +422,9 @@ fn generate_tolk_dependency_content(
         .cloned()
         .unwrap_or_default();
     let contract_path = contract.src;
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = chrono::Local::now();
+    let now_seconds = now.timestamp();
+    let now_date = now.format("%Y-%m-%d %H:%M:%S");
 
     format!(
         "{license_header}// Auto-generated dependency code for contract '{dependency_key}'
@@ -438,7 +437,8 @@ fn generate_tolk_dependency_content(
 ///
 /// - Contract: `{dependency_key}`
 /// - Path: `{contract_path}`
-/// - Timestamp: {now}
+/// - Timestamp: {now_seconds}
+/// - Generated on: {now_date}
 @pure
 fun {func_name}(): cell asm \"\"\"
 {asm_code}

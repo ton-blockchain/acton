@@ -8,6 +8,7 @@ pub mod fmt;
 pub mod init;
 pub mod internal;
 pub mod library;
+pub mod litenode;
 pub mod ls;
 pub mod new;
 pub mod retrace;

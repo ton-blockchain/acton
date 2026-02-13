@@ -1,7 +1,7 @@
 use crate::ast::top_level::{Import, TopLevel};
 use crate::ast::traits::AstNode;
 use crate::errors::{ParseError, collect_errors};
-use crate::language;
+use crate::{Func, GetMethod, language};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -81,6 +81,22 @@ impl SourceFile {
     pub fn imports(&self) -> impl Iterator<Item = Import<'_>> {
         self.top_levels().filter_map(|tl| match tl {
             TopLevel::Import(i) => Some(i),
+            _ => None,
+        })
+    }
+
+    /// Returns an iterator over all standalone functions in the file.
+    pub fn functions(&self) -> impl Iterator<Item = Func<'_>> {
+        self.top_levels().filter_map(|tl| match tl {
+            TopLevel::Func(f) => Some(f),
+            _ => None,
+        })
+    }
+
+    /// Returns an iterator over all ge methods in the file.
+    pub fn get_methods(&self) -> impl Iterator<Item = GetMethod<'_>> {
+        self.top_levels().filter_map(|tl| match tl {
+            TopLevel::GetMethod(m) => Some(m),
             _ => None,
         })
     }

@@ -11,7 +11,7 @@
   ✗ diff [TIME]
     └─ Error: expect(actual).toEqual(expected)
         10 != null
-      └─ at ./tests/simple.test[LINE]
+      └─ at tests/simple.test[LINE]
 
  ✗ 1 failed in 1 file
 

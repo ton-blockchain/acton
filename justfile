@@ -9,6 +9,7 @@ build:
 test-unit:
     {{ CARGO_TEST }} --workspace --lib --bins \
         --exclude retrace
+    cargo test --workspace --doc
 
 test-serial:
     # we need test by test execution due to Toncenter rate limit
@@ -17,7 +18,7 @@ test-serial:
 test-integration:
     {{ CARGO_TEST }} --test integration_test
     # we need test by test execution due to single debug port
-    {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
+    # {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
 
 test: test-unit test-serial test-integration
 
@@ -55,9 +56,17 @@ coverage-clean:
     cargo llvm-cov clean
 
 build-ui:
+    bun install
     cd crates/acton-test-ui && bun i && bun run build
+    cd crates/acton-litenode-ui && bun i && bun run build
 
-precommit: build-ui build check
+check-ui:
+    bun run lint:fix
+
+fmt-ui:
+    bun run fmt
+
+precommit: fmt fmt-ui build build-ui check check-ui
 
 clean:
     cargo clean

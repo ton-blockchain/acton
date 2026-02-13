@@ -1,5 +1,4 @@
 import "../../../lib/emulation/network"
-import "../../../lib/testing/expect"
 import "../../../lib/build/build"
 
 import "../../contracts/messages"

@@ -36,4 +36,4 @@ struct fs
 ///     println("File not found");
 /// }
 /// ```
-fun fs.readFile(path: slice): slice? asm "3 EXTCALL"
+fun fs.readFile(path: string): string? asm "3 EXTCALL"

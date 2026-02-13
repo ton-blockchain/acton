@@ -31,7 +31,7 @@ import "../ffi/ffi"
 /// val name = prompt("What is your name?", "John");
 /// println(format1("Hello {}", name));
 /// ```
-fun prompt(message: slice, placeholder: slice = ""): slice {
+fun prompt(message: string, placeholder: string = ""): string {
     return ffi.prompt(message, placeholder);
 }
 
@@ -42,7 +42,7 @@ fun prompt(message: slice, placeholder: slice = ""): slice {
 /// val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
 /// println(format1("Hello {}", name));
 /// ```
-fun select(message: slice, variants: tuple): slice {
+fun select(message: string, variants: tuple): string {
     return ffi.select(message, variants);
 }
 
@@ -55,10 +55,10 @@ fun select(message: slice, variants: tuple): slice {
 ///     println("Data deleted");
 /// }
 /// ```
-fun confirm(message: slice, default: bool, helpMessage: slice): bool {
+fun confirm(message: string, default: bool, helpMessage: string): bool {
     return ffi.confirm(message, default, helpMessage);
 }
 
-fun ffi.prompt(message: slice, placeholder: slice = ""): slice asm "205 EXTCALL"
-fun ffi.select(message: slice, variants: tuple): slice asm "206 EXTCALL"
-fun ffi.confirm(message: slice, default: bool, helpMessage: slice): bool asm "207 EXTCALL"
+fun ffi.prompt(message: string, placeholder: string = ""): string asm "205 EXTCALL"
+fun ffi.select(message: string, variants: tuple): string asm "206 EXTCALL"
+fun ffi.confirm(message: string, default: bool, helpMessage: string): bool asm "207 EXTCALL"

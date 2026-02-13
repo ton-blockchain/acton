@@ -8,9 +8,11 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
+use tolkc::abi::ContractABI;
 use ton_source_map::SourceMap;
 use tycho_types::boc::Boc;
 
+#[allow(clippy::too_many_arguments)]
 pub fn compile_cmd(
     path: &String,
     json: bool,
@@ -18,6 +20,7 @@ pub fn compile_cmd(
     boc: Option<String>,
     fift: Option<String>,
     source_map: Option<String>,
+    abi: Option<String>,
     clear_cache: bool,
 ) -> anyhow::Result<()> {
     if clear_cache {
@@ -46,7 +49,7 @@ pub fn compile_cmd(
     let acton_config = config::ActonConfig::load().ok();
 
     let need_debug_info = source_map.is_some();
-    if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.2".to_string()) {
+    if let Some(cached_entry) = file_cache.get(path, need_debug_info, 2, "1.3".to_string()) {
         let elapsed = start_time.elapsed();
         info!("Compile {path} from file cache (.acton/cache) in {elapsed:?}");
 
@@ -55,6 +58,8 @@ pub fn compile_cmd(
             cached_entry.code_hash_hex,
             cached_entry.fift_code,
             cached_entry.source_map,
+            cached_entry.abi,
+            abi,
             source_map,
             json,
             base64_only,
@@ -84,7 +89,7 @@ pub fn compile_cmd(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
             );
 
-            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.2".to_string())
+            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.3".to_string())
                 && !json
             {
                 eprintln!("Warning: Failed to cache compilation result: {e}");
@@ -95,6 +100,8 @@ pub fn compile_cmd(
                 result.code_hash_hex,
                 result.fift_code,
                 result.source_map,
+                result.abi,
+                abi,
                 source_map,
                 json,
                 base64_only,
@@ -131,6 +138,8 @@ fn handle_compilation_result(
     code_hash_hex: String,
     fift_code: String,
     source_map: Option<SourceMap>,
+    abi: Option<ContractABI>,
+    abi_path: Option<String>,
     source_map_path: Option<String>,
     json: bool,
     base64_only: bool,
@@ -182,6 +191,26 @@ fn handle_compilation_result(
         fs::write(fift_path, &fift_code).map_err(|err| {
             anyhow!(color_print::cformat!(
                 "Failed to save Fift file <yellow>{fift_path}</>: {err}"
+            ))
+        })?;
+    }
+
+    if let Some(abi) = &abi
+        && let Some(abi_path) = &abi_path
+    {
+        if let Some(parent_dir) = Path::new(&abi_path).parent()
+            && let Err(err) = fs::create_dir_all(parent_dir)
+        {
+            anyhow::bail!(
+                "Failed to create directory for ABI file {}: {}",
+                parent_dir.display(),
+                err
+            );
+        }
+
+        fs::write(abi_path, serde_json::to_string_pretty(abi)?).map_err(|err| {
+            anyhow!(color_print::cformat!(
+                "Failed to save ABI file <yellow>{abi_path}</>: {err}"
             ))
         })?;
     }

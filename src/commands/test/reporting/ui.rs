@@ -1,7 +1,7 @@
 use crate::commands::test::reporting::{TestReport, TestReporter};
 use axum::{
     Router,
-    extract::{Path as AxumPath, State},
+    extract::{Path as AxumPath, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json},
     routing::get,
@@ -9,6 +9,7 @@ use axum::{
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
 use owo_colors::OwoColorize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tower_http::cors::CorsLayer;
@@ -28,6 +29,7 @@ static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
 pub(crate) struct UiServerState {
     pub reports: Arc<Vec<TestReport>>,
     pub trace_dir: Option<String>,
+    pub project_root: String,
 }
 
 pub(crate) struct UiReporter {
@@ -59,17 +61,21 @@ impl TestReporter for UiReporter {
 pub(crate) async fn start_ui_server(
     reports: Vec<TestReport>,
     trace_dir: Option<String>,
+    project_root: String,
     port: u16,
 ) -> anyhow::Result<()> {
     let state = Arc::new(UiServerState {
         reports: Arc::new(reports),
         trace_dir,
+        project_root,
     });
 
     let app = Router::new()
         .route("/api/reports", get(handle_api_reports))
         .route("/api/trace/{name}", get(handle_api_trace))
-        .route("/api/contract/{name}", get(handle_api_contract));
+        .route("/api/contract/{name}", get(handle_api_contract))
+        .route("/api/file", get(handle_api_file))
+        .route("/api/config", get(handle_api_config));
 
     // In debug mode, serve UI assets directly from the filesystem for faster development.
     #[cfg(debug_assertions)]
@@ -187,6 +193,29 @@ async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
 
 async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     Json(state.reports.as_ref().clone())
+}
+
+#[derive(Deserialize)]
+struct FileQuery {
+    path: String,
+}
+
+async fn handle_api_file(Query(query): Query<FileQuery>) -> impl IntoResponse {
+    match tokio::fs::read_to_string(&query.path).await {
+        Ok(content) => content.into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, "File not found").into_response(),
+    }
+}
+
+#[derive(Serialize)]
+struct ConfigResponse {
+    project_root: String,
+}
+
+async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
+    Json(ConfigResponse {
+        project_root: state.project_root.clone(),
+    })
 }
 
 async fn handle_api_trace(

@@ -21,6 +21,7 @@
 /// val info = format3("User {} has {} items worth {:ton}", "Alice", 5, 1000000000);
 /// ```
 
+import "@stdlib/reflection"
 import "ffi/ffi"
 
 /// Formats a string with 1 argument.
@@ -34,8 +35,8 @@ import "ffi/ffi"
 /// Format supports following format soecifiers:
 /// - `{:x}` — formats a number as hexadecimal without `0x` prefix
 /// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
-fun format1<T1>(fmt: slice, arg1: T1): slice {
-    return ffi.format1(fmt, arg1.typeNameOfObject(), arg1.toTuple());
+fun format1<T1>(fmt: string, arg1: T1): string {
+    return ffi.format1(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple());
 }
 
 /// Formats a string with 2 arguments.
@@ -49,8 +50,8 @@ fun format1<T1>(fmt: slice, arg1: T1): slice {
 /// Format supports following format soecifiers:
 /// - `{:x}` — formats a number as hexadecimal without `0x` prefix
 /// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
-fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice {
-    return ffi.format2(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple());
+fun format2<T1, T2>(fmt: string, arg1: T1, arg2: T2): string {
+    return ffi.format2(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple());
 }
 
 /// Formats a string with 3 arguments.
@@ -64,8 +65,8 @@ fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice {
 /// Format supports following format soecifiers:
 /// - `{:x}` — formats a number as hexadecimal without `0x` prefix
 /// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
-fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice {
-    return ffi.format3(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple());
+fun format3<T1, T2, T3>(fmt: string, arg1: T1, arg2: T2, arg3: T3): string {
+    return ffi.format3(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple(), reflect.typeNameOfObject(arg3), arg3.toTuple());
 }
 
 /// Formats a string with 4 arguments.
@@ -79,8 +80,8 @@ fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice {
 /// Format supports following format soecifiers:
 /// - `{:x}` — formats a number as hexadecimal without `0x` prefix
 /// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
-fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4): slice {
-    return ffi.format4(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple(), arg4.typeNameOfObject(), arg4.toTuple());
+fun format4<T1, T2, T3, T4>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4): string {
+    return ffi.format4(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple(), reflect.typeNameOfObject(arg3), arg3.toTuple(), reflect.typeNameOfObject(arg4), arg4.toTuple());
 }
 
 /// Formats a string with 5 arguments.
@@ -94,17 +95,17 @@ fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4):
 /// Format supports following format soecifiers:
 /// - `{:x}` — formats a number as hexadecimal without `0x` prefix
 /// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
-fun format5<T1, T2, T3, T4, T5>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): slice {
-    return ffi.format5(fmt, arg1.typeNameOfObject(), arg1.toTuple(), arg2.typeNameOfObject(), arg2.toTuple(), arg3.typeNameOfObject(), arg3.toTuple(), arg4.typeNameOfObject(), arg4.toTuple(), arg5.typeNameOfObject(), arg5.toTuple());
+fun format5<T1, T2, T3, T4, T5>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): string {
+    return ffi.format5(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple(), reflect.typeNameOfObject(arg3), arg3.toTuple(), reflect.typeNameOfObject(arg4), arg4.toTuple(), reflect.typeNameOfObject(arg5), arg5.toTuple());
 }
 
-fun ffi.format1(fmt: slice, type1: slice, arg1: tuple): slice
+fun ffi.format1(fmt: string, type1: string, arg1: tuple): string
     asm "200 EXTCALL"
-fun ffi.format2(fmt: slice, type1: slice, arg1: tuple, type2: slice, arg2: tuple): slice
+fun ffi.format2(fmt: string, type1: string, arg1: tuple, type2: string, arg2: tuple): string
     asm "201 EXTCALL"
-fun ffi.format3(fmt: slice, type1: slice, arg1: tuple, type2: slice, arg2: tuple, type3: slice, arg3: tuple): slice
+fun ffi.format3(fmt: string, type1: string, arg1: tuple, type2: string, arg2: tuple, type3: string, arg3: tuple): string
     asm "202 EXTCALL"
-fun ffi.format4(fmt: slice, type1: slice, arg1: tuple, type2: slice, arg2: tuple, type3: slice, arg3: tuple, type4: slice, arg4: tuple): slice
+fun ffi.format4(fmt: string, type1: string, arg1: tuple, type2: string, arg2: tuple, type3: string, arg3: tuple, type4: string, arg4: tuple): string
     asm "203 EXTCALL"
-fun ffi.format5(fmt: slice, type1: slice, arg1: tuple, type2: slice, arg2: tuple, type3: slice, arg3: tuple, type4: slice, arg4: tuple, type5: slice, arg5: tuple): slice
+fun ffi.format5(fmt: string, type1: string, arg1: tuple, type2: string, arg2: tuple, type3: string, arg3: tuple, type4: string, arg4: tuple, type5: string, arg5: tuple): string
     asm "204 EXTCALL"

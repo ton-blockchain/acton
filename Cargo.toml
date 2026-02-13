@@ -9,11 +9,9 @@ members = ["crates/*"]
 
 exclude = [
     "crates/acton-test-ui",
+    "crates/acton-shared-ui",
     "crates/acton-litenode-ui",
-    "crates/acton-ui-shared",
     "crates/ffi-test",
-    "crates/ton-litenode",
-    "crates/acton-js-emulator",
 ]
 
 [workspace.package]
@@ -47,8 +45,12 @@ ton-api = { path = "crates/ton-api" }
 retrace = { path = "crates/retrace" }
 ton-source-map = { path = "crates/ton-source-map" }
 tolkfmt = { path = "crates/tolkfmt" }
+ton-networks = { path = "crates/ton-networks" }
+ton-litenode = { path = "crates/ton-litenode" }
+ton-indexer = { path = "crates/ton-indexer" }
 
 # remote crates
+rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
 tonlib-core = "0.26.6"
 tycho-types = { version = "0.3.0", features = ["bigint"] }
@@ -113,6 +115,7 @@ opener = "0.8.4"
 # acton wallet
 hmac = "0.12.1"
 pbkdf2 = "0.12.2"
+nacl = "0.5.3"
 toml_edit = "0.24.0"
 
 tokio = { version = "1.41", features = ["rt-multi-thread", "macros", "full"] }
@@ -142,6 +145,7 @@ itertools = "0.14.0"
 heck = "0.5.0"
 pretty = "0.12.5"
 winnow = "0.7.13"
+dunce = "1.0.5"
 
 [dependencies]
 # local creates
@@ -165,6 +169,7 @@ ton-api = { workspace = true }
 retrace = { workspace = true }
 ton-source-map = { workspace = true }
 tolkfmt = { workspace = true }
+ton-litenode = { workspace = true }
 
 # remote crates
 # base TON libraries
@@ -182,6 +187,7 @@ comfy-table = { workspace = true } # coverage table
 tree-sitter = { workspace = true } # tolk parser
 clap = { workspace = true } # CLI
 anyhow = { workspace = true }
+dunce = { workspace = true }
 
 # test filtering
 regex = { workspace = true }
@@ -230,6 +236,7 @@ opener = { workspace = true }
 # acton wallet
 hmac = { workspace = true }
 pbkdf2 = { workspace = true }
+nacl = { workspace = true }
 toml_edit = { workspace = true }
 
 tokio = { workspace = true }
@@ -240,6 +247,8 @@ similar = { workspace = true }
 
 # actin check
 codespan-reporting = { workspace = true }
+tracing-subscriber = "0.3.22"
+rustc-hash = "2.1.1"
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }
@@ -293,3 +302,6 @@ workspace = true
 [features]
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
 profiling = ["tolk-ls/profiling"]
+
+#[profile.release]
+#debug = "full"

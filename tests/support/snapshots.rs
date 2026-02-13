@@ -27,7 +27,14 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
     let assert1 = assert_ui();
     let mut redactions = assert1.redactions().clone();
 
-    let tmp_dir = project_path.to_string_lossy().to_string();
+    let mut tmp_dir = project_path.to_string_lossy().to_string();
+    if cfg!(windows) {
+        // since Windows uses backslashes `\` as separators,
+        // while snapshots use Unix paths and slashes `/`,
+        // we will explicitly replace Windows separators with Unix separators in this case
+        tmp_dir = tmp_dir.replace("\\", "/");
+    }
+
     let lib_dir = Path::new(tmp_dir.as_str()).parent().unwrap().join("lib");
     redactions.insert("[ROOT]", tmp_dir.clone()).unwrap();
     redactions.insert("[ACTON_LIB]", lib_dir.clone()).unwrap();
@@ -59,7 +66,7 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
         .insert("[BOC_HEX]", regex!("b5ee[\\d\\w]*"))
         .unwrap();
     redactions
-        .insert("[MAYBE_UNIX_TIME_VALUE]", regex!(" = 176\\d+"))
+        .insert("[MAYBE_UNIX_TIME_VALUE]", regex!(" = 17\\d+"))
         .unwrap();
     redactions
         .insert(
@@ -102,6 +109,12 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
         .unwrap();
     redactions
         .insert("[DEPLOYED_AT]", regex!(r"Deployed at: .*"))
+        .unwrap();
+    redactions
+        .insert(
+            "[GENERATED_ON]",
+            regex!(r"Generated on: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"),
+        )
         .unwrap();
 
     redactions.redact(&content)

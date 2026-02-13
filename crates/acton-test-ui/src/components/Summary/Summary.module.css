@@ -1,29 +1,39 @@
 .summary {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
 }
 
 .card {
   display: flex;
   flex-direction: column;
+  gap: var(--spacing-xss);
+  padding: var(--spacing-sm) var(--spacing-mds) calc(var(--spacing-sm) - 2px);
+  background-color: var(--bg-secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
 }
 
 .count {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+  color: var(--text-primary);
 }
 
 .label {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
+  font-size: var(--font-size-xss);
+  color: var(--text-muted);
   text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
 }
 
-.passed {
+.passed .count {
   color: var(--color-passed);
 }
 
-.failed {
+.failed .count {
   color: var(--color-failed);
 }

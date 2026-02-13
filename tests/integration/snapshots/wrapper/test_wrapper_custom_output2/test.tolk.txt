@@ -1,7 +1,7 @@
 import "@stdlib/gas-payments"
-import "../../../.acton/emulation/network"
-import "../../../.acton/testing/expect"
-import "../../../.acton/testing/transaction_expect"
+import "@acton/emulation/network"
+import "@acton/testing/expect"
+import "@acton/testing/transaction_expect"
 import "../../other/nested/wrapper"
 
 /// Example test case demonstrating the basic flow

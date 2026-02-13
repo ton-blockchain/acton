@@ -107,7 +107,7 @@ get fun `test-run-get-method-with-nullable-struct-with-two-int-return-type`() {
     expect(res2).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
 
     val result2: tuple = net.runGetMethod(counter.address, "currentStorageOrNull");
-    expect([result2.get<int>(0), result2.get<int>(1)]).toEqual([0, 200]);
+    expect([result2.get(0) as int, result2.get(1) as int]).toEqual([0, 200]);
 }
 
 get fun `test-run-get-method-with-single-int-argument`() {

@@ -121,7 +121,7 @@ pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
             ));
         }
 
-        return Ok(());
+        Ok(())
     }
 }
 

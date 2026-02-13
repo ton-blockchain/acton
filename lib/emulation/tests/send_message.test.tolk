@@ -3,7 +3,6 @@ import "contracts/types"
 import "../../build/build"
 import "../../testing/expect"
 import "../../testing/transaction_expect"
-import "../../tlb/maybe"
 
 struct Counter {
     address: address
@@ -40,7 +39,7 @@ fun setupTest() {
             stateInit: counter.init,
         },
     });
-    val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val _res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
     // expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
     return (counter, deployer)
@@ -98,4 +97,18 @@ get fun `test-find-transaction-with-type`() {
 
     val unknownTx = res.findTransaction<ResetCounter>({ to: counter.address });
     expect(unknownTx).toBeNone();
+}
+
+get fun `test-search-by-value`() {
+    val (counter, deployer) = setupTest();
+
+    val res = counter.sendIncrease(deployer.address, 100);
+    expect(res).toHaveSuccessfulTx({ to: counter.address, value: ton("0.1") });
+}
+
+get fun `test-search-by-value-mismatch`() {
+    val (counter, deployer) = setupTest();
+
+    val res = counter.sendIncrease(deployer.address, 100);
+    expect(res).toNotHaveTx({ to: counter.address, value: ton("0.2") });
 }

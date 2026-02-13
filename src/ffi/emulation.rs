@@ -16,11 +16,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use ton_abi::contract_abi;
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
-use ton_emulator::{extension, register_ext_methods, remote};
+use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
@@ -37,8 +38,8 @@ use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, St
 use tycho_types::dict::Dict;
 use tycho_types::models::{
     AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr,
-    LibDescr, MsgInfo, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount,
-    SkippedComputePhase, Transaction, TxInfo,
+    LibDescr, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
+    ShardAccount, SkippedComputePhase, Transaction, TxInfo,
 };
 
 extension!(build in (Context) with (path: String, name: String) using build_impl);
@@ -63,7 +64,7 @@ fn build_impl(
             debug!("Found contract with info: {found_contract:?}");
             name = found_contract.name; // use actual name instead of id
             path = found_contract.src;
-            path = fs::canonicalize(&path)
+            path = dunce::canonicalize(&path)
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or(path);
         } else {
@@ -88,7 +89,7 @@ fn build_impl(
         return Ok(());
     }
 
-    if let Some(cached) = ctx.build.build_cache.built.get(&path) {
+    if let Some(cached) = ctx.build.build_cache.built.get(Path::new(&path)) {
         let elapsed = start_time.elapsed();
         info!("Build {path} from memory cache in {elapsed:?}");
 
@@ -101,7 +102,7 @@ fn build_impl(
     if let Some(cached_entry) =
         ctx.build
             .file_build_cache
-            .get(&path, ctx.build.need_debug_info, 2, "1.2".to_string())
+            .get(&path, ctx.build.need_debug_info, 2, "1.3".to_string())
     {
         let elapsed = start_time.elapsed();
         info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
@@ -109,11 +110,11 @@ fn build_impl(
         let content = fs::read_to_string(&path).unwrap_or_default();
         ctx.build.build_cache.memoize(
             &name,
-            &path,
+            Path::new(&path),
             &cached_entry.code_boc64,
             &cached_entry.code_hash_hex,
-            cached_entry.source_map.clone().unwrap_or_default(),
-            Some(contract_abi(&content, &path)),
+            cached_entry.source_map.clone().unwrap_or_default().into(),
+            Some(contract_abi(&content, &path, &ctx.env.config.mappings).into()),
         );
 
         let code_cell = ArcCell::from_boc_b64(&cached_entry.code_boc64)
@@ -139,7 +140,7 @@ fn build_impl(
                 &success,
                 ctx.build.need_debug_info,
                 2,
-                "1.2".to_string(),
+                "1.3".to_string(),
             ) {
                 warn!("Failed to build cached code BoC for {path}: {err}");
             }
@@ -147,11 +148,11 @@ fn build_impl(
             let content = fs::read_to_string(&path).unwrap_or_default();
             ctx.build.build_cache.memoize(
                 &name,
-                &path,
+                Path::new(&path),
                 &success.code_boc64,
                 &success.code_hash_hex,
-                success.source_map.unwrap_or_default(),
-                Some(contract_abi(&content, &path)),
+                success.source_map.unwrap_or_default().into(),
+                Some(contract_abi(&content, &path, &ctx.env.config.mappings).into()),
             );
             let code_cell = ArcCell::from_boc_b64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
@@ -196,8 +197,14 @@ fn send_message_impl(
     })?;
 
     if let Some(wallet) = ctx.env.find_wallet_by_address(&src_addr) {
-        send_wallet_message(&msg, wallet, &ctx.network(), &ctx.env.api_key)
-            .context("Failed to send message to real network")?;
+        send_wallet_message(
+            &msg,
+            wallet,
+            &ctx.network(),
+            &ctx.env.api_key,
+            ctx.env.config.custom_networks(),
+        )
+        .context("Failed to send message to real network")?;
 
         // Add pseudo transaction to the result list to wait on it
         let tx = Transaction {
@@ -355,13 +362,16 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
 fn send_wallet_message(
     message: &ArcCell,
     wallet: Wallet,
-    network: &str,
+    network: &Network,
     api_key: &Option<String>,
+    custom_networks: HashMap<String, acton_config::config::CustomNetworkUrls>,
 ) -> anyhow::Result<()> {
     let expired_at_time = std::time::SystemTime::now() + Duration::from_secs(600);
     let expire_at = expired_at_time.duration_since(UNIX_EPOCH)?.as_secs() as u32;
 
-    let (seqno, need_state_init) = wallet.seqno(network)?;
+    let client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+
+    let (seqno, need_state_init) = wallet.seqno(&client)?;
     let external = wallet.wallet.create_external_msg(
         expire_at,
         seqno,
@@ -369,12 +379,10 @@ fn send_wallet_message(
         vec![message.clone()],
     )?;
 
-    if api_key.is_none() {
+    if api_key.is_none() && network != &Network::Custom("localnet".into()) {
         std::thread::sleep(Duration::from_millis(1000)); // rate limit
     }
 
-    let network = Network::from_str(network)?;
-    let client = TonApiClient::new(network, api_key.clone())?;
     client.send_boc(&external.to_boc_b64(false)?)?;
 
     Ok(())
@@ -420,7 +428,11 @@ fn send_message_debug(
         )
         .expect("Cannot send response");
 
-    let msg_cell = Emulator::patch_message(msg_cell.clone(), src_addr)?;
+    let msg_cell = Emulator::patch_message(
+        ctx.chain.world_state.get_config(),
+        msg_cell.clone(),
+        src_addr,
+    )?;
     let prepare_result = step_executor
         .prepare_transaction(
             &Boc::encode_base64(msg_cell),
@@ -489,8 +501,8 @@ fn send_message_debug(
     };
 
     let shard_account_after = &result.shard_account;
-    let shard_account_cell =
-        Boc::decode_base64(shard_account_after).context("Failed to decode shard account BoC")?;
+    let shard_account_cell = Boc::decode_base64(shard_account_after.as_ref())
+        .context("Failed to decode shard account BoC")?;
     let shard_account: ShardAccount = shard_account_cell
         .parse()
         .context("Failed to load shard account from cell")?;
@@ -499,8 +511,8 @@ fn send_message_debug(
         .world_state
         .update_account(&int_message.dst.to_string(), &shard_account);
 
-    let tx_cell =
-        Boc::decode_base64(&result.transaction).context("Failed to decode transaction BoC")?;
+    let tx_cell = Boc::decode_base64(result.transaction.as_ref())
+        .context("Failed to decode transaction BoC")?;
     let transaction: Transaction = tx_cell
         .parse()
         .context("Failed to load transaction from cell")?;
@@ -522,7 +534,7 @@ fn send_message_debug(
         shard_account,
         out_messages,
         vm_log: result.vm_log,
-        executor_logs: String::new(),
+        executor_logs: Arc::default(),
         actions: result.actions,
         code,
         externals: vec![],
@@ -687,6 +699,13 @@ fn find_transaction_by_params_impl(
                 && *expected_bounce != info.bounce
             {
                 // Bounce value mismatch
+                return false;
+            }
+
+            if let Some(expected_value) = &params.value
+                && (*expected_value) != info.value.tokens.into()
+            {
+                // Message value mismatch
                 return false;
             }
 
@@ -1175,7 +1194,11 @@ fn load_library_by_hash_impl(
     stack: &mut Tuple,
     hash: String,
 ) -> anyhow::Result<()> {
-    let lib = remote::get_library_by_hash(&ctx.network(), hash.as_str(), None);
+    let network = ctx.network();
+    let custom_networks = ctx.env.config.custom_networks();
+    let api_client = TonApiClient::new(network, custom_networks, ctx.env.api_key.clone())?;
+
+    let lib = api_client.get_library_by_hash(hash.as_str());
     match lib {
         Ok(lib) => {
             let cell = ArcCell::from_boc(&Boc::encode(lib))?;
@@ -1236,14 +1259,15 @@ fn wait_for_transaction_impl(
 
     let address_str = cell_address_to_raw(address).context("Failed to decode address")?;
 
-    let network = Network::from_str(&ctx.network()).context("Failed to parse network")?;
+    let network = ctx.network();
 
+    let custom_networks = ctx.env.config.custom_networks();
     let api_key = ctx.env.api_key.clone();
-    let api_client = TonApiClient::new(network, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
 
     let ext_message_hash_bytes = ext_message_hash.data();
 
-    if api_key.is_none() {
+    if api_key.is_none() && network != Network::Custom("localnet".into()) {
         std::thread::sleep(Duration::from_millis(1000)); // rate limit
     }
 
@@ -1306,7 +1330,7 @@ fn get_transaction_link(
     tx: TonCenterTransaction,
     hex: String,
 ) -> String {
-    let network_prefix = if ctx.network() == "testnet" {
+    let network_prefix = if ctx.network() == Network::Testnet {
         "testnet."
     } else {
         ""
@@ -1390,6 +1414,63 @@ fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     Ok(())
 }
 
+extension!(get_shard_account in (Context) with (addr: TupleItem) using get_shard_account_impl);
+fn get_shard_account_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    addr: TupleItem,
+) -> anyhow::Result<()> {
+    let addr_cell = match addr {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
+        _ => anyhow::bail!("Expected address as Cell or Slice"),
+    };
+
+    let raw_addr = cell_address_to_raw(addr_cell).context("Failed to decode address")?;
+    let shard_account = ctx.chain.world_state.get_account(&raw_addr);
+    let shard_account_cell = ArcCell::from_boc(&Boc::encode(to_cell(&shard_account)))
+        .map_err(|e| anyhow::anyhow!("Failed to encode shard account: {e}"))?;
+    stack.push(TupleItem::Cell(shard_account_cell));
+    Ok(())
+}
+
+extension!(set_shard_account in (Context) with (shard_account: TupleItem, addr: TupleItem) using set_shard_account_impl);
+fn set_shard_account_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    shard_account: TupleItem,
+    addr: TupleItem,
+) -> anyhow::Result<()> {
+    let addr_cell = match addr {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
+        _ => anyhow::bail!("Expected address as Cell or Slice"),
+    };
+    let raw_addr = cell_address_to_raw(addr_cell).context("Failed to decode address")?;
+    let shard_account = match shard_account {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
+            let shard_account_boc = cell
+                .to_boc(false)
+                .context("Failed to encode shard account to BoC")?;
+            let shard_account_cell =
+                Boc::decode(shard_account_boc).context("Failed to decode shard account BoC")?;
+            shard_account_cell
+                .parse::<ShardAccount>()
+                .context("Failed to parse shard account")?
+        }
+        TupleItem::Null => ShardAccount {
+            account: Lazy::new(&OptionalAccount(None))
+                .context("Failed to create empty shard account")?,
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        },
+        _ => anyhow::bail!("Expected shard account as Cell or Slice"),
+    };
+
+    ctx.chain
+        .world_state
+        .update_account(&raw_addr, &shard_account);
+    Ok(())
+}
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         6 => build,
@@ -1417,5 +1498,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         30 => send_single_message,
         31 => get_config,
         32 => set_config,
+        33 => get_shard_account,
+        34 => set_shard_account,
     });
 }

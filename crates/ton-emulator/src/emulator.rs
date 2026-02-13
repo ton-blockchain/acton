@@ -48,6 +48,7 @@
 
 use crate::world_state::WorldState;
 use anyhow::Context;
+use std::sync::Arc;
 use std::time::SystemTime;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{
@@ -56,10 +57,12 @@ use ton_executor::message::{
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
+use tycho_types::models::config::BlockchainConfigParams;
 use tycho_types::models::{
     AccountState, BaseMessage, ComputePhase, IntAddr, LibDescr, Message, MsgInfo, RelaxedMessage,
     RelaxedMsgInfo, ShardAccount, Transaction, TxInfo,
 };
+use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
 
 /// A high-level emulator for TON transactions.
@@ -106,7 +109,7 @@ impl Emulator {
         libs: &Dict<HashBytes, LibDescr>,
         from: Option<IntAddr>,
     ) -> anyhow::Result<SendMessageResult> {
-        let msg_cell = Self::patch_message(message, from)?;
+        let msg_cell = Self::patch_message(state.get_config(), message, from)?;
         let msg_b64 = Boc::encode_base64(&msg_cell);
         let msg = msg_cell
             .parse::<Message<'_>>()
@@ -144,14 +147,14 @@ impl Emulator {
             EmulationResult::Error(err) => return Ok(SendMessageResult::Error(err)),
         };
 
-        let shard_account_after = Boc::decode_base64(&result.shard_account)?
+        let shard_account_after = Boc::decode_base64(result.shard_account.as_ref())?
             .parse::<ShardAccount>()
             .context("Failed to parse shard account")?;
 
         // Since state was updated, we need to update it in world state too.
         state.update_account(&dst_addr, &shard_account_after);
 
-        let transaction = Boc::decode_base64(&result.transaction)?
+        let transaction = Boc::decode_base64(result.transaction.as_ref())?
             .parse::<Transaction>()
             .context("Failed to parse transaction")?;
 
@@ -242,7 +245,11 @@ impl Emulator {
         Ok(results)
     }
 
-    pub fn patch_message(message_cell: Cell, src_addr: Option<IntAddr>) -> anyhow::Result<Cell> {
+    pub fn patch_message(
+        config: Arc<Dict<u32, Cell>>,
+        message_cell: Cell,
+        src_addr: Option<IntAddr>,
+    ) -> anyhow::Result<Cell> {
         let Some(from) = src_addr else {
             return Ok(message_cell);
         };
@@ -259,15 +266,58 @@ impl Emulator {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs() as u32;
+
+                // This value is rewritten below after we compute forwarding fees.
+                info.fwd_fee = Tokens::ZERO;
             }
 
             // For some reason this set to wrong value
             message.layout = None;
 
+            if let RelaxedMsgInfo::Int(info) = &message.info {
+                // Forwarding prices are selected by destination workchain.
+                let is_masterchain = info.dst.is_masterchain();
+                let fwd_fee = Self::compute_in_msg_fwd_fee(config, &message, is_masterchain)?;
+                if let RelaxedMsgInfo::Int(info) = &mut message.info {
+                    info.fwd_fee = fwd_fee;
+                }
+            }
+
             return to_cell(&message);
         }
 
         Ok(message_cell)
+    }
+
+    pub(crate) fn compute_in_msg_fwd_fee(
+        config: Arc<Dict<u32, Cell>>,
+        message: &RelaxedMessage<'_>,
+        is_masterchain: bool,
+    ) -> anyhow::Result<Tokens> {
+        let message_cell = to_cell(message)?;
+        let root_bits = u64::from(message_cell.bit_len());
+        let mut stats = message_cell
+            .as_slice_allow_exotic()
+            .compute_unique_stats(usize::MAX)
+            .context("Failed to compute message stats for forwarding fee calculation")?;
+
+        // Real node excludes bits from the root message cell (but keeps referenced cells).
+        stats.bit_count = stats.bit_count.saturating_sub(root_bits);
+
+        let config_root = config
+            .root()
+            .clone()
+            .context("Blockchain config is empty: missing config root dictionary")?;
+        let config_params = BlockchainConfigParams::from_raw(config_root);
+        let prices = config_params
+            .get_msg_forward_prices(is_masterchain)
+            .context("Failed to get msg forward prices from blockchain config (params 24/25)")?;
+
+        // INMSG_FWDFEE for inbound params is expected to hold the remaining part.
+        // Then GETORIGINALFWDFEE restores total from that value.
+        let total = prices.compute_fwd_fee(stats);
+        let first_part = prices.get_first_part(total);
+        Ok(total.saturating_sub(first_part))
     }
 
     fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
@@ -354,7 +404,7 @@ pub enum SendMessageResult {
 #[derive(Clone, Debug)]
 pub struct SendMessageResultSuccess {
     /// Base64-encoded transaction `BoC`.
-    pub raw_transaction: String,
+    pub raw_transaction: Arc<str>,
     /// The parsed transaction object.
     pub transaction: Transaction,
     /// Logical time of the parent transaction, if any.
@@ -368,11 +418,11 @@ pub struct SendMessageResultSuccess {
     /// Cells of outgoing messages produced by this transaction.
     pub out_messages: Vec<Cell>,
     /// VM execution log.
-    pub vm_log: String,
+    pub vm_log: Arc<str>,
     /// High-level executor logs.
-    pub executor_logs: String,
+    pub executor_logs: Arc<str>,
     /// Base64-encoded outgoing actions `BoC`.
-    pub actions: Option<String>,
+    pub actions: Option<Arc<str>>,
     /// The code cell used for this transaction.
     pub code: Option<Cell>,
     /// External outgoing messages produced by this transaction.

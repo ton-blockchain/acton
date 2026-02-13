@@ -23,6 +23,7 @@ thiserror = { workspace = true }
 log = { workspace = true }
 rustc-hash = { workspace = true }
 memchr = { workspace = true }
+heck = { workspace = true }
 
 [features]
 profile_rules = []

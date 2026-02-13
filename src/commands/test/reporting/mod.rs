@@ -1,12 +1,15 @@
 use crate::commands::test::TestDescriptor;
+use crate::commands::test::trace::TransactionInfo;
 use crate::context::{AssertFailure, BuildCache, EmulationsState, KnownAddresses};
+use acton_config::test::BacktraceMode;
+use rustc_hash::FxHashMap;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 use ton_abi::ContractAbi;
 use ton_executor::get::GetMethodResult;
-use ton_source_map::SourceMap;
+use ton_source_map::{SourceLocation, SourceMap};
 use tycho_types::models::ShardAccount;
 
 pub(super) mod console;
@@ -22,35 +25,44 @@ pub struct TestExecutionContext {
     pub stdout: String,
     pub stderr: String,
     pub assert_failure: Option<AssertFailure>,
-    pub accounts: HashMap<String, ShardAccount>,
+    pub accounts: FxHashMap<String, ShardAccount>,
     pub expected_exit_code: i32,
     pub build_cache: BuildCache,
     pub emulations: EmulationsState,
     pub known_addresses: KnownAddresses,
-    pub known_code_cells: HashMap<String, String>,
+    pub known_code_cells: FxHashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FailedTransactionContext {
+    pub from_address: Option<String>,
+    pub to_address: Option<String>,
+    pub params: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TestReport {
-    pub name: String,
-    pub suite_name: String,
-    pub file_path: String,
+    pub name: Arc<str>,
+    pub suite_name: Arc<str>,
+    pub file_path: PathBuf,
     pub row: usize,
     pub column: usize,
-    #[serde(skip)]
     pub duration: Duration,
     #[serde(skip)]
     pub gas_limit: Option<u64>,
     pub status: TestStatus,
     pub message: Option<String>,
-    #[serde(skip)]
+    pub detailed_message: Option<String>,
+    pub failed_transactions: Option<Vec<TransactionInfo>>,
+    pub failed_transaction_context: Option<FailedTransactionContext>,
     pub details: Option<String>,
+    pub location: Option<SourceLocation>,
     #[serde(skip)]
-    pub abi: ContractAbi,
+    pub abi: Arc<ContractAbi>,
     #[serde(skip)]
-    pub source_map: SourceMap,
+    pub source_map: Arc<SourceMap>,
     #[serde(skip)]
-    pub backtrace: Option<String>,
+    pub backtrace: Option<BacktraceMode>,
     #[serde(skip)]
     pub execution: Option<TestExecutionContext>,
     pub trace_path: Option<String>,
@@ -219,12 +231,12 @@ impl ReporterManager {
     }
 }
 
-pub(super) fn extract_suite_name(file_path: &Path) -> String {
+pub(super) fn extract_suite_name(file_path: &Path) -> Arc<str> {
     file_path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or_else(|| file_path.to_str().unwrap_or(""))
-        .to_string()
+        .into()
 }
 
 pub(super) fn escape_xml(input: &str) -> String {

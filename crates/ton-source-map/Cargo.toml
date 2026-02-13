@@ -12,8 +12,9 @@ license = { workspace = true }
 
 [dependencies]
 tycho-types = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["rc"] }
 anyhow = { workspace = true }
+pathdiff = { workspace = true }
 
 [lints]
 workspace = true

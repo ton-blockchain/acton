@@ -151,11 +151,11 @@ mod tests {
         check_definition(
             r#"
                 fun main() {
-                    <caret>unknown;
+                    <caret>unknown_symbol;
                 }
             "#,
             expect![[r#"
-                unknown -> Unresolved
+                unknown_symbol -> Unresolved
             "#]],
         );
     }
@@ -345,17 +345,17 @@ mod tests {
     fn test_match_arm() {
         check_definition(
             r#"
-                type string = slice;
+                type ctring = slice;
 
                 fun main() {
                     match (1) {
-                        <caret>string => {}
+                        <caret>ctring => {}
                         _ => {}
                     }
                 }
             "#,
             expect![[r#"
-                string -> Global(string at test.tolk:22-28)
+                ctring -> Global(ctring at test.tolk:22-28)
             "#]],
         );
     }
@@ -364,18 +364,18 @@ mod tests {
     fn test_match_ambiguous_arm() {
         check_definition(
             r#"
-                type string = slice;
+                type ctring = slice;
 
                 fun main() {
-                    val string = "hello";
+                    val ctring = "hello";
                     match (1) {
-                        <caret>string => {}
+                        <caret>ctring => {}
                         _ => {}
                     }
                 }
             "#,
             expect![[r#"
-                string -> Local(string at 92-98)
+                ctring -> Local(ctring at 92-98)
             "#]],
         );
     }
@@ -510,15 +510,15 @@ mod tests {
     fn test_cast_as_operator() {
         check_definition(
             r#"
-                type string = slice;
+                type string2 = slice;
                 fun main() {
                     val x: int = 42;
-                    val y = <caret>x as <caret>string;
+                    val y = <caret>x as <caret>string2;
                 }
             "#,
             expect![[r#"
-                x -> Local(x at 91-92)
-                string -> Global(string at test.tolk:22-28)
+                x -> Local(x at 92-93)
+                string2 -> Global(string2 at test.tolk:22-29)
             "#]],
         );
     }

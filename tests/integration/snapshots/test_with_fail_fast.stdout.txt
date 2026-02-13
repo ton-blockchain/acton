@@ -12,7 +12,7 @@
             1,
             2
         )
-      └─ at ./tests/test1.test[LINE]
+      └─ at tests/test1.test[LINE]
 
  ✓ 1 passed, ✗ 1 failed in 1 file
 

@@ -41,6 +41,7 @@ pub struct Fix {
 pub struct Edit {
     pub span: Span,
     pub replacement: String,
+    pub file_id: FileId,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

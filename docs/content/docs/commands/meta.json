@@ -5,6 +5,7 @@
     "wrapper",
     "disasm",
     "test",
+    "check",
     "script",
     "run",
     "verify",

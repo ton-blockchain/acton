@@ -75,6 +75,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::marker::PhantomData;
 use std::ptr::{NonNull, null};
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// A thin wrapper around the C++ TON transaction emulator.
 ///
@@ -126,7 +127,7 @@ impl Executor {
         &self,
         message: &str,
         params: &RunTransactionArgs,
-    ) -> anyhow::Result<(EmulationResult, String)> {
+    ) -> anyhow::Result<(EmulationResult, Arc<str>)> {
         let message_cstr = CString::new(message).context("message string contains null bytes")?;
 
         let shard_account_b64_cstr = CString::new(params.shard_account.as_str())

@@ -214,6 +214,7 @@ pub fn new_cmd(
     mappings.insert("contracts".to_owned(), "contracts".to_owned());
     mappings.insert("tests".to_owned(), "tests".to_owned());
     mappings.insert("wrappers".to_owned(), "tests/wrappers".to_owned());
+    mappings.insert("gen".to_owned(), "gen".to_owned());
     config.mappings = Some(mappings);
 
     config.save()?;

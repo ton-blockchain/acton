@@ -27,12 +27,12 @@
 /// });
 /// ```
 
+import "@stdlib/reflection"
 import "expect"
 import "assert"
 import "../fmt"
 import "../emulation/network"
 import "../ffi/ffi"
-import "../types/transaction"
 
 /// Expect the transaction list to have a successful deploy transaction.
 ///
@@ -251,9 +251,9 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
     Assert.fail(
         format3(
             "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
-            Msg.typeName(),
-            Msg.typeName(),
-            Msg.getDeclaredPackPrefix()
+            reflect.typeNameOf<Msg>(),
+            reflect.typeNameOf<Msg>(),
+            reflect.serializationPrefixOf<Msg>()
         ),
         self.location
     );
@@ -274,6 +274,10 @@ fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {
         "expect(<actual>).toConsumeLessThan(<expected>)",
         self.location
     );
+}
+
+fun T.getDeclaredPackPrefix() {
+    return reflect.serializationPrefixOf<T>();
 }
 
 fun never.getDeclaredPackPrefix() {

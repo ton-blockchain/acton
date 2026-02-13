@@ -6,6 +6,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
+use ton_source_map::SourceLocation;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -21,7 +22,7 @@ fn assert_fail_impl(
 ) -> anyhow::Result<()> {
     *ctx.asserts.assert_failure = Some(AssertFailure::Fail(FailAssertFailure {
         message: Some(message),
-        location: Some(location),
+        location: SourceLocation::parse(&location)?,
     }));
     Ok(())
 }
@@ -42,11 +43,11 @@ fn assert_bin_impl(
     let left = left.unwrap_single();
     let right = right.unwrap_single();
 
-    if operator == "==" && left == right {
+    if operator == "==" && left.equal_to(&right) {
         stack.push_bool(true);
         return Ok(());
     }
-    if operator == "!=" && left != right {
+    if operator == "!=" && !left.equal_to(&right) {
         stack.push_bool(true);
         return Ok(());
     }
@@ -71,7 +72,7 @@ fn assert_bin_impl(
             left_type: left_name,
             right_type: right_name,
             message: Some(message),
-            location: Some(location),
+            location: SourceLocation::parse(&location)?,
         }));
         stack.push_bool(false);
         return Ok(());
@@ -84,7 +85,7 @@ fn assert_bin_impl(
         left_type: left_name,
         right_type: right_name,
         message: Some(message),
-        location: Some(location),
+        location: SourceLocation::parse(&location)?,
     }));
     stack.push_bool(false);
     Ok(())
@@ -150,7 +151,7 @@ fn assert_decimal_impl(
 
     *ctx.asserts.assert_failure = Some(AssertFailure::Fail(FailAssertFailure {
         message: Some(message),
-        location: Some(location),
+        location: SourceLocation::parse(&location)?,
     }));
 
     stack.push_bool(false);
@@ -199,7 +200,7 @@ fn fail_to_find_transaction_by_params_impl(
             parsed_txs,
             params,
             message: Some(message),
-            location: Some(location),
+            location: SourceLocation::parse(&location)?,
         },
     ));
     Ok(())
@@ -241,11 +242,7 @@ fn fail_to_not_find_transaction_by_params_impl(
             } else {
                 Some(message)
             },
-            location: if location.is_empty() {
-                None
-            } else {
-                Some(location)
-            },
+            location: SourceLocation::parse(&location)?,
         },
     ));
     Ok(())
@@ -260,11 +257,7 @@ fn fail_wallet_not_found_impl(
 ) -> anyhow::Result<()> {
     *ctx.asserts.assert_failure = Some(AssertFailure::WalletNotFound(WalletNotFoundFailure {
         wallet_name,
-        location: if location.is_empty() {
-            None
-        } else {
-            Some(location)
-        },
+        location: SourceLocation::parse(&location)?,
     }));
     Ok(())
 }
@@ -285,12 +278,14 @@ pub fn process_txs_and_search_params(
     let raw_aborted = params_reader.pop();
     let raw_success = params_reader.pop();
     let raw_exit_code = params_reader.pop();
+    let raw_msg_value = params_reader.pop();
     let raw_from = params_reader.pop();
     let raw_to = params_reader.pop();
 
     let mut params = TransactionNotFoundParams {
         to: Default::default(),
         from: None,
+        value: None,
         exit_code: None,
         success: None,
         aborted: None,
@@ -350,6 +345,13 @@ pub fn process_txs_and_search_params(
             params.aborted = None;
         } else if let TupleItem::Int(num) = raw_aborted {
             params.aborted = Some(num == BigInt::from(-1));
+        }
+    }
+    if let Some(raw_msg_value) = raw_msg_value {
+        if raw_msg_value == TupleItem::Null {
+            params.value = None;
+        } else if let TupleItem::Int(num) = raw_msg_value {
+            params.value = Some(num);
         }
     }
     if let Some(raw_from) = raw_from {

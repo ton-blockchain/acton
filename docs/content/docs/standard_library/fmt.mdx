@@ -33,7 +33,7 @@ val info = format3("User {} has {} items worth {:ton}", "Alice", 5, 1000000000);
 ## `format1`
 
 ```tolk
-fun format1<T1>(fmt: slice, arg1: T1): slice
+fun format1<T1>(fmt: string, arg1: T1): string
 ```
 
 Formats a string with 1 argument.
@@ -48,12 +48,12 @@ Format supports following format soecifiers:
 - `{:x}` — formats a number as hexadecimal without `0x` prefix
 - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L37" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L38" />
 
 ## `format2`
 
 ```tolk
-fun format2<T1, T2>(fmt: slice, arg1: T1, arg2: T2): slice
+fun format2<T1, T2>(fmt: string, arg1: T1, arg2: T2): string
 ```
 
 Formats a string with 2 arguments.
@@ -68,12 +68,12 @@ Format supports following format soecifiers:
 - `{:x}` — formats a number as hexadecimal without `0x` prefix
 - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L52" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L53" />
 
 ## `format3`
 
 ```tolk
-fun format3<T1, T2, T3>(fmt: slice, arg1: T1, arg2: T2, arg3: T3): slice
+fun format3<T1, T2, T3>(fmt: string, arg1: T1, arg2: T2, arg3: T3): string
 ```
 
 Formats a string with 3 arguments.
@@ -88,12 +88,12 @@ Format supports following format soecifiers:
 - `{:x}` — formats a number as hexadecimal without `0x` prefix
 - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L67" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L68" />
 
 ## `format4`
 
 ```tolk
-fun format4<T1, T2, T3, T4>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4): slice
+fun format4<T1, T2, T3, T4>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4): string
 ```
 
 Formats a string with 4 arguments.
@@ -108,12 +108,12 @@ Format supports following format soecifiers:
 - `{:x}` — formats a number as hexadecimal without `0x` prefix
 - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L82" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L83" />
 
 ## `format5`
 
 ```tolk
-fun format5<T1, T2, T3, T4, T5>(fmt: slice, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): slice
+fun format5<T1, T2, T3, T4, T5>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): string
 ```
 
 Formats a string with 5 arguments.
@@ -128,5 +128,5 @@ Format supports following format soecifiers:
 - `{:x}` — formats a number as hexadecimal without `0x` prefix
 - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L97" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L98" />
 

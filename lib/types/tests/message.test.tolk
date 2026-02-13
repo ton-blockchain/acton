@@ -1,3 +1,4 @@
+import "@stdlib/reflection"
 import "../message"
 import "../out_actions"
 import "../../emulation/network"
@@ -26,7 +27,7 @@ get fun `test-load-opcode`() {
     if (action is OutActionSendMessage) {
         val message = action.loadGenericMessage();
         val opcode = message.loadOpcode();
-        expect(opcode).toEqual(IncreaseCounter.getDeclaredPackPrefix());
+        expect(opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>());
     }
 }
 
@@ -36,7 +37,7 @@ get fun `test-load-opcode-for-bounced-message`() {
         bounce: false,
         value: ton("1.9999"),
         dest: dest,
-        body: beginCell().storeUint(0xFFFFFFFF, 32).storeUint(IncreaseCounter.getDeclaredPackPrefix(), 32).endCell(),
+        body: beginCell().storeUint(0xFFFFFFFF, 32).storeUint(reflect.serializationPrefixOf<IncreaseCounter>(), 32).endCell(),
     });
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
     val out_actions = vm.outActions();
@@ -49,6 +50,6 @@ get fun `test-load-opcode-for-bounced-message`() {
         expect(opcode).toEqual(0xFFFFFFFF);
 
         val actual_opcode = message.loadOpcode(true);
-        expect(actual_opcode).toEqual(IncreaseCounter.getDeclaredPackPrefix());
+        expect(actual_opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>());
     }
 }

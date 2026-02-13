@@ -59,7 +59,7 @@ impl DotReporter {
         println!();
         println!(
             "{}",
-            format!("{} | {} > {}", label, test.file_path, test.name).dimmed()
+            format!("{} | {} > {}", label, test.file_path.display(), test.name).dimmed()
         );
 
         let lines: Vec<&str> = content.trim().lines().collect();
@@ -78,8 +78,8 @@ impl DotReporter {
                     println!("{} {}: {}", "FAIL".red().bold(), test.name, message);
                 }
 
-                if let Some(details) = &test.details {
-                    println!("  {}", details.dimmed());
+                if let Some(location) = &test.location {
+                    println!("  {}", location.format().dimmed());
                 }
             }
 

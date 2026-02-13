@@ -15,7 +15,7 @@
             1,
             2
         )
-      └─ at ./tests/test1.test[LINE]
+      └─ at tests/test1.test[LINE]
   ✓ third-pass [TIME]
  > tests/test2.test.tolk (1 test)
   ✓ fourth-pass [TIME]

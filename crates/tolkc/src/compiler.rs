@@ -1,11 +1,15 @@
 #![allow(unsafe_code)]
+use crate::abi::ContractABI;
+use anyhow::Context;
+use dunce;
 use include_dir::{Dir, include_dir};
 use rustc_hash::FxHashMap;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{CStr, CString, c_char, c_int};
-use std::fs::{canonicalize, read_to_string};
+use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use ton_source_map::{HighLevelSourceMap, SourceMap, parse_marks_dict};
 
@@ -19,8 +23,11 @@ thread_local! {
 ///
 /// ## Example
 ///
-/// ```
-/// let compilation_result = tolkc::compile(Path::new(&tmp_test_filename));
+/// ```no_run
+/// use std::path::Path;
+///
+/// let tmp_test_filename = "file.tolk";
+/// let compilation_result = tolkc::compile(Path::new(&tmp_test_filename), false);
 /// match compilation_result {
 ///     tolkc::CompilerResult::Success(result) => {
 ///         // ... use result.code_boc64
@@ -64,8 +71,6 @@ pub struct Compiler {
     pub with_stack_comments: bool,
     /// Show comments with Tolk source file references in Fift code.
     pub with_src_line_comments: bool,
-    /// Other experimental options.
-    pub experimental_options: String,
     /// Mappings for paths (e.g. "@core" -> "/path/to/core")
     pub mappings: FxHashMap<String, String>,
 }
@@ -77,7 +82,6 @@ impl Compiler {
             opt_level,
             with_stack_comments: false,
             with_src_line_comments: false,
-            experimental_options: String::new(),
             mappings: FxHashMap::default(),
         }
     }
@@ -105,10 +109,54 @@ impl Compiler {
         self
     }
 
+    /// Run compiler in check mode and return all found errors.
+    pub fn check(&self, path: &Path) -> anyhow::Result<Vec<CompilerError>> {
+        let result = self.run_internal::<CompilerCheckResult>(path, false, true)?;
+
+        match result {
+            CompilerCheckResult::Success(_) => Ok(vec![]),
+            CompilerCheckResult::Error(errors) => Ok(errors.errors),
+        }
+    }
+
     /// Compiles passed file with Tolk compiler.
     ///
     /// Returns successful result with `code_boc64` or error with `message`.
     pub fn compile(&self, path: &Path, with_debug_info: bool) -> CompilerResult {
+        let result = self.run_internal::<CompilerInternalResult>(path, with_debug_info, false);
+
+        match result {
+            Ok(CompilerInternalResult::Success(result)) => {
+                let debug_marks = if with_debug_info {
+                    parse_marks_dict(&result.debug_mark_base64, &result.code_boc64)
+                        .unwrap_or_default()
+                } else {
+                    HashMap::new()
+                };
+                CompilerResult::Success(CompilerResultSuccess {
+                    fift_code: result.fift_code,
+                    code_boc64: result.code_boc64,
+                    code_hash_hex: result.code_hash_hex,
+                    source_map: result.source_map.map(|source_map| SourceMap {
+                        high_level: source_map,
+                        debug_marks,
+                    }),
+                    abi: result.abi,
+                })
+            }
+            Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
+            Err(err) => CompilerResult::Error(CompilerResultError {
+                message: err.to_string(),
+            }),
+        }
+    }
+
+    fn run_internal<TBody: DeserializeOwned>(
+        &self,
+        path: &Path,
+        with_debug_info: bool,
+        check_only: bool,
+    ) -> anyhow::Result<TBody> {
         CURRENT_MAPPINGS.with(|m| {
             *m.borrow_mut() = self.mappings.clone();
         });
@@ -118,8 +166,9 @@ impl Compiler {
             optimization_level: self.opt_level,
             with_stack_comments: self.with_stack_comments,
             with_src_line_comments: self.with_src_line_comments,
-            experimental_options: self.experimental_options.clone(),
             collect_source_map: with_debug_info,
+            json_errors: check_only,
+            check_only,
         })
         .expect("Critical error, cannot serializer path to JSON, should not happen");
 
@@ -133,7 +182,7 @@ impl Compiler {
             ) {
                 fn realpath(path_str: &str) -> Result<PathBuf, String> {
                     if Path::new(path_str).is_absolute() {
-                        return canonicalize(path_str).map_err(|e| e.to_string());
+                        return dunce::canonicalize(path_str).map_err(|e| e.to_string());
                     }
 
                     if path_str.starts_with("@stdlib/") || path_str.starts_with("@fiftlib/") {
@@ -152,8 +201,9 @@ impl Compiler {
                             if let Some(target) = mappings.get(prefix) {
                                 let cur_mapped_path = Path::new(target).join(suffix);
 
-                                resolved =
-                                    Some(canonicalize(cur_mapped_path).map_err(|e| e.to_string()));
+                                resolved = Some(
+                                    dunce::canonicalize(cur_mapped_path).map_err(|e| e.to_string()),
+                                );
                             }
                         });
 
@@ -164,7 +214,7 @@ impl Compiler {
                         return Err(format!("Unknown path mapping '{prefix}'"));
                     }
 
-                    canonicalize(path_str).map_err(|e| e.to_string())
+                    dunce::canonicalize(path_str).map_err(|e| e.to_string())
                 }
 
                 match FsReadCallbackKind::from(kind) {
@@ -273,31 +323,9 @@ impl Compiler {
                 .to_string()
         };
 
-        let result = serde_json::from_str::<CompilerInternalResult>(&compilation_result_str);
-
-        match result {
-            Ok(CompilerInternalResult::Success(result)) => {
-                let debug_marks = if with_debug_info {
-                    parse_marks_dict(&result.debug_mark_base64, &result.code_boc64)
-                        .unwrap_or_default()
-                } else {
-                    HashMap::new()
-                };
-                CompilerResult::Success(CompilerResultSuccess {
-                    fift_code: result.fift_code,
-                    code_boc64: result.code_boc64,
-                    code_hash_hex: result.code_hash_hex,
-                    source_map: result.source_map.map(|source_map| SourceMap {
-                        high_level: source_map,
-                        debug_marks,
-                    }),
-                })
-            }
-            Ok(CompilerInternalResult::Error(result)) => CompilerResult::Error(result),
-            Err(err) => CompilerResult::Error(CompilerResultError {
-                message: err.to_string(),
-            }),
-        }
+        let result = serde_json::from_str::<TBody>(&compilation_result_str)
+            .context("cannot parse JSON result from compiler")?;
+        Ok(result)
     }
 }
 
@@ -311,10 +339,12 @@ pub struct CompilerConfig {
     pub with_stack_comments: bool,
     #[serde(rename = "withSrcLineComments")]
     pub with_src_line_comments: bool,
-    #[serde(rename = "experimentalOptions")]
-    pub experimental_options: String,
     #[serde(rename = "collectSourceMap")]
     pub collect_source_map: bool,
+    #[serde(rename = "checkOnly")]
+    pub check_only: bool,
+    #[serde(rename = "jsonErrors")]
+    pub json_errors: bool,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -330,10 +360,12 @@ pub struct CompilerResultSuccess {
     pub code_boc64: String,
     pub code_hash_hex: String,
     pub source_map: Option<SourceMap>,
+    pub abi: Option<ContractABI>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum CompilerInternalResult {
     Success(CompilerInternalResultSuccess),
     Error(CompilerResultError),
@@ -351,11 +383,49 @@ pub struct CompilerInternalResultSuccess {
     pub debug_mark_base64: String,
     #[serde(rename = "sourceMap")]
     pub source_map: Option<HighLevelSourceMap>,
+    #[serde(rename = "abiJson")]
+    pub abi: Option<ContractABI>,
+    #[serde(rename = "stderr")]
+    pub stderr: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CompilerResultError {
     pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
+pub enum CompilerCheckResult {
+    Success(CompilerCheckResultSuccess),
+    Error(CompilerCheckError),
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CompilerCheckResultSuccess {
+    pub stderr: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CompilerCheckError {
+    pub errors: Vec<CompilerError>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CompilerError {
+    pub message: String,
+    pub range: CompilerErrorRange,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CompilerErrorRange {
+    pub file_name: String,
+    pub start_line_no: usize,
+    pub start_char_no: usize,
+    pub end_line_no: usize,
+    pub end_char_no: usize,
+    pub text_inside: String,
 }
 
 /// We embed the whole standard library of Tolk and Fift in binary for easier distribution.

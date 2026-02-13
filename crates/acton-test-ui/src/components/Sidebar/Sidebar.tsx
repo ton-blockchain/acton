@@ -1,5 +1,5 @@
 import type React from "react"
-import { useMemo, useState } from "react"
+import {useMemo, useState} from "react"
 import {
   FiCheck,
   FiChevronDown,
@@ -12,14 +12,16 @@ import {
   FiSun,
   FiX,
 } from "react-icons/fi"
-import { type TestReport, TestStatus } from "../../types"
-import { AppIcon } from "../common/AppIcon"
-import { Summary } from "../Summary/Summary"
+import {type TestReport, TestStatus} from "@acton/shared-ui"
+import {AppIcon} from "@acton/shared-ui"
+
+import {Summary} from "../Summary/Summary"
+
 import styles from "./Sidebar.module.css"
 
 interface SidebarProps {
   readonly reports: TestReport[]
-  readonly selectedTest: TestReport | null
+  readonly selectedTest: TestReport | undefined
   readonly onSelectTest: (test: TestReport) => void
   readonly width?: number
   readonly onCollapse?: () => void
@@ -43,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   )
 
   const toggleSuite = (suiteName: string) => {
-    setCollapsedSuites((prev) => {
+    setCollapsedSuites(prev => {
       const next = new Set(prev)
       if (next.has(suiteName)) {
         next.delete(suiteName)
@@ -55,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   const toggleStatusFilter = (status: TestStatus) => {
-    setStatusFilter((prev) => {
+    setStatusFilter(prev => {
       const next = new Set(prev)
       if (next.has(status)) {
         next.delete(status)
@@ -86,32 +88,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const getStatusIcon = (status: TestStatus) => {
     switch (status) {
-      case TestStatus.Passed:
+      case TestStatus.Passed: {
         return <FiCheck className={styles.passed} />
-      case TestStatus.Failed:
+      }
+      case TestStatus.Failed: {
         return <FiX className={styles.failed} />
-      case TestStatus.Skipped:
+      }
+      case TestStatus.Skipped: {
         return <FiCircle className={styles.skipped} />
-      case TestStatus.Todo:
+      }
+      case TestStatus.Todo: {
         return <FiMinus className={styles.todo} />
-      default:
-        return null
+      }
+      default: {
+        return
+      }
     }
   }
 
   const getSuiteStatus = (suiteReports: TestReport[]) => {
-    const hasFailed = suiteReports.some((r) => r.status === TestStatus.Failed)
-    const allPassed = suiteReports.every((r) => r.status === TestStatus.Passed)
-    return { hasFailed, allPassed }
+    const hasFailed = suiteReports.some(r => r.status === TestStatus.Failed)
+    const allPassed = suiteReports.every(r => r.status === TestStatus.Passed)
+    return {hasFailed, allPassed}
   }
 
   return (
-    <div className={styles.sidebar} style={width ? { width: `${width}px` } : undefined}>
+    <div className={styles.sidebar} style={width ? {width: `${width}px`} : undefined}>
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.title}>
             <AppIcon theme={theme ?? "light"} />
-            Acton Tests
+            Test UI
           </div>
           <div className={styles.headerButtons}>
             {onToggleTheme && (
@@ -142,21 +149,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <FiSearch className={styles.searchIcon} />
           <input
             type="text"
-            placeholder="Search tests..."
+            placeholder="Filter tests..."
             className={styles.searchInput}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={e => setSearchQuery(e.target.value)}
           />
         </div>
 
         <div className={styles.filters}>
-          {(Object.values(TestStatus) as TestStatus[]).map((status) => (
+          {(Object.values(TestStatus) as TestStatus[]).map(status => (
             <button
               key={status}
               type="button"
               className={`${styles.filterButton} ${statusFilter.has(status) ? styles.activeFilter : ""} ${styles[status.toLowerCase()]}`}
               onClick={() => toggleStatusFilter(status)}
-              title={status}
+              title={`Show ${status} tests`}
             >
               {getStatusIcon(status)}
             </button>
@@ -167,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className={styles.content}>
         {Object.entries(filteredSuites).map(([suiteName, suiteReports]) => {
           const isCollapsed = collapsedSuites.has(suiteName)
-          const { hasFailed, allPassed } = getSuiteStatus(suiteReports)
+          const {hasFailed, allPassed} = getSuiteStatus(suiteReports)
 
           return (
             <div key={suiteName} className={styles.suite}>
@@ -184,7 +191,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <FiX className={styles.failed} />
                   ) : allPassed ? (
                     <FiCheck className={styles.passed} />
-                  ) : null}
+                  ) : undefined}
                 </span>
                 <span className={styles.suiteName}>{suiteName}</span>
                 <span className={styles.suiteCount}>{suiteReports.length}</span>

@@ -139,6 +139,7 @@ jobs:
         env:
           RUSTC_WRAPPER: sccache
         run: |
+          bun install
           just build-ui
           cargo build --release --bin acton
 
@@ -277,6 +278,7 @@ jobs:
         env:
           RUSTC_WRAPPER: sccache
         run: |
+          bun install
           just build-ui
           cargo build --release --bin acton
 
@@ -421,6 +423,7 @@ jobs:
           CC: gcc
           CXX: g++
         run: |
+          bun install
           just build-ui
           cargo build --profile release-size --bin acton
 
@@ -443,6 +446,10 @@ jobs:
         run: |
           rustup component add llvm-tools-preview
           just coverage-html
+
+      - name: Run Acton tests
+        run: |
+          ./target/release-size/acton test
 
 #      - name: Upload coverage report
 #        uses: actions/upload-artifact@v4

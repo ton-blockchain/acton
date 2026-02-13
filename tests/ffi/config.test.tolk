@@ -26,8 +26,8 @@ get fun `test set config`() {
     expect(result).toBeTrue();
 
     val updatedConfig = net.getConfig();
-    var pricesAfter = updatedConfig.getStoragePrices();
-    var actual = pricesAfter.getInitial();
+    val pricesAfter = updatedConfig.getStoragePrices();
+    val actual = pricesAfter.getInitial();
 
     expect(savedPrice).toEqual(actual.bitPrice);
 }

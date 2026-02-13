@@ -1,0 +1,53 @@
+:root {
+  --background: var(--bg-color);
+  --foreground: var(--text-primary);
+  --muted: var(--bg-secondary-color);
+  --muted-foreground: var(--text-secondary);
+  --border: var(--border-color);
+
+  /* Tonscan colors - Light Theme (Default) */
+  --tonscan-bg: #f5f5f7;
+  --tonscan-card-bg: #ffffff;
+  --tonscan-border: #e8e8e8;
+  --tonscan-text-primary: #000000;
+  --tonscan-text-secondary: #707070;
+  --tonscan-accent: #0088cc;
+  --tonscan-success: #22c55e;
+  --tonscan-error: #ef4444;
+  --tonscan-row-hover: #f9f9f9;
+  --tonscan-header-bg: #ffffff;
+
+  /* Tooltip specific */
+  --tooltip-bg: #1a1a1a;
+  --tooltip-text: #ffffff;
+}
+
+:root.dark-theme {
+  /* Tonscan colors - Dark Theme */
+  --tonscan-bg: #000000;
+  --tonscan-card-bg: #121212;
+  --tonscan-border: #262626;
+  --tonscan-text-primary: #ffffff;
+  --tonscan-text-secondary: #a0a0a0;
+  --tonscan-accent: #0088cc;
+  --tonscan-success: #30d158;
+  --tonscan-error: #ff453a;
+  --tonscan-row-hover: #1a1a1a;
+  --tonscan-header-bg: #000000;
+
+  --tooltip-bg: #333333;
+  --tooltip-text: #ffffff;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background-color: var(--tonscan-bg);
+  color: var(--tonscan-text-primary);
+  transition:
+    background-color var(--transition-duration-normal),
+    color var(--transition-duration-normal);
+}
+
+/* Global Tooltip Overrides for Tonscan style */
+/* We will use specific class names instead of global overrides with !important */
