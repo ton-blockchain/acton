@@ -229,6 +229,7 @@ jobs:
           restore-keys: ton-artifacts-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         id: cache-ton-deps
         uses: actions/cache@v5
         with:
@@ -240,6 +241,7 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Cache ccache
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         uses: actions/cache@v5
         with:
           path: ~/.ccache
@@ -365,6 +367,7 @@ jobs:
         run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         id: cache-ton-deps
         uses: actions/cache@v5
         with:
@@ -376,6 +379,7 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-
 
       - name: Cache ccache
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         uses: actions/cache@v5
         with:
           path: ~/.ccache
