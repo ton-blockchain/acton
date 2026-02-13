@@ -7,4 +7,5 @@ pub mod no_bounce_handler;
 pub mod pure_function_call_unused;
 pub mod unused_import;
 pub mod unused_variable;
+pub mod used_ignored_identifier;
 pub mod write_only_variable;
