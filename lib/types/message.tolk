@@ -187,7 +187,7 @@ struct (0b0) InternalMessage {
     value: CurrencyCollection
     extraFlags: varuint16
     forwardFee: coins
-    createdLT: uint64
+    createdLt: uint64
     createdAt: uint32
 }
 

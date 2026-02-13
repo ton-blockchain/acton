@@ -1,6 +1,6 @@
 extern crate core;
 
-use crate::ast::camel_case_detector::check_name_cases;
+use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{deprecated_symbol_use, no_bounce_handler};
 use crate::rules::ast::{
     field_init_can_be_folded, mutable_variable_can_be_immutable, pure_function_call_unused,

@@ -1,4 +1,4 @@
-pub mod camel_case_detector;
+pub mod name_case_checker;
 pub mod deprecated_symbol_use;
 pub mod field_init_can_be_folded;
 pub mod mutable_variable_can_be_immutable;

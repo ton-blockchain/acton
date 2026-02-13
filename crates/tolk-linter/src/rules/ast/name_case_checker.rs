@@ -18,7 +18,7 @@ use tolk_resolver::{Resolved, Symbol};
 /// Inconsistent naming makes code harder to read and maintain.
 /// This rule enforces:
 /// - `camelCase` for variables, functions, methods, and struct fields
-/// - `UpperCamelCase` for structs, enums, enum members, and type aliases
+/// - `PascalCase` for structs, enums, enum members, and type aliases
 /// - `SCREAMING_SNAKE_CASE` for constants
 ///
 /// ### Example
@@ -61,9 +61,14 @@ enum CaseRules {
 }
 
 fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId, case: CaseRules) {
+    if symbol.name.starts_with("_") {
+        // internal names
+        return;
+    }
+
     let (correct_case, case_name) = match case {
         CaseRules::LowerCamel => (symbol.name.to_lower_camel_case(), "camelCase"),
-        CaseRules::UpperCamel => (symbol.name.to_upper_camel_case(), "UpperCamelCase"),
+        CaseRules::UpperCamel => (symbol.name.to_upper_camel_case(), "PascalCase"),
         CaseRules::ScreamingSnake => (symbol.name.to_shouty_snake_case(), "SCREAMING_SNAKE_CASE"),
     };
 
@@ -142,12 +147,17 @@ fn check_case(symbol: &Symbol, checker: &mut Checker, symbol_def_file_id: FileId
 
 pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
     // locals
-    for file_info_iter in checker.file_db.iter() {
-        if file_info_iter.is_stdlib_file() {
+    for &file_id in checker.type_db.project_index.files().keys() {
+        let Some(file_info) = checker.file_db.get_by_id(file_id) else {
+            continue;
+        };
+        if file_info.is_stdlib_file() {
             continue;
         }
 
-        let resolve_index = checker.resolve_index_for(file_info_iter.id())?;
+        let Some(resolve_index) = checker.resolve_index_for(file_id) else {
+            continue;
+        };
 
         for local_def in resolve_index.locals.iter() {
             let name = local_def.name.clone();
@@ -173,19 +183,19 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
             edits.push(Edit {
                 span: local_def.def_span,
                 replacement: correct_case.clone(),
-                file_id: file_info_iter.id(),
+                file_id,
             });
 
             usages.for_each(|usage| {
                 edits.push(Edit {
                     span: usage.span,
                     replacement: correct_case.clone(),
-                    file_id: file_info_iter.id(),
+                    file_id,
                 });
             });
 
             let diagnostic = Diagnostic {
-                file_id: file_info_iter.id(),
+                file_id,
                 severity: Severity::Warning,
                 name: NameCaseChecker::rule().name(),
                 code: NameCaseChecker::code().map(|c| c.to_string()),
@@ -211,12 +221,16 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
     let globals = checker.type_db.project_index.global_symbols();
 
     for &symbol_id in globals.values().flatten() {
-        let file_info = checker.file_db.get_by_id(symbol_id.file_id)?;
+        let Some(file_info) = checker.file_db.get_by_id(symbol_id.file_id) else {
+            continue;
+        };
         if file_info.is_stdlib_file() {
             continue;
         }
 
-        let symbol = checker.type_db.project_index.resolve_symbol(symbol_id)?;
+        let Some(symbol) = checker.type_db.project_index.resolve_symbol(symbol_id) else {
+            continue;
+        };
 
         match &symbol.kind {
             tolk_resolver::SymbolKind::GetMethod { .. } => {
