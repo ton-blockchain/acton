@@ -113,7 +113,6 @@ opener = "0.8.4"
 
 # acton wallet
 hmac = "0.12.1"
-pbkdf2 = "0.12.2"
 ring = "0.17"
 nacl = "0.5.3"
 toml_edit = "0.24.0"
@@ -235,7 +234,6 @@ opener = { workspace = true }
 
 # acton wallet
 hmac = { workspace = true }
-pbkdf2 = { workspace = true }
 ring = { workspace = true }
 nacl = { workspace = true }
 toml_edit = { workspace = true }
@@ -248,7 +246,6 @@ similar = { workspace = true }
 
 # actin check
 codespan-reporting = { workspace = true }
-tracing-subscriber = "0.3.22"
 rustc-hash = "2.1.1"
 function_name = "0.3.0"
 
