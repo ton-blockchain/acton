@@ -110,14 +110,14 @@ impl SourceLocation {
             return Ok(None);
         }
 
-        let parts = s.split(':').collect::<Vec<_>>();
+        let parts = s.rsplitn(3, ':').collect::<Vec<_>>();
         if parts.len() != 3 {
             anyhow::bail!("invalid source location, expected file:line:col, got {s}");
         }
 
-        let file = parts[0].to_owned();
+        let file = parts[2].to_owned();
         let line = parts[1].parse::<i64>()?;
-        let column = parts[2].parse::<i64>()?;
+        let column = parts[0].parse::<i64>()?;
 
         Ok(Some(SourceLocation {
             file,
