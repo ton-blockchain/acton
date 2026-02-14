@@ -139,15 +139,11 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
-    pub fn get_file_url(
-        &self,
-        file_id: FileId,
-        file_info: &tolk_resolver::file_db::FileInfo,
-    ) -> Option<Url> {
+    pub fn get_file_url(&self, file_info: &tolk_resolver::file_db::FileInfo) -> Option<Url> {
         use crate::backend::utils::FileInfoExt;
         let url = self
             .file_urls
-            .entry(file_id)
+            .entry(file_info.id())
             .or_insert_with(|| file_info.url().expect("Failed to get URL for file"));
         Some(url.clone())
     }

@@ -41,6 +41,10 @@ impl Span {
         }
     }
 
+    pub const fn file_start() -> Self {
+        Span { start: 0, end: 0 }
+    }
+
     /// Creates a span from a tree-sitter node.
     pub fn from_syntax(node: &Node) -> Self {
         Span {

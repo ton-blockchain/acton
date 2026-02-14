@@ -67,6 +67,10 @@ impl ProjectIndex {
         &self.imports
     }
 
+    pub fn imports_of(&self, file_id: FileId) -> Option<Vec<ResolvedImport>> {
+        self.imports.get(&file_id).cloned()
+    }
+
     pub const fn path_to_file_id(&self) -> &HashMap<PathBuf, FileId> {
         &self.path_to_file_id
     }

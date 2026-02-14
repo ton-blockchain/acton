@@ -1,7 +1,7 @@
 use crate::backend::Backend;
 use crate::backend::utils::{FileInfoExt, SpanExt};
 use lsp_types::*;
-use tolk_resolver::Resolved;
+use tolk_resolver::{Resolved, Span};
 use tower_lsp::jsonrpc::Result as LspResult;
 
 impl Backend {
@@ -27,13 +27,36 @@ impl Backend {
         let file_info = self.file_db.get_by_path(&path)?;
 
         let offset = file_info.position_to_offset(position)?;
+
+        // find an import under cursor
+        let imports = analysis.project_index.imports_of(file_info.id());
+        for import in imports.iter().flatten() {
+            if !import.import().span.contains(offset) {
+                // fast path
+                continue;
+            }
+
+            let Some(target) = import.target() else {
+                // cannot resolve import
+                break;
+            };
+
+            let imported_file = self.file_db.get_by_id(target)?;
+
+            let target_uri = self.get_file_url(&imported_file)?;
+            return Some(GotoDefinitionResponse::Scalar(Location::new(
+                target_uri,
+                Span::file_start().range(&imported_file),
+            )));
+        }
+
         let resolved = self.resolve_symbol_at(&analysis, &file_info, offset)?;
 
         match resolved {
             Resolved::Global(symbol_id) => {
                 let symbol = analysis.project_index.resolve_symbol(symbol_id)?;
                 let target_info = self.file_db.get_by_id(symbol_id.file_id)?;
-                let target_uri = self.get_file_url(symbol_id.file_id, &target_info)?;
+                let target_uri = self.get_file_url(&target_info)?;
                 Some(GotoDefinitionResponse::Scalar(Location::new(
                     target_uri,
                     symbol.name_span.range(&target_info),
@@ -43,7 +66,7 @@ impl Backend {
                 let resolved_uses = analysis.project_index.get_resolved_uses(file_info.id())?;
                 let local = resolved_uses.find_local(local_id)?;
                 let target_info = self.file_db.get_by_id(local_id.file_id)?;
-                let target_uri = self.get_file_url(local_id.file_id, &target_info)?;
+                let target_uri = self.get_file_url(&target_info)?;
                 Some(GotoDefinitionResponse::Scalar(Location::new(
                     target_uri,
                     local.def_span.range(&target_info),

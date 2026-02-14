@@ -77,7 +77,7 @@ impl Backend {
             .filter_map(|file_id| {
                 let index = analysis.project_index.get_resolved_uses(file_id)?;
                 let file = self.file_db.get_by_id(file_id)?;
-                let url = self.get_file_url(file_id, &file)?;
+                let url = self.get_file_url(&file)?;
 
                 let locations = index
                     .global_usages_of(symbol_id)
