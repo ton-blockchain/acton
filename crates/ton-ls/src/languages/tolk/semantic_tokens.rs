@@ -4,8 +4,7 @@ use lsp_types::*;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tolk_resolver::resolve_index::{FileResolveIndex, LocalDef, LocalDefKind, NameUse, Resolved};
-use tolk_resolver::{AstNodeSpanExt, FileInfo, Span, Symbol, SymbolKind};
-use tolk_syntax::AstNode;
+use tolk_resolver::{FileInfo, Span, Symbol, SymbolKind};
 use tower_lsp::jsonrpc::Result as LspResult;
 
 use crate::AnalysisResult;

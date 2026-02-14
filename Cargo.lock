@@ -64,7 +64,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tolk-linter",
- "tolk-ls",
  "tolk-resolver",
  "tolk-syntax",
  "tolk-ty",
@@ -77,6 +76,7 @@ dependencies = [
  "ton-emulator",
  "ton-executor",
  "ton-litenode",
+ "ton-ls",
  "ton-source-map",
  "tonlib-core",
  "tower-http",
@@ -3092,31 +3092,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tolk-ls"
-version = "0.1.0"
-dependencies = [
- "acton-config",
- "anyhow",
- "chrono",
- "dashmap 7.0.0-rc2",
- "fern",
- "log",
- "lsp-types",
- "rustc-hash",
- "serde",
- "serde_json",
- "tokio",
- "tolk-analysis",
- "tolk-linter",
- "tolk-resolver",
- "tolk-syntax",
- "tolk-ty",
- "toml",
- "tower-lsp",
- "tree-sitter",
-]
-
-[[package]]
 name = "tolk-macros"
 version = "0.1.0"
 dependencies = [
@@ -3340,6 +3315,31 @@ dependencies = [
  "tracing",
  "tvmffi",
  "tycho-types",
+]
+
+[[package]]
+name = "ton-ls"
+version = "0.1.0"
+dependencies = [
+ "acton-config",
+ "anyhow",
+ "chrono",
+ "dashmap 7.0.0-rc2",
+ "fern",
+ "log",
+ "lsp-types",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tolk-analysis",
+ "tolk-linter",
+ "tolk-resolver",
+ "tolk-syntax",
+ "tolk-ty",
+ "toml",
+ "tower-lsp",
+ "tree-sitter",
 ]
 
 [[package]]

@@ -11,9 +11,9 @@ pub mod profiling;
 pub mod utils;
 
 use crate::AnalysisResult;
+use crate::languages::tolk::semantic_tokens;
 #[cfg(feature = "profiling")]
 pub use profiling::ProfilingContext;
-use crate::languages::tolk::semantic_tokens;
 
 pub struct Backend {
     pub client: Client,

@@ -59,7 +59,7 @@ export function activate(context: vscode.ExtensionContext) {
     };
 
     client = new LanguageClient(
-        'tolk-ls',
+        'ton-ls',
         'Tolk Language Server',
         serverOptions,
         clientOptions

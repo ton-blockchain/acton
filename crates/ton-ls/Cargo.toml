@@ -1,5 +1,5 @@
 [package]
-name = "tolk-ls"
+name = "ton-ls"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }

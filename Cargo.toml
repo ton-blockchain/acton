@@ -159,7 +159,7 @@ tolk-syntax = { workspace = true }
 tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }
 tolk-linter = { workspace = true }
-tolk-ls = { path = "crates/tolk-ls" }
+ton-ls = { path = "crates/ton-ls" }
 tower-lsp = "0.20"
 dashmap = { workspace = true }
 tvmffi = { workspace = true }
@@ -304,7 +304,7 @@ workspace = true
 
 [features]
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
-profiling = ["tolk-ls/profiling"]
+profiling = ["ton-ls/profiling"]
 
 #[profile.release]
 #debug = "full"

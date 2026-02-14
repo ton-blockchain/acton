@@ -2,8 +2,8 @@ use dashmap::DashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tolk_ls::Backend;
 use tolk_resolver::file_db::FileDb;
+use ton_ls::Backend;
 use tower_lsp::{LspService, Server};
 
 pub async fn ls_cmd(
@@ -16,12 +16,10 @@ pub async fn ls_cmd(
         setup_ls_logging(log_file)?;
     }
 
-    let stdlib_path = PathBuf::from(".acton/tolk-stdlib")
-        .canonicalize()
-        .expect("Failed to canonicalize");
-    let acton_stdlib_path = PathBuf::from(".acton/")
-        .canonicalize()
-        .unwrap_or_else(|_| PathBuf::from(".acton/"));
+    let stdlib_path =
+        dunce::canonicalize(PathBuf::from(".acton/tolk-stdlib")).expect("Failed to canonicalize");
+    let acton_stdlib_path =
+        dunce::canonicalize(PathBuf::from(".acton/")).unwrap_or_else(|_| PathBuf::from(".acton/"));
     let common_tolk = stdlib_path.join("common.tolk");
 
     let file_db = FileDb::new(stdlib_path, Some(acton_stdlib_path));
@@ -40,7 +38,7 @@ pub async fn ls_cmd(
 async fn ls_cmd_internal(port: Option<u16>, stdio: bool, file_db: FileDb) -> anyhow::Result<()> {
     let (service, socket) = LspService::new(|client| {
         #[cfg(feature = "profiling")]
-        let profiling = Arc::new(tolk_ls::ProfilingContext::new());
+        let profiling = Arc::new(ton_ls::ProfilingContext::new());
 
         #[cfg(feature = "profiling")]
         {

@@ -536,6 +536,17 @@ enum Commands {
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
     },
+    #[command(about = "LSP server for the TON languages and technologies")]
+    Ls {
+        #[arg(long, help = "Port to listen on (TCP)")]
+        port: Option<u16>,
+        #[arg(long, help = "Use stdio for communication (default)")]
+        stdio: bool,
+        #[arg(long, help = "Path to log file")]
+        log_file: Option<String>,
+        #[arg(long, help = "Disable logging")]
+        no_log: bool,
+    },
     #[command(
         about = "Manage Acton versions",
         after_help = example_up_usage()
@@ -569,17 +580,6 @@ enum Commands {
     Docgen {
         #[arg(short, long, help = "Output directory path")]
         output: Option<String>,
-    },
-    #[command(about = "LSP server for the TON languages and technologies")]
-    Ls {
-        #[arg(long, help = "Port to listen on (TCP)")]
-        port: Option<u16>,
-        #[arg(long, help = "Use stdio for communication (default)")]
-        stdio: bool,
-        #[arg(long, help = "Path to log file")]
-        log_file: Option<String>,
-        #[arg(long, help = "Disable logging")]
-        no_log: bool,
     },
     #[command(name = "internal-register-contract", hide = true)]
     InternalRegisterContract {

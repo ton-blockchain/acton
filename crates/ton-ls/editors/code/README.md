@@ -10,7 +10,7 @@ Simple extension to support Tolk language using `acton`.
    ```
 2. Build the extension:
    ```bash
-   cd crates/tolk-ls/editors/code
+   cd crates/ton-ls/editors/code
    npm install
    npm run compile
    ```
