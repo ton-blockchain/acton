@@ -11,7 +11,7 @@ use tower_lsp::lsp_types::Url;
 impl Backend {
     pub fn convert_linter_diagnostics_to_lsp(
         &self,
-        diagnostics: &[tolk_linter::diagnostic::Diagnostic],
+        diagnostics: &[diagnostic::Diagnostic],
     ) -> FxHashMap<Url, Vec<Diagnostic>> {
         let mut diagnostics_by_uri: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 

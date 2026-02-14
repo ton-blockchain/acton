@@ -1114,6 +1114,7 @@ fn main() {
     let cli = Cli::parse();
 
     if !matches!(cli.command, Commands::Ls { .. }) {
+        // for language server we set up own logging
         setup_logging().expect("Failed to set up logging");
     }
 
