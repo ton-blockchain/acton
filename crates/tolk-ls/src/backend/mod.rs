@@ -7,23 +7,13 @@ use tower_lsp::jsonrpc::Result as LspResult;
 use tower_lsp::lsp_types::Url;
 use tower_lsp::{Client, LanguageServer};
 
-pub mod analysis;
-pub mod analysis_engine;
-pub mod code_actions;
-pub mod diagnostics;
-pub mod document_sync;
-pub mod goto_definition;
-pub mod inlay_hints;
 pub mod profiling;
-pub mod references;
-pub mod resolution;
-pub mod semantic_tokens;
-pub mod symbols;
 pub mod utils;
 
-use crate::backend::analysis::AnalysisResult;
+use crate::AnalysisResult;
 #[cfg(feature = "profiling")]
 pub use profiling::ProfilingContext;
+use crate::languages::tolk::semantic_tokens;
 
 pub struct Backend {
     pub client: Client,

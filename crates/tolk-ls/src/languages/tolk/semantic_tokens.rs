@@ -71,15 +71,6 @@ impl SemanticTokensBuilder {
         }
     }
 
-    pub fn add_token<'a, Node: AstNode<'a>>(
-        &mut self,
-        node: Node,
-        token_type: TokenType,
-        token_modifiers: u32,
-    ) {
-        self.add_token_at_span(node.span(), token_type, token_modifiers);
-    }
-
     pub fn add_token_at_span(&mut self, span: Span, token_type: TokenType, token_modifiers: u32) {
         let range = span.range(&self.file);
         self.tokens.push(RawSemanticToken {

@@ -90,6 +90,11 @@ fn collect_locals_hints(
             continue;
         }
 
+        if local_def.name.starts_with("_") {
+            // no need to show type hint for _ or _foo
+            continue;
+        }
+
         if let LocalDefKind::Param {
             has_type, is_self, ..
         } = local_def.kind

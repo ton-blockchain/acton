@@ -1,10 +1,10 @@
 use crate::backend::Backend;
-use crate::backend::diagnostics::convert_single_diagnostic;
 use crate::backend::utils::{SpanExt, ranges_intersect};
 use lsp_types::*;
 use std::collections::HashMap;
 use std::time::Instant;
 use tower_lsp::jsonrpc::Result as LspResult;
+use crate::languages::tolk::diagnostics::convert_single_diagnostic;
 
 impl Backend {
     pub async fn handle_code_action(

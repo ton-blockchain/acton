@@ -1,5 +1,4 @@
 use crate::backend::Backend;
-use crate::backend::analysis::AnalysisResult;
 use crate::backend::utils::FileInfoExt;
 use acton_config::config::ActonConfig;
 use lsp_types::MessageType;
@@ -13,6 +12,7 @@ use tolk_resolver::symbol_resolver::resolve;
 use tolk_ty::{TypeDb, TypeInterner, infer};
 use tower_lsp::lsp_types::Url;
 use tree_sitter::Tree;
+use crate::AnalysisResult;
 
 impl Backend {
     pub async fn analyze(&self, uri: Url) {

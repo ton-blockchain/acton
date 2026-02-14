@@ -1,5 +1,5 @@
+use crate::AnalysisResult;
 use crate::backend::Backend;
-use crate::backend::analysis::AnalysisResult;
 use tolk_resolver::{FileInfo, Resolved, Span};
 
 impl Backend {
