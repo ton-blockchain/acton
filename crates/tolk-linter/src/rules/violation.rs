@@ -1,9 +1,9 @@
 use crate::ast::{
-    acton_import_in_contract, deprecated_symbol_use, field_init_can_be_folded,
-    message_entity_naming, method_can_be_static, mutable_parameter_can_be_immutable,
-    mutable_variable_can_be_immutable, name_case_checker, no_bounce_handler,
-    pure_function_call_unused, unused_import, unused_variable, used_ignored_identifier,
-    write_only_variable,
+    acton_import_in_contract, asm_function_missing_safety_comment, deprecated_symbol_use,
+    field_init_can_be_folded, message_entity_naming, method_can_be_static,
+    mutable_parameter_can_be_immutable, mutable_variable_can_be_immutable, name_case_checker,
+    no_bounce_handler, pure_function_call_unused, unused_import, unused_variable,
+    used_ignored_identifier, write_only_variable,
 };
 use serde::Serialize;
 use std::fmt::Display;
@@ -68,6 +68,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E012") => message_entity_naming::CreateMessageInlineSend,
         (Tolk, "E013") => mutable_parameter_can_be_immutable::MutableParameterCanBeImmutable,
         (Tolk, "E014") => acton_import_in_contract::ActonImportInContract,
+        (Tolk, "E015") => asm_function_missing_safety_comment::AsmFunctionMissingSafetyComment,
         (Tolk, "S001") => name_case_checker::NameCaseChecker,
         _ => return None,
     })

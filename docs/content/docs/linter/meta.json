@@ -14,6 +14,7 @@
     "e012-create-message-inline-send",
     "e013-mutable-parameter-can-be-immutable",
     "e014-acton-import-in-contract",
+    "e015-asm-function-missing-safety-comment",
     "s001-name-case-checker"
   ]
 }

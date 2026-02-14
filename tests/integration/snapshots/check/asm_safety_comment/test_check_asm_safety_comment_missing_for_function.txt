@@ -1,0 +1,11 @@
+warning[E015]: asm function requires safety comment
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             fun readIntFromSlice(src: slice): int asm "LDI";
+  |                 ^^^^^^^^^^^^^^^^ add `// SAFETY: ...` or a doc comment section like `/// # Safety` above this declaration
+  |
+  = document why this asm usage is sound and what preconditions callers must satisfy
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E015

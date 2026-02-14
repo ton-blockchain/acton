@@ -211,6 +211,9 @@ impl FileDb {
             return false;
         };
 
+        if info.index.path.starts_with(&self.stdlib_path) {
+            return false;
+        }
         info.index.path.starts_with(acton_stdlib_path)
     }
 

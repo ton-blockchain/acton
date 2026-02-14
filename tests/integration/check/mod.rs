@@ -2,6 +2,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
 mod acton_import_tests;
+mod asm_safety_comment_tests;
 mod deprecated_tests;
 mod message_entity_naming_tests;
 mod method_can_be_static_tests;
