@@ -266,6 +266,17 @@ fn test_new_empty_project_full_flow() {
         .assert_snapshot_matches(
             "integration/snapshots/test_new_empty_project_full_flow_script.stdout.txt",
         );
+
+    // 5. Run linter check
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("check")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_empty_project_full_flow_check.stderr.txt",
+        );
 }
 
 #[test]
@@ -329,6 +340,17 @@ fn test_new_counter_project_full_flow() {
         .assert_snapshot_matches(
             "integration/snapshots/test_new_counter_project_full_flow_script.stdout.txt",
         );
+
+    // 5. Run linter check
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("check")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_counter_project_full_flow_check.stderr.txt",
+        );
 }
 
 #[test]
@@ -391,6 +413,17 @@ fn test_new_jetton_project_full_flow() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/test_new_jetton_project_full_flow_script.stdout.txt",
+        );
+
+    // 5. Run linter check
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .arg("check")
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_jetton_project_full_flow_check.stderr.txt",
         );
 }
 

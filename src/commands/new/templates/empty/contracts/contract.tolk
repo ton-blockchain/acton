@@ -1,3 +1,3 @@
-fun onInternalMessage(in: InMessage) {
+fun onInternalMessage(_in: InMessage) {
     // write your code here
 }

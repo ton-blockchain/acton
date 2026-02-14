@@ -1,7 +1,5 @@
 import "@acton/build/build"
 import "@acton/emulation/network"
-import "@acton/testing/expect"
-import "@acton/types/message"
 import "@contracts/types"
 
 struct Counter {
@@ -21,18 +19,18 @@ fun Counter.fromStorage(storage: Storage) {
 
 /// Deploys the contract to the blockchain
 fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList {
-    val msg = createMessage({
+    val deployMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: {
             stateInit: self.init,
         },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, deployMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun Counter.sendIncreaseCounter(self, from: address, increaseBy: uint32, config: SendParams = {}): SendResultList {
-    val msg = createMessage({
+    val increaseMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
@@ -40,27 +38,27 @@ fun Counter.sendIncreaseCounter(self, from: address, increaseBy: uint32, config:
             increaseBy,
         },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, increaseMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun Counter.sendResetCounter(self, from: address, config: SendParams = {}): SendResultList {
-    val msg = createMessage({
+    val resetMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body: ResetCounter {},
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, resetMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun Counter.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {
-    val msg = createMessage({
+    val anyMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
         body,
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, anyMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun Counter.currentCounter(self): int {

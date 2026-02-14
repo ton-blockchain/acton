@@ -40,13 +40,13 @@ fun onInternalMessage(in: InMessage) {
         RequestWalletAddress => {
             assert (in.valueCoins > in.originalForwardFee + MINIMAL_MESSAGE_VALUE_BOUND) throw ERR_NOT_ENOUGH_AMOUNT_TO_RESPOND;
 
-            var respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
+            val respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
                 ? msg.ownerAddress.toCell()
                 : null;
 
             var walletAddress: address? = null;
             if (msg.ownerAddress.getWorkchain() == BASECHAIN) {
-                var storage = lazy MinterStorage.load();
+                val storage = lazy MinterStorage.load();
                 walletAddress = calcAddressOfJettonWallet(msg.ownerAddress, contract.getAddress(), storage.jettonWalletCode);
             }
 
@@ -67,7 +67,7 @@ fun onInternalMessage(in: InMessage) {
             var storage = lazy MinterStorage.load();
             assert (in.senderAddress == storage.adminAddress) throw ERR_NOT_FROM_ADMIN;
 
-            var internalTransferMsg = lazy msg.internalTransferMsg.load();
+            val internalTransferMsg = lazy msg.internalTransferMsg.load();
             storage.totalSupply += internalTransferMsg.jettonAmount;
             storage.save();
 

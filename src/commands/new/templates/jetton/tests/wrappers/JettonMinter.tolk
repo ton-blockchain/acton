@@ -1,5 +1,4 @@
 import "@acton/emulation/network"
-import "@acton/testing/expect"
 import "@acton/build/build"
 
 import "@contracts/messages"
@@ -11,30 +10,30 @@ struct JettonMinter {
 }
 
 fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, includeOwnerAddress: bool, value: coins = ton("0.1")) {
-    val msg = createMessage({
+    val discoveryMsg = createMessage({
         bounce: false,
         value,
         dest: self.address,
         body: RequestWalletAddress {
             queryId: 0,
-            ownerAddress: ownerAddress,
-            includeOwnerAddress: includeOwnerAddress,
+            ownerAddress,
+            includeOwnerAddress,
         },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, discoveryMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.sendChangeContent(self, from: address, newContent: cell) {
-    val msg = createMessage({
+    val changeMsg = createMessage({
         bounce: false,
         value: ton("0.1"),
         dest: self.address,
         body: ChangeMinterContent {
             queryId: 0,
-            newContent: newContent,
+            newContent,
         },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, changeMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.fromStorage(storage: MinterStorage) {
@@ -49,7 +48,7 @@ fun JettonMinter.fromStorage(storage: MinterStorage) {
 }
 
 fun JettonMinter.sendDeploy(self, from: address, params: SendParams) {
-    val msg = createMessage({
+    val deployMsg = createMessage({
         bounce: false,
         value: params.value,
         dest: {
@@ -57,11 +56,11 @@ fun JettonMinter.sendDeploy(self, from: address, params: SendParams) {
             stateInit: self.init,
         },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, deployMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount: int, forwardTonAmount: int, totalTonAmount: int) {
-    val msg = createMessage({
+    val mintMsg = createMessage({
         bounce: false,
         value: totalTonAmount + ton("0.015"),
         dest: self.address,
@@ -71,19 +70,19 @@ fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount:
             tonAmount: totalTonAmount,
             internalTransferMsg: InternalTransferStep {
                 queryId: 0,
-                jettonAmount: jettonAmount,
+                jettonAmount,
                 transferInitiator: null,
                 sendExcessesTo: self.address,
-                forwardTonAmount: forwardTonAmount,
+                forwardTonAmount,
                 forwardPayload: createEmptySlice(),
             }.toCell(),
         },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, mintMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.sendChangeAdmin(self, from: address, newOwner: address) {
-    val msg = createMessage({
+    val changeMsg = createMessage({
         bounce: false,
         value: ton("0.05"),
         dest: self.address,
@@ -92,7 +91,7 @@ fun JettonMinter.sendChangeAdmin(self, from: address, newOwner: address) {
             newAdminAddress: newOwner,
         },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, changeMsg, SEND_MODE_PAY_FEES_SEPARATELY)
 }
 
 fun JettonMinter.getJettonData(self): JettonDataReply {
