@@ -7,7 +7,7 @@ use crate::file_db::FileDb;
 use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
 use rustc_hash::FxHashMap;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -55,7 +55,7 @@ pub struct ProjectIndex {
 
 impl ProjectIndex {
     /// Creates a new builder for `ProjectIndex`.
-    pub const fn builder(file_db: &'_ FileDb, root_path: PathBuf) -> ProjectIndexBuilder<'_> {
+    pub fn builder(file_db: &'_ FileDb, root_path: PathBuf) -> ProjectIndexBuilder<'_> {
         ProjectIndexBuilder::new(file_db, root_path)
     }
 
@@ -190,18 +190,20 @@ impl ProjectIndex {
         path_to_id: &HashMap<PathBuf, FileId>,
         file_db: &FileDb,
         stdlib_path: Option<&Path>,
+        mappings: &FxHashMap<String, String>,
     ) -> (Vec<ResolvedImport>, Vec<String>) {
         let mut errors = vec![];
         let mut file_imports = Vec::with_capacity(index.imports.len());
         for import in &index.imports {
-            let resolved = match Self::resolve_path(&import.path, &index.path, file_db, stdlib_path)
-            {
-                Ok(resolved) => resolved,
-                Err(err) => {
-                    errors.push(format!("{:#?}", err));
-                    continue;
-                }
-            };
+            let resolved =
+                match Self::resolve_path(&import.path, &index.path, file_db, stdlib_path, mappings)
+                {
+                    Ok(resolved) => resolved,
+                    Err(err) => {
+                        errors.push(format!("{:#?}", err));
+                        continue;
+                    }
+                };
             let file_id = path_to_id.get(&resolved);
             file_imports.push(ResolvedImport {
                 import: import.clone(),
@@ -216,12 +218,28 @@ impl ProjectIndex {
         file: &Path,
         file_db: &FileDb,
         stdlib_path: Option<&Path>,
+        mappings: &FxHashMap<String, String>,
     ) -> anyhow::Result<PathBuf> {
         if let Some(relative_path) = import.strip_prefix("@stdlib/") {
             let Some(stdlib) = stdlib_path else {
                 anyhow::bail!("Stdlib path not provided for @stdlib import: {}", import);
             };
             let abs_path = stdlib.join(relative_path);
+            let abs_path = Self::append_tolk_extension_if_needed(abs_path);
+            return Ok(file_db.canonicalize(&abs_path)?);
+        }
+
+        if import.starts_with('@') {
+            let (prefix, suffix) = match import.find('/') {
+                Some(pos) => (&import[..pos], &import[pos + 1..]),
+                None => (import.as_ref(), ""),
+            };
+
+            let Some(target) = mappings.get(prefix) else {
+                anyhow::bail!("Unknown path mapping '{prefix}'");
+            };
+
+            let abs_path = Path::new(target).join(suffix);
             let abs_path = Self::append_tolk_extension_if_needed(abs_path);
             return Ok(file_db.canonicalize(&abs_path)?);
         }
@@ -251,19 +269,41 @@ pub struct ProjectIndexBuilder<'a> {
     file_db: &'a FileDb,
     root_path: PathBuf,
     stdlib_path: Option<PathBuf>,
+    mappings: FxHashMap<String, String>,
 }
 
 impl<'a> ProjectIndexBuilder<'a> {
-    pub const fn new(file_db: &'a FileDb, root_path: PathBuf) -> Self {
+    pub fn new(file_db: &'a FileDb, root_path: PathBuf) -> Self {
         Self {
             file_db,
             root_path,
             stdlib_path: None,
+            mappings: FxHashMap::default(),
         }
     }
 
     pub fn with_stdlib(mut self, path: PathBuf) -> Self {
         self.stdlib_path = Some(path);
+        self
+    }
+
+    /// Sets path mappings used to resolve `@alias/...` imports.
+    ///
+    /// Keys are normalized to include `@` prefix, matching compiler behavior.
+    pub fn with_mappings(mut self, mappings: &Option<BTreeMap<String, String>>) -> Self {
+        if let Some(mappings) = mappings {
+            self.mappings = mappings
+                .iter()
+                .map(|(key, value)| {
+                    if key.starts_with('@') {
+                        (key.clone(), value.clone())
+                    } else {
+                        (format!("@{key}"), value.clone())
+                    }
+                })
+                .collect();
+        }
+
         self
     }
 
@@ -316,6 +356,7 @@ impl<'a> ProjectIndexBuilder<'a> {
                 root_file,
                 self.file_db,
                 self.stdlib_path.as_deref(),
+                &self.mappings,
             ) {
                 Ok(resolved) => resolved,
                 Err(err) => {
@@ -349,6 +390,7 @@ impl<'a> ProjectIndexBuilder<'a> {
                 &path_to_file_id,
                 self.file_db,
                 self.stdlib_path.as_deref(),
+                &self.mappings,
             );
             imports.insert(*id, file_imports);
             errors.extend(file_errors);

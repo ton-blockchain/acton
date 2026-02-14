@@ -1,1 +1,1 @@
-Error: Invalid duration format. Use '100s', '100d', '1y' or just number (seconds)
+Error: Invalid duration format. Use '[TIME]', '100d', '1y' or just number (seconds)

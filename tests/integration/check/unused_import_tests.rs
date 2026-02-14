@@ -1,4 +1,6 @@
 use crate::integration::check::{run_check_test_with_files, run_fix_test_with_files};
+use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 use function_name::named;
 
 const FUNCTIONS_FILE: &str = r#"
@@ -232,5 +234,76 @@ fn test_fix_unused_import_two_imports_on_one_line_does_not_change_file() {
             ("contracts/unused", UNUSED_FILE),
         ],
         function_name!(),
+    );
+}
+
+#[test]
+#[named]
+fn test_check_unused_import_with_mappings() {
+    let project = ProjectBuilder::new("check-unused-import-with-mappings")
+        .mapping("libs", "./libs")
+        .file("libs/functions", FUNCTIONS_FILE)
+        .file("libs/unused", UNUSED_FILE)
+        .contract(
+            "main",
+            r#"
+            import "@libs/functions";
+            import "@libs/unused";
+
+            fun main() {
+                fromFunction();
+            }
+        "#,
+        )
+        .build();
+
+    project.acton().init().run().success();
+    project
+        .acton()
+        .check()
+        .run()
+        .success()
+        .assert_stderr_snapshot_matches(&format!(
+            "integration/snapshots/check/unused_import/{}.txt",
+            function_name!()
+        ));
+}
+
+#[test]
+fn test_fix_unused_import_with_mappings() {
+    let project = ProjectBuilder::new("check-fix-unused-import-with-mappings")
+        .mapping("libs", "./libs")
+        .file("libs/functions", FUNCTIONS_FILE)
+        .file("libs/unused", UNUSED_FILE)
+        .contract(
+            "main",
+            r#"
+            import "@libs/functions";
+            import "@libs/unused";
+
+            fun main() {
+                fromFunction();
+            }
+        "#,
+        )
+        .build();
+
+    project.acton().init().run().success();
+    project.acton().check().arg("--fix").run().success();
+
+    let main_file = project.path().join("contracts/main.tolk");
+    let actual = std::fs::read_to_string(&main_file)
+        .unwrap_or_else(|e| panic!("failed to read fixed file '{}': {}", main_file.display(), e));
+
+    assert_eq!(
+        actual.trim(),
+        r#"
+            import "@libs/functions";
+
+            fun main() {
+                fromFunction();
+            }
+        "#
+        .trim()
     );
 }

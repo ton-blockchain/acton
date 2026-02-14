@@ -262,6 +262,7 @@ fn check_root_file(
     let now = Instant::now();
     let mut index = ProjectIndex::builder(file_db, root.to_owned())
         .with_stdlib(file_db.stdlib_path().to_owned())
+        .with_mappings(&acton_config.mappings)
         .build()?;
     log::debug!("Build project index took {:?}", now.elapsed());
     log::debug!("Index: {:?}", index.files().len());
