@@ -1,3 +1,7 @@
+use crate::backend::Backend;
+use crate::backend::analysis::AnalysisResult;
+use crate::backend::utils::FileInfoExt;
+use acton_config::config::ActonConfig;
 use lsp_types::MessageType;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -9,10 +13,6 @@ use tolk_resolver::symbol_resolver::resolve;
 use tolk_ty::{TypeDb, TypeInterner, infer};
 use tower_lsp::lsp_types::Url;
 use tree_sitter::Tree;
-
-use crate::backend::Backend;
-use crate::backend::analysis::AnalysisResult;
-use crate::backend::utils::FileInfoExt;
 
 impl Backend {
     pub async fn analyze(&self, uri: Url) {
@@ -82,14 +82,14 @@ impl Backend {
         crate::profile!(self, "run_analysis");
         let now = Instant::now();
 
-        let stdlib_path = self
-            .file_db
-            .canonicalize("/Users/petrmakhnev/emulator-rs/crates/tolkc/assets/tolk-stdlib")?;
-
+        let stdlib_path = self.file_db.stdlib_path();
         let root_path = self.file_db.canonicalize(root_path)?;
 
+        let acton_config = ActonConfig::load()?;
+
         let mut index = ProjectIndexBuilder::new(&self.file_db, root_path.clone())
-            .with_stdlib(stdlib_path)
+            .with_stdlib(stdlib_path.to_owned())
+            .with_mappings(&acton_config.mappings)
             .build()?;
         resolve(&self.file_db, &mut index);
 
