@@ -12,6 +12,7 @@
     "e010-used-ignored-identifier",
     "e011-message-should-be-named",
     "e012-create-message-inline-send",
+    "e013-mutable-parameter-can-be-immutable",
     "s001-name-case-checker"
   ]
 }

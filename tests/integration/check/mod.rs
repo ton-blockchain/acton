@@ -4,6 +4,7 @@ use crate::support::project::ProjectBuilder;
 mod deprecated_tests;
 mod message_entity_naming_tests;
 mod method_can_be_static_tests;
+mod mutable_parameter_can_be_immutable_tests;
 mod mutable_variable_can_be_immutable_tests;
 mod unused_import_tests;
 mod used_ignored_identifier_tests;

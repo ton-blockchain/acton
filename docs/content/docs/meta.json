@@ -13,12 +13,12 @@
     "build-system",
     "test-runner",
     "scripting",
-    "linter",
     "acton-toml.mdx",
     "--- Advanced ---",
     "advanced/libraries",
     "--- Miscellaneous ---",
     "miscellaneous/ide-support",
-    "standard_library"
+    "standard_library",
+    "linter"
   ]
 }

@@ -1,0 +1,15 @@
+warning[E013]: parameter can be immutable
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             fun foo(mutate a: int): int {
+  |                            ^ can be made immutable
+
+help: remove `mutate`
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             fun foo(mutate a: int): int {
+  |                     ^^^^^^^
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E013
