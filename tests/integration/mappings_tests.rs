@@ -1,6 +1,5 @@
 use crate::support::assertions::TestOutputExt;
 use crate::support::project::ProjectBuilder;
-use std::fs;
 
 #[test]
 fn test_mappings_success() {
@@ -216,6 +215,8 @@ fn test_mappings_recursive() {
 #[cfg(unix)]
 #[test]
 fn test_mappings_symlink_target_rejected() {
+    use std::fs;
+
     let project = ProjectBuilder::new("mappings_symlink_target")
         .mapping("@core", "./libs/core")
         .contract(
