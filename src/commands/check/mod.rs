@@ -1,5 +1,5 @@
 use crate::commands::common::error_fmt;
-use acton_config::config::{ActonConfig, ContractConfig};
+use acton_config::config::{ActonConfig, ContractConfig, LintLevel};
 use anyhow::anyhow;
 use globset::{Glob, GlobSetBuilder};
 use owo_colors::OwoColorize;
@@ -204,7 +204,9 @@ fn check_test_file(
         );
     }
 
-    let lint_settings = Checker::build_settings(acton_config, None);
+    let mut lint_settings = Checker::build_settings(acton_config, None);
+    // we can import any files in tests
+    lint_settings.insert(tolk_linter::Rule::ActonImportInContract, LintLevel::Allow);
 
     check_root_file(&root, file_db, fix, json, lint_settings, acton_config)
 }
@@ -214,7 +216,7 @@ fn check_root_file(
     file_db: &FileDb,
     fix: bool,
     json: bool,
-    lint_settings: HashMap<tolk_linter::Rule, acton_config::config::LintLevel>,
+    lint_settings: HashMap<tolk_linter::Rule, LintLevel>,
     acton_config: &ActonConfig,
 ) -> anyhow::Result<Vec<Diagnostic>> {
     let file_info = file_db.process(root)?;

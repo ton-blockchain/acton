@@ -1,7 +1,7 @@
 extern crate core;
 
 use crate::ast::name_case_checker::check_name_cases;
-use crate::ast::{deprecated_symbol_use, no_bounce_handler};
+use crate::ast::{acton_import_in_contract, deprecated_symbol_use, no_bounce_handler};
 use crate::rules::ast::{
     field_init_can_be_folded, message_entity_naming, method_can_be_static,
     mutable_parameter_can_be_immutable, mutable_variable_can_be_immutable,
@@ -365,6 +365,11 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
             self.checker,
             Rule::UnusedImport,
             unused_import::check_file(self.checker, self.file_id)
+        );
+        run_rule!(
+            self.checker,
+            Rule::ActonImportInContract,
+            acton_import_in_contract::check_file(self.checker, self.file_id)
         );
         run_rule!(
             self.checker,

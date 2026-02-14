@@ -1,0 +1,12 @@
+error[E014]: contracts cannot import files from Acton standard library
+  --> [ROOT]/contracts/helper[LINE]
+  |
+2 |                 import "../.acton/tlb/maybe.tolk";
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ this import resolves to a file in .acton
+  |
+  = Acton stdlib may use emulator-only instructions that are unavailable on-chain, so such imports can break contract execution.
+    Use on-chain-safe modules (for example, `@stdlib/...`), and if you only need data types, copy their definitions into your project.
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E014

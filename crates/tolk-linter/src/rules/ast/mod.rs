@@ -1,3 +1,4 @@
+pub mod acton_import_in_contract;
 pub mod deprecated_symbol_use;
 pub mod field_init_can_be_folded;
 pub mod message_entity_naming;
