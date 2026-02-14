@@ -1,0 +1,15 @@
+warning[E003]: variable can be immutable
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |                 var a = Foo { a: 10 };
+  |                     ^ can be made val
+
+help: use `val` instead
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |                 var a = Foo { a: 10 };
+  |                 ^^^ val
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E003

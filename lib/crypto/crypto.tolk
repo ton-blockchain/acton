@@ -6,8 +6,8 @@
 /// Examples:
 /// ```tolk
 /// // Generate a new mnemonic and derive a key pair
-/// val words = crypto.mnemonicNew();
-/// val kp = crypto.mnemonicToKeyPair(words);
+/// val words = crypto.createMnemonic();
+/// val kp = words.toKeyPair();
 ///
 /// // Sign a cell
 /// val signature = crypto.sign(kp.privateKey, myCell);
@@ -38,7 +38,7 @@ type Mnemonic = array<string>
 /// Generates a new random BIP39-compatible mnemonic phrase.
 ///
 /// Returns an array of 24 English words that can be used to derive a key pair
-/// via [crypto.mnemonicToKeyPair].
+/// via [Mnemonic.toKeyPair].
 ///
 /// Example:
 /// ```tolk
@@ -52,12 +52,12 @@ fun crypto.createMnemonic(): Mnemonic {
 /// Derives an Ed25519 [KeyPair] from a mnemonic phrase.
 ///
 /// The `words` parameter must be a tuple of 24 valid BIP39 mnemonic words,
-/// as returned by [crypto.mnemonicNew].
+/// as returned by [crypto.createMnemonic].
 ///
 /// Example:
 /// ```tolk
-/// val words = crypto.mnemonicNew();
-/// val kp = crypto.mnemonicToKeyPair(words);
+/// val words = crypto.createMnemonic();
+/// val kp = words.toKeyPair(words);
 /// // kp.privateKey — 32-byte seed
 /// // kp.publicKey  — 32-byte public key
 /// ```
@@ -77,7 +77,7 @@ fun Mnemonic.toKeyPair(self): KeyPair {
 ///
 /// Example:
 /// ```tolk
-/// val kp = crypto.mnemonicToKeyPair(words);
+/// val kp = words.toKeyPair();
 /// val signature = crypto.sign(kp.privateKey, myCell);
 /// ```
 fun crypto.sign(privateKey: int, data: cell): slice {
@@ -91,7 +91,7 @@ fun crypto.sign(privateKey: int, data: cell): slice {
 ///
 /// Example:
 /// ```tolk
-/// val kp = crypto.mnemonicToKeyPair(words);
+/// val kp = words.toKeyPair();
 /// val hash = myCell.hash();
 /// val signature = crypto.rawSign(kp.privateKey, hash);
 /// ```

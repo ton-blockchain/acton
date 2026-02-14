@@ -58,7 +58,7 @@ val out_actions = vm.outActions();
 expect(out_actions).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L48" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L50" />
 
 ## `Expectation<OutActionList>.toBeSendMessageAt`
 
@@ -78,7 +78,7 @@ Note that you should provide the message type as a generic parameter.
 
 If the action is not a send message, the test will fail.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L63" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L67" />
 
 ## `expectImpl`
 
@@ -86,7 +86,7 @@ If the action is not a send message, the test will fail.
 struct expectImpl
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L103" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L107" />
 
 ## `expectImpl.failToFindOutMsg`
 
@@ -94,5 +94,5 @@ struct expectImpl
 fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string)
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L105" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L109" />
 

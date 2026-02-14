@@ -151,7 +151,7 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
         let Some(file_info) = checker.file_db.get_by_id(file_id) else {
             continue;
         };
-        if file_info.is_stdlib_file() {
+        if !file_info.is_workspace_file() {
             continue;
         }
 
@@ -224,7 +224,7 @@ pub fn check_name_cases(checker: &mut Checker) -> Option<()> {
         let Some(file_info) = checker.file_db.get_by_id(symbol_id.file_id) else {
             continue;
         };
-        if file_info.is_stdlib_file() {
+        if !file_info.is_workspace_file() {
             continue;
         }
 

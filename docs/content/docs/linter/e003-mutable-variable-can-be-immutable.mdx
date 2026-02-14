@@ -1,0 +1,37 @@
+---
+title: "E003: mutable-variable-can-be-immutable"
+description: "Checks for variables that are declared as mutable (`var`) but are never mutated."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E003`
+- `Rule`: `mutable-variable-can-be-immutable`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: always available
+
+### What it does
+Checks for variables that are declared as mutable (`var`) but are never mutated.
+
+### Why is this bad?
+Using `val` instead of `var` makes the code clearer by signaling that the variable's value will not change.
+
+### Example
+```tolk
+fun main() {
+    var x = 1;
+    println(x);
+}
+```
+
+Use instead:
+```tolk
+fun main() {
+    val x = 1;
+    println(x);
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/mutable_variable_can_be_immutable.rs#L34" />

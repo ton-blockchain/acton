@@ -18,6 +18,7 @@ dashmap = { workspace = true }
 log = { workspace = true }
 smol_str = { workspace = true }
 rustc-hash = { workspace = true }
+dunce = { workspace = true }
 
 [dev-dependencies]
 expect-test = { workspace = true }

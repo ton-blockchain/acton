@@ -460,8 +460,8 @@ jobs:
         run: |
           ./target/release-size/acton test
 
-      #      - name: Upload coverage report
-      #        uses: actions/upload-artifact@v6
+#      - name: Upload coverage report
+#        uses: actions/upload-artifact@v6
       #        with:
       #          name: coverage-report
       #          path: target/llvm-cov/html

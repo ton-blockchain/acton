@@ -1,0 +1,37 @@
+---
+title: "E006: unused-import"
+description: "Checks for imports that are never used in the file."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E006`
+- `Rule`: `unused-import`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: sometimes available
+
+### What it does
+Checks for imports that are never used in the file.
+
+### Why is this bad?
+Unused imports clutter the code and increase compilation time.
+
+### Example
+```tolk
+import "other.tolk";
+
+fun main() {
+    println("hello");
+}
+```
+
+Use instead:
+```tolk
+fun main() {
+    println("hello");
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/unused_import.rs#L32" />

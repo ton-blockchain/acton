@@ -1,0 +1,37 @@
+---
+title: "E005: write-only-variable"
+description: "Checks for variables that are written to but never read."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E005`
+- `Rule`: `write-only-variable`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Checks for variables that are written to but never read.
+
+### Why is this bad?
+A variable that is only written to but never read is likely a bug or redundant code.
+
+### Example
+```tolk
+fun main() {
+    var x = 1;
+    x = 2;
+    println("hello");
+}
+```
+
+Use instead:
+```tolk
+fun main() {
+    println("hello");
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/write_only_variable.rs#L30" />

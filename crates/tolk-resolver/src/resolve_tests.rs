@@ -3,6 +3,7 @@ mod tests {
     use crate::file_db::FileDb;
     use crate::resolve_index::Resolved;
     use expect_test::{Expect, expect};
+    use std::collections::BTreeMap;
     use std::path::PathBuf;
 
     #[test]
@@ -1156,6 +1157,46 @@ mod tests {
     }
 
     #[test]
+    fn test_mapped_import() {
+        ResolveTestBuilder::new()
+            .mapping("@core", "libs")
+            .file("libs/math.tolk", "fun mapped_fun() {}")
+            .file(
+                "main.tolk",
+                r#"
+                import "@core/math"
+                fun main() {
+                    <caret>mapped_fun();
+                }
+                "#,
+            )
+            .target("main.tolk")
+            .check_definition(expect![[r#"
+                mapped_fun -> Global(mapped_fun at math.tolk:4-14)
+            "#]]);
+    }
+
+    #[test]
+    fn test_mapped_import_with_normalized_mapping_key() {
+        ResolveTestBuilder::new()
+            .mapping("core", "libs")
+            .file("libs/math.tolk", "fun mapped_fun() {}")
+            .file(
+                "main.tolk",
+                r#"
+                import "@core/math"
+                fun main() {
+                    <caret>mapped_fun();
+                }
+                "#,
+            )
+            .target("main.tolk")
+            .check_definition(expect![[r#"
+                mapped_fun -> Global(mapped_fun at math.tolk:4-14)
+            "#]]);
+    }
+
+    #[test]
     fn test_stdlib_import() {
         ResolveTestBuilder::new()
             .file(
@@ -1212,6 +1253,7 @@ mod tests {
     struct ResolveTestBuilder {
         files: Vec<(String, String)>,
         target_file: Option<String>,
+        mappings: Option<BTreeMap<String, String>>,
     }
 
     impl ResolveTestBuilder {
@@ -1219,7 +1261,15 @@ mod tests {
             Self {
                 files: Vec::new(),
                 target_file: None,
+                mappings: None,
             }
+        }
+
+        fn mapping(mut self, prefix: &str, target: &str) -> Self {
+            self.mappings
+                .get_or_insert_with(BTreeMap::new)
+                .insert(prefix.to_string(), target.to_string());
+            self
         }
 
         fn file(mut self, path: &str, content: &str) -> Self {
@@ -1303,7 +1353,7 @@ mod tests {
                         pos += c.len_utf8() as u32;
                     }
                     std::fs::write(&full_path, &clean_target_content).unwrap();
-                    target_abs_path = Some(full_path.canonicalize().unwrap());
+                    target_abs_path = Some(dunce::canonicalize(full_path).unwrap());
                 } else {
                     std::fs::write(&full_path, content).unwrap();
                 }
@@ -1313,14 +1363,31 @@ mod tests {
 
             let stdlib_path = PathBuf::from("../../crates/tolkc/assets/tolk-stdlib");
             let file_db = FileDb::new(stdlib_path.clone(), None);
-            let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join(stdlib_path)
-                .canonicalize()
-                .unwrap();
+
+            let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(stdlib_path);
+            let stdlib_path = dunce::canonicalize(stdlib_path).unwrap();
+
+            let mappings = self.mappings.as_ref().map(|mappings| {
+                mappings
+                    .iter()
+                    .map(|(key, value)| {
+                        let value_path = PathBuf::from(value);
+                        if value_path.is_absolute() {
+                            (key.clone(), value.clone())
+                        } else {
+                            (
+                                key.clone(),
+                                project_root.join(value).to_string_lossy().to_string(),
+                            )
+                        }
+                    })
+                    .collect::<BTreeMap<_, _>>()
+            });
 
             let mut project_index =
                 crate::project_index::ProjectIndex::builder(&file_db, target_abs_path.clone())
                     .with_stdlib(stdlib_path)
+                    .with_mappings(&mappings)
                     .build()
                     .unwrap();
 

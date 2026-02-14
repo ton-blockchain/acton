@@ -1,0 +1,43 @@
+---
+title: "E002: unused-variable"
+description: "Checks for variables and parameters that are declared but never used."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E002`
+- `Rule`: `unused-variable`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: always available
+
+### What it does
+Checks for variables and parameters that are declared but never used.
+
+### Why is this bad?
+Unused variables and parameters clutter the code and can be a sign of a bug.
+
+### Example
+```tolk
+fun main() {
+    val x = 1;
+    println("hello");
+}
+```
+
+Use instead:
+```tolk
+fun main() {
+    println("hello");
+}
+```
+Or prefix with an underscore if the variable is intentionally unused:
+```tolk
+fun main() {
+    val _x = 1;
+    println("hello");
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/unused_variable.rs#L39" />

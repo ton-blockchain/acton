@@ -1,0 +1,25 @@
+---
+title: "Linter Rules"
+description: "Reference for all Tolk linter checks"
+icon: FileCheck
+---
+
+The `acton check` command validates your Tolk code and reports diagnostics for lint rules.
+
+Use `acton check --explain <CODE>` to read a detailed explanation for any specific rule right in the terminal.
+
+| Code | Rule | Status | Quick fix | What it does |
+|:-----|:-----|:-------|:----------|:-------------|
+| [E001](./e001-field-init-can-be-folded) | [`field-init-can-be-folded`](./e001-field-init-can-be-folded) | Stable since `v0.0.1` | always available | Checks for struct initialization where the field name and the variable used to initialize it are the same. |
+| [E002](./e002-unused-variable) | [`unused-variable`](./e002-unused-variable) | Stable since `v0.0.1` | always available | Checks for variables and parameters that are declared but never used. |
+| [E003](./e003-mutable-variable-can-be-immutable) | [`mutable-variable-can-be-immutable`](./e003-mutable-variable-can-be-immutable) | Stable since `v0.0.1` | always available | Checks for variables that are declared as mutable (`var`) but are never mutated. |
+| [E004](./e004-deprecated-symbol-use) | [`deprecated-symbol-use`](./e004-deprecated-symbol-use) | Stable since `v0.0.1` | not available | Checks for usage of deprecated symbols in code. |
+| [E005](./e005-write-only-variable) | [`write-only-variable`](./e005-write-only-variable) | Stable since `v0.0.1` | not available | Checks for variables that are written to but never read. |
+| [E006](./e006-unused-import) | [`unused-import`](./e006-unused-import) | Stable since `v0.0.1` | sometimes available | Checks for imports that are never used in the file. |
+| [E007](./e007-pure-function-call-unused) | [`pure-function-call-unused`](./e007-pure-function-call-unused) | Stable since `v0.0.1` | not available | Checks for calls to `@pure` functions where the result is not used. |
+| [E008](./e008-no-bounce-handler) | [`no-bounce-handler`](./e008-no-bounce-handler) | Stable since `v0.0.1` | not available | No description provided. |
+| [E009](./e009-method-can-be-static) | [`method-can-be-static`](./e009-method-can-be-static) | Stable since `v0.0.1` | not available | Checks for instance methods where `self` is unnecessary. |
+| [E010](./e010-used-ignored-identifier) | [`used-ignored-identifier`](./e010-used-ignored-identifier) | Stable since `v0.0.1` | always available | Checks for usages of identifiers explicitly marked as unused with a leading underscore. |
+| [E011](./e011-message-should-be-named) | [`message-should-be-named`](./e011-message-should-be-named) | Stable since `v0.0.1` | not available | Checks for messages created with `createMessage(...)` but named as generic `msg`. |
+| [E012](./e012-create-message-inline-send) | [`create-message-inline-send`](./e012-create-message-inline-send) | Stable since `v0.0.1` | not available | Checks for inline sending of newly created messages: `createMessage(...).send(...)`. |
+| [S001](./s001-name-case-checker) | [`name-case-checker`](./s001-name-case-checker) | Stable since `v0.0.1` | always available | Checks identifier naming style and suggests consistent casing. |

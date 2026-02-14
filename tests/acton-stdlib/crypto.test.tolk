@@ -1,5 +1,5 @@
-import "crypto"
-import "../testing/expect"
+import "@local-acton/crypto/crypto"
+import "@local-acton/testing/expect"
 
 get fun `test-mnemonic-new-returns-24-words`() {
     val words = crypto.createMnemonic();

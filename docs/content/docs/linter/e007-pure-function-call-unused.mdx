@@ -1,0 +1,31 @@
+---
+title: "E007: pure-function-call-unused"
+description: "Checks for calls to `@pure` functions where the result is not used."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E007`
+- `Rule`: `pure-function-call-unused`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Checks for calls to `@pure` functions where the result is not used.
+
+### Why is this bad?
+`@pure` functions have no side effects, so calling them without using the result is a no-op and likely a bug.
+
+### Example
+```tolk
+@pure
+fun add(a: int, b: int): int { return a + b; }
+
+fun main() {
+    add(1, 2); // Warning: result of @pure function is not used
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/pure_function_call_unused.rs#L27" />

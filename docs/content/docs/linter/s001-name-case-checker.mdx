@@ -1,0 +1,47 @@
+---
+title: "S001: name-case-checker"
+description: "Checks identifier naming style and suggests consistent casing."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `S001`
+- `Rule`: `name-case-checker`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: always available
+
+### What it does
+Checks identifier naming style and suggests consistent casing.
+
+### Why is this bad?
+Inconsistent naming makes code harder to read and maintain.
+This rule enforces:
+- `camelCase` for variables, functions, methods, and struct fields
+- `PascalCase` for structs, enums, enum members, and type aliases
+- `SCREAMING_SNAKE_CASE` for constants
+
+### Example
+```tolk
+struct low_struct {
+    TheBad: int
+}
+
+const iAmConst_variable = 1
+
+fun BadFunctionName() {}
+```
+
+Use instead:
+```tolk
+struct LowStruct {
+    theBad: int
+}
+
+const I_AM_CONST_VARIABLE = 1
+
+fun badFunctionName() {}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/name_case_checker.rs#L45" />

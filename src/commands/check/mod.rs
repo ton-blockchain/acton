@@ -112,13 +112,14 @@ pub fn check_cmd(
             fix::apply_fixes(&file_db, &all_diagnostics)?;
         }
 
-        let shown_diagnostics = if fix {
+        let mut shown_diagnostics = if fix {
             fix::filter_fixed_diagnostics(&all_diagnostics)
         } else {
             all_diagnostics
         };
 
         if !shown_diagnostics.is_empty() {
+            shown_diagnostics.sort();
             let first_code = shown_diagnostics
                 .iter()
                 .find(|d| d.code.is_some())
@@ -146,7 +147,7 @@ fn find_stdlib() -> anyhow::Result<PathBuf> {
         );
     }
 
-    Ok(path_to_stdlib.canonicalize()?)
+    Ok(dunce::canonicalize(path_to_stdlib)?)
 }
 
 fn find_acton_stdlib() -> anyhow::Result<PathBuf> {
@@ -158,7 +159,7 @@ fn find_acton_stdlib() -> anyhow::Result<PathBuf> {
         );
     }
 
-    Ok(path_to_acton.canonicalize()?)
+    Ok(dunce::canonicalize(path_to_acton)?)
 }
 
 fn check_contract(
@@ -178,7 +179,7 @@ fn check_contract(
         println!("    {} {}", "Checking".green().bold(), config.name,);
     }
 
-    let root = PathBuf::from(&config.src).canonicalize()?;
+    let root = dunce::canonicalize(PathBuf::from(&config.src))?;
     let lint_settings = Checker::build_settings(acton_config, Some(contract_id));
 
     check_root_file(&root, file_db, fix, json, lint_settings, acton_config)
@@ -191,7 +192,7 @@ fn check_test_file(
     json: bool,
     acton_config: &ActonConfig,
 ) -> anyhow::Result<Vec<Diagnostic>> {
-    let root = file.canonicalize()?;
+    let root = dunce::canonicalize(file)?;
     let current_dir = std::env::current_dir().unwrap_or_default();
     let relative_root = pathdiff::diff_paths(&root, &current_dir).unwrap_or_else(|| root.clone());
 
@@ -261,6 +262,7 @@ fn check_root_file(
     let now = Instant::now();
     let mut index = ProjectIndex::builder(file_db, root.to_owned())
         .with_stdlib(file_db.stdlib_path().to_owned())
+        .with_mappings(&acton_config.mappings)
         .build()?;
     log::debug!("Build project index took {:?}", now.elapsed());
     log::debug!("Index: {:?}", index.files().len());

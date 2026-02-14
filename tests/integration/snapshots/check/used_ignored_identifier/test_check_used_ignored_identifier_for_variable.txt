@@ -1,0 +1,21 @@
+warning[E010]: identifier marked as unused is used
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val _value = 10;
+  |                     ------ declared with leading underscore here
+4 |                 _value;
+  |                 ^^^^^^ `_value` is marked as unused but used here
+  |
+  = remove leading underscore if this identifier should be used
+
+help: rename `_value` to `value`
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val _value = 10;
+  |                     ^^^^^^ value
+4 |                 _value;
+  |                 ^^^^^^ value
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E010

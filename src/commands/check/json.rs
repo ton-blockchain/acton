@@ -65,6 +65,7 @@ pub(super) fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_j
         "name": &diag.name,
         "code": &diag.code,
         "message": &diag.message,
+        "help": &diag.help,
         "annotations": annotations_json,
         "fixes": fixes_json,
         "source": "tolk"

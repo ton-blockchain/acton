@@ -20,7 +20,7 @@ src = ".jetton/contracts/jetton-wallet-contract.tolk"
 depends = []
 
 [test]
-include = ["lib/**", ".jetton/**"]
+include = ["tests/acton-stdlib/**", ".jetton/**"]
 
 [test.mutation]
 
@@ -30,3 +30,4 @@ v3-url = "http://localhost:3010/api/v3"
 
 [mappings]
 acton = ".acton"
+local-acton = "lib"

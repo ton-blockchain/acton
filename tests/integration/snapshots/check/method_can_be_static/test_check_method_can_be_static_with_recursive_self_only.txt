@@ -1,0 +1,11 @@
+warning[E009]: method can be static
+  --> [ROOT]/contracts/main[LINE]
+  |
+4 |             fun Foo.bar(self, n: int): int {
+  |                         ^^^^ receiver `self` is used only for recursion in `bar`
+  |
+  = replace `self.<method>(...)` with a static recursive call and remove `self` parameter
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E009

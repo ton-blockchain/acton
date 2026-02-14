@@ -1,9 +1,12 @@
 pub mod deprecated_symbol_use;
 pub mod field_init_can_be_folded;
+pub mod message_entity_naming;
+pub mod method_can_be_static;
 pub mod mutable_variable_can_be_immutable;
 pub mod name_case_checker;
 pub mod no_bounce_handler;
 pub mod pure_function_call_unused;
 pub mod unused_import;
 pub mod unused_variable;
+pub mod used_ignored_identifier;
 pub mod write_only_variable;

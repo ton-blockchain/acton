@@ -60,7 +60,7 @@ fn run_type_test(test_case: &TestCase) -> String {
     let temp_dir = tempfile::tempdir().unwrap();
     let root_path = temp_dir.path().join("main.tolk");
     fs::write(&root_path, &test_case.input).unwrap();
-    let root_path = root_path.canonicalize().unwrap();
+    let root_path = dunce::canonicalize(root_path).unwrap();
 
     for (file_path, content) in &test_case.files {
         let full_path = temp_dir.path().join(file_path);
@@ -72,7 +72,7 @@ fn run_type_test(test_case: &TestCase) -> String {
 
     let stdlib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tolkc/assets/tolk-stdlib");
     let file_db = FileDb::new(stdlib_path.clone(), None);
-    let stdlib_path = stdlib_path.canonicalize().unwrap();
+    let stdlib_path = dunce::canonicalize(stdlib_path).unwrap();
 
     let common_tolk = stdlib_path.join("common.tolk");
     // We need stdlib for all targets so preprocess it before all.

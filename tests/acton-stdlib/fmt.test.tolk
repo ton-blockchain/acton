@@ -1,8 +1,8 @@
-import "fmt"
-import "emulation/network"
-import "testing/expect"
-import "tlb/maybe"
-import "types/message"
+import "@local-acton/fmt"
+import "@local-acton/emulation/network"
+import "@local-acton/testing/expect"
+import "@local-acton/tlb/maybe"
+import "@local-acton/types/message"
 
 struct SingleInt {
     a: int

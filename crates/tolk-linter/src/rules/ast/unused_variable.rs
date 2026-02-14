@@ -67,6 +67,10 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
             // parameters of assembly or builtin functions is always implicitly used
             continue;
         }
+        if let LocalDefKind::Param { is_self: true, .. } = local.kind {
+            // `self` has a dedicated rule (`method_can_be_static`), avoid duplicate diagnostics
+            continue;
+        }
         if matches!(local.kind, LocalDefKind::TypeParameter) {
             continue;
         }

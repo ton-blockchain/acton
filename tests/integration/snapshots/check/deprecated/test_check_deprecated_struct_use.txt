@@ -1,0 +1,19 @@
+warning[E004]: usage of deprecated symbol
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |             fun main(_a: Foo) {
+  |                          ^^^ Foo is deprecated and should not be used. use Bar instead
+  |
+  = deprecated symbols may be removed in future versions
+
+warning[E004]: usage of deprecated symbol
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |                 Foo {}
+  |                 ^^^ Foo is deprecated and should not be used. use Bar instead
+  |
+  = deprecated symbols may be removed in future versions
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E004

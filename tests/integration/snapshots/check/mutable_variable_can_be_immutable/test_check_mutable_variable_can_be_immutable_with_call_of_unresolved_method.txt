@@ -1,0 +1,6 @@
+error: method `some` not found
+  --> [ROOT]/contracts/main[LINE]
+  |
+6 |                 a.some();
+  |                   ^^^^
+

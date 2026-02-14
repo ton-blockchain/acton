@@ -1,0 +1,11 @@
+warning[E011]: message should be properly named
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val msg = createMessage({
+  |                     ^^^ message should be properly named, not `msg`
+  |
+  = use a descriptive message name, for example `deployMessage` or `transferMessage`
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E011

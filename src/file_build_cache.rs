@@ -298,8 +298,7 @@ impl FileBuildCache {
         let path_buf = PathBuf::from(path);
 
         if path_buf.exists() {
-            path_buf
-                .canonicalize()
+            dunce::canonicalize(&path_buf)
                 .unwrap_or(path_buf)
                 .to_string_lossy()
                 .to_string()

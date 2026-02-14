@@ -1,0 +1,41 @@
+---
+title: "E001: field-init-can-be-folded"
+description: "Checks for struct initialization where the field name and the variable used to initialize it are the same."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E001`
+- `Rule`: `field-init-can-be-folded`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: always available
+
+### What it does
+Checks for struct initialization where the field name and the variable used to initialize it are the same.
+
+### Why is this bad?
+It's redundant and can be simplified using the shorthand syntax.
+
+### Example
+```tolk
+struct Foo { bar: int }
+
+fun main() {
+    val bar = 1;
+    val foo = Foo { bar: bar };
+}
+```
+
+Use instead:
+```tolk
+struct Foo { bar: int }
+
+fun main() {
+    val bar = 1;
+    val foo = Foo { bar };
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/field_init_can_be_folded.rs#L36" />

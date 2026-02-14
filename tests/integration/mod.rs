@@ -2,6 +2,7 @@ mod actions_tests;
 mod annotations_tests;
 mod basic_unit_tests;
 mod build_tests;
+mod check;
 mod compile_tests;
 mod config_tests;
 mod coverage_tests;

@@ -18,7 +18,7 @@ pub enum Severity {
     Help,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Diagnostic {
     pub file_id: FileId,
     pub name: &'static str,
@@ -30,21 +30,21 @@ pub struct Diagnostic {
     pub help: Option<String>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Fix {
     pub message: String,
     pub edits: Vec<Edit>,
     pub applicability: Applicability,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Edit {
     pub span: Span,
     pub replacement: String,
     pub file_id: FileId,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum DiagnosticTag {
     /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
     Unnecessary,
@@ -52,7 +52,7 @@ pub enum DiagnosticTag {
     Deprecated,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Annotation {
     /// The span of this annotation, corresponding to some subsequence of the
     /// user's input that we want to highlight.

@@ -1,0 +1,39 @@
+---
+title: "E009: method-can-be-static"
+description: "Checks for instance methods where `self` is unnecessary."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E009`
+- `Rule`: `method-can-be-static`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Checks for instance methods where `self` is unnecessary.
+
+### Why is this bad?
+If `self` is never used, the method can be static which makes the API clearer.
+
+### Example
+```tolk
+struct Foo {}
+
+fun Foo.bar(self, a: int): int {
+    return a + 1;
+}
+```
+
+Use instead:
+```tolk
+struct Foo {}
+
+fun Foo.bar(a: int): int {
+    return a + 1;
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/method_can_be_static.rs#L37" />

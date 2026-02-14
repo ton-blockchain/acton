@@ -230,7 +230,7 @@ impl FileDb {
         if let Some(cached) = self.canonicalize_cache.get(path) {
             return Ok(cached.clone());
         }
-        let canonical = path.canonicalize()?;
+        let canonical = dunce::canonicalize(path)?;
         self.canonicalize_cache
             .insert(path.to_owned(), canonical.clone());
         Ok(canonical)

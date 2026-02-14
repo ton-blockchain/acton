@@ -810,6 +810,11 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn check(mut self) -> Self {
+        self.cmd = self.cmd.arg("check").current_dir(&self.project.path);
+        self
+    }
+
     /// Start disasm command with file input
     ///
     /// # Examples

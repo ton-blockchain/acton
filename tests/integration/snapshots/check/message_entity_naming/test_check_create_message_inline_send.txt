@@ -1,0 +1,15 @@
+warning[E012]: create named message before send
+  --> [ROOT]/contracts/main[LINE]
+  |  
+3 | /                 createMessage({
+4 | |                     bounce: false,
+5 | |                     value: ton("0.1"),
+6 | |                     dest: in.senderAddress,
+7 | |                 }).send(SEND_MODE_REGULAR);
+  | /------------------------------------------^ avoid `createMessage(...).send(...)`, create named message first
+  |  
+  = split into two statements: create message in a variable, then call `.send(...)`
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E012

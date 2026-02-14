@@ -13,7 +13,7 @@ use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasNa
 use tree_sitter::Node;
 
 /// Represents a byte range in the source code.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct Span {
     /// Start byte offset (inclusive).
     pub start: u32,

@@ -25,8 +25,7 @@ fn resolve_mapped_path(import_path: &str, mappings: &Option<BTreeMap<String, Str
             if let Some(mapping) = mapping {
                 let mapped_path =
                     add_tolk_extension_if_needed_to_path(Path::new(mapping).join(path));
-                return mapped_path
-                    .canonicalize() // since for now we don't support custom Acton.toml path, it's safe
+                return dunce::canonicalize(&mapped_path) // since for now we don't support custom Acton.toml path, it's safe
                     .unwrap_or(mapped_path)
                     .to_string_lossy()
                     .to_string();

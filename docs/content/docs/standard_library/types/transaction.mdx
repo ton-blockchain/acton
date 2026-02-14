@@ -691,3 +691,17 @@ Represents account storage.
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L429" />
 
+## `ShardAccount`
+
+```tolk
+struct ShardAccount {
+    account: Cell<Account>,
+    lastTransHash: uint256,
+    lastTransLt: uint64,
+}
+```
+
+Represents a shard account state.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L439" />
+

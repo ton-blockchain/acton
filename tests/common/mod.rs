@@ -38,9 +38,9 @@ pub(crate) fn assert_ui() -> snapbox::Assert {
 }
 
 fn add_regex_redactions(subs: &mut snapbox::Redactions) {
-    subs.insert("[TIME]", regex!(r"(\d+\.)?\d+ms")).ok();
     subs.insert("[TIME]", regex!(r"(\d+\.)?\d+µs")).ok();
-    subs.insert("[TIME]", regex!(r"(\d+\.)?\d+μs")).ok();
+    subs.insert("[TIME]", regex!(r"(\d+\.)?\d+ms")).ok();
+    subs.insert("[TIME]", regex!(r"(\d+\.)?\d+s")).ok();
     subs.insert("[LINE]", regex!(r"(\.tolk):\d+:\d+")).ok();
 }
 

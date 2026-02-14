@@ -1,9 +1,9 @@
-import "../message"
+import "@local-acton/types/message"
+import "@local-acton/build/build"
+import "@local-acton/emulation/network"
+import "@local-acton/testing/expect"
+import "@local-acton/testing/transaction_expect"
 import "contracts/types"
-import "../../build/build"
-import "../../emulation/network"
-import "../../testing/expect"
-import "../../testing/transaction_expect"
 
 struct Counter {
     address: address
@@ -12,7 +12,7 @@ struct Counter {
 
 fun Counter.fromStorage(storage: Storage) {
     val init = ContractState {
-        code: build("Counter", "lib/types/tests/contracts/counter.tolk"),
+        code: build("Counter", "tests/acton-stdlib/types/contracts/counter.tolk"),
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();

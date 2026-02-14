@@ -473,14 +473,14 @@ fn generate_deploy(contract_name: &str) -> String {
     code.push_str("    if (self.stateInit == null) {\n");
     code.push_str("        Assert.fail(\"Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment\");\n");
     code.push_str("    }\n");
-    code.push_str("    val msg = createMessage({\n");
+    code.push_str("    val genericMsg = createMessage({\n");
     code.push_str("        bounce: config.bounce,\n");
     code.push_str("        value: config.value,\n");
     code.push_str("        dest: {\n");
     code.push_str("            stateInit: self.stateInit,\n");
     code.push_str("        },\n");
     code.push_str("    });\n");
-    code.push_str("    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
+    code.push_str("    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
     code.push_str("}\n");
 
     code
@@ -516,7 +516,7 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
     code.push_str(&format!(
         "fun {contract_name}.{method_name}(self, from: address, {params_str}config: SendParams = {{}}): SendResultList {{\n",
     ));
-    code.push_str("    val msg = createMessage({\n");
+    code.push_str("    val genericMsg = createMessage({\n");
     code.push_str("        bounce: config.bounce,\n");
     code.push_str("        value: config.value,\n");
     code.push_str("        dest: self.address,\n");
@@ -543,7 +543,7 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
     }
 
     code.push_str("    });\n");
-    code.push_str("    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
+    code.push_str("    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
     code.push_str("}\n");
 
     code
@@ -564,13 +564,13 @@ fn generate_send_any_method(contract_name: &str) -> String {
     code.push_str(&format!(
         "fun {contract_name}.sendAny(self, from: address, body: cell, config: SendParams = {{}}): SendResultList {{\n",
     ));
-    code.push_str("    val msg = createMessage({\n");
+    code.push_str("    val genericMsg = createMessage({\n");
     code.push_str("        bounce: config.bounce,\n");
     code.push_str("        value: config.value,\n");
     code.push_str("        dest: self.address,\n");
     code.push_str("        body,\n");
     code.push_str("    });\n");
-    code.push_str("    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
+    code.push_str("    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
     code.push_str("}\n");
 
     code
@@ -789,7 +789,7 @@ fn normalize_abs_path(project_root: &Path, path: &Path) -> PathBuf {
         project_root.join(path)
     };
 
-    abs_path.canonicalize().unwrap_or(abs_path)
+    dunce::canonicalize(&abs_path).unwrap_or(abs_path)
 }
 
 fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {

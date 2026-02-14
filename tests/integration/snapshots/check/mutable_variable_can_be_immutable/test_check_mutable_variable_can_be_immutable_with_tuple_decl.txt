@@ -1,0 +1,9 @@
+warning[E003]: variable can be immutable
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |                 var [a, b] = [100, 200];
+  |                      ^ can be made val
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E003

@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "e001-field-init-can-be-folded",
+    "e002-unused-variable",
+    "e003-mutable-variable-can-be-immutable",
+    "e004-deprecated-symbol-use",
+    "e005-write-only-variable",
+    "e006-unused-import",
+    "e007-pure-function-call-unused",
+    "e008-no-bounce-handler",
+    "e009-method-can-be-static",
+    "e010-used-ignored-identifier",
+    "e011-message-should-be-named",
+    "e012-create-message-inline-send",
+    "s001-name-case-checker"
+  ]
+}

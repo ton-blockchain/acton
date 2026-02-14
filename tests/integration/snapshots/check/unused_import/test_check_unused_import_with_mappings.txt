@@ -1,0 +1,16 @@
+warning[E006]: unused import
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |             import "@libs/unused";
+  |             ^^^^^^^^^^^^^^^^^^^^^ this import is unused
+
+help: remove unused import
+  --> [ROOT]/contracts/main[LINE]
+  |  
+3 | /             import "@libs/unused";
+4 | | 
+  | /^
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E006

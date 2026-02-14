@@ -1,0 +1,15 @@
+warning[E002]: variable is unused
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |                 var a = 100;
+  |                     ^ unused variable `a`
+
+help: prefix with underscore: `_a`
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |                 var a = 100;
+  |                     ^ _a
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E002
