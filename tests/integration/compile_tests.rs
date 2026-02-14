@@ -473,6 +473,41 @@ fn test_compile_file_without_read_permission() {
         );
 }
 
+#[cfg(unix)]
+#[test]
+fn test_compile_import_from_symlink_file() {
+    let project = ProjectBuilder::new("compile-import-symlink")
+        .contract(
+            "main",
+            r#"
+            import "./linked-lib.tolk";
+
+            fun onInternalMessage(in: InMessage) {
+                helper();
+            }
+
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        )
+        .build();
+
+    let contracts_dir = project.path().join("contracts");
+    let real_lib_path = contracts_dir.join("real-lib.tolk");
+    let symlink_lib_path = contracts_dir.join("linked-lib.tolk");
+
+    fs::write(&real_lib_path, "fun helper() {}").unwrap();
+    std::os::unix::fs::symlink(&real_lib_path, &symlink_lib_path).unwrap();
+
+    project
+        .acton()
+        .compile("contracts/main.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_compile_import_from_symlink_file.stderr.txt",
+        );
+}
+
 #[test]
 fn test_compile_corrupted_cache_file() {
     let project = ProjectBuilder::new("compile-corrupted-cache")

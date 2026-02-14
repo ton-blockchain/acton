@@ -1,5 +1,6 @@
 use crate::support::assertions::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use std::fs;
 
 #[test]
 fn test_mappings_success() {
@@ -210,4 +211,37 @@ fn test_mappings_recursive() {
         .compile("contracts/main.tolk")
         .run()
         .success();
+}
+
+#[cfg(unix)]
+#[test]
+fn test_mappings_symlink_target_rejected() {
+    let project = ProjectBuilder::new("mappings_symlink_target")
+        .mapping("@core", "./libs/core")
+        .contract(
+            "main",
+            r#"
+            import "@core/math"
+
+            fun onInternalMessage() {
+                helper();
+            }
+            "#,
+        )
+        .build();
+
+    let libs_core = project.path().join("libs/core");
+    fs::create_dir_all(&libs_core).unwrap();
+
+    let real_file = libs_core.join("real_math.tolk");
+    let symlink_file = libs_core.join("math.tolk");
+    fs::write(&real_file, "fun helper() {}").unwrap();
+    std::os::unix::fs::symlink(&real_file, &symlink_file).unwrap();
+
+    project
+        .acton()
+        .compile("contracts/main.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches("integration/snapshots/mappings/symlink_target.txt");
 }
