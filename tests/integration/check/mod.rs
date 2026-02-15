@@ -10,6 +10,7 @@ mod mutable_parameter_can_be_immutable_tests;
 mod mutable_variable_can_be_immutable_tests;
 mod name_case_checker_tests;
 mod send_mode_literal_tests;
+mod several_not_null_assertions_tests;
 mod unauthorized_access_tests;
 mod unused_import_tests;
 mod used_ignored_identifier_tests;

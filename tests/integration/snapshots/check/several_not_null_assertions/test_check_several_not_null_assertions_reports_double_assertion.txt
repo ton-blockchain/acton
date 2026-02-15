@@ -1,0 +1,17 @@
+warning[E019]: several not-null assertions in a row
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val b = a!!;
+  |                         ^^^ redundant repeated not-null assertion
+  |
+  = remove duplicate `!` and keep only one not-null assertion
+
+help: keep a single not-null assertion
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 val b = a!!;
+  |                         ^^^ a!
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E019

@@ -2,8 +2,8 @@ use crate::ast::{
     acton_import_in_contract, asm_function_missing_safety_comment, compiler_error,
     deprecated_symbol_use, field_init_can_be_folded, message_entity_naming, method_can_be_static,
     mutable_parameter_can_be_immutable, mutable_variable_can_be_immutable, name_case_checker,
-    no_bounce_handler, pure_function_call_unused, send_mode_literal, unused_import,
-    unused_variable, used_ignored_identifier, write_only_variable,
+    no_bounce_handler, pure_function_call_unused, send_mode_literal, several_not_null_assertions,
+    unused_import, unused_variable, used_ignored_identifier, write_only_variable,
 };
 use crate::dfa::unauthorized_access;
 use serde::Serialize;
@@ -72,6 +72,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E015") => asm_function_missing_safety_comment::AsmFunctionMissingSafetyComment,
         (Tolk, "E016") => send_mode_literal::SendModeLiteral,
         (Tolk, "E017") => unauthorized_access::UnauthorizedAccess,
+        (Tolk, "E019") => several_not_null_assertions::SeveralNotNullAssertions,
         (Tolk, "C001") => compiler_error::CompilerError,
         (Tolk, "S001") => name_case_checker::NameCaseChecker,
         _ => return None,

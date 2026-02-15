@@ -11,6 +11,7 @@ pub mod name_case_checker;
 pub mod no_bounce_handler;
 pub mod pure_function_call_unused;
 pub mod send_mode_literal;
+pub mod several_not_null_assertions;
 pub mod unused_import;
 pub mod unused_variable;
 pub mod used_ignored_identifier;
