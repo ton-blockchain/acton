@@ -17,10 +17,10 @@ fun main() {
          b,
     //!  ^ bool
          c] = [1, true, ""];
-    //!  ^ string
+    //!  ^ slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 77: expected string, got slice
+ok
 
 ========================================================================
 Tensor variables declaration with function call init
@@ -34,8 +34,7 @@ fun main() {
     //!  ^ slice
 }
 ------------------------------------------------------------------------
-type inference error at offset 54: expected int, got unknown
-type inference error at offset 81: expected slice, got unknown
+ok
 
 ========================================================================
 Tuple variable declaration with function call init

@@ -1049,7 +1049,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                             let name = self.text_of(&ident);
                             let name = name.as_str();
 
-                            let obj_ty = self.ctx.get_node_type_data(&dot.obj()?.syntax())?;
+                            let obj_ty = self.ctx.get_node_type_data(&cur_dot.obj()?.syntax())?;
                             let TyData::Struct { def, .. } = obj_ty else {
                                 return None;
                             };

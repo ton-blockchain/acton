@@ -45,7 +45,7 @@ fun main(foo: Foo) {
 ok
 
 ========================================================================
-If smartcast to non nullable value for struct field and tuple index TODO
+If smartcast to non nullable value for struct field and tuple index
 ========================================================================
 struct Foo {
     value: [int | null],
@@ -61,10 +61,10 @@ fun main(foo: Foo) {
 //!     ^ int?
 }
 ------------------------------------------------------------------------
-type inference error at offset 105: expected int, got int?
+ok
 
 ========================================================================
-If smartcast to non nullable value for struct field and tensor index TODO
+If smartcast to non nullable value for struct field and tensor index
 ========================================================================
 struct Foo {
     value: (int | null, bool),
@@ -80,10 +80,10 @@ fun main(foo: Foo) {
 //!     ^ int?
 }
 ------------------------------------------------------------------------
-type inference error at offset 111: expected int, got int?
+ok
 
 ========================================================================
-If smartcast to non nullable value for struct field and deep tuple index TODO
+If smartcast to non nullable value for struct field and deep tuple index
 ========================================================================
 struct Foo {
     value: [[[[[[int | null]]]]], bool],
@@ -99,7 +99,7 @@ fun main(foo: Foo) {
 //!     ^ int?
 }
 ------------------------------------------------------------------------
-type inference error at offset 131: expected int, got int?
+ok
 
 ========================================================================
 Assert smartcast to non nullable value for struct field

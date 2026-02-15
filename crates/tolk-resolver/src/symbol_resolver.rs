@@ -4,13 +4,13 @@
 //! identifier to its corresponding definition, taking into account scoping
 //! rules and global symbol visibility.
 
-use crate::FileIndex;
 use crate::file_db::{FileDb, FileInfo};
 use crate::file_index::{AstNodeSpanExt, FileId, SymbolId};
 use crate::project_index::ProjectIndex;
 use crate::resolve_index::{
     FileResolveIndex, LocalDef, LocalDefId, LocalDefKind, NameUse, NameUseKind, Resolved,
 };
+use crate::{FileIndex, SymbolKind};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tolk_syntax::{
@@ -73,6 +73,13 @@ impl GlobalEnv {
 
     fn add_file_declaration(visible: &mut HashMap<Arc<str>, Vec<SymbolId>>, file: &Arc<FileIndex>) {
         for decl in &file.decls {
+            if matches!(
+                decl.kind,
+                SymbolKind::Method { .. } | SymbolKind::EnumMember | SymbolKind::StructField
+            ) {
+                continue;
+            }
+
             visible
                 .entry(decl.name.clone())
                 .or_insert_with(|| Vec::with_capacity(1)) // avoid reallocation for the most of the cases

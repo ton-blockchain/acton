@@ -101,11 +101,11 @@ fun measure<T>(cb: (T) -> void): T {}
 fun foo() {
     val a = measure(fun (a: S) {
 //!     ^ S
-        a
-//!     ^ S
-            .x;
-//!          ^ int
+                 a
+//!              ^ S
+                      .x;
+//!                    ^ int
     })
 }
 ------------------------------------------------------------------------
-type inference error at offset 129: expected S, got int
+ok

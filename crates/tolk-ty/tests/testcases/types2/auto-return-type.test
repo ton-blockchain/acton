@@ -91,7 +91,7 @@ fun main() {
 ok
 
 ========================================================================
-Auto return type: single return with generic type and explicit type parameter TODO
+Auto return type: single return with generic type and explicit type parameter
 ========================================================================
 fun test<T>(arg: T) {
 //! ^ (T) -> T

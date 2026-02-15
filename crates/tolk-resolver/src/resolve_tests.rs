@@ -422,6 +422,28 @@ mod tests {
     }
 
     #[test]
+    fn test_struct_field_access_without_struct() {
+        check_definition(
+            r#"
+                struct Person {
+                    name: string;
+                    age: int;
+                }
+
+                fun main() {
+                    val p: Person;
+                    <caret>name;
+                    <caret>age;
+                }
+            "#,
+            expect![[r#"
+                name -> Unresolved
+                age -> Unresolved
+            "#]],
+        );
+    }
+
+    #[test]
     fn test_enum_member_access() {
         check_definition(
             r#"
@@ -461,6 +483,28 @@ mod tests {
                 add -> Global(add at test.tolk:21-24)
                 x -> Local(x at 154-155)
                 y -> Local(y at 185-186)
+            "#]],
+        );
+    }
+
+    #[test]
+    fn test_function_call_with_static_method() {
+        check_definition(
+            r#"
+                struct bar;
+
+                fun bar.add(a: int, b: int): int {
+                    return a + b;
+                }
+
+                fun main() {
+                    val x = 1;
+                    val y = 2;
+                    val result = <caret>add(x, y);
+                }
+            "#,
+            expect![[r#"
+                add -> Unresolved
             "#]],
         );
     }

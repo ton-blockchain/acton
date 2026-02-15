@@ -118,11 +118,12 @@ fun eq<T1>(a: T1): [T1] {
 fun eq2<X>(value: X) { return value; }
 
 fun name(f: int) {
-    eq(f ? null as int? : eq2(2));
-//!                     ^ int?
+    val a = f ? null as int? : eq2(2);
+//!     ^ int?
+    eq(a);
 }
 ------------------------------------------------------------------------
-type inference error at offset 128: unknown type
+ok
 
 ========================================================================
 Generic method as right hand of ternary inside other generic function call
