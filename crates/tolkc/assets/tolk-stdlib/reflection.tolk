@@ -97,3 +97,10 @@ struct SourceLocation {
 @pure
 fun reflect.sourceLocation(): SourceLocation
     builtin
+
+/// Behaves like [reflect.sourceLocation], but returns a string "fileName:lineNo:charNo".
+/// `fileName` contains the full (real) path of the source file.
+/// Being used as a default parameter value, captures the caller's location.
+@pure
+fun reflect.sourceLocationAsString(): string
+    builtin

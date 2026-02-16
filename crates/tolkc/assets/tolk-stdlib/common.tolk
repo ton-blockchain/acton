@@ -1274,6 +1274,11 @@ fun slice.preloadMaybeRef(self): cell?
 fun slice.skipMaybeRef(mutate self): self
     asm "SKIPOPTREF"
 
+/// Loads a string from a slice. A string is a nested ref, so just load a ref.
+@pure
+fun slice.loadString(mutate self): string
+    asm( -> 1 0) "LDREF"
+
 
 /**
     Builder primitives: constructing cells.
@@ -1317,6 +1322,11 @@ fun builder.storeUint(mutate self, x: int, len: int): self
 @pure
 fun builder.storeSlice(mutate self, s: slice): self
     asm(s self) "STSLICE"
+
+/// Stores a string into a builder (it's a TVM cell, stored as a ref).
+@pure
+fun builder.storeString(mutate self, s: string): self
+    asm(s self) "STREF"
 
 /// Stores an internal address into a builder.
 @pure

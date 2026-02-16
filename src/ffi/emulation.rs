@@ -630,7 +630,7 @@ fn find_transaction_by_params_impl(
     params: Tuple,
     txs: Tuple,
 ) -> anyhow::Result<()> {
-    if txs.0.is_empty() {
+    if txs.is_empty() {
         stack.push(TupleItem::Null);
         return Ok(());
     }

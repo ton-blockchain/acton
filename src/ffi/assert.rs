@@ -429,8 +429,7 @@ pub fn process_txs_and_search_params(
         .filter_map(|x| {
             let result = x.to_boc(false).ok()?;
             let tx_cell = Boc::decode(&result).ok()?;
-            let mut tx_slice = tx_cell.as_slice().ok()?;
-            Transaction::load_from(&mut tx_slice).ok()
+            tx_cell.parse::<Transaction>().ok()
         })
         .collect::<Vec<_>>();
 
