@@ -29,7 +29,7 @@ fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int
             forwardPayload: beginCell().storeMaybeRef(forwardPayload.toCell()).endCell().beginParse(),
         },
     });
-    return net.send(from, transferMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, transferMsg)
 }
 
 fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, responseAddress: address, customPayload: cell?) {
@@ -44,5 +44,5 @@ fun JettonWallet.sendBurn(self, from: address, value: int, jettonAmount: int, re
             customPayload,
         },
     });
-    return net.send(from, burnMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, burnMsg)
 }

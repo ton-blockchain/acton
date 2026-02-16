@@ -6,7 +6,7 @@
 ///
 /// Examples:
 /// ```tolk
-/// val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val results = net.send(wallet.address, msg);
 ///
 /// // Verify general success
 /// expect(results).toHaveSuccessfulTx({
@@ -20,7 +20,7 @@
 /// });
 ///
 /// // Verify failure case
-/// val failResults = net.send(wallet.address, invalidMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val failResults = net.send(wallet.address, invalidMsg);
 /// expect(failResults).toHaveFailedTx({
 ///     to: contract.address,
 ///     exit_code: 102 // specific error code
@@ -203,7 +203,7 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: Search
 ///
 /// Example:
 /// ```tolk
-/// val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val results = net.send(wallet.address, msg);
 /// expect(results).toHaveAllSuccessfulTxs();
 /// ```
 fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
@@ -263,7 +263,7 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
 ///
 /// Example:
 /// ```tolk
-/// val result = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val result = net.send(deployer.address, message);
 /// expect(result.at(0)).toConsumeLessThan(1000);
 /// ```
 fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {

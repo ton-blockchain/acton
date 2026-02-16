@@ -40,7 +40,7 @@ fun main() {
     net.disableBroadcast();
     // ...
     // This send will be emulated and not sent to the real blockchain
-    val result = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val result = net.send(wallet.address, msg);
     result.wait();
 
     // Enable broadcasting mode again
@@ -104,7 +104,7 @@ fun Counter.deploy(self, deployer: address, value: coins) {
             stateInit: self.init,
         },
     });
-    return net.send(deployer, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    return net.send(deployer, msg);
 }
 
 fun Counter.sendIncrease(self, from: address, increaseBy: int) {
@@ -114,7 +114,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int) {
         dest: self.address,
         body: IncreaseCounter { increaseBy },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    return net.send(from, msg);
 }
 
 fun Counter.getCounter(self): int {
@@ -162,13 +162,9 @@ fun main() {
     val deployer = net.wallet("deployer");
 
     val msg = createMessage({
-        bounce: true,
-        value: ton("0.1"),
-        dest: someContractAddress,
-        body: SomeMessage { param: 42 },
-    });
+        bounce: true, value: ton("0.1"));
 
-    net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    net.send(deployer.address, msg);
     println("Message sent!");
 }
 ```
@@ -207,7 +203,7 @@ You can also check the result of waiting:
 ```tolk
 fun main() {
     // ...
-    val result = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val result = net.send(deployer.address, msg);
 
     val success = result.wait();
     if (success) {

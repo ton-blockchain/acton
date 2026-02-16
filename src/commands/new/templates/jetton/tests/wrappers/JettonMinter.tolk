@@ -20,7 +20,7 @@ fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, inclu
             includeOwnerAddress,
         },
     });
-    return net.send(from, discoveryMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, discoveryMsg)
 }
 
 fun JettonMinter.sendChangeContent(self, from: address, newContent: cell) {
@@ -33,7 +33,7 @@ fun JettonMinter.sendChangeContent(self, from: address, newContent: cell) {
             newContent,
         },
     });
-    return net.send(from, changeMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, changeMsg)
 }
 
 fun JettonMinter.fromStorage(storage: MinterStorage) {
@@ -56,7 +56,7 @@ fun JettonMinter.sendDeploy(self, from: address, params: SendParams) {
             stateInit: self.init,
         },
     });
-    return net.send(from, deployMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, deployMsg)
 }
 
 fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount: int, forwardTonAmount: int, totalTonAmount: int) {
@@ -78,7 +78,7 @@ fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount:
             }.toCell(),
         },
     });
-    return net.send(from, mintMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, mintMsg)
 }
 
 fun JettonMinter.sendChangeAdmin(self, from: address, newOwner: address) {
@@ -91,7 +91,7 @@ fun JettonMinter.sendChangeAdmin(self, from: address, newOwner: address) {
             newAdminAddress: newOwner,
         },
     });
-    return net.send(from, changeMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, changeMsg)
 }
 
 fun JettonMinter.getJettonData(self): JettonDataReply {

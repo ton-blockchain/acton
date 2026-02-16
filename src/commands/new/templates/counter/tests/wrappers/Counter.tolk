@@ -26,7 +26,7 @@ fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList
             stateInit: self.init,
         },
     });
-    return net.send(from, deployMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, deployMsg)
 }
 
 fun Counter.sendIncreaseCounter(self, from: address, increaseBy: uint32, config: SendParams = {}): SendResultList {
@@ -38,7 +38,7 @@ fun Counter.sendIncreaseCounter(self, from: address, increaseBy: uint32, config:
             increaseBy,
         },
     });
-    return net.send(from, increaseMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, increaseMsg)
 }
 
 fun Counter.sendResetCounter(self, from: address, config: SendParams = {}): SendResultList {
@@ -48,7 +48,7 @@ fun Counter.sendResetCounter(self, from: address, config: SendParams = {}): Send
         dest: self.address,
         body: ResetCounter {},
     });
-    return net.send(from, resetMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, resetMsg)
 }
 
 fun Counter.sendAny(self, from: address, body: cell, config: SendParams = {}): SendResultList {
@@ -58,7 +58,7 @@ fun Counter.sendAny(self, from: address, body: cell, config: SendParams = {}): S
         dest: self.address,
         body,
     });
-    return net.send(from, anyMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, anyMsg)
 }
 
 fun Counter.currentCounter(self): int {

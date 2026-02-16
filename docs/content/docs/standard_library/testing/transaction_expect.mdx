@@ -13,7 +13,7 @@ if a contract was deployed, or if specific messages were emitted.
 
 Examples:
 ```tolk
-val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+val results = net.send(wallet.address, msg);
 
 // Verify general success
 expect(results).toHaveSuccessfulTx({
@@ -27,7 +27,7 @@ expect(results).toHaveSuccessfulDeploy({
 });
 
 // Verify failure case
-val failResults = net.send(wallet.address, invalidMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+val failResults = net.send(wallet.address, invalidMsg);
 expect(failResults).toHaveFailedTx({
     to: contract.address,
     exit_code: 102 // specific error code
@@ -161,7 +161,7 @@ Expect all transactions in the list to be successful.
 
 Example:
 ```tolk
-val results = net.send(wallet.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+val results = net.send(wallet.address, msg);
 expect(results).toHaveAllSuccessfulTxs();
 ```
 
@@ -192,7 +192,7 @@ Expect the transaction to consume less than the expected amount of gas.
 
 Example:
 ```tolk
-val result = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+val result = net.send(deployer.address, message);
 expect(result.at(0)).toConsumeLessThan(1000);
 ```
 

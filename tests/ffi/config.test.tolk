@@ -54,7 +54,7 @@ get fun `test get executor config`() {
     });
 
     val deployer = net.treasury("deployer");
-    val res = net.send(deployer.address, deployMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val res = net.send(deployer.address, deployMsg);
 
     expect(res).toHaveSuccessfulDeploy({ from: deployer.address, to: getAddress.calculateAddress() });
 

@@ -11,7 +11,7 @@
 ///
 /// // Interact
 /// val msg = createMessage({ ... });
-/// val results = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val results = net.send(deployer.address, msg);
 ///
 /// // Check state
 /// val balance = net.balance(contract.address);
@@ -186,7 +186,7 @@ fun SendResultList.at(self, index: int): SendResult {
 ///
 /// Example:
 /// ```tolk
-/// val result = net.send(wallet.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val result = net.send(wallet.address, message);
 /// val success = result.wait();
 /// if (success) {
 ///     println("Transaction applied successfully");
@@ -195,7 +195,7 @@ fun SendResultList.at(self, index: int): SendResult {
 ///
 /// Example with custom parameters:
 /// ```tolk
-/// val result = net.send(wallet.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val result = net.send(wallet.address, message);
 /// val success = result.wait(true, 30, 3000); // quiet mode, 30 attempts, 3 seconds delay
 /// ```
 fun SendResultList.wait(
@@ -295,7 +295,7 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>
 ///
 /// Example:
 /// ```tolk
-/// val tx = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val tx = net.send(deployer.address, message);
 /// val result = tx.findExternalOutMessage({ from: counter.address });
 /// expect(result).toBeDefined();
 /// val tx = result.unwrap();
@@ -351,7 +351,7 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
 ///
 /// Example:
 /// ```tolk
-/// val tx = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val tx = net.send(deployer.address, message);
 /// val result = tx.findTransaction({ to: counter.address });
 /// expect(result).toBeDefined();
 /// val tx = result.unwrap();
@@ -377,29 +377,24 @@ fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {})
 ///         dest: counter.address,
 ///         value: ton("1"),
 ///     });
-///     net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+///     net.send(deployer.address, message);
 /// }
 /// ```
 ///
 /// Returns a list of send results representing all transactions produced by this send call.
 ///
 /// See [net.sendSingle] if you need to send a single message without out message processing.
-fun net.send(from: address, message: OutMessage, mode: int): SendResultList {
-    return ffi.sendMessageFrom(message.messageCell, from.toCell(), mode)!;
+fun net.send(from: address, message: OutMessage): SendResultList {
+    val rawRes = ffi.sendMessageFrom(message.messageCell, from.toCell());
+    if (rawRes == null) {
+        Assert.fail("ffi.sendMessageFrom unexpectedly returned null")
+    }
+    return rawRes;
 }
 
 /// Send a single message from a specified address.
 ///
-/// In contrast to [net.send], this method doesn't process out messages, but returns
-/// a single send result with this out messages.
-///
-/// This method is useful for bounce testing where you want to simulate a bounced message.
-///
-/// Example:
-/// ```tolk
-/// val bounced_msg = createMessage({
-///     bounce: false,
-///     value: ton("0.95"),
+/// In contrast to [net.send]),
 ///     dest: deployer_jetton_wallet.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
@@ -456,16 +451,10 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
 /// Read more about External incomming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
 fun net.sendExternal(msg: OutMessage): SendResultList {
     // from and mode fields do not affect anything in case of an ExtIn message
-    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell(), 0)!;
+    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell())!;
 }
 
-/// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
-///
-/// Example:
-/// ```tolk
-/// val msg = createMessage({
-///     bounce: false,
-///     value: ton("1"),
+/// Transform the out message to a bounced message. Essentially),
 ///     dest: counter.address,
 /// });
 /// val bouncedMsg = msg.bounced();
@@ -524,7 +513,7 @@ fun net.treasury(name: string): Treasury {
         dest: { workchain: 0, stateInit },
     });
     // Deploy treasury
-    net.send(deployer, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    net.send(deployer, msg);
     return Treasury { address };
 }
 
@@ -915,7 +904,7 @@ fun net.topUp(to: address, amount: coins) {
         value: amount,
         dest: to,
     });
-    net.send(treasury.address, topupMsg, SEND_MODE_REGULAR);
+    net.send(treasury.address, topupMsg);
 }
 
 /// Get the balance of an address.
@@ -1152,7 +1141,7 @@ fun __treasuryCode(): cell asm """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
-fun ffi.sendMessageFrom(msg: cell, from: cell, mode: int): SendResultList? asm "9 EXTCALL"
+fun ffi.sendMessageFrom(msg: cell, from: cell): SendResultList? asm "9 EXTCALL"
 fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
 fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: string, returnType: string, args: tuple): tuple? asm "8 EXTCALL"
 fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"

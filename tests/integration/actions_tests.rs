@@ -75,7 +75,7 @@ fn test_action_fail() {
                     dest: addr,
                 });
 
-                val res = net.send(deployer.address, triggerMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+                val res = net.send(deployer.address, triggerMsg);
                 println(res);
             }
         "#,

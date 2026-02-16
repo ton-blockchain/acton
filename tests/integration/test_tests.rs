@@ -44,7 +44,7 @@ fun setupTest() {
         },
     });
 
-    net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    net.send(deployer.address, msg);
     return (counter, deployer)
 }
 "#;
@@ -484,7 +484,7 @@ fn test_send_message_to_not_deployed_contract() {
                     bounce: false,
                     value: ton("1"),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 println(res);
             }
         "#,
@@ -523,7 +523,7 @@ fn test_send_message_to_not_deployed_contract_with_register() {
                     bounce: false,
                     value: ton("1"),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 println(res);
             }
         "#,
@@ -568,7 +568,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code() {
                     value: ton("0.1"),
                     dest: address,
                 });
-                net.send(deployer.address, outMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+                net.send(deployer.address, outMsg);
 
                 val res: int = net.runGetMethod(address.calculateAddress(), "counter");
                 println(res);
@@ -615,7 +615,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code_with_backtrace_full()
                     value: ton("0.1"),
                     dest: address,
                 });
-                net.send(deployer.address, outMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+                net.send(deployer.address, outMsg);
 
                 val res: int = net.runGetMethod(address.calculateAddress(), "counter");
                 println(res);
@@ -659,7 +659,7 @@ fn test_send_invalid_message() {
                     value: ton("0.1"),
                     dest: address,
                 });
-                net.send(deployer.address, outMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+                net.send(deployer.address, outMsg);
             }
         "#,
         )
@@ -709,7 +709,7 @@ fn test_debug_logs_in_contract() {
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 println(sender.address);
             }
         "#,
@@ -825,7 +825,7 @@ fn test_auto_register_refs_if_any() {
                     dest: address,
                 });
 
-                val res = net.send(deployer.address, triggerMsg, SEND_MODE_PAY_FEES_SEPARATELY);
+                val res = net.send(deployer.address, triggerMsg);
                 println(res);
             }
         "#,
@@ -874,7 +874,7 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 expect(res).toHaveSuccessfulTx();
             }
         "#,
@@ -925,7 +925,7 @@ fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 expect(res).toHaveSuccessfulTx();
             }
         "#,
@@ -977,7 +977,7 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 expect(res).toHaveSuccessfulTx();
             }
         "#,
@@ -1028,7 +1028,7 @@ fn test_test_all_successful_tx_matcher_with_fail() {
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 expect(res).toHaveAllSuccessfulTxs();
             }
         "#,
@@ -1081,7 +1081,7 @@ fn test_test_all_successful_tx_matcher_without_fail() {
                     dest: address,
                     body: beginCell().storeUint(1, 32).endCell(),
                 });
-                val res = net.send(sender.address, msg, 0);
+                val res = net.send(sender.address, msg);
                 expect(res).toHaveAllSuccessfulTxs();
             }
         "#,

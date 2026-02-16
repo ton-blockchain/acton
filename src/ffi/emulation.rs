@@ -173,11 +173,10 @@ fn build_impl(
     Ok(())
 }
 
-extension!(send_message in (Context) with (mode: BigInt, src: ArcCell, msg: ArcCell) using send_message_impl);
+extension!(send_message in (Context) with (src: ArcCell, msg: ArcCell) using send_message_impl);
 fn send_message_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
-    _: BigInt,
     src: ArcCell,
     msg: ArcCell,
 ) -> anyhow::Result<()> {
@@ -1462,7 +1461,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
     register_ext_methods!(executor, ctx, {
         6 => build : 2,
         8 => run_get_method : 6,
-        9 => send_message : 3,
+        9 => send_message : 2,
         10 => find_transaction_by_params : 2,
         11 => is_deployed : 1,
         12 => get_deployed_code : 1,

@@ -73,7 +73,7 @@ struct (0b0111) Transaction {
 ///
 /// Example:
 /// ```tolk
-/// val result = net.send(address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+/// val result = net.send(address, msg);
 /// val tx = result.findTransaction<IncreaseCounter>({ to: address }).unwrap();
 /// val body = tx.loadBody<IncreaseCounter>();
 /// println(body.increaseBy);

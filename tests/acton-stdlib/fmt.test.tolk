@@ -91,7 +91,7 @@ get fun `test-format-message`() {
         value: ton("1.9999"),
         dest,
     });
-    val result = net.send(src, msg, SEND_MODE_REGULAR);
+    val result = net.send(src, msg);
     val first = result.at(0);
     val tx = first.tx.load();
 
