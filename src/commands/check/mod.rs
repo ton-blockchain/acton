@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use tolk_linter::diagnostic::{Annotation, Diagnostic, Severity};
+use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, Severity};
 use tolk_linter::{Checker, Rule};
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::Span;
@@ -124,6 +124,32 @@ pub fn check_cmd(
                 .iter()
                 .find(|d| d.code.is_some())
                 .and_then(|d| d.code.clone());
+
+            if !fix {
+                let count_to_autofix = shown_diagnostics
+                    .iter()
+                    .filter(|d| {
+                        d.fixes
+                            .iter()
+                            .any(|f| f.applicability == Applicability::Auto)
+                    })
+                    .count();
+
+                if count_to_autofix > 0 {
+                    let issue_word = if count_to_autofix == 1 {
+                        "issue"
+                    } else {
+                        "issues"
+                    };
+
+                    eprintln!();
+                    eprintln!(
+                        "{count_to_autofix} {issue_word} can be fixed automatically, rerun with {} flag.",
+                        "--fix".yellow()
+                    );
+                }
+            }
+
             if let Some(code) = first_code {
                 eprintln!();
                 eprintln!(

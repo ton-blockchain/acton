@@ -42,5 +42,7 @@ help: rename to camelCase: badLocal
   |                        ^^^^^^^^^ badLocal
 
 
+3 issues can be fixed automatically, rerun with --fix flag.
+
 Use acton check --explain <CODE> to get detailed explanation of a rule.
 For example: acton check --explain S001

@@ -155,5 +155,7 @@ help: rename to camelCase: badMethod
    |                                           ^^^^^^^^^^ badMethod
 
 
+9 issues can be fixed automatically, rerun with --fix flag.
+
 Use acton check --explain <CODE> to get detailed explanation of a rule.
 For example: acton check --explain S001

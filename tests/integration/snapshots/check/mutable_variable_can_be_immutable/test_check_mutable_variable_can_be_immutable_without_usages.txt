@@ -11,5 +11,7 @@ help: prefix with underscore: `_a`
   |                     ^ _a
 
 
+1 issue can be fixed automatically, rerun with --fix flag.
+
 Use acton check --explain <CODE> to get detailed explanation of a rule.
 For example: acton check --explain E002

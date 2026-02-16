@@ -13,5 +13,7 @@ help: replace with SEND_MODE_* constants
   |                                    ^ SEND_MODE_PAY_FEES_SEPARATELY + SEND_MODE_IGNORE_ERRORS
 
 
+1 issue can be fixed automatically, rerun with --fix flag.
+
 Use acton check --explain <CODE> to get detailed explanation of a rule.
 For example: acton check --explain E016
