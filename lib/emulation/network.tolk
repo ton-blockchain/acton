@@ -394,7 +394,16 @@ fun net.send(from: address, message: OutMessage): SendResultList {
 
 /// Send a single message from a specified address.
 ///
-/// In contrast to [net.send]),
+/// In contrast to [net.send], this method doesn't process out messages, but returns
+/// a single send result with this out messages.
+///
+/// This method is useful for bounce testing where you want to simulate a bounced message.
+///
+/// Example:
+/// ```tolk
+/// val bounced_msg = createMessage({
+///     bounce: false,
+///     value: ton("0.95"),
 ///     dest: deployer_jetton_wallet.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
@@ -454,7 +463,13 @@ fun net.sendExternal(msg: OutMessage): SendResultList {
     return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell())!;
 }
 
-/// Transform the out message to a bounced message. Essentially),
+/// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
+///
+/// Example:
+/// ```tolk
+/// val msg = createMessage({
+///     bounce: false,
+///     value: ton("1"),
 ///     dest: counter.address,
 /// });
 /// val bouncedMsg = msg.bounced();

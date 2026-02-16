@@ -162,7 +162,11 @@ fun main() {
     val deployer = net.wallet("deployer");
 
     val msg = createMessage({
-        bounce: true, value: ton("0.1"));
+        bounce: true,
+        value: ton("0.1"),
+        dest: someContractAddress,
+        body: SomeMessage { param: 42 },
+    });
 
     net.send(deployer.address, msg);
     println("Message sent!");
