@@ -42,7 +42,7 @@ fun Main.deploy(self, from: address, config: SendParams = {}): SendResultList {
             stateInit: self.stateInit,
         },
     });
-    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, genericMsg)
 }
 
 fun Main.sendIncrement(self, from: address, value: int32, config: SendParams = {}): SendResultList {
@@ -54,7 +54,7 @@ fun Main.sendIncrement(self, from: address, value: int32, config: SendParams = {
             value,
         },
     });
-    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, genericMsg)
 }
 
 fun Main.sendDecrement(self, from: address, value: int, config: SendParams = {}): SendResultList {
@@ -66,7 +66,7 @@ fun Main.sendDecrement(self, from: address, value: int, config: SendParams = {})
             value,
         },
     });
-    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, genericMsg)
 }
 
 /// Send message to the contract with a custom body cell
@@ -77,5 +77,5 @@ fun Main.sendAny(self, from: address, body: cell, config: SendParams = {}): Send
         dest: self.address,
         body,
     });
-    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, genericMsg)
 }

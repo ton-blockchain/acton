@@ -30,7 +30,7 @@ fun setupTest() {
             stateInit: counter.init,
         },
     });
-    val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val res = net.send(deployer.address, msg);
     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
     return (counter, deployer)

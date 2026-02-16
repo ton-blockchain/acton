@@ -480,7 +480,7 @@ fn generate_deploy(contract_name: &str) -> String {
     code.push_str("            stateInit: self.stateInit,\n");
     code.push_str("        },\n");
     code.push_str("    });\n");
-    code.push_str("    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
+    code.push_str("    return net.send(from, genericMsg)\n");
     code.push_str("}\n");
 
     code
@@ -543,7 +543,7 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
     }
 
     code.push_str("    });\n");
-    code.push_str("    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
+    code.push_str("    return net.send(from, genericMsg)\n");
     code.push_str("}\n");
 
     code
@@ -570,7 +570,7 @@ fn generate_send_any_method(contract_name: &str) -> String {
     code.push_str("        dest: self.address,\n");
     code.push_str("        body,\n");
     code.push_str("    });\n");
-    code.push_str("    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)\n");
+    code.push_str("    return net.send(from, genericMsg)\n");
     code.push_str("}\n");
 
     code

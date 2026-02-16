@@ -263,7 +263,7 @@ Step 18 (step_over):
      60|             stateInit: counter.init,
      61|         },
      62|     });
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
                  ^^^
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
      65| 
@@ -279,7 +279,7 @@ Step 19 (step_over):
      60|             stateInit: counter.init,
      61|         },
      62|     });
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
      65| 
@@ -296,7 +296,7 @@ Step 20 (step_over):
      60|             stateInit: counter.init,
      61|         },
      62|     });
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
      65| 
@@ -311,7 +311,7 @@ Step 21 (step_over):
   Code:
      61|         },
      62|     });
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
              ^^^^^^^^^^^
      65| 
@@ -330,7 +330,7 @@ Step 22 (step_over):
   Code:
      61|         },
      62|     });
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
              ^^^^^^^^^^^
      65| 
@@ -862,7 +862,7 @@ Step 47 (step_over):
   Code:
      61|         },
      62|     });
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      65| 
@@ -888,7 +888,7 @@ Step 48 (step_over):
   Code:
      61|         },
      62|     });
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      65| 
@@ -901,7 +901,7 @@ Step 48 (step_over):
 Step 49 (step_over):
   Bytecode position: DF17C65B061BB04F6BEF906CBCC7C203905E77A98E71CCC87F9A5B69B20C2C7A:728
   Code:
-     63|     val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+     63|     val res = net.send(deployer.address, msg);
      64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
      65| 
      66|     return (counter, deployer)

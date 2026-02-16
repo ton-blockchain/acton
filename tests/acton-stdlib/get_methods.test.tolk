@@ -25,7 +25,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int) {
         dest: self.address,
         body: IncreaseCounter { increaseBy },
     });
-    return net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    return net.send(from, msg);
 }
 
 fun setupTest() {
@@ -39,7 +39,7 @@ fun setupTest() {
             stateInit: counter.init,
         },
     });
-    val res = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val res = net.send(deployer.address, msg);
     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 
     return (counter, deployer)

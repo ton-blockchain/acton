@@ -25,7 +25,7 @@ fun `test-mint`() {
             newAdminAddress: new_owner,
         },
     });
-    val result = net.send(from, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    val result = net.send(from, msg);
     println(result); // show transaction tree
 }
 ```
@@ -52,7 +52,7 @@ fun JettonMinter.getWalletAddress(self, owner: address): address {
 fun `test-some`() {
     val treasury = net.treasury("trasury");
     // ..
-    net.send(treasury.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+    net.send(treasury.address, msg);
 }
 ```
 

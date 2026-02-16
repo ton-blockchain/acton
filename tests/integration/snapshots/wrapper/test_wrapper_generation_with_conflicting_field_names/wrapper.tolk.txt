@@ -40,7 +40,7 @@ fun MyContract.deploy(self, from: address, config: SendParams = {}): SendResultL
             stateInit: self.stateInit,
         },
     });
-    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, genericMsg)
 }
 
 fun MyContract.sendMessageWithConflicts(self, from: address, from_: address, config_: int, other: uint32, config: SendParams = {}): SendResultList {
@@ -54,7 +54,7 @@ fun MyContract.sendMessageWithConflicts(self, from: address, from_: address, con
             other,
         },
     });
-    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, genericMsg)
 }
 
 /// Send message to the contract with a custom body cell
@@ -65,5 +65,5 @@ fun MyContract.sendAny(self, from: address, body: cell, config: SendParams = {})
         dest: self.address,
         body,
     });
-    return net.send(from, genericMsg, SEND_MODE_PAY_FEES_SEPARATELY)
+    return net.send(from, genericMsg)
 }

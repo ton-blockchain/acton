@@ -9,7 +9,7 @@
 
  > tests/test.test.tolk (1 test)
   ✗ foo [TIME]
-    └─ Error: Failed to parse message: invalid tag
+    └─ Error: ffi.sendMessageFrom unexpectedly returned null
 
  ✗ 1 failed in 1 file
 

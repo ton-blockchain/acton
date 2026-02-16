@@ -18,7 +18,7 @@ val contract = build("MyContract");
 
 // Interact
 val msg = createMessage({ ... });
-val results = net.send(deployer.address, msg, SEND_MODE_PAY_FEES_SEPARATELY);
+val results = net.send(deployer.address, msg);
 
 // Check state
 val balance = net.balance(contract.address);
@@ -209,7 +209,7 @@ Returns `true` if transaction is found and `false` otherwise.
 
 Example:
 ```tolk
-val result = net.send(wallet.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+val result = net.send(wallet.address, message);
 val success = result.wait();
 if (success) {
     println("Transaction applied successfully");
@@ -218,7 +218,7 @@ if (success) {
 
 Example with custom parameters:
 ```tolk
-val result = net.send(wallet.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+val result = net.send(wallet.address, message);
 val success = result.wait(true, 30, 3000); // quiet mode, 30 attempts, 3 seconds delay
 ```
 
@@ -300,7 +300,7 @@ Find a external-out message in the send result list by specified parameters.
 
 Example:
 ```tolk
-val tx = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+val tx = net.send(deployer.address, message);
 val result = tx.findExternalOutMessage({ from: counter.address });
 expect(result).toBeDefined();
 val tx = result.unwrap();
@@ -330,7 +330,7 @@ Find a transaction in the send result list by specified parameters.
 
 Example:
 ```tolk
-val tx = net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+val tx = net.send(deployer.address, message);
 val result = tx.findTransaction({ to: counter.address });
 expect(result).toBeDefined();
 val tx = result.unwrap();
@@ -341,7 +341,7 @@ val tx = result.unwrap();
 ## `net.send`
 
 ```tolk
-fun net.send(from: address, message: OutMessage, mode: int): SendResultList
+fun net.send(from: address, message: OutMessage): SendResultList
 ```
 
 Send a message from a specified address with specified mode.
@@ -355,7 +355,7 @@ get fun `test-send-message`() {
         dest: counter.address,
         value: ton("1"),
     });
-    net.send(deployer.address, message, SEND_MODE_PAY_FEES_SEPARATELY);
+    net.send(deployer.address, message);
 }
 ```
 
