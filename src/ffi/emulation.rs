@@ -34,7 +34,7 @@ use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Load, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{
     AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr,
@@ -310,19 +310,14 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
         None => ArcCell::default(),
     };
 
-    let result = tx.to_boc(false).ok()?;
-    let tx_cell = Boc::decode(&result).ok()?;
-    let mut tx_slice = tx_cell.as_slice().ok()?;
-    let parsed_tx = Transaction::load_from(&mut tx_slice).ok()?;
-
+    let parsed_tx = &emulation.transaction;
     let out_messages = Tuple(
         parsed_tx
             .iter_out_msgs()
             .filter_map(Result::ok)
             .filter_map(|msg| {
                 let cell = to_cell(&msg);
-                let boc = Boc::encode_base64(&cell);
-                ArcCell::from_boc_b64(&boc).ok()
+                ArcCell::from_boc(&Boc::encode(&cell)).ok()
             })
             .map(TupleItem::Cell)
             .collect::<Vec<_>>(),
@@ -340,10 +335,7 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
         emulation
             .externals
             .iter()
-            .filter_map(|ext_cell| {
-                let boc = Boc::encode_base64(ext_cell);
-                ArcCell::from_boc_b64(&boc).ok()
-            })
+            .filter_map(|ext_cell| ArcCell::from_boc(&Boc::encode(ext_cell)).ok())
             .map(TupleItem::Cell)
             .collect::<Vec<_>>(),
     );
@@ -872,12 +864,7 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
-    let config_b64 = world_state
-        .get_config()
-        .root()
-        .clone()
-        .map(Boc::encode_base64)
-        .expect("Config has no root");
+    let config_b64 = world_state.get_config_b64();
 
     let result = if ctx.debug.is_enabled() {
         let args = serialize_tuple(&args)
@@ -1473,32 +1460,32 @@ fn set_shard_account_impl(
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        6 => build,
-        8 => run_get_method,
-        9 => send_message,
-        10 => find_transaction_by_params,
-        11 => is_deployed,
-        12 => get_deployed_code,
-        13 => crc16,
-        14 => type_name_by_opcode,
-        15 => register_address,
-        16 => register_code,
-        17 => account_state,
-        18 => register_lib,
-        19 => convert_address,
-        20 => cell_from_hex,
-        21 => load_library_by_hash,
-        23 => is_broadcasting,
-        24 => get_wallet_by_name,
-        25 => wait_for_transaction,
-        26 => enable_broadcast,
-        27 => disable_broadcast,
-        28 => set_now,
-        29 => get_now,
-        30 => send_single_message,
-        31 => get_config,
-        32 => set_config,
-        33 => get_shard_account,
-        34 => set_shard_account,
+        6 => build : 2,
+        8 => run_get_method : 6,
+        9 => send_message : 3,
+        10 => find_transaction_by_params : 2,
+        11 => is_deployed : 1,
+        12 => get_deployed_code : 1,
+        13 => crc16 : 1,
+        14 => type_name_by_opcode : 1,
+        15 => register_address : 2,
+        16 => register_code : 2,
+        17 => account_state : 1,
+        18 => register_lib : 1,
+        19 => convert_address : 1,
+        20 => cell_from_hex : 1,
+        21 => load_library_by_hash : 1,
+        23 => is_broadcasting : 0,
+        24 => get_wallet_by_name : 1,
+        25 => wait_for_transaction : 5,
+        26 => enable_broadcast : 0,
+        27 => disable_broadcast : 0,
+        28 => set_now : 1,
+        29 => get_now : 0,
+        30 => send_single_message : 2,
+        31 => get_config : 0,
+        32 => set_config : 1,
+        33 => get_shard_account : 1,
+        34 => set_shard_account : 2,
     });
 }

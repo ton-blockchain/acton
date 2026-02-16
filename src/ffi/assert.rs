@@ -439,12 +439,12 @@ pub fn process_txs_and_search_params(
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
-        100 => assert_fail,
-        101 => assert_bin,
-        102 => expect_to_end_with_exit_code,
-        103 => fail_to_find_transaction_by_params,
-        104 => fail_to_not_find_transaction_by_params,
-        105 => fail_wallet_not_found,
-        106 => assert_decimal,
+        100 => assert_fail : 2,
+        101 => assert_bin : 7,
+        102 => expect_to_end_with_exit_code : 1,
+        103 => fail_to_find_transaction_by_params : 4,
+        104 => fail_to_not_find_transaction_by_params : 4,
+        105 => fail_wallet_not_found : 2,
+        106 => assert_decimal : 5,
     });
 }

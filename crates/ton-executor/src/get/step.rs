@@ -186,6 +186,7 @@ impl StepGetExecutor {
         &mut self,
         id: i32,
         ctx: &mut Ctx,
+        stack_items_count: u8,
         callback: ExtMethodCallback<Ctx>,
     ) -> anyhow::Result<()> {
         if !self.ext_methods.insert(id) {
@@ -198,6 +199,7 @@ impl StepGetExecutor {
                 self.inner.as_ptr(),
                 id,
                 std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                c_int::from(stack_items_count),
                 std::mem::transmute::<
                     unsafe extern "C" fn(*mut Ctx, *const i8) -> *const i8,
                     unsafe extern "C" fn(*mut c_void, *const i8) -> *const i8,
@@ -214,9 +216,10 @@ impl BaseExecutor for StepGetExecutor {
         &mut self,
         id: i32,
         ctx: &mut Ctx,
+        stack_items_count: u8,
         callback: ExtMethodCallback<Ctx>,
     ) -> anyhow::Result<()> {
-        self.register_ext_method(id, ctx, callback)
+        self.register_ext_method(id, ctx, stack_items_count, callback)
     }
 }
 

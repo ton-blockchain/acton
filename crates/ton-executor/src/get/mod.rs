@@ -180,7 +180,7 @@ impl GetExecutor {
     /// let mut exec = GetExecutor::new(&args)?;
     /// let mut my_ctx = MyCtx { val: 0 };
     ///
-    /// exec.register_ext_method(100, &mut my_ctx, my_callback)?;
+    /// exec.register_ext_method(100, &mut my_ctx, 0, my_callback)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -188,6 +188,7 @@ impl GetExecutor {
         &mut self,
         id: i32,
         ctx: &mut Ctx,
+        stack_items_count: u8,
         callback: ExtMethodCallback<Ctx>,
     ) -> anyhow::Result<()> {
         if !self.ext_methods.insert(id) {
@@ -200,6 +201,7 @@ impl GetExecutor {
                 self.inner.as_ptr(),
                 id,
                 std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                c_int::from(stack_items_count),
                 std::mem::transmute::<
                     unsafe extern "C" fn(*mut Ctx, *const i8) -> *const i8,
                     unsafe extern "C" fn(*mut c_void, *const i8) -> *const i8,
@@ -216,9 +218,10 @@ impl BaseExecutor for GetExecutor {
         &mut self,
         id: i32,
         ctx: &mut Ctx,
+        stack_items_count: u8,
         callback: ExtMethodCallback<Ctx>,
     ) -> anyhow::Result<()> {
-        self.register_ext_method(id, ctx, callback)
+        self.register_ext_method(id, ctx, stack_items_count, callback)
     }
 }
 
@@ -236,6 +239,7 @@ unsafe extern "C" {
         tvm_emulator: *mut c_void,
         id: c_int,
         ctx: *mut c_void,
+        stack_items_count: c_int,
         callback: ExtMethodCallback<c_void>,
     ) -> *const c_char;
 

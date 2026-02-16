@@ -1,8 +1,8 @@
 #![cfg(test)]
-use crate::DEFAULT_CONFIG;
 use crate::common::ExecutorVerbosity;
 use crate::message::Executor;
 use crate::message::types::RunTransactionArgs;
+use crate::{DEFAULT_CONFIG, EXT_METHOD_STACK_ALL_ITEMS};
 use std::ffi::c_char;
 
 #[test]
@@ -120,7 +120,7 @@ fn test_executor_with_ext_method() -> anyhow::Result<()> {
 
     let mut exec = Executor::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
 
-    exec.register_ext_method(100, &mut my_ctx, my_callback)?;
+    exec.register_ext_method(100, &mut my_ctx, EXT_METHOD_STACK_ALL_ITEMS, my_callback)?;
 
     let msg = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
     let shard_account = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
