@@ -18,6 +18,7 @@
     "e015-asm-function-missing-safety-comment",
     "e016-send-mode-literal",
     "e017-unauthorized-access",
+    "e018-import-path-can-use-mappings",
     "e019-several-not-null-assertions",
     "s001-name-case-checker"
   ]

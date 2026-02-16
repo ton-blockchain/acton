@@ -3,6 +3,7 @@ pub mod asm_function_missing_safety_comment;
 pub mod compiler_error;
 pub mod deprecated_symbol_use;
 pub mod field_init_can_be_folded;
+pub mod import_path_can_use_mappings;
 pub mod message_entity_naming;
 pub mod method_can_be_static;
 pub mod mutable_parameter_can_be_immutable;

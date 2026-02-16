@@ -1,5 +1,5 @@
-use crate::integration::check::deprecated_tests::run_simple_test;
 use crate::integration::check::run_fix_test;
+use crate::integration::check::run_simple_test;
 use function_name::named;
 
 #[test]

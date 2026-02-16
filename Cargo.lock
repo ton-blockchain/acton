@@ -3066,6 +3066,7 @@ name = "tolk-linter"
 version = "0.1.0"
 dependencies = [
  "acton-config",
+ "dunce",
  "heck",
  "log",
  "memchr",

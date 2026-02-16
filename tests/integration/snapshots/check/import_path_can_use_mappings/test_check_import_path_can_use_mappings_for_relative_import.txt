@@ -1,0 +1,19 @@
+warning[E018]: import path can use mappings
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             import "../libs/math.tolk";
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ this import can use mapping `@libs/math`
+  |
+  = replace this import with `import "@libs/math";`
+
+help: replace import path with mapping
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             import "../libs/math.tolk";
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ import "@libs/math"
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E018

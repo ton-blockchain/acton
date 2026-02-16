@@ -5,10 +5,10 @@ use crate::ast::{
     acton_import_in_contract, deprecated_symbol_use, no_bounce_handler, several_not_null_assertions,
 };
 use crate::rules::ast::{
-    asm_function_missing_safety_comment, field_init_can_be_folded, message_entity_naming,
-    method_can_be_static, mutable_parameter_can_be_immutable, mutable_variable_can_be_immutable,
-    pure_function_call_unused, send_mode_literal, unused_import, unused_variable,
-    used_ignored_identifier, write_only_variable,
+    asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
+    message_entity_naming, method_can_be_static, mutable_parameter_can_be_immutable,
+    mutable_variable_can_be_immutable, pure_function_call_unused, send_mode_literal, unused_import,
+    unused_variable, used_ignored_identifier, write_only_variable,
 };
 use acton_config::config::LintLevel;
 use rules::diagnostic::{Diagnostic, Severity};
@@ -369,6 +369,11 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
             self.checker,
             Rule::UnusedImport,
             unused_import::check_file(self.checker, self.file_id)
+        );
+        run_rule!(
+            self.checker,
+            Rule::ImportPathCanUseMappings,
+            import_path_can_use_mappings::check_file(self.checker, self.file_id)
         );
         run_rule!(
             self.checker,

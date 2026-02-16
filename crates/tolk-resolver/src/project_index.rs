@@ -45,6 +45,8 @@ pub struct ProjectIndex {
     pub(crate) path_to_file_id: HashMap<PathBuf, FileId>,
     /// Path to the Tolk standard library, if provided.
     pub(crate) stdlib_path: Option<PathBuf>,
+    /// Path mappings used to resolve `@alias/...` imports.
+    pub(crate) mappings: FxHashMap<String, String>,
     /// Map from symbol name to all `SymbolId`s that declare it across the project.
     pub(crate) global_symbols: HashMap<Arc<str>, Vec<SymbolId>>,
     /// List of errors encountered during project indexing.
@@ -118,6 +120,10 @@ impl ProjectIndex {
 
     pub fn stdlib_path(&self) -> Option<&Path> {
         self.stdlib_path.as_deref()
+    }
+
+    pub const fn mappings(&self) -> &FxHashMap<String, String> {
+        &self.mappings
     }
 
     pub fn errors(&self) -> &[String] {
@@ -435,6 +441,7 @@ impl<'a> ProjectIndexBuilder<'a> {
             path_to_file_id,
             resolved_uses: Default::default(),
             stdlib_path: self.stdlib_path,
+            mappings: self.mappings,
             errors,
             global_symbols,
         })
