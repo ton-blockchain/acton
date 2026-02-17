@@ -16,6 +16,7 @@ import {
 } from "@acton/shared-ui"
 import {
   fmt,
+  getTransactionOpcode,
   processTransactions,
   CodeSnippet,
   DataBlock,
@@ -47,6 +48,7 @@ interface IDEConfig {
 
 interface TraceFeeSummary {
   readonly traceIndex: number
+  readonly firstMessageName: string
   readonly transactionCount: number
   readonly transactionFees: readonly bigint[]
   readonly totalGasUsed: bigint
@@ -231,13 +233,57 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     return parsedTraceTransactions[selectedTraceIndex] ?? []
   }, [parsedTraceTransactions, selectedTraceIndex])
 
+  const allContracts = useMemo(() => Object.values(backendContracts), [backendContracts])
+
   const traceFeeSummaries = useMemo((): TraceFeeSummary[] => {
+    const getFirstTraceTransaction = (transactions: readonly TransactionInfo[]) => {
+      const roots = transactions.filter(tx => !tx.parent)
+      const candidates = roots.length > 0 ? roots : transactions
+      if (candidates.length === 0) return
+
+      return [...candidates].sort((a, b) => {
+        try {
+          const aLt = BigInt(a.lt)
+          const bLt = BigInt(b.lt)
+          if (aLt < bLt) return -1
+          if (aLt > bLt) return 1
+          return 0
+        } catch {
+          return a.lt.localeCompare(b.lt)
+        }
+      })[0]
+    }
+
+    const resolveFirstMessageName = (tx: TransactionInfo | undefined): string => {
+      if (!tx) return "unknown"
+
+      const opcode = getTransactionOpcode(tx.transaction)
+      if (opcode === undefined) return "empty"
+
+      const targetContract = tx.contractName ? backendContracts[tx.contractName] : undefined
+      let opcodeName = targetContract?.abi?.messages.find(it => it.opcode === opcode)?.name
+
+      if (!opcodeName) {
+        for (const contract of allContracts) {
+          const found = contract.abi?.messages.find(it => it.opcode === opcode)?.name
+          if (found) {
+            opcodeName = found
+            break
+          }
+        }
+      }
+
+      return opcodeName ?? `0x${opcode.toString(16)}`
+    }
+
     return parsedTraceTransactions.map((transactions, traceIndex) => {
       let totalGasUsed = 0n
       let totalGasFees = 0n
       let totalForwardFees = 0n
       let totalFees = 0n
       const transactionFees: bigint[] = []
+      const firstTraceTransaction = getFirstTraceTransaction(transactions)
+      const firstMessageName = resolveFirstMessageName(firstTraceTransaction)
 
       for (const tx of transactions) {
         const description = tx.transaction.description
@@ -259,6 +305,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
 
       return {
         traceIndex,
+        firstMessageName,
         transactionCount: transactions.length,
         transactionFees,
         totalGasUsed,
@@ -267,7 +314,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
         totalFees,
       }
     })
-  }, [parsedTraceTransactions])
+  }, [allContracts, backendContracts, parsedTraceTransactions])
 
   const failedTransactions = useMemo(() => {
     if (!test.failed_transactions) return []
@@ -360,8 +407,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     handleTabChange("transactions")
   }
 
-  const allContracts = Object.values(backendContracts)
-
   if (!test) return
 
   const getStatusIcon = (status: TestStatus) => {
@@ -415,58 +460,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
               </div>
             </div>
           </div>
-
-          {traceFeeSummaries.length > 0 && (
-            <div className={styles.traceFeesSection}>
-              <div className={styles.traceFeesTitle}>Fee Summary</div>
-              <div className={styles.traceFeesTableWrapper}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Trace</TableHead>
-                      <TableHead>Tx Count</TableHead>
-                      <TableHead>Gas Used</TableHead>
-                      <TableHead>Gas Fee</TableHead>
-                      <TableHead>Forward Fee</TableHead>
-                      <TableHead>Total Fee</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {traceFeeSummaries.map(summary => (
-                      <TableRow key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}>
-                        <TableCell>
-                          <button
-                            type="button"
-                            className={styles.traceLinkButton}
-                            onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
-                            title={`Open Trace ${summary.traceIndex + 1} in Transactions`}
-                          >
-                            <span>Trace {summary.traceIndex + 1}</span>
-                            <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
-                          </button>
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {summary.transactionCount.toString()}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {summary.totalGasUsed.toString()}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {fmt.formatCurrency(summary.totalGasFees)}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {fmt.formatCurrency(summary.totalForwardFees)}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {fmt.formatCurrency(summary.totalFees)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
 
           {test.status === TestStatus.Failed && (
             <div className={styles.errorSection}>
@@ -576,6 +569,68 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
                   </div>
                 }
               />
+            </div>
+          )}
+
+          {traceFeeSummaries.length > 0 && (
+            <div className={styles.traceFeesSection}>
+              <div className={styles.traceFeesTitle}>Fee Summary</div>
+              <div className={styles.traceFeesTableWrapper}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trace</TableHead>
+                      <TableHead>Tx Count</TableHead>
+                      <TableHead>Gas Used</TableHead>
+                      <TableHead>Gas Fee</TableHead>
+                      <TableHead>Forward Fee</TableHead>
+                      <TableHead>Total Fee</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {traceFeeSummaries.map(summary => (
+                      <TableRow
+                        key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}
+                      >
+                        <TableCell>
+                          <button
+                            type="button"
+                            className={styles.traceLinkButton}
+                            onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
+                            title={`Open Trace ${summary.traceIndex + 1} (${summary.firstMessageName}) in Transactions`}
+                          >
+                            <span>
+                              Trace {summary.traceIndex + 1}
+                              <span className={styles.traceMessageSeparator} aria-hidden="true">
+                                {" · "}
+                              </span>
+                              <span className={styles.traceMessageName}>
+                                {summary.firstMessageName}
+                              </span>
+                            </span>
+                            <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
+                          </button>
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {summary.transactionCount.toString()}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {summary.totalGasUsed.toString()}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {fmt.formatCurrency(summary.totalGasFees)}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {fmt.formatCurrency(summary.totalForwardFees)}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {fmt.formatCurrency(summary.totalFees)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
         </div>

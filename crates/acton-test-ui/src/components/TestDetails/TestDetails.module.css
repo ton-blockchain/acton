@@ -350,7 +350,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transition: color 0.2s
+  transition: color 0.2s;
+  text-align: left;
 }
 
 .traceLinkButton:hover {
@@ -359,6 +360,14 @@
 
 .traceLinkIcon {
   font-size: 0.75rem;
+}
+
+.traceMessageName {
+  color: var(--text-muted);
+}
+
+.traceMessageSeparator {
+  color: var(--text-muted);
 }
 
 .numericCell {
