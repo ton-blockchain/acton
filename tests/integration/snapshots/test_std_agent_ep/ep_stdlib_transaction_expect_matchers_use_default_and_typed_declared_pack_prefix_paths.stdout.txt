@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling ep_noop
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/ep_declared_pack_prefix.test.tolk (1 test)
+  ✓ ep-transaction-expect-matchers-declared-pack-prefix-paths [TIME]
+
+ ✓ 1 passed in 1 file
