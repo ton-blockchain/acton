@@ -163,15 +163,15 @@ jobs:
       - name: Create Linux archive
         run: |
           mkdir -p dist
-          tar -czf dist/acton-${{ github.event.release.tag_name }}-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
+          tar -czf dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
             -C binaries/linux acton
 
       - name: Upload Linux archive to release
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: dist/acton-${{ github.event.release.tag_name }}-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_name: acton-${{ github.event.release.tag_name }}-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
+          asset_path: dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
+          asset_name: acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
           asset_content_type: application/gzip
         env:
           GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
