@@ -1,0 +1,28 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/cq_register_address_rebind.test.tolk (1 test)
+  ✓ cq-register-address-duplicate-symbolic-name [TIME]
+    └─ Test output:
+       N/A -> cq_register_sender A
+       └── empty 0.2 TON -> cq_duplicate_name B                                        compute phase skipped aborted
+       
+       N/A -> cq_register_sender A
+       └── empty 0.3 TON -> cq_duplicate_name B                                        compute phase skipped aborted
+       
+       N/A -> cq_register_sender A
+       └── empty 0.4 TON -> cq_duplicate_name B                                        compute phase skipped aborted
+
+ ✓ 1 passed in 1 file

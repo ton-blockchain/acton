@@ -1,0 +1,19 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling external
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/ct_extoutlist_atornull.test.tolk (1 test)
+  ✗ ct-ext-out-list-atornull-out-of-range [TIME]
+    └─ exit_code=5
+      ├─ Re-run with --backtrace full to get more information
+      ├─ tuple index out of range
+      └─ Phase: Compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

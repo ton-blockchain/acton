@@ -1,0 +1,19 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/wait_for_transaction_known_hash.test.tolk (1 test)
+  ✗ bh-stdlib-wait-for-transaction-positive-known-body-hash [TIME]
+    └─ exit_code=2
+      ├─ Re-run with --backtrace full to get more information
+      ├─ stack underflow
+      └─ Phase: Compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

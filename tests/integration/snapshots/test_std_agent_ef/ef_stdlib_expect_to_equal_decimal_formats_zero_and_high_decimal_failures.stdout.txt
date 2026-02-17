@@ -1,0 +1,30 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_decimal_edges.test.tolk (2 tests)
+  ✗ ef-decimal-failure-format-zero-decimals [TIME]
+    └─ Error: expect(actual).toEqualDecimal(expected)
+       Actual:   123.0
+       Expected: 124.0
+      └─ at tests/expect_decimal_edges.test[LINE]
+  ✗ ef-decimal-failure-format-high-decimals [TIME]
+    └─ Error: expect(actual).toEqualDecimal(expected)
+       Actual:   -0.000000000000000015
+       Expected: -0.000000000000000016
+      └─ at tests/expect_decimal_edges.test[LINE]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

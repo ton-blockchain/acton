@@ -1,0 +1,17 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/tx_expect.test.tolk (1 test)
+  ✗ ae-emit-external-message-missing [TIME]
+    └─ Error: expect(actual).toEmitExternalMessage<ExternalNotice>(): Cannot find external message ExternalNotice (opcode: 0xae110003)
+      └─ at tests/tx_expect.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

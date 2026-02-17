@@ -1,0 +1,15 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling ar_formatter_types
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/io_nested_formatter.test.tolk (1 test)
+  ✓ ar-stdlib-println-nested-tuple-and-struct-values [TIME]
+    └─ Test output:
+       ([BOC_HEX], 7, 9, 11, 13, [17, 19, 23], [29, 31], 37, 41)
+
+ ✓ 1 passed in 1 file

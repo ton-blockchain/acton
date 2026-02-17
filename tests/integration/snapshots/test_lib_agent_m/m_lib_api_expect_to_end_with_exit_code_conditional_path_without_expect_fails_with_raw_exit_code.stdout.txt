@@ -1,0 +1,17 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_exit_code.test.tolk (1 test)
+  ✗ exit-code-conditional-expect [TIME]
+    └─ exit_code=17
+      ├─ Re-run with --backtrace full to get more information
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

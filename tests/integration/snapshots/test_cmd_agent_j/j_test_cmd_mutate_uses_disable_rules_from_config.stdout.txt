@@ -1,0 +1,17 @@
+Mutation Testing
+────────────────────────────────────────────────────────────
+Contract: simple
+Source:   contracts/simple.tolk
+Files:    1
+Mutants:  0
+
+
+    Total mutants        0
+  ✓ Killed               0
+  ✗ Survived             0
+  ! Compile errors       0
+
+  ◆ Mutation Score 0.0%
+
+✓ Excellent! All mutants were killed!
+

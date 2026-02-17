@@ -1,0 +1,17 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/register_code.test.tolk (1 test)
+  ✓ register-code-cell-label [TIME]
+    └─ Test output:
+       N/A -> q_deployer A
+       └── empty 1 TON -> q_simple_alias B                                             gas=253
+           └── account created
+
+ ✓ 1 passed in 1 file

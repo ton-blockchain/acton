@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/cm_vm_set_c7.test.tolk (1 test)
+  ✓ cm-stdlib-vm-set-c7-overwrite-slot-three [TIME]
+
+ ✓ 1 passed in 1 file

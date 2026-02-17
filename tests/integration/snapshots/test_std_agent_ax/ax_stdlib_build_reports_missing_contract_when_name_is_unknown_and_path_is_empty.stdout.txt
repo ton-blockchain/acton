@@ -1,0 +1,18 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_missing_contract_empty_path.test.tolk (1 test)
+  ✗ ax-build-missing-contract-empty-path [TIME]
+    └─ Error: Contract missing not found in Acton.toml
+Available contracts:
+ simple
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

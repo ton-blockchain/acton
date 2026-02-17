@@ -1,0 +1,21 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+   Compiling worker
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/transaction_helpers.test.tolk (1 test)
+  ✗ am-transaction-varuint7-roundtrip-bug [TIME]
+    └─ exit_code=9
+      ├─ Re-run with --backtrace full to get more information
+      ├─ extra data remaining in deserialized cell
+      └─ Phase: Compute phase
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

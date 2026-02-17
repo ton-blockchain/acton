@@ -1,0 +1,19 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling echo
+    Finished in [TIME]
+   Compiling external
+    Finished in [TIME]
+   Compiling forwarder
+    Finished in [TIME]
+   Compiling receiver
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/network_paths.test.tolk (1 test)
+  ✓ ag-send-external-repeatable [TIME]
+
+ ✓ 1 passed in 1 file

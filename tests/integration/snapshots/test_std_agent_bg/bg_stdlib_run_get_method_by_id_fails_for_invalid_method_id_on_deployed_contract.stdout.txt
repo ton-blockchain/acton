@@ -1,0 +1,16 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling Counter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/bg_run_get_method_by_id_invalid_id.test.tolk (1 test)
+  ✗ bg-run-get-method-by-id-invalid-id [TIME]
+    └─ Error: Cannot execute unknown get method '' (777777)
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

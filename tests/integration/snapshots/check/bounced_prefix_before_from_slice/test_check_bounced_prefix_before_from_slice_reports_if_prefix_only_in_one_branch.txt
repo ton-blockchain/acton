@@ -1,0 +1,11 @@
+warning[E018]: missing `in.bouncedBody.skipBouncedPrefix()` before `fromSlice(in.bouncedBody)`
+   --> [ROOT]/contracts/main[LINE]
+   |
+10 |                 BounceOpToHandle.fromSlice(in.bouncedBody);
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `fromSlice(in.bouncedBody)` is reachable without `skipBouncedPrefix()`
+   |
+   = add `in.bouncedBody.skipBouncedPrefix();` before `BounceOpToHandle.fromSlice(in.bouncedBody)`
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E018

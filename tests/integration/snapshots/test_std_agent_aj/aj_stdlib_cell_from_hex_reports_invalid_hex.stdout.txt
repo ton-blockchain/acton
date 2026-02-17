@@ -1,0 +1,16 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/aj_vm_helpers.test.tolk (1 test)
+  ✗ aj-stdlib-vm-cell-from-hex-invalid [TIME]
+    └─ Error: Failed to decode cell hex deadbeef: Bag of cells deserialization error (BoC deserialization error: Unsupported cell magic number: 3735928559)
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

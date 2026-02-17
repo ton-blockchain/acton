@@ -1,0 +1,17 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling Counter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/cr_register_code_duplicate_name_precedence.test.tolk (1 test)
+  ✓ cr-register-code-cell-duplicate-name-precedence [TIME]
+    └─ Test output:
+       N/A -> cr_precedence_deployer A
+       └── empty 1 TON -> cr_duplicate_name_after B                                    gas=635
+           └── account created
+
+ ✓ 1 passed in 1 file

@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling cu_fanout
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/cu_out_messages_consistency.test.tolk (1 test)
+  ✓ cu-out-messages-atcell-at-project-builder [TIME]
+
+ ✓ 1 passed in 1 file

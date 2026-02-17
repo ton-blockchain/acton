@@ -1,0 +1,23 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_map_address_keys.test.tolk (1 test)
+  ✗ ec-stdlib-map-to-contain-key-friendly-equivalent-bug [TIME]
+    └─ Error: expect(actual).toContainKey(expected): Key 'kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD' not found in the map
+      └─ at tests/expect_map_address_keys.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

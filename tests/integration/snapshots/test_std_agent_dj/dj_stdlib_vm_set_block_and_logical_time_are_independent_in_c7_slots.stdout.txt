@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/dj_vm_logical_time_slots.test.tolk (1 test)
+  ✓ dj-vm-set-block-and-logical-time-independent-slots [TIME]
+
+ ✓ 1 passed in 1 file

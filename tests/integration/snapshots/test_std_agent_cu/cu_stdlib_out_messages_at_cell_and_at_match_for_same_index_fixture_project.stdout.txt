@@ -1,0 +1,15 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling Counter
+    Finished in [TIME]
+   Compiling CuFixtureOutMessages
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/cu_out_messages_consistency.test.tolk (1 test)
+  ✓ cu-fixture-out-messages-atcell-at-consistency [TIME]
+
+ ✓ 1 passed in 1 file

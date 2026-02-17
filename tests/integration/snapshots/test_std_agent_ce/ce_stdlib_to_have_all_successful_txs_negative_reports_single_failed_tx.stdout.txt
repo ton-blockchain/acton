@@ -1,0 +1,24 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling failing
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/tx_expect_all_successful.test.tolk (1 test)
+  ✗ ce-all-successful-negative-single-failing-tx [TIME]
+    └─ Error: expect(actual).toHaveAllSuccessfulTxs(expected)
+        N/A -> sender A
+        └── 0x1 1 TON -> failing B                                                      gas=332 exit_code=77 aborted
+            └── account created
+        
+        Unexpected transaction
+        with:
+          success=false
+      └─ at tests/tx_expect_all_successful.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

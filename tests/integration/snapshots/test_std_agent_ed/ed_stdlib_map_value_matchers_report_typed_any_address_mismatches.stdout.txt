@@ -1,0 +1,26 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/ed_map_value_matchers.test.tolk (2 tests)
+  ✗ ed-stdlib-map-to-contain-value-reports-missing-typed-address [TIME]
+    └─ Error: expect(actual).toContainValue(expected): Value 'kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA3W4G' not found in the map
+      └─ at tests/ed_map_value_matchers.test[LINE]
+  ✗ ed-stdlib-map-to-not-contain-value-reports-present-typed-address [TIME]
+    └─ Error: expect(actual).toNotContainValue(expected): Value 'kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqmB2' is found in the map
+      └─ at tests/ed_map_value_matchers.test[LINE]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

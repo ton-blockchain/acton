@@ -1,0 +1,28 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/stdlib_io.test.tolk (1 test)
+  ✓ at-stdlib-interleaved-stdout-order [TIME]
+    └─ Test output:
+       stdout-1
+       stdout-2
+       stdout-3=333
+       stdout-4
+    └─ Test stderr:
+       stderr-1
+       stderr-2
+       stderr-3
+
+ ✓ 1 passed in 1 file

@@ -1,0 +1,40 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/comparison.test.tolk (4 tests)
+  ✗ less-fail [TIME]
+    └─ Error: expect(actual).toBeLess(expected)
+        Actual:   5
+        Expected: 5
+      └─ at tests/comparison.test[LINE]
+  ✗ greater-fail [TIME]
+    └─ Error: expect(actual).toBeGreater(expected)
+        Actual:   5
+        Expected: 6
+      └─ at tests/comparison.test[LINE]
+  ✗ less-or-equal-fail [TIME]
+    └─ Error: expect(actual).toBeLessOrEqual(expected)
+        Actual:   8
+        Expected: 7
+      └─ at tests/comparison.test[LINE]
+  ✗ greater-or-equal-fail [TIME]
+    └─ Error: expect(actual).toBeGreaterOrEqual(expected)
+        Actual:   -2
+        Expected: -1
+      └─ at tests/comparison.test[LINE]
+
+ ✗ 4 failed in 1 file
+
+Some tests failed.

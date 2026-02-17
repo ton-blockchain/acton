@@ -1,0 +1,15 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/ui.test.tolk (3 tests)
+  ○ ui-skipped skipped
+  □ ui-todo [TODO]
+  ✓ ui-executed [TIME]
+
+ ✓ 1 passed, ○ 1 skipped, □ 1 todo in 1 file

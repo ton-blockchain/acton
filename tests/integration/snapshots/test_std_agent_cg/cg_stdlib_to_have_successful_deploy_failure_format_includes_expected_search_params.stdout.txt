@@ -1,0 +1,25 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/deploy_expect.test.tolk (1 test)
+  ✗ cg-to-have-successful-deploy-formatting-expected-search-params [TIME]
+    └─ Error: expect(actual).toHaveSuccessfulDeploy(expected)
+        N/A -> sender A
+        └── empty 1 TON -> receiver B                                                   gas=253
+            └── account created
+        
+        Cannot find transaction from sender A EQAXTu..1D6wLK to EQBrCx..j2I4qY
+        with:
+          deploy=true
+          success=true
+      └─ at tests/deploy_expect.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

@@ -1,0 +1,27 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/bo_random_address_reuse.test.tolk (1 test)
+  ✗ bo-stdlib-network-random-address-reuse [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            kQCaMdGt9cG70iD0tRb+8Dvt8QqRPDgRrLFHP4wanVjLn9No (bo_reused_symbolic_name),
+            kQAKIOo5BYX6HLXvPp8Ct55dApFwnI0qWrx55yyF/aI9Kyw0 (bo_reused_symbolic_name)
+        )
+      └─ at tests/bo_random_address_reuse.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

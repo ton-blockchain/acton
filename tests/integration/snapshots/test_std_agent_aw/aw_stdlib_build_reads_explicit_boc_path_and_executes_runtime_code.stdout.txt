@@ -1,0 +1,10 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_boc_path_runtime.test.tolk (1 test)
+  ✓ aw-build-boc-path-runtime [TIME]
+
+ ✓ 1 passed in 1 file

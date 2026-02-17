@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/dy_secure_random_boundaries.test.tolk (1 test)
+  ✓ dy-stdlib-secure-random-boundaries-1-and-2-lengths [TIME]
+
+ ✓ 1 passed in 1 file

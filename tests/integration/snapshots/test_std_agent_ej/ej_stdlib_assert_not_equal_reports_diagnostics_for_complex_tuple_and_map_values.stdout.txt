@@ -1,0 +1,28 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/assert_not_equal_complex.test.tolk (2 tests)
+  ✗ ej-stdlib-assert-not-equal-complex-tuple-diagnostic [TIME]
+    └─ Error: ej tuple/map notEqual diagnostic tuple
+       Values are equal but expected to be different:
+         [11, [22, 33], [BOC_HEX]]
+  ✗ ej-stdlib-assert-not-equal-complex-map-diagnostic [TIME]
+    └─ Error: ej tuple/map notEqual diagnostic map
+       Values are equal but expected to be different:
+         [BOC_HEX]
+
+ ✗ 2 failed in 1 file
+
+Some tests failed.

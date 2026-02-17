@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling worker
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/transaction_tick_tock.test.tolk (1 test)
+  ✓ ck-transaction-get-action-fee-tick-and-tock [TIME]
+
+ ✓ 1 passed in 1 file

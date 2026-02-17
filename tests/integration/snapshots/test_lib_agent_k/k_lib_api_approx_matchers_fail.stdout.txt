@@ -1,0 +1,29 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/approx.test.tolk (3 tests)
+  ✗ approx-abs-fail [TIME]
+    └─ Error: 10 !~= 20 (max delta: 5, real delta: 10
+      └─ at tests/approx.test[LINE]
+  ✗ approx-rel-fail [TIME]
+    └─ Error: 10 !~= 20 (max delta: 50%, real delta: 100%
+      └─ at tests/approx.test[LINE]
+  ✗ approx-rel-small-threshold-fail [TIME]
+    └─ Error: 200 !~= 220 (max delta: 9%, real delta: 10%
+      └─ at tests/approx.test[LINE]
+
+ ✗ 3 failed in 1 file
+
+Some tests failed.

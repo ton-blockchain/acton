@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling Counter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/crypto_sign_hash_sensitivity_edge.test.tolk (1 test)
+  ✓ ba-stdlib-sign-hash-sensitive-for-different-cells [TIME]
+
+ ✓ 1 passed in 1 file

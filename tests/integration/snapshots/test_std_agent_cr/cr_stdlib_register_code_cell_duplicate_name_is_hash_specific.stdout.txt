@@ -1,0 +1,23 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling alpha
+    Finished in [TIME]
+   Compiling beta
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/cr_register_code_duplicate_name.test.tolk (1 test)
+  ✓ cr-register-code-cell-duplicate-name-hash-specific [TIME]
+    └─ Test output:
+       N/A -> cr_duplicate_name_deployer A
+       └── empty 0.2 TON -> cr_duplicate_name B                                        gas=253
+           └── account created
+       
+       N/A -> cr_duplicate_name_deployer A
+       └── empty 0.3 TON -> cr_duplicate_name B                                        gas=353
+           └── account created
+
+ ✓ 1 passed in 1 file
