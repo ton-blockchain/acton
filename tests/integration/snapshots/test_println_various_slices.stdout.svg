@@ -19,7 +19,7 @@
   <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
 
   <text xml:space="preserve" class="container fg">
-    <tspan x="10px" y="28px"><tspan>  </tspan><tspan class="fg-green bold">Installing</tspan><tspan> standard library v0.1.0</tspan>
+    <tspan x="10px" y="28px"><tspan>  </tspan><tspan class="fg-green bold">Installing</tspan><tspan> standard library [ACTON_VERSION]</tspan>
 </tspan>
     <tspan x="10px" y="46px"><tspan>hello world</tspan>
 </tspan>

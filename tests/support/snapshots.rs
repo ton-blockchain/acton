@@ -35,6 +35,8 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
         tmp_dir = tmp_dir.replace("\\", "/");
     }
 
+    let current_version = env!("CARGO_PKG_VERSION");
+
     let lib_dir = Path::new(tmp_dir.as_str()).parent().unwrap().join("lib");
     redactions.insert("[ROOT]", tmp_dir.clone()).unwrap();
     redactions.insert("[ACTON_LIB]", lib_dir.clone()).unwrap();
@@ -115,6 +117,9 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
             "[GENERATED_ON]",
             regex!(r"Generated on: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"),
         )
+        .unwrap();
+    redactions
+        .insert("[ACTON_VERSION]", format!("v{}", current_version))
         .unwrap();
 
     redactions.redact(&content)
