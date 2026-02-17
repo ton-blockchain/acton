@@ -318,6 +318,77 @@
   gap: var(--spacing-sm);
 }
 
+.traceFeesSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.traceFeesTitle {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.traceFeesTableWrapper {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  background-color: var(--bg-color);
+}
+
+.traceLinkButton {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.2s
+}
+
+.traceLinkButton:hover {
+  color: var(--text-primary);
+}
+
+.traceLinkIcon {
+  font-size: 0.75rem;
+}
+
+.numericCell {
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.traceFeeList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.traceFeeListItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.traceFeeLabel {
+  font-size: var(--font-size-xss);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.emptyCellValue {
+  color: var(--text-muted);
+}
+
 .gridIdeSelector {
   position: relative;
   display: inline-flex;

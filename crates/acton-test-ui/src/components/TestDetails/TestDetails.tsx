@@ -3,11 +3,17 @@ import path from "node:path"
 import {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
-import {FiCheck, FiChevronDown, FiCircle, FiMinus, FiX} from "react-icons/fi"
+import {FiArrowUpRight, FiCheck, FiChevronDown, FiCircle, FiMinus, FiX} from "react-icons/fi"
 import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
 
-import {type TestReport, TestStatus, type Trace, ContractData} from "@acton/shared-ui"
+import {
+  type TestReport,
+  TestStatus,
+  type Trace,
+  ContractData,
+  type TransactionInfo,
+} from "@acton/shared-ui"
 import {
   fmt,
   processTransactions,
@@ -15,6 +21,12 @@ import {
   DataBlock,
   TransactionTree,
   ContractChip,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
@@ -31,6 +43,16 @@ interface IDEConfig {
   readonly name: string
   readonly icon: React.ReactNode
   readonly getUrl: (test: TestReport) => string
+}
+
+interface TraceFeeSummary {
+  readonly traceIndex: number
+  readonly transactionCount: number
+  readonly transactionFees: readonly bigint[]
+  readonly totalGasUsed: bigint
+  readonly totalGasFees: bigint
+  readonly totalForwardFees: bigint
+  readonly totalFees: bigint
 }
 
 export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoot}) => {
@@ -193,15 +215,59 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     return trace.traces.reduce((acc, t) => acc + t.transactions.length, 0)
   }, [trace])
 
+  const parsedTraceTransactions = useMemo((): TransactionInfo[][] => {
+    if (!trace) return []
+    return trace.traces.map((traceItem, index) => {
+      try {
+        return processTransactions(traceItem.transactions)
+      } catch (error) {
+        console.error(`Failed to process trace #${index + 1}`, error)
+        return []
+      }
+    })
+  }, [trace])
+
   const parsedTransactions = useMemo(() => {
-    if (!trace || !trace.traces[selectedTraceIndex]) return []
-    try {
-      return processTransactions(trace.traces[selectedTraceIndex].transactions)
-    } catch (error) {
-      console.error("Failed to process trace", error)
-      return []
-    }
-  }, [trace, selectedTraceIndex])
+    return parsedTraceTransactions[selectedTraceIndex] ?? []
+  }, [parsedTraceTransactions, selectedTraceIndex])
+
+  const traceFeeSummaries = useMemo((): TraceFeeSummary[] => {
+    return parsedTraceTransactions.map((transactions, traceIndex) => {
+      let totalGasUsed = 0n
+      let totalGasFees = 0n
+      let totalForwardFees = 0n
+      let totalFees = 0n
+      const transactionFees: bigint[] = []
+
+      for (const tx of transactions) {
+        const description = tx.transaction.description
+        const computePhase = description.type === "generic" ? description.computePhase : undefined
+
+        const transactionFee = tx.transaction.totalFees.coins
+        transactionFees.push(transactionFee)
+        totalFees += transactionFee
+
+        if (computePhase?.type === "vm") {
+          totalGasUsed += computePhase.gasUsed
+          totalGasFees += computePhase.gasFees
+        }
+
+        if (tx.transaction.inMessage?.info.type === "internal") {
+          totalForwardFees += tx.transaction.inMessage.info.forwardFee
+        }
+      }
+
+      return {
+        traceIndex,
+        transactionCount: transactions.length,
+        transactionFees,
+        totalGasUsed,
+        totalGasFees,
+        totalForwardFees,
+        totalFees,
+      }
+    })
+  }, [parsedTraceTransactions])
 
   const failedTransactions = useMemo(() => {
     if (!test.failed_transactions) return []
@@ -289,6 +355,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     localStorage.setItem("activeTab", tab)
   }
 
+  const handleOpenTraceTransactions = (index: number) => {
+    handleSelectTraceIndex(index)
+    handleTabChange("transactions")
+  }
+
   const allContracts = Object.values(backendContracts)
 
   if (!test) return
@@ -344,6 +415,58 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
               </div>
             </div>
           </div>
+
+          {traceFeeSummaries.length > 0 && (
+            <div className={styles.traceFeesSection}>
+              <div className={styles.traceFeesTitle}>Fee Summary</div>
+              <div className={styles.traceFeesTableWrapper}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trace</TableHead>
+                      <TableHead>Tx Count</TableHead>
+                      <TableHead>Gas Used</TableHead>
+                      <TableHead>Gas Fee</TableHead>
+                      <TableHead>Forward Fee</TableHead>
+                      <TableHead>Total Fee</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {traceFeeSummaries.map(summary => (
+                      <TableRow key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}>
+                        <TableCell>
+                          <button
+                            type="button"
+                            className={styles.traceLinkButton}
+                            onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
+                            title={`Open Trace ${summary.traceIndex + 1} in Transactions`}
+                          >
+                            <span>Trace {summary.traceIndex + 1}</span>
+                            <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
+                          </button>
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {summary.transactionCount.toString()}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {summary.totalGasUsed.toString()}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {fmt.formatCurrency(summary.totalGasFees)}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {fmt.formatCurrency(summary.totalForwardFees)}
+                        </TableCell>
+                        <TableCell className={styles.numericCell}>
+                          {fmt.formatCurrency(summary.totalFees)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
 
           {test.status === TestStatus.Failed && (
             <div className={styles.errorSection}>
