@@ -1190,15 +1190,22 @@ fn load_library_by_hash_impl(
         return Ok(());
     }
 
-    let api_client = TonApiClient::new(network, custom_networks, ctx.env.api_key.clone())?;
+    let api_key = ctx.env.api_key.clone();
+    let Ok(api_client) = TonApiClient::new(network, custom_networks, api_key) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
 
-    let lib = api_client.get_library_by_hash(hash.as_str());
-    match lib {
-        Ok(lib) => {
-            let cell = ArcCell::from_boc(&Boc::encode(lib))?;
+    match api_client
+        .get_library_by_hash(hash.as_str())
+        .and_then(|lib| ArcCell::from_boc(&Boc::encode(lib)).map_err(Into::into))
+    {
+        Ok(cell) => {
             stack.push(TupleItem::Cell(cell));
         }
-        Err(_) => stack.push(TupleItem::Null),
+        Err(_) => {
+            stack.push(TupleItem::Null);
+        }
     }
 
     Ok(())

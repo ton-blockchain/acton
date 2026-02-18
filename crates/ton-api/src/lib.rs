@@ -20,8 +20,13 @@ impl TonApiClient {
         custom_networks: HashMap<String, CustomNetworkUrls>,
         api_key: Option<String>,
     ) -> anyhow::Result<TonApiClient> {
+        let mut client_builder = reqwest::blocking::ClientBuilder::new();
+        if should_disable_system_proxy() {
+            client_builder = client_builder.no_proxy();
+        }
+
         Ok(TonApiClient {
-            client: reqwest::blocking::ClientBuilder::new()
+            client: client_builder
                 .build()
                 .context("Cannot create HTTP client, please check if network is available")?,
             network,
@@ -544,4 +549,10 @@ struct TonCenterErrorResponse {
     #[allow(dead_code)]
     ok: bool,
     error: String,
+}
+
+fn should_disable_system_proxy() -> bool {
+    std::env::var("ACTON_DISABLE_SYSTEM_PROXY")
+        .map(|value| value.trim() == "1")
+        .unwrap_or(false)
 }
