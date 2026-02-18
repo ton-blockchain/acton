@@ -91,34 +91,6 @@ jobs:
           submodules: 'true'
           path: ton-repo
 
-      - name: Cache TON build directory
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: ton-repo/build
-          key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-build-${{ runner.os }}-
-
-      - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        id: cache-ton-deps
-        uses: actions/cache@v5
-        with:
-          path: |
-            ton-repo/openssl_3
-            ton-repo/lz4
-            ton-repo/zlib
-          key: ton-deps-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-deps-${{ runner.os }}-
-
-      - name: Cache ccache
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ccache-${{ runner.os }}-
-
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
