@@ -8,4 +8,4 @@ name = "MyContract"
 src = "contracts/my-contract.tolk"
 depends = []
 
-See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information
+See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for more information

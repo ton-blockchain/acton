@@ -5,4 +5,4 @@ To define a new script add the following to Acton.toml:
 [scripts]
 script-name = "command invocation"
 
-See https://i582.github.io/acton/docs/commands/run/ for more information
+See [ACTON_DOCS_URL]/commands/run/ for more information

@@ -121,6 +121,9 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
     redactions
         .insert("[ACTON_VERSION]", format!("v{}", current_version))
         .unwrap();
+    redactions
+        .insert("[ACTON_DOCS_URL]", "https://i582.github.io/acton/docs")
+        .unwrap();
 
     redactions.redact(&content)
 }
