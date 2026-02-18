@@ -176,7 +176,18 @@ const INITIAL_UNIXTIME_STORAGE_INDEX = 0
 /// println1("Initial bit price: {}", initialPrices.bitPrice);
 /// ```
 fun StoragePricesDict.getInitial(self) {
-    return self.get(INITIAL_UNIXTIME_STORAGE_INDEX).loadValue();
+    val entry = self.get(INITIAL_UNIXTIME_STORAGE_INDEX);
+    if (!entry.isFound) {
+        return StoragePrices {
+            initialUnixTime: 0,
+            bitPrice: 0,
+            cellPrice: 0,
+            masterchainBitPrice: 0,
+            masterchainCellPrice: 0,
+        };
+    }
+
+    return entry.loadValue();
 }
 
 /// Sets the initial storage price configuration in the dictionary.
