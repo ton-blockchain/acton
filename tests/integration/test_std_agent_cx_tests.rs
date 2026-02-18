@@ -27,11 +27,11 @@ fn run_cx_stdlib_success(project_name: &str, test_body: &str, snapshot_path: &st
 }
 
 #[test]
-fn cx_stdlib_change_library_to_tuple_roundtrip_via_parse_out_actions_is_broken_bug() {
+fn cx_stdlib_change_library_decoding_via_parse_out_actions() {
     run_cx_stdlib_success(
-        "cx-stdlib-change-library-to-tuple-roundtrip-bug",
+        "cx-stdlib-change-library-decoding-via-parse-out-actions",
         r#"
-get fun `test-cx-change-library-to-tuple-roundtrip-bug`() {
+get fun `test-cx-change-library-decoding-via-parse-out-actions`() {
     val libraryCell = beginCell().storeUint(0xC0DECAFE, 32).endCell();
     changeLib(libraryCell, 2);
 
@@ -43,11 +43,14 @@ get fun `test-cx-change-library-to-tuple-roundtrip-bug`() {
     expect(parsedAction is OutActionChangeLibrary).toBeTrue();
 
     if (parsedAction is OutActionChangeLibrary) {
-        val restored = OutAction.fromTuple(parsedAction.toTuple());
-        expect(restored.kind()).toEqual("change-library");
+        expect(parsedAction.mode).toEqual(2);
+        expect(parsedAction.libref is LibRefRef).toBeTrue();
+        if (parsedAction.libref is LibRefRef) {
+            expect(parsedAction.libref.library).toEqual(libraryCell);
+        }
     }
 }
 "#,
-        "integration/snapshots/test_std_agent_cx/cx_stdlib_change_library_to_tuple_roundtrip_via_parse_out_actions_is_broken_bug.stdout.txt",
+        "integration/snapshots/test_std_agent_cx/cx_stdlib_change_library_decoding_via_parse_out_actions.stdout.txt",
     );
 }
