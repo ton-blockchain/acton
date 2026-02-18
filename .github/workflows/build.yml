@@ -35,9 +35,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            cargo-${{ runner.os }}-
 
       - name: Install Rust
         run: rustup toolchain install
@@ -63,6 +63,9 @@ jobs:
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-
 
+      - name: Check cache hit
+        run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
+
       - name: Install required system dependencies (cache not exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
@@ -75,9 +78,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y just graphviz
-
-      - name: Check cache hit
-        run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
 
       - name: Maximize Build Space
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
