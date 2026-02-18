@@ -24,8 +24,8 @@ jobs:
       - name: Check out Acton repository
         uses: actions/checkout@v6
 
-      - name: Cache Cargo registry + git + target
-        uses: actions/cache@v5
+      - name: Cache Cargo
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
@@ -41,7 +41,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@v2
         with:
-          tool: nextest
+          tool: nextest,just
 
       - name: Get TON commit hash
         id: ton-commit
@@ -62,18 +62,18 @@ jobs:
       - name: Check cache hit
         run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
 
-      - name: Install required system dependencies (cache not exist)
+      - name: Install system dependencies (cache not exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev graphviz
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
-      - name: Install required system dependencies (cache exist)
+      - name: Install system dependencies (cache exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y just graphviz
+          sudo apt-get install -y graphviz
 
       - name: Maximize Build Space
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
