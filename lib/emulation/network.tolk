@@ -276,14 +276,16 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>
         return false;
     }
 
-    if (reflect.serializationPrefixOf<TBody>() != null) {
+    val declaredPrefix = TBody.externalOutPrefix();
+    if (declaredPrefix != -1) {
         val body = self.loadBody();
-        if (body.remainingBitsCount() < TBody.getDeclaredPackPrefixLen()) {
+        val declaredPrefixLen = TBody.externalOutPrefixLen();
+        if (body.remainingBitsCount() < declaredPrefixLen) {
             return false;
         }
 
-        val prefix = body.preloadUint(TBody.getDeclaredPackPrefixLen());
-        if (prefix != reflect.serializationPrefixOf<TBody>()) {
+        val prefix = body.preloadUint(declaredPrefixLen);
+        if (prefix != declaredPrefix) {
             return false;
         }
     }
@@ -322,9 +324,8 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
 
         var externalIdx = 0;
         while (externalIdx < externals.size()) {
-            val externalOut = externals
-                .get<Cell<Message<RemainingBitsAndRefs, ExternalOutMessageInfo>>>(externalIdx)
-                .load();
+            val externalOutCell = externals.get(externalIdx) as cell as Cell<Message<RemainingBitsAndRefs, ExternalOutMessageInfo>>;
+            val externalOut = externalOutCell.load();
 
             if (externalOut.matches<TBody>(params)) {
                 return Maybe<Message<TBody, ExternalOutMessageInfo>>.some(
@@ -332,7 +333,7 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
                         info: externalOut.info,
                         init: externalOut.init,
                         body: EitherLeft{
-                            value: TBody.fromSlice(externalOut.loadBody()),
+                            value: TBody.decodeExternalOutBody(externalOut.loadBody()),
                         },
                     },
                 );
@@ -1121,6 +1122,30 @@ fun crc16(data: string): int asm "13 EXTCALL"
 
 fun tuple.fromTuple(data: tuple): tuple {
     return data;
+}
+
+fun T.externalOutPrefix() {
+    return reflect.serializationPrefixOf<T>();
+}
+
+fun never.externalOutPrefix() {
+    return -1;
+}
+
+fun T.externalOutPrefixLen() {
+    return reflect.serializationPrefixLenOf<T>();
+}
+
+fun never.externalOutPrefixLen() {
+    return 0;
+}
+
+fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T {
+    return T.fromSlice(body);
+}
+
+fun never.decodeExternalOutBody(_: RemainingBitsAndRefs): never {
+    throw 0;
 }
 
 struct impl
