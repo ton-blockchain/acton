@@ -88,9 +88,8 @@ jobs:
         with:
           repository: i582/ton
           ref: pmakhnev/acton
-          fetch-depth: '1'
-          submodules: 'true'
-          path: ton-repo
+          fetch-depth: 1
+          submodules: true
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
