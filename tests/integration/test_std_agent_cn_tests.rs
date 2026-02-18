@@ -32,19 +32,6 @@ fn run_cn_stdlib_success(project_name: &str, test_body: &str, snapshot_path: &st
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_cn_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = format!("{CN_VM_IMPORTS}\n{test_body}\n");
-    ProjectBuilder::new(project_name)
-        .test_file("c5_roundtrip", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn cn_stdlib_set_c5_roundtrip_restores_single_and_double_action_out_lists() {
     run_cn_stdlib_success(
@@ -104,18 +91,31 @@ get fun `test-cn-set-c5-roundtrip-non-empty-transitions`() {
 
 #[test]
 fn cn_stdlib_set_c5_to_empty_cell_breaks_vm_out_actions_bug() {
-    run_cn_stdlib_failure(
+    run_cn_stdlib_success(
         "cn-stdlib-set-c5-empty-cell-out-actions-bug",
         r#"
 get fun `test-cn-set-c5-empty-cell-out-actions-bug`() {
     val emptyC5 = vm.getC5();
     vm.setC5(emptyC5);
 
-    // BUG: vm.outActions should treat empty C5 as an empty out-action list, but parseOutActions tries to decode a missing OutList node and aborts with exit_code=63.
     val parsed = vm.outActions();
     expect(parsed.size()).toEqual(0);
 }
 "#,
         "integration/snapshots/test_std_agent_cn/cn_stdlib_set_c5_to_empty_cell_breaks_vm_out_actions_bug.stdout.txt",
+    );
+}
+
+#[test]
+fn cn_stdlib_parse_out_actions_direct_empty_cell_returns_empty_list() {
+    run_cn_stdlib_success(
+        "cn-stdlib-parse-out-actions-direct-empty-cell",
+        r#"
+get fun `test-cn-parse-out-actions-direct-empty-cell`() {
+    val parsed = vm.parseOutActions(createEmptyCell());
+    expect(parsed.size()).toEqual(0);
+}
+"#,
+        "integration/snapshots/test_std_agent_cn/cn_stdlib_parse_out_actions_direct_empty_cell_returns_empty_list.stdout.txt",
     );
 }

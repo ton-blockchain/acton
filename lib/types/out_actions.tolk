@@ -263,6 +263,11 @@ fun vm.outActions(): OutActionList {
 /// println(out_actions.size());
 /// ```
 fun vm.parseOutActions(cell: cell): OutActionList {
+    val rootSlice = cell.beginParse();
+    if (rootSlice.remainingBitsCount() == 0 && rootSlice.remainingRefsCount() == 0) {
+        return createEmptyTuple();
+    }
+
     var result = createEmptyTuple();
     val root = cell as Cell<OutList>;
     var next: Cell<OutList>? = root;
