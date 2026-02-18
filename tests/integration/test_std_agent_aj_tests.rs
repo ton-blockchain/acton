@@ -219,17 +219,15 @@ get fun `test-aj-stdlib-vm-convert-address-invalid`() {
 
 #[test]
 fn aj_stdlib_get_config_param_generic_is_not_usable_bug() {
-    run_aj_vm_failure_case(
+    run_aj_vm_success_case(
         "aj-stdlib-vm-get-config-param-generic-bug",
         r#"
 get fun `test-aj-stdlib-vm-get-config-param-generic-bug`() {
     vm.setTime(1700001000);
-    // BUG: vm.getConfigParam<T> cannot cast tuple item to generic T; expected successful read of slot 3, got compiler error "can not convert type `unknown` to return type `int`".
     val now = vm.getConfigParam<int>(3);
     expect(now).toEqual(1700001000);
 }
 "#,
-        "can not convert type",
         "integration/snapshots/test_std_agent_aj/aj_stdlib_get_config_param_generic_is_not_usable_bug.stdout.txt",
     );
 }

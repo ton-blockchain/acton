@@ -7,7 +7,7 @@
 
  TEST  [ROOT]
 
+ > tests/aj_vm_helpers.test.tolk (1 test)
+  ✓ aj-stdlib-vm-get-config-param-generic-bug [TIME]
 
- ✗ 1 failed in 0 files
-
-Some tests failed.
+ ✓ 1 passed in 1 file

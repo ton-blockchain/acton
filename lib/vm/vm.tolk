@@ -39,7 +39,7 @@ fun vm.setC5(cell: cell): void
 fun vm.getConfigParam<T>(index: int): T {
     val c7 = vm.getC7();
     val params = c7.get(0) as tuple;
-    return params.get(index);
+    return params.get(index) as T;
 }
 
 /// Generic helper to overwrite a single config parameter.

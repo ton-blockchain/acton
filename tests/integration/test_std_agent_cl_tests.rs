@@ -37,27 +37,6 @@ fn run_cl_vm_success_case(project_name: &str, test_body: &str, snapshot_path: &s
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_cl_vm_failure_case(
-    project_name: &str,
-    test_body: &str,
-    expected_message: &str,
-    snapshot_path: &str,
-) {
-    let test_source = format!("{VM_IMPORTS}\n{test_body}\n");
-
-    ProjectBuilder::new(project_name)
-        .contract("simple", SIMPLE_CONTRACT)
-        .test_file("cl_vm_helpers", &test_source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_contains(expected_message)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn cl_stdlib_set_config_param_keeps_neighbor_slots_consistent() {
     run_cl_vm_success_case(
@@ -111,18 +90,16 @@ get fun `test-cl-stdlib-set-config-param-slot-three`() {
 
 #[test]
 fn cl_stdlib_get_config_param_tuple_read_is_not_usable_bug() {
-    run_cl_vm_failure_case(
+    run_cl_vm_success_case(
         "cl-stdlib-get-config-param-tuple-read-bug",
         r#"
 get fun `test-cl-stdlib-get-config-param-tuple-read-bug`() {
     vm.setConfigParam(tuple [ton("9"), null], 7);
 
-    // BUG: vm.getConfigParam<T> cannot cast C7 tuple item to a typed return value; expected slot 7 tuple read to succeed, got compiler error "can not convert type `unknown` to return type `tuple`".
     val originalBalance = vm.getConfigParam<tuple>(7);
     expect(originalBalance.get(0) as int).toEqual(ton("9"));
 }
 "#,
-        "can not convert type",
         "integration/snapshots/test_std_agent_cl/cl_stdlib_get_config_param_tuple_read_is_not_usable_bug.stdout.txt",
     );
 }
