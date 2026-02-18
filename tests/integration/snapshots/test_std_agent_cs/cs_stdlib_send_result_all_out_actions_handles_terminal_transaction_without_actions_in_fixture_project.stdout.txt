@@ -8,11 +8,6 @@
  TEST  [ROOT]
 
  > tests/cs_send_result_all_out_actions_terminal.test.tolk (1 test)
-  ✗ cs-send-result-all-out-actions-terminal [TIME]
-    └─ exit_code=63
-      ├─ Re-run with --backtrace full to get more information
-      └─ Phase: Compute phase
+  ✓ cs-send-result-all-out-actions-terminal [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

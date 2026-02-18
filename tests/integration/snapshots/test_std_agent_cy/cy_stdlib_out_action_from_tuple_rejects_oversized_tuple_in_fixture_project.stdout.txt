@@ -9,7 +9,7 @@
 
  > tests/cy_out_action_from_tuple_oversized.test.tolk (1 test)
   ✗ cy-out-action-from-tuple-rejects-oversized [TIME]
-    └─ Error: Unknown out action
+    └─ Error: Unknown out action at index 0 (decode error code 7)
 
  ✗ 1 failed in 1 file
 

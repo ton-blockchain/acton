@@ -229,8 +229,7 @@ get fun `test-cs-send-result-all-out-actions-project-builder`() {
 }
 
 #[test]
-fn cs_stdlib_send_result_all_out_actions_terminal_transaction_without_actions_triggers_exit63_bug_in_fixture_project(
-) {
+fn cs_stdlib_send_result_all_out_actions_terminal_transaction_without_actions_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/cs_send_result_all_out_actions_terminal.test.tolk";
 
@@ -279,7 +278,6 @@ get fun `test-cs-send-result-all-out-actions-terminal`() {
         to: counterAddress,
     });
 
-    // BUG: SendResult.allOutActions should return an empty list for transactions without out actions, expected size=0, got exit_code=63.
     val terminalActions = txs.at(0).allOutActions();
     expect(terminalActions.size()).toEqual(0);
 }
@@ -292,8 +290,8 @@ get fun `test-cs-send-result-all-out-actions-terminal`() {
         .test()
         .path(test_path)
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_cs/cs_stdlib_send_result_all_out_actions_handles_terminal_transaction_without_actions_in_fixture_project.stdout.txt",
         );

@@ -14,12 +14,6 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/out_actions.test.tolk (1 test)
-  ✗ cx-change-library-to-tuple-roundtrip-bug [TIME]
-    └─ exit_code=7
-      ├─ Re-run with --backtrace full to get more information
-      ├─ not an integer
-      └─ Phase: Compute phase
+  ✓ cx-change-library-to-tuple-roundtrip-bug [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

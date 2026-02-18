@@ -14,7 +14,7 @@ import "../../lib/vm/vm"
 fun changeLib(code: cell, mode: int): void asm "SETLIBCODE"
 "#;
 
-fn run_cx_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
+fn run_cx_stdlib_success(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{CX_OUT_ACTIONS_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
         .test_file("out_actions", &source)
@@ -22,14 +22,13 @@ fn run_cx_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &st
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
         .assert_snapshot_matches(snapshot_path);
 }
 
 #[test]
 fn cx_stdlib_change_library_to_tuple_roundtrip_via_parse_out_actions_is_broken_bug() {
-    run_cx_stdlib_failure(
+    run_cx_stdlib_success(
         "cx-stdlib-change-library-to-tuple-roundtrip-bug",
         r#"
 get fun `test-cx-change-library-to-tuple-roundtrip-bug`() {
@@ -44,9 +43,6 @@ get fun `test-cx-change-library-to-tuple-roundtrip-bug`() {
     expect(parsedAction is OutActionChangeLibrary).toBeTrue();
 
     if (parsedAction is OutActionChangeLibrary) {
-        // BUG: OutActionChangeLibrary.toTuple should roundtrip through OutAction.fromTuple
-        // after vm.parseOutActions, but parsing the produced tuple aborts with exit_code=7
-        // ("not an integer").
         val restored = OutAction.fromTuple(parsedAction.toTuple());
         expect(restored.kind()).toEqual("change-library");
     }

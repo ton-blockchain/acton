@@ -22,6 +22,7 @@
 /// ```
 
 import "message"
+import "../fmt"
 import "../testing/assert"
 import "../tlb/either"
 import "../vm/vm"
@@ -179,8 +180,12 @@ type OutActionList = tuple
 /// println(action.kind());
 /// ```
 fun OutActionList.at(self, i: int): OutAction {
-    val rawAction = self.get(i) as tuple;
-    return OutAction.fromTuple(rawAction);
+    val rawAction = self.get(i);
+    try {
+        return (rawAction as cell as Cell<OutAction>).load();
+    } catch (e) {
+        Assert.fail(format2("Unknown out action at index {} (decode error code {})", i, e));
+    }
 }
 
 /// Returns the send message action at the given index.
@@ -276,7 +281,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
         val loaded = next.load();
         match (loaded.action) {
             OutActionSendMessage => {
-                result.push(loaded.action.toTuple());
+                result.push(loaded.action.toCell());
                 if (loaded.action.prev.beginParse().remainingBitsCount() == 0) {
                     next = null;
                 } else {
@@ -284,7 +289,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
                 }
             }
             OutActionSetCode => {
-                result.push(loaded.action.toTuple());
+                result.push(loaded.action.toCell());
                 if (loaded.action.prev.beginParse().remainingBitsCount() == 0) {
                     next = null;
                 } else {
@@ -292,7 +297,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
                 }
             }
             OutActionReserveCurrency => {
-                result.push(loaded.action.toTuple());
+                result.push(loaded.action.toCell());
                 if (loaded.action.prev.beginParse().remainingBitsCount() == 0) {
                     next = null;
                 } else {
@@ -300,7 +305,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
                 }
             }
             OutActionChangeLibrary => {
-                result.push(loaded.action.toTuple());
+                result.push(loaded.action.toCell());
                 if (loaded.action.prev.beginParse().remainingBitsCount() == 0) {
                     next = null;
                 } else {

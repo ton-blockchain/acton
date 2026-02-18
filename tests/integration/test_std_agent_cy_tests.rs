@@ -28,7 +28,7 @@ fn run_cy_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &st
         .run()
         .failure()
         .assert_failed(1)
-        .assert_contains("Unknown out action")
+        .assert_contains("Unknown out action at index")
         .assert_snapshot_matches(snapshot_path);
 }
 
@@ -79,7 +79,7 @@ get fun `test-cy-out-action-from-tuple-rejects-oversized`() {{
         .run()
         .failure()
         .assert_failed(1)
-        .assert_contains("Unknown out action")
+        .assert_contains("Unknown out action at index")
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_cy/cy_stdlib_out_action_from_tuple_rejects_oversized_tuple_in_fixture_project.stdout.txt",
         );

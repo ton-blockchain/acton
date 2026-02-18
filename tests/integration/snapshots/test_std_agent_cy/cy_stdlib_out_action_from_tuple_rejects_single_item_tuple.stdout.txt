@@ -15,7 +15,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  > tests/out_actions_malformed.test.tolk (1 test)
   ✗ cy-out-action-from-tuple-rejects-single-item [TIME]
-    └─ Error: Unknown out action
+    └─ Error: Unknown out action at index 0 (decode error code 7)
 
  ✗ 1 failed in 1 file
 
