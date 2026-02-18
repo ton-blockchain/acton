@@ -42,6 +42,11 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
       - name: Get TON commit hash
         id: ton-commit
         run: |
@@ -131,11 +136,6 @@ jobs:
       - name: Test acton binary
         run: |
           ./target/debug/acton --help
-
-      - name: Installing additional Rust components
-        uses: taiki-e/install-action@v2
-        with:
-          tool: nextest
 
       - name: Run tests
         run: |
