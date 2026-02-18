@@ -21,6 +21,12 @@ jobs:
       arch: ${{ steps.detect-arch.outputs.arch }}
 
     steps:
+      - name: Maximize Build Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
       - name: Check out Acton repository
         uses: actions/checkout@v6
 
@@ -28,7 +34,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Cache Cargo registry + git + target
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/registry
@@ -41,7 +47,7 @@ jobs:
       - name: Install required system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
+          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
       - name: Clone TON repository
@@ -57,7 +63,7 @@ jobs:
 
       - name: Cache TON build directory
         id: cache-ton-build
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ton-repo/build
           key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -65,15 +71,19 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-
 
+      - name: Check cache hit
+        run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
+
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         id: cache-ton-deps
-        uses: actions/cache@v5
+        uses: actions/cache/restore@v5
         with:
           path: |
             ton-repo/openssl_3
@@ -83,7 +93,8 @@ jobs:
           restore-keys: ton-deps-${{ runner.os }}-
 
       - name: Cache ccache
-        uses: actions/cache@v5
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v5
         with:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
@@ -92,7 +103,7 @@ jobs:
       - name: Init submodules for build
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
-          git submodule update --init --recursive
+          cd ton-repo && git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'

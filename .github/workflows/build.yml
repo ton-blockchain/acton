@@ -154,7 +154,6 @@ jobs:
           CC: gcc
           CXX: g++
         run: |
-          bun install
           just build-ui
           cargo build --bin acton
 
