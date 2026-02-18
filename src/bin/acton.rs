@@ -123,10 +123,9 @@ enum Commands {
         #[arg(
             long,
             help = "Debug server port",
-            default_value = "12345",
             help_heading = "Debugging"
         )]
-        debug_port: u16,
+        debug_port: Option<u16>,
         #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
         backtrace: Option<BacktraceMode>,
 
@@ -1541,7 +1540,7 @@ fn setup_logging() -> anyhow::Result<()> {
 fn create_test_config(
     filter: Option<String>,
     debug: bool,
-    debug_port: u16,
+    debug_port: Option<u16>,
     backtrace: Option<BacktraceMode>,
     coverage: bool,
     coverage_format: Option<CoverageFormat>,
@@ -1575,7 +1574,7 @@ fn create_test_config(
             filter,
             report_formats,
             if debug { Some(true) } else { None },
-            Some(debug_port),
+            debug_port,
             backtrace,
             if coverage { Some(true) } else { None },
             coverage_format,
@@ -1611,7 +1610,7 @@ fn create_test_config(
 
     TestConfig {
         debug,
-        debug_port,
+        debug_port: debug_port.unwrap_or(12345),
         backtrace,
         coverage,
         filter,

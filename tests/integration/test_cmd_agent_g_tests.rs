@@ -157,10 +157,22 @@ fn g_test_cmd_cli_default_debug_port_must_not_override_config_debug_port() {
             ..Default::default()
         },
         None,
+        None,
+    );
+
+    assert_eq!(merged.debug_port, 18186);
+}
+
+#[test]
+fn g_test_cmd_cli_explicit_debug_port_still_overrides_config_debug_port() {
+    let merged = merge_test_config(
+        TestSettings {
+            debug_port: Some(18186),
+            ..Default::default()
+        },
+        None,
         Some(12345),
     );
 
-    // BUG: create_test_config always forwards clap default `12345` as a CLI override,
-    // so Acton.toml `debug-port` cannot win when user didn't pass `--debug-port`.
-    assert_eq!(merged.debug_port, 18186);
+    assert_eq!(merged.debug_port, 12345);
 }
