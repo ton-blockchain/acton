@@ -28,9 +28,6 @@ jobs:
       - name: Check out Acton repository
         uses: actions/checkout@v6
 
-      - name: Install Rust
-        run: rustup toolchain install
-
       - name: Cache Cargo registry + git + target
         uses: actions/cache@v5
         with:
@@ -41,6 +38,9 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
+
+      - name: Install Rust
+        run: rustup toolchain install
 
       - name: Get TON commit hash
         id: ton-commit
