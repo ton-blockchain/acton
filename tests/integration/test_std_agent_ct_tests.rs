@@ -88,7 +88,7 @@ fun deployCtExternalHarness() {
 }
 "#;
 
-fn run_ct_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
+fn run_ct_stdlib_success(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{CT_NETWORK_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
         .file("contracts/messages", CT_MESSAGES)
@@ -98,14 +98,13 @@ fn run_ct_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &st
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
         .assert_snapshot_matches(snapshot_path);
 }
 
 #[test]
 fn ct_stdlib_ext_out_list_at_or_null_out_of_range_returns_null_bug() {
-    run_ct_stdlib_failure(
+    run_ct_stdlib_success(
         "ct-stdlib-ext-out-list-atornull-out-of-range",
         r#"
 get fun `test-ct-ext-out-list-atornull-out-of-range`() {
@@ -119,11 +118,113 @@ get fun `test-ct-ext-out-list-atornull-out-of-range`() {
     val externals = txs.at(0).externals;
     expect(externals.size()).toEqual(1);
 
-    // BUG: ExtOutList.atOrNull should return null for out-of-range indices, expected null, got exit_code=5 (tuple index out of range).
     val missing = externals.atOrNull<CtExternalNotice>(1);
-    expect(missing).toBeNull();
+    expect(missing == null).toBeTrue();
 }
 "#,
         "integration/snapshots/test_std_agent_ct/ct_stdlib_ext_out_list_at_or_null_out_of_range_returns_null_bug.stdout.txt",
+    );
+}
+
+#[test]
+fn ct_stdlib_ext_out_list_at_or_null_negative_index_returns_null() {
+    run_ct_stdlib_success(
+        "ct-stdlib-ext-out-list-atornull-negative-index",
+        r#"
+get fun `test-ct-ext-out-list-atornull-negative-index`() {
+    val externalAddress = deployCtExternalHarness();
+
+    val txs = net.sendExternal(
+        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 3 }),
+    );
+    expect(txs).toHaveLength(1);
+
+    val externals = txs.at(0).externals;
+    expect(externals.size()).toEqual(1);
+
+    val missing = externals.atOrNull<CtExternalNotice>(-1);
+    expect(missing == null).toBeTrue();
+}
+"#,
+        "integration/snapshots/test_std_agent_ct/ct_stdlib_ext_out_list_at_or_null_negative_index_returns_null.stdout.txt",
+    );
+}
+
+#[test]
+fn ct_stdlib_ext_out_list_at_or_null_opcode_mismatch_returns_null() {
+    run_ct_stdlib_success(
+        "ct-stdlib-ext-out-list-atornull-opcode-mismatch",
+        r#"
+get fun `test-ct-ext-out-list-atornull-opcode-mismatch`() {
+    val externalAddress = deployCtExternalHarness();
+
+    val txs = net.sendExternal(
+        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 4 }),
+    );
+    expect(txs).toHaveLength(1);
+
+    val externals = txs.at(0).externals;
+    expect(externals.size()).toEqual(1);
+
+    val mismatched = externals.atOrNull<CtTriggerExternal>(0);
+    expect(mismatched == null).toBeTrue();
+}
+"#,
+        "integration/snapshots/test_std_agent_ct/ct_stdlib_ext_out_list_at_or_null_opcode_mismatch_returns_null.stdout.txt",
+    );
+}
+
+#[test]
+fn ct_stdlib_ext_out_list_at_or_null_valid_index_returns_message() {
+    run_ct_stdlib_success(
+        "ct-stdlib-ext-out-list-atornull-valid-index",
+        r#"
+get fun `test-ct-ext-out-list-atornull-valid-index`() {
+    val externalAddress = deployCtExternalHarness();
+
+    val txs = net.sendExternal(
+        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 5 }),
+    );
+    expect(txs).toHaveLength(1);
+
+    val externals = txs.at(0).externals;
+    expect(externals.size()).toEqual(1);
+
+    val first = externals.atOrNull<CtExternalNotice>(0);
+    expect(first != null).toBeTrue();
+    expect(first!.loadBody().count).toEqual(1);
+}
+"#,
+        "integration/snapshots/test_std_agent_ct/ct_stdlib_ext_out_list_at_or_null_valid_index_returns_message.stdout.txt",
+    );
+}
+
+#[test]
+fn ct_stdlib_ext_out_list_at_or_null_empty_list_returns_null() {
+    run_ct_stdlib_success(
+        "ct-stdlib-ext-out-list-atornull-empty-list",
+        r#"
+get fun `test-ct-ext-out-list-atornull-empty-list`() {
+    val externalAddress = deployCtExternalHarness();
+    val sender = net.treasury("ct_internal_sender");
+
+    val txs = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.2"),
+            dest: externalAddress,
+        }),
+    );
+    expect(txs).toHaveLength(1);
+
+    val externals = txs.at(0).externals;
+    expect(externals.size()).toEqual(0);
+
+    val missing = externals.atOrNull<CtExternalNotice>(0);
+    expect(missing == null).toBeTrue();
+}
+"#,
+        "integration/snapshots/test_std_agent_ct/ct_stdlib_ext_out_list_at_or_null_empty_list_returns_null.stdout.txt",
     );
 }

@@ -78,9 +78,14 @@ fun ExtOutList.at<Msg>(self, index: int): ExtMessageRelaxed<Msg> {
 /// Returns the external outgoing message at the given index with given type or
 /// null if message is not a given type.
 ///
-/// Note that if message is not a given type, this method will return null instead
-/// of throwing an exception. Use [ExtOutList.at] if you don't want to handle null case.
+/// Note that if message is not a given type or the index is out of range,
+/// this method will return null instead of throwing an exception.
+/// Use [ExtOutList.at] if you don't want to handle null case.
 fun ExtOutList.atOrNull<Msg>(self, index: int): ExtMessageRelaxed<Msg>? {
+    if (index < 0 || index >= self.size()) {
+        return null;
+    }
+
     val cell = self.get(index) as cell as Cell<ExtMessageRelaxed<Msg>>;
     try {
         return cell.load();
