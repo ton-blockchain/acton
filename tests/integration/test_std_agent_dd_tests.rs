@@ -178,7 +178,6 @@ get fun `test-dd-find-external-out-message-type-and-source`() {
         to: relayAddress,
     });
 
-    // BUG: SendResultList.findExternalOutMessage fails to compile because network.tolk uses tuple.get with type arguments.
     val alpha = txs.findExternalOutMessage<DdAlphaNotice>({
         from: rootAddress,
         to: createAddressNone(),
@@ -223,7 +222,6 @@ get fun `test-dd-find-external-out-message-per-send`() {
     expect(first).toHaveLength(2);
     expect(second).toHaveLength(2);
 
-    // BUG: SendResultList.findExternalOutMessage fails to compile because network.tolk uses tuple.get with type arguments.
     val firstBeta = first.findExternalOutMessage<DdBetaNotice>({
         from: relayAddress,
         to: createAddressNone(),

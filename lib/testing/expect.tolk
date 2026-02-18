@@ -345,7 +345,7 @@ fun Expectation<any_address>.toBeExternalAddress(self) {
 fun Expectation<tuple>.toContain<U>(self, expected: U) {
     var i = 0;
     while (i < self.value.size()) {
-        val item = self.value.get<U>(i);
+        val item = self.value.get(i) as U;
         if (item == expected) {
             return;
         }
@@ -367,7 +367,7 @@ fun Expectation<tuple>.toContain<U>(self, expected: U) {
 fun Expectation<tuple>.toNotContain<U>(self, expected: U) {
     var i = 0;
     while (i < self.value.size()) {
-        val item = self.value.get<U>(i);
+        val item = self.value.get(i) as U;
         if (item == expected) {
             Assert.fail("Tuple contains the value but it should not", self.location);
         }

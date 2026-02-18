@@ -268,7 +268,6 @@ get fun `test-find-external-out-message-bug`() {
         createExternalMessage(harness.address, TriggerExternal { id: 5 }),
     );
 
-    // BUG: SendResultList.findExternalOutMessage fails to compile because it calls tuple.get with type arguments.
     val found = txs.findExternalOutMessage<ExternalAlpha>({
         from: harness.address,
         to: createAddressNone(),

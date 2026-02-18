@@ -683,8 +683,8 @@ fun net.disableBroadcast(): void {
 /// ```
 /// ```tolk
 /// val data: tuple = net.runGetMethod(wallet.address, "get_all_data");
-/// val first = data.get<int>(0);
-/// val second = data.get<int>(1);
+/// val first = data.get(0) as int;
+/// val second = data.get(1) as int;
 /// ```
 ///
 /// If you need to run a get method by its ID, use [net.runGetMethodById] instead.

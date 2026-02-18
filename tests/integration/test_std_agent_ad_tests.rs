@@ -138,30 +138,17 @@ get fun `test-ad-stdlib-map-helpers`() {
 
 #[test]
 fn ad_stdlib_expect_tuple_contain_should_compile_and_assert_at_runtime_bug() {
-    let source = format!(
-        "{EXPECT_IMPORTS}\n{}\n",
+    run_expect_success(
+        "ad-stdlib-expect-tuple-contain-compile-bug",
         r#"
 get fun `test-ad-stdlib-tuple-contain-compile-bug`() {
     var values = createEmptyTuple();
     values.push(1);
-    // BUG: Expectation<tuple>.toContain() fails in stdlib compilation; expected matcher runtime behavior, got compiler error.
     expect(values).toContain(1);
 }
-"#
+"#,
+        "integration/snapshots/test_std_agent_ad/ad_stdlib_expect_tuple_contain_should_compile_and_assert_at_runtime_bug.stdout.txt",
     );
-
-    ProjectBuilder::new("ad-stdlib-expect-tuple-contain-compile-bug")
-        .test_file("expect_behavior", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_stderr_contains("type arguments not expected here")
-        .assert_snapshot_matches(
-            "integration/snapshots/test_std_agent_ad/ad_stdlib_expect_tuple_contain_should_compile_and_assert_at_runtime_bug.stdout.txt",
-        );
 }
 
 #[test]

@@ -21,11 +21,7 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-fn run_expect_tuple_membership_compile_failure(
-    project_name: &str,
-    test_body: &str,
-    snapshot_path: &str,
-) {
+fn run_expect_tuple_membership_success(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{EXPECT_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
         .contract("simple", SIMPLE_CONTRACT)
@@ -34,15 +30,37 @@ fn run_expect_tuple_membership_compile_failure(
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
-        .assert_stderr_contains("type arguments not expected here")
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(snapshot_path);
+}
+
+fn run_expect_tuple_membership_failure(
+    project_name: &str,
+    test_body: &str,
+    snapshot_path: &str,
+    contains: &[&str],
+) {
+    let source = format!("{EXPECT_IMPORTS}\n{test_body}\n");
+    let output = ProjectBuilder::new(project_name)
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("expect_tuple_membership", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure();
+
+    output.assert_failed(1);
+    for needle in contains {
+        output.assert_contains(needle);
+    }
+    output.assert_snapshot_matches(snapshot_path);
 }
 
 #[test]
 fn ca_stdlib_expect_tuple_to_contain_existing_value_reports_compile_diagnostic_bug() {
-    run_expect_tuple_membership_compile_failure(
+    run_expect_tuple_membership_success(
         "ca-stdlib-expect-tuple-to-contain-existing-value-bug",
         r#"
 get fun `test-ca-stdlib-to-contain-existing-value-bug`() {
@@ -50,7 +68,6 @@ get fun `test-ca-stdlib-to-contain-existing-value-bug`() {
     values.push(1);
     values.push(2);
 
-    // BUG: Expectation<tuple>.toContain() should compile and validate tuple membership at runtime; expected pass, got compiler error "type arguments not expected here".
     expect(values).toContain(2);
 }
 "#,
@@ -60,7 +77,7 @@ get fun `test-ca-stdlib-to-contain-existing-value-bug`() {
 
 #[test]
 fn ca_stdlib_expect_tuple_to_contain_missing_value_runtime_diagnostic_is_unreachable_bug() {
-    run_expect_tuple_membership_compile_failure(
+    run_expect_tuple_membership_failure(
         "ca-stdlib-expect-tuple-to-contain-missing-value-diagnostic-bug",
         r#"
 get fun `test-ca-stdlib-to-contain-missing-value-diagnostic-bug`() {
@@ -68,17 +85,17 @@ get fun `test-ca-stdlib-to-contain-missing-value-diagnostic-bug`() {
     values.push(10);
     values.push(20);
 
-    // BUG: Expectation<tuple>.toContain() should fail at runtime with "Tuple doesn't contain the value"; got compiler error "type arguments not expected here".
     expect(values).toContain(30);
 }
 "#,
         "integration/snapshots/test_std_agent_ca/ca_stdlib_expect_tuple_to_contain_missing_value_runtime_diagnostic_is_unreachable_bug.stdout.txt",
+        &["Tuple doesn't contain the value"],
     );
 }
 
 #[test]
 fn ca_stdlib_expect_tuple_to_not_contain_present_value_runtime_diagnostic_is_unreachable_bug() {
-    run_expect_tuple_membership_compile_failure(
+    run_expect_tuple_membership_failure(
         "ca-stdlib-expect-tuple-to-not-contain-present-value-diagnostic-bug",
         r#"
 get fun `test-ca-stdlib-to-not-contain-present-value-diagnostic-bug`() {
@@ -86,10 +103,43 @@ get fun `test-ca-stdlib-to-not-contain-present-value-diagnostic-bug`() {
     values.push(7);
     values.push(8);
 
-    // BUG: Expectation<tuple>.toNotContain() should fail at runtime with "Tuple contains the value but it should not"; got compiler error "type arguments not expected here".
     expect(values).toNotContain(8);
 }
 "#,
         "integration/snapshots/test_std_agent_ca/ca_stdlib_expect_tuple_to_not_contain_present_value_runtime_diagnostic_is_unreachable_bug.stdout.txt",
+        &["Tuple contains the value but it should not"],
+    );
+}
+
+#[test]
+fn ca_stdlib_expect_tuple_to_not_contain_missing_value_passes() {
+    run_expect_tuple_membership_success(
+        "ca-stdlib-expect-tuple-to-not-contain-missing-value",
+        r#"
+get fun `test-ca-stdlib-to-not-contain-missing-value`() {
+    var values = createEmptyTuple();
+    values.push(7);
+    values.push(8);
+
+    expect(values).toNotContain(9);
+}
+"#,
+        "integration/snapshots/test_std_agent_ca/ca_stdlib_expect_tuple_to_not_contain_missing_value_passes.stdout.txt",
+    );
+}
+
+#[test]
+fn ca_stdlib_expect_tuple_to_contain_missing_value_in_empty_tuple_reports_runtime_diagnostic() {
+    run_expect_tuple_membership_failure(
+        "ca-stdlib-expect-tuple-to-contain-empty-tuple-missing-value",
+        r#"
+get fun `test-ca-stdlib-to-contain-empty-tuple-missing-value`() {
+    var values = createEmptyTuple();
+
+    expect(values).toContain(1);
+}
+"#,
+        "integration/snapshots/test_std_agent_ca/ca_stdlib_expect_tuple_to_contain_missing_value_in_empty_tuple_reports_runtime_diagnostic.stdout.txt",
+        &["Tuple doesn't contain the value"],
     );
 }
