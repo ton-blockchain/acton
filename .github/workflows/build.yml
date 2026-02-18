@@ -46,12 +46,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install required system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
-          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
-
       - name: Get TON commit hash
         id: ton-commit
         run: |
@@ -67,6 +61,19 @@ jobs:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-
+
+      - name: Install required system dependencies
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
+          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+
+      - name: Install required system dependencies
+        if: steps.cache-ton-artifacts.outputs.cache-hit == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just graphviz
 
       - name: Check cache hit
         run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
@@ -89,7 +96,7 @@ jobs:
           path: ton-repo
 
       - name: Cache TON build directory
-        id: cache-ton-build
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         uses: actions/cache@v5
         with:
           path: ton-repo/build
