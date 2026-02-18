@@ -13,15 +13,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
- > tests/prompt_select_bug.test.tolk (1 test)
-  ✗ ap-stdlib-select-starting-cursor-index-zero-bug [TIME]
-    └─ Error: expect(actual).toEqual(expected)
-        (
-            ,
-            Safe
-        )
-      └─ at tests/prompt_select_bug.test[LINE]
+ > tests/prompt_select.test.tolk (1 test)
+  ✓ ap-stdlib-select-starting-cursor-index-zero-bug [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

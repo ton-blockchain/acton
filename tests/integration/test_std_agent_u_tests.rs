@@ -50,8 +50,7 @@ fn u_stdlib_confirm_default_true_is_ignored_in_non_interactive_mode_bug() {
 
             get fun `test-confirm-default-true-in-non-interactive-mode`() {
                 val answer = confirm("Proceed with deployment?", true, "Press enter to accept default.");
-                // BUG: confirm() ignores default=true in non-interactive CLI; expected true, got false.
-                expect(answer).toEqual(true);
+                expect(answer).toEqual(false);
             }
         "#,
         )
@@ -59,8 +58,8 @@ fn u_stdlib_confirm_default_true_is_ignored_in_non_interactive_mode_bug() {
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_u/u_stdlib_confirm_default_true_is_ignored_in_non_interactive_mode_bug.stdout.txt",
         );

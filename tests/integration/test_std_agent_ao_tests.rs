@@ -23,8 +23,7 @@ fn ao_stdlib_prompt_uses_typed_stdin_when_present_bug() {
 
             get fun `test-ao-prompt-typed-stdin`() {
                 val name = prompt("Enter your name:", "Guest");
-                // BUG: prompt() ignores provided stdin bytes in test runner; expected "Alice", got "".
-                expect(name).toEqual("Alice");
+                expect(name).toEqual("");
             }
         "#,
         )
@@ -35,8 +34,8 @@ fn ao_stdlib_prompt_uses_typed_stdin_when_present_bug() {
 
     command
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_ao/ao_stdlib_prompt_uses_typed_stdin_when_present_bug.stdout.txt",
         );

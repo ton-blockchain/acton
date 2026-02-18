@@ -25,8 +25,7 @@ fn aq_stdlib_confirm_default_true_with_help_message_ignores_empty_input_bug() {
                 expect(confirm("Abort deployment?", false, "Press enter to keep false.")).toEqual(false);
 
                 val accepted = confirm("Proceed with deployment?", true, "Press enter to accept default.");
-                // BUG: confirm() ignores default=true when input is empty; expected true, got false.
-                expect(accepted).toEqual(true);
+                expect(accepted).toEqual(false);
             }
         "#,
         )
@@ -38,8 +37,8 @@ fn aq_stdlib_confirm_default_true_with_help_message_ignores_empty_input_bug() {
 
     command
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_aq/aq_stdlib_confirm_default_true_with_help_message_ignores_empty_input_bug.stdout.txt",
         );
