@@ -775,11 +775,20 @@ fun net.randomAddress(name: string? = null, wc: int = 0): address {
     builder.storeUint(0b0, 1);
     builder.storeInt(wc, 8);
 
-    var i = 0;
-    while (i < 32) {
-        val num = random.range(256);
-        builder.storeUint(num, 8);
-        i += 1;
+    if (name != null) {
+        val deterministicHash = beginCell()
+            .storeInt(wc, 8)
+            .storeSlice(name.beginParse())
+            .endCell()
+            .hash();
+        builder.storeUint(deterministicHash, 256);
+    } else {
+        var i = 0;
+        while (i < 32) {
+            val num = random.range(256);
+            builder.storeUint(num, 8);
+            i += 1;
+        }
     }
 
     val address = address.fromValidBuilder(builder);

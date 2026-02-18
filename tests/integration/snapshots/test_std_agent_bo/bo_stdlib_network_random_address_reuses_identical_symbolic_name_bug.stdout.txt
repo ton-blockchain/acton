@@ -14,14 +14,6 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/bo_random_address_reuse.test.tolk (1 test)
-  ✗ bo-stdlib-network-random-address-reuse [TIME]
-    └─ Error: expect(actual).toEqual(expected)
-        (
-            kQCaMdGt9cG70iD0tRb+8Dvt8QqRPDgRrLFHP4wanVjLn9No (bo_reused_symbolic_name),
-            kQAKIOo5BYX6HLXvPp8Ct55dApFwnI0qWrx55yyF/aI9Kyw0 (bo_reused_symbolic_name)
-        )
-      └─ at tests/bo_random_address_reuse.test[LINE]
+  ✓ bo-stdlib-network-random-address-reuse [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file
