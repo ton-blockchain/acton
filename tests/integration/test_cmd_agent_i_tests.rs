@@ -144,7 +144,6 @@ fn i_test_cmd_unknown_fork_network_should_fail_fast() {
         )
         .build();
 
-    // BUG: unknown --fork-net values are silently ignored in `acton test`; expected CLI parse error.
     project
         .acton()
         .test()

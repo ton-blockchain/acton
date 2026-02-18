@@ -38,7 +38,6 @@ get fun `test-ej-stdlib-assert-not-equal-complex-map-diagnostic`() {{
     balances.set(7, 70);
     balances.set(11, 110);
 
-    // BUG: Assert.notEqual should render map key/value entries in diagnostics; expected readable map contents, got opaque [BOC_HEX].
     Assert.notEqual(balances, balances, "ej tuple/map notEqual diagnostic map");
 }}
 "#

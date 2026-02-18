@@ -1155,47 +1155,50 @@ fn main() {
             fork_block_number,
             ui,
             ui_port,
-        } => {
-            let config = create_test_config(
-                filter,
-                debug,
-                debug_port,
-                backtrace,
-                coverage,
-                coverage_format,
-                coverage_file,
-                exclude,
-                include,
-                clear_cache,
-                reporter,
-                junit_path,
-                junit_merge,
-                snapshot,
-                baseline_snapshot,
-                fork_net,
-                api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
-                fork_block_number,
-                save_test_trace.or_else(|| {
-                    if ui {
-                        Some(".acton/traces".to_owned())
-                    } else {
-                        None
-                    }
-                }),
-                mutate,
-                mutate_overrides,
-                mutate_contract,
-                disable_rule,
-                Some(fail_fast),
-                ui,
-                ui_port,
-            );
+        } => match fork_net.as_deref().map(Network::from_str).transpose() {
+            Ok(fork_net) => {
+                let config = create_test_config(
+                    filter,
+                    debug,
+                    debug_port,
+                    backtrace,
+                    coverage,
+                    coverage_format,
+                    coverage_file,
+                    exclude,
+                    include,
+                    clear_cache,
+                    reporter,
+                    junit_path,
+                    junit_merge,
+                    snapshot,
+                    baseline_snapshot,
+                    fork_net,
+                    api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
+                    fork_block_number,
+                    save_test_trace.or_else(|| {
+                        if ui {
+                            Some(".acton/traces".to_owned())
+                        } else {
+                            None
+                        }
+                    }),
+                    mutate,
+                    mutate_overrides,
+                    mutate_contract,
+                    disable_rule,
+                    Some(fail_fast),
+                    ui,
+                    ui_port,
+                );
 
-            if mutate {
-                mutation::test_mutate_cmd(&path, &config)
-            } else {
-                test_cmd(path, &config)
+                if mutate {
+                    mutation::test_mutate_cmd(&path, &config)
+                } else {
+                    test_cmd(path, &config)
+                }
             }
+            Err(err) => Err(err.into()),
         }
         Commands::Run { script, args } => run_cmd(&script, &args),
         Commands::Retrace {
@@ -1553,7 +1556,7 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
-    fork_net: Option<String>,
+    fork_net: Option<Network>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
     save_test_trace: Option<String>,
@@ -1594,7 +1597,7 @@ fn create_test_config(
             junit_merge,
             snapshot,
             baseline_snapshot,
-            fork_net.and_then(|n| Network::from_str(&n).ok()),
+            fork_net,
             api_key,
             fork_block_number,
             save_test_trace,
@@ -1634,6 +1637,6 @@ fn create_test_config(
         fail_fast: fail_fast.unwrap_or(false),
         ui,
         ui_port,
-        fork_net: fork_net.and_then(|n| Network::from_str(&n).ok()),
+        fork_net,
     }
 }
