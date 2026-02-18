@@ -8,11 +8,6 @@
  TEST  [ROOT]
 
  > tests/bj_get_account_state_transition_bug.test.tolk (1 test)
-  ✗ bj-stdlib-get-account-state-transition-bug [TIME]
-    └─ Error: expect(actual).toBeNull()
-        [null, null, null, null, null, null, null, null, null, null, null, null, 0] != null
-      └─ at tests/bj_get_account_state_transition_bug.test[LINE]
+  ✓ bj-stdlib-get-account-state-transition-bug [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

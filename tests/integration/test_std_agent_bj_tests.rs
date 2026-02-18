@@ -33,7 +33,7 @@ fn run_bj_project_case(project_name: &str, test_body: &str, snapshot_path: &str)
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_bj_fixture_failure_case(test_file: &str, test_body: &str, snapshot_path: &str) {
+fn run_bj_fixture_success_case(test_file: &str, test_body: &str, snapshot_path: &str) {
     let fixture = FixtureProject::load("basic");
     let test_path = format!("tests/{test_file}.test.tolk");
     let test_source = format!("{NETWORK_IMPORTS}\n{test_body}\n");
@@ -46,8 +46,8 @@ fn run_bj_fixture_failure_case(test_file: &str, test_body: &str, snapshot_path: 
         .test()
         .path(&test_path)
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(snapshot_path);
 }
 
@@ -71,22 +71,20 @@ get fun `test-bj-stdlib-get-account-state-after-top-up`() {
 }
 
 #[test]
-fn bj_stdlib_get_account_state_should_transition_from_null_to_non_null_after_top_up_bug() {
-    run_bj_fixture_failure_case(
+fn bj_stdlib_get_account_state_transitions_from_null_to_non_null_after_top_up() {
+    run_bj_fixture_success_case(
         "bj_get_account_state_transition_bug",
         r#"
 get fun `test-bj-stdlib-get-account-state-transition-bug`() {
     val target = net.randomAddress("bj_state_transition_before_after_top_up");
     val before = net.getAccountState(target);
+    expect(before == null).toEqual(true);
 
     net.topUp(target, ton("1"));
 
     val after = net.getAccountState(target);
     expect(after).toBeNotNull();
     expect(after!.storage.balance.grams).toEqual(ton("1"));
-
-    // BUG: net.getAccountState(randomAddress) returns non-null default-like account data before funding; expected null before topUp and AccountInfo after topUp.
-    expect(before).toBeNull();
 }
 "#,
         "integration/snapshots/test_std_agent_bj/bj_stdlib_get_account_state_should_transition_from_null_to_non_null_after_top_up_bug.stdout.txt",

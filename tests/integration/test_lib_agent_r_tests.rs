@@ -38,27 +38,6 @@ fn run_account_state_case(project_name: &str, test_body: &str, snapshot_path: &s
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_account_state_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let test_code = format!(
-        r#"
-            {}
-
-            {}
-        "#,
-        TEST_IMPORTS, test_body
-    );
-
-    ProjectBuilder::new(project_name)
-        .test_file("account_state", &test_code)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn r_lib_api_top_up_materializes_account_and_increases_balance() {
     run_account_state_case(
@@ -168,14 +147,19 @@ fn r_lib_api_set_shard_account_copies_state_between_addresses() {
 }
 
 #[test]
-fn r_lib_api_get_account_state_for_fresh_address_returns_non_null_bug() {
-    run_account_state_failure_case(
-        "r-lib-api-get-account-state-fresh-address-bug",
+fn r_lib_api_get_account_state_for_fresh_address_is_null_before_top_up() {
+    run_account_state_case(
+        "r-lib-api-get-account-state-fresh-address",
         r#"
         get fun `test-get-account-state-for-fresh-address-should-be-null`() {
             val target = net.randomAddress("r-fresh-account-state");
-            // BUG: net.getAccountState(randomAddress) returns non-null default-like account data; expected null for undeployed account.
-            expect(net.getAccountState(target)).toBeNull();
+            val before = net.getAccountState(target);
+            expect(before == null).toEqual(true);
+
+            net.topUp(target, ton("1"));
+            val after = net.getAccountState(target);
+            expect(after == null).toEqual(false);
+            expect(after!.storage.balance.grams).toEqual(ton("1"));
         }
         "#,
         "integration/snapshots/test_lib_agent_r/r_lib_api_get_account_state_for_fresh_address_returns_non_null_bug.stdout.txt",
