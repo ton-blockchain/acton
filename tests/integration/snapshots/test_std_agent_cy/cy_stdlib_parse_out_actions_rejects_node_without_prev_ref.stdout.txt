@@ -13,7 +13,10 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
- > tests/out_actions.test.tolk (1 test)
-  ✓ al-get-send-message-body-null-non-send [TIME]
+ > tests/out_actions_malformed.test.tolk (1 test)
+  ✗ cy-parse-out-actions-rejects-node-without-prev-ref [TIME]
+    └─ Error: Malformed out action list node
 
- ✓ 1 passed in 1 file
+ ✗ 1 failed in 1 file
+
+Some tests failed.

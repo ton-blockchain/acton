@@ -47,19 +47,6 @@ fn run_al_stdlib_success(project_name: &str, test_body: &str, snapshot_path: &st
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_al_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = format!("{OUT_ACTIONS_IMPORTS}\n{test_body}\n");
-    ProjectBuilder::new(project_name)
-        .test_file("out_actions", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn al_stdlib_out_actions_list_traversal_preserves_reverse_order_and_kinds() {
     run_al_stdlib_success(
@@ -150,7 +137,7 @@ get fun `test-al-parse-out-actions-from-c5`() {
 
 #[test]
 fn al_stdlib_get_send_message_at_returns_null_for_non_send_entries() {
-    run_al_stdlib_failure(
+    run_al_stdlib_success(
         "al-stdlib-get-send-message-at-null-non-send",
         r#"
 get fun `test-al-get-send-message-at-null-non-send`() {
@@ -175,8 +162,7 @@ get fun `test-al-get-send-message-at-null-non-send`() {
 
     expect(sendAction).toBeNotNull();
     expect(sendAction!.mode).toEqual(SEND_MODE_REGULAR);
-    // BUG: getSendMessageAt should return null for set-code action at index 1, but returns a parsed send-message-like tuple.
-    expect(nonSendAction).toBeNull();
+    expect(nonSendAction == null).toBeTrue();
     expect(outActions.at(1).kind()).toEqual("set-code");
 }
 "#,
@@ -260,7 +246,7 @@ get fun `test-al-get-send-message-body-ref-right`() {
 
 #[test]
 fn al_stdlib_get_send_message_body_at_returns_null_for_non_send_action() {
-    run_al_stdlib_failure(
+    run_al_stdlib_success(
         "al-stdlib-get-send-message-body-null-non-send",
         r#"
 get fun `test-al-get-send-message-body-null-non-send`() {
@@ -271,8 +257,7 @@ get fun `test-al-get-send-message-body-null-non-send`() {
     expect(outActions.at(0).kind()).toEqual("set-code");
 
     val body = outActions.getSendMessageBodyAt<InlinePayload>(0);
-    // BUG: getSendMessageBodyAt should return null for set-code action at index 0, but returns a non-null pseudo-body.
-    expect(body).toBeNull();
+    expect(body == null).toBeTrue();
 }
 "#,
         "integration/snapshots/test_std_agent_al/al_stdlib_get_send_message_body_at_returns_null_for_non_send_action.stdout.txt",
@@ -310,5 +295,34 @@ get fun `test-al-out-message-out-actions-helper`() {
 }
 "#,
         "integration/snapshots/test_std_agent_al/al_stdlib_out_message_out_actions_helper_returns_send_action_with_mode_and_body.stdout.txt",
+    );
+}
+
+#[test]
+fn al_stdlib_get_send_message_helpers_return_null_for_reserve_and_change_library_actions() {
+    run_al_stdlib_success(
+        "al-stdlib-get-send-message-helpers-null-for-reserve-and-change-library",
+        r#"
+get fun `test-al-get-send-message-helpers-null-for-reserve-and-change-library`() {
+    reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    changeLib(beginCell().storeUint(0xEE, 8).endCell(), 2);
+
+    val outActions = vm.outActions();
+    expect(outActions.size()).toEqual(2);
+    expect(outActions.at(0).kind()).toEqual("change-library");
+    expect(outActions.at(1).kind()).toEqual("reserve-currency");
+
+    val sendAtChange = outActions.getSendMessageAt(0);
+    val sendAtReserve = outActions.getSendMessageAt(1);
+    expect(sendAtChange == null).toBeTrue();
+    expect(sendAtReserve == null).toBeTrue();
+
+    val bodyAtChange = outActions.getSendMessageBodyAt<InlinePayload>(0);
+    val bodyAtReserve = outActions.getSendMessageBodyAt<InlinePayload>(1);
+    expect(bodyAtChange == null).toBeTrue();
+    expect(bodyAtReserve == null).toBeTrue();
+}
+"#,
+        "integration/snapshots/test_std_agent_al/al_stdlib_get_send_message_helpers_return_null_for_reserve_and_change_library_actions.stdout.txt",
     );
 }

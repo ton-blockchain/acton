@@ -24,7 +24,7 @@ struct (0x7e8764ef) IncreaseCounter {
 }
 "#;
 
-fn run_outlist_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
+fn run_outlist_success(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{OUTLIST_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
         .test_file("outlist_behavior", &source)
@@ -32,14 +32,14 @@ fn run_outlist_failure(project_name: &str, test_body: &str, snapshot_path: &str)
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(snapshot_path);
 }
 
 #[test]
 fn cb_stdlib_outlist_to_be_send_message_at_incompatible_typed_payload_reports_exit_code() {
-    run_outlist_failure(
+    run_outlist_success(
         "cb-stdlib-outlist-incompatible-typed-payload",
         r#"
 get fun `test-cb-outlist-incompatible-typed-payload`() {
@@ -59,10 +59,29 @@ get fun `test-cb-outlist-incompatible-typed-payload`() {
 
     val out_actions = vm.outActions();
     expectToEndWithExitCode(567);
-    // BUG: toBeSendMessageAt should fail for malformed payload matching opcode prefix; expected ASSERTION_FAILED (567), got success (0).
     expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 }
 "#,
         "integration/snapshots/test_std_agent_cb/cb_stdlib_outlist_to_be_send_message_at_incompatible_typed_payload_reports_exit_code.stdout.txt",
+    );
+}
+
+#[test]
+fn cb_stdlib_outlist_to_be_send_message_at_fails_for_non_send_action() {
+    run_outlist_success(
+        "cb-stdlib-outlist-non-send-action",
+        r#"
+get fun `test-cb-outlist-non-send-action`() {
+    reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+
+    val out_actions = vm.outActions();
+    expect(out_actions.size()).toEqual(1);
+    expect(out_actions.at(0).kind()).toEqual("reserve-currency");
+
+    expectToEndWithExitCode(567);
+    expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
+}
+"#,
+        "integration/snapshots/test_std_agent_cb/cb_stdlib_outlist_to_be_send_message_at_fails_for_non_send_action.stdout.txt",
     );
 }

@@ -16,6 +16,7 @@ use std::fs;
 
 const CY_OUT_ACTIONS_IMPORTS: &str = r#"
 import "../../lib/types/out_actions"
+import "../../lib/vm/vm"
 "#;
 
 fn run_cy_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
@@ -29,6 +30,25 @@ fn run_cy_stdlib_failure(project_name: &str, test_body: &str, snapshot_path: &st
         .failure()
         .assert_failed(1)
         .assert_contains("Unknown out action at index")
+        .assert_snapshot_matches(snapshot_path);
+}
+
+fn run_cy_stdlib_failure_with_contains(
+    project_name: &str,
+    test_body: &str,
+    snapshot_path: &str,
+    expected_message: &str,
+) {
+    let source = format!("{CY_OUT_ACTIONS_IMPORTS}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .test_file("out_actions_malformed", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains(expected_message)
         .assert_snapshot_matches(snapshot_path);
 }
 
@@ -83,4 +103,23 @@ get fun `test-cy-out-action-from-tuple-rejects-oversized`() {{
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_cy/cy_stdlib_out_action_from_tuple_rejects_oversized_tuple_in_fixture_project.stdout.txt",
         );
+}
+
+#[test]
+fn cy_stdlib_parse_out_actions_rejects_node_without_prev_ref() {
+    run_cy_stdlib_failure_with_contains(
+        "cy-stdlib-parse-out-actions-rejects-node-without-prev-ref",
+        r#"
+get fun `test-cy-parse-out-actions-rejects-node-without-prev-ref`() {
+    val malformedNode = beginCell()
+        .storeUint(0x0ec3c86d, 32)
+        .storeUint(0, 8)
+        .endCell();
+
+    vm.parseOutActions(malformedNode);
+}
+"#,
+        "integration/snapshots/test_std_agent_cy/cy_stdlib_parse_out_actions_rejects_node_without_prev_ref.stdout.txt",
+        "Malformed out action list node",
+    );
 }

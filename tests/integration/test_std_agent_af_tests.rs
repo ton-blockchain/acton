@@ -151,7 +151,7 @@ get fun `test-af-outlist-opcode-mismatch-known-type`() {
 
 #[test]
 fn af_stdlib_outlist_to_be_send_message_at_opcode_mismatch_without_known_type_name() {
-    run_outlist_failure(
+    run_outlist_success(
         "af-stdlib-outlist-opcode-mismatch-unknown-type",
         r#"
 get fun `test-af-outlist-opcode-mismatch-unknown-type`() {
@@ -166,7 +166,6 @@ get fun `test-af-outlist-opcode-mismatch-unknown-type`() {
 
     val out_actions = vm.outActions();
     expectToEndWithExitCode(567);
-    // BUG: toBeSendMessageAt should fail for mismatched raw opcode bodies; expected ASSERTION_FAILED (567), got success (0).
     expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 }
 "#,
@@ -176,7 +175,7 @@ get fun `test-af-outlist-opcode-mismatch-unknown-type`() {
 
 #[test]
 fn af_stdlib_outlist_to_be_send_message_at_bounced_prefix_opcode_mismatch_is_reported() {
-    run_outlist_failure(
+    run_outlist_success(
         "af-stdlib-outlist-opcode-mismatch-bounced-prefix",
         r#"
 get fun `test-af-outlist-opcode-mismatch-bounced-prefix`() {
@@ -196,7 +195,6 @@ get fun `test-af-outlist-opcode-mismatch-bounced-prefix`() {
 
     val out_actions = vm.outActions();
     expectToEndWithExitCode(567);
-    // BUG: toBeSendMessageAt should fail for bounced-prefix opcode mismatch; expected ASSERTION_FAILED (567), got success (0).
     expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 }
 "#,

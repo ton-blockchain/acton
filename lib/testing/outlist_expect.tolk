@@ -65,14 +65,15 @@ fun Expectation<OutActionList>.toBeEmpty(self) {
 ///
 /// If the action is not a send message, the test will fail.
 fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
-    val action = self.value.at(index);
-    if (action is OutActionSendMessage) {
+    val action = self.value.getSendMessageAt(index);
+    if (action != null) {
         try {
-            action.loadMessage<Msg>();
+            // Force typed body decoding to catch malformed payloads, not only opcode mismatches.
+            action!.loadBody<Msg>();
         } catch (e) {
             if (e == 63) {
                 // prefix mismatch
-                val msg = action.loadGenericMessage();
+                val msg = action!.loadGenericMessage();
                 val opcode = msg.loadOpcode();
                 if (opcode == null) {
                     expectImpl.failToFindOutMsg<Msg>(e, self.location);
@@ -99,7 +100,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
     }
 
     Assert.fail(
-        format2("Out action at index {} is not a send message, but {}", index, action.kind()),
+        format1("Out action at index {} is not a send message", index),
         self.location
     );
 }

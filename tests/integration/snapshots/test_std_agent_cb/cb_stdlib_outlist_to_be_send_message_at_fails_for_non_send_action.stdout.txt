@@ -13,7 +13,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
- > tests/out_actions.test.tolk (1 test)
-  ✓ al-get-send-message-body-null-non-send [TIME]
+ > tests/outlist_behavior.test.tolk (1 test)
+  ✓ cb-outlist-non-send-action [TIME]
 
  ✓ 1 passed in 1 file

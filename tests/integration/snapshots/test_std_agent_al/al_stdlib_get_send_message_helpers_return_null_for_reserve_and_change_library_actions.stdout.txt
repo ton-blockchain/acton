@@ -14,6 +14,6 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/out_actions.test.tolk (1 test)
-  ✓ al-get-send-message-body-null-non-send [TIME]
+  ✓ al-get-send-message-helpers-null-for-reserve-and-change-library [TIME]
 
  ✓ 1 passed in 1 file
