@@ -29,12 +29,6 @@ jobs:
       arch: ${{ steps.detect-arch.outputs.arch }}
 
     steps:
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
       - name: Check out Acton repository
         uses: actions/checkout@v6
 
@@ -58,24 +52,11 @@ jobs:
           sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
-      - name: Clone TON repository
-        run: |
-          git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch --depth=1 ton-repo
-          cd ton-repo
-
       - name: Get TON commit hash
         id: ton-commit
         run: |
-          TON_COMMIT=$(git ls-remote https://github.com/i582/ton.git pmakhnev/acton | cut -f1)
+          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
           echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
-
-      - name: Cache TON build directory
-        id: cache-ton-build
-        uses: actions/cache@v5
-        with:
-          path: ton-repo/build
-          key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-build-${{ runner.os }}-
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
@@ -87,6 +68,31 @@ jobs:
 
       - name: Check cache hit
         run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
+
+      - name: Maximize Build Space
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      - name: Clone TON repository
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: i582/ton
+          ref: pmakhnev/acton
+          fetch-depth: '1'
+          submodules: 'true'
+          path: ton-repo
+
+      - name: Cache TON build directory
+        id: cache-ton-build
+        uses: actions/cache@v5
+        with:
+          path: ton-repo/build
+          key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-build-${{ runner.os }}-
 
       - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -107,11 +113,6 @@ jobs:
           path: ~/.ccache
           key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ccache-${{ runner.os }}-
-
-      - name: Init submodules for build
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: |
-          cd ton-repo && git submodule update --init --recursive
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -181,8 +182,8 @@ jobs:
         run: |
           ./target/debug/acton test
 
-#      - name: Upload coverage report
-#        uses: actions/upload-artifact@v6
+      #      - name: Upload coverage report
+      #        uses: actions/upload-artifact@v6
       #        with:
       #          name: coverage-report
       #          path: target/llvm-cov/html
@@ -193,7 +194,7 @@ jobs:
           just clippy
 
   create-canary-release:
-    needs: [build-linux]
+    needs: [ build-linux ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && false
 
