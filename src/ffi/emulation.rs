@@ -1255,6 +1255,8 @@ fn wait_for_transaction_impl(
     address: ArcCell,
 ) -> anyhow::Result<()> {
     if !ctx.is_broadcasting {
+        // In emulation mode waitForTransaction is a no-op.
+        stack.push_bool(true);
         return Ok(());
     }
 

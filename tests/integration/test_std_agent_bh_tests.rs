@@ -25,7 +25,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 #[test]
-fn bh_stdlib_wait_for_transaction_positive_for_known_body_hash_after_send() {
+fn bh_stdlib_wait_for_transaction_returns_true_in_emulation_mode() {
     let source = format!(
         r#"
 {NETWORK_IMPORTS}
@@ -79,23 +79,21 @@ get fun `test-bh-stdlib-wait-for-transaction-positive-known-body-hash`() {{
     val bodyHash = body.hash();
     val bodyHashSlice = beginCell().storeUint(bodyHash, 256).toSlice();
 
-    // BUG: net.waitForTransaction should return a bool in emulation mode; expected true for a known body hash after send, got compute-phase stack underflow.
-    net.waitForTransaction(inMsg.info.dest, bodyHashSlice, true, 1, 1);
+    expect(net.waitForTransaction(inMsg.info.dest, bodyHashSlice, true, 1, 1)).toEqual(true);
 }}
 "#
     );
 
-    ProjectBuilder::new("bh-stdlib-wait-for-transaction-known-body-hash")
+    ProjectBuilder::new("bh-stdlib-wait-for-transaction-emulation-noop")
         .contract("receiver", RECEIVER_CONTRACT)
         .test_file("wait_for_transaction_known_hash", &source)
         .build()
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
-        .assert_contains("stack underflow")
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_std_agent_bh/bh_stdlib_wait_for_transaction_positive_for_known_body_hash_after_send_bug.stdout.txt",
+            "integration/snapshots/test_std_agent_bh/bh_stdlib_wait_for_transaction_returns_true_in_emulation_mode.stdout.txt",
         );
 }

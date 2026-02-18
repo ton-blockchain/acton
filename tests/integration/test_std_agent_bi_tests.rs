@@ -14,6 +14,7 @@ use crate::support::project::ProjectBuilder;
 
 const NETWORK_IMPORTS: &str = r#"
 import "../../lib/emulation/network"
+import "../../lib/testing/expect"
 "#;
 
 const NOOP_CONTRACT: &str = r#"
@@ -22,7 +23,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
 #[test]
-fn bi_stdlib_wait_for_transaction_missing_hash_before_send_returns_false_bug() {
+fn bi_stdlib_wait_for_transaction_returns_true_in_emulation_mode() {
     let source = format!(
         r#"
 {NETWORK_IMPORTS}
@@ -31,23 +32,21 @@ get fun `test-bi-stdlib-wait-for-transaction-missing-hash-before-send`() {{
     val sender = net.treasury("bi_wait_sender");
     val missingHashSlice = beginCell().storeUint(0xB1, 8).storeUint(0, 248).toSlice();
 
-    // BUG: net.waitForTransaction should return false in emulation mode for a missing hash before send, got compute-phase stack underflow.
-    net.waitForTransaction(sender.address, missingHashSlice, true, 1, 1);
+    expect(net.waitForTransaction(sender.address, missingHashSlice, true, 1, 1)).toEqual(true);
 }}
 "#
     );
 
-    ProjectBuilder::new("bi-stdlib-wait-for-transaction-missing-hash-before-send")
+    ProjectBuilder::new("bi-stdlib-wait-for-transaction-emulation-noop")
         .contract("noop", NOOP_CONTRACT)
         .test_file("wait_for_transaction_missing_hash_before_send", &source)
         .build()
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
-        .assert_contains("stack underflow")
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_std_agent_bi/bi_stdlib_wait_for_transaction_missing_hash_before_send_returns_false_bug.stdout.txt",
+            "integration/snapshots/test_std_agent_bi/bi_stdlib_wait_for_transaction_returns_true_in_emulation_mode.stdout.txt",
         );
 }
