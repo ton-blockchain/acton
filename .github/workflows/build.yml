@@ -167,7 +167,7 @@ jobs:
 
       - name: Run tests
         run: |
-          just test
+          cargo nextest run
 
       - name: Run Acton tests
         run: |
