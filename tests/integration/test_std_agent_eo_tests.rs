@@ -69,19 +69,6 @@ fn run_eo_success_case(project_name: &str, test_body: &str, snapshot_path: &str)
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_eo_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = format!("{EO_TRANSACTION_IMPORTS}\n{test_body}\n");
-    ProjectBuilder::new(project_name)
-        .test_file("eo_transaction_varuint", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn eo_stdlib_transaction_varuint_unpack_from_slice_supports_canonical_boundary_values() {
     run_eo_success_case(
@@ -106,22 +93,20 @@ get fun `test-eo-varuint-unpack-canonical-boundaries`() {
 
 #[test]
 fn eo_stdlib_transaction_varuint7_pack_to_builder_roundtrip_boundary_bug() {
-    run_eo_failure_case(
+    run_eo_success_case(
         "eo-stdlib-transaction-varuint7-pack-roundtrip-boundary-bug",
         r#"
 get fun `test-eo-varuint7-pack-roundtrip-boundary-bug`() {
     val source = EoVarUint7Box { value: 0 };
 
     var directBuilder = beginCell();
-    source.value.packToBuilder(directBuilder);
+    source.value.packToBuilder(mutate directBuilder);
     val directCell = directBuilder.endCell();
     var directSlice = directCell.beginParse();
 
-    // BUG: VarUint7.packToBuilder should serialize canonical size+bytes format, expected EoVarUint7Box.fromCell(source.toCell()) to decode 0, got deserialization failure (exit code 9).
-    val directDecoded = VarUint7.unpackFromSlice(directSlice);
+    val directDecoded = VarUint7.unpackFromSlice(mutate directSlice);
     expect(directDecoded).toEqual(source.value);
 
-    // BUG: VarUint7.packToBuilder should serialize canonical size+bytes format, expected EoVarUint7Box.fromCell(source.toCell()) to decode 0, got deserialization failure (exit code 9).
     val decoded = EoVarUint7Box.fromCell(source.toCell());
     expect(decoded.value).toEqual(source.value);
 }
@@ -132,22 +117,20 @@ get fun `test-eo-varuint7-pack-roundtrip-boundary-bug`() {
 
 #[test]
 fn eo_stdlib_transaction_varuint3_pack_to_builder_roundtrip_boundary_bug() {
-    run_eo_failure_case(
+    run_eo_success_case(
         "eo-stdlib-transaction-varuint3-pack-roundtrip-boundary-bug",
         r#"
 get fun `test-eo-varuint3-pack-roundtrip-boundary-bug`() {
     val source = EoVarUint3Box { value: 255 };
 
     var directBuilder = beginCell();
-    source.value.packToBuilder(directBuilder);
+    source.value.packToBuilder(mutate directBuilder);
     val directCell = directBuilder.endCell();
     var directSlice = directCell.beginParse();
 
-    // BUG: VarUint3.packToBuilder should serialize canonical size+bytes format, expected direct pack/unpack to decode 255, got deserialization failure (exit code 9).
-    val directDecoded = VarUint3.unpackFromSlice(directSlice);
+    val directDecoded = VarUint3.unpackFromSlice(mutate directSlice);
     expect(directDecoded).toEqual(source.value);
 
-    // BUG: VarUint3.packToBuilder should serialize canonical size+bytes format, expected EoVarUint3Box.fromCell(source.toCell()) to decode 255, got deserialization failure (exit code 9).
     val decoded = EoVarUint3Box.fromCell(source.toCell());
     expect(decoded.value).toEqual(source.value);
 }

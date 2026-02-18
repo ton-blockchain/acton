@@ -152,22 +152,6 @@ fn run_am_success_case(project_name: &str, test_body: &str, snapshot_path: &str)
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_am_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = with_am_source(test_body);
-    ProjectBuilder::new(project_name)
-        .file("contracts/messages", AM_MESSAGES)
-        .contract("worker", AM_WORKER_CONTRACT)
-        .contract("receiver", AM_RECEIVER_CONTRACT)
-        .test_file("transaction_helpers", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn am_stdlib_transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints() {
     run_am_success_case(
@@ -377,7 +361,7 @@ get fun `test-am-transaction-get-account-address-workchain-override`() {
 
 #[test]
 fn am_stdlib_transaction_varuint7_roundtrip_for_storage_used_large_values_bug() {
-    run_am_failure_case(
+    run_am_success_case(
         "am-stdlib-transaction-varuint7-roundtrip-bug",
         r#"
 get fun `test-am-transaction-varuint7-roundtrip-bug`() {
@@ -387,8 +371,8 @@ get fun `test-am-transaction-varuint7-roundtrip-bug`() {
     };
     val decoded = StorageUsed.fromCell(original.toCell());
 
-    // BUG: VarUint7.packToBuilder stores fixed-width bits, expected StorageUsed.fromCell(original.toCell()) to decode, got deserialization failure (exit code 9).
     expect(decoded.cells).toEqual(original.cells);
+    expect(decoded.bits).toEqual(original.bits);
 }
 "#,
         "integration/snapshots/test_std_agent_am/am_stdlib_transaction_varuint7_roundtrip_for_storage_used_large_values_bug.stdout.txt",

@@ -14,12 +14,6 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/network_storage_fee_missing.test.tolk (1 test)
-  ✗ bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug [TIME]
-    └─ exit_code=9
-      ├─ Re-run with --backtrace full to get more information
-      ├─ extra data remaining in deserialized cell
-      └─ Phase: Compute phase
+  ✓ bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

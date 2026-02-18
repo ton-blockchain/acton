@@ -13,7 +13,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
+ > tests/eo_transaction_varuint.test.tolk (1 test)
+  ✓ eo-varuint3-pack-roundtrip-boundary-bug [TIME]
 
- ✗ 1 failed in 0 files
-
-Some tests failed.
+ ✓ 1 passed in 1 file

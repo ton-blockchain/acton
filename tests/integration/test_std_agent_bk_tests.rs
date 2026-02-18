@@ -47,24 +47,6 @@ fn run_network_success_case(project_name: &str, test_body: &str, snapshot_path: 
     run_network_success_case_with_imports(NETWORK_IMPORTS, project_name, test_body, snapshot_path);
 }
 
-fn run_network_failure_case_with_imports(
-    imports: &str,
-    project_name: &str,
-    test_body: &str,
-    snapshot_path: &str,
-) {
-    let source = format!("{imports}\n{test_body}\n");
-    ProjectBuilder::new(project_name)
-        .test_file("network_storage_fee_missing", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn bk_stdlib_network_get_account_storage_fee_returns_null_for_missing_account() {
     run_network_success_case(
@@ -174,7 +156,7 @@ get fun `test-bk-stdlib-account-state-frozen-local-roundtrip`() {
 
 #[test]
 fn bk_stdlib_account_state_frozen_roundtrip_via_set_account_bug() {
-    run_network_failure_case_with_imports(
+    run_network_success_case_with_imports(
         NETWORK_IMPORTS_WITH_TRANSACTION,
         "bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug",
         r#"
@@ -201,7 +183,6 @@ get fun `test-bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug`() {
         net.setAccount(frozenAddr, frozenAcc);
     }
 
-    // BUG: frozen AccountState fails to roundtrip through setAccount/getAccount and aborts with exit_code=9.
     val frozenAccAfter = net.getAccount(frozenAddr);
     expect(frozenAccAfter is AccountInfo).toBeTrue();
     if (frozenAccAfter is AccountInfo) {
