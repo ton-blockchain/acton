@@ -156,17 +156,17 @@ jobs:
         run: |
           bun install
           just build-ui
-          cargo build --profile release-size --bin acton
+          cargo build --bin acton
 
       - name: Test acton binary
         run: |
-          ./target/release-size/acton --help
+          ./target/debug/acton --help
 
       #      - name: Upload acton binary as artifact
       #        uses: actions/upload-artifact@v6
       #        with:
       #          name: acton-linux-binary
-      #          path: target/release-size/acton
+      #          path: target/debug/acton
 
       - name: Install cargo-llvm-cov and nextest
         uses: taiki-e/install-action@v2
@@ -180,7 +180,7 @@ jobs:
 
       - name: Run Acton tests
         run: |
-          ./target/release-size/acton test
+          ./target/debug/acton test
 
 #      - name: Upload coverage report
 #        uses: actions/upload-artifact@v6
@@ -196,7 +196,7 @@ jobs:
   create-canary-release:
     needs: [build-linux]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && false
 
     steps:
       - name: Checkout repository
