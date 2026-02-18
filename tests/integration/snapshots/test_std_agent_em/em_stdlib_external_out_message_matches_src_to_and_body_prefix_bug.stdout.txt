@@ -13,7 +13,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
+ > tests/em_message_matches.test.tolk (1 test)
+  ✓ em-message-matches-external-out-filters [TIME]
 
- ✗ 1 failed in 0 files
-
-Some tests failed.
+ ✓ 1 passed in 1 file

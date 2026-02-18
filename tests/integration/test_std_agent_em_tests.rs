@@ -42,7 +42,7 @@ fun emExternalOutMessage(
 }
 "#;
 
-fn run_em_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
+fn run_em_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{EM_MATCHES_IMPORTS}\n{test_body}\n");
 
     ProjectBuilder::new(project_name)
@@ -51,18 +51,17 @@ fn run_em_failure_case(project_name: &str, test_body: &str, snapshot_path: &str)
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
-        .assert_contains("getDeclaredPackPrefixLen")
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(snapshot_path);
 }
 
 #[test]
-fn em_stdlib_external_out_message_matches_src_to_and_body_prefix_bug() {
-    run_em_failure_case(
-        "em-stdlib-message-matches-external-out-filters-bug",
+fn em_stdlib_external_out_message_matches_src_to_and_body_prefix() {
+    run_em_success_case(
+        "em-stdlib-message-matches-external-out-filters",
         r#"
-get fun `test-em-message-matches-external-out-filters-bug`() {
+get fun `test-em-message-matches-external-out-filters`() {
     val src = address("0:00000000000000000000000000000000000000000000000000000000000000E1");
     val wrongSrc = address("0:00000000000000000000000000000000000000000000000000000000000000E2");
     val dest = createAddressNone();
@@ -75,7 +74,6 @@ get fun `test-em-message-matches-external-out-filters-bug`() {
         EmNotice { queryId: 77 }.toCell().beginParse(),
     );
 
-    // BUG: Message.matches is unusable for external-out filters; expected src/to and body-prefix checks to compile, got getDeclaredPackPrefixLen-related compile errors.
     expect(msg.matches({ from: src, to: dest })).toBeTrue();
     expect(msg.matches({ from: wrongSrc, to: dest })).toBeFalse();
     expect(msg.matches({ from: src, to: wrongDest })).toBeFalse();

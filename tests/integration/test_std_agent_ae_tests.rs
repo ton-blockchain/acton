@@ -333,17 +333,32 @@ get fun `test-ae-failed-tx-missing-exit-code`() {
 }
 
 #[test]
-fn ae_stdlib_to_not_have_tx_with_deploy_false_is_ignored_bug() {
-    run_failure_case(
-        "ae-stdlib-deploy-false-filter-bug",
+fn ae_stdlib_deploy_filter_distinguishes_deploy_and_non_deploy_transactions() {
+    run_success_case(
+        "ae-stdlib-deploy-filter",
         r#"
-get fun `test-ae-deploy-false-filter-bug`() {
-    val (_, harness, deployRes) = deployHarness();
+get fun `test-ae-deploy-filter`() {
+    val (sender, harness, deployRes) = deployHarness();
 
-    // BUG: SearchParams.deploy=false is ignored; expected non-deploy filter to exclude deploy txs, but deploy tx still matches.
+    expect(deployRes).toHaveTx({
+        to: harness.address,
+        deploy: true,
+    });
     expect(deployRes).toNotHaveTx({
         to: harness.address,
         deploy: false,
+    });
+
+    val callRes = sendPing(sender, harness, 1);
+    expect(callRes).toHaveTx<Ping>({
+        from: sender.address,
+        to: harness.address,
+        deploy: false,
+    });
+    expect(callRes).toNotHaveTx<Ping>({
+        from: sender.address,
+        to: harness.address,
+        deploy: true,
     });
 }
 "#,

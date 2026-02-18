@@ -8,17 +8,6 @@
  TEST  [ROOT]
 
  > tests/tx_expect.test.tolk (1 test)
-  ✗ ae-deploy-false-filter-bug [TIME]
-    └─ Error: expect(actual).toNotHaveTx(expected)
-        N/A -> sender A
-        └── empty 1 TON -> harness B                                                    gas=351
-            └── account created
-        
-        Unexpected transaction from <any> to harness B EQAaaK..1fnTtj
-        with:
-          deploy=false
-      └─ at tests/tx_expect.test[LINE]
+  ✓ ae-deploy-filter [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

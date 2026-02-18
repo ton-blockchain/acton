@@ -648,13 +648,13 @@ fn find_transaction_by_params_impl(
         || params.to.is_some();
 
     let found = parsed_txs.iter().filter(|tx| {
-        if let Some(expected_deploy) = params.deploy
-            && expected_deploy
-            && (tx.orig_status != AccountStatus::NotExists
-                || tx.end_status != AccountStatus::Active)
-        {
-            // We expect to deploy contract but we don't
-            return false;
+        if let Some(expected_deploy) = params.deploy {
+            let is_deploy =
+                tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active;
+            if expected_deploy != is_deploy {
+                // Deploy flag mismatch
+                return false;
+            }
         }
 
         let in_msg = tx.load_in_msg();
