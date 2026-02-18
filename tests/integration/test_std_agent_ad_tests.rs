@@ -30,19 +30,6 @@ fn run_expect_success(project_name: &str, test_body: &str, snapshot_path: &str) 
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_expect_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = format!("{EXPECT_IMPORTS}\n{test_body}\n");
-    ProjectBuilder::new(project_name)
-        .test_file("expect_behavior", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn ad_stdlib_expect_comparison_helpers_accept_ordered_values() {
     run_expect_success(
@@ -68,9 +55,13 @@ fn ad_stdlib_expect_approx_helpers_accept_boundary_deltas() {
 get fun `test-ad-stdlib-approx-boundary-deltas`() {
     expect(1000).toBeApproxEqAbs(1007, 7);
     expect(1000).toBeApproxEqAbs(993, 7);
+    expect(-1000).toBeApproxEqAbs(-1007, 7);
+    expect(0).toBeApproxEqAbs(0, 0);
 
     expect(1000).toBeApproxEqRel(1089, 9);
     expect(1000).toBeApproxEqRel(1099, 9);
+    expect(-1000).toBeApproxEqRel(-1099, 9);
+    expect(0).toBeApproxEqRel(0, 0);
 }
 "#,
         "integration/snapshots/test_std_agent_ad/ad_stdlib_expect_approx_helpers_accept_boundary_deltas.stdout.txt",
@@ -152,16 +143,57 @@ get fun `test-ad-stdlib-tuple-contain-compile-bug`() {
 }
 
 #[test]
-fn ad_stdlib_expect_rel_approx_with_negative_actual_should_fail_but_passes_bug() {
-    run_expect_failure(
-        "ad-stdlib-expect-rel-approx-negative-actual-bug",
+fn ad_stdlib_expect_rel_approx_with_negative_actual_fails_with_assertion_message() {
+    run_expect_success(
+        "ad-stdlib-expect-rel-approx-negative-actual",
         r#"
-get fun `test-ad-stdlib-rel-approx-negative-actual-bug`() {
+get fun `test-ad-stdlib-rel-approx-negative-actual`() {
     expectToEndWithExitCode(567);
-    // BUG: toBeApproxEqRel uses signed actual value in denominator; expected ASSERTION_FAILED (567), got success (0).
     expect(-100).toBeApproxEqRel(100, 10);
 }
 "#,
         "integration/snapshots/test_std_agent_ad/ad_stdlib_expect_rel_approx_with_negative_actual_should_fail_but_passes_bug.stdout.txt",
+    );
+}
+
+#[test]
+fn ad_stdlib_expect_rel_approx_with_positive_actual_above_boundary_fails_with_assertion_message() {
+    run_expect_success(
+        "ad-stdlib-expect-rel-approx-positive-above-boundary",
+        r#"
+get fun `test-ad-stdlib-rel-approx-positive-above-boundary`() {
+    expectToEndWithExitCode(567);
+    expect(100).toBeApproxEqRel(111, 10);
+}
+"#,
+        "integration/snapshots/test_std_agent_ad/ad_stdlib_expect_rel_approx_with_positive_actual_above_boundary_fails_with_assertion_message.stdout.txt",
+    );
+}
+
+#[test]
+fn ad_stdlib_expect_rel_approx_with_zero_actual_and_non_zero_expected_fails_with_assertion_message() {
+    run_expect_success(
+        "ad-stdlib-expect-rel-approx-zero-actual",
+        r#"
+get fun `test-ad-stdlib-rel-approx-zero-actual`() {
+    expectToEndWithExitCode(567);
+    expect(0).toBeApproxEqRel(1, 10);
+}
+"#,
+        "integration/snapshots/test_std_agent_ad/ad_stdlib_expect_rel_approx_with_zero_actual_and_non_zero_expected_fails_with_assertion_message.stdout.txt",
+    );
+}
+
+#[test]
+fn ad_stdlib_expect_abs_approx_with_delta_above_boundary_fails_with_assertion_message() {
+    run_expect_success(
+        "ad-stdlib-expect-abs-approx-above-boundary",
+        r#"
+get fun `test-ad-stdlib-abs-approx-above-boundary`() {
+    expectToEndWithExitCode(567);
+    expect(100).toBeApproxEqAbs(111, 10);
+}
+"#,
+        "integration/snapshots/test_std_agent_ad/ad_stdlib_expect_abs_approx_with_delta_above_boundary_fails_with_assertion_message.stdout.txt",
     );
 }
