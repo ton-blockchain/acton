@@ -16,10 +16,6 @@ concurrency:
 permissions:
   contents: write
 
-#env:
-#  SCCACHE_GHA_ENABLED: true
-#  RUSTC_WRAPPER: sccache
-
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -151,14 +147,6 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
-
-      - name: Install sccache
-        if: false
-        uses: mozilla-actions/sccache-action@v0.0.9
-        env:
-          SCCACHE_VERSION: v0.13.0
-        with:
-          version: ${{ env.SCCACHE_VERSION }}
 
       - name: Build acton binary
         env:
