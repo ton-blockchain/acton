@@ -14,10 +14,11 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/network_storage_fee_missing.test.tolk (1 test)
-  ✗ bk-stdlib-network-get-account-storage-fee-missing-account [TIME]
-    └─ Error: expect(actual).toBeNull()
-        [null, null, null, null, null, null, null, null, null, null, null, null, 0] != null
-      └─ at tests/network_storage_fee_missing.test[LINE]
+  ✗ bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug [TIME]
+    └─ exit_code=9
+      ├─ Re-run with --backtrace full to get more information
+      ├─ extra data remaining in deserialized cell
+      └─ Phase: Compute phase
 
  ✗ 1 failed in 1 file
 

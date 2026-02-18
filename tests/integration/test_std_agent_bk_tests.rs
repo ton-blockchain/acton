@@ -19,8 +19,41 @@ import "../../lib/emulation/network"
 import "../../lib/testing/expect"
 "#;
 
-fn run_network_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = format!("{NETWORK_IMPORTS}\n{test_body}\n");
+const NETWORK_IMPORTS_WITH_TRANSACTION: &str = r#"
+import "../../lib/emulation/network"
+import "../../lib/testing/expect"
+import "../../lib/types/transaction"
+"#;
+
+fn run_network_success_case_with_imports(
+    imports: &str,
+    project_name: &str,
+    test_body: &str,
+    snapshot_path: &str,
+) {
+    let source = format!("{imports}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .test_file("network_storage_fee_missing", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
+fn run_network_success_case(project_name: &str, test_body: &str, snapshot_path: &str) {
+    run_network_success_case_with_imports(NETWORK_IMPORTS, project_name, test_body, snapshot_path);
+}
+
+fn run_network_failure_case_with_imports(
+    imports: &str,
+    project_name: &str,
+    test_body: &str,
+    snapshot_path: &str,
+) {
+    let source = format!("{imports}\n{test_body}\n");
     ProjectBuilder::new(project_name)
         .test_file("network_storage_fee_missing", &source)
         .build()
@@ -33,23 +66,23 @@ fn run_network_failure_case(project_name: &str, test_body: &str, snapshot_path: 
 }
 
 #[test]
-fn bk_stdlib_network_get_account_storage_fee_returns_null_for_missing_account_bug() {
-    run_network_failure_case(
+fn bk_stdlib_network_get_account_storage_fee_returns_null_for_missing_account() {
+    run_network_success_case(
         "bk-stdlib-network-get-account-storage-fee-missing-account",
         r#"
 get fun `test-bk-stdlib-network-get-account-storage-fee-missing-account`() {
     val missing = net.randomAddress("bk_missing_storage_fee_account");
-    expect(net.getAccountState(missing)).toBeNull();
-    // BUG: net.getAccountStorageFee should return null for a missing account; expected null, got 0.
-    expect(net.getAccountStorageFee(missing, 86400)).toBeNull();
+    expect(net.getAccountState(missing) == null).toBeTrue();
+    expect(net.getAccountStorageFee(missing, 86400) == null).toBeTrue();
+    expect(net.getAccountStorageFee(missing, 0) == null).toBeTrue();
 }
 "#,
-        "integration/snapshots/test_std_agent_bk/bk_stdlib_network_get_account_storage_fee_returns_null_for_missing_account_bug.stdout.txt",
+        "integration/snapshots/test_std_agent_bk/bk_stdlib_network_get_account_storage_fee_returns_null_for_missing_account.stdout.txt",
     );
 }
 
 #[test]
-fn bk_stdlib_network_get_account_storage_fee_returns_non_null_for_existing_account_bug_in_fixture_project(
+fn bk_stdlib_network_get_account_storage_fee_returns_non_null_for_existing_account_in_fixture_project(
 ) {
     let fixture = FixtureProject::load("basic");
     let source = r#"
@@ -60,9 +93,13 @@ get fun `test-bk-stdlib-network-get-account-storage-fee-existing-account`() {
     val seconds = 86400;
     val treasury = net.treasury("bk_storage_fee_sender");
 
-    // BUG: net.getAccountStorageFee should return a non-null fee for a deployed treasury account; expected int value, got deserialization error (exit code 9).
     val storageFee = net.getAccountStorageFee(treasury.address, seconds);
-    expect(storageFee).toBeNotNull();
+    expect(storageFee != null).toBeTrue();
+
+    val zeroFee = net.getAccountStorageFee(treasury.address, 0);
+    expect(zeroFee != null).toBeTrue();
+    expect(zeroFee!).toEqual(0);
+    expect(storageFee! >= zeroFee!).toBeTrue();
 }
 "#;
 
@@ -79,10 +116,99 @@ get fun `test-bk-stdlib-network-get-account-storage-fee-existing-account`() {
         .test()
         .path("tests/network_get_account_storage_fee_existing.test.tolk")
         .run()
-        .failure()
-        .assert_failed(1)
-        .assert_contains("extra data remaining in deserialized cell")
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_std_agent_bk/bk_stdlib_network_get_account_storage_fee_returns_non_null_for_existing_account_bug_in_fixture_project.stdout.txt",
+            "integration/snapshots/test_std_agent_bk/bk_stdlib_network_get_account_storage_fee_returns_non_null_for_existing_account_in_fixture_project.stdout.txt",
         );
+}
+
+#[test]
+fn bk_stdlib_account_state_variants_uninit_and_active_are_parsed_from_accounts() {
+    run_network_success_case_with_imports(
+        NETWORK_IMPORTS_WITH_TRANSACTION,
+        "bk-stdlib-account-state-uninit-and-active-variants",
+        r#"
+get fun `test-bk-stdlib-account-state-uninit-and-active-variants`() {
+    val uninitAddr = net.randomAddress("bk_state_variant_uninit_addr");
+    net.topUp(uninitAddr, ton("1"));
+
+    val uninitAcc = net.getAccount(uninitAddr);
+    expect(uninitAcc is AccountInfo).toBeTrue();
+    if (uninitAcc is AccountInfo) {
+        expect(uninitAcc.storage.state is AccountStateUninit).toBeTrue();
+    }
+
+    val treasury = net.treasury("bk_state_variant_active_treasury");
+    val activeAcc = net.getAccount(treasury.address);
+    expect(activeAcc is AccountInfo).toBeTrue();
+    if (activeAcc is AccountInfo) {
+        expect(activeAcc.storage.state is AccountStateActive).toBeTrue();
+    }
+}
+"#,
+        "integration/snapshots/test_std_agent_bk/bk_stdlib_account_state_variants_uninit_and_active_are_parsed_from_accounts.stdout.txt",
+    );
+}
+
+#[test]
+fn bk_stdlib_account_state_frozen_local_roundtrip_cell_works() {
+    run_network_success_case_with_imports(
+        NETWORK_IMPORTS_WITH_TRANSACTION,
+        "bk-stdlib-account-state-frozen-local-roundtrip",
+        r#"
+get fun `test-bk-stdlib-account-state-frozen-local-roundtrip`() {
+    val frozenHash = beginCell().storeUint(0x11, 32).endCell().hash();
+    val frozen = AccountStateFrozen { stateHash: frozenHash };
+    val parsed = AccountState.fromCell(frozen.toCell());
+
+    expect(parsed is AccountStateFrozen).toBeTrue();
+    if (parsed is AccountStateFrozen) {
+        expect(parsed.stateHash).toEqual(frozenHash);
+    }
+}
+"#,
+        "integration/snapshots/test_std_agent_bk/bk_stdlib_account_state_frozen_local_roundtrip_cell_works.stdout.txt",
+    );
+}
+
+#[test]
+fn bk_stdlib_account_state_frozen_roundtrip_via_set_account_bug() {
+    run_network_failure_case_with_imports(
+        NETWORK_IMPORTS_WITH_TRANSACTION,
+        "bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug",
+        r#"
+get fun `test-bk-stdlib-account-state-frozen-roundtrip-via-set-account-bug`() {
+    val baseAddr = net.randomAddress("bk_state_variant_frozen_base_addr");
+    net.topUp(baseAddr, ton("1"));
+
+    val baseAcc = net.getAccount(baseAddr);
+    expect(baseAcc is AccountInfo).toBeTrue();
+
+    val frozenAddr = net.randomAddress("bk_state_variant_frozen_target_addr");
+    val frozenHash = beginCell().storeUint(0x11, 32).endCell().hash();
+
+    if (baseAcc is AccountInfo) {
+        val frozenAcc = AccountInfo {
+            addr: frozenAddr,
+            storageStat: baseAcc.storageStat,
+            storage: {
+                lastTransLt: baseAcc.storage.lastTransLt,
+                balance: baseAcc.storage.balance,
+                state: AccountStateFrozen { stateHash: frozenHash },
+            },
+        };
+        net.setAccount(frozenAddr, frozenAcc);
+    }
+
+    // BUG: frozen AccountState fails to roundtrip through setAccount/getAccount and aborts with exit_code=9.
+    val frozenAccAfter = net.getAccount(frozenAddr);
+    expect(frozenAccAfter is AccountInfo).toBeTrue();
+    if (frozenAccAfter is AccountInfo) {
+        expect(frozenAccAfter.storage.state is AccountStateFrozen).toBeTrue();
+    }
+}
+"#,
+        "integration/snapshots/test_std_agent_bk/bk_stdlib_account_state_frozen_roundtrip_via_set_account_bug.stdout.txt",
+    );
 }
