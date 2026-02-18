@@ -57,6 +57,8 @@ jobs:
         run: |
           TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
           echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
