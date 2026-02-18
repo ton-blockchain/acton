@@ -91,8 +91,8 @@ get fun `test-cv-out-action-inline-parity`() {
 }
 
 #[test]
-fn cv_stdlib_out_action_send_message_load_message_and_generic_are_parity_for_ref_body_in_fixture_project(
-) {
+fn cv_stdlib_out_action_send_message_load_message_and_generic_are_parity_for_ref_body_in_fixture_project()
+ {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/cv_out_action_ref_parity.test.tolk";
     let source = format!(

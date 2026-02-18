@@ -34,19 +34,6 @@ fn run_fmt_success(project_name: &str, test_body: &str, snapshot_path: &str) {
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_fmt_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = wrap_fmt_test_source(test_body);
-    ProjectBuilder::new(project_name)
-        .test_file("fmt_behavior", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn bs_stdlib_format2_plain_placeholders_use_default_formatter_for_int_and_bool() {
     run_fmt_success(
@@ -63,12 +50,11 @@ get fun `test-bs-stdlib-format2-default-formatter`() {
 
 #[test]
 fn bs_stdlib_format2_escaped_braces_around_placeholder_should_collapse_bug() {
-    run_fmt_failure(
+    run_fmt_success(
         "bs-stdlib-format2-escaped-braces-bug",
         r#"
 get fun `test-bs-stdlib-format2-escaped-braces-bug`() {
     val rendered = format2("open={{{}}} close={}", "inner", "done");
-    // BUG: format2 matches "{}" inside "{{{}}}" and leaves doubled braces; expected "open={inner} close=done", got "open={{inner}} close=done".
     expect(rendered).toEqual("open={inner} close=done");
 }
 "#,

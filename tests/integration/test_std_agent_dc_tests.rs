@@ -56,8 +56,8 @@ fn run_dc_transaction_success(project_name: &str, test_body: &str, snapshot_path
 }
 
 #[test]
-fn dc_stdlib_transaction_get_account_address_defaults_to_basechain_and_masterchain_override_changes_only_workchain(
-) {
+fn dc_stdlib_transaction_get_account_address_defaults_to_basechain_and_masterchain_override_changes_only_workchain()
+ {
     run_dc_transaction_success(
         "dc-stdlib-transaction-get-account-address-default-vs-masterchain",
         r#"

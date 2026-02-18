@@ -66,7 +66,9 @@ get fun `test-ay-stdlib-secure-random-accepts-127-bytes`() {{
     );
 
     fs::write(
-        fixture.path().join("tests/secure_random_127_boundary.test.tolk"),
+        fixture
+            .path()
+            .join("tests/secure_random_127_boundary.test.tolk"),
         source,
     )
     .expect("failed to write secure random 127 boundary test");

@@ -213,7 +213,9 @@ fn cu_stdlib_out_messages_at_cell_and_at_match_for_same_index_fixture_project() 
     )
     .expect("failed to write fixture messages for cu out-messages test");
     fs::write(
-        fixture.path().join("contracts/cu_fixture_out_messages.tolk"),
+        fixture
+            .path()
+            .join("contracts/cu_fixture_out_messages.tolk"),
         CU_FIXTURE_CONTRACT,
     )
     .expect("failed to write fixture contract for cu out-messages test");

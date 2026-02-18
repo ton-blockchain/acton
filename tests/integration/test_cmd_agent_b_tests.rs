@@ -113,7 +113,9 @@ fn b_test_cmd_junit_merge_creates_only_single_output_file() {
         first_suite_file.display()
     );
 
-    let second_suite_file = project.path().join("test-results/TEST-second.test.tolk.xml");
+    let second_suite_file = project
+        .path()
+        .join("test-results/TEST-second.test.tolk.xml");
     assert!(
         !second_suite_file.exists(),
         "Per-suite file should not exist in junit merge mode: {}",

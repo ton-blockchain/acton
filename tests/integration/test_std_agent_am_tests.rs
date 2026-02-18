@@ -337,7 +337,8 @@ get fun `test-am-transaction-get-action-fee-match-and-none`() {
 }
 
 #[test]
-fn am_stdlib_transaction_get_account_address_defaults_to_basechain_and_supports_masterchain_override() {
+fn am_stdlib_transaction_get_account_address_defaults_to_basechain_and_supports_masterchain_override()
+ {
     run_am_success_case(
         "am-stdlib-transaction-get-account-address-workchain-override",
         r#"

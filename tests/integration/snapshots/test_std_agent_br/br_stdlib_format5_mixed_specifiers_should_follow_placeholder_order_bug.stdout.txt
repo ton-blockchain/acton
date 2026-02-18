@@ -14,14 +14,6 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/fmt_behavior.test.tolk (1 test)
-  ✗ br-stdlib-format5-placeholder-order-bug [TIME]
-    └─ Error: expect(actual).toEqual(expected)
-        (
-            16 | 1.5 TON | ff | left | right,
-            255 | 1.5 TON | 10 | left | right
-        )
-      └─ at tests/fmt_behavior.test[LINE]
+  ✓ br-stdlib-format5-placeholder-order-bug [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

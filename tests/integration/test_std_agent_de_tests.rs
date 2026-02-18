@@ -20,11 +20,7 @@ const PANIC_EVENT_LOOP: &str = "event loop thread panicked";
 const PANIC_ABORT: &str = "thread caused non-unwinding panic. aborting.";
 const WAITING_LOG: &str = "Awaiting transaction... [Attempt 1/1]";
 
-fn run_wait_missing_hash_case(
-    project_name: &str,
-    get_method_name: &str,
-    quiet: bool,
-) {
+fn run_wait_missing_hash_case(project_name: &str, get_method_name: &str, quiet: bool) {
     let quiet_literal = if quiet { "true" } else { "false" };
     let source = format!(
         r#"

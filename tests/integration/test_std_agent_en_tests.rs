@@ -26,11 +26,7 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-fn run_find_external_out_message_success(
-    project_name: &str,
-    test_body: &str,
-    snapshot_path: &str,
-) {
+fn run_find_external_out_message_success(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{EN_IMPORTS}\n{test_body}\n");
 
     ProjectBuilder::new(project_name)
@@ -46,7 +42,8 @@ fn run_find_external_out_message_success(
 }
 
 #[test]
-fn en_stdlib_find_external_out_message_typed_branch_reports_tuple_get_type_argument_compile_error() {
+fn en_stdlib_find_external_out_message_typed_branch_reports_tuple_get_type_argument_compile_error()
+{
     run_find_external_out_message_success(
         "en-stdlib-find-external-out-message-typed-branch-bug",
         r#"
@@ -62,7 +59,8 @@ get fun `test-en-find-external-out-message-typed-branch-bug`() {
 }
 
 #[test]
-fn en_stdlib_find_external_out_message_default_branch_reports_tuple_get_type_argument_compile_error() {
+fn en_stdlib_find_external_out_message_default_branch_reports_tuple_get_type_argument_compile_error()
+ {
     run_find_external_out_message_success(
         "en-stdlib-find-external-out-message-default-branch-bug",
         r#"

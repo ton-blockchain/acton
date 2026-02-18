@@ -68,7 +68,8 @@ fn run_df_project_success(project_name: &str, test_body: &str, snapshot_path: &s
 }
 
 #[test]
-fn df_stdlib_net_send_single_matches_net_send_first_result_transaction_and_action_in_project_builder() {
+fn df_stdlib_net_send_single_matches_net_send_first_result_transaction_and_action_in_project_builder()
+ {
     run_df_project_success(
         "df-stdlib-send-single-vs-send-first-result-project-builder",
         r#"
@@ -153,13 +154,20 @@ get fun `test-df-send-single-vs-send-first-result-project-builder`() {
 }
 
 #[test]
-fn df_stdlib_net_send_single_matches_net_send_first_result_transaction_and_action_in_fixture_project() {
+fn df_stdlib_net_send_single_matches_net_send_first_result_transaction_and_action_in_fixture_project()
+ {
     let fixture = FixtureProject::load("basic");
 
-    fs::write(fixture.path().join("contracts/df_messages.tolk"), DF_MESSAGES)
-        .expect("failed to write fixture messages for df sendSingle/send equivalence test");
-    fs::write(fixture.path().join("contracts/df_echo.tolk"), DF_ECHO_CONTRACT)
-        .expect("failed to write fixture contract for df sendSingle/send equivalence test");
+    fs::write(
+        fixture.path().join("contracts/df_messages.tolk"),
+        DF_MESSAGES,
+    )
+    .expect("failed to write fixture messages for df sendSingle/send equivalence test");
+    fs::write(
+        fixture.path().join("contracts/df_echo.tolk"),
+        DF_ECHO_CONTRACT,
+    )
+    .expect("failed to write fixture contract for df sendSingle/send equivalence test");
 
     let acton_path = fixture.path().join("Acton.toml");
     let mut acton_toml = fs::read_to_string(&acton_path)

@@ -64,8 +64,8 @@ get fun `test-bk-stdlib-network-get-account-storage-fee-missing-account`() {
 }
 
 #[test]
-fn bk_stdlib_network_get_account_storage_fee_returns_non_null_for_existing_account_in_fixture_project(
-) {
+fn bk_stdlib_network_get_account_storage_fee_returns_non_null_for_existing_account_in_fixture_project()
+ {
     let fixture = FixtureProject::load("basic");
     let source = r#"
 import "../../lib/emulation/network"

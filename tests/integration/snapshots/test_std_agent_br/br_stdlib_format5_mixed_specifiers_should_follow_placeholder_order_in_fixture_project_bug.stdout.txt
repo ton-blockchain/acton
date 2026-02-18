@@ -8,14 +8,6 @@
  TEST  [ROOT]
 
  > tests/br_stdlib_format5_placeholder_order_bug.test.tolk (1 test)
-  ✗ br-stdlib-format5-placeholder-order-fixture-bug [TIME]
-    └─ Error: expect(actual).toEqual(expected)
-        (
-            2 TON | 16 | 59682f00 | mid | end,
-            1.5 TON | 2000000000 | 10 | mid | end
-        )
-      └─ at tests/br_stdlib_format5_placeholder_order_bug.test[LINE]
+  ✓ br-stdlib-format5-placeholder-order-fixture-bug [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

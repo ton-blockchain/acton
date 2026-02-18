@@ -198,7 +198,9 @@ fn f_test_cmd_ui_trace_files_are_created_only_for_executed_tests() {
             "integration/snapshots/test_cmd_agent_f/f_test_cmd_ui_trace_files_are_created_only_for_executed_tests.stdout.txt",
         );
 
-    let skipped_trace = project.path().join(".acton/traces/test-ui-skipped_trace.json");
+    let skipped_trace = project
+        .path()
+        .join(".acton/traces/test-ui-skipped_trace.json");
     assert!(
         !skipped_trace.exists(),
         "Skipped test trace must not be created: {}",
@@ -312,7 +314,9 @@ fn f_test_cmd_ui_filter_limits_trace_generation_to_selected_tests() {
             "integration/snapshots/test_cmd_agent_f/f_test_cmd_ui_filter_limits_trace_generation_to_selected_tests.stdout.txt",
         );
 
-    let beta_trace = project.path().join(".acton/traces/test-ui-filter-beta_trace.json");
+    let beta_trace = project
+        .path()
+        .join(".acton/traces/test-ui-filter-beta_trace.json");
     assert!(
         !beta_trace.exists(),
         "Filtered out test trace must not be created: {}",

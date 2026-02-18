@@ -87,8 +87,8 @@ fn run_dg_project_success(project_name: &str, test_body: &str, snapshot_path: &s
 }
 
 #[test]
-fn dg_stdlib_net_send_external_with_state_init_deploys_and_supports_transaction_presence_search_in_project_builder(
-) {
+fn dg_stdlib_net_send_external_with_state_init_deploys_and_supports_transaction_presence_search_in_project_builder()
+ {
     run_dg_project_success(
         "dg-stdlib-send-external-state-init-project-builder",
         r#"
@@ -146,12 +146,15 @@ get fun `test-dg-send-external-state-init-project-builder`() {
 }
 
 #[test]
-fn dg_stdlib_net_send_external_with_state_init_deploys_and_supports_transaction_presence_search_in_fixture_project(
-) {
+fn dg_stdlib_net_send_external_with_state_init_deploys_and_supports_transaction_presence_search_in_fixture_project()
+ {
     let fixture = FixtureProject::load("basic");
 
-    fs::write(fixture.path().join("contracts/dg_messages.tolk"), DG_MESSAGES)
-        .expect("failed to write fixture messages for dg sendExternal stateInit test");
+    fs::write(
+        fixture.path().join("contracts/dg_messages.tolk"),
+        DG_MESSAGES,
+    )
+    .expect("failed to write fixture messages for dg sendExternal stateInit test");
     fs::write(
         fixture.path().join("contracts/dg_external_stateinit.tolk"),
         DG_EXTERNAL_CONTRACT,

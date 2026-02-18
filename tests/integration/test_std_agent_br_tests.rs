@@ -23,7 +23,7 @@ fn wrap_fmt_test_source(test_body: &str) -> String {
     format!("{FMT_TEST_IMPORTS}\n{test_body}\n")
 }
 
-fn run_project_builder_fmt_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
+fn run_project_builder_fmt_success(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = wrap_fmt_test_source(test_body);
     ProjectBuilder::new(project_name)
         .test_file("fmt_behavior", &source)
@@ -31,19 +31,18 @@ fn run_project_builder_fmt_failure(project_name: &str, test_body: &str, snapshot
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(snapshot_path);
 }
 
 #[test]
 fn br_stdlib_format5_mixed_specifiers_should_follow_placeholder_order_bug() {
-    run_project_builder_fmt_failure(
+    run_project_builder_fmt_success(
         "br-stdlib-format5-placeholder-order-bug",
         r#"
 get fun `test-br-stdlib-format5-placeholder-order-bug`() {
     val rendered = format5("{} | {:ton} | {:x} | {} | {}", 255, 1500000000, 16, "left", "right");
-    // BUG: format5 applies {:x} and {:ton} while iterating args, not by placeholder position; expected "255 | 1.5 TON | 10 | left | right", got "16 | 1.5 TON | ff | left | right".
     expect(rendered).toEqual("255 | 1.5 TON | 10 | left | right");
 }
 "#,
@@ -59,7 +58,6 @@ fn br_stdlib_format5_mixed_specifiers_should_follow_placeholder_order_in_fixture
         r#"
 get fun `test-br-stdlib-format5-placeholder-order-fixture-bug`() {
     val rendered = format5("{:ton} | {} | {:x} | {} | {}", 1500000000, 2000000000, 16, "mid", "end");
-    // BUG: format5 consumes {:x} before {:ton} regardless of placeholder order; expected "1.5 TON | 2000000000 | 10 | mid | end", got "2 TON | 16 | 59682f00 | mid | end".
     expect(rendered).toEqual("1.5 TON | 2000000000 | 10 | mid | end");
 }
 "#,
@@ -73,8 +71,8 @@ get fun `test-br-stdlib-format5-placeholder-order-fixture-bug`() {
         .test()
         .path(test_path)
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_br/br_stdlib_format5_mixed_specifiers_should_follow_placeholder_order_in_fixture_project_bug.stdout.txt",
         );

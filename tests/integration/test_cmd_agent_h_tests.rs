@@ -76,12 +76,10 @@ fn read_json_from_project(
     relative_path: &str,
 ) -> serde_json::Value {
     let full_path = project.path().join(relative_path);
-    let content = fs::read_to_string(&full_path).unwrap_or_else(|e| {
-        panic!("Failed to read JSON file {}: {}", full_path.display(), e)
-    });
-    serde_json::from_str(&content).unwrap_or_else(|e| {
-        panic!("Failed to parse JSON file {}: {}", full_path.display(), e)
-    })
+    let content = fs::read_to_string(&full_path)
+        .unwrap_or_else(|e| panic!("Failed to read JSON file {}: {}", full_path.display(), e));
+    serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("Failed to parse JSON file {}: {}", full_path.display(), e))
 }
 
 fn assert_trace_json_contract(
@@ -129,7 +127,10 @@ fn assert_trace_json_contract(
         );
 
         for tx in transactions {
-            assert!(tx["lt"].as_str().is_some(), "Missing transaction lt in {relative_path}");
+            assert!(
+                tx["lt"].as_str().is_some(),
+                "Missing transaction lt in {relative_path}"
+            );
             assert!(
                 tx["raw_transaction"].as_str().is_some(),
                 "Missing raw_transaction in {relative_path}"
@@ -157,7 +158,9 @@ fn assert_trace_json_contract(
         .as_object()
         .unwrap_or_else(|| panic!("Missing wallets object in {relative_path}"));
     assert!(
-        wallets.values().any(|name| name.as_str() == Some("deployer")),
+        wallets
+            .values()
+            .any(|name| name.as_str() == Some("deployer")),
         "Expected deployer wallet in {relative_path}"
     );
     assert!(
@@ -302,7 +305,8 @@ fn h_test_cmd_save_test_trace_creates_trace_per_test_and_single_contract_file() 
         .count();
 
     assert_eq!(
-        contract_json_files, 1,
+        contract_json_files,
+        1,
         "Expected exactly one contract trace file in {}",
         contracts_dir.display()
     );

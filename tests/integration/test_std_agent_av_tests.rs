@@ -83,8 +83,11 @@ fn av_stdlib_fs_read_file_repeated_normalized_reads_are_stable() {
         "stable-line-from-agent-av",
     )
     .expect("failed to write stable fixture content");
-    fs::write(project_path.join("fixtures/stable/nested/marker.txt"), "marker")
-        .expect("failed to write nested marker fixture");
+    fs::write(
+        project_path.join("fixtures/stable/nested/marker.txt"),
+        "marker",
+    )
+    .expect("failed to write nested marker fixture");
 
     let test_code = format!(
         r#"
@@ -107,8 +110,11 @@ get fun `test-fs-read-repeated-normalized-is-stable`() {{
 "#
     );
 
-    fs::write(project_path.join("tests/fs_read_stable.test.tolk"), test_code)
-        .expect("failed to write fs_read_stable test");
+    fs::write(
+        project_path.join("tests/fs_read_stable.test.tolk"),
+        test_code,
+    )
+    .expect("failed to write fs_read_stable test");
 
     fixture
         .acton()

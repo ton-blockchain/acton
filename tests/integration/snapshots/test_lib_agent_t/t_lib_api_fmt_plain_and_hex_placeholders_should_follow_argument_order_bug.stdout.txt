@@ -14,14 +14,6 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/fmt_env.test.tolk (1 test)
-  ✗ fmt-placeholder-order [TIME]
-    └─ Error: expect(actual).toEqual(expected)
-        (
-            16 ff,
-            255 10
-        )
-      └─ at tests/fmt_env.test[LINE]
+  ✓ fmt-placeholder-order [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

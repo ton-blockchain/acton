@@ -9,10 +9,10 @@
 //! Required test name prefix:
 //! - g_test_cmd_
 
-use acton_config::config::TestSettings;
-use acton_config::test::TestConfig as RunnerTestConfig;
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use acton_config::config::TestSettings;
+use acton_config::test::TestConfig as RunnerTestConfig;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -143,7 +143,10 @@ fn g_test_cmd_cli_debug_override_wins_over_config_debug_false() {
         None,
     );
 
-    assert!(merged.debug, "CLI --debug must override Acton.toml debug=false");
+    assert!(
+        merged.debug,
+        "CLI --debug must override Acton.toml debug=false"
+    );
 }
 
 #[test]

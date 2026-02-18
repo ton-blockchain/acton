@@ -49,7 +49,6 @@ fn t_lib_api_fmt_plain_and_hex_placeholders_should_follow_argument_order_bug() {
 
             get fun `test-fmt-placeholder-order`() {
                 val rendered = format2("{} {:x}", 255, 16);
-                // BUG: format2 applies {:x} before {} regardless of placeholder order; expected "255 10", got "16 ff".
                 expect(rendered).toEqual("255 10");
             }
         "#,
@@ -58,10 +57,39 @@ fn t_lib_api_fmt_plain_and_hex_placeholders_should_follow_argument_order_bug() {
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_lib_agent_t/t_lib_api_fmt_plain_and_hex_placeholders_should_follow_argument_order_bug.stdout.txt",
+        );
+}
+
+#[test]
+fn t_lib_api_fmt_fallback_for_non_int_specs_and_ignores_extra_args() {
+    ProjectBuilder::new("t-lib-api-fmt-fallback-and-extra-args")
+        .test_file(
+            "fmt_env",
+            r#"
+            import "../../lib/fmt"
+            import "../../lib/testing/expect"
+
+            get fun `test-fmt-fallback-and-extra-args`() {
+                val fallback = format2("{:x} {:ton}", "abc", "tonlike");
+                expect(fallback).toEqual("abc tonlike");
+
+                val extra = format2("{}", 255, 16);
+                expect(extra).toEqual("255");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_lib_agent_t/t_lib_api_fmt_fallback_for_non_int_specs_and_ignores_extra_args.stdout.txt",
         );
 }
 

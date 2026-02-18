@@ -73,8 +73,8 @@ get fun `test-cw-out-action-load-body-mismatch-diagnostic`() {
 }
 
 #[test]
-fn cw_stdlib_out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnostic_in_fixture_project(
-) {
+fn cw_stdlib_out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnostic_in_fixture_project()
+ {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/cw_out_action_load_body_mismatch.test.tolk";
     let source = format!(

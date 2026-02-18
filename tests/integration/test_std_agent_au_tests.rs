@@ -64,8 +64,11 @@ get fun `test-au-fs-read-non-utf8-binary-fixture`() {{
             .expect("Binary fixture path must have a parent directory"),
     )
     .expect("Failed to create binary fixture directory");
-    std::fs::write(&binary_path, [0x00, 0xFF, 0x80, 0x10, 0xB5, 0xEE, 0x9C, 0x72])
-        .expect("Failed to write non-UTF8 binary fixture");
+    std::fs::write(
+        &binary_path,
+        [0x00, 0xFF, 0x80, 0x10, 0xB5, 0xEE, 0x9C, 0x72],
+    )
+    .expect("Failed to write non-UTF8 binary fixture");
 
     project
         .acton()
@@ -82,7 +85,10 @@ get fun `test-au-fs-read-non-utf8-binary-fixture`() {{
 fn au_stdlib_fs_read_file_keeps_binary_like_text_content_across_normalized_paths() {
     run_fs_case(
         "au-stdlib-fs-binary-like-content-normalized-paths",
-        &[("fixtures/au-binary-like.txt", "B5EE9C72\r\n00FF10AA\r\n7F00\r\n")],
+        &[(
+            "fixtures/au-binary-like.txt",
+            "B5EE9C72\r\n00FF10AA\r\n7F00\r\n",
+        )],
         r#"
 get fun `test-au-fs-read-binary-like-content-normalized-paths`() {
     val direct = fs.readFile("fixtures/au-binary-like.txt");

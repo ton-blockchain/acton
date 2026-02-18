@@ -51,8 +51,8 @@ get fun `test-dp-stdlib-config-storage-prices-get-initial-empty-dict-fallback`()
 }
 
 #[test]
-fn dp_stdlib_config_storage_prices_get_initial_missing_zero_key_in_non_empty_dict_falls_back_to_zero_prices(
-) {
+fn dp_stdlib_config_storage_prices_get_initial_missing_zero_key_in_non_empty_dict_falls_back_to_zero_prices()
+ {
     run_config_success_case(
         "dp-stdlib-config-storage-prices-get-initial-missing-zero-key-fallback",
         r#"

@@ -16,8 +16,7 @@ use std::fs;
 
 const MISSING_LIBRARY_HASH: &str =
     "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-const KNOWN_LIBRARY_HASH: &str =
-    "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27";
+const KNOWN_LIBRARY_HASH: &str = "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27";
 
 #[test]
 fn bl_stdlib_fetch_and_register_library_returns_false_without_panicking_on_transport_errors() {

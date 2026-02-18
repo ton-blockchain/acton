@@ -34,19 +34,6 @@ fn run_fmt_success(project_name: &str, test_body: &str, snapshot_path: &str) {
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_fmt_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = wrap_fmt_test_source(test_body);
-    ProjectBuilder::new(project_name)
-        .test_file("fmt_behavior", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn y_stdlib_format1_and_format2_support_plain_hex_and_ton_specifiers() {
     run_fmt_success(
@@ -86,12 +73,11 @@ get fun `test-y-stdlib-format3-format4-mixed-specifiers`() {
 
 #[test]
 fn y_stdlib_format5_should_respect_placeholder_order_for_plain_hex_and_ton_bug() {
-    run_fmt_failure(
+    run_fmt_success(
         "y-stdlib-format5-placeholder-order-bug",
         r#"
 get fun `test-y-stdlib-format5-placeholder-order-bug`() {
     val rendered = format5("{} | {:x} | {:ton} | {} | {}", 255, 16, 1500000000, "left", "right");
-    // BUG: format5 replaces specifiers by argument type priority, not placeholder order; expected "255 | 10 | 1.5 TON | left | right", got "1500000000 | ff | 0.000000016 TON | left | right".
     expect(rendered).toEqual("255 | 10 | 1.5 TON | left | right");
 }
 "#,

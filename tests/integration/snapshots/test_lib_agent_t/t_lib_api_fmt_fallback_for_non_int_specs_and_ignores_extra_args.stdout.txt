@@ -13,7 +13,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
- > tests/fmt_behavior.test.tolk (1 test)
-  ✓ y-stdlib-format5-placeholder-order-bug [TIME]
+ > tests/fmt_env.test.tolk (1 test)
+  ✓ fmt-fallback-and-extra-args [TIME]
 
  ✓ 1 passed in 1 file
