@@ -62,14 +62,14 @@ jobs:
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ runner.os }}-
 
-      - name: Install required system dependencies
+      - name: Install required system dependencies (cache not exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
-      - name: Install required system dependencies
+      - name: Install required system dependencies (cache exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit == 'true'
         run: |
           sudo apt-get update
@@ -171,31 +171,18 @@ jobs:
         run: |
           ./target/debug/acton --help
 
-      #      - name: Upload acton binary as artifact
-      #        uses: actions/upload-artifact@v6
-      #        with:
-      #          name: acton-linux-binary
-      #          path: target/debug/acton
-
-      - name: Install cargo-llvm-cov and nextest
+      - name: Installing additional Rust components
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-llvm-cov,nextest
+          tool: nextest
 
-      - name: Run tests and generate coverage
+      - name: Run tests
         run: |
-          rustup component add llvm-tools-preview
-          just coverage-html
+          just test
 
       - name: Run Acton tests
         run: |
           ./target/debug/acton test
-
-      #      - name: Upload coverage report
-      #        uses: actions/upload-artifact@v6
-      #        with:
-      #          name: coverage-report
-      #          path: target/llvm-cov/html
 
       - name: Run formatter and linter
         run: |
