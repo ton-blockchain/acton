@@ -24,8 +24,9 @@ fn bp_stdlib_env_slice_returns_raw_and_empty_values_and_null_when_missing() {
             import "../../lib/testing/expect"
 
             get fun `test-bp-stdlib-env-slice-branches`() {
-                // BUG: env<slice> should read raw environment values; expected "  keep surrounding spaces  ", got unsupported type error for `slice`.
                 expect(env<slice>("BP_ENV_SLICE_RAW")).toEqual("  keep surrounding spaces  ");
+                expect(env<slice>("BP_ENV_SLICE_EMPTY")).toEqual("");
+                expect(env<slice>("BP_ENV_SLICE_MISSING")).toBeNull();
             }
         "#,
         )
@@ -33,10 +34,10 @@ fn bp_stdlib_env_slice_returns_raw_and_empty_values_and_null_when_missing() {
         .acton()
         .test()
         .env("BP_ENV_SLICE_RAW", "  keep surrounding spaces  ")
+        .env("BP_ENV_SLICE_EMPTY", "")
         .run()
-        .failure()
-        .assert_failed(1)
-        .assert_contains("env() supports only int, bool, slice, address and cell types, but got slice")
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_bp/bp_stdlib_env_slice_returns_raw_and_empty_values_and_null_when_missing.stdout.txt",
         );
@@ -75,5 +76,71 @@ get fun `test-bp-stdlib-env-or-string-fallback`() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_bp/bp_stdlib_env_or_string_uses_missing_fallback_and_preserves_present_values.stdout.txt",
+        );
+}
+
+#[test]
+fn bp_stdlib_env_or_slice_uses_fallback_for_missing_and_present_value_when_set() {
+    ProjectBuilder::new("bp-stdlib-env-or-slice-fallback-vs-present")
+        .test_file(
+            "env_or_slice",
+            r#"
+            import "../../lib/env"
+            import "../../lib/testing/expect"
+
+            get fun `test-bp-stdlib-env-or-slice-fallback-vs-present`() {
+                val fallbackOpt = env<slice>("BP_ENV_OR_SLICE_FALLBACK_SOURCE");
+                expect(fallbackOpt).toBeNotNull();
+
+                val fallback = fallbackOpt!;
+                expect(envOr<slice>("BP_ENV_OR_SLICE_MISSING", fallback)).toEqual(fallback);
+                expect(envOr<slice>("BP_ENV_OR_SLICE_PRESENT", fallback)).toEqual("present-slice-value");
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .env("BP_ENV_OR_SLICE_FALLBACK_SOURCE", "fallback-slice-value")
+        .env("BP_ENV_OR_SLICE_PRESENT", "present-slice-value")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_std_agent_bp/bp_stdlib_env_or_slice_uses_fallback_for_missing_and_present_value_when_set.stdout.txt",
+        );
+}
+
+#[test]
+fn bp_stdlib_env_string_and_slice_support_long_values_without_truncation() {
+    let long_value = "long-segment-".repeat(150);
+    let source = format!(
+        r#"
+            import "../../lib/env"
+            import "../../lib/testing/expect"
+
+            get fun `test-bp-stdlib-env-string-and-slice-long-values`() {{
+                val asString = env<string>("BP_ENV_LONG_VALUE");
+                val asSlice = env<slice>("BP_ENV_LONG_VALUE");
+
+                expect(asString).toBeNotNull();
+                expect(asSlice).toBeNotNull();
+                expect(asString!).toEqual("{long_value}");
+                expect(asSlice!).toEqual("{long_value}");
+            }}
+        "#
+    );
+
+    ProjectBuilder::new("bp-stdlib-env-string-slice-long-values")
+        .test_file("env_long_values", &source)
+        .build()
+        .acton()
+        .test()
+        .env("BP_ENV_LONG_VALUE", &long_value)
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_std_agent_bp/bp_stdlib_env_string_and_slice_support_long_values_without_truncation.stdout.txt",
         );
 }

@@ -15,7 +15,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  > tests/fmt_env.test.tolk (1 test)
   ✗ env-unsupported-type [TIME]
-    └─ Error: env() supports only int, bool, slice, address and cell types, but got Unsupported
+    └─ Error: env() supports only int, bool, string, slice, address and cell types, but got Unsupported
 
  ✗ 1 failed in 1 file
 

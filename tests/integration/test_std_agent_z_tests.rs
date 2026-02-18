@@ -15,6 +15,7 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 
 const RAW_ADDR: &str = "0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147";
+const FRIENDLY_ZERO_ADDR: &str = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
 
 #[test]
 fn z_stdlib_env_parses_int_bool_address_and_cell_in_supported_formats() {
@@ -127,9 +128,14 @@ fn z_stdlib_env_or_uses_defaults_only_for_null_paths() {
                 expect(envOr<bool>("Z_OR_BAD_BOOL", true)).toEqual(false);
 
                 val fallbackAddress = address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ");
+                expect(envOr<address>("Z_OR_MISSING_ADDRESS", fallbackAddress)).toEqual(fallbackAddress);
                 expect(envOr<address>("Z_OR_BAD_ADDRESS", fallbackAddress)).toEqual(fallbackAddress);
 
                 val fallbackCell = beginCell().storeUint(777, 16).endCell();
+                val resolvedMissingCell = envOr<cell>("Z_OR_MISSING_CELL", fallbackCell);
+                var missingSlice = resolvedMissingCell.beginParse();
+                expect(missingSlice.loadUint(16)).toEqual(777);
+
                 val resolvedCell = envOr<cell>("Z_OR_BAD_CELL", fallbackCell);
                 var slice = resolvedCell.beginParse();
                 expect(slice.loadUint(16)).toEqual(777);
@@ -148,5 +154,37 @@ fn z_stdlib_env_or_uses_defaults_only_for_null_paths() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_z/z_stdlib_env_or_uses_defaults_only_for_null_paths.stdout.txt",
+        );
+}
+
+#[test]
+fn z_stdlib_env_parses_user_friendly_address_form() {
+    ProjectBuilder::new("z-stdlib-env-address-friendly-form")
+        .test_file(
+            "env_friendly_address",
+            r#"
+            import "../../lib/env"
+            import "../../lib/fmt"
+            import "../../lib/testing/expect"
+
+            get fun `test-z-stdlib-env-address-friendly-form`() {
+                val parsed = env<address>("Z_ENV_ADDRESS_FRIENDLY");
+                expect(parsed).toBeNotNull();
+
+                val renderedParsed = format1("{}", parsed!);
+                val renderedExpected = format1("{}", address("0:0000000000000000000000000000000000000000000000000000000000000000"));
+                expect(renderedParsed).toEqual(renderedExpected);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .env("Z_ENV_ADDRESS_FRIENDLY", FRIENDLY_ZERO_ADDR)
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_std_agent_z/z_stdlib_env_parses_user_friendly_address_form.stdout.txt",
         );
 }

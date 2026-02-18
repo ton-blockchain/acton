@@ -1,0 +1,15 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling dd_relay
+    Finished in [TIME]
+   Compiling dd_root
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/dd_find_external_out_message.test.tolk (1 test)
+  ✓ dd-find-external-out-message-type-and-source [TIME]
+
+ ✓ 1 passed in 1 file

@@ -36,7 +36,7 @@ fn bq_stdlib_env_unsupported_generic_type_triggers_assert_fail_branch() {
         .failure()
         .assert_failed(1)
         .assert_contains(
-            "env() supports only int, bool, slice, address and cell types, but got Unsupported",
+            "env() supports only int, bool, string, slice, address and cell types, but got Unsupported",
         )
         .assert_snapshot_matches(
             "integration/snapshots/test_std_agent_bq/bq_stdlib_env_unsupported_generic_type_triggers_assert_fail_branch.stdout.txt",

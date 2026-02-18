@@ -1,7 +1,8 @@
 /// Module for accessing environment variables.
 ///
 /// This module provides a type-safe way to access environment variables during test execution or script running.
-/// It supports parsing environment variables into standard Tolk types like `int`, `bool`, `slice`, `address`, and `cell`.
+/// It supports parsing environment variables into standard Tolk types like `int`, `bool`,
+/// `string`, `slice`, `address`, and `cell`.
 ///
 /// Examples:
 /// ```tolk
@@ -31,7 +32,8 @@ import "testing/assert"
 /// Supported types:
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
 /// - `bool`: returns true if value is "true" or "1" (case-insensitive), otherwise false.
-/// - `slice`: returns the raw string value.
+/// - `string`: returns the raw string value.
+/// - `slice`: returns the raw string value as a slice.
 /// - `address`: parsed as a TON address (raw or user-friendly).
 /// - `cell`: parsed from base64 or hex encoded BoC.
 ///
@@ -50,7 +52,8 @@ fun env<T>(name: string): T? {
 /// Supported types:
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
 /// - `bool`: returns true if value is "true" or "1" (case-insensitive), otherwise false.
-/// - `slice`: returns the raw string value.
+/// - `string`: returns the raw string value.
+/// - `slice`: returns the raw string value as a slice.
 /// - `address`: parsed as a TON address (raw or user-friendly).
 /// - `cell`: parsed from base64 or hex encoded BoC.
 ///
@@ -76,6 +79,10 @@ fun bool.__env(name: string): bool? {
 }
 
 fun string.__env(name: string): string? {
+    return ffi.envString(name);
+}
+
+fun slice.__env(name: string): slice? {
     return ffi.envSlice(name);
 }
 
@@ -88,7 +95,7 @@ fun cell.__env(name: string): cell? {
 }
 
 fun T.__env(name: string): T? {
-    Assert.fail(format1("env() supports only int, bool, slice, address and cell types, but got {}", reflect.typeNameOf<T>()));
+    Assert.fail(format1("env() supports only int, bool, string, slice, address and cell types, but got {}", reflect.typeNameOf<T>()));
 }
 
 fun ffi.envInt(name: string): int?
@@ -97,8 +104,11 @@ fun ffi.envInt(name: string): int?
 fun ffi.envBool(name: string): bool?
     asm "51 EXTCALL"
 
-fun ffi.envSlice(name: string): string?
+fun ffi.envString(name: string): string?
     asm "52 EXTCALL"
+
+fun ffi.envSlice(name: string): slice?
+    asm "55 EXTCALL"
 
 fun ffi.envAddress(name: string): address?
     asm "53 EXTCALL"

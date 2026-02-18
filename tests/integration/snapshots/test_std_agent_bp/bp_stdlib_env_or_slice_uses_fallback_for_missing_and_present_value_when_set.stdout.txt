@@ -13,7 +13,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
- > tests/env_slice_branches.test.tolk (1 test)
-  ✓ bp-stdlib-env-slice-branches [TIME]
+ > tests/env_or_slice.test.tolk (1 test)
+  ✓ bp-stdlib-env-or-slice-fallback-vs-present [TIME]
 
  ✓ 1 passed in 1 file

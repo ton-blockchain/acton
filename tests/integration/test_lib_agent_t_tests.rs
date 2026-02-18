@@ -162,7 +162,7 @@ fn t_lib_api_env_rejects_unsupported_target_types_with_clear_error() {
         .failure()
         .assert_failed(1)
         .assert_contains(
-            "env() supports only int, bool, slice, address and cell types, but got Unsupported",
+            "env() supports only int, bool, string, slice, address and cell types, but got Unsupported",
         )
         .assert_snapshot_matches(
             "integration/snapshots/test_lib_agent_t/t_lib_api_env_rejects_unsupported_target_types_with_clear_error.stdout.txt",

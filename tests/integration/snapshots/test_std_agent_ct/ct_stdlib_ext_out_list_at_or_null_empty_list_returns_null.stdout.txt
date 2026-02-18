@@ -1,0 +1,13 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling external
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/ct_extoutlist_atornull.test.tolk (1 test)
+  ✓ ct-ext-out-list-atornull-empty-list [TIME]
+
+ ✓ 1 passed in 1 file

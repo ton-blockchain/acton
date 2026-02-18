@@ -47,6 +47,17 @@ fn env_bool_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow:
     Ok(())
 }
 
+extension!(env_string in (Context) with (name: String) using env_string_impl);
+fn env_string_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
+    match env::var(&name) {
+        Ok(val) => {
+            stack.push_string(&val);
+        }
+        Err(_) => stack.push(TupleItem::Null),
+    }
+    Ok(())
+}
+
 extension!(env_slice in (Context) with (name: String) using env_slice_impl);
 fn env_slice_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
@@ -103,8 +114,9 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
     register_ext_methods!(executor, ctx, {
         50 => env_int : 1,
         51 => env_bool : 1,
-        52 => env_slice : 1,
+        52 => env_string : 1,
         53 => env_address : 1,
         54 => env_cell : 1,
+        55 => env_slice : 1,
     });
 }

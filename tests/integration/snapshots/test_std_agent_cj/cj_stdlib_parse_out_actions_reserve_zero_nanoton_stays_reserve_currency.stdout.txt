@@ -13,7 +13,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
 
  TEST  [ROOT]
 
- > tests/env_slice_branches.test.tolk (1 test)
-  ✓ bp-stdlib-env-slice-branches [TIME]
+ > tests/out_actions.test.tolk (1 test)
+  ✓ cj-parse-out-actions-reserve-zero-nanoton-kind [TIME]
 
  ✓ 1 passed in 1 file
