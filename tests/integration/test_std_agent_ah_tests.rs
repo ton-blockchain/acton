@@ -43,30 +43,6 @@ fn run_ah_stdlib_case(project_name: &str, test_body: &str, snapshot_path: &str, 
     output.assert_snapshot_matches(snapshot_path);
 }
 
-fn run_ah_stdlib_failure_case(
-    project_name: &str,
-    test_body: &str,
-    snapshot_path: &str,
-    contains: &[&str],
-) {
-    let test_source = format!("{NETWORK_IMPORTS}\n{test_body}\n");
-
-    let output = ProjectBuilder::new(project_name)
-        .contract("simple", SIMPLE_CONTRACT)
-        .test_file("ah_stdlib_network", &test_source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure();
-
-    output.assert_failed(1);
-    for needle in contains {
-        output.assert_contains(needle);
-    }
-    output.assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn ah_stdlib_balance_returns_zero_for_unknown_address_then_top_up_updates_balance() {
     run_ah_stdlib_case(
@@ -135,7 +111,7 @@ get fun `test-ah-stdlib-set-account-fresh-target-preserves-markers`() {
 
 #[test]
 fn ah_stdlib_set_account_preserves_existing_shard_markers_and_balance() {
-    run_ah_stdlib_failure_case(
+    run_ah_stdlib_case(
         "ah-stdlib-set-account-preserves-markers-and-balance",
         r#"
 get fun `test-ah-stdlib-set-account-preserves-existing-shard-markers-and-balance`() {

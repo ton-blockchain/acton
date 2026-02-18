@@ -18,7 +18,7 @@ import "../../lib/testing/expect"
 import "../../lib/vm/vm"
 "#;
 
-fn run_crypto_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
+fn run_crypto_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = format!("{CRYPTO_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
         .test_file("crypto_behavior", &source)
@@ -26,14 +26,14 @@ fn run_crypto_failure_case(project_name: &str, test_body: &str, snapshot_path: &
         .acton()
         .test()
         .run()
-        .failure()
-        .assert_failed(1)
+        .success()
+        .assert_passed(1)
         .assert_snapshot_matches(snapshot_path);
 }
 
 #[test]
 fn az_stdlib_crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time() {
-    run_crypto_failure_case(
+    run_crypto_case(
         "az-stdlib-fast-random-without-seed-fixed-time",
         r#"
 get fun `test-az-stdlib-fast-random-without-seed-fixed-time`() {

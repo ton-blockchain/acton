@@ -14,14 +14,6 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
  TEST  [ROOT]
 
  > tests/crypto_behavior.test.tolk (1 test)
-  ✗ az-stdlib-fast-random-without-seed-fixed-time [TIME]
-    └─ Error: expect(actual).toEqual(expected)
-        (
-            [BOC_HEX],
-            [BOC_HEX]
-        )
-      └─ at tests/crypto_behavior.test[LINE]
+  ✓ az-stdlib-fast-random-without-seed-fixed-time [TIME]
 
- ✗ 1 failed in 1 file
-
-Some tests failed.
+ ✓ 1 passed in 1 file

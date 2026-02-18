@@ -30,19 +30,6 @@ fn run_crypto_case(project_name: &str, test_body: &str, snapshot_path: &str) {
         .assert_snapshot_matches(snapshot_path);
 }
 
-fn run_crypto_failure_case(project_name: &str, test_body: &str, snapshot_path: &str) {
-    let source = format!("{CRYPTO_IMPORTS}\n{test_body}\n");
-    ProjectBuilder::new(project_name)
-        .test_file("crypto_behavior", &source)
-        .build()
-        .acton()
-        .test()
-        .run()
-        .failure()
-        .assert_failed(1)
-        .assert_snapshot_matches(snapshot_path);
-}
-
 #[test]
 fn an_stdlib_crypto_create_mnemonic_returns_24_words() {
     run_crypto_case(
@@ -126,7 +113,7 @@ get fun `test-an-stdlib-raw-sign-deterministic-hash-sensitive`() {
 
 #[test]
 fn an_stdlib_crypto_fast_random_bytes_seeded_are_deterministic() {
-    run_crypto_failure_case(
+    run_crypto_case(
         "an-stdlib-fast-random-seeded-deterministic",
         r#"
 get fun `test-an-stdlib-fast-random-seeded-deterministic`() {
@@ -151,6 +138,25 @@ get fun `test-an-stdlib-fast-random-rejects-128-bytes`() {
 }
 "#,
         "integration/snapshots/test_std_agent_an/an_stdlib_crypto_fast_random_bytes_rejects_128_bytes.stdout.txt",
+    );
+}
+
+#[test]
+fn an_stdlib_crypto_fast_random_bytes_supports_zero_bytes() {
+    run_crypto_case(
+        "an-stdlib-fast-random-supports-zero-bytes",
+        r#"
+get fun `test-an-stdlib-fast-random-supports-zero-bytes`() {
+    val seeded = crypto.getFastRandomBytes(0, 42);
+    val noSeed = crypto.getFastRandomBytes(0);
+
+    expect(seeded.remainingBitsCount()).toEqual(0);
+    expect(seeded.remainingRefsCount()).toEqual(0);
+    expect(noSeed.remainingBitsCount()).toEqual(0);
+    expect(noSeed.remainingRefsCount()).toEqual(0);
+}
+"#,
+        "integration/snapshots/test_std_agent_an/an_stdlib_crypto_fast_random_bytes_supports_zero_bytes.stdout.txt",
     );
 }
 

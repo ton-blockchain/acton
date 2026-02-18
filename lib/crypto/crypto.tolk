@@ -126,17 +126,17 @@ fun crypto.getSecureRandomBytes(bytesNum: uint16): slice {
 /// val bytes = crypto.getFastRandomBytes(16, 42);
 /// ```
 fun crypto.getFastRandomBytes(bytesNum: uint16, seed: int? = null): slice {
-    if(seed == null) {
+    if (seed == null) {
         seed = blockchain.now();
     }
-    random.initializeBy(seed);
+    random.setSeed(seed as uint256);
     // In this case bytes won't fit in one slice
     if (bytesNum >= 128) {
         Assert.fail("getFastRandomBytes expects bytesNum less than 128");
     }
 
     var res = beginCell();
-    while(bytesNum > 0) {
+    while (bytesNum > 0) {
         var rnd = beginCell().storeUint(random.uint256(), 256).toSlice();
         val neededBytesNum = min(32, bytesNum);
         res.storeUint(rnd.loadUint(8 * neededBytesNum), 8 * neededBytesNum);
