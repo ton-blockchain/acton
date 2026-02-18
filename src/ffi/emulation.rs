@@ -1182,6 +1182,14 @@ fn load_library_by_hash_impl(
 ) -> anyhow::Result<()> {
     let network = ctx.network();
     let custom_networks = ctx.env.config.custom_networks();
+
+    if let Network::Custom(network_name) = &network
+        && !custom_networks.contains_key(network_name.as_ref())
+    {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    }
+
     let api_client = TonApiClient::new(network, custom_networks, ctx.env.api_key.clone())?;
 
     let lib = api_client.get_library_by_hash(hash.as_str());

@@ -24,17 +24,18 @@ const UNKNOWN_LIBRARY_HASH: &str =
     "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d28";
 
 #[test]
-fn bm_stdlib_load_library_unknown_hash_returns_null_in_project_builder_bug() {
+fn bm_stdlib_load_library_unknown_hash_returns_null_in_project_builder() {
     let source = format!(
         r#"
 {NETWORK_IMPORTS}
 
 get fun `test-bm-load-library-unknown-hash-project-builder`() {{
-    // BUG: net.loadLibrary should return null for unknown hash, expected null, got process abort in ffi.loadLibrary.
-    val lib = net.loadLibrary("{UNKNOWN_LIBRARY_HASH}");
-    expect(lib).toBeNull();
+    val unknown = net.loadLibrary("{UNKNOWN_LIBRARY_HASH}");
+    val empty = net.loadLibrary("");
+    expect(unknown).toBeNull();
+    expect(empty).toBeNull();
 
-    if (lib == null) {{
+    if (unknown == null && empty == null) {{
         println("bm-load-library-null-project-builder");
     }}
 }}
@@ -48,16 +49,16 @@ get fun `test-bm-load-library-unknown-hash-project-builder`() {{
         .test()
         .fork_net("custom:bm-missing-net")
         .run()
-        .failure()
-        .assert_contains("tests/load_library_unknown_hash.test.tolk (1 test)")
-        .assert_stderr_contains("event loop thread panicked")
+        .success()
+        .assert_passed(1)
+        .assert_contains("bm-load-library-null-project-builder")
         .assert_snapshot_matches(
-            "integration/snapshots/test_std_agent_bm/bm_stdlib_load_library_unknown_hash_returns_null_in_project_builder_bug.stdout.txt",
+            "integration/snapshots/test_std_agent_bm/bm_stdlib_load_library_unknown_hash_returns_null_in_project_builder.stdout.txt",
         );
 }
 
 #[test]
-fn bm_stdlib_load_library_unknown_hash_returns_null_in_fixture_project_bug() {
+fn bm_stdlib_load_library_unknown_hash_returns_null_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/bm_load_library_unknown_hash.test.tolk";
     let source = format!(
@@ -65,11 +66,12 @@ fn bm_stdlib_load_library_unknown_hash_returns_null_in_fixture_project_bug() {
 {NETWORK_IMPORTS}
 
 get fun `test-bm-load-library-unknown-hash-fixture`() {{
-    // BUG: net.loadLibrary should return null for unknown hash, expected null, got process abort in ffi.loadLibrary.
-    val lib = net.loadLibrary("{UNKNOWN_LIBRARY_HASH}");
-    expect(lib).toBeNull();
+    val unknown = net.loadLibrary("{UNKNOWN_LIBRARY_HASH}");
+    val malformed = net.loadLibrary("not-a-hash");
+    expect(unknown).toBeNull();
+    expect(malformed).toBeNull();
 
-    if (lib == null) {{
+    if (unknown == null && malformed == null) {{
         println("bm-load-library-null-fixture");
     }}
 }}
@@ -85,10 +87,10 @@ get fun `test-bm-load-library-unknown-hash-fixture`() {{
         .path(test_path)
         .fork_net("custom:bm-missing-net")
         .run()
-        .failure()
-        .assert_contains("tests/bm_load_library_unknown_hash.test.tolk (1 test)")
-        .assert_stderr_contains("event loop thread panicked")
+        .success()
+        .assert_passed(1)
+        .assert_contains("bm-load-library-null-fixture")
         .assert_snapshot_matches(
-            "integration/snapshots/test_std_agent_bm/bm_stdlib_load_library_unknown_hash_returns_null_in_fixture_project_bug.stdout.txt",
+            "integration/snapshots/test_std_agent_bm/bm_stdlib_load_library_unknown_hash_returns_null_in_fixture_project.stdout.txt",
         );
 }
