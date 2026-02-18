@@ -206,8 +206,8 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
             continue;
         }
 
-        if rem.starts_with('{') {
-            let Some(close_rel) = rem[1..].find('}') else {
+        if let Some(stripped) = rem.strip_prefix('{') {
+            let Some(close_rel) = stripped.find('}') else {
                 bail!(
                     "Invalid format string at byte {}: unclosed '{{' placeholder",
                     i

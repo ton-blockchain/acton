@@ -120,11 +120,7 @@ enum Commands {
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
         debug: bool,
-        #[arg(
-            long,
-            help = "Debug server port",
-            help_heading = "Debugging"
-        )]
+        #[arg(long, help = "Debug server port", help_heading = "Debugging")]
         debug_port: Option<u16>,
         #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
         backtrace: Option<BacktraceMode>,
@@ -1198,8 +1194,8 @@ fn main() {
                     test_cmd(path, &config)
                 }
             }
-            Err(err) => Err(err.into()),
-        }
+            Err(err) => Err(err),
+        },
         Commands::Run { script, args } => run_cmd(&script, &args),
         Commands::Retrace {
             hash,

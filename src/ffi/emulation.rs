@@ -649,8 +649,8 @@ fn find_transaction_by_params_impl(
 
     let found = parsed_txs.iter().filter(|tx| {
         if let Some(expected_deploy) = params.deploy {
-            let is_deploy =
-                tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active;
+            let is_deploy = tx.orig_status == AccountStatus::NotExists
+                && tx.end_status == AccountStatus::Active;
             if expected_deploy != is_deploy {
                 // Deploy flag mismatch
                 return false;
