@@ -1274,7 +1274,13 @@ fn wait_for_transaction_impl(
 
     let custom_networks = ctx.env.config.custom_networks();
     let api_key = ctx.env.api_key.clone();
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+    let api_client = match TonApiClient::new(network.clone(), custom_networks, api_key.clone()) {
+        Ok(client) => client,
+        Err(_) => {
+            stack.push_bool(false);
+            return Ok(());
+        }
+    };
 
     let ext_message_hash_bytes = ext_message_hash.data();
 
@@ -1327,10 +1333,6 @@ fn wait_for_transaction_impl(
         }
     }
 
-    ctx.asserts.fail(
-        "Transaction was not applied after {} attempts. Check your wallet's transactions"
-            .to_owned(),
-    );
     stack.push_bool(false);
     Ok(())
 }
