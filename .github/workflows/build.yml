@@ -167,7 +167,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo nextest run --workspace
+          just test
 
       - name: Run Acton tests
         run: |
