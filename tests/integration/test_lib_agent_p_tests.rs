@@ -212,7 +212,6 @@ fn p_lib_api_to_have_and_not_have_tx_by_opcode() {
                     to: target,
                     opcode: 0x11223344,
                 }});
-                // BUG: expected opcode filter 0x11223345 to reject tx with opcode 0x11223344, but matcher still reports it as found.
                 expect(txs).toNotHaveTx({{
                     from: sender.address,
                     to: target,
@@ -234,6 +233,59 @@ fn p_lib_api_to_have_and_not_have_tx_by_opcode() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test_lib_agent_p/p_lib_api_to_have_and_not_have_tx_by_opcode.stdout.txt",
+        );
+}
+
+#[test]
+fn p_lib_api_find_transaction_by_explicit_opcode_without_generic() {
+    let test_code = format!(
+        r#"
+            {}
+
+            get fun `test-find-transaction-opcode-filter`() {{
+                val init = ContractState {{
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                }};
+                val target = AutoDeployAddress {{ stateInit: init }}.calculateAddress();
+                val sender = net.treasury("sender");
+
+                val txs = net.send(sender.address, createMessage({{
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {{ stateInit: init }},
+                    body: beginCell().storeUint(0x55667788, 32).storeUint(5, 32).endCell(),
+                }}));
+
+                val found = txs.findTransaction({{
+                    from: sender.address,
+                    to: target,
+                    opcode: 0x55667788,
+                }});
+                expect(found).toBeDefined();
+
+                val missing = txs.findTransaction({{
+                    from: sender.address,
+                    to: target,
+                    opcode: 0x55667789,
+                }});
+                expect(missing).toBeNone();
+            }}
+        "#,
+        TEST_IMPORTS,
+    );
+
+    ProjectBuilder::new("p-lib-api-find-transaction-opcode")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("search_params", &test_code)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_lib_agent_p/p_lib_api_find_transaction_by_explicit_opcode_without_generic.stdout.txt",
         );
 }
 

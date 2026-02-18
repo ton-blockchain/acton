@@ -363,7 +363,10 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
 /// val tx = result.unwrap();
 /// ```
 fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {}): Maybe<Transaction> {
-    params.opcode = Msg.getDeclaredPackPrefix();
+    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
+    if (declaredPrefix != null) {
+        params.opcode = declaredPrefix;
+    }
     val tx = ffi.findTransactionByParams(self, params.toTuple());
     if (tx == null) {
         return Maybe<Transaction>.none();

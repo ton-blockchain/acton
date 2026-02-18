@@ -640,6 +640,12 @@ fn find_transaction_by_params_impl(
         stack.push(TupleItem::Null);
         return Ok(());
     };
+    let requires_internal_in_msg = params.opcode.is_some()
+        || params.bounced.is_some()
+        || params.bounce.is_some()
+        || params.value.is_some()
+        || params.from.is_some()
+        || params.to.is_some();
 
     let found = parsed_txs.iter().filter(|tx| {
         if let Some(expected_deploy) = params.deploy
@@ -723,6 +729,8 @@ fn find_transaction_by_params_impl(
                     return false;
                 }
             }
+        } else if requires_internal_in_msg {
+            return false;
         }
 
         let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {

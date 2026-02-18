@@ -46,7 +46,10 @@ import "../ffi/ffi"
 /// });
 /// ```
 fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params: SearchParams = {}) {
-    params.opcode = Msg.getDeclaredPackPrefix();
+    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
+    if (declaredPrefix != null) {
+        params.opcode = declaredPrefix;
+    }
     params.success = true;
     params.deploy = true;
 
@@ -75,7 +78,10 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params
 /// });
 /// ```
 fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: SearchParams = {}) {
-    params.opcode = Msg.getDeclaredPackPrefix();
+    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
+    if (declaredPrefix != null) {
+        params.opcode = declaredPrefix;
+    }
     params.success = true;
     if (params.exitCode == null) {
         params.exitCode = 0;
@@ -103,7 +109,10 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: Se
 /// });
 /// ```
 fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams = {}) {
-    params.opcode = Msg.getDeclaredPackPrefix();
+    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
+    if (declaredPrefix != null) {
+        params.opcode = declaredPrefix;
+    }
 
     val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx == null) {
@@ -127,7 +136,10 @@ fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams
 /// });
 /// ```
 fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchParams = {}) {
-    params.opcode = Msg.getDeclaredPackPrefix();
+    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
+    if (declaredPrefix != null) {
+        params.opcode = declaredPrefix;
+    }
 
     val tx = ffi.findTransactionByParams(self.value, params.toTuple());
     if (tx != null) {
@@ -151,7 +163,10 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchPar
 /// });
 /// ```
 fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: SearchParams = {}) {
-    params.opcode = Msg.getDeclaredPackPrefix();
+    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
+    if (declaredPrefix != null) {
+        params.opcode = declaredPrefix;
+    }
     params.bounced = true;
 
     val tx = ffi.findTransactionByParams(self.value, params.toTuple());
@@ -178,7 +193,10 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: Searc
 /// });
 /// ```
 fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: SearchParams = {}) {
-    params.opcode = Msg.getDeclaredPackPrefix();
+    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
+    if (declaredPrefix != null) {
+        params.opcode = declaredPrefix;
+    }
     params.success = false;
     if (params.exitCode == null) {
         Assert.fail("expect(<actual>).toHaveFailedTx(params) must have not null exitCode parameter in params");
