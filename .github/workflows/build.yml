@@ -31,8 +31,6 @@ jobs:
 
       - name: Cache Cargo
         uses: ubicloud/rust-cache@v2
-        with:
-          cache-all-crates: true
 
       - name: Install Rust
         run: rustup toolchain install
