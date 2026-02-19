@@ -379,10 +379,11 @@ enum Commands {
         graph: Option<String>,
         #[arg(
             long,
-            default_value = "build",
             help = "Output directory for build artifacts"
         )]
         out_dir: Option<String>,
+        #[arg(long, help = "Directory to save generated Fift output")]
+        output_fift: Option<String>,
         #[arg(long, help = "Show compiled contract info")]
         info: bool,
     },
@@ -832,6 +833,10 @@ fn example_build_usage() -> StyledStr {
             "Generate dependency graph as SVG file",
             "acton build --graph deps.svg",
         ),
+        (
+            "Build with Fift output",
+            "acton build --output-fift build/fift",
+        ),
     ]);
 
     let header = styled.get_header();
@@ -1249,8 +1254,9 @@ fn main() {
             clear_cache,
             graph,
             out_dir,
+            output_fift,
             info,
-        } => build_cmd(contract_id, clear_cache, graph, out_dir, info),
+        } => build_cmd(contract_id, clear_cache, graph, out_dir, output_fift, info),
         Commands::Compile {
             path,
             json,

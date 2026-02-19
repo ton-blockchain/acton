@@ -58,6 +58,7 @@ pub struct ActonConfig {
     pub libraries: Option<LibrariesConfig>,
     pub mappings: Option<BTreeMap<String, String>>,
     pub networks: Option<BTreeMap<String, CustomNetworkConfig>>,
+    pub build: Option<BuildSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -138,6 +139,13 @@ pub enum LintEntry {
 pub struct LintConfig {
     #[serde(flatten)]
     pub entries: BTreeMap<String, LintEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct BuildSettings {
+    pub out_dir: Option<String>,
+    pub output_fift: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -228,6 +236,7 @@ impl Default for ActonConfig {
             scripts: None,
             mappings: None,
             networks: None,
+            build: None,
         }
     }
 }
@@ -392,6 +401,11 @@ impl ActonConfig {
     #[must_use]
     pub fn wallets(&self) -> Option<&BTreeMap<String, WalletConfig>> {
         self.wallets.as_ref().map(|w| &w.wallets)
+    }
+
+    #[must_use]
+    pub fn build_settings(&self) -> Option<&BuildSettings> {
+        self.build.as_ref()
     }
 
     #[must_use]

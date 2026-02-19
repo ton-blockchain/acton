@@ -21,6 +21,7 @@ pub fn build_cmd(
     clear_cache: bool,
     graph_output: Option<String>,
     out_dir: Option<String>,
+    output_fift: Option<String>,
     show_info: bool,
 ) -> anyhow::Result<()> {
     stdlib::ensure_latest(Path::new("."))?;
@@ -29,7 +30,16 @@ pub fn build_cmd(
     // since first compilation WITHOUT debug mode will set debug=false forever
     enable_emulator_debug_mode()?;
 
-    let out_dir = out_dir.unwrap_or_else(|| "build".to_string());
+    let config = ActonConfig::load()?;
+    let out_dir = out_dir
+        .or_else(|| config.build_settings().and_then(|build| build.out_dir.clone()))
+        .unwrap_or_else(|| "build".to_string());
+    let output_fift = output_fift
+        .or_else(|| {
+            config
+                .build_settings()
+                .and_then(|build| build.output_fift.clone())
+        });
 
     if !Path::new(&out_dir).exists() {
         fs::create_dir_all(&out_dir)?;
@@ -42,8 +52,6 @@ pub fn build_cmd(
     }
 
     println!("   {} contracts", "Compiling".green().bold());
-
-    let config = ActonConfig::load()?;
 
     let contracts = match config.contracts() {
         Some(contracts) => contracts,
@@ -121,9 +129,9 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
             &config,
         )?;
 
-        let (code_boc64, code_hash) =
+        let (code_boc64, code_hash, code_fift) =
             match process_contract(&mut file_cache, contract_config, contract_path, &config) {
-                Ok((code, hash)) => (code, hash),
+                Ok((code, hash, fift)) => (code, hash, fift),
                 Err(err) => {
                     failure_count += 1;
                     compile_errors.insert(parent_contract.clone(), err);
@@ -146,6 +154,15 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
                 "Warning: Failed to save build artifact file for {}: {}",
                 contract_config.name, e
             );
+        }
+
+        if let Some(output_dir) = output_fift.as_deref() && !code_fift.is_empty() {
+            if let Err(e) = save_fift_artifact(output_dir, &parent_contract, &code_fift) {
+                eprintln!(
+                    "Warning: Failed to save Fift artifact for {}: {}",
+                    contract_config.name, e
+                );
+            }
         }
 
         if let Err(e) = save_boc_file(contract_config, &code_boc64) {
@@ -196,14 +213,14 @@ fn process_contract(
     contract_config: &ContractConfig,
     contract_path: &String,
     acton_config: &ActonConfig,
-) -> anyhow::Result<(String, String)> {
-    let (code_boc64, code_hash) = if contract_path.ends_with(".boc") {
+) -> anyhow::Result<(String, String, String)> {
+    let (code_boc64, code_hash, code_fift) = if contract_path.ends_with(".boc") {
         debug!("Loading BoC file: {contract_path}");
         match fs::read(contract_path) {
             Ok(boc_data) => match Boc::decode(&boc_data) {
                 Ok(boc) => {
                     let code_boc64 = Boc::encode_base64(&boc);
-                    (code_boc64, boc.repr_hash().to_string())
+                    (code_boc64, boc.repr_hash().to_string(), String::new())
                 }
                 Err(e) => {
                     anyhow::bail!("Failed to decode BoC file {contract_path}: {e}");
@@ -218,7 +235,11 @@ fn process_contract(
 
         if let Some(cached_result) = cached_result {
             debug!("Cache hit, use cached result for '{contract_path}'");
-            (cached_result.code_boc64, cached_result.code_hash_hex)
+            (
+                cached_result.code_boc64,
+                cached_result.code_hash_hex,
+                cached_result.fift_code,
+            )
         } else {
             debug!("Cache miss, recompile '{contract_path}'");
             let compile_start = Instant::now();
@@ -241,7 +262,7 @@ fn process_contract(
 
                     println!("    {} in {:?}", "Finished".green(), compile_time);
 
-                    (result.code_boc64, result.code_hash_hex)
+                    (result.code_boc64, result.code_hash_hex, result.fift_code)
                 }
                 tolkc::CompilerResult::Error(error) => {
                     anyhow::bail!(error.message);
@@ -249,7 +270,23 @@ fn process_contract(
             }
         }
     };
-    Ok((code_boc64, code_hash))
+    Ok((code_boc64, code_hash, code_fift))
+}
+
+fn save_fift_artifact(
+    output_dir: &str,
+    contract_key: &str,
+    code_fift: &str,
+) -> anyhow::Result<()> {
+    let dir = Path::new(output_dir);
+    if !dir.exists() {
+        fs::create_dir_all(dir)?;
+    }
+
+    let filename = format!("{contract_key}.fif");
+    let path = dir.join(filename);
+    fs::write(path, code_fift)?;
+    Ok(())
 }
 
 fn save_boc_file(contract_config: &ContractConfig, code_boc64: &str) -> anyhow::Result<()> {

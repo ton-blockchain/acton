@@ -53,6 +53,21 @@ acton build --out-dir artifacts/
 
 ## Acton.toml Configuration
 
+### Build Section
+
+You can set build output paths in the `[build]` section:
+
+```toml
+[build]
+out-dir = "build"
+output-fift = "build/fift"
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `out-dir` | string | no | Directory for `acton build` JSON artifacts (defaults to `build/`) |
+| `output-fift` | string | no | Directory for generated Fift output files (defaults to disabled) |
+
 ### Contracts Section
 
 Contracts are defined using `[contracts.*]` sections where `*` is the contract key.
