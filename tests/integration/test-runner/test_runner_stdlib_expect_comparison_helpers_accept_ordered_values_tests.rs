@@ -160,8 +160,7 @@ get fun `test-ad-stdlib-rel-approx-positive-above-boundary`() {
 }
 
 #[test]
-fn expect_rel_approx_with_zero_actual_and_non_zero_expected_fails_with_assertion_message()
-{
+fn expect_rel_approx_with_zero_actual_and_non_zero_expected_fails_with_assertion_message() {
     run_expect_success(
         "ad-stdlib-expect-rel-approx-zero-actual",
         r#"

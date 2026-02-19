@@ -62,8 +62,7 @@ fn assert_fail_wallet_not_found_direct_call_without_wallets_shows_setup_hint() {
 }
 
 #[test]
-fn assert_fail_wallet_not_found_direct_call_with_loaded_wallets_lists_available_wallets()
-{
+fn assert_fail_wallet_not_found_direct_call_with_loaded_wallets_lists_available_wallets() {
     let location = "scripts/el_assert_fail_wallet_not_found.tolk:5:5";
     let home_temp = TempDir::new().expect("failed to create HOME tempdir");
     let home = home_temp

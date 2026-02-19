@@ -1,0 +1,4 @@
+Error: In absolute_nested_missing_target:
+
+Failed to locate [ROOT]/contracts/missing_root/deeper/../../absolute_nested_missing_target.tolk: [NOT_FOUND]
+Build failed with 1 error

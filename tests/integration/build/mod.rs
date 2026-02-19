@@ -1,0 +1,10 @@
+mod build_cmd_cache_reuse_tests;
+mod build_cmd_contract_path_resolution_tests;
+mod build_cmd_contract_selection_tests;
+mod build_cmd_dependencies_cycle_tests;
+mod build_cmd_dependencies_order_tests;
+mod build_cmd_diagnostics_tests;
+mod build_cmd_output_boc_tests;
+mod build_cmd_output_graph_tests;
+mod build_cmd_project_config_edge_tests;
+mod build_cmd_rebuild_after_source_change_tests;

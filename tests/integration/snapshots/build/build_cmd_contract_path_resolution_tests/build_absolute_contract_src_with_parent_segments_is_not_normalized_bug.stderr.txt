@@ -1,0 +1,4 @@
+Error: In absolute_normalized_target:
+
+Failed to locate [ROOT]/contracts/nested/../absolute_normalized_target.tolk: [NOT_FOUND]
+Build failed with 1 error

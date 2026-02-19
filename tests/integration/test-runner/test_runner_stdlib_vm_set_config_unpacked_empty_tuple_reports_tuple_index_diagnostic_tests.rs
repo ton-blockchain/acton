@@ -48,8 +48,7 @@ get fun `test-dl-vm-set-config-unpacked-empty-tuple-diagnostic`() {
 }
 
 #[test]
-fn vm_set_config_unpacked_single_item_tuple_reports_tuple_index_diagnostic_in_fixture_project()
- {
+fn vm_set_config_unpacked_single_item_tuple_reports_tuple_index_diagnostic_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
     let test_path = "tests/dl_vm_set_config_unpacked_single_item_malformed.test.tolk";
     let source = format!(

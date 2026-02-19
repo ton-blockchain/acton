@@ -1,0 +1,7 @@
+error: unexpected argument '--contract' found
+
+  tip: to pass '--contract' as a value, use '-- --contract'
+
+Usage: acton build [OPTIONS] [CONTRACT_ID]
+
+For more information, try '--help'.

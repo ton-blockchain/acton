@@ -31,8 +31,7 @@ fn run_find_external_out_message_success(project_name: &str, test_body: &str, sn
 }
 
 #[test]
-fn find_external_out_message_typed_branch_reports_tuple_get_type_argument_compile_error()
-{
+fn find_external_out_message_typed_branch_reports_tuple_get_type_argument_compile_error() {
     run_find_external_out_message_success(
         "en-stdlib-find-external-out-message-typed-branch-bug",
         r#"
@@ -48,8 +47,7 @@ get fun `test-en-find-external-out-message-typed-branch-bug`() {
 }
 
 #[test]
-fn find_external_out_message_default_branch_reports_tuple_get_type_argument_compile_error()
- {
+fn find_external_out_message_default_branch_reports_tuple_get_type_argument_compile_error() {
     run_find_external_out_message_success(
         "en-stdlib-find-external-out-message-default-branch-bug",
         r#"

@@ -125,8 +125,7 @@ fn expect_to_end_with_exit_code_last_call_wins() {
 }
 
 #[test]
-fn expect_to_end_with_exit_code_conditional_path_without_expect_fails_with_raw_exit_code()
-{
+fn expect_to_end_with_exit_code_conditional_path_without_expect_fails_with_raw_exit_code() {
     ProjectBuilder::new("m-lib-api-conditional-expect")
         .contract("simple", SIMPLE_CONTRACT)
         .test_file(

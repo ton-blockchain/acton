@@ -1,0 +1,3 @@
+Error: Contract --contract not found in Acton.toml
+Available contracts:
+ existing

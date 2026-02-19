@@ -1,0 +1,7 @@
+core
+orphan
+alpha
+beta
+delta
+gamma
+root

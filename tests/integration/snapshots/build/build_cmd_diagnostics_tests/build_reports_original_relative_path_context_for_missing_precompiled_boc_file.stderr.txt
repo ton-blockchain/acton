@@ -1,0 +1,4 @@
+Error: In missing_precompiled_with_segments:
+
+Failed to read BoC file ./contracts/nested/../missing/missing_precompiled_with_segments.boc: [NOT_FOUND]
+Build failed with 1 error

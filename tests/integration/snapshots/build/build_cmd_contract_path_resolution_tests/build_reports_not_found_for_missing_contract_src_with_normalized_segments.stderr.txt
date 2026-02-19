@@ -1,0 +1,4 @@
+Error: In missing_target:
+
+Failed to locate contracts/nested/../missing_target.tolk: [NOT_FOUND]
+Build failed with 1 error

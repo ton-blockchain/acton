@@ -1,0 +1,13 @@
+Error: In child:
+
+[ROOT]/contracts/child[LINE]: error: expected <expression>, got `;`
+   2 |     val childValue = ;
+     |                      ^
+
+In parent:
+
+[ROOT]/contracts/parent[LINE]: error: Failed to import: [NOT_FOUND]
+   1 | import "../gen/child_code.tolk"
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+Build failed with 2 errors

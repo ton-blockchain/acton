@@ -1,0 +1,16 @@
+Error: In a_parent:
+
+[ROOT]/contracts/a_parent[LINE]: error: Failed to import: [NOT_FOUND]
+   1 | import "../gen/child_code.tolk"
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+In child:
+
+[ROOT]/contracts/child[LINE]: error: expected <expression>, got `;`
+   2 |     val childValue = ;
+     |                      ^
+
+In m_invalid_boc:
+
+Failed to decode BoC file contracts/m_invalid_boc.boc: unknown BOC tag
+Build failed with 3 errors

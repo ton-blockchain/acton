@@ -1,0 +1,6 @@
+Error: TOML parse error at line 6, column 2
+  |
+6 | [contracts.child]
+  |  ^^^^^^^^^
+data did not match any variant of untagged enum ContractDependency
+

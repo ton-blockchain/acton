@@ -1,0 +1,10 @@
+core_a
+core_b
+core_c
+mid_left
+mid_right
+mid_mixed
+observer
+join_left
+join_right
+root

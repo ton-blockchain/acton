@@ -1,0 +1,10 @@
+Error: In aa_decode_failure:
+
+Failed to decode BoC file contracts/aa_decode_failure.boc: unknown BOC tag
+In zz_compile_failure:
+
+[ROOT]/contracts/zz_compile_failure[LINE]: error: expected <expression>, got `;`
+   2 |     val broken = ;
+     |                  ^
+
+Build failed with 2 errors

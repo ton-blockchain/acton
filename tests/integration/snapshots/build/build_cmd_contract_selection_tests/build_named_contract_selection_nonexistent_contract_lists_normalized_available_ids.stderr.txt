@@ -1,0 +1,5 @@
+Error: Contract missing_contract not found in Acton.toml
+Available contracts:
+ alpha
+ beta_contract
+ zeta

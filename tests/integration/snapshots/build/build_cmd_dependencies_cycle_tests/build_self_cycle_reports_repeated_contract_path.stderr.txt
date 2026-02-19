@@ -1,0 +1,1 @@
+Error: Circular dependency detected in contracts: self_ref → self_ref

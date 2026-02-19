@@ -1,0 +1,4 @@
+Error: In absolute_corner_target:
+
+Failed to locate [ROOT]/contracts/absolute_corner/nested/../absolute_corner_target.tolk: [NOT_FOUND]
+Build failed with 1 error

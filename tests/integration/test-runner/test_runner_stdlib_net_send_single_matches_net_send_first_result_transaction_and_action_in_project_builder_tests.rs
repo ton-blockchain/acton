@@ -63,8 +63,7 @@ fn run_project_success(project_name: &str, test_body: &str, snapshot_path: &str)
 }
 
 #[test]
-fn net_send_single_matches_net_send_first_result_transaction_and_action_in_project_builder()
- {
+fn net_send_single_matches_net_send_first_result_transaction_and_action_in_project_builder() {
     run_project_success(
         "df-stdlib-send-single-vs-send-first-result-project-builder",
         r#"
@@ -149,8 +148,7 @@ get fun `test-df-send-single-vs-send-first-result-project-builder`() {
 }
 
 #[test]
-fn net_send_single_matches_net_send_first_result_transaction_and_action_in_fixture_project()
- {
+fn net_send_single_matches_net_send_first_result_transaction_and_action_in_fixture_project() {
     let fixture = FixtureProject::load("basic");
 
     fs::write(

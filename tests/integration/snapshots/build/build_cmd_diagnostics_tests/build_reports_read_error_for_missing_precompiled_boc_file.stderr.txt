@@ -1,0 +1,4 @@
+Error: In missing_precompiled:
+
+Failed to read BoC file contracts/missing_precompiled.boc: [NOT_FOUND]
+Build failed with 1 error

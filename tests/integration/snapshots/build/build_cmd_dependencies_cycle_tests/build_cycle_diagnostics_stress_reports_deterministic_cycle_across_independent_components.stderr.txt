@@ -1,0 +1,1 @@
+Error: Circular dependency detected in contracts: aa2 → aa3 → aa1 → aa2

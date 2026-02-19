@@ -1,0 +1,7 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling base
+    Finished in [TIME]
+   Compiling target
+    Finished in [TIME]
+    Finished in [TIME]

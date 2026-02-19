@@ -1,0 +1,4 @@
+Error: In broken_precompiled:
+
+Failed to decode BoC file contracts/broken_precompiled.boc: unknown BOC tag
+Build failed with 1 error
