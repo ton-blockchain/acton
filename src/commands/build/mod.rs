@@ -30,7 +30,16 @@ pub fn build_cmd(
     // since first compilation WITHOUT debug mode will set debug=false forever
     enable_emulator_debug_mode()?;
 
-    let out_dir = out_dir.unwrap_or_else(|| "build".to_string());
+    let config = ActonConfig::load()?;
+    let out_dir = out_dir
+        .or_else(|| config.build_settings().and_then(|build| build.out_dir.clone()))
+        .unwrap_or_else(|| "build".to_string());
+    let output_fift = output_fift
+        .or_else(|| {
+            config
+                .build_settings()
+                .and_then(|build| build.output_fift.clone())
+        });
 
     if !Path::new(&out_dir).exists() {
         fs::create_dir_all(&out_dir)?;
@@ -43,16 +52,6 @@ pub fn build_cmd(
     }
 
     println!("   {} contracts", "Compiling".green().bold());
-
-    let config = ActonConfig::load()?;
-    let output_fift_dir = output_fift
-        .or_else(|| {
-            config
-                .build
-                .as_ref()
-                .and_then(|build| build.output_fift.clone())
-        })
-        .filter(|path| !path.is_empty());
 
     let contracts = match config.contracts() {
         Some(contracts) => contracts,
@@ -130,9 +129,9 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
             &config,
         )?;
 
-        let (code_boc64, code_hash, fift_code) =
+        let (code_boc64, code_hash, code_fift) =
             match process_contract(&mut file_cache, contract_config, contract_path, &config) {
-                Ok((code, hash, fift_code)) => (code, hash, fift_code),
+                Ok((code, hash, fift)) => (code, hash, fift),
                 Err(err) => {
                     failure_count += 1;
                     compile_errors.insert(parent_contract.clone(), err);
@@ -157,19 +156,18 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
             );
         }
 
+        if let Some(output_dir) = output_fift.as_deref() && !code_fift.is_empty() {
+            if let Err(e) = save_fift_artifact(output_dir, &parent_contract, &code_fift) {
+                eprintln!(
+                    "Warning: Failed to save Fift artifact for {}: {}",
+                    contract_config.name, e
+                );
+            }
+        }
+
         if let Err(e) = save_boc_file(contract_config, &code_boc64) {
             eprintln!(
                 "Warning: Failed to save cached BoC file for {}: {}",
-                contract_config.name, e
-            );
-        }
-
-        if let Some(output_fift_dir) = &output_fift_dir
-            && let Some(fift_code) = &fift_code
-            && let Err(e) = save_fift_file(output_fift_dir, &parent_contract, fift_code)
-        {
-            eprintln!(
-                "Warning: Failed to save Fift file for {}: {}",
                 contract_config.name, e
             );
         }
@@ -215,14 +213,14 @@ fn process_contract(
     contract_config: &ContractConfig,
     contract_path: &String,
     acton_config: &ActonConfig,
-) -> anyhow::Result<(String, String, Option<String>)> {
-    let (code_boc64, code_hash, fift_code) = if contract_path.ends_with(".boc") {
+) -> anyhow::Result<(String, String, String)> {
+    let (code_boc64, code_hash, code_fift) = if contract_path.ends_with(".boc") {
         debug!("Loading BoC file: {contract_path}");
         match fs::read(contract_path) {
             Ok(boc_data) => match Boc::decode(&boc_data) {
                 Ok(boc) => {
                     let code_boc64 = Boc::encode_base64(&boc);
-                    (code_boc64, boc.repr_hash().to_string(), None)
+                    (code_boc64, boc.repr_hash().to_string(), String::new())
                 }
                 Err(e) => {
                     anyhow::bail!("Failed to decode BoC file {contract_path}: {e}");
@@ -240,7 +238,7 @@ fn process_contract(
             (
                 cached_result.code_boc64,
                 cached_result.code_hash_hex,
-                Some(cached_result.fift_code),
+                cached_result.fift_code,
             )
         } else {
             debug!("Cache miss, recompile '{contract_path}'");
@@ -264,11 +262,7 @@ fn process_contract(
 
                     println!("    {} in {:?}", "Finished".green(), compile_time);
 
-                    (
-                        result.code_boc64,
-                        result.code_hash_hex,
-                        Some(result.fift_code),
-                    )
+                    (result.code_boc64, result.code_hash_hex, result.fift_code)
                 }
                 tolkc::CompilerResult::Error(error) => {
                     anyhow::bail!(error.message);
@@ -276,7 +270,23 @@ fn process_contract(
             }
         }
     };
-    Ok((code_boc64, code_hash, fift_code))
+    Ok((code_boc64, code_hash, code_fift))
+}
+
+fn save_fift_artifact(
+    output_dir: &str,
+    contract_key: &str,
+    code_fift: &str,
+) -> anyhow::Result<()> {
+    let dir = Path::new(output_dir);
+    if !dir.exists() {
+        fs::create_dir_all(dir)?;
+    }
+
+    let filename = format!("{contract_key}.fif");
+    let path = dir.join(filename);
+    fs::write(path, code_fift)?;
+    Ok(())
 }
 
 fn save_boc_file(contract_config: &ContractConfig, code_boc64: &str) -> anyhow::Result<()> {
@@ -313,30 +323,6 @@ fn save_build_artifact(
     let filename = format!("{contract_key}.json");
     let path = Path::new(out_dir).join(filename);
     fs::write(path, serde_json::to_string_pretty(&json_data)?)?;
-
-    Ok(())
-}
-
-fn save_fift_file(
-    output_fift_dir: &str,
-    contract_key: &str,
-    fift_code: &str,
-) -> anyhow::Result<()> {
-    let filename = format!("{contract_key}.fif");
-    let path = Path::new(output_fift_dir).join(filename);
-
-    if let Some(parent_dir) = path.parent()
-        && let Err(err) = fs::create_dir_all(parent_dir)
-    {
-        anyhow::bail!(
-            "Failed to create directory for Fift file {}: {}",
-            parent_dir.display(),
-            err
-        );
-    }
-
-    fs::write(&path, fift_code)
-        .map_err(|err| anyhow!("Failed to save Fift file {}: {}", path.display(), err))?;
 
     Ok(())
 }

@@ -3,12 +3,18 @@
   "title": "Acton Configuration Schema",
   "description": "JSON schema for Acton.toml configuration file",
   "type": "object",
-  "required": ["package"],
+  "required": [
+    "package"
+  ],
   "properties": {
     "package": {
       "type": "object",
       "description": "Package metadata for the Acton project",
-      "required": ["name", "description", "version"],
+      "required": [
+        "name",
+        "description",
+        "version"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -38,7 +44,10 @@
       "description": "Custom network configurations",
       "additionalProperties": {
         "type": "object",
-        "required": ["v2-url", "v3-url"],
+        "required": [
+          "v2-url",
+          "v3-url"
+        ],
         "properties": {
           "v2-url": {
             "type": "string",
@@ -64,7 +73,12 @@
           "description": "List of test reporters to use",
           "items": {
             "type": "string",
-            "enum": ["console", "teamcity", "junit", "dot"]
+            "enum": [
+              "console",
+              "teamcity",
+              "junit",
+              "dot"
+            ]
           }
         },
         "debug": {
@@ -170,11 +184,15 @@
     },
     "build": {
       "type": "object",
-      "description": "Default settings for the build command",
+      "description": "Build options for acton build",
       "properties": {
+        "out-dir": {
+          "type": "string",
+          "description": "Output directory for build artifacts"
+        },
         "output-fift": {
           "type": "string",
-          "description": "Directory where per-contract compiled Fift files are saved"
+          "description": "Directory where .fif artifacts are written"
         }
       }
     },
@@ -183,7 +201,10 @@
       "description": "Definition of contracts in the project",
       "additionalProperties": {
         "type": "object",
-        "required": ["name", "src"],
+        "required": [
+          "name",
+          "src"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -205,7 +226,9 @@
                 {
                   "type": "object",
                   "description": "Detailed dependency configuration",
-                  "required": ["name"],
+                  "required": [
+                    "name"
+                  ],
                   "properties": {
                     "name": {
                       "type": "string",
@@ -214,7 +237,10 @@
                     "kind": {
                       "type": "string",
                       "description": "Dependency type",
-                      "enum": ["embed_code", "library_ref"],
+                      "enum": [
+                        "embed_code",
+                        "library_ref"
+                      ],
                       "default": "embed_code"
                     },
                     "function": {
@@ -258,7 +284,11 @@
         "anyOf": [
           {
             "type": "string",
-            "enum": ["allow", "warn", "deny"],
+            "enum": [
+              "allow",
+              "warn",
+              "deny"
+            ],
             "description": "Global lint level for a rule"
           },
           {
@@ -266,7 +296,11 @@
             "description": "Contract-specific lint overrides",
             "additionalProperties": {
               "type": "string",
-              "enum": ["allow", "warn", "deny"]
+              "enum": [
+                "allow",
+                "warn",
+                "deny"
+              ]
             }
           }
         ]
