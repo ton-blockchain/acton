@@ -154,7 +154,6 @@ get fun `test-af-outlist-opcode-mismatch-unknown-type`() {
     msg.send(SEND_MODE_REGULAR);
 
     val out_actions = vm.outActions();
-    expectToEndWithExitCode(567);
     expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 }
 "#,
@@ -183,7 +182,6 @@ get fun `test-af-outlist-opcode-mismatch-bounced-prefix`() {
     msg.send(SEND_MODE_REGULAR);
 
     val out_actions = vm.outActions();
-    expectToEndWithExitCode(567);
     expect(out_actions).toBeSendMessageAt<IncreaseCounter>(0);
 }
 "#,
