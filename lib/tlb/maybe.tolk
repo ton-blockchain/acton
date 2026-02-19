@@ -34,7 +34,7 @@ fun Maybe<X>.some(value: X): Maybe<X> {
 /// Unwraps the Maybe, returning the contained value if present,
 /// or throws an exception if None.
 ///
-/// This is unsafe — use only when you're certain the value is present.
+/// This is unsafe. Use it only when you are certain the value is present.
 /// For safe access, use `unwrapOr` instead.
 ///
 /// # Throws

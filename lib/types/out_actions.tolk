@@ -183,7 +183,7 @@ type OutActionList = tuple
 ///
 /// NOTE: this list is reversed, so the last action is at index 0.
 ///
-/// Hard-fails with [Assert.fail] if the stored tuple element cannot be decoded as [OutAction].
+/// Fails with [Assert.fail] if the stored tuple element cannot be decoded as [OutAction].
 ///
 /// Example:
 /// ```tolk
@@ -267,7 +267,7 @@ fun vm.outActions(): OutActionList {
 /// Parses the out actions from the raw cell (like C5 register).
 ///
 /// If [cell] is empty (no bits and no refs), returns an empty tuple.
-/// Hard-fails with [Assert.fail] if list node layout is malformed.
+/// Fails with [Assert.fail] if list node layout is malformed.
 ///
 /// Example:
 /// ```tolk

@@ -71,7 +71,7 @@ Returns `null` for malformed or too-short body data:
 - skipBounce is true, first opcode is `0xFFFFFFFF`, and fewer than 32 bits remain
   for the second opcode.
 
-If skipBounce is true, the 0xFFFFFFFF prefix is skipped.
+If skipBounce is true, the `0xFFFFFFFF` prefix is skipped.
 
 Example:
 ```tolk
@@ -112,7 +112,7 @@ Loads the opcode of the message.
 
 Same behavior as [MessageRelaxedGeneric.loadOpcode](#messagerelaxedgenericloadopcode):
 - returns the first 32-bit opcode by default;
--  If skipBounce is true, the 0xFFFFFFFF prefix is skipped.;
+- if skipBounce is true, the `0xFFFFFFFF` prefix is skipped;
 - returns `null` for malformed or too-short body data.
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L86" />

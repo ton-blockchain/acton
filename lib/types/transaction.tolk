@@ -103,7 +103,7 @@ fun Transaction.loadInMsg<Msg>(self) {
 
 /// Returns consumed gas for ordinary transactions with VM compute phase.
 ///
-/// Hard-fails with [Assert.fail]:
+/// Fails with [Assert.fail]:
 /// - if `description` is not [TransOrd];
 /// - if `description.computePh` is [TrComputeSkipped].
 fun Transaction.getUsedGas(self) {

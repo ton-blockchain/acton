@@ -52,7 +52,7 @@ struct MessageRelaxedGeneric {
 /// - [skipBounce] is true, first opcode is `0xFFFFFFFF`, and fewer than 32 bits remain
 ///   for the second opcode.
 ///
-/// If [skipBounce] is true, the 0xFFFFFFFF prefix is skipped.
+/// If [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped.
 ///
 /// Example:
 /// ```tolk
@@ -81,7 +81,7 @@ struct ExtMessageRelaxedGeneric {
 ///
 /// Same behavior as [MessageRelaxedGeneric.loadOpcode]:
 /// - returns the first 32-bit opcode by default;
-/// -  If [skipBounce] is true, the 0xFFFFFFFF prefix is skipped.;
+/// - if [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped;
 /// - returns `null` for malformed or too-short body data.
 fun ExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
     return implMsg.loadOpcode(self.body, skipBounce);

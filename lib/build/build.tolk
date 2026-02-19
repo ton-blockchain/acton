@@ -18,7 +18,7 @@
 /// val cell = build("jetton-wallet");
 /// ```
 ///
-/// If `path` is non-empty, Acton.toml lookup is skipped and that path is used directly.
+/// If `path` is non-empty, `Acton.toml` lookup is skipped and that path is used directly.
 /// The path can point to:
 /// - a `.tolk` file (compiled, with in-memory and `.acton/cache` caching),
 /// - a `.boc` file (loaded directly as code cell, without compilation).
@@ -33,5 +33,5 @@
 /// val cell = build("jetton-wallet", "build/jetton-wallet.boc");
 /// ```
 ///
-/// Note that the path should be absolute or relative to the root project directory with Acton.toml.
+/// The path should be absolute or relative to the project root (the directory with `Acton.toml`).
 fun build(name: string, path: string = ""): cell asm "6 EXTCALL"

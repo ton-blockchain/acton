@@ -158,7 +158,7 @@ fun Transaction.getUsedGas(self)
 
 Returns consumed gas for ordinary transactions with VM compute phase.
 
-Hard-fails with [Assert.fail](../../testing/assert/#assertfail):
+Fails with [Assert.fail](../../testing/assert/#assertfail):
 - if `description` is not [TransOrd](#transord);
 - if `description.computePh` is [TrComputeSkipped](#trcomputeskipped).
 
