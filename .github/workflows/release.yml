@@ -25,15 +25,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Cache Cargo
-        uses: actions/cache/restore@v5
+        uses: ubicloud/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-
+          save-if: false
 
       - name: Install Rust
         run: rustup toolchain install
@@ -53,7 +47,7 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: actions/cache/restore@v5
+        uses: ubicloud/cache/restore@v4
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
