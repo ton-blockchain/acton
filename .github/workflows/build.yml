@@ -39,6 +39,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
 
+
       - name: Install Rust
         run: rustup toolchain install
 
