@@ -5,7 +5,7 @@
 /// `string`, `slice`, `address`, and `cell`.
 ///
 /// `env<T>`/`envOr<T>` support only these types. For unsupported generic `T`, execution fails
-/// via `Assert.fail(...)`.
+/// via [Assert.fail].
 ///
 /// Note for `bool`: when a variable is present, only `"true"` and `"1"` (case-insensitive) map
 /// to `true`; any other present value maps to `false`.
@@ -43,7 +43,7 @@ import "testing/assert"
 /// - `address`: parsed as a TON address (raw or user-friendly).
 /// - `cell`: parsed from base64 or hex encoded BoC.
 ///
-/// Unsupported generic types do not return `null` and instead fail via `Assert.fail(...)`.
+/// Unsupported generic types do not return `null` and instead fail via [Assert.fail].
 ///
 /// Example:
 /// ```tolk
@@ -66,7 +66,7 @@ fun env<T>(name: string): T? {
 /// - `cell`: parsed from base64 or hex encoded BoC.
 ///
 /// For `envOr<bool>`, a present but non-boolean value becomes `false`, so `default` is not used.
-/// Unsupported generic types fail via `Assert.fail(...)` before `default` can be applied.
+/// Unsupported generic types fail via [Assert.fail] before `default` can be applied.
 ///
 /// Example:
 /// ```tolk
