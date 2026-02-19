@@ -47,9 +47,20 @@ fun println<T>(value: T): void {
 /// println1("Hello, 0x{:x}", 10);
 /// ```
 ///
-/// Format supports following format soecifiers:
-/// - `{:x}` — formats a number as hexadecimal without `0x` prefix
-/// - `{:ton}` — formats a number as TON value (e.g `0.11 TON`)
+/// Format supports the following placeholders:
+/// - `{}` - default formatter output
+/// - `{:x}` - formats an int as lowercase hexadecimal without `0x` prefix
+/// - `{:ton}` - formats an int amount in nanotons as `<value> TON`
+///
+/// Notes:
+/// - Escape literal braces with `{{` and `}}`.
+/// - Invalid format strings fail at runtime with parser errors that include byte positions
+///   (for example: unknown modifiers, unsupported placeholder payload, unclosed `{`,
+///   unmatched `}`).
+/// - If placeholders outnumber arguments, unmatched placeholders stay in output as text.
+/// - If arguments outnumber placeholders, extra arguments are ignored.
+/// - For non-int arguments, `{:x}` and `{:ton}` fall back to the same behavior as `{}`.
+/// - `{:ton}` uses floating-point conversion, so very large values can be rounded.
 fun println1<T>(fmt: string, value: T): void {
     println(format1(fmt, value))
 }

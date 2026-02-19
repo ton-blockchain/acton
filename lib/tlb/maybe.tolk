@@ -35,7 +35,11 @@ fun Maybe<X>.some(value: X): Maybe<X> {
 /// or throws an exception if None.
 ///
 /// This is unsafe — use only when you're certain the value is present.
-/// For safe access, use `unwrap_or` instead.
+/// For safe access, use `unwrapOr` instead.
+///
+/// # Throws
+///
+/// - Throws exit code `7` when called on `None`.
 ///
 /// Example:
 /// ```tolk
@@ -57,7 +61,7 @@ fun Maybe<X>.unwrap(self): X {
 /// Example:
 /// ```tolk
 /// val maybeValue = Maybe<slice>.none();
-/// val name = maybeValue.unwrap_or("default"); // Returns "default"
+/// val name = maybeValue.unwrapOr("default"); // Returns "default"
 /// ```
 fun Maybe<X>.unwrapOr(self, default: X): X {
     if (self is None) {

@@ -1,12 +1,16 @@
-/// Module for building contracts.
+/// Module for building contract code cells.
 ///
-/// This module provides the capability to compile Tolk contracts dynamically during the execution of tests or scripts.
-/// It interfaces with the Tolk compiler to generate the code cell for a given contract.
+/// `build(name, path)` can compile a `.tolk` contract or load a prebuilt `.boc` file.
+/// For `.tolk` sources, build results are cached in-memory for the current run and
+/// persisted in `.acton/cache` for reuse across runs.
 
 /// Build a contract with a specified name and optional path.
 ///
-/// If path is ommited, Acton will search for a contract with the given name in the Acton.toml file.
-/// If no contract with the given name is found, test will fail.
+/// `name` is the contract id key in `Acton.toml` (`[contracts.<id>]`), not the display
+/// name stored in `[contracts.<id>].name`.
+///
+/// If `path` is omitted (empty string), Acton looks up the contract id in `Acton.toml`.
+/// If no contract with that id is found, execution fails.
 ///
 /// Example:
 ///
@@ -14,11 +18,19 @@
 /// val cell = build("jetton-wallet");
 /// ```
 ///
-/// If you want to build a contract from a specific path, provide the path as the second argument.
+/// If `path` is non-empty, Acton.toml lookup is skipped and that path is used directly.
+/// The path can point to:
+/// - a `.tolk` file (compiled, with in-memory and `.acton/cache` caching),
+/// - a `.boc` file (loaded directly as code cell, without compilation).
 ///
 /// Example:
 /// ```tolk
 /// val cell = build("jetton-wallet", "contracts/jetton-wallet-contract.tolk");
+/// ```
+///
+/// Example with prebuilt code:
+/// ```tolk
+/// val cell = build("jetton-wallet", "build/jetton-wallet.boc");
 /// ```
 ///
 /// Note that the path should be absolute or relative to the root project directory with Acton.toml.

@@ -30,7 +30,8 @@ struct (0b01) Frozen
 struct (0b10) Active
 struct (0b11) NonExisting
 
-/// Represents possible account statuses.
+/// Type alias for transaction account status values used by [Transaction.origStatus] and
+/// [Transaction.endStatus].
 type AccountStatus = Uninitialized | Frozen | Active | NonExisting
 
 /// Represents depth and balance information for split accounts.
@@ -69,7 +70,11 @@ struct (0b0111) Transaction {
 
 /// Loads the in message body of the transaction with given type.
 ///
-/// Note that if message type mismatch, loading will fail with exit code 63.
+/// Fails if transaction has no inbound message (`messages.inMsg` is `None`), because this
+/// method unwraps it before typed decoding.
+///
+/// After an inbound message exists, if message type does not match `Msg`, loading fails with
+/// exit code 63.
 ///
 /// Example:
 /// ```tolk
@@ -86,13 +91,21 @@ fun Transaction.loadBody<Msg>(self) {
 
 /// Loads the in message of the transaction with given type.
 ///
-/// Note that if message type mismatch, loading will fail with exit code 63.
+/// Fails if transaction has no inbound message (`messages.inMsg` is `None`), because this
+/// method unwraps it before typed decoding.
+///
+/// After an inbound message exists, if message type does not match `Msg`, loading fails with
+/// exit code 63.
 fun Transaction.loadInMsg<Msg>(self) {
     val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
     return inMsgCell.load()
 }
 
-/// Returns consumed gas for transaction.
+/// Returns consumed gas for ordinary transactions with VM compute phase.
+///
+/// Hard-fails with [Assert.fail]:
+/// - if `description` is not [TransOrd];
+/// - if `description.computePh` is [TrComputeSkipped].
 fun Transaction.getUsedGas(self) {
     val description = self.description.load();
     if (description is TransOrd) {
@@ -106,7 +119,12 @@ fun Transaction.getUsedGas(self) {
     }
 }
 
-/// Returns fee for action phase of the transaction.
+/// Returns action-phase fee based on [Transaction.description] variant.
+///
+/// Behavior by variant:
+/// - [TransOrd] and [TransTickTock] with `action = Some`: returns `action.totalActionFees`;
+/// - [TransOrd] and [TransTickTock] with `action = None`: returns `None`;
+/// - all other [TransactionDescr] variants: returns `None`.
 fun Transaction.getActionFee(self): Maybe<coins> {
     val descr = self.description.load();
     if (descr is TransOrd) {

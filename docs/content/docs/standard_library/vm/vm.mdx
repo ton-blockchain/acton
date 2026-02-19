@@ -116,8 +116,12 @@ Set the blockchain configuration root dictionary.
 
 This function allows you to override the configuration root dictionary (parameter 9) in the VM state.
 The config root is a dictionary containing blockchain configuration parameters.
+It writes C7 slot 9 only.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L60" />
+Note that this does not recompute unpacked config in C7 slot 14.
+After [vm.setConfigRootDict](#vmsetconfigrootdict), [vm.getConfigUnpacked](#vmgetconfigunpacked) can still return stale values.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L64" />
 
 ## `CONFIG_UNPACKED_INDEX`
 
@@ -125,7 +129,7 @@ The config root is a dictionary containing blockchain configuration parameters.
 const CONFIG_UNPACKED_INDEX = 14
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L69" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L73" />
 
 ## `vm.setConfigUnpacked`
 
@@ -137,8 +141,13 @@ Set the unpacked configuration parameters tuple.
 
 This function allows you to override the unpacked configuration parameters (parameter 14) in the VM state.
 The unpacked config contains a tuple of configuration values extracted from the config dictionary.
+It writes C7 slot 14 directly and does not validate tuple shape.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L75" />
+Use [vm.getConfigUnpacked](#vmgetconfigunpacked) as a template for expected tuple layout.
+If this tuple is malformed (for example, too short), later operations that assume
+specific indices can fail with runtime errors such as `tuple index out of range`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L84" />
 
 ## `vm.getConfigUnpacked`
 
@@ -149,14 +158,15 @@ fun vm.getConfigUnpacked()
 Get the unpacked configuration parameters tuple.
 
 Retrieves the unpacked configuration parameters (parameter 14) from the current VM state.
-Returns a tuple of configuration values.
+Returns a tuple of configuration values from C7 slot 14 as-is.
+This value is independent from C7 slot 9 set via [vm.setConfigRootDict](#vmsetconfigrootdict).
 
 Example:
 ```tolk
 val unpacked = vm.getConfigUnpacked();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L93" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L103" />
 
 ## `vm.setTime`
 
@@ -166,7 +176,9 @@ fun vm.setTime(now: int)
 
 Override `blockchain.now()` for deterministic testing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L101" />
+Writes C7 parameter tuple slot 3 and affects `blockchain.now()` reads.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L113" />
 
 ## `vm.setBlockLogicalTime`
 
@@ -176,7 +188,10 @@ fun vm.setBlockLogicalTime(blockLogicalTime: int)
 
 Override the **block** logical time.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L106" />
+Writes C7 parameter tuple slot 4.
+Does not change slots 3 (`now`) or 5 (`logical time`).
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L121" />
 
 ## `vm.setLogicalTime`
 
@@ -186,7 +201,10 @@ fun vm.setLogicalTime(logicalTime: int)
 
 Override the **transaction** logical time.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L111" />
+Writes C7 parameter tuple slot 5.
+Does not change slots 3 (`now`) or 4 (`block logical time`).
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L129" />
 
 ## `vm.setOriginalBalance`
 
@@ -196,7 +214,9 @@ fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null)
 
 Override the original balance of the contract.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L116" />
+Writes C7 parameter tuple slot 7 as `[balance, extraCurrencies]`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L136" />
 
 ## `vm.registerLibrary`
 
@@ -206,7 +226,9 @@ fun vm.registerLibrary(cell: cell)
 
 Register a new library for current test.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L121" />
+Re-registering the same library cell is idempotent and does not change C5/C7.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L143" />
 
 ## `vm.convertAddress`
 
@@ -214,14 +236,20 @@ Register a new library for current test.
 fun vm.convertAddress(addr: string): address
 ```
 
-Convert a slice with string representation of address to an address type.
+Convert a string representation of address to an internal address value.
+
+Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
+(base64/base64url with flags).
+The returned value is normalized as an internal address; rendered formatting may
+differ from input flags, while representing the same account.
+Invalid input fails with an error like `Failed to convert address from <input>`.
 
 Example:
 ```tolk
-val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
+val address = vm.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L131" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L159" />
 
 ## `vm.cellFromHex`
 
@@ -229,5 +257,11 @@ val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5l
 fun vm.cellFromHex(cellHex: string): cell
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L136" />
+Decode a root cell from hex-encoded BOC bytes.
+
+`cellHex` must be a valid BOC serialized as hex.
+Invalid or malformed input (including non-BOC payloads) fails with an error like
+`Failed to decode cell hex <input>`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/vm/vm.tolk#L169" />
 

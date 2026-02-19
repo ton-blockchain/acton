@@ -114,14 +114,20 @@ be printed in the error message.
 fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int)
 ```
 
-Asserts that the function without arguments consumes less than the expected amount of gas.
+Asserts that the function without arguments consumes less than or equal to the expected amount of gas.
+Returns the callback result.
+
+Gas is compared using `end - start - 26`.
+The fixed `26` gas measurement overhead is subtracted before the `<= expected` check.
 
 Example:
 ```tolk
 get fun test_gas_consumption() {
-    Assert.consumesLessThan(fun do_something() {
+    val result = Assert.consumesLessThan(fun do_something() {
         // do something that consumes gas
+        return 42;
     }, 100);
+    Assert.equal(result, 42);
 }
 ```
 
@@ -129,7 +135,7 @@ If you need to pass arguments to the function, you can use the `consumesLessThan
 `consumesLessThan2` or `consumesLessThan3` functions which are similar to the `consumesLessThan`
 but accept arguments.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L118" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L124" />
 
 ## `Assert.consumesLessThan1`
 
@@ -137,21 +143,26 @@ but accept arguments.
 fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int)
 ```
 
-Asserts that the function with single argument consumes less than the expected amount of gas.
+Asserts that the function with a single argument consumes less than or equal to the expected amount of gas.
+Returns the callback result.
+
+Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
 
 Example:
 ```tolk
 get fun test_gas_consumption() {
-    Assert.consumesLessThan1(fun do_something(a: int, b: int) {
+    val result = Assert.consumesLessThan1(fun do_something(a: int) {
         // do something that consumes gas
+        return a + 1;
     }, 100, 100);
-//     ^^^  ^^^ this argument will be passed to the function as the second argument
-//     |
-//     this argument will be passed to the function as the first argument
+//     ^^^  ^^^
+//     |    expected max gas (inclusive)
+//     callback argument `a`
+    Assert.equal(result, 101);
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L139" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L150" />
 
 ## `Assert.consumesLessThan2`
 
@@ -164,23 +175,27 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
 )
 ```
 
-Asserts that the function with two arguments consumes less than the expected amount of gas.
+Asserts that the function with two arguments consumes less than or equal to the expected amount of gas.
+Returns the callback result.
+
+Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
 
 Example:
 ```tolk
 get fun test_gas_consumption() {
-    Assert.consumesLessThan2(fun do_something(a: int, b: int) {
+    val result = Assert.consumesLessThan2(fun do_something(a: int, b: int) {
         // do something that consumes gas
-    }, 100, 100, 100);
-//     ^^^  ^^^  ^^^ this argument will be passed to the function as the third argument
-//     |    |
-//     |    this argument will be passed to the function as the second argument
-//     |
-//     this argument will be passed to the function as the first argument
+        return a + b;
+    }, 10, 20, 100);
+//     ^^  ^^  ^^^
+//     |   |   expected max gas (inclusive)
+//     |   callback argument `b`
+//     callback argument `a`
+    Assert.equal(result, 30);
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L162" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L177" />
 
 ## `Assert.consumesLessThan3`
 
@@ -194,25 +209,28 @@ fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
 )
 ```
 
-Asserts that the function with three arguments consumes less than the expected amount of gas.
+Asserts that the function with three arguments consumes less than or equal to the expected amount of gas.
+Returns the callback result.
+
+Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
 
 Example:
 ```tolk
 get fun test_gas_consumption() {
-    Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
+    val result = Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
         // do something that consumes gas
-    }, 100, 100, 100, 100);
-//     ^^^  ^^^  ^^^  ^^^ this argument will be passed to the function as the fourth argument
-//     |    |    |
-//     |    |    this argument will be passed to the function as the third argument
-//     |    |
-//     |    this argument will be passed to the function as the second argument
-//     |
-//     this argument will be passed to the function as the first argument
+        return a + b + c;
+    }, 10, 20, 30, 100);
+//     ^^  ^^  ^^  ^^^
+//     |   |   |   expected max gas (inclusive)
+//     |   |   callback argument `c`
+//     |   callback argument `b`
+//     callback argument `a`
+    Assert.equal(result, 60);
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L192" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L210" />
 
 ## `Assert.failWalletNotFound`
 
@@ -227,7 +245,7 @@ It provides detailed information about available wallets and instructions on how
 
 NOT FOR PUBLIC USE.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L212" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L230" />
 
 ## `Assert.equalDecimal`
 
@@ -244,5 +262,5 @@ be printed in the error message.
 This is a low-level function. Expectation API provides a higher-level interface
 with automatic location tracking.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L225" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/assert.tolk#L243" />
 

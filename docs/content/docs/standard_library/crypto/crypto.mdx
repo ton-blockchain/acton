@@ -78,13 +78,13 @@ fun Mnemonic.toKeyPair(self): KeyPair
 
 Derives an Ed25519 [KeyPair](#keypair) from a mnemonic phrase.
 
-The `words` parameter must be a tuple of 24 valid BIP39 mnemonic words,
-as returned by [crypto.createMnemonic](#cryptocreatemnemonic).
+`self` must be a Mnemonic (`array<string>`) of 24 valid BIP39 words,
+for example as returned by [crypto.createMnemonic](#cryptocreatemnemonic).
 
 Example:
 ```tolk
 val words = crypto.createMnemonic();
-val kp = words.toKeyPair(words);
+val kp = words.toKeyPair();
 // kp.privateKey — 32-byte seed
 // kp.publicKey  — 32-byte public key
 ```
@@ -139,14 +139,17 @@ fun crypto.getSecureRandomBytes(bytesNum: uint16): slice
 
 Generates cryptographically secure random bytes.
 
-Returns a slice containing `bytesNum` random bytes (1 to 128).
+Returns a slice containing `bytesNum` random bytes.
+
+Current accepted range is `1..127`.
+`0` and values `>= 128` fail.
 
 Example:
 ```tolk
 val randomBytes = crypto.getSecureRandomBytes(32);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L110" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L113" />
 
 ## `crypto.getFastRandomBytes`
 
@@ -166,5 +169,5 @@ Example:
 val bytes = crypto.getFastRandomBytes(16, 42);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L128" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L131" />
 

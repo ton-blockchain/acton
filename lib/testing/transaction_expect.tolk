@@ -4,6 +4,9 @@
 /// It allows verifying the outcome of network operations, such as checking if a transaction succeeded,
 /// if a contract was deployed, or if specific messages were emitted.
 ///
+/// Matchers accept `SearchParams`; all non-null fields are used as filters.
+/// Generic matcher variants (`<Msg>`) additionally inject opcode filtering from `Msg` declared prefix (if present).
+///
 /// Examples:
 /// ```tolk
 /// val results = net.send(wallet.address, msg);
@@ -23,7 +26,7 @@
 /// val failResults = net.send(wallet.address, invalidMsg);
 /// expect(failResults).toHaveFailedTx({
 ///     to: contract.address,
-///     exit_code: 102 // specific error code
+///     exitCode: 102 // specific error code
 /// });
 /// ```
 
@@ -37,6 +40,7 @@ import "../ffi/ffi"
 /// Expect the transaction list to have a successful deploy transaction.
 ///
 /// Transaction is considered as "deploy" if previous status was "NonExisting" and end status was "Active".
+/// If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
 ///
 /// Example:
 ///
@@ -67,8 +71,13 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params
 
 /// Expect the transaction list to have a successful transaction.
 ///
-/// Transaction is considered as "successful" if exit code is 0, but exit code
-/// can be overridden by the `exitCode` parameter.
+/// Matcher sets `params.success = true`.
+/// Runtime "success" means both compute phase and action phase are successful.
+///
+/// By default matcher also requires `params.exitCode = 0` when `exitCode` is not provided.
+/// This default can be overridden with explicit `params.exitCode`.
+///
+/// If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
 ///
 /// Example:
 /// ```tolk
@@ -101,11 +110,16 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: Se
 
 /// Expect the transaction list to have a transaction with specified parameters.
 ///
+/// All non-null `SearchParams` fields are applied as filters.
+///
+/// If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
+///
 /// Example:
 /// ```tolk
 /// expect(txs).toHaveTx({
 ///     from: deployer.address,
 ///     to: counter.address,
+///     actionExitCode: 37,
 /// });
 /// ```
 fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams = {}) {
@@ -182,14 +196,20 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: Searc
 }
 
 /// Expect the transaction list to have a **failed** transaction.
-/// Exit code in parameters must be set to non zero value.
+///
+/// This matcher sets `params.success = false`.
+/// `params.exitCode` is required and must be non-zero.
+/// If `exitCode` is null or `0`, matcher fails immediately before transaction search.
+///
+/// Any additional non-null `SearchParams` fields further narrow the search.
+/// If generic `Msg` is provided and has declared prefix, matcher also filters by `params.opcode`.
 ///
 /// Example:
 /// ```tolk
 /// expect(txs).toHaveFailedTx({
 ///     from: deployer.address,
 ///     to: counter.address,
-///     exit_code: 123,
+///     exitCode: 123,
 /// });
 /// ```
 fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: SearchParams = {}) {
