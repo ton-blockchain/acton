@@ -7,7 +7,7 @@
 
  TEST  [ROOT]
 
- > tests/ah_stdlib_network.test.tolk (1 test)
+ > tests/network.test.tolk (1 test)
   ✓ ah-stdlib-set-shard-account-copy-state [TIME]
 
  ✓ 1 passed in 1 file

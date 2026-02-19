@@ -7,14 +7,14 @@
 
  TEST  [ROOT]
 
- > tests/cc_stdlib_outlist_to_be_empty_non_empty_fail.test.tolk (1 test)
+ > tests/outlist_to_be_empty_non_empty_fail.test.tolk (1 test)
   ✗ cc-outlist-to-be-empty-non-empty-fail [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
             1,
             0
         )
-      └─ at tests/cc_stdlib_outlist_to_be_empty_non_empty_fail.test[LINE]
+      └─ at tests/outlist_to_be_empty_non_empty_fail.test[LINE]
 
  ✗ 1 failed in 1 file
 

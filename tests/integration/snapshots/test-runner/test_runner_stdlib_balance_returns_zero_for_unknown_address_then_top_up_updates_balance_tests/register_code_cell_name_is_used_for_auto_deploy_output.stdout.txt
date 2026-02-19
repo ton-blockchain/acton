@@ -7,7 +7,7 @@
 
  TEST  [ROOT]
 
- > tests/ah_stdlib_network.test.tolk (1 test)
+ > tests/network.test.tolk (1 test)
   ✓ ah-stdlib-register-code-cell-output-name [TIME]
     └─ Test output:
        N/A -> ah_register_code_deployer A

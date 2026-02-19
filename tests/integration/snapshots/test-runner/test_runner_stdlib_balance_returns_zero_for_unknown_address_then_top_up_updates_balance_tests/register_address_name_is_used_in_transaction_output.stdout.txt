@@ -7,7 +7,7 @@
 
  TEST  [ROOT]
 
- > tests/ah_stdlib_network.test.tolk (1 test)
+ > tests/network.test.tolk (1 test)
   ✓ ah-stdlib-register-address-output-name [TIME]
     └─ Test output:
        N/A -> ah_register_address_deployer A

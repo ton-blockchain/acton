@@ -7,7 +7,7 @@
 
  TEST  [ROOT]
 
- > tests/bz_stdlib_expect_address_matchers_wrong_kind_failures.test.tolk (3 tests)
+ > tests/expect_address_matchers_wrong_kind_failures.test.tolk (3 tests)
   ✓ bz-stdlib-to-be-internal-address-fails-for-none [TIME]
   ✓ bz-stdlib-to-be-none-address-fails-for-internal [TIME]
   ✓ bz-stdlib-to-be-external-address-fails-for-internal [TIME]
