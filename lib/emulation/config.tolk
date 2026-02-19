@@ -26,7 +26,9 @@
 /// val storagePrices = config.getStoragePrices();
 /// println1("Bit price: {}", storagePrices);
 /// ```
-///
+
+import "../testing/assert"
+
 /// Type representing the blockchain configuration.
 ///
 /// The configuration is a key-value map where keys are parameter indices (0-255)
@@ -178,13 +180,7 @@ const INITIAL_UNIXTIME_STORAGE_INDEX = 0
 fun StoragePricesDict.getInitial(self) {
     val entry = self.get(INITIAL_UNIXTIME_STORAGE_INDEX);
     if (!entry.isFound) {
-        return StoragePrices {
-            initialUnixTime: 0,
-            bitPrice: 0,
-            cellPrice: 0,
-            masterchainBitPrice: 0,
-            masterchainCellPrice: 0,
-        };
+        Assert.fail("No value found for INITIAL_UNIXTIME_STORAGE_INDEX");
     }
 
     return entry.loadValue();

@@ -334,7 +334,7 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
 
             if (externalOut.matches<TBody>(params)) {
                 return Maybe<Message<TBody, ExternalOutMessageInfo>>.some(
-                    Message{
+                    Message {
                         info: externalOut.info,
                         init: externalOut.init,
                         body: EitherLeft{

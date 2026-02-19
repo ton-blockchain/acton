@@ -1,4 +1,4 @@
-  Installing standard library v0.1.0
+  Installing standard library [ACTON_VERSION]
    Compiling contracts
    Compiling alpha
     Finished in [TIME]
