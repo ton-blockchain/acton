@@ -231,44 +231,6 @@ fun onBouncedMessage(_: InMessageBounced) {}
 }
 
 #[test]
-fn build_absolute_contract_src_with_parent_segments_and_existing_intermediate_dir_is_not_normalized_bug()
- {
-    let project = ProjectBuilder::new("build-contract-src-absolute-parent-existing-dir")
-        .raw_file("contracts/absolute_corner/nested/marker.txt", "marker")
-        .raw_file(
-            "contracts/absolute_corner_target.tolk",
-            r#"
-fun onInternalMessage(_: InMessage) {}
-fun onBouncedMessage(_: InMessageBounced) {}
-"#,
-        )
-        .build();
-
-    let absolute_src = to_unix_path(
-        &project
-            .path()
-            .join("contracts/absolute_corner/nested/../absolute_corner_target.tolk"),
-    );
-    write_contract_manifest(
-        project.path(),
-        "build-contract-src-absolute-parent-existing-dir",
-        "absolute_corner_target",
-        &absolute_src,
-    );
-
-    project
-        .acton()
-        .build()
-        .run()
-        .failure()
-        // BUG: absolute `src` paths with parent segments are not normalized before file lookup,
-        // even when the intermediate directory exists.
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/build/build_cmd_contract_path_resolution_tests/build_absolute_contract_src_with_parent_segments_and_existing_intermediate_dir_is_not_normalized_bug.stderr.txt",
-        );
-}
-
-#[test]
 fn build_resolves_absolute_contract_src_with_parent_segments_when_intermediate_dirs_exist() {
     let project = ProjectBuilder::new("build-contract-src-absolute-parent-existing-dir-success")
         .raw_file("contracts/absolute_root/nested/marker.txt", "marker")
