@@ -660,6 +660,7 @@ impl Project {
             build_clear_cache: false,
             build_graph: None,
             build_out_dir: None,
+            build_output_fift: None,
             disasm_string: None,
             disasm_output: None,
             disasm_address: None,
@@ -704,6 +705,7 @@ pub(crate) struct ActonCommand {
     pub(crate) build_clear_cache: bool,
     pub(crate) build_graph: Option<Option<String>>,
     pub(crate) build_out_dir: Option<String>,
+    pub(crate) build_output_fift: Option<String>,
     pub(crate) disasm_string: Option<String>,
     pub(crate) disasm_output: Option<String>,
     pub(crate) disasm_address: Option<String>,
@@ -1198,6 +1200,12 @@ impl ActonCommand {
         self
     }
 
+    /// Set output directory for compiled Fift files (only for build command)
+    pub(crate) fn with_output_fift(mut self, path: &str) -> Self {
+        self.build_output_fift = Some(path.to_string());
+        self
+    }
+
     /// Enable info output for build command
     pub(crate) fn with_info(mut self) -> Self {
         self.build_info = true;
@@ -1290,6 +1298,10 @@ impl ActonCommand {
 
         if let Some(out_dir) = self.build_out_dir {
             self.cmd = self.cmd.arg("--out-dir").arg(out_dir);
+        }
+
+        if let Some(output_fift_dir) = self.build_output_fift {
+            self.cmd = self.cmd.arg("--output-fift").arg(output_fift_dir);
         }
 
         if self.build_info {
