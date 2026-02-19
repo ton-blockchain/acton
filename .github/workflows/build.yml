@@ -30,15 +30,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Cache Cargo
-        uses: ubicloud/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-
+        uses: ubicloud/rust-cache@v2
 
       - name: Install Rust
         run: rustup toolchain install
