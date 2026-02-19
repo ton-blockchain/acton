@@ -1,3 +1,4 @@
+use super::GITHUB_SOURCE_BASE;
 use anyhow::Result;
 use regex::Regex;
 use std::collections::HashMap;
@@ -7,8 +8,6 @@ use tolk_syntax::{
     AstNode, BaseFunction, Constant as AstConstant, Enum as AstEnum, HasName, SourceFile,
     Struct as AstStruct, TopLevel, TypeAlias as AstTypeAlias, parse,
 };
-
-use super::GITHUB_SOURCE_BASE;
 
 pub(super) fn generate_stdlib_docs(lib_dir: &Path, out_dir: &Path) -> Result<()> {
     if !lib_dir.exists() {
