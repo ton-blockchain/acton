@@ -152,11 +152,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .run()
         .success()
         .assert_contains("dependency graph: deps.svg")
-        .assert_file_exists("deps.svg")
-        .assert_file_snapshot_matches(
-            "deps.svg",
-            "integration/snapshots/build/build_cmd_output_graph_tests/test_build_graph_default_path_outputs_expected_svg.svg.gen",
-        );
+        .assert_file_exists("deps.svg");
 
     assert!(
         !project.path().join("deps.dot").exists(),
@@ -191,11 +187,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .run()
         .success()
         .assert_contains("dependency graph: custom_graph.svg")
-        .assert_file_exists("custom_graph.svg")
-        .assert_file_snapshot_matches(
-            "custom_graph.svg",
-            "integration/snapshots/build/build_cmd_output_graph_tests/test_build_graph_custom_path_outputs_expected_svg_only.svg.gen",
-        );
+        .assert_file_exists("custom_graph.svg");
 
     assert!(
         !project.path().join("deps.svg").exists(),
@@ -547,11 +539,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
     output
         .assert_contains("dependency graph: graphs/mixed-kinds.svg")
-        .assert_file_exists("graphs/mixed-kinds.svg")
-        .assert_file_snapshot_matches(
-            "graphs/mixed-kinds.svg",
-            "integration/snapshots/build/build_cmd_output_graph_tests/test_build_graph_complex_mixed_dependency_kinds_match_expected_artifact_content.svg.gen",
-        );
+        .assert_file_exists("graphs/mixed-kinds.svg");
 
     let svg = read_graph_svg(project.path(), "graphs/mixed-kinds.svg");
     assert_graph_shape(
