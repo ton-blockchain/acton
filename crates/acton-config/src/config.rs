@@ -51,7 +51,6 @@ pub struct ActonConfig {
     pub test: Option<TestSettings>,
     pub lint: Option<LintConfig>,
     pub fmt: Option<FmtSettings>,
-    pub build: Option<BuildSettings>,
     pub scripts: Option<BTreeMap<String, String>>,
     #[serde(skip)] // we build wallets manually
     pub wallets: Option<WalletsConfig>,
@@ -154,12 +153,6 @@ pub struct BuildSettings {
 pub struct FmtSettings {
     pub width: Option<usize>,
     pub ignore: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "kebab-case")]
-pub struct BuildSettings {
-    pub output_fift: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

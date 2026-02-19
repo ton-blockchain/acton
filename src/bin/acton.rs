@@ -1256,7 +1256,14 @@ fn main() {
             out_dir,
             output_fift,
             info,
-        } => build_cmd(contract_id, clear_cache, graph, out_dir, output_fift, info),
+        } => build_cmd(
+            contract_id,
+            clear_cache,
+            graph,
+            out_dir,
+            output_fift,
+            info,
+        ),
         Commands::Compile {
             path,
             json,

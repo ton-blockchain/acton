@@ -245,14 +245,21 @@ fn process_contract(
             let compile_start = Instant::now();
             println!("   {} {}", "Compiling".green().bold(), contract_config.name);
 
-            let compiler = tolkc::Compiler::new(2).with_mappings(&acton_config.mappings);
+            let mut compiler = tolkc::Compiler::new(2).with_mappings(&acton_config.mappings);
+            compiler.with_src_line_comments = true;
+            compiler.with_stack_comments = true;
             let compilation_result = compiler.compile(Path::new(contract_path), false);
             let compile_time = compile_start.elapsed();
 
             match compilation_result {
                 tolkc::CompilerResult::Success(result) => {
-                    if let Err(e) =
-                        file_cache.put(contract_path, &result, false, 2, "1.3".to_string())
+                    if let Err(e) = file_cache.put(
+                        contract_path,
+                        &result,
+                        false,
+                        2,
+                        "1.3".to_string()
+                    )
                     {
                         eprintln!(
                             "Warning: Failed to cache compilation result for {}: {}",

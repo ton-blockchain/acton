@@ -79,6 +79,9 @@ pub fn compile_cmd(
         compiler = compiler.with_mappings(&acton_config.mappings)
     }
 
+    compiler.with_src_line_comments = true;
+    compiler.with_stack_comments = true;
+
     let compilation_result = compiler.compile(Path::new(path), with_debug_info);
     let compile_time = compile_start.elapsed();
 
@@ -89,8 +92,13 @@ pub fn compile_cmd(
                 "Compile {path} from source (compilation: {compile_time:?}, total: {total_elapsed:?})"
             );
 
-            if let Err(e) = file_cache.put(path, &result, with_debug_info, 2, "1.3".to_string())
-                && !json
+            if let Err(e) =
+                file_cache.put(
+                    path,
+                    &result,
+                    with_debug_info,
+                    2,
+                    "1.3".to_string()) && !json
             {
                 eprintln!("Warning: Failed to cache compilation result: {e}");
             }
