@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   build-linux:
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
     if: true
 
     outputs:
