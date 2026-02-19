@@ -1,0 +1,14 @@
+  Installing standard library v0.1.0
+   Compiling contracts
+   Compiling noop
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/send_result_wait_missing_hash.test.tolk (1 test)
+Awaiting transaction... [Attempt 1/1]
+  ✓ de-stdlib-wait-missing-hash-non-quiet [TIME]
+
+ ✓ 1 passed in 1 file
