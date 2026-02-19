@@ -378,6 +378,12 @@ enum Commands {
             help = "Output directory for build artifacts"
         )]
         out_dir: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Directory to save compiled Fift files"
+        )]
+        output_fift: Option<String>,
         #[arg(long, help = "Show compiled contract info")]
         info: bool,
     },
@@ -815,6 +821,10 @@ fn example_build_usage() -> StyledStr {
        <dim>{{</> name<dim> = </><green>"child"</><dim>,</> kind<dim> = </><green>"library_ref"</><dim>,</> function<dim> = </><green>"getChildCode"</><dim>,</> path<dim> = </><green>"child_dep.tolk"</> <dim>}}</>
      <dim>]</>"#
     );
+    let build_config_example = color_print::cformat!(
+        r#"<dim>[</>build<dim>]</>
+     output-fift<dim> = </><green>"build/fift"</>"#
+    );
 
     let build_examples = Vec::from([
         ("Build all contracts", "acton build"),
@@ -826,6 +836,10 @@ fn example_build_usage() -> StyledStr {
         (
             "Generate dependency graph as SVG file",
             "acton build --graph deps.svg",
+        ),
+        (
+            "Save compiled Fift files to a custom directory",
+            "acton build --output-fift build/fift",
         ),
     ]);
 
@@ -839,6 +853,11 @@ fn example_build_usage() -> StyledStr {
         "\n     {named}# Configure contracts in Acton.toml{named:#}"
     );
     let _ = write!(writer, "\n     {config_example}");
+    let _ = write!(
+        writer,
+        "\n\n     {named}# Optional build output settings{named:#}"
+    );
+    let _ = write!(writer, "\n     {build_config_example}");
     let _ = write!(writer, "\n\n{header}Examples:{header:#}");
 
     const USAGE_SEP: &str = "\n     ";
@@ -1247,8 +1266,9 @@ fn main() {
             clear_cache,
             graph,
             out_dir,
+            output_fift,
             info,
-        } => build_cmd(contract_id, clear_cache, graph, out_dir, info),
+        } => build_cmd(contract_id, clear_cache, graph, out_dir, output_fift, info),
         Commands::Compile {
             path,
             json,

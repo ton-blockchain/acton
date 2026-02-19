@@ -168,6 +168,16 @@
         }
       }
     },
+    "build": {
+      "type": "object",
+      "description": "Default settings for the build command",
+      "properties": {
+        "output-fift": {
+          "type": "string",
+          "description": "Directory where per-contract compiled Fift files are saved"
+        }
+      }
+    },
     "contracts": {
       "type": "object",
       "description": "Definition of contracts in the project",

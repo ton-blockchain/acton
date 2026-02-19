@@ -11,5 +11,5 @@ keys = { mnemonic-env = "WALLET_MNEMONIC" }
 [wallets.deployer.expected]
 [WALLET_ADDRESS_TESTNET]
 
-See https://i582.github.io/acton/docs/scripting/setup-wallets/ for more information
+See [ACTON_DOCS_URL]/scripting/setup-wallets/ for more information
 

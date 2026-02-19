@@ -51,6 +51,7 @@ pub struct ActonConfig {
     pub test: Option<TestSettings>,
     pub lint: Option<LintConfig>,
     pub fmt: Option<FmtSettings>,
+    pub build: Option<BuildSettings>,
     pub scripts: Option<BTreeMap<String, String>>,
     #[serde(skip)] // we build wallets manually
     pub wallets: Option<WalletsConfig>,
@@ -149,6 +150,12 @@ pub struct FmtSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
+pub struct BuildSettings {
+    pub output_fift: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
 pub struct MutationConfig {
     pub disable_rules: Option<Vec<String>>,
 }
@@ -223,6 +230,7 @@ impl Default for ActonConfig {
                 width: Some(100),
                 ignore: Some(vec![]),
             }),
+            build: None,
             wallets: None,
             libraries: None,
             scripts: None,
@@ -786,5 +794,22 @@ utils = "/usr/local/lib/tolk/utils"
         let mappings = config.mappings.as_ref().unwrap();
         assert_eq!(mappings.get("core").unwrap(), "./core");
         assert_eq!(mappings.get("utils").unwrap(), "/usr/local/lib/tolk/utils");
+    }
+
+    #[test]
+    fn test_build_settings_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[build]
+output-fift = "build/fift"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let build = config.build.as_ref().unwrap();
+        assert_eq!(build.output_fift.as_deref(), Some("build/fift"));
     }
 }
