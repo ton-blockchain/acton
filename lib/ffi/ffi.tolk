@@ -1,2 +1,9 @@
-/// Namespace for all functions with `EXTCALL` implementation.
+/// Namespace for host-provided functions implemented via `EXTCALL`.
+///
+/// Each declaration like `fun ffi.foo(...): ... asm "<id> EXTCALL"` is a contract between
+/// stdlib code and the host runtime: opcode id and argument count must match the registered
+/// runtime handler.
+///
+/// FFI handlers are injected by Acton host executors (for example script/test/emulation runs).
+/// Without host registration for a given opcode, that `EXTCALL` is unavailable at runtime.
 struct ffi

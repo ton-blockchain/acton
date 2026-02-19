@@ -73,7 +73,7 @@ struct DepthBalanceInfo {
 
 Represents depth and balance information for split accounts.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L37" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L38" />
 
 ## `Transaction`
 
@@ -108,7 +108,7 @@ struct (0b0111) Transaction {
 
 Represents a transaction in the TON blockchain.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L43" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L44" />
 
 ## `Transaction.loadBody`
 
@@ -118,7 +118,11 @@ fun Transaction.loadBody<Msg>(self)
 
 Loads the in message body of the transaction with given type.
 
-Note that if message type mismatch, loading will fail with exit code 63.
+Fails if transaction has no inbound message (`messages.inMsg` is `None`), because this
+method unwraps it before typed decoding.
+
+After an inbound message exists, if message type does not match `Msg`, loading fails with
+exit code 63.
 
 Example:
 ```tolk
@@ -128,7 +132,7 @@ val body = tx.loadBody<IncreaseCounter>();
 println(body.increaseBy);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L81" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L86" />
 
 ## `Transaction.loadInMsg`
 
@@ -138,9 +142,13 @@ fun Transaction.loadInMsg<Msg>(self)
 
 Loads the in message of the transaction with given type.
 
-Note that if message type mismatch, loading will fail with exit code 63.
+Fails if transaction has no inbound message (`messages.inMsg` is `None`), because this
+method unwraps it before typed decoding.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L90" />
+After an inbound message exists, if message type does not match `Msg`, loading fails with
+exit code 63.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L99" />
 
 ## `Transaction.getUsedGas`
 
@@ -148,9 +156,13 @@ Note that if message type mismatch, loading will fail with exit code 63.
 fun Transaction.getUsedGas(self)
 ```
 
-Returns consumed gas for transaction.
+Returns consumed gas for ordinary transactions with VM compute phase.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L96" />
+Fails with [Assert.fail](../../testing/assert/#assertfail):
+- if `description` is not [TransOrd](#transord);
+- if `description.computePh` is [TrComputeSkipped](#trcomputeskipped).
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L109" />
 
 ## `Transaction.getActionFee`
 
@@ -158,9 +170,14 @@ Returns consumed gas for transaction.
 fun Transaction.getActionFee(self): Maybe<coins>
 ```
 
-Returns fee for action phase of the transaction.
+Returns action-phase fee based on Transaction.description variant.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L110" />
+Behavior by variant:
+- [TransOrd](#transord) and [TransTickTock](#transticktock) with `action = Some`: returns `action.totalActionFees`;
+- [TransOrd](#transord) and [TransTickTock](#transticktock) with `action = None`: returns `None`;
+- all other TransactionDescr variants: returns `None`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L128" />
 
 ## `Transaction.getAccountAddress`
 
@@ -170,7 +187,7 @@ fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN)
 
 Return address of account of this transaction.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L132" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L150" />
 
 ## `TransactionMessages`
 
@@ -183,7 +200,7 @@ struct TransactionMessages {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L141" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L159" />
 
 ## `MerkleUpdate`
 
@@ -206,7 +223,7 @@ struct (0b0100) MerkleUpdate<X> {
 
 Represents merkle update for proof-of-work.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L149" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L167" />
 
 ## `HashUpdate`
 
@@ -221,7 +238,7 @@ struct (0b01110010) HashUpdate<X> {
 
 Represents simple hash update.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L165" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L183" />
 
 ## `MerkleProof`
 
@@ -238,7 +255,7 @@ struct (0b0011) MerkleProof<X> {
 
 Represents merkle proof.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L173" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L191" />
 
 ## `TrStoragePhase`
 
@@ -255,7 +272,7 @@ struct TrStoragePhase {
 
 Represents storage phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L186" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L204" />
 
 ## `AccUnchanged`
 
@@ -265,7 +282,7 @@ struct (0b0) AccUnchanged
 
 Represents account status changes.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L196" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L214" />
 
 ## `AccFrozen`
 
@@ -273,7 +290,7 @@ Represents account status changes.
 struct (0b10) AccFrozen
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L197" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L215" />
 
 ## `AccDeleted`
 
@@ -281,7 +298,7 @@ struct (0b10) AccFrozen
 struct (0b11) AccDeleted
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L198" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L216" />
 
 ## `TrCreditPhase`
 
@@ -296,7 +313,7 @@ struct TrCreditPhase {
 
 Represents credit phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L204" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L222" />
 
 ## `TrComputeSkipped`
 
@@ -308,7 +325,7 @@ struct (0b0) TrComputeSkipped {
 
 Represents compute phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L212" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L230" />
 
 ## `TrComputeVm`
 
@@ -322,7 +339,7 @@ struct (0b1) TrComputeVm {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L215" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L233" />
 
 ## `TrComputeVmRef`
 
@@ -340,7 +357,7 @@ struct TrComputeVmRef {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L223" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L241" />
 
 ## `CSkipNoState`
 
@@ -350,7 +367,7 @@ struct (0b00) CSkipNoState
 
 Represents reasons for skipping computation.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L239" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L257" />
 
 ## `CSkipBadState`
 
@@ -358,7 +375,7 @@ Represents reasons for skipping computation.
 struct (0b01) CSkipBadState
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L240" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L258" />
 
 ## `CSkipNoGas`
 
@@ -366,7 +383,7 @@ struct (0b01) CSkipBadState
 struct (0b10) CSkipNoGas
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L241" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L259" />
 
 ## `CSkipSuspended`
 
@@ -374,7 +391,7 @@ struct (0b10) CSkipNoGas
 struct (0b110) CSkipSuspended
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L242" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L260" />
 
 ## `TrActionPhase`
 
@@ -399,7 +416,7 @@ struct TrActionPhase {
 
 Represents action phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L248" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L266" />
 
 ## `TrBounceNegfunds`
 
@@ -409,7 +426,7 @@ struct (0b00) TrBounceNegfunds
 
 Represents bounce phase of transaction processing.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L266" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L284" />
 
 ## `TrBounceNofunds`
 
@@ -420,7 +437,7 @@ struct (0b01) TrBounceNofunds {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L267" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L285" />
 
 ## `TrBounceOk`
 
@@ -432,7 +449,7 @@ struct (0b1) TrBounceOk {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L271" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L289" />
 
 ## `TransOrd`
 
@@ -452,7 +469,7 @@ struct (0b0000) TransOrd {
 
 Represents ordinary transaction description.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L281" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L299" />
 
 ## `TransStorage`
 
@@ -464,7 +481,7 @@ struct (0b0001) TransStorage {
 
 Represents storage transaction description.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L294" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L312" />
 
 ## `TransTickTock`
 
@@ -482,7 +499,7 @@ struct (0b001) TransTickTock {
 
 Represents tick-tock transaction description.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L299" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L317" />
 
 ## `SplitMergeInfo`
 
@@ -497,7 +514,7 @@ struct SplitMergeInfo {
 
 Represents split-merge information.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L310" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L328" />
 
 ## `TransSplitPrepare`
 
@@ -515,7 +532,7 @@ struct (0b0100) TransSplitPrepare {
 
 Represents split prepare transaction description.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L318" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L336" />
 
 ## `TransSplitInstall`
 
@@ -529,7 +546,7 @@ struct (0b0101) TransSplitInstall {
 
 Represents split install transaction description.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L329" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L347" />
 
 ## `TransMergePrepare`
 
@@ -543,7 +560,7 @@ struct (0b0110) TransMergePrepare {
 
 Represents merge prepare transaction description.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L336" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L354" />
 
 ## `TransMergeInstall`
 
@@ -563,7 +580,15 @@ struct (0b0111) TransMergeInstall {
 
 Represents merge install transaction description.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L343" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L361" />
+
+## `varUintSize`
+
+```tolk
+fun varUintSize(value: int, maxBytes: int): int
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L385" />
 
 ## `VarUint7.packToBuilder`
 
@@ -571,7 +596,7 @@ Represents merge install transaction description.
 fun VarUint7.packToBuilder(self, mutate b: builder)
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L367" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L407" />
 
 ## `VarUint7.unpackFromSlice`
 
@@ -579,7 +604,7 @@ fun VarUint7.packToBuilder(self, mutate b: builder)
 fun VarUint7.unpackFromSlice(mutate s: slice): VarUint7
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L371" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L415" />
 
 ## `VarUint3.packToBuilder`
 
@@ -587,7 +612,7 @@ fun VarUint7.unpackFromSlice(mutate s: slice): VarUint7
 fun VarUint3.packToBuilder(self, mutate b: builder)
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L378" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L422" />
 
 ## `VarUint3.unpackFromSlice`
 
@@ -595,7 +620,7 @@ fun VarUint3.packToBuilder(self, mutate b: builder)
 fun VarUint3.unpackFromSlice(mutate s: slice): VarUint3
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L382" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L430" />
 
 ## `StorageUsed`
 
@@ -608,7 +633,7 @@ struct StorageUsed {
 
 Represents storage used information.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L388" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L436" />
 
 ## `StorageExtraNone`
 
@@ -618,7 +643,7 @@ struct (0b000) StorageExtraNone
 
 Represents storage extra information.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L394" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L442" />
 
 ## `StorageExtraDict`
 
@@ -628,7 +653,7 @@ struct (0b001) StorageExtraDict {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L395" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L443" />
 
 ## `StorageInfo`
 
@@ -647,7 +672,7 @@ struct StorageInfo {
 
 Represents storage information.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L403" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L451" />
 
 ## `AccountNone`
 
@@ -657,7 +682,7 @@ struct (0b0) AccountNone
 
 Represents account.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L415" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L463" />
 
 ## `AccountInfo`
 
@@ -672,7 +697,37 @@ struct (0b1) AccountInfo {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L416" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L464" />
+
+## `AccountStateUninit`
+
+```tolk
+struct (0b00) AccountStateUninit
+```
+
+Account state in AccountStorage (block.tlb `AccountState`).
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L477" />
+
+## `AccountStateActive`
+
+```tolk
+struct (0b1) AccountStateActive {
+    stateInit: StateInit
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L478" />
+
+## `AccountStateFrozen`
+
+```tolk
+struct (0b01) AccountStateFrozen {
+    stateHash: uint256
+}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L481" />
 
 ## `AccountStorage`
 
@@ -683,13 +738,13 @@ struct AccountStorage {
     /// Account balance.
     balance: CurrencyCollection,
     /// Account state.
-    state: AccountStatus
+    state: AccountState
 }
 ```
 
 Represents account storage.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L429" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L489" />
 
 ## `ShardAccount`
 
@@ -703,5 +758,5 @@ struct ShardAccount {
 
 Represents a shard account state.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L439" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L499" />
 

@@ -72,8 +72,12 @@ fun Maybe<X>.unwrap(self): X
 Unwraps the Maybe, returning the contained value if present,
 or throws an exception if None.
 
-This is unsafe — use only when you're certain the value is present.
-For safe access, use `unwrap_or` instead.
+This is unsafe. Use it only when you are certain the value is present.
+For safe access, use `unwrapOr` instead.
+
+# Throws
+
+- Throws exit code `7` when called on `None`.
 
 Example:
 ```tolk
@@ -81,7 +85,7 @@ val maybeValue = Maybe.some(42);
 val value = maybeValue.unwrap(); // Returns 42
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L45" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L49" />
 
 ## `Maybe<X>.unwrapOr`
 
@@ -97,8 +101,8 @@ This is the safe way to access optional values.
 Example:
 ```tolk
 val maybeValue = Maybe<slice>.none();
-val name = maybeValue.unwrap_or("default"); // Returns "default"
+val name = maybeValue.unwrapOr("default"); // Returns "default"
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L62" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L66" />
 

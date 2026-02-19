@@ -57,6 +57,10 @@ const CONFIG_ROOT_INDEX = 9
 ///
 /// This function allows you to override the configuration root dictionary (parameter 9) in the VM state.
 /// The config root is a dictionary containing blockchain configuration parameters.
+/// It writes C7 slot 9 only.
+///
+/// Note that this does not recompute unpacked config in C7 slot 14.
+/// After [vm.setConfigRootDict], [vm.getConfigUnpacked] can still return stale values.
 fun vm.setConfigRootDict(root: dict) {
     var c7 = vm.getC7();
     var params = c7.get(0) as tuple;
@@ -72,6 +76,11 @@ const CONFIG_UNPACKED_INDEX = 14
 ///
 /// This function allows you to override the unpacked configuration parameters (parameter 14) in the VM state.
 /// The unpacked config contains a tuple of configuration values extracted from the config dictionary.
+/// It writes C7 slot 14 directly and does not validate tuple shape.
+///
+/// Use [vm.getConfigUnpacked] as a template for expected tuple layout.
+/// If this tuple is malformed (for example, too short), later operations that assume
+/// specific indices can fail with runtime errors such as `tuple index out of range`.
 fun vm.setConfigUnpacked(values: tuple) {
     var c7 = vm.getC7();
     var params = c7.get(0) as tuple;
@@ -84,7 +93,8 @@ fun vm.setConfigUnpacked(values: tuple) {
 /// Get the unpacked configuration parameters tuple.
 ///
 /// Retrieves the unpacked configuration parameters (parameter 14) from the current VM state.
-/// Returns a tuple of configuration values.
+/// Returns a tuple of configuration values from C7 slot 14 as-is.
+/// This value is independent from C7 slot 9 set via [vm.setConfigRootDict].
 ///
 /// Example:
 /// ```tolk
@@ -98,41 +108,64 @@ fun vm.getConfigUnpacked() {
 }
 
 /// Override `blockchain.now()` for deterministic testing.
+///
+/// Writes C7 parameter tuple slot 3 and affects `blockchain.now()` reads.
 fun vm.setTime(now: int) {
     vm.setConfigParam(now, 3);
 }
 
 /// Override the **block** logical time.
+///
+/// Writes C7 parameter tuple slot 4.
+/// Does not change slots 3 (`now`) or 5 (`logical time`).
 fun vm.setBlockLogicalTime(blockLogicalTime: int) {
     vm.setConfigParam(blockLogicalTime, 4);
 }
 
 /// Override the **transaction** logical time.
+///
+/// Writes C7 parameter tuple slot 5.
+/// Does not change slots 3 (`now`) or 4 (`block logical time`).
 fun vm.setLogicalTime(logicalTime: int) {
     vm.setConfigParam(logicalTime, 5);
 }
 
 /// Override the original balance of the contract.
+///
+/// Writes C7 parameter tuple slot 7 as `[balance, extraCurrencies]`.
 fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null) {
     vm.setConfigParam(tuple [balance, extraCurrencies], 7);
 }
 
 /// Register a new library for current test.
+///
+/// Re-registering the same library cell is idempotent and does not change C5/C7.
 fun vm.registerLibrary(cell: cell) {
     ffi.registerLibrary(cell);
 }
 
-/// Convert a slice with string representation of address to an address type.
+/// Convert a string representation of address to an internal [address] value.
+///
+/// Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
+/// (base64/base64url with flags).
+/// The returned value is normalized as an internal address; rendered formatting may
+/// differ from input flags, while representing the same account.
+/// Invalid input fails with an error like `Failed to convert address from <input>`.
 ///
 /// Example:
 /// ```tolk
-/// val address = net.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
+/// val address = vm.convertAddress("kQCPFJYFqhowz0BRAfqNPdLOC1_Rlupki_0BezWU6rHk5lbt");
 /// ```
 fun vm.convertAddress(addr: string): address {
     val cell = ffi.convertAddress(addr);
     return cell.beginParse() as address;
 }
 
+/// Decode a root cell from hex-encoded BOC bytes.
+///
+/// `cellHex` must be a valid BOC serialized as hex.
+/// Invalid or malformed input (including non-BOC payloads) fails with an error like
+/// `Failed to decode cell hex <input>`.
 fun vm.cellFromHex(cellHex: string): cell {
     return ffi.cellFromHex(cellHex);
 }

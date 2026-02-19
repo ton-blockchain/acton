@@ -4,6 +4,12 @@
 /// It supports parsing environment variables into standard Tolk types like `int`, `bool`,
 /// `string`, `slice`, `address`, and `cell`.
 ///
+/// `env<T>`/`envOr<T>` support only these types. For unsupported generic `T`, execution fails
+/// via [Assert.fail].
+///
+/// Note for `bool`: when a variable is present, only `"true"` and `"1"` (case-insensitive) map
+/// to `true`; any other present value maps to `false`.
+///
 /// Examples:
 /// ```tolk
 /// // Read an integer configuration
@@ -27,40 +33,45 @@ import "ffi/ffi"
 import "testing/assert"
 
 /// Returns value of the environment variable with the given name
-/// or `null` if not found or type mismatched.
+/// or `null` if not found or parsing fails for a supported type.
 ///
 /// Supported types:
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
-/// - `bool`: returns true if value is "true" or "1" (case-insensitive), otherwise false.
+/// - `bool`: for present variable, returns true if value is "true" or "1" (case-insensitive), otherwise false.
 /// - `string`: returns the raw string value.
 /// - `slice`: returns the raw string value as a slice.
 /// - `address`: parsed as a TON address (raw or user-friendly).
 /// - `cell`: parsed from base64 or hex encoded BoC.
 ///
+/// Unsupported generic types do not return `null` and instead fail via [Assert.fail].
+///
 /// Example:
 /// ```tolk
 /// val foo = env<int>("FOO");
-/// val bar = env<slice>("BAR");
+/// val bar = env<string>("BAR");
 /// ```
 fun env<T>(name: string): T? {
     return T.__env(name);
 }
 
 /// Returns value of the environment variable with the given name
-/// or `default` value if not found or type mismatched.
+/// or `default` value if not found or parsing fails for a supported type.
 ///
 /// Supported types:
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
-/// - `bool`: returns true if value is "true" or "1" (case-insensitive), otherwise false.
+/// - `bool`: for present variable, returns true if value is "true" or "1" (case-insensitive), otherwise false.
 /// - `string`: returns the raw string value.
 /// - `slice`: returns the raw string value as a slice.
 /// - `address`: parsed as a TON address (raw or user-friendly).
 /// - `cell`: parsed from base64 or hex encoded BoC.
 ///
+/// For `envOr<bool>`, a present but non-boolean value becomes `false`, so `default` is not used.
+/// Unsupported generic types fail via [Assert.fail] before `default` can be applied.
+///
 /// Example:
 /// ```tolk
 /// val foo = envOr<int>("FOO", 42);
-/// val bar = envOr<slice>("BAR", "default");
+/// val bar = envOr<string>("BAR", "default");
 /// ```
 fun envOr<T>(name: string, default: T): T {
     val value = env<T>(name);

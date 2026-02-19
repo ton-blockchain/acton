@@ -94,12 +94,16 @@ fun Expectation<T>.toEqualDecimal(self, expected: T, decimals: int)
 
 Asserts that actual value is equal to expected value as decimal with given precision.
 
+Comparison itself is exact (no rounding is applied to actual or expected values).
+`decimals` controls only failure-message formatting:
+decimal point insertion, trailing-zero trimming, and normalized integer-style output (`.0`).
+
 Example:
 ```tolk
 expect(ton("1.5")).toEqualDecimal(ton("1.5"), 9);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L79" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L83" />
 
 ## `Expectation<T>.toNotEqual`
 
@@ -114,7 +118,7 @@ Example:
 expect(10).toNotEqual(20);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L89" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L93" />
 
 ## `Expectation<T>.toBeLess`
 
@@ -129,7 +133,7 @@ Example:
 expect(5).toBeLess(10);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L99" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L103" />
 
 ## `Expectation<T>.toBeGreater`
 
@@ -144,7 +148,7 @@ Example:
 expect(10).toBeGreater(5);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L115" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L119" />
 
 ## `Expectation<T>.toBeLessOrEqual`
 
@@ -160,7 +164,7 @@ expect(5).toBeLessOrEqual(10);
 expect(10).toBeLessOrEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L132" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L136" />
 
 ## `Expectation<T>.toBeGreaterOrEqual`
 
@@ -176,7 +180,7 @@ expect(10).toBeGreaterOrEqual(5);
 expect(10).toBeGreaterOrEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L149" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L153" />
 
 ## `Expectation<int>.toBeApproxEqAbs`
 
@@ -192,7 +196,7 @@ expect(10).toBeApproxEqAbs(15, 10); // ok, difference is 5, which is less than m
 expect(10).toBeApproxEqAbs(20, 5); // error, difference is 10, which is greater than maximum allowed difference of 5
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L166" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L170" />
 
 ## `Expectation<int>.toBeApproxEqRel`
 
@@ -200,15 +204,22 @@ expect(10).toBeApproxEqAbs(20, 5); // error, difference is 10, which is greater 
 fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int)
 ```
 
-Asserts that actual value is approximately equal to expected value using difference in percentage.
+Asserts that actual value is approximately equal to expected value using relative percentage difference.
+
+Relative delta is computed as:
+`floor(abs(actual - expected) * 100 / abs(actual))`.
+The assertion passes when this computed percentage is less than or equal to `maxDelta`.
+
+Zero branch:
+if `actual == 0`, only `expected == 0` passes; any non-zero `expected` is treated as infinite delta and fails.
 
 Example:
 ```tolk
-expect(10).toBeApproxEqRel(15, 60); // ok, difference is 50%, which is less than maximum allowed difference of 60%
-expect(10).toBeApproxEqRel(20, 50); // error, difference is 100%, which is greater than maximum allowed difference of 50%
+expect(1000).toBeApproxEqRel(1099, 9);
+expect(0).toBeApproxEqRel(0, 0);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L190" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L201" />
 
 ## `Expectation<T?>.toBeNull`
 
@@ -223,7 +234,7 @@ Example:
 expect(null).toBeNull();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L214" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L242" />
 
 ## `Expectation<T?>.toBeNotNull`
 
@@ -235,10 +246,11 @@ Asserts that actual value is not null.
 
 Example:
 ```tolk
-expect(null).toBeNotNull();
+val someValue: int? = 10;
+expect(someValue).toBeNotNull();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L224" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L253" />
 
 ## `Expectation<Maybe<T>>.toBeDefined`
 
@@ -246,7 +258,17 @@ expect(null).toBeNotNull();
 fun Expectation<Maybe<T>>.toBeDefined(self)
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L228" />
+Asserts that actual `Maybe<T>` value is defined (`Some`).
+
+Fails when actual value is `None`.
+
+Example:
+```tolk
+val someValue = Maybe<int>.some(10);
+expect(someValue).toBeDefined();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L266" />
 
 ## `Expectation<Maybe<T>>.toBeNone`
 
@@ -254,7 +276,17 @@ fun Expectation<Maybe<T>>.toBeDefined(self)
 fun Expectation<Maybe<T>>.toBeNone(self)
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L233" />
+Asserts that actual `Maybe<T>` value is `None`.
+
+Fails when actual value is `Some`.
+
+Example:
+```tolk
+val noneValue = Maybe<int>.none();
+expect(noneValue).toBeNone();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L280" />
 
 ## `Expectation<slice>.toBeNonEmpty`
 
@@ -266,10 +298,10 @@ Asserts that actual value is not empty.
 
 Example:
 ```tolk
-expect("").toBeNonEmpty();
+expect("hello").toBeNonEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L245" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L292" />
 
 ## `Expectation<slice>.toBeEmpty`
 
@@ -284,7 +316,7 @@ Example:
 expect("").toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L255" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L302" />
 
 ## `Expectation<int>.toBeNaN`
 
@@ -299,7 +331,7 @@ Example:
 expect(nan()).toBeNaN();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L265" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L312" />
 
 ## `Expectation<int>.toBeNonNaN`
 
@@ -311,10 +343,10 @@ Asserts that actual value is not NaN.
 
 Example:
 ```tolk
-expect(nan()).toBeNonNaN();
+expect(0).toBeNonNaN();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L275" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L322" />
 
 ## `Expectation<bool>.toBeTrue`
 
@@ -329,7 +361,7 @@ Example:
 expect(true).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L285" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L332" />
 
 ## `Expectation<bool>.toBeFalse`
 
@@ -344,7 +376,7 @@ Example:
 expect(false).toBeFalse();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L295" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L342" />
 
 ## `Expectation<any_address>.toBeInternalAddress`
 
@@ -359,7 +391,7 @@ Example:
 expect(addr).toBeInternalAddress();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L305" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L352" />
 
 ## `Expectation<any_address>.toBeNoneAddress`
 
@@ -374,7 +406,7 @@ Example:
 expect(addr).toBeNoneAddress();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L317" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L364" />
 
 ## `Expectation<any_address>.toBeExternalAddress`
 
@@ -389,7 +421,7 @@ Example:
 expect(addr).toBeExternalAddress();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L329" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L376" />
 
 ## `Expectation<tuple>.toContain`
 
@@ -408,7 +440,7 @@ tuple.push(3);
 expect(tuple).toContain(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L345" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L392" />
 
 ## `Expectation<tuple>.toNotContain`
 
@@ -427,7 +459,7 @@ tuple.push(3);
 expect(tuple).toNotContain(4);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L367" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L414" />
 
 ## `Expectation<tuple>.toHaveLength`
 
@@ -446,7 +478,7 @@ tuple.push(3);
 expect(tuple).toHaveLength(3);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L388" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L435" />
 
 ## `Expectation<map<K, V>>.toContainKey`
 
@@ -464,7 +496,7 @@ map.set(2, 3);
 expect(map).toContainKey(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L401" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L448" />
 
 ## `Expectation<map<K, V>>.toNotContainKey`
 
@@ -482,7 +514,7 @@ map.set(2, 3);
 expect(map).toNotContainKey(4);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L417" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L464" />
 
 ## `Expectation<map<K, V>>.toContainValue`
 
@@ -500,7 +532,7 @@ map.set(2, 3);
 expect(map).toContainValue(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L433" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L480" />
 
 ## `Expectation<map<K, V>>.toNotContainValue`
 
@@ -518,7 +550,7 @@ map.set(2, 3);
 expect(map).toNotContainValue(4);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L455" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L502" />
 
 ## `Expectation<map<K, V>>.toBeEmpty`
 
@@ -534,7 +566,7 @@ var map = createEmptyMap<int32, int32>();
 expect(map).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L473" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L520" />
 
 ## `Expectation<map<K, V>>.toBeNonEmpty`
 
@@ -552,7 +584,7 @@ map.set(2, 3);
 expect(map).toBeNonEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L488" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L535" />
 
 ## `Expectation<map<K, V>>.toHaveLength`
 
@@ -570,7 +602,7 @@ map.set(2, 3);
 expect(map).toHaveLength(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L503" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L550" />
 
 ## `expect`
 
@@ -591,7 +623,7 @@ Optional location can be provided to specify the location of the expectation to
 be printed in the error message. You likely don't want to set this manually,
 as the location will be automatically set by the test framework.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L526" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L573" />
 
 ## `expectToEndWithExitCode`
 
@@ -620,5 +652,5 @@ get fun test_fail_with() {
 
 This function is more flexible and can be used conditionally in the test.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L550" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L597" />
 

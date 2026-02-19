@@ -68,19 +68,19 @@ type ExtOutList = tuple
 
 /// Returns the external outgoing message at the given index with given type.
 ///
-/// Note that if message is not a given type, loading will fail with exit code 63.
-/// If you want to handle this case, use [ExtOutList.atOrNull] instead.
+/// If the message is not of the requested type, loading fails with exit code 63.
+/// Use [ExtOutList.atOrNull] to handle this case without throwing.
 fun ExtOutList.at<Msg>(self, index: int): ExtMessageRelaxed<Msg> {
     val cell = self.get(index) as cell as Cell<ExtMessageRelaxed<Msg>>;
     return cell.load();
 }
 
 /// Returns the external outgoing message at the given index with given type or
-/// null if message is not a given type.
+/// `null` if message is not of the requested type.
 ///
-/// Note that if message is not a given type or the index is out of range,
-/// this method will return null instead of throwing an exception.
-/// Use [ExtOutList.at] if you don't want to handle null case.
+/// If message is not of the requested type, `index < 0`, or `index >= self.size()`,
+/// this method returns `null` instead of throwing.
+/// Use [ExtOutList.at] if you do not want to handle the `null` case.
 fun ExtOutList.atOrNull<Msg>(self, index: int): ExtMessageRelaxed<Msg>? {
     if (index < 0 || index >= self.size()) {
         return null;
@@ -375,7 +375,12 @@ fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {})
     return Maybe<Transaction>.some(txCell.load());
 }
 
-/// Send a message from a specified address with specified mode.
+/// Send a message from a specified address.
+///
+/// In broadcast mode, sending to the real network is attempted only when `from`
+/// matches one of the wallets opened at script startup.
+/// If `from` is not an opened wallet address, this method falls back to normal
+/// emulator execution, even when [net.isBroadcasting] is `true`.
 ///
 /// Example:
 /// ```tolk
@@ -608,6 +613,11 @@ fun net.isBroadcasting(): bool {
 ///
 /// This function allows scripts to manually enable broadcasting behavior.
 /// Useful for testing broadcasting logic in emulation mode.
+/// It toggles only the runtime broadcast flag.
+///
+/// Wallets are loaded once at startup (when the script is launched with CLI `--broadcast`).
+/// Calling [net.enableBroadcast] later does not load wallets, so [net.wallet] can still fail
+/// and wallet-backed real sends can remain unavailable.
 ///
 /// Example:
 /// ```tolk
@@ -624,6 +634,7 @@ fun net.enableBroadcast(): void {
 /// Disable broadcasting mode.
 ///
 /// This function allows scripts to manually disable broadcasting behavior.
+/// It does not reload or rebuild the startup wallet map.
 ///
 /// Example:
 /// ```tolk
@@ -746,8 +757,15 @@ fun net.getDeployedCode(addr: address): cell? {
 ///
 /// Example:
 /// ```tolk
-/// val messageHash = "abc123...";
-/// net.waitForTransaction(wallet.address, messageHash, 20, 2000);
+/// val txs = net.send(wallet.address, message);
+/// val tx = txs.at(0).tx.load();
+/// val inMsg = tx.messages.load().inMsg.unwrap().load();
+///
+/// var body = inMsg.body;
+/// body.skipBits(1); // skip Either tag bit
+/// val bodyHashSlice = beginCell().storeUint(body.hash(), 256).toSlice();
+///
+/// val ok = net.waitForTransaction(inMsg.info.dest, bodyHashSlice, true, 20, 2000);
 /// ```
 ///
 /// See [SendResultList.wait] for high-level API.

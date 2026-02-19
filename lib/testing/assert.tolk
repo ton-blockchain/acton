@@ -101,14 +101,20 @@ fun Assert.fail(message: string = "", location: string = ""): never {
     throw ASSERTION_FAILED;
 }
 
-/// Asserts that the function without arguments consumes less than the expected amount of gas.
+/// Asserts that the function without arguments consumes less than or equal to the expected amount of gas.
+/// Returns the callback result.
+///
+/// Gas is compared using `end - start - 26`.
+/// The fixed `26` gas measurement overhead is subtracted before the `<= expected` check.
 ///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan(fun do_something() {
+///     val result = Assert.consumesLessThan(fun do_something() {
 ///         // do something that consumes gas
+///         return 42;
 ///     }, 100);
+///     Assert.equal(result, 42);
 /// }
 /// ```
 ///
@@ -123,17 +129,22 @@ fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int) {
     return result;
 }
 
-/// Asserts that the function with single argument consumes less than the expected amount of gas.
+/// Asserts that the function with a single argument consumes less than or equal to the expected amount of gas.
+/// Returns the callback result.
+///
+/// Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
 ///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan1(fun do_something(a: int, b: int) {
+///     val result = Assert.consumesLessThan1(fun do_something(a: int) {
 ///         // do something that consumes gas
+///         return a + 1;
 ///     }, 100, 100);
-/// //     ^^^  ^^^ this argument will be passed to the function as the second argument
-/// //     |
-/// //     this argument will be passed to the function as the first argument
+/// //     ^^^  ^^^
+/// //     |    expected max gas (inclusive)
+/// //     callback argument `a`
+///     Assert.equal(result, 101);
 /// }
 /// ```
 fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int) {
@@ -144,19 +155,23 @@ fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected:
     return result;
 }
 
-/// Asserts that the function with two arguments consumes less than the expected amount of gas.
+/// Asserts that the function with two arguments consumes less than or equal to the expected amount of gas.
+/// Returns the callback result.
+///
+/// Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
 ///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan2(fun do_something(a: int, b: int) {
+///     val result = Assert.consumesLessThan2(fun do_something(a: int, b: int) {
 ///         // do something that consumes gas
-///     }, 100, 100, 100);
-/// //     ^^^  ^^^  ^^^ this argument will be passed to the function as the third argument
-/// //     |    |
-/// //     |    this argument will be passed to the function as the second argument
-/// //     |
-/// //     this argument will be passed to the function as the first argument
+///         return a + b;
+///     }, 10, 20, 100);
+/// //     ^^  ^^  ^^^
+/// //     |   |   expected max gas (inclusive)
+/// //     |   callback argument `b`
+/// //     callback argument `a`
+///     Assert.equal(result, 30);
 /// }
 /// ```
 fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
@@ -172,21 +187,24 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
     return result;
 }
 
-/// Asserts that the function with three arguments consumes less than the expected amount of gas.
+/// Asserts that the function with three arguments consumes less than or equal to the expected amount of gas.
+/// Returns the callback result.
+///
+/// Uses the same gas accounting as `consumesLessThan`: `end - start - 26 <= expected`.
 ///
 /// Example:
 /// ```tolk
 /// get fun test_gas_consumption() {
-///     Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
+///     val result = Assert.consumesLessThan3(fun do_something(a: int, b: int, c: int) {
 ///         // do something that consumes gas
-///     }, 100, 100, 100, 100);
-/// //     ^^^  ^^^  ^^^  ^^^ this argument will be passed to the function as the fourth argument
-/// //     |    |    |
-/// //     |    |    this argument will be passed to the function as the third argument
-/// //     |    |
-/// //     |    this argument will be passed to the function as the second argument
-/// //     |
-/// //     this argument will be passed to the function as the first argument
+///         return a + b + c;
+///     }, 10, 20, 30, 100);
+/// //     ^^  ^^  ^^  ^^^
+/// //     |   |   |   expected max gas (inclusive)
+/// //     |   |   callback argument `c`
+/// //     |   callback argument `b`
+/// //     callback argument `a`
+///     Assert.equal(result, 60);
 /// }
 /// ```
 fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
@@ -236,7 +254,8 @@ fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "
     }
 }
 
-/// Internal function to assert that the function consumed less than the expected amount of gas.
+/// Internal function to assert that consumed gas is less than or equal to the expected amount of gas.
+/// Consumed gas is measured as `end - start - 26`.
 ///
 /// NOT FOR PUBLIC USE.
 fun ffi.assertConsumedLess(start: int, end: int, expected: int) {

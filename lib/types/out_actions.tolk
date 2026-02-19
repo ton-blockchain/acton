@@ -27,9 +27,14 @@ import "../testing/assert"
 import "../vm/vm"
 
 /// Represents a node in the out list.
-/// This is an internal type, you shouldn't use it directly.
+/// This is an internal linked-list node, you should not use it directly.
+///
+/// `prev` is stored in the list node itself and points to the previous list node.
+/// It is not a field of any `OutAction*` payload.
 struct OutList {
+    /// Link to previous out-list node.
     prev: Cell<OutList>
+    /// Serialized out action stored in this node.
     action: OutAction
 }
 
@@ -132,10 +137,11 @@ struct (0b1) LibRefRef {
     library: cell
 }
 
-/// Represents library reference, either hash or cell reference.
+/// Type alias for library reference used by [OutActionChangeLibrary.libref].
+/// Value is either a hash-only reference ([LibRefHash]) or an in-cell library ([LibRefRef]).
 type LibRef = LibRefHash | LibRefRef
 
-/// Represents all possible out actions.
+/// Type alias for tagged union of all supported out action variants.
 type OutAction =
     | OutActionSendMessage
     | OutActionSetCode
@@ -143,6 +149,12 @@ type OutAction =
     | OutActionChangeLibrary
 
 /// Returns the kind of the out action as a string.
+///
+/// Exact return values:
+/// - `"send-message"` for [OutActionSendMessage]
+/// - `"set-code"` for [OutActionSetCode]
+/// - `"reserve-currency"` for [OutActionReserveCurrency]
+/// - `"change-library"` for [OutActionChangeLibrary]
 fun OutAction.kind(self): string {
     match (self) {
         OutActionSendMessage => {
@@ -160,7 +172,9 @@ fun OutAction.kind(self): string {
     }
 }
 
-/// Represents a list of out actions.
+/// Type alias for the out action list tuple.
+///
+/// Each tuple entry is a raw cell that must decode as [OutAction] when read via [OutActionList.at].
 ///
 /// To get the out actions, use [vm.outActions] method.
 type OutActionList = tuple
@@ -168,6 +182,8 @@ type OutActionList = tuple
 /// Returns the out action at the given index.
 ///
 /// NOTE: this list is reversed, so the last action is at index 0.
+///
+/// Fails with [Assert.fail] if the stored tuple element cannot be decoded as [OutAction].
 ///
 /// Example:
 /// ```tolk
@@ -209,6 +225,8 @@ fun OutActionList.getSendMessageAt(self, i: int): OutActionSendMessage? {
 /// Note that you should provide the message type as a generic parameter.
 ///
 /// If the action is not a send message, returns null.
+/// If the action is a send message but `Msg` does not match actual body type, this call throws
+/// (for example with exit code 63 from typed message decoding).
 ///
 /// Example:
 /// ```tolk
@@ -247,6 +265,9 @@ fun vm.outActions(): OutActionList {
 }
 
 /// Parses the out actions from the raw cell (like C5 register).
+///
+/// If [cell] is empty (no bits and no refs), returns an empty tuple.
+/// Fails with [Assert.fail] if list node layout is malformed.
 ///
 /// Example:
 /// ```tolk

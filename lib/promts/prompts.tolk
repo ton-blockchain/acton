@@ -26,6 +26,9 @@ import "../ffi/ffi"
 /// Placeholder is the text that will be displayed in the input field as
 /// a hint to the user.
 ///
+/// Non-interactive fallback:
+/// - Returns `""` when user input cannot be collected (for example, non-interactive runner).
+///
 /// Example:
 /// ```tolk
 /// val name = prompt("What is your name?", "John");
@@ -37,6 +40,12 @@ fun prompt(message: string, placeholder: string = ""): string {
 
 /// Prompts the user to select an option from a list of variants.
 ///
+/// Input and fallback behavior:
+/// - `variants` is expected to be a tuple of strings.
+/// - If `variants` is not a tuple, returns `""`.
+/// - Non-string tuple items are silently ignored.
+/// - If prompt execution fails (including non-interactive mode), returns `""`.
+///
 /// Example:
 /// ```tolk
 /// val name = select("What is your name?", ["John", "Jane", "Jim"] as tuple);
@@ -47,6 +56,11 @@ fun select(message: string, variants: tuple): string {
 }
 
 /// Prompts the user to confirm an action.
+///
+/// Default and fallback behavior:
+/// - `default` is forwarded to the interactive host confirm prompt.
+/// - If prompt execution fails, result is `false` even when `default` is `true`
+///   (this includes non-interactive mode and known empty-input failure flows).
 ///
 /// Example:
 /// ```tolk

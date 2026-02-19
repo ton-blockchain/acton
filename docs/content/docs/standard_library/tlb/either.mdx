@@ -5,6 +5,25 @@ description: "either.tolk standard library file"
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
 
+Tagged union that stores either `X` (left) or `Y` (right).
+
+Alias semantics:
+- `Either<X, Y>` is exactly `EitherLeft<X> | EitherRight<Y>`.
+
+Encoding semantics:
+- Left branch starts with tag bit `0` (`0b0`).
+- Right branch starts with tag bit `1` (`0b1`).
+
+Typical consumption pattern:
+```tolk
+fun branchScore(choice: Either<uint32, uint32>): int {
+    return match (choice) {
+        EitherLeft => 1000 + choice.value,
+        EitherRight => 2000 + choice.value,
+    };
+}
+```
+
 ## Definitions
 
 ## `Either<X, Y>.left`
@@ -14,9 +33,10 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 fun Either<X, Y>.left(value: X)
 ```
 
-Left contructor
+Left constructor.
+Encodes with tag bit `0` followed by `value`.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L4" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L23" />
 
 ## `Either<X, Y>.right`
 
@@ -25,9 +45,10 @@ Left contructor
 fun Either<X, Y>.right(value: Y)
 ```
 
-Right contructor
+Right constructor.
+Encodes with tag bit `1` followed by `value`.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L10" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L30" />
 
 ## `EitherLeft`
 
@@ -37,7 +58,9 @@ struct (0b0) EitherLeft<X> {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L15" />
+Left variant with explicit TLB tag `0b0`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L36" />
 
 ## `EitherRight`
 
@@ -47,5 +70,7 @@ struct (0b1) EitherRight<X> {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L19" />
+Right variant with explicit TLB tag `0b1`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L41" />
 

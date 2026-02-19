@@ -24,8 +24,15 @@ struct fs
 /// Reads the entire contents of a file at the given path as a string slice
 /// with snake-string encoding.
 ///
-/// Returns the file contents as a slice if the file exists and can be read,
-/// or `null` if the file doesn't exist or cannot be read.
+/// Behavior details:
+/// - The file is read as UTF-8 text.
+/// - On any read failure, returns `null` (missing file, non-UTF-8 content,
+///   permission error, or other host I/O error).
+/// - Failure reasons are intentionally collapsed to `null`; no error reason is exposed.
+/// - Relative paths are resolved by the host process working directory. Path forms such as
+///   `./a.txt` and `dir/../a.txt` are accepted and follow host path normalization rules.
+/// - Newline bytes are preserved as-is after UTF-8 decoding (for example, CRLF is not
+///   normalized to LF).
 ///
 /// Example:
 /// ```tolk

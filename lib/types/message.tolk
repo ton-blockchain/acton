@@ -46,7 +46,13 @@ struct MessageRelaxedGeneric {
 
 /// Loads the opcode of the message.
 ///
-/// If [skipBounce] is true, the 0xFFFFFFFF prefix is skipped.
+/// Returns `null` for malformed or too-short body data:
+/// - body marks `EitherRight` but does not contain a body reference;
+/// - decoded body has fewer than 32 bits for the first opcode;
+/// - [skipBounce] is true, first opcode is `0xFFFFFFFF`, and fewer than 32 bits remain
+///   for the second opcode.
+///
+/// If [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped.
 ///
 /// Example:
 /// ```tolk
@@ -73,7 +79,10 @@ struct ExtMessageRelaxedGeneric {
 
 /// Loads the opcode of the message.
 ///
-/// If [skipBounce] is true, the 0xFFFFFFFF prefix is skipped.
+/// Same behavior as [MessageRelaxedGeneric.loadOpcode]:
+/// - returns the first 32-bit opcode by default;
+/// - if [skipBounce] is true, the `0xFFFFFFFF` prefix is skipped;
+/// - returns `null` for malformed or too-short body data.
 fun ExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int? {
     return implMsg.loadOpcode(self.body, skipBounce);
 }
@@ -101,6 +110,10 @@ struct MessageRelaxed<X> {
 }
 
 /// Loads the body of the message.
+///
+/// Decoding branch behavior:
+/// - `EitherLeft`: body is already in this cell and is returned directly.
+/// - `EitherRight`: body is loaded from referenced cell.
 ///
 /// Note that if message type mismatch, loading will fail with exit code 63.
 ///
@@ -133,6 +146,10 @@ struct ExtMessageRelaxed<X> {
 }
 
 /// Loads the body of the message.
+///
+/// Decoding branch behavior:
+/// - `EitherLeft`: body is already in this cell and is returned directly.
+/// - `EitherRight`: body is loaded from referenced cell.
 ///
 /// Note that if message type mismatch, loading will fail with exit code 63.
 fun ExtMessageRelaxed<X>.loadBody(self): X {
@@ -212,11 +229,21 @@ struct (0b11) ExternalOutMessageInfo {
     createdAt: uint32
 }
 
+/// Tagged union for the TL-B `CommonMsgInfo` constructors.
+///
+/// Runtime variant is selected by the leading tag:
+/// - `0b0`: [InternalMessage]
+/// - `0b10`: [ExternalInMessageInfo]
+/// - `0b11`: [ExternalOutMessageInfo]
 type CommonMessageInfo =
     | InternalMessage
     | ExternalInMessageInfo
     | ExternalOutMessageInfo
 
+/// Generic message structure with configurable body and info types.
+///
+/// `TInfo` defaults to [CommonMessageInfo], so when `Message` is loaded with default generic
+/// arguments, `info` is decoded as one of the `CommonMsgInfo` tagged variants above.
 @overflow1023_policy("suppress")
 struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
     info: TInfo
@@ -224,6 +251,11 @@ struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
     body: Either<TBody, Cell<TBody>>
 }
 
+/// Loads `Message.body`.
+///
+/// Decoding branch behavior:
+/// - `EitherLeft`: body is already in this cell and is returned directly.
+/// - `EitherRight`: body is loaded from referenced cell.
 fun Message<TBody, TInfo>.loadBody(self): TBody {
     return match (self.body) {
         EitherLeft => self.body.value,

@@ -34,20 +34,25 @@ if (transfer != null) {
 
 ```tolk
 struct OutList {
+    /// Link to previous out-list node.
+    prev: Cell<OutList>
+    /// Serialized out action stored in this node.
     action: OutAction
 }
 ```
 
 Represents a node in the out list.
-This is an internal type, you shouldn't use it directly.
+This is an internal linked-list node, you should not use it directly.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L31" />
+`prev` is stored in the list node itself and points to the previous list node.
+It is not a field of any `OutAction*` payload.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L34" />
 
 ## `OutActionSendMessage`
 
 ```tolk
 struct (0x0ec3c86d) OutActionSendMessage {
-    prev: Cell<OutList>
     /// Mode of the send message. See `SEND_MODE_*` constants.
     mode: uint8
     /// Message to send.
@@ -59,7 +64,7 @@ struct (0x0ec3c86d) OutActionSendMessage {
 
 Represents send message action.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L36" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L42" />
 
 ## `OutActionSendMessage.loadMessage`
 
@@ -84,7 +89,7 @@ if (action is OutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L62" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L67" />
 
 ## `OutActionSendMessage.loadBody`
 
@@ -106,7 +111,7 @@ if (action is OutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L79" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L84" />
 
 ## `OutActionSendMessage.loadGenericMessage`
 
@@ -129,13 +134,12 @@ if (action is OutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L97" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L102" />
 
 ## `OutActionSetCode`
 
 ```tolk
 struct (0xad4de08e) OutActionSetCode {
-    prev: Cell<OutList>
     /// New code to set.
     newCode: cell
 }
@@ -143,13 +147,12 @@ struct (0xad4de08e) OutActionSetCode {
 
 Represents set code action.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L102" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L107" />
 
 ## `OutActionReserveCurrency`
 
 ```tolk
 struct (0x36e6b809) OutActionReserveCurrency {
-    prev: Cell<OutList>
     /// Mode of the reserve currency. See `RESERVE_MODE_*` constants.
     mode: uint8
     /// Currency to reserve.
@@ -159,13 +162,12 @@ struct (0x36e6b809) OutActionReserveCurrency {
 
 Represents reserve currency action.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L109" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L113" />
 
 ## `OutActionChangeLibrary`
 
 ```tolk
 struct (0x26fa1dd4) OutActionChangeLibrary {
-    prev: Cell<OutList>
     /// Mode of the change library.
     mode: uint7
     /// Library reference, either hash or cell reference.
@@ -175,7 +177,7 @@ struct (0x26fa1dd4) OutActionChangeLibrary {
 
 Represents change library action.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L118" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L121" />
 
 ## `LibRefHash`
 
@@ -188,7 +190,7 @@ struct (0b0) LibRefHash {
 
 Represents library reference as a hash.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L127" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L129" />
 
 ## `LibRefRef`
 
@@ -201,7 +203,7 @@ struct (0b1) LibRefRef {
 
 Represents library reference as a cell reference.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L133" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L135" />
 
 ## `OutAction.kind`
 
@@ -211,7 +213,13 @@ fun OutAction.kind(self): string
 
 Returns the kind of the out action as a string.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L149" />
+Exact return values:
+- `"send-message"` for [OutActionSendMessage](#outactionsendmessage)
+- `"set-code"` for [OutActionSetCode](#outactionsetcode)
+- `"reserve-currency"` for [OutActionReserveCurrency](#outactionreservecurrency)
+- `"change-library"` for [OutActionChangeLibrary](#outactionchangelibrary)
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L158" />
 
 ## `OutActionList.at`
 
@@ -223,6 +231,8 @@ Returns the out action at the given index.
 
 NOTE: this list is reversed, so the last action is at index 0.
 
+Fails with [Assert.fail](../../testing/assert/#assertfail) if the stored tuple element cannot be decoded as OutAction.
+
 Example:
 ```tolk
 val out_actions = vm.outActions();
@@ -230,7 +240,7 @@ val action = out_actions.at(0);
 println(action.kind());
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L181" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L194" />
 
 ## `OutActionList.getSendMessageAt`
 
@@ -251,7 +261,7 @@ if (action != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L198" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L215" />
 
 ## `OutActionList.getSendMessageBodyAt`
 
@@ -264,6 +274,8 @@ Returns the body of the send message at the given index.
 Note that you should provide the message type as a generic parameter.
 
 If the action is not a send message, returns null.
+If the action is a send message but `Msg` does not match actual body type, this call throws
+(for example with exit code 63 from typed message decoding).
 
 Example:
 ```tolk
@@ -274,7 +286,7 @@ if (body != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L220" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L239" />
 
 ## `OutMessage.outActions`
 
@@ -284,7 +296,7 @@ fun OutMessage.outActions(self, mode: int): OutActionList
 
 Returns the out actions for the message.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L239" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L248" />
 
 ## `vm.outActions`
 
@@ -300,7 +312,7 @@ val out_actions = vm.outActions();
 println(out_actions.size());
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L254" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L263" />
 
 ## `vm.parseOutActions`
 
@@ -310,11 +322,14 @@ fun vm.parseOutActions(cell: cell): OutActionList
 
 Parses the out actions from the raw cell (like C5 register).
 
+If cell is empty (no bits and no refs), returns an empty tuple.
+Fails with [Assert.fail](../../testing/assert/#assertfail) if list node layout is malformed.
+
 Example:
 ```tolk
 val out_actions = vm.parseOutActions(vm.getC5());
 println(out_actions.size());
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L265" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/out_actions.tolk#L277" />
 

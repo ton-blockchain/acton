@@ -65,7 +65,13 @@ fun MessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int?
 
 Loads the opcode of the message.
 
-If skipBounce is true, the 0xFFFFFFFF prefix is skipped.
+Returns `null` for malformed or too-short body data:
+- body marks `EitherRight` but does not contain a body reference;
+- decoded body has fewer than 32 bits for the first opcode;
+- skipBounce is true, first opcode is `0xFFFFFFFF`, and fewer than 32 bits remain
+  for the second opcode.
+
+If skipBounce is true, the `0xFFFFFFFF` prefix is skipped.
 
 Example:
 ```tolk
@@ -78,7 +84,7 @@ if (action is OutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L61" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L67" />
 
 ## `ExtMessageRelaxedGeneric`
 
@@ -94,7 +100,7 @@ Represents a generic external message. Unlike [ExtMessageRelaxed](#extmessagerel
 load the body of the message. Instead body is represented as a slice and can be parsed
 later manually (for example to load the opcode).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L68" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L74" />
 
 ## `ExtMessageRelaxedGeneric.loadOpcode`
 
@@ -104,9 +110,12 @@ fun ExtMessageRelaxedGeneric.loadOpcode(self, skipBounce: bool = false): int?
 
 Loads the opcode of the message.
 
-If skipBounce is true, the 0xFFFFFFFF prefix is skipped.
+Same behavior as [MessageRelaxedGeneric.loadOpcode](#messagerelaxedgenericloadopcode):
+- returns the first 32-bit opcode by default;
+- if skipBounce is true, the `0xFFFFFFFF` prefix is skipped;
+- returns `null` for malformed or too-short body data.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L77" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L86" />
 
 ## `MessageRelaxed`
 
@@ -135,7 +144,7 @@ if (action is OutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L96" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L105" />
 
 ## `MessageRelaxed<X>.loadBody`
 
@@ -144,6 +153,10 @@ fun MessageRelaxed<X>.loadBody(self): X
 ```
 
 Loads the body of the message.
+
+Decoding branch behavior:
+- `EitherLeft`: body is already in this cell and is returned directly.
+- `EitherRight`: body is loaded from referenced cell.
 
 Note that if message type mismatch, loading will fail with exit code 63.
 
@@ -158,7 +171,7 @@ if (action is OutActionSendMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L117" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L130" />
 
 ## `ExtMessageRelaxed`
 
@@ -176,7 +189,7 @@ loads the body of the message with passed type.
 
 If actual message body has a different type, loading will fail with exit code 63.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L128" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L141" />
 
 ## `ExtMessageRelaxed<X>.loadBody`
 
@@ -186,9 +199,13 @@ fun ExtMessageRelaxed<X>.loadBody(self): X
 
 Loads the body of the message.
 
+Decoding branch behavior:
+- `EitherLeft`: body is already in this cell and is returned directly.
+- `EitherRight`: body is loaded from referenced cell.
+
 Note that if message type mismatch, loading will fail with exit code 63.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L138" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L155" />
 
 ## `IntMsgInfoRelaxed`
 
@@ -209,7 +226,7 @@ struct (0b0) IntMsgInfoRelaxed {
 
 Represents common message info for internal relaxed message.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L146" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L163" />
 
 ## `ExtMsgInfoRelaxed`
 
@@ -224,7 +241,7 @@ struct (0b11) ExtMsgInfoRelaxed {
 
 Represents common message info for external relaxed message.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L160" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L177" />
 
 ## `CurrencyCollection`
 
@@ -239,7 +256,7 @@ struct CurrencyCollection {
 
 Represents a currency collection as TON amount + extra currencies.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L168" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L185" />
 
 ## `InternalMessage`
 
@@ -265,7 +282,7 @@ int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
                created_lt:uint64 created_at:uint32 = CommonMsgInfo;
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L181" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L198" />
 
 ## `ExternalInMessageInfo`
 
@@ -282,7 +299,7 @@ ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
                    import_fee:Grams = CommonMsgInfo;
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L198" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L215" />
 
 ## `ExternalOutMessageInfo`
 
@@ -300,7 +317,7 @@ ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
                     created_lt:uint64 created_at:uint32 = CommonMsgInfo;
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L208" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L225" />
 
 ## `Message`
 
@@ -313,7 +330,12 @@ struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L220" />
+Generic message structure with configurable body and info types.
+
+`TInfo` defaults to CommonMessageInfo, so when `Message` is loaded with default generic
+arguments, `info` is decoded as one of the `CommonMsgInfo` tagged variants above.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L247" />
 
 ## `Message<TBody, TInfo>.loadBody`
 
@@ -321,7 +343,13 @@ struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
 fun Message<TBody, TInfo>.loadBody(self): TBody
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L227" />
+Loads `Message.body`.
+
+Decoding branch behavior:
+- `EitherLeft`: body is already in this cell and is returned directly.
+- `EitherRight`: body is loaded from referenced cell.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L259" />
 
 ## `implMsg`
 
@@ -329,7 +357,7 @@ fun Message<TBody, TInfo>.loadBody(self): TBody
 struct implMsg
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L234" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L266" />
 
 ## `implMsg.loadOpcode`
 
@@ -337,5 +365,5 @@ struct implMsg
 fun implMsg.loadOpcode(body: slice, skipBounce: bool)
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L236" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L268" />
 

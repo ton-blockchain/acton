@@ -35,6 +35,9 @@ import "../testing/assert"
 /// and values are cells containing the serialized configuration parameter data.
 /// Configuration parameters are defined in the [`block.tlb`](https://github.com/ton-blockchain/ton/blob/master/crypto/block/block.tlb)
 /// TL-B schema.
+///
+/// `Config.set*` methods mutate only this in-memory map.
+/// To apply updates to the emulator globally, call [net.setConfig] with the mutated config.
 type Config = map<uint32, cell>
 
 /// Sets a raw configuration parameter at the given index.
@@ -42,6 +45,7 @@ type Config = map<uint32, cell>
 /// This is a low-level function that directly stores a cell at the specified parameter index.
 /// For type-safe parameter access, prefer using specialized setter functions such as
 /// [Config.setGasPrices], [Config.setStoragePrices], or [Config.setGlobalVersion].
+/// This mutates only the local [Config] value until you call [net.setConfig].
 ///
 /// Parameters:
 /// - `index`: The configuration parameter index (typically 0-90)
@@ -96,6 +100,7 @@ struct (0xc4) GlobalVersion {
 /// This function updates the network version and validator capabilities configuration.
 /// When validators vote to update the network, they update this parameter, allowing
 /// the TON Blockchain to upgrade without downtime.
+/// This mutates only the local [Config] value until you call [net.setConfig].
 ///
 /// Parameters:
 /// - `version`: The new global network version struct containing version and capabilities
@@ -107,6 +112,9 @@ struct (0xc4) GlobalVersion {
 ///     capabilities: 0xFF
 /// };
 /// config.setGlobalVersion(newVersion);
+/// if (!net.setConfig(config)) {
+///     Assert.fail("Failed to apply config");
+/// }
 /// ```
 fun Config.setGlobalVersion(mutate self, version: GlobalVersion) {
     self.set(GLOBAL_VERSION_INDEX, version.toCell());
@@ -206,6 +214,9 @@ fun StoragePricesDict.getInitial(self) {
 /// };
 /// storagePrices.setInitial(newInitialPrices);
 /// config.setStoragePrices(storagePrices);
+/// if (!net.setConfig(config)) {
+///     Assert.fail("Failed to apply config");
+/// }
 /// ```
 fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices) {
     self.set(INITIAL_UNIXTIME_STORAGE_INDEX, prices);
@@ -216,6 +227,7 @@ fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices) {
 /// Storage prices are organized as a dictionary mapping timestamps to price structures,
 /// allowing for price adjustments over time. This function updates the entire storage
 /// price dictionary.
+/// This mutates only the local [Config] value until you call [net.setConfig].
 ///
 /// Parameters:
 /// - `prices`: A dictionary mapping Unix timestamps to [StoragePrices] configurations
@@ -231,6 +243,9 @@ fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices) {
 ///     masterchainCellPrice: 1000
 /// });
 /// config.setStoragePrices(pricesDict);
+/// if (!net.setConfig(config)) {
+///     Assert.fail("Failed to apply config");
+/// }
 /// ```
 fun Config.setStoragePrices(mutate self, prices: StoragePricesDict) {
     val pricesDict = prices.toCell();
@@ -307,6 +322,8 @@ const BASECHAIN_GAS_PRICES_INDEX = 21
 /// Parameters:
 /// - `prices`: Gas price configuration struct
 /// - `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
+///
+/// This mutates only the local [Config] value until you call [net.setConfig].
 fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int) {
     val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
     self.set(index, prices.toCell());
@@ -317,7 +334,7 @@ fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int) {
 /// Returns the gas price configuration that determines transaction execution costs.
 ///
 /// Parameters:
-/// - `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
+/// - `chainType`: If equal to `MASTERCHAIN`, reads Param 20; any other value (including `BASECHAIN`) reads Param 21
 ///
 /// Returns: [GasPrices] configuration union containing the gas pricing parameters.
 ///
@@ -363,7 +380,9 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 ///
 /// Parameters:
 /// - `prices`: Message forwarding price configuration
-/// - `chainType`: If `MASTERCHAIN`, sets masterchain message prices (Param 24); if `BASECHAIN`, sets basechain prices (Param 25)
+/// - `chainType`: If equal to `MASTERCHAIN`, uses Param 24; any other value (including `BASECHAIN`) uses Param 25
+///
+/// This mutates only the local [Config] value until you call [net.setConfig].
 ///
 /// Example:
 /// ```tolk
@@ -376,6 +395,9 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 ///     nextFrac: 21845
 /// };
 /// config.setMsgForwardPrices(msgPrices, MASTERCHAIN);
+/// if (!net.setConfig(config)) {
+///     Assert.fail("Failed to apply config");
+/// }
 /// ```
 fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int) {
     val index = chainType == MASTERCHAIN
@@ -390,7 +412,7 @@ fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType:
 /// Returns the message forwarding prices that determine message routing costs.
 ///
 /// Parameters:
-/// - `chainType`: If `MASTERCHAIN`, sets masterchain message prices (Param 24); if `BASECHAIN`, sets basechain prices (Param 25)
+/// - `chainType`: If equal to `MASTERCHAIN`, reads Param 24; any other value (including `BASECHAIN`) reads Param 25
 ///
 /// Returns: [MsgForwardPrices] configuration containing message forwarding price parameters.
 ///
@@ -432,7 +454,10 @@ struct (0xc0) PrecompiledContractsConfig {
     list: map<uint256, PrecompiledSmartContract>
 }
 
-/// Adds new entry to precompiled gas contract list
+/// Adds a precompiled contract gas entry if `hash` is not already present.
+///
+/// Returns `true` when a new entry is inserted.
+/// Returns `false` for duplicate `hash` values, and keeps the original `gasUsage` unchanged.
 fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64) {
     return self.list.addIfNotExists(hash, {
         gasUsage: gasForComputePhase,
@@ -444,6 +469,7 @@ fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasFor
 /// Updates the list of precompiled smart contracts and their associated gas costs.
 /// Precompiled contracts are system-provided optimizations for common cryptographic
 /// and utility operations.
+/// This mutates only the local [Config] value until you call [net.setConfig].
 ///
 /// Parameters:
 /// - `precompiledConfig`: Configuration containing the dictionary of precompiled contracts
@@ -456,6 +482,9 @@ fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasFor
 ///     list: contractsList
 /// };
 /// config.setPrecompiledContractsConfig(precompiledConfig);
+/// if (!net.setConfig(config)) {
+///     Assert.fail("Failed to apply config");
+/// }
 /// ```
 fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: PrecompiledContractsConfig) {
     self.set(PRECOMPILED_CONTRACTS_CONFIG_INDEX, precompiledConfig.toCell());
@@ -465,6 +494,9 @@ fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: Precomp
 ///
 /// Returns the configuration of all precompiled contracts available in the network,
 /// including their fixed gas costs.
+/// In the default emulator config this dictionary starts with one built-in entry.
+/// If you explicitly write an empty dictionary via [Config.setPrecompiledContractsConfig]
+/// and apply it with [net.setConfig], subsequent reads return an empty dictionary.
 ///
 /// Returns: [PrecompiledContractsConfig] containing the precompiled contracts dictionary.
 ///
