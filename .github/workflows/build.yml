@@ -16,10 +16,6 @@ concurrency:
 permissions:
   contents: write
 
-env:
-  SCCACHE_GHA_ENABLED: true
-  RUSTC_WRAPPER: sccache
-
 jobs:
   build-linux:
     runs-on: ubuntu-latest
@@ -29,53 +25,35 @@ jobs:
       arch: ${{ steps.detect-arch.outputs.arch }}
 
     steps:
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
       - name: Check out Acton repository
         uses: actions/checkout@v6
 
-      - name: Install Rust
-        run: rustup toolchain install
-
-      - name: Cache Cargo registry + git + target
+      - name: Cache Cargo
         uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            cargo-${{ runner.os }}-
 
-      - name: Install required system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev just graphviz
-          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+      - name: Install Rust
+        run: rustup toolchain install
 
-      - name: Clone TON repository
-        run: |
-          git clone https://github.com/i582/ton.git --branch pmakhnev/acton --single-branch --depth=1 ton-repo
-          cd ton-repo
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest,just
 
       - name: Get TON commit hash
         id: ton-commit
         run: |
-          TON_COMMIT=$(git ls-remote https://github.com/i582/ton.git pmakhnev/acton | cut -f1)
+          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
           echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
-
-      - name: Cache TON build directory
-        id: cache-ton-build
-        uses: actions/cache@v5
-        with:
-          path: ton-repo/build
-          key: ton-build-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-build-${{ runner.os }}-
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
@@ -88,30 +66,35 @@ jobs:
       - name: Check cache hit
         run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
 
-      - name: Cache TON dependencies (OpenSSL, LZ4, Zlib)
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        id: cache-ton-deps
-        uses: actions/cache@v5
-        with:
-          path: |
-            ton-repo/openssl_3
-            ton-repo/lz4
-            ton-repo/zlib
-          key: ton-deps-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-deps-${{ runner.os }}-
-
-      - name: Cache ccache
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: actions/cache@v5
-        with:
-          path: ~/.ccache
-          key: ccache-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ccache-${{ runner.os }}-
-
-      - name: Init submodules for build
+      - name: Install system dependencies (cache not exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
-          cd ton-repo && git submodule update --init --recursive
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev graphviz
+          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+
+      - name: Install system dependencies (cache exist)
+        if: steps.cache-ton-artifacts.outputs.cache-hit == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+
+      - name: Maximize Build Space
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      - name: Clone TON repository
+        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: i582/ton
+          ref: pmakhnev/acton
+          fetch-depth: 1
+          submodules: true
+          path: ton-repo
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -142,13 +125,6 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
 
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-        env:
-          SCCACHE_VERSION: v0.13.0
-        with:
-          version: ${{ env.SCCACHE_VERSION }}
-
       - name: Build acton binary
         env:
           CC: gcc
@@ -161,31 +137,13 @@ jobs:
         run: |
           ./target/debug/acton --help
 
-      #      - name: Upload acton binary as artifact
-      #        uses: actions/upload-artifact@v6
-      #        with:
-      #          name: acton-linux-binary
-      #          path: target/debug/acton
-
-      - name: Install cargo-llvm-cov and nextest
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov,nextest
-
-      - name: Run tests and generate coverage
+      - name: Run tests
         run: |
-          rustup component add llvm-tools-preview
-          just coverage-html
+          just test
 
       - name: Run Acton tests
         run: |
           ./target/debug/acton test
-
-#      - name: Upload coverage report
-#        uses: actions/upload-artifact@v6
-      #        with:
-      #          name: coverage-report
-      #          path: target/llvm-cov/html
 
       - name: Run formatter and linter
         run: |
@@ -193,7 +151,7 @@ jobs:
           just clippy
 
   create-canary-release:
-    needs: [build-linux]
+    needs: [ build-linux ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && false
 
