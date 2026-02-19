@@ -17,22 +17,21 @@ For detailed information about each blockchain configuration parameter, see the
 
 Examples:
 ```tolk
-// Update basechain gas prices.
-var config = net.getConfig();
-var baseGas = config.getGasPrices(BASECHAIN);
-baseGas.other.gasPrice = 1000;
-baseGas.other.gasLimit = 1000000;
-config.setGasPrices(baseGas, BASECHAIN);
+// Set custom gas prices
+var config = net.blockchainConfig();
+val gasPrice = GasPricesSimple {
+    gasPrice: 1000,
+    gasLimit: 1000000,
+    gasCredit: 10000,
+    blockGasLimit: 10000000,
+    freezeDueLimit: 1000000000,
+    deleteDueLimit: 5000000000
+};
+config.setGasPrices(simplePrices, MASTERCHAIN);
 
-// `set*` mutates only local `config`. Apply globally with net.setConfig.
-if (!net.setConfig(config)) {
-    Assert.fail("Failed to apply config");
-}
-
-// Access storage prices.
-val storagePrices = net.getConfig().getStoragePrices();
-val initialPrices = storagePrices.getInitial();
-println1("Initial bit price: {}", initialPrices.bitPrice);
+// Access storage prices
+val storagePrices = config.getStoragePrices();
+println1("Bit price: {}", storagePrices);
 ```
 
 ## Definitions
@@ -59,7 +58,7 @@ Example:
 config.setParamRaw(20, gasCell);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L59" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L58" />
 
 ## `Config.getParamRaw`
 
@@ -83,7 +82,7 @@ Example:
 val paramCell = config.getParamRaw(20);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L78" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L77" />
 
 ## `GLOBAL_VERSION_INDEX`
 
@@ -96,7 +95,7 @@ Configuration parameter index for global network version (Param 8).
 This parameter contains the network version number and capability flags supported by validators.
 It is used to coordinate network upgrades and enable/disable protocol features.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L86" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L85" />
 
 ## `GlobalVersion`
 
@@ -114,7 +113,7 @@ Network version and capabilities information (Param 8).
 This struct contains the current network version and a set of capability flags
 that indicate which features are supported by the network.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L92" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L91" />
 
 ## `Config.setGlobalVersion`
 
@@ -144,7 +143,7 @@ if (!net.setConfig(config)) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L120" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L119" />
 
 ## `Config.getGlobalVersion`
 
@@ -165,7 +164,7 @@ val version = config.getGlobalVersion();
 println(format2("Network version: {}, capabilities: {}", version.version, version.capabilities));
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L136" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L135" />
 
 ## `STORAGE_PRICES_INDEX`
 
@@ -178,7 +177,7 @@ Configuration parameter index for storage prices (Param 18).
 Storage prices determine the cost of storing data on the TON Blockchain.
 These costs are used to prevent spam and ensure network maintenance is properly funded.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L144" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L143" />
 
 ## `StoragePrices`
 
@@ -203,7 +202,7 @@ This struct defines the pricing for data storage in both the masterchain and reg
 Prices are given per 65536 seconds of storage. Storage fees are calculated based on the number
 of bits and cells used to represent contract code and data.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L151" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L150" />
 
 ## `INITIAL_UNIXTIME_STORAGE_INDEX`
 
@@ -216,7 +215,7 @@ Configuration parameter index for the initial storage price (timestamp 0).
 This index refers to the storage price entry at index 0, which represents the initial
 storage price configuration that applies from the beginning of time.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L174" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L173" />
 
 ## `StoragePricesDict.getInitial`
 
@@ -238,7 +237,7 @@ val initialPrices = storagePrices.getInitial();
 println1("Initial bit price: {}", initialPrices.bitPrice);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L189" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L188" />
 
 ## `StoragePricesDict.setInitial`
 
@@ -271,7 +270,7 @@ if (!net.setConfig(config)) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L222" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L221" />
 
 ## `Config.setStoragePrices`
 
@@ -305,7 +304,7 @@ if (!net.setConfig(config)) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L251" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L250" />
 
 ## `Config.getStoragePrices`
 
@@ -328,7 +327,7 @@ println(format3("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
     prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice));
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L272" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L271" />
 
 ## `GasPricesExtended`
 
@@ -355,7 +354,7 @@ Gas price configuration for extended gas schemes (Param 20/21 variant).
 
 This variant includes a special gas limit for system contracts.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L281" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L280" />
 
 ## `GasPrices`
 
@@ -375,7 +374,7 @@ Gas price configuration with flat pricing prefix.
 This allows for two-tiered pricing where a flat fee and price are applied first,
 followed by the standard pricing structure.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L302" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L301" />
 
 ## `MASTERCHAIN_GAS_PRICES_INDEX`
 
@@ -385,7 +384,7 @@ const MASTERCHAIN_GAS_PRICES_INDEX = 20
 
 Configuration parameter index for masterchain gas prices (Param 20).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L312" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L311" />
 
 ## `BASECHAIN_GAS_PRICES_INDEX`
 
@@ -395,7 +394,7 @@ const BASECHAIN_GAS_PRICES_INDEX = 21
 
 Configuration parameter index for basechain gas prices (Param 21).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L315" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L314" />
 
 ## `Config.setGasPrices`
 
@@ -411,11 +410,11 @@ and each gas unit has a price in nanotons.
 
 Parameters:
 - `prices`: Gas price configuration struct
-- `chainType`: If equal to `MASTERCHAIN`, uses Param 20; any other value (including `BASECHAIN`) uses Param 21
+- `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
 
 This mutates only the local Config value until you call [net.setConfig](../network/#netsetconfig).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L328" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L327" />
 
 ## `Config.getGasPrices`
 
@@ -438,7 +437,7 @@ val gasPrices = config.getGasPrices(BASECHAIN);
 println1("Gas limit basechain: {}", gasPrices);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L347" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L346" />
 
 ## `MsgForwardPrices`
 
@@ -464,7 +463,7 @@ Message forwarding price configuration (Param 24/25).
 This struct defines the costs associated with forwarding messages between accounts and shards
 in the TON Blockchain. Message routing uses these prices to calculate fees for message delivery.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L356" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L355" />
 
 ## `MASTERCHAIN_MSG_FORWARD_PRICES_INDEX`
 
@@ -474,7 +473,7 @@ const MASTERCHAIN_MSG_FORWARD_PRICES_INDEX = 24
 
 Configuration parameter index for masterchain message forwarding prices (Param 24).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L372" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L371" />
 
 ## `BASECHAIN_MSG_FORWARD_PRICES_INDEX`
 
@@ -484,7 +483,7 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 
 Configuration parameter index for basechain message forwarding prices (Param 25).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L375" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L374" />
 
 ## `Config.setMsgForwardPrices`
 
@@ -519,7 +518,7 @@ if (!net.setConfig(config)) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L403" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L402" />
 
 ## `Config.getMsgForwardPrices`
 
@@ -543,7 +542,7 @@ println(format3("Lump price: {}, Bit price: {}, Cell price: {}",
     msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice));
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L426" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L425" />
 
 ## `PRECOMPILED_CONTRACTS_CONFIG_INDEX`
 
@@ -557,7 +556,7 @@ Precompiled contracts are built-in smart contracts optimized for specific comput
 They consume a fixed amount of gas regardless of input size, making them more efficient
 than general-purpose contracts for their specific functions.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L439" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L438" />
 
 ## `PrecompiledSmartContract`
 
@@ -572,7 +571,7 @@ Precompiled smart contract configuration.
 
 Specifies the gas usage for a precompiled contract.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L444" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L443" />
 
 ## `PrecompiledContractsConfig`
 
@@ -588,7 +587,7 @@ Configuration for all precompiled contracts (Param 45).
 Contains a dictionary mapping contract addresses to their gas usage specifications.
 Precompiled contracts are optimized implementations of common operations provided by the system.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L453" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L452" />
 
 ## `PrecompiledContractsConfig.addContractGas`
 
@@ -601,7 +600,7 @@ Adds a precompiled contract gas entry if `hash` is not already present.
 Returns `true` when a new entry is inserted.
 Returns `false` for duplicate `hash` values, and keeps the original `gasUsage` unchanged.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L462" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L461" />
 
 ## `Config.setPrecompiledContractsConfig`
 
@@ -632,7 +631,7 @@ if (!net.setConfig(config)) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L490" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L489" />
 
 ## `Config.getPrecompiledContractsConfig`
 
@@ -656,5 +655,5 @@ val precompiledConfig = config.getPrecompiledContractsConfig();
 val contractsList = precompiledConfig.list;
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L509" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L508" />
 

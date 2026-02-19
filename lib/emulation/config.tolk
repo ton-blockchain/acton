@@ -10,22 +10,21 @@
 ///
 /// Examples:
 /// ```tolk
-/// // Update basechain gas prices.
-/// var config = net.getConfig();
-/// var baseGas = config.getGasPrices(BASECHAIN);
-/// baseGas.other.gasPrice = 1000;
-/// baseGas.other.gasLimit = 1000000;
-/// config.setGasPrices(baseGas, BASECHAIN);
+/// // Set custom gas prices
+/// var config = net.blockchainConfig();
+/// val gasPrice = GasPricesSimple {
+///     gasPrice: 1000,
+///     gasLimit: 1000000,
+///     gasCredit: 10000,
+///     blockGasLimit: 10000000,
+///     freezeDueLimit: 1000000000,
+///     deleteDueLimit: 5000000000
+/// };
+/// config.setGasPrices(simplePrices, MASTERCHAIN);
 ///
-/// // `set*` mutates only local `config`. Apply globally with net.setConfig.
-/// if (!net.setConfig(config)) {
-///     Assert.fail("Failed to apply config");
-/// }
-///
-/// // Access storage prices.
-/// val storagePrices = net.getConfig().getStoragePrices();
-/// val initialPrices = storagePrices.getInitial();
-/// println1("Initial bit price: {}", initialPrices.bitPrice);
+/// // Access storage prices
+/// val storagePrices = config.getStoragePrices();
+/// println1("Bit price: {}", storagePrices);
 /// ```
 
 import "../testing/assert"
@@ -322,7 +321,7 @@ const BASECHAIN_GAS_PRICES_INDEX = 21
 ///
 /// Parameters:
 /// - `prices`: Gas price configuration struct
-/// - `chainType`: If equal to `MASTERCHAIN`, uses Param 20; any other value (including `BASECHAIN`) uses Param 21
+/// - `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
 ///
 /// This mutates only the local [Config] value until you call [net.setConfig].
 fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int) {

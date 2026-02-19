@@ -1,9 +1,8 @@
 /// Module for building contract code cells.
 ///
-/// `build(name, path)` can compile a `.tolk` contract or load a prebuilt `.boc` file.
-/// For `.tolk` sources, build results are cached in-memory for the current run and
-/// persisted in `.acton/cache` for reuse across runs.
-
+/// This module provides the capability to compile Tolk contracts dynamically during the execution of tests or scripts.
+/// It interfaces with the Tolk compiler to generate the code cell for a given contract.
+///
 /// Build a contract with a specified name and optional path.
 ///
 /// `name` is the contract id key in `Acton.toml` (`[contracts.<id>]`), not the display
