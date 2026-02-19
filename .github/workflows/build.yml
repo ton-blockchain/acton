@@ -31,6 +31,13 @@ jobs:
 
       - name: Cache Cargo
         uses: ubicloud/rust-cache@v2
+        with:
+          cache-directories:
+            ~/.cargo/bin
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/registry
+            ~/.cargo/git
 
       - name: Install Rust
         run: rustup toolchain install
