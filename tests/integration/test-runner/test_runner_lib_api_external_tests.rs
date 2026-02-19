@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary for test-runner external API tests:
 //! - tests/integration/test-runner/test_runner_lib_api_external_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_lib_api_external/**
+//! - tests/integration/snapshots/test-runner/test_runner_lib_api_external_tests/**
 //! - tests/integration/testdata/test_runner_lib_api_external/**
 //! - tests/support/test_runner_lib_api_external/** (optional)
 //!

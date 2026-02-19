@@ -88,7 +88,7 @@ fn comparison_matchers_pass() {
         .success()
         .assert_passed(4)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_matchers/comparison_matchers_pass.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_matchers_tests/comparison_matchers_pass.stdout.txt",
         );
 }
 
@@ -103,7 +103,7 @@ fn comparison_matchers_fail() {
         .failure()
         .assert_failed(4)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_matchers/comparison_matchers_fail.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_matchers_tests/comparison_matchers_fail.stdout.txt",
         );
 }
 
@@ -118,7 +118,7 @@ fn approx_matchers_pass() {
         .success()
         .assert_passed(4)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_matchers/approx_matchers_pass.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_matchers_tests/approx_matchers_pass.stdout.txt",
         );
 }
 
@@ -133,6 +133,6 @@ fn approx_matchers_fail() {
         .failure()
         .assert_failed(3)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_matchers/approx_matchers_fail.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_matchers_tests/approx_matchers_fail.stdout.txt",
         );
 }

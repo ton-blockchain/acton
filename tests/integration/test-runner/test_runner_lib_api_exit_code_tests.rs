@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary:
 //! - tests/integration/test-runner/test_runner_lib_api_exit_code_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_lib_api_exit_code/**
+//! - tests/integration/snapshots/test-runner/test_runner_lib_api_exit_code_tests/**
 //! - tests/integration/testdata/test_runner_lib_api_exit_code/**
 //! - tests/support/test_runner_lib_api_exit_code/** (optional)
 
@@ -37,7 +37,7 @@ fn expect_to_end_with_exit_code_marks_controlled_throw_as_pass() {
         .assert_passed(1)
         .assert_not_contains("Expected exit_code=")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_exit_code/expect_to_end_with_exit_code_marks_controlled_throw_as_pass.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_exit_code_tests/expect_to_end_with_exit_code_marks_controlled_throw_as_pass.stdout.txt",
         );
 }
 
@@ -64,7 +64,7 @@ fn expect_to_end_with_exit_code_reports_mismatched_throw() {
         .assert_failed(1)
         .assert_contains("Expected exit_code=42, got=99")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_exit_code/expect_to_end_with_exit_code_reports_mismatched_throw.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_exit_code_tests/expect_to_end_with_exit_code_reports_mismatched_throw.stdout.txt",
         );
 }
 
@@ -92,7 +92,7 @@ fn expect_to_end_with_exit_code_overrides_fail_with_annotation() {
         .assert_passed(1)
         .assert_not_contains("Expected exit_code=12")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_exit_code/expect_to_end_with_exit_code_overrides_fail_with_annotation.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_exit_code_tests/expect_to_end_with_exit_code_overrides_fail_with_annotation.stdout.txt",
         );
 }
 
@@ -120,7 +120,7 @@ fn expect_to_end_with_exit_code_last_call_wins() {
         .assert_passed(1)
         .assert_not_contains("Expected exit_code=5")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_exit_code/expect_to_end_with_exit_code_last_call_wins.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_exit_code_tests/expect_to_end_with_exit_code_last_call_wins.stdout.txt",
         );
 }
 
@@ -152,6 +152,6 @@ fn expect_to_end_with_exit_code_conditional_path_without_expect_fails_with_raw_e
         .assert_contains("exit_code=17")
         .assert_not_contains("Expected exit_code=")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_exit_code/expect_to_end_with_exit_code_conditional_path_without_expect_fails_with_raw_exit_code.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_exit_code_tests/expect_to_end_with_exit_code_conditional_path_without_expect_fails_with_raw_exit_code.stdout.txt",
         );
 }

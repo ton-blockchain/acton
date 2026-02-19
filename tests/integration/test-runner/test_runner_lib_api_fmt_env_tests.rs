@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary for agent T:
 //! - tests/integration/test-runner/test_runner_lib_api_fmt_env_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_lib_api_fmt_env/**
+//! - tests/integration/snapshots/test-runner/test_runner_lib_api_fmt_env_tests/**
 
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
@@ -29,7 +29,7 @@ fn fmt_supports_mixed_hex_ton_and_plain_placeholders() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env/fmt_supports_mixed_hex_ton_and_plain_placeholders.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env_tests/fmt_supports_mixed_hex_ton_and_plain_placeholders.stdout.txt",
         );
 }
 
@@ -55,7 +55,7 @@ fn fmt_plain_and_hex_placeholders_should_follow_argument_order_bug() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env/fmt_plain_and_hex_placeholders_should_follow_argument_order_bug.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env_tests/fmt_plain_and_hex_placeholders_should_follow_argument_order_bug.stdout.txt",
         );
 }
 
@@ -84,7 +84,7 @@ fn fmt_fallback_for_non_int_specs_and_ignores_extra_args() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env/fmt_fallback_for_non_int_specs_and_ignores_extra_args.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env_tests/fmt_fallback_for_non_int_specs_and_ignores_extra_args.stdout.txt",
         );
 }
 
@@ -117,7 +117,7 @@ fn env_bool_parsing_handles_case_numeric_falsey_and_missing() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env/env_bool_parsing_handles_case_numeric_falsey_and_missing.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env_tests/env_bool_parsing_handles_case_numeric_falsey_and_missing.stdout.txt",
         );
 }
 
@@ -157,7 +157,7 @@ fn env_or_uses_defaults_for_invalid_int_address_and_cell_values() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env/env_or_uses_defaults_for_invalid_int_address_and_cell_values.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env_tests/env_or_uses_defaults_for_invalid_int_address_and_cell_values.stdout.txt",
         );
 }
 
@@ -188,6 +188,6 @@ fn env_rejects_unsupported_target_types_with_clear_error() {
             "env() supports only int, bool, string, slice, address and cell types, but got Unsupported",
         )
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env/env_rejects_unsupported_target_types_with_clear_error.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_fmt_env_tests/env_rejects_unsupported_target_types_with_clear_error.stdout.txt",
         );
 }

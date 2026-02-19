@@ -21,290 +21,292 @@ mod reporters_tests;
 mod run_tests;
 mod script_tests;
 mod stdlib_tests;
-#[path = "test-runner/test_runner_selection_and_fail_fast_tests.rs"]
-mod test_runner_selection_and_fail_fast_tests;
-#[path = "test-runner/test_runner_reporting_and_coverage_tests.rs"]
-mod test_runner_reporting_and_coverage_tests;
-#[path = "test-runner/test_runner_ui_tests.rs"]
-mod test_runner_ui_tests;
-#[path = "test-runner/test_runner_debug_port_tests.rs"]
-mod test_runner_debug_port_tests;
 #[path = "test-runner/test_runner_cmd_agent_h_tests.rs"]
 mod test_runner_cmd_agent_h_tests;
+#[path = "test-runner/test_runner_debug_port_tests.rs"]
+mod test_runner_debug_port_tests;
 #[path = "test-runner/test_runner_fork_network_tests.rs"]
 mod test_runner_fork_network_tests;
-#[path = "test-runner/test_runner_mutate_tests.rs"]
-mod test_runner_mutate_tests;
-#[path = "test-runner/test_runner_lib_api_matchers_tests.rs"]
-mod test_runner_lib_api_matchers_tests;
-#[path = "test-runner/test_runner_lib_api_map_tests.rs"]
-mod test_runner_lib_api_map_tests;
-#[path = "test-runner/test_runner_lib_api_exit_code_tests.rs"]
-mod test_runner_lib_api_exit_code_tests;
-#[path = "test-runner/test_runner_lib_api_send_single_tests.rs"]
-mod test_runner_lib_api_send_single_tests;
-#[path = "test-runner/test_runner_lib_api_external_tests.rs"]
-mod test_runner_lib_api_external_tests;
-#[path = "test-runner/test_runner_lib_api_transaction_matchers_tests.rs"]
-mod test_runner_lib_api_transaction_matchers_tests;
-#[path = "test-runner/test_runner_lib_api_register_code_cell_tests.rs"]
-mod test_runner_lib_api_register_code_cell_tests;
 #[path = "test-runner/test_runner_lib_api_account_state_tests.rs"]
 mod test_runner_lib_api_account_state_tests;
-#[path = "test-runner/test_runner_lib_api_wallet_mode_tests.rs"]
-mod test_runner_lib_api_wallet_mode_tests;
+#[path = "test-runner/test_runner_lib_api_exit_code_tests.rs"]
+mod test_runner_lib_api_exit_code_tests;
+#[path = "test-runner/test_runner_lib_api_external_tests.rs"]
+mod test_runner_lib_api_external_tests;
 #[path = "test-runner/test_runner_lib_api_fmt_env_tests.rs"]
 mod test_runner_lib_api_fmt_env_tests;
-#[path = "test-runner/test_runner_stdlib_maybe_tests.rs"]
-mod test_runner_stdlib_maybe_tests;
-#[path = "test-runner/test_runner_stdlib_either_tests.rs"]
-mod test_runner_stdlib_either_tests;
-#[path = "test-runner/test_runner_stdlib_assert_tests.rs"]
-mod test_runner_stdlib_assert_tests;
-#[path = "test-runner/test_runner_stdlib_expect_tests.rs"]
-mod test_runner_stdlib_expect_tests;
-#[path = "test-runner/test_runner_stdlib_transaction_expect_tests.rs"]
-mod test_runner_stdlib_transaction_expect_tests;
-#[path = "test-runner/test_runner_stdlib_af_outlist_tests.rs"]
-mod test_runner_stdlib_af_outlist_tests;
-#[path = "test-runner/test_runner_stdlib_ag_send_tests.rs"]
-mod test_runner_stdlib_ag_send_tests;
-#[path = "test-runner/test_runner_stdlib_ah_balance_tests.rs"]
-mod test_runner_stdlib_ah_balance_tests;
-#[path = "test-runner/test_runner_stdlib_ai_config_tests.rs"]
-mod test_runner_stdlib_ai_config_tests;
-#[path = "test-runner/test_runner_stdlib_aj_set_tests.rs"]
-mod test_runner_stdlib_aj_set_tests;
-#[path = "test-runner/test_runner_stdlib_ak_load_tests.rs"]
-mod test_runner_stdlib_ak_load_tests;
-#[path = "test-runner/test_runner_stdlib_al_out_tests.rs"]
-mod test_runner_stdlib_al_out_tests;
-#[path = "test-runner/test_runner_stdlib_am_transaction_tests.rs"]
-mod test_runner_stdlib_am_transaction_tests;
-#[path = "test-runner/test_runner_stdlib_an_crypto_tests.rs"]
-mod test_runner_stdlib_an_crypto_tests;
-#[path = "test-runner/test_runner_stdlib_ao_prompt_tests.rs"]
-mod test_runner_stdlib_ao_prompt_tests;
-#[path = "test-runner/test_runner_stdlib_ap_select_tests.rs"]
-mod test_runner_stdlib_ap_select_tests;
-#[path = "test-runner/test_runner_stdlib_aq_confirm_tests.rs"]
-mod test_runner_stdlib_aq_confirm_tests;
-#[path = "test-runner/test_runner_stdlib_ar_println_tests.rs"]
-mod test_runner_stdlib_ar_println_tests;
-#[path = "test-runner/test_runner_stdlib_as_println1_tests.rs"]
-mod test_runner_stdlib_as_println1_tests;
-#[path = "test-runner/test_runner_stdlib_at_keeps_tests.rs"]
-mod test_runner_stdlib_at_keeps_tests;
-#[path = "test-runner/test_runner_stdlib_au_fs_tests.rs"]
-mod test_runner_stdlib_au_fs_tests;
-#[path = "test-runner/test_runner_stdlib_av_fs_tests.rs"]
-mod test_runner_stdlib_av_fs_tests;
-#[path = "test-runner/test_runner_stdlib_aw_build_tests.rs"]
-mod test_runner_stdlib_aw_build_tests;
-#[path = "test-runner/test_runner_stdlib_ax_build_tests.rs"]
-mod test_runner_stdlib_ax_build_tests;
-#[path = "test-runner/test_runner_stdlib_ay_crypto_tests.rs"]
-mod test_runner_stdlib_ay_crypto_tests;
-#[path = "test-runner/test_runner_stdlib_az_crypto_tests.rs"]
-mod test_runner_stdlib_az_crypto_tests;
-#[path = "test-runner/test_runner_stdlib_ba_crypto_tests.rs"]
-mod test_runner_stdlib_ba_crypto_tests;
-#[path = "test-runner/test_runner_stdlib_bb_global_tests.rs"]
-mod test_runner_stdlib_bb_global_tests;
-#[path = "test-runner/test_runner_stdlib_bc_config_tests.rs"]
-mod test_runner_stdlib_bc_config_tests;
-#[path = "test-runner/test_runner_stdlib_bd_config_tests.rs"]
-mod test_runner_stdlib_bd_config_tests;
-#[path = "test-runner/test_runner_stdlib_be_config_tests.rs"]
-mod test_runner_stdlib_be_config_tests;
-#[path = "test-runner/test_runner_stdlib_bf_wallet_tests.rs"]
-mod test_runner_stdlib_bf_wallet_tests;
-#[path = "test-runner/test_runner_stdlib_bg_run_tests.rs"]
-mod test_runner_stdlib_bg_run_tests;
-#[path = "test-runner/test_runner_stdlib_bh_wait_tests.rs"]
-mod test_runner_stdlib_bh_wait_tests;
-#[path = "test-runner/test_runner_stdlib_bi_wait_tests.rs"]
-mod test_runner_stdlib_bi_wait_tests;
-#[path = "test-runner/test_runner_stdlib_bj_get_tests.rs"]
-mod test_runner_stdlib_bj_get_tests;
-#[path = "test-runner/test_runner_stdlib_bk_network_tests.rs"]
-mod test_runner_stdlib_bk_network_tests;
-#[path = "test-runner/test_runner_stdlib_bl_fetch_tests.rs"]
-mod test_runner_stdlib_bl_fetch_tests;
-#[path = "test-runner/test_runner_stdlib_bm_load_tests.rs"]
-mod test_runner_stdlib_bm_load_tests;
-#[path = "test-runner/test_runner_stdlib_bn_enable_tests.rs"]
-mod test_runner_stdlib_bn_enable_tests;
-#[path = "test-runner/test_runner_stdlib_bo_network_tests.rs"]
-mod test_runner_stdlib_bo_network_tests;
-#[path = "test-runner/test_runner_stdlib_bp_env_tests.rs"]
-mod test_runner_stdlib_bp_env_tests;
-#[path = "test-runner/test_runner_stdlib_bq_env_tests.rs"]
-mod test_runner_stdlib_bq_env_tests;
-#[path = "test-runner/test_runner_stdlib_br_format5_tests.rs"]
-mod test_runner_stdlib_br_format5_tests;
-#[path = "test-runner/test_runner_stdlib_bs_format2_tests.rs"]
-mod test_runner_stdlib_bs_format2_tests;
-#[path = "test-runner/test_runner_stdlib_bt_assert_tests.rs"]
-mod test_runner_stdlib_bt_assert_tests;
-#[path = "test-runner/test_runner_stdlib_bu_assert_tests.rs"]
-mod test_runner_stdlib_bu_assert_tests;
-#[path = "test-runner/test_runner_stdlib_bv_assert_tests.rs"]
-mod test_runner_stdlib_bv_assert_tests;
-#[path = "test-runner/test_runner_stdlib_bw_wallet_tests.rs"]
-mod test_runner_stdlib_bw_wallet_tests;
-#[path = "test-runner/test_runner_stdlib_bx_expect_tests.rs"]
-mod test_runner_stdlib_bx_expect_tests;
-#[path = "test-runner/test_runner_stdlib_by_expect_tests.rs"]
-mod test_runner_stdlib_by_expect_tests;
-#[path = "test-runner/test_runner_stdlib_bz_expect_tests.rs"]
-mod test_runner_stdlib_bz_expect_tests;
-#[path = "test-runner/test_runner_stdlib_ca_expect_tests.rs"]
-mod test_runner_stdlib_ca_expect_tests;
-#[path = "test-runner/test_runner_stdlib_cb_outlist_tests.rs"]
-mod test_runner_stdlib_cb_outlist_tests;
-#[path = "test-runner/test_runner_stdlib_cc_outlist_tests.rs"]
-mod test_runner_stdlib_cc_outlist_tests;
-#[path = "test-runner/test_runner_stdlib_cd_outlist_tests.rs"]
-mod test_runner_stdlib_cd_outlist_tests;
-#[path = "test-runner/test_runner_stdlib_ce_to_tests.rs"]
-mod test_runner_stdlib_ce_to_tests;
-#[path = "test-runner/test_runner_stdlib_cf_to_tests.rs"]
-mod test_runner_stdlib_cf_to_tests;
-#[path = "test-runner/test_runner_stdlib_cg_to_tests.rs"]
-mod test_runner_stdlib_cg_to_tests;
-#[path = "test-runner/test_runner_stdlib_ch_ext_tests.rs"]
-mod test_runner_stdlib_ch_ext_tests;
-#[path = "test-runner/test_runner_stdlib_ci_ext_tests.rs"]
-mod test_runner_stdlib_ci_ext_tests;
-#[path = "test-runner/test_runner_stdlib_cj_parse_tests.rs"]
-mod test_runner_stdlib_cj_parse_tests;
-#[path = "test-runner/test_runner_stdlib_ck_transaction_tests.rs"]
-mod test_runner_stdlib_ck_transaction_tests;
-#[path = "test-runner/test_runner_stdlib_cl_set_tests.rs"]
-mod test_runner_stdlib_cl_set_tests;
-#[path = "test-runner/test_runner_stdlib_cm_vm_tests.rs"]
-mod test_runner_stdlib_cm_vm_tests;
-#[path = "test-runner/test_runner_stdlib_cn_set_tests.rs"]
-mod test_runner_stdlib_cn_set_tests;
-#[path = "test-runner/test_runner_stdlib_co_get_tests.rs"]
-mod test_runner_stdlib_co_get_tests;
-#[path = "test-runner/test_runner_stdlib_cp_net_tests.rs"]
-mod test_runner_stdlib_cp_net_tests;
-#[path = "test-runner/test_runner_stdlib_cq_register_tests.rs"]
-mod test_runner_stdlib_cq_register_tests;
-#[path = "test-runner/test_runner_stdlib_cr_register_tests.rs"]
-mod test_runner_stdlib_cr_register_tests;
-#[path = "test-runner/test_runner_stdlib_cs_send_tests.rs"]
-mod test_runner_stdlib_cs_send_tests;
-#[path = "test-runner/test_runner_stdlib_ct_ext_tests.rs"]
-mod test_runner_stdlib_ct_ext_tests;
-#[path = "test-runner/test_runner_stdlib_cu_out_tests.rs"]
-mod test_runner_stdlib_cu_out_tests;
-#[path = "test-runner/test_runner_stdlib_cv_out_tests.rs"]
-mod test_runner_stdlib_cv_out_tests;
-#[path = "test-runner/test_runner_stdlib_cw_out_tests.rs"]
-mod test_runner_stdlib_cw_out_tests;
-#[path = "test-runner/test_runner_stdlib_cx_change_tests.rs"]
-mod test_runner_stdlib_cx_change_tests;
-#[path = "test-runner/test_runner_stdlib_cy_out_tests.rs"]
-mod test_runner_stdlib_cy_out_tests;
-#[path = "test-runner/test_runner_stdlib_cz_change_tests.rs"]
-mod test_runner_stdlib_cz_change_tests;
-#[path = "test-runner/test_runner_stdlib_da_transaction_tests.rs"]
-mod test_runner_stdlib_da_transaction_tests;
-#[path = "test-runner/test_runner_stdlib_db_transaction_tests.rs"]
-mod test_runner_stdlib_db_transaction_tests;
-#[path = "test-runner/test_runner_stdlib_dc_transaction_tests.rs"]
-mod test_runner_stdlib_dc_transaction_tests;
-#[path = "test-runner/test_runner_stdlib_dd_find_tests.rs"]
-mod test_runner_stdlib_dd_find_tests;
-#[path = "test-runner/test_runner_stdlib_de_wait_tests.rs"]
-mod test_runner_stdlib_de_wait_tests;
-#[path = "test-runner/test_runner_stdlib_df_net_tests.rs"]
-mod test_runner_stdlib_df_net_tests;
-#[path = "test-runner/test_runner_stdlib_dh_create_tests.rs"]
-mod test_runner_stdlib_dh_create_tests;
-#[path = "test-runner/test_runner_stdlib_di_net_tests.rs"]
-mod test_runner_stdlib_di_net_tests;
-#[path = "test-runner/test_runner_stdlib_dj_vm_tests.rs"]
-mod test_runner_stdlib_dj_vm_tests;
-#[path = "test-runner/test_runner_stdlib_dk_vm_tests.rs"]
-mod test_runner_stdlib_dk_vm_tests;
-#[path = "test-runner/test_runner_stdlib_dl_vm_tests.rs"]
-mod test_runner_stdlib_dl_vm_tests;
-#[path = "test-runner/test_runner_stdlib_dm_config_tests.rs"]
-mod test_runner_stdlib_dm_config_tests;
-#[path = "test-runner/test_runner_stdlib_dn_config_tests.rs"]
-mod test_runner_stdlib_dn_config_tests;
-#[path = "test-runner/test_runner_stdlib_do_config_tests.rs"]
-mod test_runner_stdlib_do_config_tests;
-#[path = "test-runner/test_runner_stdlib_dp_config_tests.rs"]
-mod test_runner_stdlib_dp_config_tests;
-#[path = "test-runner/test_runner_stdlib_dq_config_tests.rs"]
-mod test_runner_stdlib_dq_config_tests;
-#[path = "test-runner/test_runner_stdlib_dr_config_tests.rs"]
-mod test_runner_stdlib_dr_config_tests;
-#[path = "test-runner/test_runner_stdlib_ds_config_tests.rs"]
-mod test_runner_stdlib_ds_config_tests;
-#[path = "test-runner/test_runner_stdlib_dt_config_tests.rs"]
-mod test_runner_stdlib_dt_config_tests;
-#[path = "test-runner/test_runner_stdlib_du_precompiled_tests.rs"]
-mod test_runner_stdlib_du_precompiled_tests;
-#[path = "test-runner/test_runner_stdlib_dv_vm_tests.rs"]
-mod test_runner_stdlib_dv_vm_tests;
-#[path = "test-runner/test_runner_stdlib_dw_crypto_tests.rs"]
-mod test_runner_stdlib_dw_crypto_tests;
-#[path = "test-runner/test_runner_stdlib_dx_mnemonic_tests.rs"]
-mod test_runner_stdlib_dx_mnemonic_tests;
-#[path = "test-runner/test_runner_stdlib_dy_crypto_tests.rs"]
-mod test_runner_stdlib_dy_crypto_tests;
-#[path = "test-runner/test_runner_stdlib_dz_crypto_tests.rs"]
-mod test_runner_stdlib_dz_crypto_tests;
-#[path = "test-runner/test_runner_stdlib_ea_format3_tests.rs"]
-mod test_runner_stdlib_ea_format3_tests;
-#[path = "test-runner/test_runner_stdlib_eb_format1_tests.rs"]
-mod test_runner_stdlib_eb_format1_tests;
-#[path = "test-runner/test_runner_stdlib_ec_expect_tests.rs"]
-mod test_runner_stdlib_ec_expect_tests;
-#[path = "test-runner/test_runner_stdlib_ed_map_tests.rs"]
-mod test_runner_stdlib_ed_map_tests;
-#[path = "test-runner/test_runner_stdlib_ee_expect_tests.rs"]
-mod test_runner_stdlib_ee_expect_tests;
-#[path = "test-runner/test_runner_stdlib_ef_expect_tests.rs"]
-mod test_runner_stdlib_ef_expect_tests;
-#[path = "test-runner/test_runner_stdlib_eg_assert_tests.rs"]
-mod test_runner_stdlib_eg_assert_tests;
-#[path = "test-runner/test_runner_stdlib_eh_env_tests.rs"]
-mod test_runner_stdlib_eh_env_tests;
-#[path = "test-runner/test_runner_stdlib_ei_crc16_tests.rs"]
-mod test_runner_stdlib_ei_crc16_tests;
-#[path = "test-runner/test_runner_stdlib_ej_assert_tests.rs"]
-mod test_runner_stdlib_ej_assert_tests;
-#[path = "test-runner/test_runner_stdlib_ek_assert_tests.rs"]
-mod test_runner_stdlib_ek_assert_tests;
-#[path = "test-runner/test_runner_stdlib_el_assert_tests.rs"]
-mod test_runner_stdlib_el_assert_tests;
-#[path = "test-runner/test_runner_stdlib_em_external_tests.rs"]
-mod test_runner_stdlib_em_external_tests;
-#[path = "test-runner/test_runner_stdlib_en_find_tests.rs"]
-mod test_runner_stdlib_en_find_tests;
-#[path = "test-runner/test_runner_stdlib_eo_transaction_tests.rs"]
-mod test_runner_stdlib_eo_transaction_tests;
-#[path = "test-runner/test_runner_stdlib_ep_declared_tests.rs"]
-mod test_runner_stdlib_ep_declared_tests;
-#[path = "test-runner/test_runner_stdlib_u_prompts_tests.rs"]
-mod test_runner_stdlib_u_prompts_tests;
-#[path = "test-runner/test_runner_stdlib_v_println_tests.rs"]
-mod test_runner_stdlib_v_println_tests;
-#[path = "test-runner/test_runner_stdlib_w_fs_tests.rs"]
-mod test_runner_stdlib_w_fs_tests;
-#[path = "test-runner/test_runner_stdlib_x_build_tests.rs"]
-mod test_runner_stdlib_x_build_tests;
-#[path = "test-runner/test_runner_stdlib_y_format1_tests.rs"]
-mod test_runner_stdlib_y_format1_tests;
-#[path = "test-runner/test_runner_stdlib_z_env_tests.rs"]
-mod test_runner_stdlib_z_env_tests;
+#[path = "test-runner/test_runner_lib_api_map_tests.rs"]
+mod test_runner_lib_api_map_tests;
+#[path = "test-runner/test_runner_lib_api_matchers_tests.rs"]
+mod test_runner_lib_api_matchers_tests;
+#[path = "test-runner/test_runner_lib_api_register_code_cell_tests.rs"]
+mod test_runner_lib_api_register_code_cell_tests;
+#[path = "test-runner/test_runner_lib_api_send_single_tests.rs"]
+mod test_runner_lib_api_send_single_tests;
+#[path = "test-runner/test_runner_lib_api_transaction_matchers_tests.rs"]
+mod test_runner_lib_api_transaction_matchers_tests;
+#[path = "test-runner/test_runner_lib_api_wallet_mode_tests.rs"]
+mod test_runner_lib_api_wallet_mode_tests;
+#[path = "test-runner/test_runner_mutate_tests.rs"]
+mod test_runner_mutate_tests;
+#[path = "test-runner/test_runner_reporting_and_coverage_tests.rs"]
+mod test_runner_reporting_and_coverage_tests;
+#[path = "test-runner/test_runner_selection_and_fail_fast_tests.rs"]
+mod test_runner_selection_and_fail_fast_tests;
+#[path = "test-runner/test_runner_ui_tests.rs"]
+mod test_runner_ui_tests;
+
+#[path = "test-runner/test_runner_stdlib_assert_consumes_less_than1_returns_computed_function_result_tests.rs"]
+mod test_runner_stdlib_assert_consumes_less_than1_returns_computed_function_result_tests;
+#[path = "test-runner/test_runner_stdlib_assert_consumes_less_than2_returns_function_result_when_within_limit_tests.rs"]
+mod test_runner_stdlib_assert_consumes_less_than2_returns_function_result_when_within_limit_tests;
+#[path = "test-runner/test_runner_stdlib_assert_consumes_less_than3_returns_computed_result_tests.rs"]
+mod test_runner_stdlib_assert_consumes_less_than3_returns_computed_result_tests;
+#[path = "test-runner/test_runner_stdlib_assert_equal_decimal_does_not_round_half_up_boundaries_tests.rs"]
+mod test_runner_stdlib_assert_equal_decimal_does_not_round_half_up_boundaries_tests;
+#[path = "test-runner/test_runner_stdlib_assert_equal_passes_for_identical_tuple_values_tests.rs"]
+mod test_runner_stdlib_assert_equal_passes_for_identical_tuple_values_tests;
+#[path = "test-runner/test_runner_stdlib_assert_fail_formats_message_and_custom_location_in_output_tests.rs"]
+mod test_runner_stdlib_assert_fail_formats_message_and_custom_location_in_output_tests;
+#[path = "test-runner/test_runner_stdlib_assert_fail_wallet_not_found_direct_call_without_wallets_shows_setup_hint_tests.rs"]
+mod test_runner_stdlib_assert_fail_wallet_not_found_direct_call_without_wallets_shows_setup_hint_tests;
+#[path = "test-runner/test_runner_stdlib_assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values_tests.rs"]
+mod test_runner_stdlib_assert_not_equal_reports_diagnostics_for_complex_tuple_and_map_values_tests;
+#[path = "test-runner/test_runner_stdlib_balance_returns_zero_for_unknown_address_then_top_up_updates_balance_tests.rs"]
+mod test_runner_stdlib_balance_returns_zero_for_unknown_address_then_top_up_updates_balance_tests;
+#[path = "test-runner/test_runner_stdlib_build_accepts_contract_name_and_explicit_path_tests.rs"]
+mod test_runner_stdlib_build_accepts_contract_name_and_explicit_path_tests;
+#[path = "test-runner/test_runner_stdlib_build_reads_explicit_boc_path_and_executes_runtime_code_tests.rs"]
+mod test_runner_stdlib_build_reads_explicit_boc_path_and_executes_runtime_code_tests;
+#[path = "test-runner/test_runner_stdlib_build_reports_missing_contract_when_name_is_unknown_and_path_is_empty_tests.rs"]
+mod test_runner_stdlib_build_reports_missing_contract_when_name_is_unknown_and_path_is_empty_tests;
+#[path = "test-runner/test_runner_stdlib_change_library_decodes_libref_ref_branch_tests.rs"]
+mod test_runner_stdlib_change_library_decodes_libref_ref_branch_tests;
+#[path = "test-runner/test_runner_stdlib_change_library_decoding_via_parse_out_actions_tests.rs"]
+mod test_runner_stdlib_change_library_decoding_via_parse_out_actions_tests;
+#[path = "test-runner/test_runner_stdlib_config_get_msg_forward_prices_returns_per_chain_values_after_both_writes_tests.rs"]
+mod test_runner_stdlib_config_get_msg_forward_prices_returns_per_chain_values_after_both_writes_tests;
+#[path = "test-runner/test_runner_stdlib_config_get_precompiled_contracts_config_default_decodes_with_builtin_entry_tests.rs"]
+mod test_runner_stdlib_config_get_precompiled_contracts_config_default_decodes_with_builtin_entry_tests;
+#[path = "test-runner/test_runner_stdlib_config_global_version_roundtrip_supports_zero_values_tests.rs"]
+mod test_runner_stdlib_config_global_version_roundtrip_supports_zero_values_tests;
+#[path = "test-runner/test_runner_stdlib_config_raw_param_roundtrip_for_global_version_cell_tests.rs"]
+mod test_runner_stdlib_config_raw_param_roundtrip_for_global_version_cell_tests;
+#[path = "test-runner/test_runner_stdlib_config_set_gas_prices_extended_fields_keep_base_and_masterchain_independent_tests.rs"]
+mod test_runner_stdlib_config_set_gas_prices_extended_fields_keep_base_and_masterchain_independent_tests;
+#[path = "test-runner/test_runner_stdlib_config_set_gas_prices_sequential_chain_updates_remain_isolated_tests.rs"]
+mod test_runner_stdlib_config_set_gas_prices_sequential_chain_updates_remain_isolated_tests;
+#[path = "test-runner/test_runner_stdlib_config_set_msg_forward_prices_keeps_basechain_and_masterchain_isolated_tests.rs"]
+mod test_runner_stdlib_config_set_msg_forward_prices_keeps_basechain_and_masterchain_isolated_tests;
+#[path = "test-runner/test_runner_stdlib_config_set_param_raw_get_param_raw_roundtrip_preserves_cell_shape_tests.rs"]
+mod test_runner_stdlib_config_set_param_raw_get_param_raw_roundtrip_preserves_cell_shape_tests;
+#[path = "test-runner/test_runner_stdlib_config_storage_prices_get_initial_empty_dict_falls_back_to_zero_prices_tests.rs"]
+mod test_runner_stdlib_config_storage_prices_get_initial_empty_dict_falls_back_to_zero_prices_tests;
+#[path = "test-runner/test_runner_stdlib_config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries_tests.rs"]
+mod test_runner_stdlib_config_storage_prices_multi_entry_roundtrip_keeps_initial_and_future_entries_tests;
+#[path = "test-runner/test_runner_stdlib_config_storage_prices_roundtrip_preserves_multiple_timestamp_entries_tests.rs"]
+mod test_runner_stdlib_config_storage_prices_roundtrip_preserves_multiple_timestamp_entries_tests;
+#[path = "test-runner/test_runner_stdlib_config_storage_prices_set_initial_overwrites_zero_and_preserves_future_entries_tests.rs"]
+mod test_runner_stdlib_config_storage_prices_set_initial_overwrites_zero_and_preserves_future_entries_tests;
+#[path = "test-runner/test_runner_stdlib_confirm_default_true_with_help_message_ignores_empty_input_bug_tests.rs"]
+mod test_runner_stdlib_confirm_default_true_with_help_message_ignores_empty_input_bug_tests;
+#[path = "test-runner/test_runner_stdlib_crc16_matches_known_vectors_tests.rs"]
+mod test_runner_stdlib_crc16_matches_known_vectors_tests;
+#[path = "test-runner/test_runner_stdlib_create_external_message_honors_explicit_external_src_and_omits_state_init_tests.rs"]
+mod test_runner_stdlib_create_external_message_honors_explicit_external_src_and_omits_state_init_tests;
+#[path = "test-runner/test_runner_stdlib_crypto_create_mnemonic_returns_24_non_empty_words_tests.rs"]
+mod test_runner_stdlib_crypto_create_mnemonic_returns_24_non_empty_words_tests;
+#[path = "test-runner/test_runner_stdlib_crypto_create_mnemonic_returns_24_words_tests.rs"]
+mod test_runner_stdlib_crypto_create_mnemonic_returns_24_words_tests;
+#[path = "test-runner/test_runner_stdlib_crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time_tests.rs"]
+mod test_runner_stdlib_crypto_fast_random_bytes_without_seed_is_deterministic_for_fixed_vm_time_tests;
+#[path = "test-runner/test_runner_stdlib_crypto_secure_random_bytes_accepts_127_bytes_in_fixture_project_tests.rs"]
+mod test_runner_stdlib_crypto_secure_random_bytes_accepts_127_bytes_in_fixture_project_tests;
+#[path = "test-runner/test_runner_stdlib_crypto_secure_random_bytes_boundaries_1_and_2_have_expected_lengths_tests.rs"]
+mod test_runner_stdlib_crypto_secure_random_bytes_boundaries_1_and_2_have_expected_lengths_tests;
+#[path = "test-runner/test_runner_stdlib_crypto_sign_is_deterministic_for_same_key_and_cell_tests.rs"]
+mod test_runner_stdlib_crypto_sign_is_deterministic_for_same_key_and_cell_tests;
+#[path = "test-runner/test_runner_stdlib_crypto_sign_is_hash_sensitive_for_different_cells_in_fixture_project_tests.rs"]
+mod test_runner_stdlib_crypto_sign_is_hash_sensitive_for_different_cells_in_fixture_project_tests;
+#[path = "test-runner/test_runner_stdlib_declared_pack_prefix_helpers_direct_calls_return_expected_values_tests.rs"]
+mod test_runner_stdlib_declared_pack_prefix_helpers_direct_calls_return_expected_values_tests;
+#[path = "test-runner/test_runner_stdlib_either_left_and_right_encode_expected_tag_bits_tests.rs"]
+mod test_runner_stdlib_either_left_and_right_encode_expected_tag_bits_tests;
+#[path = "test-runner/test_runner_stdlib_enable_broadcast_toggle_reflects_in_is_broadcasting_tests.rs"]
+mod test_runner_stdlib_enable_broadcast_toggle_reflects_in_is_broadcasting_tests;
+#[path = "test-runner/test_runner_stdlib_env_or_address_falls_back_for_invalid_present_and_uses_valid_present_value_tests.rs"]
+mod test_runner_stdlib_env_or_address_falls_back_for_invalid_present_and_uses_valid_present_value_tests;
+#[path = "test-runner/test_runner_stdlib_env_parses_int_bool_address_and_cell_in_supported_formats_tests.rs"]
+mod test_runner_stdlib_env_parses_int_bool_address_and_cell_in_supported_formats_tests;
+#[path = "test-runner/test_runner_stdlib_env_slice_returns_raw_and_empty_values_and_null_when_missing_tests.rs"]
+mod test_runner_stdlib_env_slice_returns_raw_and_empty_values_and_null_when_missing_tests;
+#[path = "test-runner/test_runner_stdlib_env_unsupported_generic_type_triggers_assert_fail_branch_tests.rs"]
+mod test_runner_stdlib_env_unsupported_generic_type_triggers_assert_fail_branch_tests;
+#[path = "test-runner/test_runner_stdlib_expect_address_matchers_accept_internal_none_and_external_addresses_tests.rs"]
+mod test_runner_stdlib_expect_address_matchers_accept_internal_none_and_external_addresses_tests;
+#[path = "test-runner/test_runner_stdlib_expect_bool_matchers_pass_for_true_and_false_values_tests.rs"]
+mod test_runner_stdlib_expect_bool_matchers_pass_for_true_and_false_values_tests;
+#[path = "test-runner/test_runner_stdlib_expect_comparison_helpers_accept_ordered_values_tests.rs"]
+mod test_runner_stdlib_expect_comparison_helpers_accept_ordered_values_tests;
+#[path = "test-runner/test_runner_stdlib_expect_map_to_contain_key_supports_address_keys_tests.rs"]
+mod test_runner_stdlib_expect_map_to_contain_key_supports_address_keys_tests;
+#[path = "test-runner/test_runner_stdlib_expect_map_to_have_length_accepts_empty_and_single_entry_maps_tests.rs"]
+mod test_runner_stdlib_expect_map_to_have_length_accepts_empty_and_single_entry_maps_tests;
+#[path = "test-runner/test_runner_stdlib_expect_nan_matchers_accept_nan_and_non_nan_values_tests.rs"]
+mod test_runner_stdlib_expect_nan_matchers_accept_nan_and_non_nan_values_tests;
+#[path = "test-runner/test_runner_stdlib_expect_to_equal_decimal_accepts_zero_and_high_decimals_when_values_match_tests.rs"]
+mod test_runner_stdlib_expect_to_equal_decimal_accepts_zero_and_high_decimals_when_values_match_tests;
+#[path = "test-runner/test_runner_stdlib_expect_tuple_to_contain_existing_value_reports_compile_diagnostic_bug_tests.rs"]
+mod test_runner_stdlib_expect_tuple_to_contain_existing_value_reports_compile_diagnostic_bug_tests;
+#[path = "test-runner/test_runner_stdlib_ext_message_load_opcode_returns_null_for_either_right_without_ref_tests.rs"]
+mod test_runner_stdlib_ext_message_load_opcode_returns_null_for_either_right_without_ref_tests;
+#[path = "test-runner/test_runner_stdlib_ext_message_relaxed_load_body_returns_left_value_tests.rs"]
+mod test_runner_stdlib_ext_message_relaxed_load_body_returns_left_value_tests;
+#[path = "test-runner/test_runner_stdlib_ext_out_list_at_or_null_out_of_range_returns_null_bug_tests.rs"]
+mod test_runner_stdlib_ext_out_list_at_or_null_out_of_range_returns_null_bug_tests;
+#[path = "test-runner/test_runner_stdlib_external_out_message_matches_src_to_and_body_prefix_tests.rs"]
+mod test_runner_stdlib_external_out_message_matches_src_to_and_body_prefix_tests;
+#[path = "test-runner/test_runner_stdlib_fetch_and_register_library_returns_false_without_panicking_on_transport_errors_tests.rs"]
+mod test_runner_stdlib_fetch_and_register_library_returns_false_without_panicking_on_transport_errors_tests;
+#[path = "test-runner/test_runner_stdlib_find_external_out_message_filters_by_type_and_source_across_transactions_tests.rs"]
+mod test_runner_stdlib_find_external_out_message_filters_by_type_and_source_across_transactions_tests;
+#[path = "test-runner/test_runner_stdlib_find_external_out_message_typed_branch_reports_tuple_get_type_argument_compile_error_tests.rs"]
+mod test_runner_stdlib_find_external_out_message_typed_branch_reports_tuple_get_type_argument_compile_error_tests;
+#[path = "test-runner/test_runner_stdlib_format1_and_format2_support_plain_hex_and_ton_specifiers_tests.rs"]
+mod test_runner_stdlib_format1_and_format2_support_plain_hex_and_ton_specifiers_tests;
+#[path = "test-runner/test_runner_stdlib_format2_plain_placeholders_use_default_formatter_for_int_and_bool_tests.rs"]
+mod test_runner_stdlib_format2_plain_placeholders_use_default_formatter_for_int_and_bool_tests;
+#[path = "test-runner/test_runner_stdlib_format3_mixed_placeholders_should_follow_template_order_bug_tests.rs"]
+mod test_runner_stdlib_format3_mixed_placeholders_should_follow_template_order_bug_tests;
+#[path = "test-runner/test_runner_stdlib_format4_ignores_extra_arguments_when_template_has_only_two_placeholders_tests.rs"]
+mod test_runner_stdlib_format4_ignores_extra_arguments_when_template_has_only_two_placeholders_tests;
+#[path = "test-runner/test_runner_stdlib_format5_mixed_specifiers_should_follow_placeholder_order_bug_tests.rs"]
+mod test_runner_stdlib_format5_mixed_specifiers_should_follow_placeholder_order_bug_tests;
+#[path = "test-runner/test_runner_stdlib_fs_read_file_normalizes_parent_segments_from_nested_paths_tests.rs"]
+mod test_runner_stdlib_fs_read_file_normalizes_parent_segments_from_nested_paths_tests;
+#[path = "test-runner/test_runner_stdlib_fs_read_file_returns_content_for_existing_and_normalized_paths_tests.rs"]
+mod test_runner_stdlib_fs_read_file_returns_content_for_existing_and_normalized_paths_tests;
+#[path = "test-runner/test_runner_stdlib_fs_read_file_returns_null_for_non_utf8_binary_fixture_tests.rs"]
+mod test_runner_stdlib_fs_read_file_returns_null_for_non_utf8_binary_fixture_tests;
+#[path = "test-runner/test_runner_stdlib_get_account_state_after_top_up_returns_account_info_with_expected_balance_tests.rs"]
+mod test_runner_stdlib_get_account_state_after_top_up_returns_account_info_with_expected_balance_tests;
+#[path = "test-runner/test_runner_stdlib_get_deployed_code_transitions_from_null_to_non_null_in_project_builder_tests.rs"]
+mod test_runner_stdlib_get_deployed_code_transitions_from_null_to_non_null_in_project_builder_tests;
+#[path = "test-runner/test_runner_stdlib_global_version_roundtrip_persists_after_net_set_config_tests.rs"]
+mod test_runner_stdlib_global_version_roundtrip_persists_after_net_set_config_tests;
+#[path = "test-runner/test_runner_stdlib_keeps_stdout_and_stderr_separated_when_stderr_happens_first_tests.rs"]
+mod test_runner_stdlib_keeps_stdout_and_stderr_separated_when_stderr_happens_first_tests;
+#[path = "test-runner/test_runner_stdlib_load_library_unknown_hash_returns_null_in_project_builder_tests.rs"]
+mod test_runner_stdlib_load_library_unknown_hash_returns_null_in_project_builder_tests;
+#[path = "test-runner/test_runner_stdlib_load_opcode_reads_opcode_from_either_left_body_tests.rs"]
+mod test_runner_stdlib_load_opcode_reads_opcode_from_either_left_body_tests;
+#[path = "test-runner/test_runner_stdlib_map_value_matchers_support_typed_any_address_values_tests.rs"]
+mod test_runner_stdlib_map_value_matchers_support_typed_any_address_values_tests;
+#[path = "test-runner/test_runner_stdlib_maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics_tests.rs"]
+mod test_runner_stdlib_maybe_some_none_unwrap_and_unwrap_or_follow_documented_semantics_tests;
+#[path = "test-runner/test_runner_stdlib_mnemonic_to_keypair_is_deterministic_for_repeated_calls_tests.rs"]
+mod test_runner_stdlib_mnemonic_to_keypair_is_deterministic_for_repeated_calls_tests;
+#[path = "test-runner/test_runner_stdlib_net_is_deployed_transitions_false_to_true_on_deterministic_deploy_path_tests.rs"]
+mod test_runner_stdlib_net_is_deployed_transitions_false_to_true_on_deterministic_deploy_path_tests;
+#[path = "test-runner/test_runner_stdlib_net_send_single_matches_net_send_first_result_transaction_and_action_in_project_builder_tests.rs"]
+mod test_runner_stdlib_net_send_single_matches_net_send_first_result_transaction_and_action_in_project_builder_tests;
+#[path = "test-runner/test_runner_stdlib_net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder_tests.rs"]
+mod test_runner_stdlib_net_set_now_overwrites_timestamp_across_multiple_updates_in_project_builder_tests;
+#[path = "test-runner/test_runner_stdlib_network_get_account_storage_fee_returns_null_for_missing_account_tests.rs"]
+mod test_runner_stdlib_network_get_account_storage_fee_returns_null_for_missing_account_tests;
+#[path = "test-runner/test_runner_stdlib_network_random_address_reuses_identical_symbolic_name_bug_tests.rs"]
+mod test_runner_stdlib_network_random_address_reuses_identical_symbolic_name_bug_tests;
+#[path = "test-runner/test_runner_stdlib_out_action_from_tuple_rejects_single_item_tuple_tests.rs"]
+mod test_runner_stdlib_out_action_from_tuple_rejects_single_item_tuple_tests;
+#[path = "test-runner/test_runner_stdlib_out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnostic_tests.rs"]
+mod test_runner_stdlib_out_action_send_message_load_body_mismatched_type_reports_exit_code63_diagnostic_tests;
+#[path = "test-runner/test_runner_stdlib_out_action_send_message_load_message_and_generic_are_parity_for_inline_body_tests.rs"]
+mod test_runner_stdlib_out_action_send_message_load_message_and_generic_are_parity_for_inline_body_tests;
+#[path = "test-runner/test_runner_stdlib_out_actions_list_traversal_preserves_reverse_order_and_kinds_tests.rs"]
+mod test_runner_stdlib_out_actions_list_traversal_preserves_reverse_order_and_kinds_tests;
+#[path = "test-runner/test_runner_stdlib_out_messages_at_cell_and_at_match_for_each_index_project_builder_tests.rs"]
+mod test_runner_stdlib_out_messages_at_cell_and_at_match_for_each_index_project_builder_tests;
+#[path = "test-runner/test_runner_stdlib_outlist_to_be_empty_passes_for_empty_out_actions_tests.rs"]
+mod test_runner_stdlib_outlist_to_be_empty_passes_for_empty_out_actions_tests;
+#[path = "test-runner/test_runner_stdlib_outlist_to_be_non_empty_empty_list_reports_failure_message_tests.rs"]
+mod test_runner_stdlib_outlist_to_be_non_empty_empty_list_reports_failure_message_tests;
+#[path = "test-runner/test_runner_stdlib_outlist_to_be_non_empty_passes_for_single_send_action_tests.rs"]
+mod test_runner_stdlib_outlist_to_be_non_empty_passes_for_single_send_action_tests;
+#[path = "test-runner/test_runner_stdlib_outlist_to_be_send_message_at_incompatible_typed_payload_reports_exit_code_tests.rs"]
+mod test_runner_stdlib_outlist_to_be_send_message_at_incompatible_typed_payload_reports_exit_code_tests;
+#[path = "test-runner/test_runner_stdlib_parse_out_actions_preserves_reserve_and_change_library_kinds_tests.rs"]
+mod test_runner_stdlib_parse_out_actions_preserves_reserve_and_change_library_kinds_tests;
+#[path = "test-runner/test_runner_stdlib_precompiled_add_contract_gas_duplicate_hash_does_not_overwrite_original_entry_tests.rs"]
+mod test_runner_stdlib_precompiled_add_contract_gas_duplicate_hash_does_not_overwrite_original_entry_tests;
+#[path = "test-runner/test_runner_stdlib_println1_formats_negative_hex_and_ton_values_tests.rs"]
+mod test_runner_stdlib_println1_formats_negative_hex_and_ton_values_tests;
+#[path = "test-runner/test_runner_stdlib_println_and_println1_support_hex_and_ton_formatters_tests.rs"]
+mod test_runner_stdlib_println_and_println1_support_hex_and_ton_formatters_tests;
+#[path = "test-runner/test_runner_stdlib_println_formats_nested_tuple_and_struct_values_tests.rs"]
+mod test_runner_stdlib_println_formats_nested_tuple_and_struct_values_tests;
+#[path = "test-runner/test_runner_stdlib_prompt_uses_typed_stdin_when_present_bug_tests.rs"]
+mod test_runner_stdlib_prompt_uses_typed_stdin_when_present_bug_tests;
+#[path = "test-runner/test_runner_stdlib_prompts_return_deterministic_fallbacks_in_non_interactive_runner_tests.rs"]
+mod test_runner_stdlib_prompts_return_deterministic_fallbacks_in_non_interactive_runner_tests;
+#[path = "test-runner/test_runner_stdlib_register_address_duplicate_symbolic_name_rebind_visibility_in_output_tests.rs"]
+mod test_runner_stdlib_register_address_duplicate_symbolic_name_rebind_visibility_in_output_tests;
+#[path = "test-runner/test_runner_stdlib_register_code_cell_duplicate_name_is_hash_specific_tests.rs"]
+mod test_runner_stdlib_register_code_cell_duplicate_name_is_hash_specific_tests;
+#[path = "test-runner/test_runner_stdlib_run_get_method_by_id_fails_for_undeployed_contract_tests.rs"]
+mod test_runner_stdlib_run_get_method_by_id_fails_for_undeployed_contract_tests;
+#[path = "test-runner/test_runner_stdlib_select_multiple_options_return_empty_string_in_non_interactive_mode_tests.rs"]
+mod test_runner_stdlib_select_multiple_options_return_empty_string_in_non_interactive_mode_tests;
+#[path = "test-runner/test_runner_stdlib_send_processes_children_and_find_transaction_by_participants_and_opcode_tests.rs"]
+mod test_runner_stdlib_send_processes_children_and_find_transaction_by_participants_and_opcode_tests;
+#[path = "test-runner/test_runner_stdlib_send_result_all_out_actions_flattens_root_and_child_transactions_in_project_builder_tests.rs"]
+mod test_runner_stdlib_send_result_all_out_actions_flattens_root_and_child_transactions_in_project_builder_tests;
+#[path = "test-runner/test_runner_stdlib_set_c5_roundtrip_restores_single_and_double_action_out_lists_tests.rs"]
+mod test_runner_stdlib_set_c5_roundtrip_restores_single_and_double_action_out_lists_tests;
+#[path = "test-runner/test_runner_stdlib_set_config_param_keeps_neighbor_slots_consistent_tests.rs"]
+mod test_runner_stdlib_set_config_param_keeps_neighbor_slots_consistent_tests;
+#[path = "test-runner/test_runner_stdlib_set_time_and_logical_time_update_c7_slots_tests.rs"]
+mod test_runner_stdlib_set_time_and_logical_time_update_c7_slots_tests;
+#[path = "test-runner/test_runner_stdlib_to_consume_less_than_accepts_threshold_above_measured_gas_tests.rs"]
+mod test_runner_stdlib_to_consume_less_than_accepts_threshold_above_measured_gas_tests;
+#[path = "test-runner/test_runner_stdlib_to_have_all_successful_txs_negative_reports_single_failed_tx_tests.rs"]
+mod test_runner_stdlib_to_have_all_successful_txs_negative_reports_single_failed_tx_tests;
+#[path = "test-runner/test_runner_stdlib_to_have_successful_deploy_rejects_non_deploy_success_transaction_tests.rs"]
+mod test_runner_stdlib_to_have_successful_deploy_rejects_non_deploy_success_transaction_tests;
+#[path = "test-runner/test_runner_stdlib_to_have_successful_tx_matches_success_and_opcode_filters_tests.rs"]
+mod test_runner_stdlib_to_have_successful_tx_matches_success_and_opcode_filters_tests;
+#[path = "test-runner/test_runner_stdlib_transaction_get_account_address_defaults_to_basechain_and_masterchain_override_changes_only_workchain_tests.rs"]
+mod test_runner_stdlib_transaction_get_account_address_defaults_to_basechain_and_masterchain_override_changes_only_workchain_tests;
+#[path = "test-runner/test_runner_stdlib_transaction_get_action_fee_tick_and_tock_match_ord_action_fee_tests.rs"]
+mod test_runner_stdlib_transaction_get_action_fee_tick_and_tock_match_ord_action_fee_tests;
+#[path = "test-runner/test_runner_stdlib_transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints_tests.rs"]
+mod test_runner_stdlib_transaction_load_body_and_load_in_msg_extract_typed_payload_and_endpoints_tests;
+#[path = "test-runner/test_runner_stdlib_transaction_load_body_decodes_nested_payload_from_inbound_message_tests.rs"]
+mod test_runner_stdlib_transaction_load_body_decodes_nested_payload_from_inbound_message_tests;
+#[path = "test-runner/test_runner_stdlib_transaction_load_in_msg_decodes_typed_payload_and_matches_inbound_opcode_tests.rs"]
+mod test_runner_stdlib_transaction_load_in_msg_decodes_typed_payload_and_matches_inbound_opcode_tests;
+#[path = "test-runner/test_runner_stdlib_transaction_varuint_unpack_from_slice_supports_canonical_boundary_values_tests.rs"]
+mod test_runner_stdlib_transaction_varuint_unpack_from_slice_supports_canonical_boundary_values_tests;
+#[path = "test-runner/test_runner_stdlib_vm_get_config_unpacked_stays_stable_after_set_config_root_dict_mutation_tests.rs"]
+mod test_runner_stdlib_vm_get_config_unpacked_stays_stable_after_set_config_root_dict_mutation_tests;
+#[path = "test-runner/test_runner_stdlib_vm_register_library_is_idempotent_under_repeated_same_cell_registration_tests.rs"]
+mod test_runner_stdlib_vm_register_library_is_idempotent_under_repeated_same_cell_registration_tests;
+#[path = "test-runner/test_runner_stdlib_vm_set_block_and_logical_time_are_independent_in_c7_slots_tests.rs"]
+mod test_runner_stdlib_vm_set_block_and_logical_time_are_independent_in_c7_slots_tests;
+#[path = "test-runner/test_runner_stdlib_vm_set_c7_overwrites_slot_three_without_clobbering_neighbors_tests.rs"]
+mod test_runner_stdlib_vm_set_c7_overwrites_slot_three_without_clobbering_neighbors_tests;
+#[path = "test-runner/test_runner_stdlib_vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic_tests.rs"]
+mod test_runner_stdlib_vm_set_config_unpacked_empty_tuple_reports_tuple_index_diagnostic_tests;
+#[path = "test-runner/test_runner_stdlib_wait_for_transaction_returns_true_in_emulation_mode_tests.rs"]
+mod test_runner_stdlib_wait_for_transaction_returns_true_in_emulation_mode_tests;
+#[path = "test-runner/test_runner_stdlib_wait_for_transaction_returns_true_in_emulation_mode_v2_tests.rs"]
+mod test_runner_stdlib_wait_for_transaction_returns_true_in_emulation_mode_v2_tests;
+#[path = "test-runner/test_runner_stdlib_wait_missing_tx_hash_non_quiet_returns_false_tests.rs"]
+mod test_runner_stdlib_wait_missing_tx_hash_non_quiet_returns_false_tests;
+#[path = "test-runner/test_runner_stdlib_wallet_matches_treasury_address_without_broadcast_tests.rs"]
+mod test_runner_stdlib_wallet_matches_treasury_address_without_broadcast_tests;
+#[path = "test-runner/test_runner_stdlib_wallet_missing_in_broadcast_without_wallets_config_reports_setup_instructions_tests.rs"]
+mod test_runner_stdlib_wallet_missing_in_broadcast_without_wallets_config_reports_setup_instructions_tests;
+
 mod test_tests;
 mod verify_tests;
 mod wallet_tests;

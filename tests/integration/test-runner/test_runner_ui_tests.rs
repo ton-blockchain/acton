@@ -82,7 +82,7 @@ fn ui_creates_default_trace_dir_and_runs_tests_before_bind_failure() {
             "\"name\":\"test-ui-default-trace\"",
         )
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_creates_default_trace_dir_and_runs_tests_before_bind_failure.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_ui_tests/ui_creates_default_trace_dir_and_runs_tests_before_bind_failure.stdout.txt",
         );
 }
 
@@ -113,7 +113,7 @@ fn ui_save_test_trace_writes_to_custom_directory() {
             "\"name\":\"test-ui-custom-trace\"",
         )
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_save_test_trace_writes_to_custom_directory.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_ui_tests/ui_save_test_trace_writes_to_custom_directory.stdout.txt",
         );
 
     let default_trace = project
@@ -186,7 +186,7 @@ fn ui_trace_files_are_created_only_for_executed_tests() {
         .assert_todo(1)
         .assert_file_exists(".acton/traces/test-ui-executed_trace.json")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_trace_files_are_created_only_for_executed_tests.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_ui_tests/ui_trace_files_are_created_only_for_executed_tests.stdout.txt",
         );
 
     let skipped_trace = project
@@ -228,7 +228,7 @@ fn ui_works_with_dot_reporter_without_console_summary() {
         .assert_not_contains("✓ 1 passed")
         .assert_file_exists(".acton/traces/test-ui-dot-reporter_trace.json")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_works_with_dot_reporter_without_console_summary.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_ui_tests/ui_works_with_dot_reporter_without_console_summary.stdout.txt",
         );
 }
 
@@ -302,7 +302,7 @@ fn ui_filter_limits_trace_generation_to_selected_tests() {
         .assert_not_contains("filter-beta")
         .assert_file_exists(".acton/traces/test-ui-filter-alpha_trace.json")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_ui/ui_filter_limits_trace_generation_to_selected_tests.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_ui_tests/ui_filter_limits_trace_generation_to_selected_tests.stdout.txt",
         );
 
     let beta_trace = project

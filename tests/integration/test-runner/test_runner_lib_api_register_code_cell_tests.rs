@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary:
 //! - tests/integration/test-runner/test_runner_lib_api_register_code_cell_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_lib_api_register_code_cell/**
+//! - tests/integration/snapshots/test-runner/test_runner_lib_api_register_code_cell_tests/**
 
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
@@ -59,7 +59,7 @@ fn register_code_cell_labels_auto_deploy_transactions() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell/register_code_cell_labels_auto_deploy_transactions.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell_tests/register_code_cell_labels_auto_deploy_transactions.stdout.txt",
         );
 }
 
@@ -106,7 +106,7 @@ fn register_code_cell_last_registration_wins_for_same_hash() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell/register_code_cell_last_registration_wins_for_same_hash.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell_tests/register_code_cell_last_registration_wins_for_same_hash.stdout.txt",
         );
 }
 
@@ -163,7 +163,7 @@ fn register_code_cell_does_not_rename_other_contract_hashes() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell/register_code_cell_does_not_rename_other_contract_hashes.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell_tests/register_code_cell_does_not_rename_other_contract_hashes.stdout.txt",
         );
 }
 
@@ -212,7 +212,7 @@ fn register_address_name_has_priority_over_registered_code_name() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell/register_address_name_has_priority_over_registered_code_name.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell_tests/register_address_name_has_priority_over_registered_code_name.stdout.txt",
         );
 }
 
@@ -271,6 +271,6 @@ fn register_code_cell_from_get_deployed_code_applies_to_future_transactions() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell/register_code_cell_from_get_deployed_code_applies_to_future_transactions.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_register_code_cell_tests/register_code_cell_from_get_deployed_code_applies_to_future_transactions.stdout.txt",
         );
 }

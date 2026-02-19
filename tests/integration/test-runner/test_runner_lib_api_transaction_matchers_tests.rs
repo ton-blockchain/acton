@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary:
 //! - tests/integration/test-runner/test_runner_lib_api_transaction_matchers_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers/**
+//! - tests/integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers_tests/**
 //! - tests/integration/testdata/test_runner_lib_api_transaction_matchers/**
 //! - tests/support/test_runner_lib_api_transaction_matchers/** (optional)
 
@@ -74,7 +74,7 @@ fn to_have_and_not_have_tx_by_action_exit_code() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers/p_lib_api_to_have_and_not_have_tx_by_action_exit_code.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers_tests/lib_api_to_have_and_not_have_tx_by_action_exit_code.stdout.txt",
         );
 }
 
@@ -120,7 +120,7 @@ fn to_have_and_not_have_tx_by_compute_phase_skipped() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers/p_lib_api_to_have_and_not_have_tx_by_compute_phase_skipped.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers_tests/lib_api_to_have_and_not_have_tx_by_compute_phase_skipped.stdout.txt",
         );
 }
 
@@ -179,7 +179,7 @@ fn to_have_and_not_have_tx_by_body() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers/p_lib_api_to_have_and_not_have_tx_by_body.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers_tests/lib_api_to_have_and_not_have_tx_by_body.stdout.txt",
         );
 }
 
@@ -229,7 +229,7 @@ fn to_have_and_not_have_tx_by_opcode() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers/p_lib_api_to_have_and_not_have_tx_by_opcode.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers_tests/lib_api_to_have_and_not_have_tx_by_opcode.stdout.txt",
         );
 }
 
@@ -282,7 +282,7 @@ fn find_transaction_by_explicit_opcode_without_generic() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers/p_lib_api_find_transaction_by_explicit_opcode_without_generic.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers_tests/lib_api_find_transaction_by_explicit_opcode_without_generic.stdout.txt",
         );
 }
 
@@ -349,6 +349,6 @@ fn to_have_tx_with_bounced_opcode_prefix() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers/p_lib_api_to_have_tx_with_bounced_opcode_prefix.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_transaction_matchers_tests/lib_api_to_have_tx_with_bounced_opcode_prefix.stdout.txt",
         );
 }

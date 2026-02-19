@@ -35,7 +35,7 @@ fn fork_net_mainnet_formats_addresses_as_mainnet() {
         .assert_contains(RAW_ADDRESS_MAINNET)
         .assert_not_contains(RAW_ADDRESS_TESTNET)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_fork_network/fork_net_mainnet_formats_addresses_as_mainnet.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_fork_network_tests/fork_net_mainnet_formats_addresses_as_mainnet.stdout.txt",
         );
 }
 
@@ -65,7 +65,7 @@ fn fork_net_testnet_formats_addresses_as_testnet() {
         .assert_contains(RAW_ADDRESS_TESTNET)
         .assert_not_contains(RAW_ADDRESS_MAINNET)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_fork_network/fork_net_testnet_formats_addresses_as_testnet.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_fork_network_tests/fork_net_testnet_formats_addresses_as_testnet.stdout.txt",
         );
 }
 
@@ -93,7 +93,7 @@ fn rejects_non_numeric_fork_block_number() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_fork_network/rejects_non_numeric_fork_block_number.stderr.txt",
+            "integration/snapshots/test-runner/test_runner_fork_network_tests/rejects_non_numeric_fork_block_number.stderr.txt",
         );
 }
 
@@ -124,7 +124,7 @@ fn accepts_api_key_and_fork_block_without_remote_access() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_fork_network/accepts_api_key_and_fork_block_without_remote_access.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_fork_network_tests/accepts_api_key_and_fork_block_without_remote_access.stdout.txt",
         );
 }
 

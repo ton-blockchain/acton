@@ -36,7 +36,7 @@ get fun `test-s-lib-api-wallet-local-when-not-broadcasting`() {
     expect(deployer.address).toEqual(localTreasury.address);
 }
 "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode/s_lib_api_wallet_uses_local_treasury_when_broadcast_disabled.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode_tests/lib_api_wallet_uses_local_treasury_when_broadcast_disabled.stdout.txt",
     );
 }
 
@@ -63,7 +63,7 @@ get fun `test-s-lib-api-enable-broadcast-requires-configured-wallet`() {
         .code(1)
         .assert_failed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode/s_lib_api_enable_broadcast_wallet_lookup_requires_configured_wallet.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode_tests/lib_api_enable_broadcast_wallet_lookup_requires_configured_wallet.stdout.txt",
         );
 }
 
@@ -83,7 +83,7 @@ get fun `test-s-lib-api-disable-broadcast-restores-local-wallet`() {
     expect(restored.address).toEqual(net.treasury("restored").address);
 }
 "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode/s_lib_api_disable_broadcast_restores_local_wallet_resolution.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode_tests/lib_api_disable_broadcast_restores_local_wallet_resolution.stdout.txt",
     );
 }
 
@@ -106,7 +106,7 @@ get fun `test-s-lib-api-broadcast-toggle-roundtrip`() {
     expect(net.isBroadcasting()).toEqual(false);
 }
 "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode/s_lib_api_broadcast_toggle_roundtrip_updates_mode.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode_tests/lib_api_broadcast_toggle_roundtrip_updates_mode.stdout.txt",
     );
 }
 
@@ -124,6 +124,6 @@ get fun `test-s-lib-api-local-wallet-names-distinct`() {
     expect(beta.address).toEqual(net.treasury("beta").address);
 }
 "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode/s_lib_api_local_wallet_names_map_to_distinct_treasuries.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_wallet_mode_tests/lib_api_local_wallet_names_map_to_distinct_treasuries.stdout.txt",
     );
 }

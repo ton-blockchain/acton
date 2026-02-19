@@ -37,7 +37,7 @@ fn mutate_requires_mutate_contract() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test-runner/mutate/mutate_requires_mutate_contract.stderr.txt",
+            "integration/snapshots/test-runner/test_runner_mutate_tests/mutate_requires_mutate_contract.stderr.txt",
         );
 }
 
@@ -52,7 +52,7 @@ fn mutate_fails_for_unknown_contract() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test-runner/mutate/mutate_fails_for_unknown_contract.stderr.txt",
+            "integration/snapshots/test-runner/test_runner_mutate_tests/mutate_fails_for_unknown_contract.stderr.txt",
         );
 }
 
@@ -67,7 +67,7 @@ fn mutate_reports_summary() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/mutate/mutate_reports_summary.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_mutate_tests/mutate_reports_summary.stdout.txt",
         );
 }
 
@@ -86,7 +86,7 @@ fn mutate_disable_rule_filters_mutants() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/mutate/mutate_disable_rule_filters_mutants.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_mutate_tests/mutate_disable_rule_filters_mutants.stdout.txt",
         );
 }
 
@@ -120,6 +120,6 @@ disable-rules = ["remove_assert", "flip_plus", "flip_gt_ge"]
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/mutate/mutate_uses_disable_rules_from_config.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_mutate_tests/mutate_uses_disable_rules_from_config.stdout.txt",
         );
 }

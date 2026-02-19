@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary:
 //! - tests/integration/test-runner/test_runner_lib_api_account_state_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_lib_api_account_state/**
+//! - tests/integration/snapshots/test-runner/test_runner_lib_api_account_state_tests/**
 //! - tests/integration/testdata/test_runner_lib_api_account_state/**
 //! - tests/support/test_runner_lib_api_account_state/** (optional)
 
@@ -53,7 +53,7 @@ fn top_up_materializes_account_and_increases_balance() {
             expect(secondBalance).toBeGreater(firstBalance);
         }
         "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_account_state/top_up_materializes_account_and_increases_balance.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_account_state_tests/top_up_materializes_account_and_increases_balance.stdout.txt",
     );
 }
 
@@ -79,7 +79,7 @@ fn set_shard_account_null_resets_state_and_balance() {
             expect(shardAfterReset!.lastTransHash).toEqual(0);
         }
         "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_account_state/set_shard_account_null_resets_state_and_balance.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_account_state_tests/set_shard_account_null_resets_state_and_balance.stdout.txt",
     );
 }
 
@@ -106,7 +106,7 @@ fn set_account_preserves_shard_markers_for_existing_address() {
             expect(targetShardAfter!.lastTransHash).toEqual(targetShardBefore!.lastTransHash);
         }
         "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_account_state/set_account_preserves_shard_markers_for_existing_address.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_account_state_tests/set_account_preserves_shard_markers_for_existing_address.stdout.txt",
     );
 }
 
@@ -139,7 +139,7 @@ fn set_shard_account_copies_state_between_addresses() {
             expect(net.balance(target)).toEqual(expectedBalance);
         }
         "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_account_state/set_shard_account_copies_state_between_addresses.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_account_state_tests/set_shard_account_copies_state_between_addresses.stdout.txt",
     );
 }
 
@@ -159,6 +159,6 @@ fn get_account_state_for_fresh_address_is_null_before_top_up() {
             expect(after!.storage.balance.grams).toEqual(ton("1"));
         }
         "#,
-        "integration/snapshots/test-runner/test_runner_lib_api_account_state/get_account_state_for_fresh_address_is_null_before_top_up.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_account_state_tests/get_account_state_for_fresh_address_is_null_before_top_up.stdout.txt",
     );
 }

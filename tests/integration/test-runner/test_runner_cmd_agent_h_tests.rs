@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary for agent H:
 //! - tests/integration/test-runner/test_runner_cmd_agent_h_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_cmd_agent_h/**
+//! - tests/integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/**
 //! - tests/integration/testdata/test_runner_cmd_agent_h/**
 //! - tests/support/test_runner_cmd_agent_h/** (optional)
 //!
@@ -191,13 +191,13 @@ fn save_test_trace_without_path_uses_default_directory() {
     output
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_cmd_agent_h/save_test_trace_without_path_uses_default_directory.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/save_test_trace_without_path_uses_default_directory.stdout.txt",
         )
         .assert_file_exists(".acton/traces/test-default-trace_trace.json")
         .assert_file_exists(".acton/traces/contracts/simple.json")
         .assert_file_snapshot_matches(
             ".acton/traces/contracts/simple.json",
-            "integration/snapshots/test-runner/test_runner_cmd_agent_h/save_test_trace_without_path_uses_default_directory.contract.txt",
+            "integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/save_test_trace_without_path_uses_default_directory.contract.txt",
         );
 
     assert_trace_json_contract(
@@ -230,7 +230,7 @@ fn save_test_trace_with_custom_directory_uses_regular_non_ui_flow() {
         .assert_passed(1)
         .assert_not_contains("UI")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_cmd_agent_h/save_test_trace_with_custom_directory_uses_regular_non_ui_flow.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/save_test_trace_with_custom_directory_uses_regular_non_ui_flow.stdout.txt",
         )
         .assert_file_exists("custom-traces/test-custom-trace_trace.json")
         .assert_file_exists("custom-traces/contracts/simple.json");
@@ -275,7 +275,7 @@ fn save_test_trace_creates_trace_per_test_and_single_contract_file() {
     output
         .assert_passed(2)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_cmd_agent_h/save_test_trace_creates_trace_per_test_and_single_contract_file.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/save_test_trace_creates_trace_per_test_and_single_contract_file.stdout.txt",
         )
         .assert_file_exists("trace-multi/test-trace-first_trace.json")
         .assert_file_exists("trace-multi/test-trace-second_trace.json")
@@ -329,7 +329,7 @@ fn regular_run_without_trace_flag_does_not_create_trace_artifacts() {
     output
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_cmd_agent_h/regular_run_without_trace_flag_does_not_create_trace_artifacts.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/regular_run_without_trace_flag_does_not_create_trace_artifacts.stdout.txt",
         );
 
     let trace_dir = project.path().join(".acton/traces");
@@ -355,7 +355,7 @@ fn save_test_trace_can_be_enabled_after_regular_run() {
     regular_output
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_cmd_agent_h/save_test_trace_can_be_enabled_after_regular_run.regular.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/save_test_trace_can_be_enabled_after_regular_run.regular.stdout.txt",
         );
 
     let default_trace_dir = project.path().join(".acton/traces");
@@ -376,7 +376,7 @@ fn save_test_trace_can_be_enabled_after_regular_run() {
     traced_output
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_cmd_agent_h/save_test_trace_can_be_enabled_after_regular_run.trace.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_cmd_agent_h_tests/save_test_trace_can_be_enabled_after_regular_run.trace.stdout.txt",
         )
         .assert_file_exists("trace-after-regular/test-after-regular_trace.json")
         .assert_file_exists("trace-after-regular/contracts/simple.json");

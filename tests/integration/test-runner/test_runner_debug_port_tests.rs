@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary:
 //! - tests/integration/test-runner/test_runner_debug_port_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_debug_port/**
+//! - tests/integration/snapshots/test-runner/test_runner_debug_port_tests/**
 
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
@@ -72,7 +72,7 @@ fn debug_port_without_debug_does_not_start_server() {
         .assert_passed(1)
         .assert_not_contains("Debugger server listening on")
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_debug_port/debug_port_without_debug_does_not_start_server.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_debug_port_tests/debug_port_without_debug_does_not_start_server.stdout.txt",
         );
 }
 
@@ -90,7 +90,7 @@ fn debug_port_rejects_values_outside_u16_range() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_debug_port/debug_port_rejects_values_outside_u16_range.stderr.txt",
+            "integration/snapshots/test-runner/test_runner_debug_port_tests/debug_port_rejects_values_outside_u16_range.stderr.txt",
         );
 }
 
@@ -107,7 +107,7 @@ fn debug_port_rejects_non_numeric_value() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_debug_port/debug_port_rejects_non_numeric_value.stderr.txt",
+            "integration/snapshots/test-runner/test_runner_debug_port_tests/debug_port_rejects_non_numeric_value.stderr.txt",
         );
 }
 
@@ -123,7 +123,7 @@ fn debug_flag_preserves_missing_path_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_debug_port/debug_flag_preserves_missing_path_error.stderr.txt",
+            "integration/snapshots/test-runner/test_runner_debug_port_tests/debug_flag_preserves_missing_path_error.stderr.txt",
         );
 }
 

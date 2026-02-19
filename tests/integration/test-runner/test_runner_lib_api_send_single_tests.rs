@@ -189,7 +189,7 @@ fn send_single_keeps_out_messages_without_executing_children() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_send_single/send_single_keeps_out_messages_without_executing_children.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_send_single_tests/send_single_keeps_out_messages_without_executing_children.stdout.txt",
         );
 }
 
@@ -274,7 +274,7 @@ fn send_executes_child_transactions_and_matches_notify_expectation() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_send_single/send_executes_child_transactions_and_matches_notify_expectation.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_send_single_tests/send_executes_child_transactions_and_matches_notify_expectation.stdout.txt",
         );
 }
 
@@ -359,7 +359,7 @@ fn send_single_bounce_roundtrip_matches_bounced_notify_opcode() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_send_single/send_single_bounce_roundtrip_matches_bounced_notify_opcode.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_send_single_tests/send_single_bounce_roundtrip_matches_bounced_notify_opcode.stdout.txt",
         );
 }
 
@@ -446,6 +446,6 @@ fn send_single_bounce_roundtrip_matches_failed_tx_exit_code() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test-runner/test_runner_lib_api_send_single/send_single_bounce_roundtrip_matches_failed_tx_exit_code.stdout.txt",
+            "integration/snapshots/test-runner/test_runner_lib_api_send_single_tests/send_single_bounce_roundtrip_matches_failed_tx_exit_code.stdout.txt",
         );
 }

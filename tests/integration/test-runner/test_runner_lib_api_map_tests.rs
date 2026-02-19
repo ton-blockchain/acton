@@ -2,7 +2,7 @@
 //!
 //! Ownership boundary for agent L:
 //! - tests/integration/test-runner/test_runner_lib_api_map_tests.rs
-//! - tests/integration/snapshots/test-runner/test_runner_lib_api_map/**
+//! - tests/integration/snapshots/test-runner/test_runner_lib_api_map_tests/**
 //! - tests/integration/testdata/test_runner_lib_api_map/**
 //! - tests/support/test_runner_lib_api_map/** (optional)
 
@@ -112,7 +112,7 @@ fn map_contains_and_absence_matchers_pass_for_contract_side_map() {
     .success()
     .assert_passed(1)
     .assert_snapshot_matches(
-        "integration/snapshots/test-runner/test_runner_lib_api_map/map_contains_and_absence_matchers_pass_for_contract_side_map.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_map_tests/map_contains_and_absence_matchers_pass_for_contract_side_map.stdout.txt",
     );
 }
 
@@ -138,7 +138,7 @@ fn map_empty_matchers_pass_for_empty_contract_side_map() {
     .success()
     .assert_passed(1)
     .assert_snapshot_matches(
-        "integration/snapshots/test-runner/test_runner_lib_api_map/map_empty_matchers_pass_for_empty_contract_side_map.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_map_tests/map_empty_matchers_pass_for_empty_contract_side_map.stdout.txt",
     );
 }
 
@@ -165,7 +165,7 @@ fn map_have_length_counts_unique_keys_after_overwrite() {
     .success()
     .assert_passed(1)
     .assert_snapshot_matches(
-        "integration/snapshots/test-runner/test_runner_lib_api_map/map_have_length_counts_unique_keys_after_overwrite.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_map_tests/map_have_length_counts_unique_keys_after_overwrite.stdout.txt",
     );
 }
 
@@ -188,7 +188,7 @@ fn map_to_contain_key_failure_reports_missing_key() {
     .failure()
     .assert_failed(1)
     .assert_snapshot_matches(
-        "integration/snapshots/test-runner/test_runner_lib_api_map/map_to_contain_key_failure_reports_missing_key.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_map_tests/map_to_contain_key_failure_reports_missing_key.stdout.txt",
     );
 }
 
@@ -211,6 +211,6 @@ fn map_to_not_contain_value_failure_reports_present_value() {
     .failure()
     .assert_failed(1)
     .assert_snapshot_matches(
-        "integration/snapshots/test-runner/test_runner_lib_api_map/map_to_not_contain_value_failure_reports_present_value.stdout.txt",
+        "integration/snapshots/test-runner/test_runner_lib_api_map_tests/map_to_not_contain_value_failure_reports_present_value.stdout.txt",
     );
 }
