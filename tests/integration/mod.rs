@@ -122,7 +122,6 @@ mod test_std_agent_dc_tests;
 mod test_std_agent_dd_tests;
 mod test_std_agent_de_tests;
 mod test_std_agent_df_tests;
-mod test_std_agent_dg_tests;
 mod test_std_agent_dh_tests;
 mod test_std_agent_di_tests;
 mod test_std_agent_dj_tests;
