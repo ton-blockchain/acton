@@ -28,6 +28,7 @@ acton build [OPTIONS] [CONTRACT]
 | `--clear-cache`   | Clear the compilation cache before building. Forces recompilation of all contracts regardless of cache state |
 | `--graph [PATH]`  | Generate a visual dependency graph as an SVG file. Requires Graphviz to be installed. Defaults to `deps.svg` |
 | `--out-dir [DIR]` | Directory to save build artifacts. Defaults to `build/`                                                      |
+| `--output-fift [DIR]` | Directory to save compiled Fift files (`<contract>.fif`) for `.tolk` sources. Precompiled `.boc` entries are skipped. If omitted, no Fift files are written. |
 
 ### Examples
 
@@ -49,9 +50,30 @@ acton build --graph diagrams/dependencies.svg
 
 # Build with custom output directory for JSON artifacts
 acton build --out-dir artifacts/
+
+# Build and save compiled Fift files for each contract
+acton build --output-fift build/fift
 ```
 
 ## Acton.toml Configuration
+
+### Build Section
+
+Use `[build]` to configure default outputs for `acton build`:
+
+```toml
+[build]
+output-fift = "build/fift"
+```
+
+When enabled, Acton writes one file per compiled `.tolk` contract: `<output-fift>/<contract-key>.fif`.  
+Contracts with `src = "*.boc"` are not recompiled, so no `.fif` file is produced for them.
+
+CLI flags have priority over config values. Example:
+
+```bash
+acton build --output-fift artifacts/fift
+```
 
 ### Contracts Section
 

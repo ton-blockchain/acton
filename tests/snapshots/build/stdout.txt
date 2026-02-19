@@ -9,6 +9,7 @@ Options:
       --clear-cache        Clear compilation cache before building
       --graph <GRAPH>      Generate dependency graph as SVG file (requires graphviz)
       --out-dir <OUT_DIR>  Output directory for build artifacts [default: build]
+      --output-fift <DIR>  Directory to save compiled Fift files
       --info               Show compiled contract info
   -h, --help               Print help
 
@@ -24,6 +25,10 @@ Configuration:
        { name = "child", kind = "library_ref", function = "getChildCode", path = "child_dep.tolk" }
      ]
 
+     # Optional build output settings
+     [build]
+     output-fift = "build/fift"
+
 Examples:
      # Build all contracts
      acton build
@@ -36,5 +41,8 @@ Examples:
 
      # Generate dependency graph as SVG file
      acton build --graph deps.svg
+
+     # Save compiled Fift files to a custom directory
+     acton build --output-fift build/fift
 
 For more information, see https://i582.github.io/acton/docs/build-system

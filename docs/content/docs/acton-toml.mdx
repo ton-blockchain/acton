@@ -12,6 +12,7 @@ The top-level of `Acton.toml` contains the following sections:
 
 - `[package]` — Project metadata.
 - `[contracts]` — Definition of smart contracts in the project.
+- `[build]` — Build command output settings.
 - `[test]` — Configuration for the test runner.
 - `[lint]` — Linter configuration.
 - `[networks]` — Custom network definitions.
@@ -80,6 +81,25 @@ depends = [
     { name = "LibraryContract", kind = "library_ref", function = "get_lib_code" }
 ]
 ```
+
+---
+
+## `[build]` Section
+
+Configures defaults for `acton build`.
+
+| Field         | Type     | Required | Description                                                                       |
+|:--------------|:---------|:---------|:----------------------------------------------------------------------------------|
+| `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
+
+Example:
+```toml
+[build]
+output-fift = "build/fift"
+```
+
+`acton build --output-fift <DIR>` overrides this value for a single run.  
+Precompiled `.boc` contracts are skipped for Fift output.
 
 ---
 

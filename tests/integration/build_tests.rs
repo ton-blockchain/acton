@@ -1480,6 +1480,136 @@ fn test_build_with_custom_out_dir() {
 }
 
 #[test]
+fn test_build_with_output_fift_cli() {
+    let project = ProjectBuilder::new("build-output-fift-cli")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_output_fift("build/fift")
+        .run()
+        .success();
+
+    let fift_file = project.path().join("build/fift/simple.fif");
+    assert!(
+        fift_file.exists(),
+        "build/fift/simple.fif should be created"
+    );
+
+    let content = fs::read_to_string(&fift_file).expect("Should read Fift file");
+    assert!(!content.is_empty(), "Fift file should not be empty");
+}
+
+#[test]
+fn test_build_with_output_fift_from_config() {
+    let project = ProjectBuilder::new("build-output-fift-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\noutput-fift = \"build/fift\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project.acton().build().run().success();
+
+    let fift_file = project.path().join("build/fift/simple.fif");
+    assert!(
+        fift_file.exists(),
+        "build/fift/simple.fif should be created"
+    );
+}
+
+#[test]
+fn test_build_with_output_fift_cli_overrides_config() {
+    let project = ProjectBuilder::new("build-output-fift-override")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\noutput-fift = \"config/fift\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .with_output_fift("cli/fift")
+        .run()
+        .success();
+
+    let cli_fift_file = project.path().join("cli/fift/simple.fif");
+    assert!(
+        cli_fift_file.exists(),
+        "cli/fift/simple.fif should be created"
+    );
+
+    let config_fift_file = project.path().join("config/fift/simple.fif");
+    assert!(
+        !config_fift_file.exists(),
+        "config/fift/simple.fif should not be created when CLI override is used"
+    );
+}
+
+#[test]
+fn test_build_with_output_fift_for_multiple_contracts() {
+    let project = ProjectBuilder::new("build-output-fift-multi")
+        .contract("first", SIMPLE_CONTRACT)
+        .contract("second", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_output_fift("build/fift")
+        .run()
+        .success();
+
+    let first_fift_file = project.path().join("build/fift/first.fif");
+    let second_fift_file = project.path().join("build/fift/second.fif");
+
+    assert!(
+        first_fift_file.exists(),
+        "build/fift/first.fif should be created"
+    );
+    assert!(
+        second_fift_file.exists(),
+        "build/fift/second.fif should be created"
+    );
+}
+
+#[test]
+fn test_build_with_output_fift_skips_boc_sources() {
+    let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
+
+    let project = ProjectBuilder::new("build-output-fift-mixed")
+        .contract_from_boc("from_boc", boc_bytes)
+        .contract("from_tolk", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_output_fift("build/fift")
+        .run()
+        .success();
+
+    let tolk_fift_file = project.path().join("build/fift/from_tolk.fif");
+    assert!(
+        tolk_fift_file.exists(),
+        "build/fift/from_tolk.fif should be created"
+    );
+
+    let boc_fift_file = project.path().join("build/fift/from_boc.fif");
+    assert!(
+        !boc_fift_file.exists(),
+        "build/fift/from_boc.fif should not be created for precompiled .boc sources"
+    );
+}
+
+#[test]
 fn test_build_multiple_contracts_artifacts() {
     let project = ProjectBuilder::new("build-multi-artifacts")
         .contract("contract1", SIMPLE_CONTRACT)
