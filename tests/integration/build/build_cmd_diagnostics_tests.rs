@@ -2,8 +2,8 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 use std::path::Path;
-const INVALID_PRECOMPILED_BOC: &[u8] =
-    include_bytes!("../testdata/build/build_cmd_diagnostics_tests/invalid_precompiled.boc");
+
+const INVALID_PRECOMPILED_BOC: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 fn write_boc_contract_manifest(
     project_root: &Path,
