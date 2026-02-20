@@ -379,17 +379,14 @@ fun Expectation<any_address>.toBeExternalAddress(self) {
     }
 }
 
-/// Asserts that actual value represeneted as tuple contains the expected value.
+/// Asserts that actual value represeneted as an array contains the expected value.
 ///
 /// Example:
 /// ```tolk
-/// var tuple = createEmptyTuple();
-/// tuple.push(1);
-/// tuple.push(2);
-/// tuple.push(3);
-/// expect(tuple).toContain(2);
+/// val arr = [1, 2, 3];
+/// expect(arr).toContain(2);
 /// ```
-fun Expectation<tuple>.toContain<U>(self, expected: U) {
+fun Expectation<array<E>>.toContain<U>(self, expected: U) {
     var i = 0;
     while (i < self.value.size()) {
         val item = self.value.get(i) as U;
@@ -398,41 +395,61 @@ fun Expectation<tuple>.toContain<U>(self, expected: U) {
         }
         i += 1;
     }
-    Assert.fail("Tuple doesn't contain the value", self.location);
+    Assert.fail("Array doesn't contain the value", self.location);
 }
 
-/// Asserts that actual value represeneted as tuple does not contain the expected value.
+/// Asserts that actual value represeneted as an array does not contain the expected value.
 ///
 /// Example:
 /// ```tolk
-/// var tuple = createEmptyTuple();
-/// tuple.push(1);
-/// tuple.push(2);
-/// tuple.push(3);
-/// expect(tuple).toNotContain(4);
+/// val arr = [1, 2, 3];
+/// expect(arr).toNotContain(4);
 /// ```
-fun Expectation<tuple>.toNotContain<U>(self, expected: U) {
+fun Expectation<array<E>>.toNotContain<U>(self, expected: U) {
     var i = 0;
     while (i < self.value.size()) {
         val item = self.value.get(i) as U;
         if (item == expected) {
-            Assert.fail("Tuple contains the value but it should not", self.location);
+            Assert.fail("Array contains the value, but it should not", self.location);
         }
         i += 1;
     }
 }
 
-/// Asserts that actual value represeneted as tuple has the expected length.
+/// Asserts that actual value represeneted as an array is empty.
 ///
 /// Example:
 /// ```tolk
-/// var tuple = createEmptyTuple();
-/// tuple.push(1);
-/// tuple.push(2);
-/// tuple.push(3);
-/// expect(tuple).toHaveLength(3);
+/// val arr = array<int> [];
+/// expect(arr).toBeEmpty();
 /// ```
-fun Expectation<tuple>.toHaveLength(self, length: int) {
+fun Expectation<array<E>>.toBeEmpty(self) {
+    if (self.value.size() != 0) {
+        Assert.fail("expect(<actual>).toBeEmpty(<expected>): array is not empty", self.location);
+    }
+}
+
+/// Asserts that actual value represeneted as an array is not empty.
+///
+/// Example:
+/// ```tolk
+/// val arr = [1, 2, 3];
+/// expect(arr).toBeNonEmpty();
+/// ```
+fun Expectation<array<E>>.toBeNonEmpty(self) {
+    if (self.value.size() == 0) {
+        Assert.fail("expect(<actual>).toBeNonEmpty(<expected>): array is empty", self.location);
+    }
+}
+
+/// Asserts that actual value represeneted as an array has the expected length.
+///
+/// Example:
+/// ```tolk
+/// val arr = [1, 2, 3];
+/// expect(arr).toHaveLength(3);
+/// ```
+fun Expectation<array<E>>.toHaveLength(self, length: int) {
     Assert.equal(self.value.size(), length, "expect(<actual>).toHaveLength(<expected>)", self.location);
 }
 

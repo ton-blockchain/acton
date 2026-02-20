@@ -9,7 +9,7 @@
 
  > tests/expect_tuple_membership.test.tolk (1 test)
   ✗ ca-stdlib-to-not-contain-present-value-diagnostic-bug [TIME]
-    └─ Error: Tuple contains the value but it should not
+    └─ Error: Array contains the value, but it should not
       └─ at tests/expect_tuple_membership.test[LINE]
 
  ✗ 1 failed in 1 file

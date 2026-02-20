@@ -1,0 +1,39 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+No contracts section found in Acton.toml. Add at least one contract.
+To add a contract add the following section to Acton.toml:
+
+[contracts.my-contract]
+name = "MyContract"
+src = "contracts/my-contract.tolk"
+depends = []
+
+See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for more information
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_array.test.tolk (5 tests)
+  ✗ stdlib-array-to-contain-missing [TIME]
+    └─ Error: Array doesn't contain the value
+      └─ at tests/expect_array.test[LINE]
+  ✗ stdlib-array-to-not-contain-present [TIME]
+    └─ Error: Array contains the value, but it should not
+      └─ at tests/expect_array.test[LINE]
+  ✗ stdlib-array-to-be-empty-on-non-empty [TIME]
+    └─ Error: expect(actual).toBeEmpty(expected): array is not empty
+      └─ at tests/expect_array.test[LINE]
+  ✗ stdlib-array-to-be-non-empty-on-empty [TIME]
+    └─ Error: expect(actual).toBeNonEmpty(expected): array is empty
+      └─ at tests/expect_array.test[LINE]
+  ✗ stdlib-array-to-have-length-mismatch [TIME]
+    └─ Error: expect(actual).toHaveLength(expected)
+        (
+            3,
+            4
+        )
+      └─ at tests/expect_array.test[LINE]
+
+ ✗ 5 failed in 1 file
+
+Some tests failed.

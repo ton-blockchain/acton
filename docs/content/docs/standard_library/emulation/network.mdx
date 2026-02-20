@@ -90,7 +90,7 @@ Information about external outgoing message.
 ## `ChildTxsIds`
 
 ```tolk
-type ChildTxsIds = tuple
+type ChildTxsIds = array<int>
 ```
 
 Represents a list of child transactions IDs (LT) for single send result.
@@ -100,7 +100,7 @@ Represents a list of child transactions IDs (LT) for single send result.
 ## `OutMessages`
 
 ```tolk
-type OutMessages = tuple
+type OutMessages = array<cell>
 ```
 
 Represents a list of out messages for single send result.
@@ -110,7 +110,7 @@ Represents a list of out messages for single send result.
 ## `ExtOutList`
 
 ```tolk
-type ExtOutList = tuple
+type ExtOutList = array<cell>
 ```
 
 Represents a list of external outgoing messages for single send result.

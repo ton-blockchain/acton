@@ -9,7 +9,7 @@
 
  > tests/expect_tuple_membership.test.tolk (1 test)
   ✗ ca-stdlib-to-contain-empty-tuple-missing-value [TIME]
-    └─ Error: Tuple doesn't contain the value
+    └─ Error: Array doesn't contain the value
       └─ at tests/expect_tuple_membership.test[LINE]
 
  ✗ 1 failed in 1 file

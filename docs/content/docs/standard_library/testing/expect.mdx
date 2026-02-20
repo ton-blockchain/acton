@@ -423,62 +423,85 @@ expect(addr).toBeExternalAddress();
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L376" />
 
-## `Expectation<tuple>.toContain`
+## `Expectation<array<E>>.toContain`
 
 ```tolk
-fun Expectation<tuple>.toContain<U>(self, expected: U)
+fun Expectation<array<E>>.toContain<U>(self, expected: U)
 ```
 
-Asserts that actual value represeneted as tuple contains the expected value.
+Asserts that actual value represeneted as an array contains the expected value.
 
 Example:
 ```tolk
-var tuple = createEmptyTuple();
-tuple.push(1);
-tuple.push(2);
-tuple.push(3);
-expect(tuple).toContain(2);
+val arr = [1, 2, 3];
+expect(arr).toContain(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L392" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L389" />
 
-## `Expectation<tuple>.toNotContain`
+## `Expectation<array<E>>.toNotContain`
 
 ```tolk
-fun Expectation<tuple>.toNotContain<U>(self, expected: U)
+fun Expectation<array<E>>.toNotContain<U>(self, expected: U)
 ```
 
-Asserts that actual value represeneted as tuple does not contain the expected value.
+Asserts that actual value represeneted as an array does not contain the expected value.
 
 Example:
 ```tolk
-var tuple = createEmptyTuple();
-tuple.push(1);
-tuple.push(2);
-tuple.push(3);
-expect(tuple).toNotContain(4);
+val arr = [1, 2, 3];
+expect(arr).toNotContain(4);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L414" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L408" />
 
-## `Expectation<tuple>.toHaveLength`
+## `Expectation<array<E>>.toBeEmpty`
 
 ```tolk
-fun Expectation<tuple>.toHaveLength(self, length: int)
+fun Expectation<array<E>>.toBeEmpty(self)
 ```
 
-Asserts that actual value represeneted as tuple has the expected length.
+Asserts that actual value represeneted as an array is empty.
 
 Example:
 ```tolk
-var tuple = createEmptyTuple();
-tuple.push(1);
-tuple.push(2);
-tuple.push(3);
-expect(tuple).toHaveLength(3);
+val arr = array<int> [];
+expect(arr).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L435" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L426" />
+
+## `Expectation<array<E>>.toBeNonEmpty`
+
+```tolk
+fun Expectation<array<E>>.toBeNonEmpty(self)
+```
+
+Asserts that actual value represeneted as an array is not empty.
+
+Example:
+```tolk
+val arr = [1, 2, 3];
+expect(arr).toBeNonEmpty();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L439" />
+
+## `Expectation<array<E>>.toHaveLength`
+
+```tolk
+fun Expectation<array<E>>.toHaveLength(self, length: int)
+```
+
+Asserts that actual value represeneted as an array has the expected length.
+
+Example:
+```tolk
+val arr = [1, 2, 3];
+expect(arr).toHaveLength(3);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L452" />
 
 ## `Expectation<map<K, V>>.toContainKey`
 
@@ -496,7 +519,7 @@ map.set(2, 3);
 expect(map).toContainKey(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L448" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L465" />
 
 ## `Expectation<map<K, V>>.toNotContainKey`
 
@@ -514,7 +537,7 @@ map.set(2, 3);
 expect(map).toNotContainKey(4);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L464" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L481" />
 
 ## `Expectation<map<K, V>>.toContainValue`
 
@@ -532,7 +555,7 @@ map.set(2, 3);
 expect(map).toContainValue(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L480" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L497" />
 
 ## `Expectation<map<K, V>>.toNotContainValue`
 
@@ -550,7 +573,7 @@ map.set(2, 3);
 expect(map).toNotContainValue(4);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L502" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L519" />
 
 ## `Expectation<map<K, V>>.toBeEmpty`
 
@@ -566,7 +589,7 @@ var map = createEmptyMap<int32, int32>();
 expect(map).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L520" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L537" />
 
 ## `Expectation<map<K, V>>.toBeNonEmpty`
 
@@ -584,7 +607,7 @@ map.set(2, 3);
 expect(map).toBeNonEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L535" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L552" />
 
 ## `Expectation<map<K, V>>.toHaveLength`
 
@@ -602,7 +625,7 @@ map.set(2, 3);
 expect(map).toHaveLength(2);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L550" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L567" />
 
 ## `expect`
 
@@ -623,7 +646,7 @@ Optional location can be provided to specify the location of the expectation to
 be printed in the error message. You likely don't want to set this manually,
 as the location will be automatically set by the test framework.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L573" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L590" />
 
 ## `expectToEndWithExitCode`
 
@@ -651,5 +674,5 @@ get fun test_fail_with() {
 
 This function is more flexible and can be used conditionally in the test.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L597" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/expect.tolk#L614" />
 

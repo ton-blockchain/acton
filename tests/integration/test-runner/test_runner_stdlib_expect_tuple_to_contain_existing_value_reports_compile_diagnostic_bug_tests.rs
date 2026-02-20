@@ -78,7 +78,7 @@ get fun `test-ca-stdlib-to-contain-missing-value-diagnostic-bug`() {
 }
 "#,
         "integration/snapshots/test-runner/test_runner_stdlib_expect_tuple_to_contain_existing_value_reports_compile_diagnostic_bug_tests/expect_tuple_to_contain_missing_value_runtime_diagnostic_is_unreachable_bug.stdout.txt",
-        &["Tuple doesn't contain the value"],
+        &["Array doesn't contain the value"],
     );
 }
 
@@ -96,7 +96,7 @@ get fun `test-ca-stdlib-to-not-contain-present-value-diagnostic-bug`() {
 }
 "#,
         "integration/snapshots/test-runner/test_runner_stdlib_expect_tuple_to_contain_existing_value_reports_compile_diagnostic_bug_tests/expect_tuple_to_not_contain_present_value_runtime_diagnostic_is_unreachable_bug.stdout.txt",
-        &["Tuple contains the value but it should not"],
+        &["Array contains the value, but it should not"],
     );
 }
 
@@ -129,6 +129,6 @@ get fun `test-ca-stdlib-to-contain-empty-tuple-missing-value`() {
 }
 "#,
         "integration/snapshots/test-runner/test_runner_stdlib_expect_tuple_to_contain_existing_value_reports_compile_diagnostic_bug_tests/expect_tuple_to_contain_missing_value_in_empty_tuple_reports_runtime_diagnostic.stdout.txt",
-        &["Tuple doesn't contain the value"],
+        &["Array doesn't contain the value"],
     );
 }

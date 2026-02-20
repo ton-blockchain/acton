@@ -58,13 +58,13 @@ struct ExtOutMsgInfo {
 }
 
 /// Represents a list of child transactions IDs (LT) for single send result.
-type ChildTxsIds = tuple
+type ChildTxsIds = array<int>
 
 /// Represents a list of out messages for single send result.
-type OutMessages = tuple
+type OutMessages = array<cell>
 
 /// Represents a list of external outgoing messages for single send result.
-type ExtOutList = tuple
+type ExtOutList = array<cell>
 
 /// Returns the external outgoing message at the given index with given type.
 ///
