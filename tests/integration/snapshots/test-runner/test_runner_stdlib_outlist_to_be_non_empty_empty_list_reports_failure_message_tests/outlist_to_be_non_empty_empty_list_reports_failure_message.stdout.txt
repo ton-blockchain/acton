@@ -15,9 +15,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
 
  > tests/outlist_non_empty.test.tolk (1 test)
   ✗ cd-stdlib-outlist-to-be-non-empty-empty-list [TIME]
-    └─ Error: expect(actual).toNotEqual(expected)
-       Values are equal but expected to be different:
-         0
+    └─ Error: expect(actual).toBeNonEmpty(expected): array is empty
       └─ at tests/outlist_non_empty.test[LINE]
 
  ✗ 1 failed in 1 file

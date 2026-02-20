@@ -172,12 +172,10 @@ fun OutAction.kind(self): string {
     }
 }
 
-/// Type alias for the out action list tuple.
-///
-/// Each tuple entry is a raw cell that must decode as [OutAction] when read via [OutActionList.at].
+/// Type alias for the out action list array.
 ///
 /// To get the out actions, use [vm.outActions] method.
-type OutActionList = tuple
+type OutActionList = array<Cell<OutAction>>
 
 /// Returns the out action at the given index.
 ///
@@ -194,7 +192,7 @@ type OutActionList = tuple
 fun OutActionList.at(self, i: int): OutAction {
     val rawAction = self.get(i);
     try {
-        return (rawAction as cell as Cell<OutAction>).load();
+        return rawAction.load();
     } catch (e) {
         Assert.fail(format2("Unknown out action at index {} (decode error code {})", i, e));
     }
@@ -277,10 +275,10 @@ fun vm.outActions(): OutActionList {
 fun vm.parseOutActions(cell: cell): OutActionList {
     val rootSlice = cell.beginParse();
     if (rootSlice.remainingBitsCount() == 0 && rootSlice.remainingRefsCount() == 0) {
-        return createEmptyTuple();
+        return [];
     }
 
-    var result = createEmptyTuple();
+    var result = OutActionList [];
     var next: Cell<OutList>? = cell as Cell<OutList>;
 
     while (next != null) {
@@ -291,7 +289,7 @@ fun vm.parseOutActions(cell: cell): OutActionList {
 
         val prev = nodeSlice.loadRef() as Cell<OutList>;
         val rawAction = beginCell().storeSlice(nodeSlice).endCell();
-        result.push(rawAction);
+        result.push(rawAction as Cell<OutAction>);
 
         val prevSlice = prev.beginParse();
         if (prevSlice.remainingBitsCount() == 0 && prevSlice.remainingRefsCount() == 0) {

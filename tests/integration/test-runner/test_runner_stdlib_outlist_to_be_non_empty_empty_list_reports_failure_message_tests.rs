@@ -16,8 +16,7 @@ fn run_outlist_failure(project_name: &str, test_body: &str, snapshot_path: &str)
         .run()
         .failure()
         .assert_failed(1)
-        .assert_contains("expect(actual).toNotEqual(expected)")
-        .assert_contains("Values are equal but expected to be different")
+        .assert_contains("expect(actual).toBeNonEmpty(expected): array is empty")
         .assert_contains("0")
         .assert_snapshot_matches(snapshot_path);
 }

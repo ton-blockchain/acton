@@ -29,32 +29,6 @@ import "../ffi/ffi"
 import "../types/message"
 import "../types/out_actions"
 
-/// Expect the out action list to be non empty.
-///
-/// Example:
-/// ```tolk
-/// val out_actions = vm.outActions();
-/// expect(out_actions).toBeNonEmpty();
-/// ```
-fun Expectation<OutActionList>.toBeNonEmpty(self) {
-    val value = self.value.size();
-    val expectation = Expectation<int>.create(value, reflect.typeNameOfObject(value), self.location);
-    expectation.toNotEqual(0);
-}
-
-/// Expect the out action list to be empty.
-///
-/// Example:
-/// ```tolk
-/// val out_actions = vm.outActions();
-/// expect(out_actions).toBeEmpty();
-/// ```
-fun Expectation<OutActionList>.toBeEmpty(self) {
-    val value = self.value.size();
-    val expectation = Expectation<int>.create(value, reflect.typeNameOfObject(value), self.location);
-    expectation.toEqual(0);
-}
-
 /// Expect the out action at the given index to be a send message that can be loaded as `MessageRelaxed<Msg>`.
 ///
 /// Indexing is reverse-chronological (same as `OutActionList.at`): index `0` is the last produced action.

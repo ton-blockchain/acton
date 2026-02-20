@@ -9,11 +9,7 @@
 
  > tests/outlist_to_be_empty_non_empty_fail.test.tolk (1 test)
   ✗ cc-outlist-to-be-empty-non-empty-fail [TIME]
-    └─ Error: expect(actual).toEqual(expected)
-        (
-            1,
-            0
-        )
+    └─ Error: expect(actual).toBeEmpty(expected): array is not empty
       └─ at tests/outlist_to_be_empty_non_empty_fail.test[LINE]
 
  ✗ 1 failed in 1 file
