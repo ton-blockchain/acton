@@ -25,7 +25,17 @@ impl Tuple {
     #[must_use]
     pub fn parse_snake_string(cell: &ArcCell) -> Option<String> {
         let mut parser = cell.parser();
-        Self::parse_snake_string_slice(&mut parser)
+        let bytes = Self::parse_snake_bytes_slice(&mut parser)?;
+        String::from_utf8(bytes).ok()
+    }
+
+    /// Parse a snake bytes from a cell.
+    ///
+    /// If the slice is not a snake bytes, returns `None`.
+    #[must_use]
+    pub fn parse_snake_bytes(cell: &ArcCell) -> Option<Vec<u8>> {
+        let mut parser = cell.parser();
+        Self::parse_snake_bytes_slice(&mut parser)
     }
 
     /// Parse a snake string from a cell slice (parser).
@@ -35,6 +45,16 @@ impl Tuple {
     /// not some other data with 8-bit encoding that forms a valid UTF-8 string.
     #[must_use]
     pub fn parse_snake_string_slice(parser: &mut CellParser) -> Option<String> {
+        String::from_utf8(Self::parse_snake_bytes_slice(parser)?).ok()
+    }
+
+    /// Parse a snake bytes from a cell slice (parser).
+    ///
+    /// If the slice is not a snake string, returns `None`.
+    /// This is tricky since we cannot be sure that the slice is a snake string and
+    /// not some other data with 8-bit encoding that forms a valid UTF-8 string.
+    #[must_use]
+    pub fn parse_snake_bytes_slice(parser: &mut CellParser) -> Option<Vec<u8>> {
         let mut all_bits = Vec::new();
         let bits_to_load = parser.remaining_bits();
         if !bits_to_load.is_multiple_of(8) {
@@ -49,8 +69,7 @@ impl Tuple {
 
         if parser.remaining_refs() == 0 {
             // this is a single cell snake string (or the end of one)
-            let result = String::from_utf8(all_bits).ok()?;
-            return Some(result);
+            return Some(all_bits);
         }
 
         let mut next_data_ref = parser.next_reference().ok()?;
@@ -73,8 +92,7 @@ impl Tuple {
             }
         }
 
-        let result = String::from_utf8(all_bits).ok()?;
-        Some(result)
+        Some(all_bits)
     }
 
     /// Push a snake string to the tuple.
@@ -82,6 +100,13 @@ impl Tuple {
     /// If the string is too long, it will be split into multiple cells automatically.
     pub fn push_string(&mut self, s: &str) {
         let bytes = s.as_bytes();
+        self.push_bytes(bytes);
+    }
+
+    /// Push a snake bytes to the tuple.
+    ///
+    /// If the array is too long, it will be split into multiple cells automatically.
+    pub fn push_bytes(&mut self, bytes: &[u8]) {
         let total_bits = bytes.len() * 8;
 
         // We leave 8 bits free in each cell for prefixes

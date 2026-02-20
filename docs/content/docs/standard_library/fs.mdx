@@ -68,3 +68,59 @@ if (content != null) {
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fs.tolk#L46" />
 
+## `fs.readBytes`
+
+```tolk
+fun fs.readBytes(path: string): slice?
+```
+
+Reads the entire contents of a file as raw bytes.
+
+Returns:
+- `slice` with file bytes on success.
+- `null` on read failure (missing file, permission error, etc).
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fs.tolk#L53" />
+
+## `fs.writeString`
+
+```tolk
+fun fs.writeString(path: string, data: string): bool
+```
+
+Writes UTF-8 text to a file.
+
+Returns:
+- `true` if the file was written successfully.
+- `false` on any host I/O error.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fs.tolk#L60" />
+
+## `fs.writeBytes`
+
+```tolk
+fun fs.writeBytes(path: string, data: slice): bool
+```
+
+Writes raw bytes from a slice to a file.
+
+Returns:
+- `true` if the file was written successfully.
+- `false` on invalid byte slice input or host I/O error.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fs.tolk#L67" />
+
+## `fs.exists`
+
+```tolk
+fun fs.exists(path: string): bool
+```
+
+Checks whether a path exists.
+
+Returns:
+- `true` when the path exists.
+- `false` when missing or if existence check fails.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fs.tolk#L74" />
+
