@@ -162,21 +162,9 @@ pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Va
     })
 }
 
-pub fn map_block_transactions(bt: &LiteNodeBlockTransactions) -> Value {
+pub fn map_block_transactions(_: &LiteNodeBlockTransactions) -> Value {
     serde_json::json!({
-        "@type": "blocks.transactions",
-        "id": map_block_id(&bt.id),
-        "req_count": bt.transactions.len(),
-        "incomplete": false,
-        "transactions": bt.transactions.iter().map(|tx| {
-            serde_json::json!({
-                "@type": "blocks.shortTxId",
-                "mode": 0,
-                "account": tx.address.to_string(),
-                "lt": tx.transaction_id.lt.to_string(),
-                "hash": tx.transaction_id.hash.to_base64()
-            })
-        }).collect::<Vec<_>>()
+      "@type": "ok",
     })
 }
 
