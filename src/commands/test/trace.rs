@@ -149,3 +149,29 @@ pub(super) fn dump_test_transactions(
 
     Ok(())
 }
+
+pub(super) fn dump_precomputed_test_trace(
+    test: &TestDescriptor,
+    traces: Vec<TransactionList>,
+    output_dir: &str,
+) -> anyhow::Result<()> {
+    let test_info = TestTrace {
+        name: test.name.clone(),
+        pos: test.pos.clone(),
+        traces,
+        contracts: vec![],
+        wallets: BTreeMap::new(),
+    };
+
+    let str = serde_json::to_string(&test_info)?;
+    let output_path = Path::new(output_dir);
+    if !output_path.exists() {
+        fs::create_dir_all(output_path)?;
+    }
+
+    let filename = format!("{}_trace.json", test.name);
+    let file_path = output_path.join(filename);
+    fs::write(file_path, str)?;
+
+    Ok(())
+}

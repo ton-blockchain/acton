@@ -118,7 +118,11 @@ struct JestLocation {
 
 #[derive(Debug, Clone, Deserialize)]
 struct RawJestMatcherEvent {
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
     matcher: String,
+    #[serde(default)]
     status: String,
     #[serde(default)]
     test_name: String,
@@ -134,6 +138,14 @@ struct RawJestMatcherEvent {
     location: Option<String>,
     #[serde(default)]
     transaction_query: Option<RawTransactionQueryFailure>,
+    #[serde(default)]
+    transaction_traces: Vec<RawJestTransactionTraceList>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawJestTransactionTraceList {
+    #[serde(default)]
+    transactions: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -712,8 +724,12 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
     reporter_manager.init()?;
     reporter_manager.on_testing_started()?;
 
-    let (jest_results, mut matcher_events_by_test) =
-        run_jest_results(&path, config.filter.as_deref())?;
+    let (jest_results, mut matcher_events_by_test, mut transaction_traces_by_test) =
+        run_jest_results(
+            &path,
+            config.filter.as_deref(),
+            config.save_test_trace.is_some(),
+        )?;
 
     let mut total_passed = 0;
     let mut total_failed = 0;
@@ -744,6 +760,11 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
             let test_name = jest_test_name(&assertion).to_owned();
             let matcher_events =
                 take_jest_matcher_events(&mut matcher_events_by_test, &suite_path_key, &test_name);
+            let transaction_traces = take_jest_transaction_traces(
+                &mut transaction_traces_by_test,
+                &suite_path_key,
+                &test_name,
+            );
             let duration = map_jest_duration(assertion.duration);
             let (message, details) = jest_messages(&assertion, &status, matcher_events.as_deref());
 
@@ -779,6 +800,11 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
             };
             let mut test_report = test_report;
             enrich_jest_transaction_matcher_context(&mut test_report);
+            maybe_dump_jest_test_trace(
+                &mut test_report,
+                config.save_test_trace.as_deref(),
+                transaction_traces,
+            );
 
             reporter_manager.on_test_started(&test_report)?;
             reporter_manager.on_test_finished(&test_report)?;
@@ -865,7 +891,12 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
 fn run_jest_results(
     path: &str,
     filter: Option<&str>,
-) -> anyhow::Result<(JestResults, HashMap<(String, String), Vec<MatcherEvent>>)> {
+    capture_traces: bool,
+) -> anyhow::Result<(
+    JestResults,
+    HashMap<(String, String), Vec<MatcherEvent>>,
+    HashMap<(String, String), Vec<trace::TransactionList>>,
+)> {
     let output_path = PathBuf::from(JEST_RESULTS_PATH);
     let matcher_events_path = PathBuf::from(JEST_MATCHER_EVENTS_PATH);
     let setup_path = PathBuf::from(JEST_SETUP_FILE_PATH);
@@ -876,19 +907,24 @@ fn run_jest_results(
     let mut npm_cmd = process::Command::new("npm");
     npm_cmd.arg("test").arg("--");
     npm_cmd.env("ACTON_JEST_MATCHERS_FILE", &matcher_events_path);
+    npm_cmd.env(
+        "ACTON_JEST_CAPTURE_TRANSACTIONS",
+        if capture_traces { "1" } else { "0" },
+    );
     append_jest_args(&mut npm_cmd, path, filter, &output_path, &setup_path);
     match npm_cmd.output() {
         Ok(output) => {
             if output_path.exists() {
                 let results = read_jest_results(&output_path)?;
-                let matcher_events = match read_jest_matcher_events(&matcher_events_path) {
-                    Ok(events) => events,
-                    Err(err) => {
-                        warn!("Cannot parse Jest matcher events: {err}");
-                        HashMap::new()
-                    }
-                };
-                return Ok((results, matcher_events));
+                let (matcher_events, transaction_traces) =
+                    match read_jest_matcher_events(&matcher_events_path) {
+                        Ok(events) => events,
+                        Err(err) => {
+                            warn!("Cannot parse Jest matcher events: {err}");
+                            (HashMap::new(), HashMap::new())
+                        }
+                    };
+                return Ok((results, matcher_events, transaction_traces));
             }
             failures.push(format_command_failure("npm test", &output, &output_path));
         }
@@ -904,19 +940,24 @@ fn run_jest_results(
     let mut npx_cmd = process::Command::new("npx");
     npx_cmd.arg("jest");
     npx_cmd.env("ACTON_JEST_MATCHERS_FILE", &matcher_events_path);
+    npx_cmd.env(
+        "ACTON_JEST_CAPTURE_TRANSACTIONS",
+        if capture_traces { "1" } else { "0" },
+    );
     append_jest_args(&mut npx_cmd, path, filter, &output_path, &setup_path);
     match npx_cmd.output() {
         Ok(output) => {
             if output_path.exists() {
                 let results = read_jest_results(&output_path)?;
-                let matcher_events = match read_jest_matcher_events(&matcher_events_path) {
-                    Ok(events) => events,
-                    Err(err) => {
-                        warn!("Cannot parse Jest matcher events: {err}");
-                        HashMap::new()
-                    }
-                };
-                return Ok((results, matcher_events));
+                let (matcher_events, transaction_traces) =
+                    match read_jest_matcher_events(&matcher_events_path) {
+                        Ok(events) => events,
+                        Err(err) => {
+                            warn!("Cannot parse Jest matcher events: {err}");
+                            (HashMap::new(), HashMap::new())
+                        }
+                    };
+                return Ok((results, matcher_events, transaction_traces));
             }
             failures.push(format_command_failure("npx jest", &output, &output_path));
         }
@@ -998,13 +1039,17 @@ fn absolute_path_string(path: &Path) -> String {
 
 fn read_jest_matcher_events(
     events_path: &Path,
-) -> anyhow::Result<HashMap<(String, String), Vec<MatcherEvent>>> {
+) -> anyhow::Result<(
+    HashMap<(String, String), Vec<MatcherEvent>>,
+    HashMap<(String, String), Vec<trace::TransactionList>>,
+)> {
     if !events_path.exists() {
-        return Ok(HashMap::new());
+        return Ok((HashMap::new(), HashMap::new()));
     }
 
     let raw = fs::read_to_string(events_path)?;
     let mut out: HashMap<(String, String), Vec<MatcherEvent>> = HashMap::new();
+    let mut traces: HashMap<(String, String), Vec<trace::TransactionList>> = HashMap::new();
 
     for (index, line) in raw.lines().enumerate() {
         let line = line.trim();
@@ -1021,6 +1066,18 @@ fn read_jest_matcher_events(
 
         let test_path = normalize_jest_test_path(&parsed.test_path);
         let key = (test_path, parsed.test_name);
+
+        if parsed.kind.as_deref() == Some("transaction_dump") {
+            let collected = parsed
+                .transaction_traces
+                .iter()
+                .filter_map(raw_trace_list_to_transactions)
+                .collect::<Vec<_>>();
+            if !collected.is_empty() {
+                traces.entry(key).or_default().extend(collected);
+            }
+            continue;
+        }
 
         out.entry(key).or_default().push(MatcherEvent {
             matcher: parsed.matcher,
@@ -1054,7 +1111,7 @@ fn read_jest_matcher_events(
         });
     }
 
-    Ok(out)
+    Ok((out, traces))
 }
 
 fn normalize_jest_test_path(path: &str) -> String {
@@ -1079,6 +1136,34 @@ fn take_jest_matcher_events(
     }
 
     matcher_events_by_test.remove(&(String::new(), test_name.to_owned()))
+}
+
+fn take_jest_transaction_traces(
+    traces_by_test: &mut HashMap<(String, String), Vec<trace::TransactionList>>,
+    suite_path: &str,
+    test_name: &str,
+) -> Vec<trace::TransactionList> {
+    if let Some(traces) = traces_by_test.remove(&(suite_path.to_owned(), test_name.to_owned())) {
+        return traces;
+    }
+
+    traces_by_test
+        .remove(&(String::new(), test_name.to_owned()))
+        .unwrap_or_default()
+}
+
+fn raw_trace_list_to_transactions(
+    list: &RawJestTransactionTraceList,
+) -> Option<trace::TransactionList> {
+    let transactions = list
+        .transactions
+        .iter()
+        .filter_map(transaction_json_to_trace_transaction)
+        .collect::<Vec<_>>();
+    if transactions.is_empty() {
+        return None;
+    }
+    Some(trace::TransactionList { transactions })
 }
 
 fn read_jest_results(output_path: &Path) -> anyhow::Result<JestResults> {
@@ -1328,10 +1413,87 @@ fn transaction_query_to_failed_transactions(
         .collect()
 }
 
+fn maybe_dump_jest_test_trace(
+    test_report: &mut TestReport,
+    trace_dir: Option<&str>,
+    precomputed_traces: Vec<trace::TransactionList>,
+) {
+    let Some(trace_dir) = trace_dir else {
+        return;
+    };
+
+    let traces = if precomputed_traces.is_empty() {
+        collect_jest_trace_lists(test_report)
+    } else {
+        precomputed_traces
+    };
+    if traces.is_empty() {
+        return;
+    }
+
+    let test_descriptor = TestDescriptor {
+        id: 0,
+        name: test_report.name.clone(),
+        annotations: vec![],
+        expected_exit_code: None,
+        gas_limit: None,
+        todo_description: None,
+        pos: Pos {
+            row: test_report.row,
+            column: test_report.column,
+            uri: test_report.file_path.to_string_lossy().to_string(),
+        },
+    };
+
+    if let Err(err) = trace::dump_precomputed_test_trace(&test_descriptor, traces, trace_dir) {
+        warn!("Cannot dump Jest trace for '{}': {err}", test_report.name);
+        return;
+    }
+
+    test_report.trace_path = Some(format!("{}_trace.json", test_report.name));
+}
+
+fn collect_jest_trace_lists(test_report: &TestReport) -> Vec<trace::TransactionList> {
+    let mut traces = Vec::new();
+
+    if let Some(events) = &test_report.matcher_events {
+        for event in events
+            .iter()
+            .filter(|event| event.status.eq_ignore_ascii_case("failed"))
+        {
+            let Some(query) = &event.transaction_query else {
+                continue;
+            };
+
+            let transactions = transaction_query_to_failed_transactions(query);
+            if transactions.is_empty() {
+                continue;
+            }
+
+            traces.push(trace::TransactionList { transactions });
+        }
+    }
+
+    if traces.is_empty()
+        && let Some(transactions) = &test_report.failed_transactions
+        && !transactions.is_empty()
+    {
+        traces.push(trace::TransactionList {
+            transactions: transactions.clone(),
+        });
+    }
+
+    traces
+}
+
 fn transaction_query_candidate_to_failed_transaction(
     candidate: &TransactionQueryCandidate,
 ) -> Option<trace::TransactionInfo> {
-    let tx = candidate.transaction.as_object()?;
+    transaction_json_to_trace_transaction(&candidate.transaction)
+}
+
+fn transaction_json_to_trace_transaction(tx: &serde_json::Value) -> Option<trace::TransactionInfo> {
+    let tx = tx.as_object()?;
 
     let lt = tx.get("lt").and_then(json_value_as_string)?;
     let raw_transaction = tx.get("raw_transaction").and_then(json_value_as_string)?;
