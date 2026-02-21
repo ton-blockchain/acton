@@ -1057,7 +1057,7 @@ fn get_address_code(account: &ShardAccount) -> Option<ArcCell> {
     };
 
     let code = state.code?;
-    let cell = ArcCell::from_boc_b64(&Boc::encode_base64(code)).ok()?;
+    let cell = ArcCell::from_boc(&Boc::encode(code)).ok()?;
 
     Some(cell)
 }
@@ -1149,7 +1149,7 @@ fn account_state_impl(ctx: &mut Context, stk: &mut Tuple, addr: ArcCell) -> anyh
     account.store_into(&mut builder, Cell::empty_context())?;
     let cell = builder.build()?;
 
-    let Ok(cell) = ArcCell::from_boc_b64(&Boc::encode_base64(cell)) else {
+    let Ok(cell) = ArcCell::from_boc(&Boc::encode(cell)) else {
         stk.push(TupleItem::Null);
         return Ok(());
     };
