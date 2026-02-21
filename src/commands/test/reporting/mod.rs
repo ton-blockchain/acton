@@ -41,6 +41,37 @@ pub struct FailedTransactionContext {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct MatcherEvent {
+    pub matcher: String,
+    pub status: String,
+    pub received: Option<String>,
+    pub expected: Vec<String>,
+    pub message: Option<String>,
+    pub location: Option<String>,
+    pub transaction_query: Option<TransactionQueryFailure>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TransactionQueryFailure {
+    pub pattern: serde_json::Value,
+    pub candidates: Vec<TransactionQueryCandidate>,
+    pub negated: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TransactionQueryCandidate {
+    pub transaction: serde_json::Value,
+    pub mismatches: Vec<TransactionQueryMismatch>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TransactionQueryMismatch {
+    pub field: String,
+    pub expected: String,
+    pub actual: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct TestReport {
     pub name: Arc<str>,
     pub suite_name: Arc<str>,
@@ -56,6 +87,7 @@ pub struct TestReport {
     pub failed_transactions: Option<Vec<TransactionInfo>>,
     pub failed_transaction_context: Option<FailedTransactionContext>,
     pub details: Option<String>,
+    pub matcher_events: Option<Vec<MatcherEvent>>,
     pub location: Option<SourceLocation>,
     #[serde(skip)]
     pub abi: Arc<ContractAbi>,

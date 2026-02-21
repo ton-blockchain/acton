@@ -167,6 +167,21 @@ impl<'a> FormatterContext<'a> {
         self.format_transaction_tree(&tree, &contract_letters, 0, "")
     }
 
+    /// Format already serialized transactions (for Jest bridge reports) as a tree.
+    #[must_use]
+    pub fn format_transaction_infos(&self, transactions: &[TransactionInfo]) -> String {
+        let send_results = self.parse_send_results_from_transaction_infos(transactions);
+        if send_results.is_empty() {
+            return String::new();
+        }
+
+        let known_contracts = self.collect_known_contracts(&send_results);
+        let contract_letters = self.create_contract_letters(&known_contracts);
+
+        let tree = self.build_transaction_tree(send_results);
+        self.format_transaction_tree(&tree, &contract_letters, 0, "")
+    }
+
     /// Parse transaction items into `SendResult` structures
     fn parse_send_results(&self, tx_items: &[TupleItem]) -> Vec<SendResult> {
         tx_items
@@ -229,6 +244,63 @@ impl<'a> FormatterContext<'a> {
                 _ => None,
             })
             .collect::<Vec<_>>()
+    }
+
+    fn parse_send_results_from_transaction_infos(
+        &self,
+        transactions: &[TransactionInfo],
+    ) -> Vec<SendResult> {
+        transactions
+            .iter()
+            .filter_map(|tx_info| {
+                let tx_cell = Boc::decode_base64(tx_info.raw_transaction.as_ref()).ok()?;
+                let tx = tx_cell.parse::<Transaction>().ok()?;
+                let parent_lt = tx_info
+                    .parent_transaction
+                    .as_deref()
+                    .and_then(|lt| lt.parse::<i64>().ok());
+                let children_ids = tx_info
+                    .child_transactions
+                    .iter()
+                    .filter_map(|lt| lt.parse::<i64>().ok())
+                    .collect::<Vec<_>>();
+                let actions = tx_info
+                    .actions
+                    .as_ref()
+                    .and_then(|actions| ArcCell::from_boc_b64(actions.as_ref()).ok())
+                    .unwrap_or_default();
+                let externals = tx
+                    .iter_out_msgs()
+                    .filter_map(|msg| {
+                        let Ok(msg) = msg else {
+                            return None;
+                        };
+
+                        if let MsgInfo::ExtOut(_) = &msg.info {
+                            return Some(to_cell(&msg));
+                        }
+
+                        None
+                    })
+                    .collect::<Vec<_>>();
+
+                let is_root_external_in = parent_lt.is_none()
+                    && !children_ids.is_empty()
+                    && matches!(tx.load_in_msg(), Ok(Some(msg)) if matches!(msg.info, MsgInfo::ExtIn(_)));
+                if is_root_external_in {
+                    return None;
+                }
+
+                Some(SendResult {
+                    tx,
+                    children_ids,
+                    parent_lt,
+                    actions,
+                    out_messages: vec![],
+                    externals,
+                })
+            })
+            .collect()
     }
 
     /// Collect all known contract addresses from send results
@@ -433,19 +505,28 @@ impl<'a> FormatterContext<'a> {
         if is_root {
             let in_msg = &tx.load_in_msg();
             if let Ok(Some(in_msg)) = in_msg {
-                let src_addr = match &in_msg.info {
-                    MsgInfo::Int(info) => info.src.clone(),
-                    _ => panic!("Expected internal message"),
+                let src_formatted = match &in_msg.info {
+                    MsgInfo::Int(info) => self.format_address_with_letter(
+                        &info.src,
+                        contract_letters,
+                        show_full_names,
+                    ),
+                    MsgInfo::ExtIn(info) => self.format_address_with_letter(
+                        &info.dst,
+                        contract_letters,
+                        show_full_names,
+                    ),
+                    MsgInfo::ExtOut(_) => String::new(),
                 };
-                let src_formatted =
-                    self.format_address_with_letter(&src_addr, contract_letters, show_full_names);
-                tx_builder += &format!(
-                    "{} {} {}\n",
-                    "N/A".dimmed(),
-                    "->".dimmed(),
-                    src_formatted.trim()
-                );
-                tx_builder += "└── ".dimmed().to_string().as_str();
+                if !src_formatted.trim().is_empty() {
+                    tx_builder += &format!(
+                        "{} {} {}\n",
+                        "N/A".dimmed(),
+                        "->".dimmed(),
+                        src_formatted.trim()
+                    );
+                    tx_builder += "└── ".dimmed().to_string().as_str();
+                }
             }
         }
 

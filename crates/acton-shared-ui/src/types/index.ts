@@ -11,6 +11,33 @@ export interface FailedTransactionContext {
   readonly params: [string, string][]
 }
 
+export interface MatcherEvent {
+  readonly matcher: string
+  readonly status: string
+  readonly received?: string
+  readonly expected: string[]
+  readonly message?: string
+  readonly location?: string
+  readonly transaction_query?: TransactionQueryFailure
+}
+
+export interface TransactionQueryFailure {
+  readonly pattern: unknown
+  readonly candidates: readonly TransactionQueryCandidate[]
+  readonly negated?: boolean
+}
+
+export interface TransactionQueryCandidate {
+  readonly transaction: unknown
+  readonly mismatches: readonly TransactionQueryMismatch[]
+}
+
+export interface TransactionQueryMismatch {
+  readonly field: string
+  readonly expected: string
+  readonly actual: string
+}
+
 export interface TestReport {
   readonly name: string
   readonly suite_name: string
@@ -24,6 +51,7 @@ export interface TestReport {
   readonly failed_transactions?: BackendTransaction[]
   readonly failed_transaction_context?: FailedTransactionContext
   readonly details?: string
+  readonly matcher_events?: MatcherEvent[]
   readonly trace_path?: string
 }
 

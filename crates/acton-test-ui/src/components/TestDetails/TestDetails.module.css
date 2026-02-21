@@ -324,6 +324,40 @@
   gap: var(--spacing-sm);
 }
 
+.matcherSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.matcherTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.matcherTableWrapper {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  background-color: var(--bg-color);
+}
+
+.matcherPassed {
+  color: var(--color-passed);
+  font-weight: var(--font-weight-medium);
+}
+
+.matcherFailed {
+  color: var(--color-failed);
+  font-weight: var(--font-weight-medium);
+}
+
+.matcherOther {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
 .traceFeesTitle {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);

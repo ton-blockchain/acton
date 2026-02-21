@@ -10,8 +10,9 @@ use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
 use crate::commands::test::reporting::teamcity::TeamCityReporter;
 use crate::commands::test::reporting::ui::{UiReporter, start_ui_server};
 use crate::commands::test::reporting::{
-    ReporterManager, TestExecutionContext, TestReport, TestStatus, TestSuiteStats,
-    extract_suite_name,
+    FailedTransactionContext, MatcherEvent, ReporterManager, TestExecutionContext, TestReport,
+    TestStatus, TestSuiteStats, TransactionQueryCandidate, TransactionQueryFailure,
+    TransactionQueryMismatch, extract_suite_name,
 };
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
@@ -69,6 +70,9 @@ pub mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 const JEST_RESULTS_PATH: &str = ".acton/jest-results.json";
+const JEST_MATCHER_EVENTS_PATH: &str = ".acton/jest-matcher-events.jsonl";
+const JEST_SETUP_FILE_PATH: &str = ".acton/acton-jest-setup.cjs";
+const JEST_SETUP_SCRIPT: &str = include_str!("../../../assets/jest/acton-jest-matchers.cjs");
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -110,6 +114,54 @@ struct JestLocation {
     line: Option<usize>,
     #[serde(default)]
     column: Option<usize>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawJestMatcherEvent {
+    matcher: String,
+    status: String,
+    #[serde(default)]
+    test_name: String,
+    #[serde(default)]
+    test_path: String,
+    #[serde(default)]
+    received: Option<String>,
+    #[serde(default)]
+    expected: Vec<String>,
+    #[serde(default)]
+    message: Option<String>,
+    #[serde(default)]
+    location: Option<String>,
+    #[serde(default)]
+    transaction_query: Option<RawTransactionQueryFailure>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawTransactionQueryFailure {
+    #[serde(default)]
+    pattern: serde_json::Value,
+    #[serde(default)]
+    candidates: Vec<RawTransactionQueryCandidate>,
+    #[serde(default)]
+    negated: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawTransactionQueryCandidate {
+    #[serde(default)]
+    transaction: serde_json::Value,
+    #[serde(default)]
+    mismatches: Vec<RawTransactionQueryMismatch>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawTransactionQueryMismatch {
+    #[serde(default)]
+    field: String,
+    #[serde(default)]
+    expected: String,
+    #[serde(default)]
+    actual: String,
 }
 
 #[derive(Debug)]
@@ -660,7 +712,8 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
     reporter_manager.init()?;
     reporter_manager.on_testing_started()?;
 
-    let jest_results = run_jest_results(&path, config.filter.as_deref())?;
+    let (jest_results, mut matcher_events_by_test) =
+        run_jest_results(&path, config.filter.as_deref())?;
 
     let mut total_passed = 0;
     let mut total_failed = 0;
@@ -684,13 +737,18 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
         reporter_manager.on_suite_started(&suite_path, &suite_tests)?;
 
         let mut suite_stats = TestSuiteStats::default();
+        let suite_path_key = suite_path.to_string_lossy().to_string();
+
         for assertion in assertions {
             let status = map_jest_status(&assertion.status);
+            let test_name = jest_test_name(&assertion).to_owned();
+            let matcher_events =
+                take_jest_matcher_events(&mut matcher_events_by_test, &suite_path_key, &test_name);
             let duration = map_jest_duration(assertion.duration);
-            let (message, details) = jest_messages(&assertion, &status);
+            let (message, details) = jest_messages(&assertion, &status, matcher_events.as_deref());
 
             let test_report = TestReport {
-                name: jest_test_name(&assertion).into(),
+                name: test_name.into(),
                 suite_name: extract_suite_name(&suite_path),
                 file_path: suite_path.clone(),
                 row: assertion
@@ -711,6 +769,7 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
                 failed_transactions: None,
                 failed_transaction_context: None,
                 details,
+                matcher_events,
                 location: None,
                 abi: Arc::new(ContractAbi::default()),
                 source_map: Arc::new(SourceMap::default()),
@@ -718,6 +777,8 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
                 execution: None,
                 trace_path: None,
             };
+            let mut test_report = test_report;
+            enrich_jest_transaction_matcher_context(&mut test_report);
 
             reporter_manager.on_test_started(&test_report)?;
             reporter_manager.on_test_finished(&test_report)?;
@@ -800,24 +861,34 @@ fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()
     Ok(())
 }
 
-fn run_jest_results(path: &str, filter: Option<&str>) -> anyhow::Result<JestResults> {
+#[allow(clippy::type_complexity)]
+fn run_jest_results(
+    path: &str,
+    filter: Option<&str>,
+) -> anyhow::Result<(JestResults, HashMap<(String, String), Vec<MatcherEvent>>)> {
     let output_path = PathBuf::from(JEST_RESULTS_PATH);
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    if output_path.exists() {
-        let _ = fs::remove_file(&output_path);
-    }
+    let matcher_events_path = PathBuf::from(JEST_MATCHER_EVENTS_PATH);
+    let setup_path = PathBuf::from(JEST_SETUP_FILE_PATH);
+    prepare_jest_bridge_files(&output_path, &matcher_events_path, &setup_path)?;
 
     let mut failures = Vec::new();
 
     let mut npm_cmd = process::Command::new("npm");
     npm_cmd.arg("test").arg("--");
-    append_jest_args(&mut npm_cmd, path, filter, &output_path);
+    npm_cmd.env("ACTON_JEST_MATCHERS_FILE", &matcher_events_path);
+    append_jest_args(&mut npm_cmd, path, filter, &output_path, &setup_path);
     match npm_cmd.output() {
         Ok(output) => {
             if output_path.exists() {
-                return read_jest_results(&output_path);
+                let results = read_jest_results(&output_path)?;
+                let matcher_events = match read_jest_matcher_events(&matcher_events_path) {
+                    Ok(events) => events,
+                    Err(err) => {
+                        warn!("Cannot parse Jest matcher events: {err}");
+                        HashMap::new()
+                    }
+                };
+                return Ok((results, matcher_events));
             }
             failures.push(format_command_failure("npm test", &output, &output_path));
         }
@@ -832,11 +903,20 @@ fn run_jest_results(path: &str, filter: Option<&str>) -> anyhow::Result<JestResu
 
     let mut npx_cmd = process::Command::new("npx");
     npx_cmd.arg("jest");
-    append_jest_args(&mut npx_cmd, path, filter, &output_path);
+    npx_cmd.env("ACTON_JEST_MATCHERS_FILE", &matcher_events_path);
+    append_jest_args(&mut npx_cmd, path, filter, &output_path, &setup_path);
     match npx_cmd.output() {
         Ok(output) => {
             if output_path.exists() {
-                return read_jest_results(&output_path);
+                let results = read_jest_results(&output_path)?;
+                let matcher_events = match read_jest_matcher_events(&matcher_events_path) {
+                    Ok(events) => events,
+                    Err(err) => {
+                        warn!("Cannot parse Jest matcher events: {err}");
+                        HashMap::new()
+                    }
+                };
+                return Ok((results, matcher_events));
             }
             failures.push(format_command_failure("npx jest", &output, &output_path));
         }
@@ -856,17 +936,43 @@ fn run_jest_results(path: &str, filter: Option<&str>) -> anyhow::Result<JestResu
     );
 }
 
+fn prepare_jest_bridge_files(
+    output_path: &Path,
+    matcher_events_path: &Path,
+    setup_path: &Path,
+) -> anyhow::Result<()> {
+    for path in [output_path, matcher_events_path, setup_path] {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+
+    for path in [output_path, matcher_events_path] {
+        if path.exists() {
+            let _ = fs::remove_file(path);
+        }
+    }
+
+    fs::write(setup_path, JEST_SETUP_SCRIPT)?;
+    Ok(())
+}
+
 fn append_jest_args(
     command: &mut process::Command,
     path: &str,
     filter: Option<&str>,
     output_path: &Path,
+    setup_path: &Path,
 ) {
+    let setup_module_path = absolute_path_string(setup_path);
+
     command
         .arg("--json")
         .arg("--outputFile")
         .arg(output_path)
         .arg("--testLocationInResults")
+        .arg("--setupFilesAfterEnv")
+        .arg(setup_module_path)
         .arg("--runInBand");
 
     if let Some(filter) = filter
@@ -878,6 +984,101 @@ fn append_jest_args(
     if path != "." {
         command.arg(path);
     }
+}
+
+fn absolute_path_string(path: &Path) -> String {
+    dunce::canonicalize(path)
+        .unwrap_or_else(|_| {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            cwd.join(path)
+        })
+        .to_string_lossy()
+        .to_string()
+}
+
+fn read_jest_matcher_events(
+    events_path: &Path,
+) -> anyhow::Result<HashMap<(String, String), Vec<MatcherEvent>>> {
+    if !events_path.exists() {
+        return Ok(HashMap::new());
+    }
+
+    let raw = fs::read_to_string(events_path)?;
+    let mut out: HashMap<(String, String), Vec<MatcherEvent>> = HashMap::new();
+
+    for (index, line) in raw.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let parsed: RawJestMatcherEvent = serde_json::from_str(line)
+            .map_err(|err| anyhow!("Cannot parse matcher event line {}: {err}", index + 1))?;
+
+        if parsed.test_name.trim().is_empty() {
+            continue;
+        }
+
+        let test_path = normalize_jest_test_path(&parsed.test_path);
+        let key = (test_path, parsed.test_name);
+
+        out.entry(key).or_default().push(MatcherEvent {
+            matcher: parsed.matcher,
+            status: parsed.status,
+            received: parsed.received,
+            expected: parsed.expected,
+            message: parsed.message,
+            location: parsed.location,
+            transaction_query: parsed
+                .transaction_query
+                .map(|query| TransactionQueryFailure {
+                    pattern: query.pattern,
+                    candidates: query
+                        .candidates
+                        .into_iter()
+                        .map(|candidate| TransactionQueryCandidate {
+                            transaction: candidate.transaction,
+                            mismatches: candidate
+                                .mismatches
+                                .into_iter()
+                                .map(|mismatch| TransactionQueryMismatch {
+                                    field: mismatch.field,
+                                    expected: mismatch.expected,
+                                    actual: mismatch.actual,
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                    negated: query.negated,
+                }),
+        });
+    }
+
+    Ok(out)
+}
+
+fn normalize_jest_test_path(path: &str) -> String {
+    if path.trim().is_empty() {
+        return String::new();
+    }
+    dunce::canonicalize(path)
+        .unwrap_or_else(|_| PathBuf::from(path))
+        .to_string_lossy()
+        .to_string()
+}
+
+fn take_jest_matcher_events(
+    matcher_events_by_test: &mut HashMap<(String, String), Vec<MatcherEvent>>,
+    suite_path: &str,
+    test_name: &str,
+) -> Option<Vec<MatcherEvent>> {
+    if let Some(events) =
+        matcher_events_by_test.remove(&(suite_path.to_owned(), test_name.to_owned()))
+    {
+        return Some(events);
+    }
+
+    matcher_events_by_test.remove(&(String::new(), test_name.to_owned()))
 }
 
 fn read_jest_results(output_path: &Path) -> anyhow::Result<JestResults> {
@@ -985,10 +1186,22 @@ fn jest_test_name(assertion: &JestAssertionResult) -> &str {
 fn jest_messages(
     assertion: &JestAssertionResult,
     status: &TestStatus,
+    matcher_events: Option<&[MatcherEvent]>,
 ) -> (Option<String>, Option<String>) {
     if assertion.failure_messages.is_empty() {
         return match status {
-            TestStatus::Failed => (Some("Jest test failed".to_owned()), None),
+            TestStatus::Failed => {
+                let matcher_message = matcher_events.and_then(|events| {
+                    events
+                        .iter()
+                        .find(|event| event.status.eq_ignore_ascii_case("failed"))
+                        .and_then(|event| event.message.clone())
+                });
+                (
+                    matcher_message.or_else(|| Some("Jest test failed".to_owned())),
+                    None,
+                )
+            }
             TestStatus::Todo => (None, Some("TODO".to_owned())),
             _ => (None, None),
         };
@@ -1000,6 +1213,205 @@ fn jest_messages(
         TestStatus::Todo | TestStatus::Skipped => (None, Some(details)),
         TestStatus::Passed => (None, None),
     }
+}
+
+fn enrich_jest_transaction_matcher_context(test_report: &mut TestReport) {
+    if test_report.status != TestStatus::Failed {
+        return;
+    }
+
+    let Some(events) = &test_report.matcher_events else {
+        return;
+    };
+    let Some(event) = events
+        .iter()
+        .find(|event| event.transaction_query.is_some())
+    else {
+        return;
+    };
+    let Some(query) = &event.transaction_query else {
+        return;
+    };
+
+    let context = transaction_query_to_failed_context(query);
+    if context.from_address.is_some() || context.to_address.is_some() || !context.params.is_empty()
+    {
+        test_report.failed_transaction_context = Some(context);
+    }
+
+    let failed_transactions = transaction_query_to_failed_transactions(query);
+    if !failed_transactions.is_empty() {
+        test_report.failed_transactions = Some(failed_transactions);
+    }
+
+    if test_report.details.is_none() {
+        test_report.details = event.location.clone();
+    }
+
+    if test_report.detailed_message.is_none() {
+        test_report.detailed_message = event.message.clone();
+    }
+
+    test_report.message = Some(transaction_query_summary(
+        query,
+        test_report.failed_transaction_context.as_ref(),
+    ));
+}
+
+fn transaction_query_summary(
+    query: &TransactionQueryFailure,
+    context: Option<&FailedTransactionContext>,
+) -> String {
+    if query.negated {
+        if let Some(context) = context {
+            let from = context.from_address.as_deref().unwrap_or("<any>");
+            let to = context.to_address.as_deref().unwrap_or("<any>");
+            return format!("Unexpected transaction from {from} to {to}");
+        }
+
+        return format!(
+            "Unexpected transaction matching pattern {} (checked {} candidate(s))",
+            compact_json(&query.pattern, 220),
+            query.candidates.len()
+        );
+    }
+
+    if let Some(context) = context {
+        let from = context.from_address.as_deref().unwrap_or("<any>");
+        let to = context.to_address.as_deref().unwrap_or("<any>");
+        return format!("Cannot find transaction from {from} to {to}");
+    }
+
+    format!(
+        "Cannot find transaction matching pattern {} (checked {} candidate(s))",
+        compact_json(&query.pattern, 220),
+        query.candidates.len()
+    )
+}
+
+fn transaction_query_to_failed_context(
+    query: &TransactionQueryFailure,
+) -> FailedTransactionContext {
+    let mut from_address = None;
+    let mut to_address = None;
+    let mut params = Vec::new();
+
+    if let Some(pattern) = query.pattern.as_object() {
+        for (key, value) in pattern {
+            let formatted = format_pattern_value(value);
+            match key.as_str() {
+                "from" => from_address = Some(formatted),
+                "to" | "on" => {
+                    if to_address.is_none() {
+                        to_address = Some(formatted);
+                    }
+                }
+                _ => params.push((key.clone(), formatted)),
+            }
+        }
+    }
+
+    FailedTransactionContext {
+        from_address,
+        to_address,
+        params,
+    }
+}
+
+fn transaction_query_to_failed_transactions(
+    query: &TransactionQueryFailure,
+) -> Vec<trace::TransactionInfo> {
+    query
+        .candidates
+        .iter()
+        .filter_map(transaction_query_candidate_to_failed_transaction)
+        .collect()
+}
+
+fn transaction_query_candidate_to_failed_transaction(
+    candidate: &TransactionQueryCandidate,
+) -> Option<trace::TransactionInfo> {
+    let tx = candidate.transaction.as_object()?;
+
+    let lt = tx.get("lt").and_then(json_value_as_string)?;
+    let raw_transaction = tx.get("raw_transaction").and_then(json_value_as_string)?;
+    if raw_transaction.is_empty() {
+        return None;
+    }
+
+    let parent_transaction = tx.get("parent_transaction").and_then(json_value_as_string);
+    let child_transactions = tx
+        .get("child_transactions")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(json_value_as_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let shard_account_before = tx
+        .get("shard_account_before")
+        .and_then(json_value_as_string)
+        .unwrap_or_default();
+    let shard_account = tx
+        .get("shard_account")
+        .and_then(json_value_as_string)
+        .unwrap_or_default();
+    let vm_log_diff = tx
+        .get("vm_log_diff")
+        .and_then(json_value_as_string)
+        .unwrap_or_default();
+    let executor_logs = tx
+        .get("executor_logs")
+        .and_then(json_value_as_string)
+        .unwrap_or_default();
+    let actions = tx
+        .get("actions")
+        .and_then(json_value_as_string)
+        .map(Arc::from);
+    let dest_contract_info = tx.get("dest_contract_info").and_then(json_value_as_string);
+
+    Some(trace::TransactionInfo {
+        lt,
+        raw_transaction: raw_transaction.into(),
+        parent_transaction,
+        child_transactions,
+        shard_account_before,
+        shard_account,
+        vm_log_diff,
+        executor_logs: executor_logs.into(),
+        actions,
+        dest_contract_info,
+    })
+}
+
+fn json_value_as_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Number(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn format_pattern_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(value) => value.clone(),
+        serde_json::Value::Number(value) => value.to_string(),
+        serde_json::Value::Bool(value) => value.to_string(),
+        serde_json::Value::Null => "null".to_owned(),
+        _ => compact_json(value, 180),
+    }
+}
+
+fn compact_json(value: &serde_json::Value, max_chars: usize) -> String {
+    let raw = serde_json::to_string(value).unwrap_or_else(|_| value.to_string());
+    if raw.chars().count() <= max_chars {
+        return raw;
+    }
+    let head = raw.chars().take(max_chars).collect::<String>();
+    format!("{head}...")
 }
 
 fn synthetic_suite_failure_assertion(message: &str) -> JestAssertionResult {
@@ -1280,6 +1692,7 @@ fn run_file_tests(
             failed_transactions: None,
             failed_transaction_context: None,
             details: None,
+            matcher_events: None,
             location: None,
             abi: abi.clone(),
             source_map: source_map.clone(),

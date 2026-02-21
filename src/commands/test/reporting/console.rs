@@ -221,12 +221,50 @@ impl TestReporter for ConsoleReporter {
                         println!("    {} {}", "└─".dimmed(), error.error.yellow());
                     }
                 }
+            } else if test.failed_transaction_context.is_some()
+                || test
+                    .failed_transactions
+                    .as_ref()
+                    .is_some_and(|transactions| !transactions.is_empty())
+            {
+                process_structured_transaction_failure(test);
             } else if let Some(message) = &test.message {
                 println!("    {} {}", "└─".dimmed(), message.yellow());
                 if let Some(details) = &test.details
                     && !details.trim().is_empty()
                 {
                     println!("    {}", details.dimmed());
+                }
+            }
+
+            if let Some(events) = &test.matcher_events
+                && !events.is_empty()
+            {
+                let failed_events = events
+                    .iter()
+                    .filter(|event| event.status.eq_ignore_ascii_case("failed"))
+                    .filter(|event| event.transaction_query.is_none())
+                    .collect::<Vec<_>>();
+                if !failed_events.is_empty() {
+                    println!(
+                        "    {} {} matcher event(s), {} failed",
+                        "└─".dimmed(),
+                        events.len(),
+                        failed_events.len()
+                    );
+
+                    for event in failed_events.iter().take(5) {
+                        let message = event
+                            .message
+                            .as_deref()
+                            .unwrap_or("matcher assertion failed");
+                        println!(
+                            "      {} {}: {}",
+                            "•".dimmed(),
+                            event.matcher,
+                            message.yellow()
+                        );
+                    }
                 }
             }
         }
@@ -251,6 +289,135 @@ impl TestReporter for ConsoleReporter {
 
         Ok(())
     }
+}
+
+fn process_structured_transaction_failure(test: &TestReport) {
+    if let Some(message) = test.detailed_message.as_deref().or(test.message.as_deref()) {
+        if message.trim().is_empty() {
+            println!("    {}", "└─".dimmed());
+        } else {
+            let highlighted_message = FormatterContext::highlight_actual_expected(message);
+            println!(
+                "    {} {} {}",
+                "└─".dimmed(),
+                "Error:".bright_red(),
+                highlighted_message
+            );
+        }
+    } else {
+        println!("    {}", "└─".dimmed());
+    }
+
+    let formatter = FormatterContext::empty();
+    if let Some(failed_transactions) = &test.failed_transactions
+        && !failed_transactions.is_empty()
+    {
+        let tx_tree = formatter.format_transaction_infos(failed_transactions);
+        for line in tx_tree.lines() {
+            println!("        {line}");
+        }
+    }
+
+    if let Some(context) = &test.failed_transaction_context {
+        let from = format_structured_address(context.from_address.as_deref());
+        let to = format_structured_address(context.to_address.as_deref());
+        let is_unexpected = test.matcher_events.as_ref().is_some_and(|events| {
+            events.iter().any(|event| {
+                event
+                    .transaction_query
+                    .as_ref()
+                    .is_some_and(|query| query.negated)
+            })
+        });
+
+        if is_unexpected {
+            if context.from_address.is_some() || context.to_address.is_some() {
+                println!("        Unexpected transaction from {from} to {to}");
+            } else {
+                println!("        Unexpected transaction");
+            }
+            if !context.params.is_empty() {
+                println!("        with:");
+                for (key, value) in &context.params {
+                    println!(
+                        "          {key}={}",
+                        format_structured_param_value(key, value)
+                    );
+                }
+            }
+        } else {
+            println!("        Cannot find transaction from {from} to {to}");
+            println!("        with:");
+            for (key, value) in &context.params {
+                println!(
+                    "          {key}={}",
+                    format_structured_param_value(key, value)
+                );
+            }
+        }
+    }
+
+    if let Some(details) = &test.details
+        && !details.trim().is_empty()
+    {
+        println!("      {} at {}", "└─".dimmed(), details.dimmed());
+    }
+}
+
+fn shorten_address(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.len() <= 14 {
+        return trimmed.to_owned();
+    }
+    format!("{}..{}", &trimmed[..6], &trimmed[trimmed.len() - 6..])
+}
+
+fn format_structured_address(value: Option<&str>) -> String {
+    match value {
+        Some(value) => shorten_address(value).cyan().to_string(),
+        None => "<any>".dimmed().to_string(),
+    }
+}
+
+fn format_structured_param_value(key: &str, value: &str) -> String {
+    let value = value.trim();
+
+    if value.eq_ignore_ascii_case("true") {
+        return "true".green().to_string();
+    }
+    if value.eq_ignore_ascii_case("false") {
+        return "false".red().to_string();
+    }
+    if value.eq_ignore_ascii_case("null") {
+        return "null".dimmed().to_string();
+    }
+
+    if matches!(
+        key,
+        "from" | "to" | "on" | "src" | "dest" | "address" | "from_address" | "to_address"
+    ) {
+        return shorten_address(value).cyan().to_string();
+    }
+
+    if matches!(
+        key,
+        "exit_code" | "action_exit_code" | "exitCode" | "actionResultCode"
+    ) {
+        if value == "0" || value == "0n" {
+            return value.green().to_string();
+        }
+        return value.red().to_string();
+    }
+
+    if value.starts_with("0x")
+        || value.ends_with('n')
+        || value.parse::<i128>().is_ok()
+        || value.parse::<u128>().is_ok()
+    {
+        return value.green().to_string();
+    }
+
+    value.to_owned()
 }
 
 fn process_test_fail(

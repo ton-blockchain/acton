@@ -8,6 +8,7 @@ import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
 
 import {
+  type MatcherEvent,
   type TestReport,
   TestStatus,
   type Trace,
@@ -212,6 +213,16 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     return `${(ms / 1000).toFixed(2)}s`
   }
 
+  const compactValue = (value: unknown, maxLen = 180) => {
+    try {
+      const raw = typeof value === "string" ? value : JSON.stringify(value)
+      if (!raw) return "-"
+      return raw.length > maxLen ? `${raw.slice(0, maxLen)}...` : raw
+    } catch {
+      return String(value)
+    }
+  }
+
   const transactionCount = useMemo(() => {
     if (!trace) return 0
     return trace.traces.reduce((acc, t) => acc + t.transactions.length, 0)
@@ -325,6 +336,13 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
       return []
     }
   }, [test.failed_transactions])
+
+  const matcherEvents = useMemo<readonly MatcherEvent[]>(() => {
+    return test.matcher_events ?? []
+  }, [test.matcher_events])
+  const visibleMatcherEvents = useMemo<readonly MatcherEvent[]>(() => {
+    return matcherEvents.filter(event => event.transaction_query === undefined)
+  }, [matcherEvents])
 
   const contracts = useMemo(() => {
     const map = new Map<string, ContractData>()
@@ -569,6 +587,60 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
                   </div>
                 }
               />
+            </div>
+          )}
+
+          {visibleMatcherEvents.length > 0 && (
+            <div className={styles.matcherSection}>
+              <div className={styles.matcherTitle}>
+                Jest Matcher Events ({visibleMatcherEvents.length})
+              </div>
+              <div className={styles.matcherTableWrapper}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Matcher</TableHead>
+                      <TableHead>Received</TableHead>
+                      <TableHead>Expected</TableHead>
+                      <TableHead>Message</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleMatcherEvents.map((event, index) => (
+                      <TableRow key={`${event.matcher}:${index}`}>
+                        <TableCell>
+                          <span
+                            className={
+                              event.status.toLowerCase() === "passed"
+                                ? styles.matcherPassed
+                                : event.status.toLowerCase() === "failed"
+                                  ? styles.matcherFailed
+                                  : styles.matcherOther
+                            }
+                          >
+                            {event.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>{event.matcher}</TableCell>
+                        <TableCell>
+                          {event.received || <span className={styles.emptyCellValue}>-</span>}
+                        </TableCell>
+                        <TableCell>
+                          {event.expected.length > 0 ? (
+                            compactValue(event.expected.join(", "))
+                          ) : (
+                            <span className={styles.emptyCellValue}>-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {event.message || <span className={styles.emptyCellValue}>-</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           )}
 
