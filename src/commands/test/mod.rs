@@ -480,6 +480,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let need_debug_info =
         config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
 
+    let mut cache = ContractAbiParseCache::new();
     let mut abort_after_precompile = false;
     let mut prepared_files = Vec::with_capacity(test_files.len());
     for file in &test_files {
@@ -488,6 +489,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
             need_debug_info,
             &file_cache,
             &acton_config,
+            &mut cache,
         );
         match prepared {
             Ok(prepared) => prepared_files.push(prepared),
@@ -723,18 +725,18 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         .expect("cannot lock reporter manager")
         .finalize()?;
 
-    if config.snapshot.is_some() || config.baseline_snapshot.is_some() {
-        match profiling::collect_profile(&runner) {
-            Ok(()) => {}
-            Err(err) => {
-                eprintln!(
-                    "{}: Cannot collect profiling result: {}",
-                    "Error".red(),
-                    err
-                );
-            }
-        }
-    }
+    // if config.snapshot.is_some() || config.baseline_snapshot.is_some() {
+    //     match profiling::collect_profile(&runner) {
+    //         Ok(()) => {}
+    //         Err(err) => {
+    //             eprintln!(
+    //                 "{}: Cannot collect profiling result: {}",
+    //                 "Error".red(),
+    //                 err
+    //             );
+    //         }
+    //     }
+    // }
 
     if config.ui
         && let Some(reports) = reports_for_ui
@@ -949,18 +951,23 @@ fn compile_test_file(
 }
 
 fn compile_test_for_file(
-    file: &str,
+    filepath: &str,
     content: &str,
     need_debug_info: bool,
     file_cache: &FileBuildCache,
     acton_config: &ActonConfig,
 ) -> anyhow::Result<tolkc::compiler::CompilerResultSuccess> {
-    let tmp_test_filename = file.to_owned() + ".test.tolk";
+    let tmp_test_filename = filepath.to_owned() + ".test.tolk";
 
-    let executable_code = prepare_test_file(content);
+    let file = tolk_syntax::parse(&content);
+    let executable_code = prepare_test_file(&file, content);
     fs::write(&tmp_test_filename, executable_code)?;
-    let compilation_result =
-        compile_test_file(file_cache, &tmp_test_filename, need_debug_info, acton_config)?;
+    let compilation_result = compile_test_file(
+        file_cache,
+        &tmp_test_filename,
+        need_debug_info,
+        acton_config,
+    )?;
     let _ = fs::remove_file(&tmp_test_filename);
 
     let result = match compilation_result {
@@ -984,32 +991,44 @@ struct PreparedTestFile {
 }
 
 fn prepare_test_file_data(
-    file: &str,
+    filepath: &str,
     need_debug_info: bool,
     file_cache: &FileBuildCache,
     acton_config: &ActonConfig,
+    cache: &mut ContractAbiParseCache,
 ) -> anyhow::Result<PreparedTestFile> {
-    let content = fs::read_to_string(file)
-        .map_err(|err| anyhow!("Error reading file '{file}': {err}"))?;
+    let content: Arc<str> = fs::read_to_string(filepath)
+        .map_err(|err| anyhow!("Error reading file '{filepath}': {err}"))?
+        .into();
 
-    let tests = find_all_test(file, &content);
-    let abi = contract_abi(content.as_str(), file, &acton_config.mappings);
+    let file = tolk_syntax::parse(&content);
+    let tests = find_all_test(filepath, &file, &content);
+    let abi = contract_abi_with_file(
+        content.clone(),
+        filepath,
+        &file,
+        &acton_config.mappings,
+        Some(cache),
+    );
 
     let now = Instant::now();
     let compilation_result = compile_test_for_file(
-        file,
-        &content,
+        filepath,
+        content.as_ref(),
         need_debug_info,
         file_cache,
         acton_config,
     )?;
-    debug!("Test file '{file}' compilation time: {:?}", now.elapsed());
+    debug!(
+        "Test file '{filepath}' compilation time: {:?}",
+        now.elapsed()
+    );
 
     let code_cell = ArcCell::from_boc_b64(&compilation_result.code_boc64)?;
     let source_map = compilation_result.source_map.unwrap_or_default();
 
     Ok(PreparedTestFile {
-        file: file.to_string(),
+        file: filepath.to_string(),
         tests,
         abi: Arc::new(abi),
         code_cell,
