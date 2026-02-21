@@ -288,7 +288,7 @@ fn collect_file_dependency_paths_from_imports_recursive(
         }
 
         let Some(import_path) = parse_import_path_line(&line) else {
-            break;
+            continue;
         };
 
         let import_path = resolve_mapped_path(import_path, mappings);
