@@ -1,4 +1,3 @@
-pub mod compat;
 pub mod from_stack;
 pub mod json_stack;
 pub mod serde;
