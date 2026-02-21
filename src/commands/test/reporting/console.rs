@@ -199,29 +199,34 @@ impl TestReporter for ConsoleReporter {
                 time_unit.red().dimmed()
             );
 
-            let Some(exec) = &test.execution else {
-                anyhow::bail!("Test execution context is missing for failed test")
-            };
+            if let Some(exec) = &test.execution {
+                let formatter = FormatterContext {
+                    contract_abi: test.abi.clone(),
+                    accounts: Cow::Borrowed(&exec.accounts),
+                    build_cache: Cow::Borrowed(&exec.build_cache),
+                    emulations: Cow::Borrowed(&exec.emulations),
+                    known_addresses: Cow::Borrowed(&exec.known_addresses),
+                    known_code_cells: Cow::Borrowed(&exec.known_code_cells),
+                    backtrace: test.backtrace,
+                    fork_net: None,
+                    network: None,
+                    api_key: None,
+                };
 
-            let formatter = FormatterContext {
-                contract_abi: test.abi.clone(),
-                accounts: Cow::Borrowed(&exec.accounts),
-                build_cache: Cow::Borrowed(&exec.build_cache),
-                emulations: Cow::Borrowed(&exec.emulations),
-                known_addresses: Cow::Borrowed(&exec.known_addresses),
-                known_code_cells: Cow::Borrowed(&exec.known_code_cells),
-                backtrace: test.backtrace,
-                fork_net: None,
-                network: None,
-                api_key: None,
-            };
-
-            match &exec.get_result {
-                GetMethodResult::Success(result) => {
-                    process_test_fail(test, exec, formatter, result);
+                match &exec.get_result {
+                    GetMethodResult::Success(result) => {
+                        process_test_fail(test, exec, formatter, result);
+                    }
+                    GetMethodResult::Error(error) => {
+                        println!("    {} {}", "└─".dimmed(), error.error.yellow());
+                    }
                 }
-                GetMethodResult::Error(error) => {
-                    println!("    {} {}", "└─".dimmed(), error.error.yellow());
+            } else if let Some(message) = &test.message {
+                println!("    {} {}", "└─".dimmed(), message.yellow());
+                if let Some(details) = &test.details
+                    && !details.trim().is_empty()
+                {
+                    println!("    {}", details.dimmed());
                 }
             }
         }

@@ -116,6 +116,12 @@ enum Commands {
             help_heading = "Execution"
         )]
         fail_fast: bool,
+        #[arg(
+            long,
+            help = "Run tests using Jest bridge mode",
+            help_heading = "Execution"
+        )]
+        jest: bool,
 
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
@@ -1167,6 +1173,7 @@ fn main() {
             mutate_contract,
             disable_rule,
             fail_fast,
+            jest,
             fork_block_number,
             ui,
             ui_port,
@@ -1184,6 +1191,7 @@ fn main() {
                     include,
                     clear_cache,
                     reporter,
+                    jest,
                     junit_path,
                     junit_merge,
                     snapshot,
@@ -1568,6 +1576,7 @@ fn create_test_config(
     include: Vec<String>,
     clear_cache: bool,
     report_formats: Vec<ReportFormat>,
+    run_jest: bool,
     junit_path: Option<String>,
     junit_merge: bool,
     snapshot: Option<String>,
@@ -1592,6 +1601,7 @@ fn create_test_config(
         return test_settings.to_test_config(
             filter,
             report_formats,
+            run_jest,
             if debug { Some(true) } else { None },
             debug_port,
             backtrace,
@@ -1639,6 +1649,7 @@ fn create_test_config(
         include_patterns: include,
         clear_cache,
         report_formats,
+        run_jest,
         junit_path,
         junit_merge,
         snapshot,

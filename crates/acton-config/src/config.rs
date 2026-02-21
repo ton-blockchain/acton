@@ -99,6 +99,7 @@ pub struct PackageConfig {
 pub struct TestSettings {
     pub filter: Option<String>,
     pub reporter: Option<Vec<String>>,
+    pub run_jest: Option<bool>,
     pub debug: Option<bool>,
     pub debug_port: Option<u16>,
     pub backtrace: Option<String>,
@@ -477,6 +478,7 @@ impl TestSettings {
         &self,
         filter_override: Option<String>,
         report_formats: Vec<ReportFormat>,
+        run_jest_override: bool,
         debug_override: Option<bool>,
         debug_port_override: Option<u16>,
         backtrace_override: Option<BacktraceMode>,
@@ -524,6 +526,7 @@ impl TestSettings {
         TestConfig {
             filter: filter_override.or_else(|| self.filter.clone()),
             report_formats: final_report_formats,
+            run_jest: run_jest_override || self.run_jest.unwrap_or(false),
             debug: debug_override.unwrap_or_else(|| self.debug.unwrap_or(false)),
             debug_port: debug_port_override.unwrap_or_else(|| self.debug_port.unwrap_or(12345)),
             backtrace: backtrace_override.or_else(|| {
@@ -684,6 +687,7 @@ version = "0.1.0"
 [test]
 filter = "test-unit.*"
 reporter = ["console", "junit"]
+run-jest = true
 debug = true
 debug-port = 9999
 backtrace = "full"
@@ -703,6 +707,7 @@ junit-merge = true
             test_settings.reporter,
             Some(vec!["console".to_string(), "junit".to_string()])
         );
+        assert_eq!(test_settings.run_jest, Some(true));
         assert_eq!(test_settings.debug, Some(true));
         assert_eq!(test_settings.debug_port, Some(9999));
         assert_eq!(test_settings.backtrace, Some("full".to_string()));

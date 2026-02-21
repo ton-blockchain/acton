@@ -68,6 +68,49 @@ pub mod reporting;
 pub mod trace;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
+const JEST_RESULTS_PATH: &str = ".acton/jest-results.json";
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JestResults {
+    #[serde(default)]
+    test_results: Vec<JestSuiteResult>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JestSuiteResult {
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    assertion_results: Vec<JestAssertionResult>,
+    #[serde(default)]
+    message: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JestAssertionResult {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    full_name: String,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    failure_messages: Vec<String>,
+    duration: Option<f64>,
+    location: Option<JestLocation>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JestLocation {
+    #[serde(default)]
+    line: Option<usize>,
+    #[serde(default)]
+    column: Option<usize>,
+}
 
 #[derive(Debug)]
 pub struct TestResult {
@@ -392,6 +435,10 @@ impl<'a> TestRunner<'a> {
 }
 
 pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()> {
+    if config.run_jest {
+        return test_cmd_jest(path, config);
+    }
+
     // First we need to build all contracts and generate all dependency files with code
     build_cmd(None, config.clear_cache, None, None, None, false)?;
     println!("     {} tests", "Running".green().bold());
@@ -580,6 +627,390 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         process::exit(1)
     }
     Ok(())
+}
+
+fn test_cmd_jest(path: Option<String>, config: &TestConfig) -> anyhow::Result<()> {
+    println!("     {} tests", "Running".green().bold());
+
+    let path = path.unwrap_or_else(|| ".".to_string());
+
+    if !fs::exists(&path).unwrap_or(false) {
+        anyhow::bail!(error_fmt::file_not_found(&path));
+    }
+
+    let metadata = match fs::metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(err) => {
+            anyhow::bail!("Cannot access '{path}': {err}")
+        }
+    };
+    if !metadata.is_file() && !metadata.is_dir() {
+        anyhow::bail!("Path '{path}' is neither a file nor a directory");
+    }
+
+    let ui_reporter = if config.ui {
+        Some(UiReporter::new())
+    } else {
+        None
+    };
+    let reports_for_ui = ui_reporter.as_ref().map(UiReporter::get_reports_arc);
+
+    let mut reporter_manager = ReporterManager::new();
+    TestRunner::setup_reporters(&mut reporter_manager, config, ui_reporter);
+    reporter_manager.init()?;
+    reporter_manager.on_testing_started()?;
+
+    let jest_results = run_jest_results(&path, config.filter.as_deref())?;
+
+    let mut total_passed = 0;
+    let mut total_failed = 0;
+    let mut total_skipped = 0;
+    let mut total_todo = 0;
+    let mut should_stop = false;
+
+    for suite in jest_results.test_results {
+        let suite_path = if suite.name.is_empty() {
+            dunce::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path))
+        } else {
+            dunce::canonicalize(&suite.name).unwrap_or_else(|_| PathBuf::from(&suite.name))
+        };
+
+        let mut assertions = suite.assertion_results;
+        if assertions.is_empty() && !suite.message.trim().is_empty() {
+            assertions.push(synthetic_suite_failure_assertion(&suite.message));
+        }
+
+        let suite_tests = make_jest_test_descriptors(&suite_path, &assertions);
+        reporter_manager.on_suite_started(&suite_path, &suite_tests)?;
+
+        let mut suite_stats = TestSuiteStats::default();
+        for assertion in assertions {
+            let status = map_jest_status(&assertion.status);
+            let duration = map_jest_duration(assertion.duration);
+            let (message, details) = jest_messages(&assertion, &status);
+
+            let test_report = TestReport {
+                name: jest_test_name(&assertion).into(),
+                suite_name: extract_suite_name(&suite_path),
+                file_path: suite_path.clone(),
+                row: assertion
+                    .location
+                    .as_ref()
+                    .and_then(|loc| loc.line)
+                    .unwrap_or(0),
+                column: assertion
+                    .location
+                    .as_ref()
+                    .and_then(|loc| loc.column)
+                    .unwrap_or(0),
+                duration,
+                gas_limit: None,
+                status,
+                message,
+                detailed_message: None,
+                failed_transactions: None,
+                failed_transaction_context: None,
+                details,
+                location: None,
+                abi: Arc::new(ContractAbi::default()),
+                source_map: Arc::new(SourceMap::default()),
+                backtrace: config.backtrace,
+                execution: None,
+                trace_path: None,
+            };
+
+            reporter_manager.on_test_started(&test_report)?;
+            reporter_manager.on_test_finished(&test_report)?;
+            suite_stats.add_test(&test_report.status, test_report.duration);
+
+            match test_report.status {
+                TestStatus::Passed => total_passed += 1,
+                TestStatus::Failed => {
+                    total_failed += 1;
+                    if config.fail_fast {
+                        should_stop = true;
+                    }
+                }
+                TestStatus::Skipped => total_skipped += 1,
+                TestStatus::Todo => total_todo += 1,
+            }
+
+            if should_stop {
+                break;
+            }
+        }
+
+        reporter_manager.on_suite_finished(&suite_path, &suite_stats)?;
+        if should_stop {
+            break;
+        }
+    }
+
+    let total_tests = total_passed + total_failed + total_skipped + total_todo;
+    let global_stats = TestSuiteStats {
+        total: total_tests,
+        passed: total_passed,
+        failed: total_failed,
+        skipped: total_skipped,
+        todo: total_todo,
+        duration: Duration::default(),
+    };
+    reporter_manager.on_testing_finished(&global_stats)?;
+    reporter_manager.finalize()?;
+
+    if config.ui
+        && let Some(reports) = reports_for_ui
+    {
+        let reports = reports.lock().expect("cannot lock mutex").clone();
+        let trace_dir = config.save_test_trace.clone();
+        let project_root = std::env::current_dir().unwrap_or_default();
+        let project_root = dunce::canonicalize(project_root)
+            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default())
+            .to_string_lossy()
+            .to_string();
+        let project_root = if project_root.ends_with(std::path::MAIN_SEPARATOR) {
+            project_root
+        } else {
+            format!("{}{}", project_root, std::path::MAIN_SEPARATOR)
+        };
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?;
+        rt.block_on(async {
+            start_ui_server(reports, trace_dir, project_root, config.ui_port).await
+        })?;
+    }
+
+    if let Some(filter) = &config.filter
+        && total_tests == 0
+    {
+        println!(
+            "{}",
+            color_print::cformat!(
+                "\nNo tests matched filter <yellow>{filter}</>, please check the filter spelling/pattern."
+            )
+        );
+        process::exit(1);
+    }
+
+    if total_failed > 0 {
+        process::exit(1);
+    }
+
+    Ok(())
+}
+
+fn run_jest_results(path: &str, filter: Option<&str>) -> anyhow::Result<JestResults> {
+    let output_path = PathBuf::from(JEST_RESULTS_PATH);
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    if output_path.exists() {
+        let _ = fs::remove_file(&output_path);
+    }
+
+    let mut failures = Vec::new();
+
+    let mut npm_cmd = process::Command::new("npm");
+    npm_cmd.arg("test").arg("--");
+    append_jest_args(&mut npm_cmd, path, filter, &output_path);
+    match npm_cmd.output() {
+        Ok(output) => {
+            if output_path.exists() {
+                return read_jest_results(&output_path);
+            }
+            failures.push(format_command_failure("npm test", &output, &output_path));
+        }
+        Err(err) => {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                failures.push("`npm` was not found in PATH".to_owned());
+            } else {
+                failures.push(format!("Failed to run `npm test`: {err}"));
+            }
+        }
+    }
+
+    let mut npx_cmd = process::Command::new("npx");
+    npx_cmd.arg("jest");
+    append_jest_args(&mut npx_cmd, path, filter, &output_path);
+    match npx_cmd.output() {
+        Ok(output) => {
+            if output_path.exists() {
+                return read_jest_results(&output_path);
+            }
+            failures.push(format_command_failure("npx jest", &output, &output_path));
+        }
+        Err(err) => {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                failures.push("`npx` was not found in PATH".to_owned());
+            } else {
+                failures.push(format!("Failed to run `npx jest`: {err}"));
+            }
+        }
+    }
+
+    anyhow::bail!(
+        "Jest bridge failed to produce '{}'.\n{}",
+        output_path.display(),
+        failures.join("\n\n")
+    );
+}
+
+fn append_jest_args(
+    command: &mut process::Command,
+    path: &str,
+    filter: Option<&str>,
+    output_path: &Path,
+) {
+    command
+        .arg("--json")
+        .arg("--outputFile")
+        .arg(output_path)
+        .arg("--testLocationInResults")
+        .arg("--runInBand");
+
+    if let Some(filter) = filter
+        && !filter.trim().is_empty()
+    {
+        command.arg("--testNamePattern").arg(filter);
+    }
+
+    if path != "." {
+        command.arg(path);
+    }
+}
+
+fn read_jest_results(output_path: &Path) -> anyhow::Result<JestResults> {
+    let raw = fs::read_to_string(output_path)?;
+    serde_json::from_str::<JestResults>(&raw).map_err(|err| {
+        anyhow!(
+            "Cannot parse Jest JSON report '{}': {err}",
+            output_path.display()
+        )
+    })
+}
+
+fn format_command_failure(label: &str, output: &process::Output, output_path: &Path) -> String {
+    let mut message = format!(
+        "`{label}` exited with status {} but did not produce '{}'",
+        output.status,
+        output_path.display()
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if !stdout.is_empty() {
+        message.push_str("\nstdout:\n");
+        message.push_str(&truncate_output(&stdout));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    if !stderr.is_empty() {
+        message.push_str("\nstderr:\n");
+        message.push_str(&truncate_output(&stderr));
+    }
+
+    message
+}
+
+fn truncate_output(text: &str) -> String {
+    const MAX_CHARS: usize = 1200;
+    if text.chars().count() <= MAX_CHARS {
+        return text.to_owned();
+    }
+
+    let head: String = text.chars().take(MAX_CHARS).collect();
+    format!("{head}\n... (truncated)")
+}
+
+fn make_jest_test_descriptors(
+    suite_path: &Path,
+    assertions: &[JestAssertionResult],
+) -> Vec<TestDescriptor> {
+    let uri = suite_path.to_string_lossy().to_string();
+    assertions
+        .iter()
+        .map(|assertion| TestDescriptor {
+            id: 0,
+            name: jest_test_name(assertion).into(),
+            annotations: Vec::new(),
+            expected_exit_code: None,
+            gas_limit: None,
+            todo_description: None,
+            pos: Pos {
+                row: assertion
+                    .location
+                    .as_ref()
+                    .and_then(|loc| loc.line)
+                    .unwrap_or(0),
+                column: assertion
+                    .location
+                    .as_ref()
+                    .and_then(|loc| loc.column)
+                    .unwrap_or(0),
+                uri: uri.clone(),
+            },
+        })
+        .collect()
+}
+
+fn map_jest_status(status: &str) -> TestStatus {
+    match status {
+        "passed" => TestStatus::Passed,
+        "failed" => TestStatus::Failed,
+        "todo" => TestStatus::Todo,
+        "pending" | "skipped" | "disabled" => TestStatus::Skipped,
+        _ => TestStatus::Skipped,
+    }
+}
+
+fn map_jest_duration(duration_ms: Option<f64>) -> Duration {
+    let Some(duration_ms) = duration_ms else {
+        return Duration::default();
+    };
+    if !duration_ms.is_finite() || duration_ms <= 0.0 {
+        return Duration::default();
+    }
+
+    Duration::from_secs_f64(duration_ms / 1000.0)
+}
+
+fn jest_test_name(assertion: &JestAssertionResult) -> &str {
+    if assertion.full_name.trim().is_empty() {
+        assertion.title.as_str()
+    } else {
+        assertion.full_name.as_str()
+    }
+}
+
+fn jest_messages(
+    assertion: &JestAssertionResult,
+    status: &TestStatus,
+) -> (Option<String>, Option<String>) {
+    if assertion.failure_messages.is_empty() {
+        return match status {
+            TestStatus::Failed => (Some("Jest test failed".to_owned()), None),
+            TestStatus::Todo => (None, Some("TODO".to_owned())),
+            _ => (None, None),
+        };
+    }
+
+    let details = assertion.failure_messages.join("\n\n");
+    match status {
+        TestStatus::Failed => (Some(details), None),
+        TestStatus::Todo | TestStatus::Skipped => (None, Some(details)),
+        TestStatus::Passed => (None, None),
+    }
+}
+
+fn synthetic_suite_failure_assertion(message: &str) -> JestAssertionResult {
+    JestAssertionResult {
+        title: "suite setup".to_owned(),
+        full_name: "suite setup".to_owned(),
+        status: "failed".to_owned(),
+        failure_messages: vec![message.to_owned()],
+        duration: Some(0.0),
+        location: None,
+    }
 }
 
 fn build_overrides_for_mutations(
