@@ -35,6 +35,8 @@ use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell as TyCell, CellBuilder as TyCellBuilder};
 use vmlogs::parser::{CellLike, VmStackValue, vm_stack_value};
 
 #[allow(clippy::too_many_arguments)]
@@ -270,7 +272,7 @@ fn execute_script(
     };
 
     if debug {
-        let stack = serialize_tuple(&stack)?.to_boc_b64(false)?;
+        let stack = Boc::encode_base64(serialize_tuple(&stack)?);
         let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
         ffi::register(&mut executor, &mut ctx);
 
@@ -297,7 +299,7 @@ fn execute_script(
     let mut executor = GetExecutor::new(&params)?;
     ffi::register(&mut executor, &mut ctx);
 
-    let stack = serialize_tuple(&stack)?.to_boc_b64(false)?;
+    let stack = Boc::encode_base64(serialize_tuple(&stack)?);
     let result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
     print_script_result(&mut ctx, ScriptResult { result });
     Ok(())
@@ -406,11 +408,11 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<Tup
         }
         VmStackValue::Cell(cell_like) => convert_cell_like(cell_like).map(TupleItem::Cell),
         VmStackValue::Builder(hex) => {
-            let cell = ArcCell::from_boc_hex(hex)?;
+            let cell = Boc::decode_hex(hex)?;
             Ok(TupleItem::Builder(cell))
         }
         VmStackValue::CellSlice(cs) => {
-            let cell = ArcCell::from_boc_hex(cs.value)?;
+            let cell = Boc::decode_hex(cs.value)?;
             Ok(TupleItem::Slice(cell))
         }
         VmStackValue::Continuation(_) => {
@@ -421,22 +423,22 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<Tup
     }
 }
 
-fn convert_cell_like(cell_like: CellLike<'_>) -> anyhow::Result<ArcCell> {
+fn convert_cell_like(cell_like: CellLike<'_>) -> anyhow::Result<TyCell> {
     match cell_like {
-        CellLike::Cell(hex) => Ok(ArcCell::from_boc_hex(hex)?),
-        CellLike::Builder(hex) => Ok(ArcCell::from_boc_hex(hex)?),
+        CellLike::Cell(hex) => Ok(Boc::decode_hex(hex)?),
+        CellLike::Builder(hex) => Ok(Boc::decode_hex(hex)?),
     }
 }
 
-fn string_to_slice(s: &str) -> anyhow::Result<ArcCell> {
+fn string_to_slice(s: &str) -> anyhow::Result<TyCell> {
     let bytes = s.as_bytes();
     let total_bits = bytes.len() * 8;
 
     if total_bits <= 1023 {
         // Fast path, the string fits in one cell
-        let mut b = CellBuilder::new();
-        b.store_bits(total_bits, bytes)?;
-        return Ok(b.build()?.to_arc());
+        let mut b = TyCellBuilder::new();
+        b.store_raw(bytes, total_bits as u16)?;
+        return Ok(b.build()?);
     }
 
     let mut remaining_bytes = bytes;
@@ -450,17 +452,17 @@ fn string_to_slice(s: &str) -> anyhow::Result<ArcCell> {
     }
 
     // build cells from last to first
-    let mut next_cell: Option<ArcCell> = None;
+    let mut next_cell: Option<TyCell> = None;
 
     for (chunk, bits) in cell_data.into_iter().rev() {
-        let mut b = CellBuilder::new();
-        b.store_bits(bits, chunk)?;
+        let mut b = TyCellBuilder::new();
+        b.store_raw(chunk, bits as u16)?;
 
         if let Some(next) = next_cell {
-            b.store_reference(&next)?;
+            b.store_reference(next)?;
         }
 
-        next_cell = Some(ArcCell::from(b.build()?));
+        next_cell = Some(b.build()?);
     }
 
     if let Some(root_cell) = next_cell {

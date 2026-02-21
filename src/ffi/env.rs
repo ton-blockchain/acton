@@ -4,10 +4,10 @@ use std::env;
 use std::str::FromStr;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use tonlib_core::TonAddress;
-use tonlib_core::cell::{ArcCell, CellBuilder};
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::models::IntAddr;
 
 extension!(env_int in (Context) with (name: String) using env_int_impl);
 fn env_int_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
@@ -73,12 +73,12 @@ extension!(env_address in (Context) with (name: String) using env_address_impl);
 fn env_address_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
-            if let Ok(addr) = TonAddress::from_str(&val) {
+            if let Ok(addr) = IntAddr::from_str(&val) {
                 let mut builder = CellBuilder::new();
-                if builder.store_address(&addr).is_ok()
+                if addr.store_into(&mut builder, Cell::empty_context()).is_ok()
                     && let Ok(cell) = builder.build()
                 {
-                    stack.push(TupleItem::Slice(cell.to_arc()));
+                    stack.push(TupleItem::Slice(cell));
                     return Ok(());
                 }
             }
@@ -93,10 +93,10 @@ extension!(env_cell in (Context) with (name: String) using env_cell_impl);
 fn env_cell_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
-            let cell = if let Ok(b) = ArcCell::from_boc_b64(&val) {
+            let cell = if let Ok(b) = Boc::decode_base64(&val) {
                 Some(b)
             } else {
-                ArcCell::from_boc_hex(&val).ok()
+                Boc::decode_hex(&val).ok()
             };
 
             if let Some(cell) = cell {

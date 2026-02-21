@@ -5,13 +5,12 @@ use std::collections::HashMap;
 use std::time::UNIX_EPOCH;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
-use tonlib_core::cell::{ArcCell, CellBuilder};
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
+use tycho_types::cell::{Cell, CellBuilder, Load};
 use tycho_types::dict::Dict;
+use tycho_types::models::IntAddr;
 use tycho_types::prelude::HashBytes;
 
 #[derive(Debug, Clone)]
@@ -46,20 +45,23 @@ pub fn get_jetton_wallet_data(address: String, code: Cell, data: Cell) -> Option
     };
 
     let owner_address = match &result[1] {
-        TupleItem::Slice(s) => s.parser().load_address().ok()?.to_string(),
+        TupleItem::Slice(s) => {
+            let mut slice = s.as_slice_allow_exotic();
+            IntAddr::load_from(&mut slice).ok()?.to_string()
+        }
         _ => return None,
     };
 
     let jetton_master_address = match &result[2] {
-        TupleItem::Slice(s) => s.parser().load_address().ok()?.to_string(),
+        TupleItem::Slice(s) => {
+            let mut slice = s.as_slice_allow_exotic();
+            IntAddr::load_from(&mut slice).ok()?.to_string()
+        }
         _ => return None,
     };
 
     let jetton_wallet_code = match &result[3] {
-        TupleItem::Cell(c) => {
-            let boc = c.to_boc(false).unwrap_or_default();
-            Boc::decode(&boc).ok()?
-        }
+        TupleItem::Cell(c) => c.clone(),
         _ => return None,
     };
 
@@ -84,36 +86,17 @@ pub fn parse_jetton_content(content_cell: Cell) -> Value {
 
     if prefix == 0x01 {
         // Off-chain: read URI
-        let remaining_bits = parser.size_bits();
+        let remaining = parser.load_remaining();
         let mut builder = CellBuilder::new();
-
-        for _ in 0..remaining_bits {
-            if let Ok(bit) = parser.load_bit() {
-                let _ = builder.store_bit(bit);
-            }
-        }
-
-        while parser.size_refs() > 0 {
-            if let Ok(r) = parser.load_reference() {
-                let boc = Boc::encode(r);
-                if let Ok(arc_cell) = ArcCell::from_boc(boc.as_slice()) {
-                    let _ = builder.store_reference(&arc_cell);
-                }
-            }
-        }
-
-        if let Ok(cell) = builder.build()
-            && let Some(uri) = Tuple::parse_snake_string(&ArcCell::from(cell))
+        if builder.store_slice(&remaining).is_ok()
+            && let Ok(cell) = builder.build()
+            && let Some(uri) = Tuple::parse_snake_string(&cell)
         {
             return json!({ "uri": uri });
         }
     } else if prefix == 0x00 {
         // On-chain: HashmapE 256 ^Cell
-        let Ok(dict_cell) = content_cell.as_slice_allow_exotic().load_reference() else {
-            return json!({});
-        };
-
-        let Ok(dict_cell) = Boc::decode(Boc::encode(dict_cell)) else {
+        let Ok(dict_cell) = content_cell.as_slice_allow_exotic().load_reference_cloned() else {
             return json!({});
         };
 
@@ -141,11 +124,7 @@ pub fn parse_jetton_content(content_cell: Cell) -> Value {
                 continue;
             };
 
-            let Ok(value_cell) = ArcCell::from_boc(&Boc::encode(value_cell)) else {
-                continue;
-            };
-
-            let mut slice = value_cell.parser();
+            let mut slice = value_cell.as_slice_allow_exotic();
             let _ = slice.load_uint(8);
 
             if let Some(s) = Tuple::parse_snake_string_slice(&mut slice) {
@@ -180,25 +159,20 @@ pub fn get_jetton_data(address: String, code: Cell, data: Cell) -> Option<Jetton
 
     let admin_address = match &result[2] {
         TupleItem::Slice(s) => {
-            let addr = s.parser().load_address().ok()?;
+            let mut slice = s.as_slice_allow_exotic();
+            let addr = IntAddr::load_from(&mut slice).ok()?;
             addr.to_string()
         }
         _ => return None,
     };
 
     let jetton_content = match &result[3] {
-        TupleItem::Cell(c) => {
-            let boc = c.to_boc(false).unwrap_or_default();
-            Boc::decode(&boc).ok()?
-        }
+        TupleItem::Cell(c) => c.clone(),
         _ => return None,
     };
 
     let jetton_wallet_code = match &result[4] {
-        TupleItem::Cell(c) => {
-            let boc = c.to_boc(false).unwrap_or_default();
-            Boc::decode(&boc).ok()?
-        }
+        TupleItem::Cell(c) => c.clone(),
         _ => return None,
     };
 
@@ -243,7 +217,7 @@ pub fn run_get_method(
     let executor = GetExecutor::new(&params)?;
 
     let stack = Tuple(vec![]);
-    let stack = serialize_tuple(&stack)?.to_boc_b64(false)?;
+    let stack = Boc::encode_base64(serialize_tuple(&stack)?);
     let result = executor.run_get_method(&stack, &params, None)?;
 
     match result {
@@ -252,7 +226,7 @@ pub fn run_get_method(
                 anyhow::bail!("VM exited with code {}", result.vm_exit_code);
             }
 
-            let cell = ArcCell::from_boc_b64(&result.stack)?;
+            let cell = Boc::decode_base64(result.stack.as_ref())?;
 
             Tuple::deserialize(&cell)
         }

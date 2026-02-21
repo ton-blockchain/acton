@@ -6,10 +6,9 @@ use crate::storage::AccountStatus;
 use crate::types::BocBytes;
 use base64::Engine;
 use serde_json::value::Value;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::json_stack::{legacy_stack_to_json, stack_to_json};
 use tvmffi::stack::Tuple;
+use tycho_types::boc::Boc;
 
 pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
     serde_json::json!({
@@ -134,7 +133,7 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
 }
 
 pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Value {
-    let stack_cell = ArcCell::from_boc(&r.stack).unwrap_or_default();
+    let stack_cell = Boc::decode(&r.stack).unwrap_or_default();
     let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
     let stack_json: Value = if is_legacy {
         Value::Array(legacy_stack_to_json(&stack_tuple).unwrap_or_default())

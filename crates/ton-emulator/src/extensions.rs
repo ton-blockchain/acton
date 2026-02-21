@@ -2,10 +2,10 @@
 #![allow(unsafe_code)]
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::from_stack::{ArgError, FromStack};
 use tvmffi::stack::Tuple;
+use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 
 pub fn pop_arg<T: FromStack>(t: &mut Tuple) -> Result<T, ArgError> {
     let item = t.pop().ok_or(ArgError::StackUnderflow)?;
@@ -97,10 +97,8 @@ macro_rules! extension {
     };
 }
 
-fn cell_to_ffi_boc64(cell: &ArcCell) -> *const c_char {
-    let s = cell
-        .to_boc_b64(false)
-        .expect("Failed to encode cell to BOC");
+fn cell_to_ffi_boc64(cell: &Cell) -> *const c_char {
+    let s = Boc::encode_base64(cell);
     CString::new(s)
         .expect("Failed to create C string from BOC")
         .into_raw()
@@ -120,7 +118,7 @@ pub unsafe fn with_tuple(ptr: *const c_char, f: impl FnOnce(&mut Tuple)) -> *con
             .cast_const();
     };
 
-    let mut tuple = ArcCell::from_boc_b64(boc)
+    let mut tuple = Boc::decode_base64(boc)
         .ok()
         .and_then(|c| tvmffi::serde::parse_tuple(&c).ok())
         .unwrap_or_else(Tuple::empty);

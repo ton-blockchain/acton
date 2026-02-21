@@ -14,7 +14,6 @@ use tokio::sync::{mpsc, oneshot};
 use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::json_stack::json_to_legacy_item;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -835,9 +834,7 @@ fn handle_run_get_method(
     let stack_cell = stack
         .serialize()
         .context("Failed to serialize stack to BoC")?;
-    let stack_b64 = stack_cell
-        .to_boc_b64(false)
-        .context("Failed to encode stack to Base64")?;
+    let stack_b64 = Boc::encode_base64(&stack_cell);
 
     let exec = GetExecutor::new(&args).context("Failed to create GetExecutor")?;
 

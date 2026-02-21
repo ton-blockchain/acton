@@ -5,8 +5,8 @@ use num_bigint::BigInt;
 use rand::RngCore;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use tonlib_core::cell::CellBuilder;
 use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::cell::CellBuilder;
 
 extension!(get_secure_random_bytes in (Context) with (bytes_num: BigInt) using get_secure_random_bytes_impl);
 fn get_secure_random_bytes_impl(
@@ -23,9 +23,9 @@ fn get_secure_random_bytes_impl(
     rand::thread_rng().fill_bytes(&mut buf);
 
     let mut builder = CellBuilder::new();
-    builder.store_bits(n * 8, &buf)?;
+    builder.store_raw(&buf, (n * 8) as u16)?;
     let cell = builder.build()?;
-    stack.push(TupleItem::Slice(cell.into()));
+    stack.push(TupleItem::Slice(cell));
     Ok(())
 }
 
@@ -36,12 +36,12 @@ fn mnemonic_new_impl(_ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()
     for word in &words {
         // Tolk `string` = Cell with a ref to a snake-string cell
         let mut snake = CellBuilder::new();
-        snake.store_bits(word.len() * 8, word.as_bytes())?;
+        snake.store_raw(word.as_bytes(), (word.len() * 8) as u16)?;
         let snake_cell = snake.build()?;
 
         let mut wrapper = CellBuilder::new();
-        wrapper.store_reference(&snake_cell.into())?;
-        items.push(TupleItem::Cell(wrapper.build()?.into()));
+        wrapper.store_reference(snake_cell)?;
+        items.push(TupleItem::Cell(wrapper.build()?));
     }
     stack.push(TupleItem::Tuple(items));
     Ok(())
@@ -107,9 +107,9 @@ fn raw_sign_impl(
 
     // Return signature as a 512-bit slice (64 bytes)
     let mut builder = CellBuilder::new();
-    builder.store_bits(512, &sig)?;
+    builder.store_raw(&sig, 512)?;
     let cell = builder.build()?;
-    stack.push(TupleItem::Slice(cell.into()));
+    stack.push(TupleItem::Slice(cell));
     Ok(())
 }
 

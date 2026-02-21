@@ -7,9 +7,7 @@ use num_traits::ToPrimitive;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_source_map::SourceLocation;
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
 use tycho_types::cell::Load;
 use tycho_types::models::{IntAddr, Transaction};
 
@@ -360,13 +358,11 @@ pub fn process_txs_and_search_params(
         } else if let TupleItem::Tuple(raw_from) = &raw_from
             && let TupleItem::Slice(cell) = &raw_from[0]
         {
-            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
             let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.from = Some(address);
             }
         } else if let TupleItem::Slice(cell) = raw_from {
-            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
             let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.from = Some(address);
@@ -379,13 +375,11 @@ pub fn process_txs_and_search_params(
         } else if let TupleItem::Tuple(raw_to) = &raw_to
             && let TupleItem::Slice(cell) = &raw_to[0]
         {
-            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
             let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.to = Some(address);
             }
         } else if let TupleItem::Slice(cell) = raw_to {
-            let cell = Boc::decode(cell.to_boc(false).ok()?).ok()?;
             let mut slice = cell.as_slice().ok()?;
             if let Ok(address) = IntAddr::load_from(&mut slice) {
                 params.to = Some(address);
@@ -410,9 +404,7 @@ pub fn process_txs_and_search_params(
         if raw_body == TupleItem::Null {
             params.body = None;
         } else if let TupleItem::Cell(cell) = raw_body {
-            let boc = cell.to_boc(false).ok()?;
-            let decoded_cell = Boc::decode(&boc).ok()?;
-            params.body = Some(decoded_cell);
+            params.body = Some(cell);
         }
     }
 
@@ -426,11 +418,7 @@ pub fn process_txs_and_search_params(
             },
             _ => None,
         })
-        .filter_map(|x| {
-            let result = x.to_boc(false).ok()?;
-            let tx_cell = Boc::decode(&result).ok()?;
-            tx_cell.parse::<Transaction>().ok()
-        })
+        .filter_map(|x| x.parse::<Transaction>().ok())
         .collect::<Vec<_>>();
 
     Some((params, parsed_txs))

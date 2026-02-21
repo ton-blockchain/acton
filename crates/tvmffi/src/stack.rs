@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use std::ops::{Deref, DerefMut};
-use tonlib_core::cell::ArcCell;
+use tycho_types::cell::Cell;
 
 /// Tuple represent a stack of items for the TVM.
 #[derive(Default, Debug, Clone, Eq)]
@@ -110,9 +110,9 @@ pub enum TupleItem {
     Null,
     Int(BigInt),
     Nan,
-    Cell(ArcCell),
-    Slice(ArcCell),
-    Builder(ArcCell),
+    Cell(Cell),
+    Slice(Cell),
+    Builder(Cell),
     Tuple(Tuple),
     TypedTuple {
         type_name: String,

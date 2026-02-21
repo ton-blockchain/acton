@@ -4,7 +4,7 @@
 use crate::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use thiserror::Error;
-use tonlib_core::cell::ArcCell;
+use tycho_types::cell::Cell;
 
 /// An error type for converting `TupleItem` to a Rust type.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -90,7 +90,7 @@ impl FromStack for Tuple {
 }
 
 /// Convert a `TupleItem` to a Cell.
-impl FromStack for ArcCell {
+impl FromStack for Cell {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
         match item {
             TupleItem::Cell(c) => Ok(c),
@@ -103,7 +103,7 @@ impl FromStack for ArcCell {
 mod tests {
     use super::*;
     use crate::stack::{Tuple, TupleItem};
-    use tonlib_core::cell::CellBuilder;
+    use tycho_types::cell::CellBuilder;
 
     #[test]
     fn test_string_from_stack() {
@@ -140,8 +140,8 @@ mod tests {
 
         // Test invalid UTF-8 (should return CellParse error)
         let mut builder = CellBuilder::new();
-        builder.store_bits(16, &[0xFF, 0xFF]).unwrap(); // Invalid UTF-8
-        let cell = ArcCell::from(builder.build().unwrap());
+        builder.store_raw(&[0xFF, 0xFF], 16).unwrap(); // Invalid UTF-8
+        let cell = builder.build().unwrap();
 
         let result = String::from_item(TupleItem::Slice(cell));
         assert!(matches!(result, Err(ArgError::CellParse)));
@@ -213,10 +213,10 @@ mod tests {
     fn test_cell_from_stack() {
         // Test successful cell conversion
         let mut builder = CellBuilder::new();
-        builder.store_bits(8, b"test").unwrap();
-        let cell = ArcCell::from(builder.build().unwrap());
+        builder.store_raw(b"test", 8).unwrap();
+        let cell = builder.build().unwrap();
 
-        let result = ArcCell::from_item(TupleItem::Cell(cell.clone()));
+        let result = Cell::from_item(TupleItem::Cell(cell.clone()));
         assert_eq!(result, Ok(cell));
     }
 
@@ -276,8 +276,8 @@ mod tests {
             Err(ArgError::TypeMismatch { expected: "Tuple" })
         ));
 
-        // Test ArcCell from non-cell
-        let result = ArcCell::from_item(TupleItem::Int(BigInt::from(42)));
+        // Test Cell from non-cell
+        let result = Cell::from_item(TupleItem::Int(BigInt::from(42)));
         assert!(matches!(
             result,
             Err(ArgError::TypeMismatch { expected: "Cell" })
@@ -288,8 +288,8 @@ mod tests {
     fn test_edge_cases() {
         // Test string with odd number of bits (not divisible by 8)
         let mut builder = CellBuilder::new();
-        builder.store_bits(7, &[0xFF]).unwrap(); // 7 bits, not divisible by 8
-        let cell = ArcCell::from(builder.build().unwrap());
+        builder.store_raw(&[0xFF], 7).unwrap(); // 7 bits, not divisible by 8
+        let cell = builder.build().unwrap();
 
         let result = String::from_item(TupleItem::Slice(cell));
         assert!(matches!(result, Err(ArgError::CellParse)));

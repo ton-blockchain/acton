@@ -32,6 +32,7 @@ use ton_source_map::SourceMap;
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::compat::CellCompatExt;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -337,7 +338,7 @@ fn get_script_result(
                 anyhow::bail!("VM exit code {}", result.vm_exit_code)
             }
 
-            let cell = ArcCell::from_boc_b64(&result.stack)?;
+            let cell = Boc::decode_base64(result.stack.as_ref())?;
 
             let tuple = Tuple::deserialize(&cell)?;
             let tuple_str = formatter.format_tuple(&tuple, false, false);

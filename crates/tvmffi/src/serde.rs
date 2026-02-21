@@ -1,16 +1,17 @@
 use crate::stack::{Tuple, TupleItem};
 use anyhow::anyhow;
-use num_bigint::{BigInt, BigUint};
-use tonlib_core::cell::{ArcCell, CellBuilder, CellParser};
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
+use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 
 impl Tuple {
     /// Serialize a tuple to a cell.
-    pub fn serialize(&self) -> Result<ArcCell, anyhow::Error> {
+    pub fn serialize(&self) -> Result<Cell, anyhow::Error> {
         serialize_tuple(self)
     }
 
     /// Deserialize a tuple from a cell.
-    pub fn deserialize(src: &ArcCell) -> Result<Tuple, anyhow::Error> {
+    pub fn deserialize(src: &Cell) -> Result<Tuple, anyhow::Error> {
         parse_tuple(src)
     }
 }
@@ -19,43 +20,49 @@ impl Tuple {
 pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyhow::Result<()> {
     match src {
         TupleItem::Null => {
-            builder.store_u8(8, 0x00)?;
+            builder.store_small_uint(0x00, 8)?;
         }
         TupleItem::Int(value) => {
             // Check if value fits in int64
             if value <= &BigInt::from(9223372036854775807i64)
                 && value >= &BigInt::from(-9223372036854775808i64)
             {
-                builder.store_u8(8, 0x01)?;
-                builder.store_int(64, value)?;
+                builder.store_small_uint(0x01, 8)?;
+                let int64 = value
+                    .to_i64()
+                    .ok_or_else(|| anyhow!("invalid i64 value in tuple serialization"))?;
+                builder.store_u64(int64 as u64)?;
                 return Ok(());
             }
+
             // Use int257 for larger values
-            builder.store_u16(15, 0x0100)?;
-            builder.store_int(257, &value.clone())?;
+            builder.store_small_uint(0x02, 8)?;
+            builder.store_uint(0, 7)?;
+            builder.store_bigint(value, 257, true)?;
         }
         TupleItem::Nan => {
-            builder.store_u16(16, 0x02ff)?;
+            builder.store_small_uint(0x02, 8)?;
+            builder.store_small_uint(0xff, 8)?;
         }
         TupleItem::Cell(cell) => {
-            builder.store_u8(8, 0x03)?;
-            builder.store_reference(cell)?;
+            builder.store_small_uint(0x03, 8)?;
+            builder.store_reference(cell.clone())?;
         }
         TupleItem::Slice(cell) => {
-            builder.store_u8(8, 0x04)?;
-            builder.store_u32(10, 0)?;
-            builder.store_u32(10, cell.bit_len() as u32)?;
-            builder.store_u32(3, 0)?;
-            builder.store_u32(3, cell.references().len() as u32)?;
-            builder.store_reference(cell)?;
+            builder.store_small_uint(0x04, 8)?;
+            builder.store_uint(0, 10)?;
+            builder.store_uint(cell.bit_len() as u64, 10)?;
+            builder.store_uint(0, 3)?;
+            builder.store_uint(cell.reference_count() as u64, 3)?;
+            builder.store_reference(cell.clone())?;
         }
         TupleItem::Builder(cell) => {
-            builder.store_u8(8, 0x05)?;
-            builder.store_reference(cell)?;
+            builder.store_small_uint(0x05, 8)?;
+            builder.store_reference(cell.clone())?;
         }
         TupleItem::Tuple(items) => {
-            let mut head: Option<ArcCell> = None;
-            let mut tail: Option<ArcCell> = None;
+            let mut head: Option<Cell> = None;
+            let mut tail: Option<Cell> = None;
 
             for (i, item) in items.iter().enumerate() {
                 std::mem::swap(&mut head, &mut tail);
@@ -63,26 +70,26 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
                 if i > 1 {
                     let mut bc = CellBuilder::new();
                     if let Some(tail) = tail.as_ref() {
-                        bc.store_reference(tail)?;
+                        bc.store_reference(tail.clone())?;
                     }
                     if let Some(head) = head.as_ref() {
-                        bc.store_reference(head)?;
+                        bc.store_reference(head.clone())?;
                     }
-                    head = Some(ArcCell::new(bc.build()?));
+                    head = Some(bc.build()?);
                 }
 
                 let mut bc = CellBuilder::new();
                 serialize_tuple_item(&mut bc, item)?;
-                tail = Some(ArcCell::new(bc.build()?));
+                tail = Some(bc.build()?);
             }
 
-            builder.store_u8(8, 0x07)?;
-            builder.store_u16(16, items.len() as u16)?;
+            builder.store_small_uint(0x07, 8)?;
+            builder.store_u16(items.len() as u16)?;
             if let Some(h) = &head {
-                builder.store_reference(h)?;
+                builder.store_reference(h.clone())?;
             }
             if let Some(t) = &tail {
-                builder.store_reference(t)?;
+                builder.store_reference(t.clone())?;
             }
         }
         TupleItem::TypedTuple { inner: items, .. } => {
@@ -93,18 +100,18 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
 }
 
 /// Parse a tuple item from a cell parser
-pub fn parse_tuple_item(parser: &mut CellParser<'_>) -> Result<TupleItem, anyhow::Error> {
-    let kind = parser.load_u8(8)?;
+pub fn parse_tuple_item(parser: &mut CellSlice<'_>) -> Result<TupleItem, anyhow::Error> {
+    let kind = parser.load_small_uint(8)?;
 
     match kind {
         0 => Ok(TupleItem::Null),
         1 => {
-            let value = parser.load_i64(64)?;
+            let value = parser.load_u64()? as i64;
             Ok(TupleItem::Int(BigInt::from(value)))
         }
         2 => {
-            if parser.load_u64(7)? == 0 {
-                let value = parser.load_int(257)?;
+            if parser.load_uint(7)? == 0 {
+                let value = parser.load_bigint(257, true)?;
                 Ok(TupleItem::Int(value))
             } else {
                 parser.load_bit()?;
@@ -112,72 +119,69 @@ pub fn parse_tuple_item(parser: &mut CellParser<'_>) -> Result<TupleItem, anyhow
             }
         }
         3 => {
-            let cell = parser.next_reference()?;
+            let cell = parser.load_reference_cloned()?;
             Ok(TupleItem::Cell(cell))
         }
         4 => {
-            let start_bits = parser.load_u32(10)?;
-            let end_bits = parser.load_u32(10)?;
-            let start_refs = parser.load_u32(3)?;
-            let end_refs = parser.load_u32(3)?;
+            let start_bits = parser.load_uint(10)? as u16;
+            let end_bits = parser.load_uint(10)? as u16;
+            let start_refs = parser.load_uint(3)? as u8;
+            let end_refs = parser.load_uint(3)? as u8;
 
-            let cell_ref = parser.next_reference()?;
+            let cell_ref = parser.load_reference_cloned()?;
 
-            let mut parser = cell_ref.parser();
-            parser.skip_bits(start_bits as usize)?;
-            let root_data_size = (end_bits - start_bits) as usize;
-            let root_bits = parser.load_bits(root_data_size)?;
+            let mut parser = cell_ref.as_slice_allow_exotic();
+            parser.skip_first(start_bits, start_refs)?;
 
-            // skip first refs
-            for _ in 0..start_refs {
-                parser.next_reference()?;
-            }
+            let root_data_size = end_bits.saturating_sub(start_bits);
+            let mut root_bits = vec![0u8; root_data_size.div_ceil(8) as usize];
+            parser.load_raw(&mut root_bits, root_data_size)?;
 
             let mut builder = CellBuilder::new();
-            builder.store_bits(root_data_size, &root_bits)?;
+            builder.store_raw(&root_bits, root_data_size)?;
 
             for _ in start_refs..end_refs {
-                let next_ref = parser.next_reference()?;
-                builder.store_reference(&next_ref)?;
+                let next_ref = parser.load_reference_cloned()?;
+                builder.store_reference(next_ref)?;
             }
 
             let final_cell = builder.build()?;
 
-            Ok(TupleItem::Slice(final_cell.into()))
+            Ok(TupleItem::Slice(final_cell))
         }
         5 => {
-            let cell = parser.next_reference()?;
+            let cell = parser.load_reference_cloned()?;
             Ok(TupleItem::Builder(cell))
         }
         7 => {
-            let length = parser.load_u16(16)? as usize;
+            let length = parser.load_u16()? as usize;
             let mut items: Vec<TupleItem> = Vec::with_capacity(length);
 
             if length > 1 {
-                let head_ref = parser.next_reference()?;
-                let tail_ref = parser.next_reference()?;
+                let head_ref = parser.load_reference_cloned()?;
+                let tail_ref = parser.load_reference_cloned()?;
 
-                let mut tail_parser = tail_ref.parser();
+                let mut tail_parser = tail_ref.as_slice_allow_exotic();
                 items.insert(0, parse_tuple_item(&mut tail_parser)?);
 
                 let mut head_refs = vec![head_ref];
-                let mut current_parser = head_refs[0].parser();
+                let mut current_parser = head_refs[0].as_slice_allow_exotic();
 
                 for _ in 0..length - 2 {
-                    let old_head = current_parser.next_reference()?;
-                    let new_tail = current_parser.next_reference()?;
+                    let old_head = current_parser.load_reference_cloned()?;
+                    let new_tail = current_parser.load_reference_cloned()?;
 
-                    let mut new_tail_parser = new_tail.parser();
+                    let mut new_tail_parser = new_tail.as_slice_allow_exotic();
                     items.insert(0, parse_tuple_item(&mut new_tail_parser)?);
 
                     head_refs.push(old_head);
-                    current_parser = head_refs[head_refs.len() - 1].parser();
+                    current_parser = head_refs[head_refs.len() - 1].as_slice_allow_exotic();
                 }
 
                 items.insert(0, parse_tuple_item(&mut current_parser)?);
             } else if length == 1 {
-                let ref_cell = parser.next_reference()?;
-                let mut item_parser = ref_cell.parser();
+                let ref_cell = parser.load_reference_cloned()?;
+                let mut item_parser = ref_cell.as_slice_allow_exotic();
                 items.push(parse_tuple_item(&mut item_parser)?);
             }
 
@@ -192,11 +196,11 @@ pub fn parse_tuple_item(parser: &mut CellParser<'_>) -> Result<TupleItem, anyhow
 }
 
 /// Serialize a tuple (stack) to a cell
-pub fn serialize_tuple(src: &Tuple) -> Result<ArcCell, anyhow::Error> {
+pub fn serialize_tuple(src: &Tuple) -> Result<Cell, anyhow::Error> {
     let mut builder = CellBuilder::new();
-    builder.store_uint(24, &BigUint::from(src.0.len()))?;
+    builder.store_uint(src.0.len() as u64, 24)?;
     serialize_tuple_tail(&src.0, &mut builder)?;
-    Ok(ArcCell::new(builder.build()?))
+    builder.build().map_err(Into::into)
 }
 
 fn serialize_tuple_tail(src: &[TupleItem], builder: &mut CellBuilder) -> anyhow::Result<()> {
@@ -204,8 +208,8 @@ fn serialize_tuple_tail(src: &[TupleItem], builder: &mut CellBuilder) -> anyhow:
         // rest:^(VmStackList n)
         let mut tail_builder = CellBuilder::new();
         serialize_tuple_tail(&src[..src.len() - 1], &mut tail_builder)?;
-        let tail_cell = ArcCell::new(tail_builder.build()?);
-        builder.store_reference(&tail_cell)?;
+        let tail_cell = tail_builder.build()?;
+        builder.store_reference(tail_cell)?;
 
         // tos
         serialize_tuple_item(builder, &src[src.len() - 1])?;
@@ -214,20 +218,20 @@ fn serialize_tuple_tail(src: &[TupleItem], builder: &mut CellBuilder) -> anyhow:
 }
 
 /// Parse a tuple (stack) from a cell
-pub fn parse_tuple(src: &ArcCell) -> Result<Tuple, anyhow::Error> {
-    let mut cur_cell = ArcCell::clone(src);
-    let mut cs = cur_cell.parser();
+pub fn parse_tuple(src: &Cell) -> Result<Tuple, anyhow::Error> {
+    let mut cur_cell = src.clone();
+    let mut cs = cur_cell.as_slice_allow_exotic();
 
-    let size = cs.load_u32(24)? as usize;
+    let size = cs.load_uint(24)? as usize;
     let mut result: Vec<TupleItem> = Vec::with_capacity(size);
 
     for _ in 0..size {
-        let next_ref = cs.next_reference()?;
+        let next_ref = cs.load_reference_cloned()?;
         let item = parse_tuple_item(&mut cs)?;
         result.insert(0, item);
 
-        cur_cell = ArcCell::clone(&next_ref);
-        cs = cur_cell.parser();
+        cur_cell = next_ref;
+        cs = cur_cell.as_slice_allow_exotic();
     }
 
     Ok(Tuple(result))
@@ -241,9 +245,9 @@ mod tests {
     fn roundtrip_test(item: TupleItem) {
         let mut builder = CellBuilder::new();
         serialize_tuple_item(&mut builder, &item).unwrap();
-        let cell = ArcCell::new(builder.build().unwrap());
+        let cell = builder.build().unwrap();
 
-        let mut parser = cell.parser();
+        let mut parser = cell.as_slice_allow_exotic();
         let deserialized = parse_tuple_item(&mut parser).unwrap();
 
         assert_eq!(item, deserialized);
@@ -263,16 +267,13 @@ mod tests {
 
     #[test]
     fn test_small_int_roundtrip() {
-        roundtrip_test(TupleItem::Int(BigInt::from(42u64)));
-        // roundtrip_test(TupleItem::Int(BigInt::from(i64::MIN)));
-        // roundtrip_test(TupleItem::Int(BigInt::from(i64::MAX)));
+        roundtrip_test(TupleItem::Int(BigInt::from(42)));
+        roundtrip_test(TupleItem::Int(BigInt::from(-123)));
     }
 
     #[test]
     fn test_large_int_roundtrip() {
-        // Large integer that doesn't fit in i64
-        let large_int = BigInt::from(1u128 << 100);
-        roundtrip_test(TupleItem::Int(large_int));
+        roundtrip_test(TupleItem::Int(BigInt::from(2u64).pow(100)));
     }
 
     #[test]
@@ -283,74 +284,115 @@ mod tests {
     #[test]
     fn test_cell_roundtrip() {
         let mut builder = CellBuilder::new();
-        builder.store_u8(8, 42).unwrap();
-        let test_cell = ArcCell::new(builder.build().unwrap());
+        builder.store_small_uint(42, 8).unwrap();
+        let cell = builder.build().unwrap();
 
-        roundtrip_test(TupleItem::Cell(test_cell));
+        roundtrip_test(TupleItem::Cell(cell));
     }
 
     #[test]
     fn test_slice_roundtrip() {
         let mut builder = CellBuilder::new();
-        builder.store_u8(8, 42).unwrap();
-        builder.store_u8(8, 43).unwrap();
-        let test_cell = ArcCell::new(builder.build().unwrap());
+        builder.store_small_uint(42, 8).unwrap();
+        builder.store_small_uint(43, 8).unwrap();
+        let cell = builder.build().unwrap();
 
-        roundtrip_test(TupleItem::Slice(test_cell));
+        roundtrip_test(TupleItem::Slice(cell));
     }
 
     #[test]
     fn test_builder_roundtrip() {
         let mut builder = CellBuilder::new();
-        builder.store_u8(8, 42).unwrap();
-        let test_cell = ArcCell::new(builder.build().unwrap());
+        builder.store_small_uint(42, 8).unwrap();
+        let cell = builder.build().unwrap();
 
-        roundtrip_test(TupleItem::Builder(test_cell));
+        roundtrip_test(TupleItem::Builder(cell));
     }
 
     #[test]
     fn test_empty_tuple_roundtrip() {
-        roundtrip_test(TupleItem::Tuple(Tuple::empty()));
+        roundtrip_test(TupleItem::Tuple(Tuple(vec![])));
     }
 
     #[test]
     fn test_single_item_tuple_roundtrip() {
-        roundtrip_test(TupleItem::Tuple(Tuple(vec![TupleItem::Null])));
         roundtrip_test(TupleItem::Tuple(Tuple(vec![TupleItem::Int(BigInt::from(
-            123u64,
+            42,
         ))])));
     }
 
     #[test]
-    fn test_multi_item_tuple_roundtrip() {
-        let items = vec![
+    fn test_multiple_item_tuple_roundtrip() {
+        roundtrip_test(TupleItem::Tuple(Tuple(vec![
+            TupleItem::Int(BigInt::from(42)),
             TupleItem::Null,
-            TupleItem::Int(BigInt::from(42u64)),
             TupleItem::Nan,
-        ];
-        roundtrip_test(TupleItem::Tuple(Tuple(items)));
+        ])));
     }
 
     #[test]
     fn test_nested_tuple_roundtrip() {
-        let inner_tuple = TupleItem::Tuple(Tuple(vec![
-            TupleItem::Null,
-            TupleItem::Int(BigInt::from(1u64)),
+        let nested = TupleItem::Tuple(Tuple(vec![
+            TupleItem::Int(BigInt::from(1)),
+            TupleItem::Tuple(Tuple(vec![
+                TupleItem::Int(BigInt::from(2)),
+                TupleItem::Tuple(Tuple(vec![TupleItem::Int(BigInt::from(3))])),
+            ])),
         ]));
-        let outer_tuple =
-            TupleItem::Tuple(Tuple(vec![inner_tuple, TupleItem::Int(BigInt::from(2u64))]));
-        roundtrip_test(outer_tuple);
+
+        roundtrip_test(nested);
     }
 
     #[test]
-    fn test_tuple_stack_roundtrip() {
+    fn test_serialize_deserialize_empty_tuple() {
         roundtrip_tuple_test(vec![]);
-        roundtrip_tuple_test(vec![TupleItem::Null]);
-        let items = vec![
+    }
+
+    #[test]
+    fn test_serialize_deserialize_simple_tuple() {
+        roundtrip_tuple_test(vec![
+            TupleItem::Int(BigInt::from(42)),
             TupleItem::Null,
-            TupleItem::Int(BigInt::from(42u64)),
             TupleItem::Nan,
-        ];
-        roundtrip_tuple_test(items);
+        ]);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_complex_tuple() {
+        let mut cell_builder = CellBuilder::new();
+        cell_builder.store_small_uint(0xAB, 8).unwrap();
+        let test_cell = cell_builder.build().unwrap();
+
+        roundtrip_tuple_test(vec![
+            TupleItem::Int(BigInt::from(12345)),
+            TupleItem::Cell(test_cell.clone()),
+            TupleItem::Tuple(Tuple(vec![
+                TupleItem::Slice(test_cell.clone()),
+                TupleItem::Int(BigInt::from(-9876)),
+            ])),
+            TupleItem::Builder(test_cell),
+        ]);
+    }
+
+    #[test]
+    fn test_serialize_deserialize_deeply_nested() {
+        let mut nested = TupleItem::Int(BigInt::from(0));
+
+        for i in 1..10 {
+            nested = TupleItem::Tuple(Tuple(vec![TupleItem::Int(BigInt::from(i)), nested]));
+        }
+
+        roundtrip_tuple_test(vec![nested]);
+    }
+
+    #[test]
+    fn test_int_boundary_values() {
+        // Test i64 boundaries
+        roundtrip_test(TupleItem::Int(BigInt::from(i64::MAX)));
+        roundtrip_test(TupleItem::Int(BigInt::from(i64::MIN)));
+
+        // Test values just outside i64 range (should use int257 encoding)
+        roundtrip_test(TupleItem::Int(BigInt::from(i64::MAX) + BigInt::from(1)));
+        roundtrip_test(TupleItem::Int(BigInt::from(i64::MIN) - BigInt::from(1)));
     }
 }

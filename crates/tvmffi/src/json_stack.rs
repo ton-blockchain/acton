@@ -4,8 +4,7 @@ use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::ops::Mul;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
+use tycho_types::boc::Boc;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "@type")]
@@ -60,13 +59,13 @@ fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
         }),
         TupleItem::Nan => anyhow::bail!("NaN not supported in JSON stack"),
         TupleItem::Cell(c) => Ok(JsonStackEntry::Cell {
-            cell: c.to_boc_b64(false)?,
+            cell: Boc::encode_base64(c),
         }),
         TupleItem::Slice(c) => Ok(JsonStackEntry::Slice {
-            slice: c.to_boc_b64(false)?,
+            slice: Boc::encode_base64(c),
         }),
         TupleItem::Builder(c) => Ok(JsonStackEntry::Builder {
-            builder: c.to_boc_b64(false)?,
+            builder: Boc::encode_base64(c),
         }),
         TupleItem::Tuple(t) => {
             let mut elements = Vec::new();
@@ -90,10 +89,10 @@ pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
             }
             Ok(serde_json::json!(["num", format!("0x{i:x}")]))
         }
-        TupleItem::Cell(c) => Ok(serde_json::json!(["cell", { "bytes": c.to_boc_b64(false)? }])),
-        TupleItem::Slice(c) => Ok(serde_json::json!(["slice", { "bytes": c.to_boc_b64(false)? }])),
+        TupleItem::Cell(c) => Ok(serde_json::json!(["cell", { "bytes": Boc::encode_base64(c) }])),
+        TupleItem::Slice(c) => Ok(serde_json::json!(["slice", { "bytes": Boc::encode_base64(c) }])),
         TupleItem::Builder(c) => {
-            Ok(serde_json::json!(["builder", { "bytes": c.to_boc_b64(false)? }]))
+            Ok(serde_json::json!(["builder", { "bytes": Boc::encode_base64(c) }]))
         }
         TupleItem::Tuple(t) => {
             let elements =
@@ -137,15 +136,15 @@ fn json_to_item(entry: JsonStackEntry) -> anyhow::Result<TupleItem> {
             Ok(TupleItem::Int(i))
         }
         JsonStackEntry::Cell { cell } => {
-            let c = ArcCell::from_boc_b64(&cell).context("Failed to decode cell BOC")?;
+            let c = Boc::decode_base64(&cell).context("Failed to decode cell BOC")?;
             Ok(TupleItem::Cell(c))
         }
         JsonStackEntry::Slice { slice } => {
-            let c = ArcCell::from_boc_b64(&slice).context("Failed to decode slice BOC")?;
+            let c = Boc::decode_base64(&slice).context("Failed to decode slice BOC")?;
             Ok(TupleItem::Slice(c))
         }
         JsonStackEntry::Builder { builder } => {
-            let c = ArcCell::from_boc_b64(&builder).context("Failed to decode builder BOC")?;
+            let c = Boc::decode_base64(&builder).context("Failed to decode builder BOC")?;
             Ok(TupleItem::Builder(c))
         }
         JsonStackEntry::Tuple { tuple } => {
@@ -196,7 +195,7 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                 .get("bytes")
                 .and_then(|v| v.as_str())
                 .context("cell must have bytes")?;
-            let c = ArcCell::from_boc_b64(bytes)?;
+            let c = Boc::decode_base64(bytes)?;
             Ok(TupleItem::Cell(c))
         }
         "slice" => {
@@ -204,7 +203,7 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                 .get("bytes")
                 .and_then(|v| v.as_str())
                 .context("slice must have bytes")?;
-            let c = ArcCell::from_boc_b64(bytes)?;
+            let c = Boc::decode_base64(bytes)?;
             Ok(TupleItem::Slice(c))
         }
         "builder" => {
@@ -212,7 +211,7 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                 .get("bytes")
                 .and_then(|v| v.as_str())
                 .context("builder must have bytes")?;
-            let c = ArcCell::from_boc_b64(bytes)?;
+            let c = Boc::decode_base64(bytes)?;
             Ok(TupleItem::Builder(c))
         }
         "tuple" => {

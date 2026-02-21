@@ -317,7 +317,7 @@ impl<'a> TestRunner<'a> {
 
         let (result, captured_stdout, captured_stderr, assert_failure, expected_exit_code) =
             if self.config.debug {
-                let stack = serialize_tuple(&Tuple::empty())?.to_boc_b64(false)?;
+                let stack = Boc::encode_base64(serialize_tuple(&Tuple::empty())?);
                 let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
                 ffi::register(&mut executor, &mut ctx);
 
@@ -359,7 +359,7 @@ impl<'a> TestRunner<'a> {
                 let mut executor = GetExecutor::new(&params)?;
                 ffi::register(&mut executor, &mut ctx);
 
-                let stack = serialize_tuple(&Tuple::empty())?.to_boc_b64(false)?;
+                let stack = Boc::encode_base64(serialize_tuple(&Tuple::empty())?);
                 let get_result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
 
                 if let Some(trace_dir) = &self.config.save_test_trace

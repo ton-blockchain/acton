@@ -2,16 +2,14 @@ use crate::context::to_cell;
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::{DebugContext, VARIABLE_REFERENCE_COUNTER};
 use crate::formatter::FormatterContext;
-use anyhow::anyhow;
 use dap::requests::VariablesArguments;
 use dap::types::Variable;
 use log::debug;
 use std::sync::atomic::Ordering;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::parse_tuple_item;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 use tycho_types::models::{
     CurrencyCollection, IntAddr, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
     StateInit,
@@ -41,7 +39,8 @@ impl DebugContext {
 
         let variables = if args.variables_reference == 1 {
             let stack = executor.get_stack();
-            let stack = Tuple::deserialize(&ArcCell::from_boc_b64(&stack)?)?;
+            let stack_cell = Boc::decode_base64(&stack)?;
+            let stack = Tuple::deserialize(&stack_cell)?;
 
             current_loc
                 .variables
@@ -73,7 +72,7 @@ impl DebugContext {
                 variables.push(Variable {
                     name: "c4 (storage)".to_string(),
                     type_field: Some("storage".to_string()),
-                    value: out_actions.to_boc_hex(false)?,
+                    value: Boc::encode_hex(&out_actions),
                     ..Default::default()
                 });
             }
@@ -96,8 +95,8 @@ impl DebugContext {
 
             // c7 register
             let c7 = executor.get_c7();
-            let c7_cell = &ArcCell::from_boc_b64(&c7)?;
-            let mut c7_slice = c7_cell.parser();
+            let c7_cell = Boc::decode_base64(&c7)?;
+            let mut c7_slice = c7_cell.as_slice_allow_exotic();
             let c7_tuple = parse_tuple_item(&mut c7_slice)?;
             let c7_ref = VARIABLE_REFERENCE_COUNTER.fetch_add(1, Ordering::SeqCst) as i64;
             self.variables.tuple.insert(c7_ref, c7_tuple.clone());
@@ -113,7 +112,7 @@ impl DebugContext {
             variables
         } else if args.variables_reference == 3 {
             let stack_boc = executor.get_stack();
-            let stack_cell = ArcCell::from_boc_b64(&stack_boc)?;
+            let stack_cell = Boc::decode_base64(&stack_boc)?;
             let stack_tuple = Tuple::deserialize(&stack_cell)?;
 
             stack_tuple
@@ -221,30 +220,25 @@ impl DebugContext {
         }
     }
 
-    fn get_storage(&self, executor: &AnyExecutor) -> anyhow::Result<ArcCell> {
+    fn get_storage(&self, executor: &AnyExecutor) -> anyhow::Result<Cell> {
         let c4 = executor.get_control_register(4);
-        let c4_cell = &ArcCell::from_boc_b64(&c4)?;
-        let mut c4_slice = c4_cell.parser();
+        let c4_cell = Boc::decode_base64(&c4)?;
+        let mut c4_slice = c4_cell.as_slice_allow_exotic();
 
         if let TupleItem::Cell(c4_tuple) = parse_tuple_item(&mut c4_slice)? {
             Ok(c4_tuple)
         } else {
-            Ok(ArcCell::default())
+            Ok(Cell::default())
         }
     }
 
     fn get_out_actions(&self, executor: &AnyExecutor) -> anyhow::Result<Vec<OutAction>> {
         let c5 = executor.get_control_register(5);
-        let c5_cell = &ArcCell::from_boc_b64(&c5)?;
-        let mut c5_slice = c5_cell.parser();
+        let c5_cell = Boc::decode_base64(&c5)?;
+        let mut c5_slice = c5_cell.as_slice_allow_exotic();
 
         if let TupleItem::Cell(c5_tuple) = parse_tuple_item(&mut c5_slice)? {
-            let c5_boc = c5_tuple
-                .to_boc(false)
-                .map_err(|e| anyhow!("Failed to encode c5 tuple to BoC: {e}"))?;
-            let c5_cell =
-                &Boc::decode(&c5_boc).map_err(|e| anyhow!("Failed to decode c5 BoC: {e}"))?;
-            let c5_slice = c5_cell.as_slice()?;
+            let c5_slice = c5_tuple.as_slice()?;
 
             let out_actions = OutActionsRevIter::new(c5_slice)
                 .filter_map(Result::ok)

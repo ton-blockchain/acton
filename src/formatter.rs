@@ -18,9 +18,6 @@ use std::sync::Arc;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
 use ton_source_map::{DebugLocation, SourceLocation};
-use tonlib_core::TonAddress;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, Load};
@@ -37,9 +34,9 @@ struct SendResult {
     children_ids: Vec<i64>,
     parent_lt: Option<i64>,
     #[allow(dead_code)]
-    actions: ArcCell,
+    actions: Cell,
     #[allow(dead_code)]
-    out_messages: Vec<ArcCell>,
+    out_messages: Vec<Cell>,
     externals: Vec<Cell>,
 }
 
@@ -98,34 +95,33 @@ impl<'a> FormatterContext<'a> {
         }
     }
 
-    fn format_slice(&self, slice: &ArcCell) -> String {
-        let mut parser = slice.parser();
+    fn format_slice(&self, slice: &Cell) -> String {
+        let mut parser = slice.as_slice_allow_exotic();
 
-        if parser.remaining_bits() == 2 && parser.load_u8(2).unwrap_or(0) == 0 {
+        if parser.size_bits() == 2 && parser.load_small_uint(2).unwrap_or(1) == 0 {
             return "addr_none".to_string();
         }
 
-        if parser.remaining_bits() == 267
-            && let Ok(address) = parser.load_address()
+        if parser.size_bits() == 267
+            && let Ok(address) = IntAddr::load_from(&mut parser)
         {
             return self.address_to_string(&address);
         }
 
-        slice
-            .to_boc_hex(false)
-            .unwrap_or_else(|_| "<invalid slice>".to_owned())
+        Boc::encode_hex(slice)
     }
 
-    fn address_to_string(&self, address: &TonAddress) -> String {
-        let need_mainnet_address =
-            self.fork_net == Some(Network::Mainnet) || self.network == Some(Network::Mainnet);
-        address.to_base64_std_flags(false, !need_mainnet_address)
+    fn address_to_string(&self, address: &IntAddr) -> String {
+        match address {
+            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
+            _ => address.to_string(),
+        }
     }
 
-    fn format_address_slice(&self, slice: &ArcCell, colorize: bool) -> String {
-        let mut parser = slice.parser();
-        if let Ok(address) = parser.load_address() {
-            let addr = Self::arc_cell_to_addr(slice);
+    fn format_address_slice(&self, slice: &Cell, colorize: bool) -> String {
+        let mut parser = slice.as_slice_allow_exotic();
+        if let Ok(address) = IntAddr::load_from(&mut parser) {
+            let addr = Self::cell_to_addr(slice);
             let address_base64 = self.address_to_string(&address);
 
             let addr_str = if colorize {
@@ -144,13 +140,11 @@ impl<'a> FormatterContext<'a> {
             return addr_str;
         }
 
-        slice
-            .to_boc_hex(false)
-            .unwrap_or_else(|_| "invalid address".to_owned())
+        Boc::encode_hex(slice)
     }
 
-    fn arc_cell_to_addr(slice: &ArcCell) -> Option<IntAddr> {
-        let cell = Boc::decode(slice.to_boc(false).ok()?).ok()?;
+    fn cell_to_addr(cell: &Cell) -> Option<IntAddr> {
+        let cell = cell.clone();
         let mut slice = cell.as_slice().ok()?;
         let addr = IntAddr::load_from(&mut slice);
         addr.ok()
@@ -186,9 +180,7 @@ impl<'a> FormatterContext<'a> {
                         TupleItem::Tuple(out_messages),
                         TupleItem::Tuple(externals),
                     ) => {
-                        let result = tx.to_boc(false).ok()?;
-                        let tx_cell = Boc::decode(&result).ok()?;
-                        let tx = tx_cell.parse::<Transaction>().ok()?;
+                        let tx = tx.parse::<Transaction>().ok()?;
                         Some(SendResult {
                             tx,
                             children_ids: child_ids
@@ -214,11 +206,7 @@ impl<'a> FormatterContext<'a> {
                             externals: externals
                                 .iter()
                                 .filter_map(|ext| match ext {
-                                    TupleItem::Cell(cell) => {
-                                        let boc = cell.to_boc(false).ok()?;
-                                        let cell = Boc::decode(&boc).ok()?;
-                                        Some(cell)
-                                    }
+                                    TupleItem::Cell(cell) => Some(cell.clone()),
                                     _ => None,
                                 })
                                 .collect(),
@@ -1178,7 +1166,7 @@ impl<'a> FormatterContext<'a> {
                 self.format_tuple(items, root, colorize)
             }
             TupleItem::Slice(cell) => {
-                if cell.bit_len() == 0 && cell.references().is_empty() {
+                if cell.bit_len() == 0 && cell.reference_count() == 0 {
                     return "empty slice".to_owned();
                 }
 
@@ -1197,15 +1185,11 @@ impl<'a> FormatterContext<'a> {
             }
             TupleItem::Nan => "NaN".to_owned(),
             TupleItem::Cell(cell) => {
-                let s = cell
-                    .to_boc_hex(false)
-                    .unwrap_or_else(|_| "<invalid cell>".to_owned());
+                let s = Boc::encode_hex(cell);
                 if colorize { s.dimmed().to_string() } else { s }
             }
             TupleItem::Builder(cell) => {
-                let s = cell
-                    .to_boc_hex(false)
-                    .unwrap_or_else(|_| "<invalid builder>".to_owned());
+                let s = Boc::encode_hex(cell);
                 if colorize { s.dimmed().to_string() } else { s }
             }
             TupleItem::Tuple(items) => self.format_tuple(items, root, colorize),
@@ -1803,7 +1787,7 @@ impl<'a> FormatterContext<'a> {
                         .find_tx_executor_logs(tx.lt)
                         .map(Arc::from)
                         .unwrap_or_default(),
-                    actions: Some(res.actions.to_boc_b64(false).ok()?.into()),
+                    actions: Some(Boc::encode_base64(&res.actions).into()),
                 })
             })
             .collect()

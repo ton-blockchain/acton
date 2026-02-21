@@ -3270,7 +3270,6 @@ dependencies = [
  "serde",
  "ton-executor",
  "ton-networks",
- "tonlib-core",
  "tvmffi",
  "tycho-types",
 ]
@@ -3573,10 +3572,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "num-bigint",
+ "num-traits",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "tonlib-core",
  "tycho-types",
 ]
 
