@@ -2,6 +2,7 @@ use acton_config::config::ActonConfig;
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
 use log::debug;
+use path_absolutize::*;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -225,12 +226,13 @@ impl FileBuildCache {
         let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
-        let file_path =
-            dunce::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(&file_path));
+        let file_path = Path::new(file_path).absolutize()?;
         let contracts = self.config.contracts.clone().unwrap_or_default().contracts;
         let Some((_, contract_info)) = contracts.iter().find(|(_, config)| {
-            dunce::canonicalize(&config.src).unwrap_or_else(|_| PathBuf::from(&config.src))
-                == file_path
+            let Ok(abs_path) = Path::new(&config.src).absolutize() else {
+                return false;
+            };
+            abs_path == file_path
         }) else {
             return Ok(file_deps);
         };
@@ -298,8 +300,9 @@ impl FileBuildCache {
         let path_buf = PathBuf::from(path);
 
         if path_buf.exists() {
-            dunce::canonicalize(&path_buf)
-                .unwrap_or(path_buf)
+            path_buf
+                .absolutize()
+                .unwrap_or_else(|_| Path::new(path).into())
                 .to_string_lossy()
                 .to_string()
         } else {

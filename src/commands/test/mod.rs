@@ -31,6 +31,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
 use num_traits::ToPrimitive;
 use owo_colors::OwoColorize;
+use path_absolutize::Absolutize;
 use regex::Regex;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -807,7 +808,7 @@ fn run_file_tests(
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
-    let file_path = dunce::canonicalize(file_path).unwrap_or_else(|_| PathBuf::from(file_path));
+    let file_path = Path::new(file_path).absolutize()?;
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
         let regex = match Regex::new(pattern) {
             Ok(r) => r,
@@ -841,7 +842,7 @@ fn run_file_tests(
         let mut test_report = TestReport {
             name: test.name.clone(),
             suite_name,
-            file_path: file_path.clone(),
+            file_path: file_path.to_path_buf(),
             row: test.pos.row,
             column: test.pos.column,
             duration: Duration::default(),

@@ -1,6 +1,7 @@
 pub mod abi_serde;
 
 use num_bigint::BigInt;
+use path_absolutize::Absolutize;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -33,12 +34,10 @@ fn resolve_mapped_path<'a>(
             if let Some(mapping) = mapping {
                 let mapped_path =
                     add_tolk_extension_if_needed_to_path(Path::new(mapping).join(path));
-                return Cow::Owned(
-                    dunce::canonicalize(&mapped_path) // since for now we don't support custom Acton.toml path, it's safe
-                        .unwrap_or(mapped_path)
-                        .to_string_lossy()
-                        .to_string(),
-                );
+                let Ok(abs_path) = mapped_path.absolutize() else {
+                    return Cow::Borrowed(import_path);
+                };
+                return Cow::Owned(abs_path.to_string_lossy().to_string());
             }
         }
     }

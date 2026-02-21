@@ -146,6 +146,7 @@ heck = "0.5.0"
 pretty = "0.12.5"
 winnow = "0.7.13"
 dunce = "1.0.5"
+path-absolutize = "3.1.1"
 
 [dependencies]
 # local creates
@@ -249,6 +250,7 @@ similar = { workspace = true }
 codespan-reporting = { workspace = true }
 rustc-hash = "2.1.1"
 function_name = "0.3.0"
+path-absolutize = { workspace = true }
 
 [dev-dependencies]
 snapbox = { version = "0.6.23", features = ["regex", "cmd", "dir", "term-svg"] }
