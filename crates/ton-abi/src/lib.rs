@@ -1,6 +1,7 @@
 pub mod abi_serde;
 
 use num_bigint::BigInt;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
@@ -205,6 +206,18 @@ struct FileInfo {
     tree: tree_sitter::Tree,
 }
 
+#[derive(Debug, Default)]
+pub struct ContractAbiParseCache {
+    files: FxHashMap<String, SourceFile>,
+}
+
+impl ContractAbiParseCache {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 pub fn get_file_dependencies(
     file_path: &str,
     include_itself: bool,
@@ -320,7 +333,7 @@ pub fn contract_abi(
     mappings: &Option<BTreeMap<String, String>>,
 ) -> ContractAbi {
     let file = tolk_syntax::parse(&content);
-    contract_abi_with_file(content, file_path, &file, mappings)
+    contract_abi_with_file(content, file_path, &file, mappings, None)
 }
 
 #[must_use]
@@ -329,6 +342,7 @@ pub fn contract_abi_with_file(
     file_path: &str,
     file: &anyhow::Result<SourceFile>,
     mappings: &Option<BTreeMap<String, String>>,
+    cache: Option<&mut ContractAbiParseCache>,
 ) -> ContractAbi {
     let contract_name = get_contract_name_from_file_path(file_path);
 
@@ -336,7 +350,10 @@ pub fn contract_abi_with_file(
         return ContractAbi::default();
     };
 
-    let files = collect_imported_files(file, content, file_path, mappings);
+    let mut local_cache = ContractAbiParseCache::default();
+    let cache = cache.unwrap_or(&mut local_cache);
+
+    let files = collect_imported_files(file, content, file_path, mappings, cache);
 
     let mut abi_info = AbiInfo {
         get_methods: Vec::new(),
@@ -379,7 +396,8 @@ pub fn extract_handled_messages(
         return Vec::new();
     };
 
-    let files = collect_imported_files(&file, content, file_path, mappings);
+    let mut cache = ContractAbiParseCache::default();
+    let files = collect_imported_files(&file, content, file_path, mappings, &mut cache);
 
     let mut handled_messages = Vec::new();
 
@@ -454,6 +472,7 @@ fn collect_imported_files(
     content: Arc<str>,
     file_path: &str,
     mappings: &Option<BTreeMap<String, String>>,
+    cache: &mut ContractAbiParseCache,
 ) -> Vec<FileInfo> {
     let mut files = Vec::with_capacity(4);
     let mut processed = HashSet::with_capacity(4);
@@ -464,6 +483,10 @@ fn collect_imported_files(
         tree: file.tree.clone(),
     });
     processed.insert(file_path.to_string());
+    cache
+        .files
+        .entry(file_path.to_string())
+        .or_insert_with(|| file.clone());
 
     collect_imported_files_recursive(
         file,
@@ -472,6 +495,7 @@ fn collect_imported_files(
         &mut files,
         &mut processed,
         mappings,
+        cache,
     );
 
     files
@@ -484,6 +508,7 @@ fn collect_imported_files_recursive(
     files: &mut Vec<FileInfo>,
     processed: &mut HashSet<String>,
     mappings: &Option<BTreeMap<String, String>>,
+    cache: &mut ContractAbiParseCache,
 ) {
     for import in file.imports() {
         let Some(path_node) = import.path() else {
@@ -503,28 +528,37 @@ fn collect_imported_files_recursive(
             continue;
         }
 
-        let Ok(import_content) = fs::read_to_string(&resolved) else {
-            continue;
+        let parsed_file = if let Some(cached) = cache.files.get(&resolved) {
+            cached.clone()
+        } else {
+            let Ok(import_content) = fs::read_to_string(&resolved) else {
+                continue;
+            };
+            let import_content: Arc<str> = import_content.into();
+
+            let Ok(parsed_file) = tolk_syntax::parse(&import_content) else {
+                continue;
+            };
+            cache.files.insert(resolved.clone(), parsed_file.clone());
+            parsed_file
         };
-        let import_content: Arc<str> = import_content.into();
 
-        if let Ok(parsed_file) = tolk_syntax::parse(&import_content) {
-            collect_imported_files_recursive(
-                &parsed_file,
-                import_content.clone(),
-                &resolved,
-                files,
-                processed,
-                mappings,
-            );
+        collect_imported_files_recursive(
+            &parsed_file,
+            parsed_file.source.clone(),
+            &resolved,
+            files,
+            processed,
+            mappings,
+            cache,
+        );
 
-            files.push(FileInfo {
-                path: resolved.clone(),
-                content: import_content,
-                tree: parsed_file.tree,
-            });
-            processed.insert(resolved);
-        }
+        files.push(FileInfo {
+            path: resolved.clone(),
+            content: parsed_file.source.clone(),
+            tree: parsed_file.tree,
+        });
+        processed.insert(resolved);
     }
 }
 

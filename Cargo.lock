@@ -3216,6 +3216,7 @@ dependencies = [
  "crc",
  "dunce",
  "num-bigint",
+ "rustc-hash",
  "serde",
  "tolk-syntax",
  "tree-sitter",

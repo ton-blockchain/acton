@@ -41,7 +41,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
 use tolk_syntax::{AstNode, HasName, SourceFile};
-use ton_abi::{ContractAbi, contract_abi, contract_abi_with_file};
+use ton_abi::{ContractAbi, ContractAbiParseCache, contract_abi, contract_abi_with_file};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
@@ -92,6 +92,7 @@ pub struct TestRunner<'a> {
     reporter_manager: &'a mut ReporterManager,
     mutation_overrides: BTreeMap<String, ArcCell>,
     remote_cache: RemoteSnapshotCache,
+    abi_parse_cache: ContractAbiParseCache,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
     ref_contracts: BTreeMap<String, tycho_types::cell::Cell>,
@@ -166,6 +167,7 @@ impl<'a> TestRunner<'a> {
             mutation_overrides,
             ref_contracts,
             remote_cache: RemoteSnapshotCache::new(),
+            abi_parse_cache: ContractAbiParseCache::new(),
         }
     }
 
@@ -753,6 +755,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         filepath,
         &file,
         &runner.acton_config.mappings,
+        Some(&mut runner.abi_parse_cache),
     );
 
     fs::write(&tmp_test_filename, executable_code)?;
