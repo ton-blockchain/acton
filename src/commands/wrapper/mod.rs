@@ -5,6 +5,7 @@ use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use ton_abi::{ContractAbi, TypeAbi};
 
 struct WrapperModel {
@@ -49,13 +50,14 @@ fn build_model(
         ));
     }
 
-    let content = fs::read_to_string(&contract_path)
-        .map_err(|e| anyhow!("Failed to read contract file: {e}"))?;
+    let content: Arc<str> = fs::read_to_string(&contract_path)
+        .map_err(|e| anyhow!("Failed to read contract file: {e}"))?
+        .into();
 
     let contract_path_str = contract_path.to_str().unwrap_or_default();
-    let mut abi = ton_abi::contract_abi(&content, contract_path_str, &config.mappings);
+    let mut abi = ton_abi::contract_abi(content.clone(), contract_path_str, &config.mappings);
     let handled_messages =
-        ton_abi::extract_handled_messages(&content, contract_path_str, &config.mappings);
+        ton_abi::extract_handled_messages(content, contract_path_str, &config.mappings);
 
     let file_stem = contract_path
         .file_stem()

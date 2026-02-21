@@ -124,7 +124,7 @@ fn run_script_file(
     } else {
         &None
     };
-    let abi = contract_abi(content, file_path, mappings);
+    let abi = contract_abi(content.into(), file_path, mappings);
 
     let mut compiler = tolkc::Compiler::new(2);
     if let Ok(config) = &acton_config {

@@ -745,15 +745,15 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     let file = tolk_syntax::parse(&content);
     let tests = find_all_test(filepath, &file, &content);
 
+    let executable_code = prepare_test_file(&file, &content);
+    let tmp_test_filename = filepath.to_owned() + ".test.tolk";
+
     let abi = contract_abi_with_file(
-        content.as_str(),
+        content.into(),
         filepath,
         &file,
         &runner.acton_config.mappings,
     );
-
-    let executable_code = prepare_test_file(&file, &content);
-    let tmp_test_filename = filepath.to_owned() + ".test.tolk";
 
     fs::write(&tmp_test_filename, executable_code)?;
 
@@ -1009,7 +1009,7 @@ fn run_file_tests(
             if let GetMethodResult::Success(get_result) = get_result {
                 runner.emulations.save_get_method(&test.name, get_result);
                 // TODO: remove this memoize somehow
-                let content = fs::read_to_string(&file_path).unwrap_or_default();
+                let content: Arc<str> = fs::read_to_string(&file_path).unwrap_or_default().into();
                 runner.build_cache.memoize(
                     &test.name,
                     &file_path,
@@ -1018,7 +1018,7 @@ fn run_file_tests(
                     source_map.clone(),
                     Some(
                         contract_abi(
-                            &content,
+                            content,
                             file_path.to_string_lossy().as_ref(),
                             &runner.acton_config.mappings,
                         )

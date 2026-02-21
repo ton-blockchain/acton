@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tolk_syntax::SourceFile;
 
 fn resolve_mapped_path(import_path: &str, mappings: &Option<BTreeMap<String, String>>) -> String {
@@ -191,7 +192,7 @@ struct AbiInfo {
 #[derive(Debug)]
 struct FileInfo {
     path: String,
-    content: String,
+    content: Arc<str>,
     tree: tree_sitter::Tree,
 }
 
@@ -208,8 +209,8 @@ pub fn get_file_dependencies(
         return Ok(vec![]);
     }
 
-    let content = match fs::read_to_string(file_path) {
-        Ok(content) => content,
+    let content: Arc<str> = match fs::read_to_string(file_path) {
+        Ok(content) => content.into(),
         Err(e) => anyhow::bail!("Failed to read file '{file_path}': {e}"),
     };
 
@@ -218,8 +219,7 @@ pub fn get_file_dependencies(
         Err(e) => anyhow::bail!("Failed to parse file '{file_path}': {e:?}"),
     };
 
-    let root_node = tree.root_node();
-    let files = collect_imported_files(&root_node, &content, file_path, mappings);
+    let files = collect_imported_files(&tree, content, file_path, mappings);
 
     let mut dependencies: Vec<String> = files
         .into_iter()
@@ -236,17 +236,17 @@ pub fn get_file_dependencies(
 
 #[must_use]
 pub fn contract_abi(
-    content: &str,
+    content: Arc<str>,
     file_path: &str,
     mappings: &Option<BTreeMap<String, String>>,
 ) -> ContractAbi {
-    let file = tolk_syntax::parse(content);
+    let file = tolk_syntax::parse(&content);
     contract_abi_with_file(content, file_path, &file, mappings)
 }
 
 #[must_use]
 pub fn contract_abi_with_file(
-    content: &str,
+    content: Arc<str>,
     file_path: &str,
     file: &anyhow::Result<SourceFile>,
     mappings: &Option<BTreeMap<String, String>>,
@@ -257,9 +257,7 @@ pub fn contract_abi_with_file(
         return ContractAbi::default();
     };
 
-    let root_node = file.root_node();
-
-    let files = collect_imported_files(&root_node, content, file_path, mappings);
+    let files = collect_imported_files(file, content, file_path, mappings);
 
     let mut abi_info = AbiInfo {
         get_methods: Vec::new(),
@@ -294,16 +292,15 @@ pub fn contract_abi_with_file(
 
 #[must_use]
 pub fn extract_handled_messages(
-    content: &str,
+    content: Arc<str>,
     file_path: &str,
     mappings: &Option<BTreeMap<String, String>>,
 ) -> Vec<String> {
-    let Ok(tree) = tolk_syntax::parse(content) else {
+    let Ok(file) = tolk_syntax::parse(&content) else {
         return Vec::new();
     };
 
-    let root_node = tree.root_node();
-    let files = collect_imported_files(&root_node, content, file_path, mappings);
+    let files = collect_imported_files(&file, content, file_path, mappings);
 
     let mut handled_messages = Vec::new();
 
@@ -374,26 +371,23 @@ fn find_match_patterns(node: &tree_sitter::Node<'_>, content: &str) -> Vec<Strin
 }
 
 fn collect_imported_files(
-    root_node: &tree_sitter::Node<'_>,
-    content: &str,
+    file: &SourceFile,
+    content: Arc<str>,
     file_path: &str,
     mappings: &Option<BTreeMap<String, String>>,
 ) -> Vec<FileInfo> {
-    let mut files = Vec::new();
-    let mut processed = HashSet::new();
+    let mut files = Vec::with_capacity(4);
+    let mut processed = HashSet::with_capacity(4);
 
-    let Ok(parsed_file) = tolk_syntax::parse(content) else {
-        return vec![];
-    };
     files.push(FileInfo {
         path: file_path.to_string(),
-        content: content.to_string(),
-        tree: parsed_file.tree,
+        content: content.clone(),
+        tree: file.tree.clone(),
     });
     processed.insert(file_path.to_string());
 
     collect_imported_files_recursive(
-        root_node,
+        file,
         content,
         file_path,
         &mut files,
@@ -405,28 +399,19 @@ fn collect_imported_files(
 }
 
 fn collect_imported_files_recursive(
-    node: &tree_sitter::Node<'_>,
-    content: &str,
+    file: &SourceFile,
+    content: Arc<str>,
     file_path: &str,
     files: &mut Vec<FileInfo>,
     processed: &mut HashSet<String>,
     mappings: &Option<BTreeMap<String, String>>,
 ) {
-    let mut cursor = node.walk();
-    for child in node
-        .children(&mut cursor)
-        .filter(|child| child.kind() == "import_directive")
-    {
-        let Some(path_node) = child.child_by_field_name("path") else {
+    for import in file.imports() {
+        let Some(path_node) = import.path() else {
             continue;
         };
 
-        let import_path_text = path_node
-            .utf8_text(content.as_bytes())
-            .unwrap_or("")
-            .to_string();
-
-        let import_path1 = import_path_text.trim_matches('"');
+        let import_path1 = path_node.content(content.as_ref());
         let import_path = resolve_mapped_path(import_path1, mappings);
 
         let resolved_path = resolve_import_path(file_path, &import_path);
@@ -442,13 +427,12 @@ fn collect_imported_files_recursive(
         let Ok(import_content) = fs::read_to_string(&resolved) else {
             continue;
         };
+        let import_content: Arc<str> = import_content.into();
 
         if let Ok(parsed_file) = tolk_syntax::parse(&import_content) {
-            let root_node = parsed_file.root_node();
-
             collect_imported_files_recursive(
-                &root_node,
-                &import_content,
+                &parsed_file,
+                import_content.clone(),
                 &resolved,
                 files,
                 processed,
@@ -955,7 +939,7 @@ fun onInternalMessage() {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", &None);
 
         assert_eq!(abi.name, "test");
         assert!(abi.entry_point.is_some());
@@ -976,7 +960,7 @@ get fun custom_method(): int {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", &None);
 
         assert_eq!(abi.get_methods.len(), 1);
         assert_eq!(abi.get_methods[0].name, "custom_method");
@@ -1013,7 +997,7 @@ get fun custom_id(): int {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", &None);
 
         assert_eq!(abi.get_methods.len(), 5);
 
@@ -1064,7 +1048,7 @@ struct (0b1010) BinaryData {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", &None);
 
         assert_eq!(abi.types.len(), 5);
         assert_eq!(abi.messages.len(), 3); // Only structs with pack_prefix
@@ -1111,7 +1095,7 @@ fun regular_function() {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", &None);
 
         assert!(abi.entry_point.is_some());
         assert!(abi.external_entry_point.is_some());
@@ -1154,7 +1138,7 @@ get fun large_id(): int {
 }
 ";
 
-        let abi = contract_abi(code, "test.tolk", &None);
+        let abi = contract_abi(code.into(), "test.tolk", &None);
 
         assert_eq!(abi.get_methods.len(), 3);
 
@@ -1203,7 +1187,7 @@ get fun main_method(): int {
 }
 "#;
 
-        let abi = contract_abi(main_content, "main.tolk", &None);
+        let abi = contract_abi(main_content.into(), "main.tolk", &None);
 
         let _ = fs::remove_file(import_path);
 

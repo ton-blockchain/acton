@@ -150,7 +150,7 @@ pub(crate) fn run_script_file(
     debug_port: u16,
     stack: Tuple,
 ) -> anyhow::Result<String> {
-    let abi = contract_abi(content, file_path, &None);
+    let abi = contract_abi(content.into(), file_path, &None);
 
     let config = ActonConfig::load();
 

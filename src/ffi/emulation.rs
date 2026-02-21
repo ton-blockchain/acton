@@ -107,14 +107,14 @@ fn build_impl(
         let elapsed = start_time.elapsed();
         info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
 
-        let content = fs::read_to_string(&path).unwrap_or_default();
+        let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
         ctx.build.build_cache.memoize(
             &name,
             Path::new(&path),
             &cached_entry.code_boc64,
             &cached_entry.code_hash_hex,
             cached_entry.source_map.clone().unwrap_or_default().into(),
-            Some(contract_abi(&content, &path, &ctx.env.config.mappings).into()),
+            Some(contract_abi(content, &path, &ctx.env.config.mappings).into()),
         );
 
         let code_cell = ArcCell::from_boc_b64(&cached_entry.code_boc64)
@@ -145,14 +145,14 @@ fn build_impl(
                 warn!("Failed to build cached code BoC for {path}: {err}");
             }
 
-            let content = fs::read_to_string(&path).unwrap_or_default();
+            let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
             ctx.build.build_cache.memoize(
                 &name,
                 Path::new(&path),
                 &success.code_boc64,
                 &success.code_hash_hex,
                 success.source_map.unwrap_or_default().into(),
-                Some(contract_abi(&content, &path, &ctx.env.config.mappings).into()),
+                Some(contract_abi(content, &path, &ctx.env.config.mappings).into()),
             );
             let code_cell = ArcCell::from_boc_b64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
