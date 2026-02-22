@@ -32,7 +32,7 @@ use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
 use std::fs::OpenOptions;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
@@ -1164,23 +1164,45 @@ fn example_completions_usage() -> StyledStr {
     )
 }
 
-fn configure_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<()> {
-    let is_custom_manifest = manifest_path.is_some();
-    let manifest_path = manifest_path.unwrap_or_else(|| PathBuf::from("Acton.toml"));
-    let mut resolved_manifest_path = if manifest_path.is_absolute() {
-        manifest_path
-    } else {
-        env::current_dir()?.join(manifest_path)
-    };
+fn find_manifest_in_ancestors(start_dir: &Path) -> Option<PathBuf> {
+    start_dir
+        .ancestors()
+        .map(|dir| dir.join("Acton.toml"))
+        .find(|candidate| candidate.is_file())
+}
 
-    if resolved_manifest_path.is_dir() {
-        resolved_manifest_path = resolved_manifest_path.join("Acton.toml");
+fn resolve_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<(PathBuf, bool)> {
+    let cwd = env::current_dir()?;
+
+    if let Some(manifest_path) = manifest_path {
+        let mut resolved = if manifest_path.is_absolute() {
+            manifest_path
+        } else {
+            cwd.join(manifest_path)
+        };
+
+        if resolved.is_dir() {
+            resolved = resolved.join("Acton.toml");
+        }
+
+        return Ok((resolved, true));
     }
+
+    if let Some(found_manifest_path) = find_manifest_in_ancestors(&cwd) {
+        return Ok((found_manifest_path, true));
+    }
+
+    Ok((cwd.join("Acton.toml"), false))
+}
+
+fn configure_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<()> {
+    let (resolved_manifest_path, should_switch_to_project_root) =
+        resolve_manifest_path(manifest_path)?;
 
     init_manifest_path(&resolved_manifest_path)?;
 
-    // Keep relative paths in commands stable by working from the manifest directory.
-    if is_custom_manifest
+    // Keep relative paths in commands stable by working from the project directory.
+    if should_switch_to_project_root
         && let Some(project_dir) = resolved_manifest_path.parent()
         && project_dir.exists()
     {

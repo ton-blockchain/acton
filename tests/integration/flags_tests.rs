@@ -447,3 +447,73 @@ fn test_manifest_path_test_works_from_nested_directory() {
             "integration/snapshots/flags/test_manifest_path_test_works_from_nested_directory.stdout.txt",
         );
 }
+
+#[test]
+fn test_manifest_auto_detect_build_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-auto-build-from-nested")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let output = project
+        .acton()
+        .build()
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_auto_detect_build_works_from_nested_directory.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "build/simple.json",
+            "integration/snapshots/flags/test_manifest_auto_detect_build_works_from_nested_directory.build_simple_json.txt",
+        );
+}
+
+#[test]
+fn test_manifest_auto_detect_check_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-auto-check-from-nested")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    project
+        .acton()
+        .check()
+        .current_dir(&nested_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_auto_detect_check_works_from_nested_directory.stdout.txt",
+        );
+}
+
+#[test]
+fn test_manifest_auto_detect_test_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-auto-test-from-nested")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("manifest_path", PASSING_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    project
+        .acton()
+        .test()
+        .current_dir(&nested_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_auto_detect_test_works_from_nested_directory.stdout.txt",
+        );
+}
