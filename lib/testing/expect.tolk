@@ -240,18 +240,22 @@ fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int) {
 /// expect(null).toBeNull();
 /// ```
 fun Expectation<T?>.toBeNull(self) {
-    Assert.equal(self.value, null, "expect(<actual>).toBeNull()", self.location);
+    if (self.value != null) {
+        Assert.fail("expect(<actual>).toBeNull(): value is not null", self.location);
+    }
 }
 
 /// Asserts that actual value is not null.
 ///
 /// Example:
 /// ```tolk
-/// val someValue: int? = 10;
+/// val someValue: int? = cond ? 10 : null;
 /// expect(someValue).toBeNotNull();
 /// ```
 fun Expectation<T?>.toBeNotNull(self) {
-    Assert.notEqual(self.value, null, "expect(<actual>).toBeNotNull()", self.location);
+    if (self.value == null) {
+        Assert.fail("expect(<actual>).toBeNotNull(): value is null", self.location);
+    }
 }
 
 /// Asserts that actual `Maybe<T>` value is defined (`Some`).
