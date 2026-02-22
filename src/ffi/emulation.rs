@@ -603,7 +603,7 @@ fn find_transaction_by_params_impl(
         return Ok(());
     }
 
-    let (params, parsed_txs) = if let Some(value) = process_txs_and_search_params(&txs, params) {
+    let (params, parsed_txs) = if let Some(value) = process_txs_and_search_params(&txs, &params) {
         value
     } else {
         stack.push(TupleItem::Null);

@@ -186,7 +186,7 @@ fn fail_to_find_transaction_by_params_impl(
     //     body: cell? = null,
     // }
 
-    let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
+    let (params, parsed_txs) = match process_txs_and_search_params(&txs, &params) {
         Some(value) => value,
         None => return Ok(()),
     };
@@ -224,7 +224,7 @@ fn fail_to_not_find_transaction_by_params_impl(
     //     body: cell? = null,
     // }
 
-    let (params, parsed_txs) = match process_txs_and_search_params(&txs, params) {
+    let (params, parsed_txs) = match process_txs_and_search_params(&txs, &params) {
         Some(value) => value,
         None => return Ok(()),
     };
@@ -262,22 +262,28 @@ fn fail_wallet_not_found_impl(
 #[must_use]
 pub fn process_txs_and_search_params(
     txs: &Tuple,
-    params: Tuple,
+    params: &Tuple,
 ) -> Option<(TransactionNotFoundParams, Vec<Transaction>)> {
-    let mut params_reader = params.0;
-    let raw_body = params_reader.pop();
-    let raw_compute_phase_skipped = params_reader.pop();
-    let raw_action_exit_code = params_reader.pop();
-    let raw_opcode = params_reader.pop();
-    let raw_bounced = params_reader.pop();
-    let raw_bounce = params_reader.pop();
-    let raw_deploy = params_reader.pop();
-    let raw_aborted = params_reader.pop();
-    let raw_success = params_reader.pop();
-    let raw_exit_code = params_reader.pop();
-    let raw_msg_value = params_reader.pop();
-    let raw_from = params_reader.pop();
-    let raw_to = params_reader.pop();
+    let item_from_end = |idx_from_end: usize| {
+        params
+            .0
+            .len()
+            .checked_sub(idx_from_end + 1)
+            .and_then(|idx| params.0.get(idx))
+    };
+    let raw_body = item_from_end(0);
+    let raw_compute_phase_skipped = item_from_end(1);
+    let raw_action_exit_code = item_from_end(2);
+    let raw_opcode = item_from_end(3);
+    let raw_bounced = item_from_end(4);
+    let raw_bounce = item_from_end(5);
+    let raw_deploy = item_from_end(6);
+    let raw_aborted = item_from_end(7);
+    let raw_success = item_from_end(8);
+    let raw_exit_code = item_from_end(9);
+    let raw_msg_value = item_from_end(10);
+    let raw_from = item_from_end(11);
+    let raw_to = item_from_end(12);
 
     let mut params = TransactionNotFoundParams {
         to: Default::default(),
@@ -296,114 +302,82 @@ pub fn process_txs_and_search_params(
     };
 
     if let Some(raw_opcode) = raw_opcode {
-        if raw_opcode == TupleItem::Null {
+        if raw_opcode == &TupleItem::Null {
             params.opcode = None;
-        } else if let Some(num) = read_int_like_param(&raw_opcode) {
+        } else if let Some(num) = read_int_like_param(raw_opcode) {
             params.opcode = num.to_u32();
         }
     }
     if let Some(raw_bounced) = raw_bounced {
-        if raw_bounced == TupleItem::Null {
+        if raw_bounced == &TupleItem::Null {
             params.bounced = None;
-        } else if let TupleItem::Int(num) = raw_bounced {
-            params.bounced = Some(num == BigInt::from(-1));
+        } else if let Some(value) = read_bool_like_param(raw_bounced) {
+            params.bounced = Some(value);
         }
     }
     if let Some(raw_bounce) = raw_bounce {
-        if raw_bounce == TupleItem::Null {
+        if raw_bounce == &TupleItem::Null {
             params.bounce = None;
-        } else if let TupleItem::Int(num) = raw_bounce {
-            params.bounce = Some(num == BigInt::from(-1));
+        } else if let Some(value) = read_bool_like_param(raw_bounce) {
+            params.bounce = Some(value);
         }
     }
     if let Some(raw_deploy) = raw_deploy {
-        if raw_deploy == TupleItem::Null {
+        if raw_deploy == &TupleItem::Null {
             params.deploy = None;
-        } else if let TupleItem::Int(num) = raw_deploy {
-            params.deploy = Some(num == BigInt::from(-1));
+        } else if let Some(value) = read_bool_like_param(raw_deploy) {
+            params.deploy = Some(value);
         }
     }
     if let Some(raw_exit_code) = raw_exit_code {
-        if raw_exit_code == TupleItem::Null {
+        if raw_exit_code == &TupleItem::Null {
             params.exit_code = None;
-        } else if let Some(num) = read_int_like_param(&raw_exit_code) {
+        } else if let Some(num) = read_int_like_param(raw_exit_code) {
             params.exit_code = num.to_u32();
         }
     }
     if let Some(raw_success) = raw_success {
-        if raw_success == TupleItem::Null {
+        if raw_success == &TupleItem::Null {
             params.success = None;
-        } else if let TupleItem::Int(num) = raw_success {
-            params.success = Some(num == BigInt::from(-1));
+        } else if let Some(value) = read_bool_like_param(raw_success) {
+            params.success = Some(value);
         }
     }
     if let Some(raw_aborted) = raw_aborted {
-        if raw_aborted == TupleItem::Null {
+        if raw_aborted == &TupleItem::Null {
             params.aborted = None;
-        } else if let TupleItem::Int(num) = raw_aborted {
-            params.aborted = Some(num == BigInt::from(-1));
+        } else if let Some(value) = read_bool_like_param(raw_aborted) {
+            params.aborted = Some(value);
         }
     }
     if let Some(raw_msg_value) = raw_msg_value {
-        if raw_msg_value == TupleItem::Null {
+        if raw_msg_value == &TupleItem::Null {
             params.value = None;
         } else if let TupleItem::Int(num) = raw_msg_value {
-            params.value = Some(num);
+            params.value = Some(num.clone());
         }
     }
-    if let Some(raw_from) = raw_from {
-        if raw_from == TupleItem::Null {
-            params.from = None;
-        } else if let TupleItem::Tuple(raw_from) = &raw_from
-            && let TupleItem::Slice(cell) = &raw_from[0]
-        {
-            let mut slice = cell.as_slice().ok()?;
-            if let Ok(address) = IntAddr::load_from(&mut slice) {
-                params.from = Some(address);
-            }
-        } else if let TupleItem::Slice(cell) = raw_from {
-            let mut slice = cell.as_slice().ok()?;
-            if let Ok(address) = IntAddr::load_from(&mut slice) {
-                params.from = Some(address);
-            }
-        }
-    }
-    if let Some(raw_to) = raw_to {
-        if raw_to == TupleItem::Null {
-            params.to = None;
-        } else if let TupleItem::Tuple(raw_to) = &raw_to
-            && let TupleItem::Slice(cell) = &raw_to[0]
-        {
-            let mut slice = cell.as_slice().ok()?;
-            if let Ok(address) = IntAddr::load_from(&mut slice) {
-                params.to = Some(address);
-            }
-        } else if let TupleItem::Slice(cell) = raw_to {
-            let mut slice = cell.as_slice().ok()?;
-            if let Ok(address) = IntAddr::load_from(&mut slice) {
-                params.to = Some(address);
-            }
-        }
-    }
+    params.from = read_optional_address_param(raw_from)?;
+    params.to = read_optional_address_param(raw_to)?;
     if let Some(raw_action_exit_code) = raw_action_exit_code {
-        if raw_action_exit_code == TupleItem::Null {
+        if raw_action_exit_code == &TupleItem::Null {
             params.action_exit_code = None;
-        } else if let Some(num) = read_int_like_param(&raw_action_exit_code) {
+        } else if let Some(num) = read_int_like_param(raw_action_exit_code) {
             params.action_exit_code = Some(num.to_i32().unwrap_or(0));
         }
     }
     if let Some(raw_compute_phase_skipped) = raw_compute_phase_skipped {
-        if raw_compute_phase_skipped == TupleItem::Null {
+        if raw_compute_phase_skipped == &TupleItem::Null {
             params.compute_phase_skipped = None;
-        } else if let TupleItem::Int(num) = raw_compute_phase_skipped {
-            params.compute_phase_skipped = Some(num == BigInt::from(-1));
+        } else if let Some(value) = read_bool_like_param(raw_compute_phase_skipped) {
+            params.compute_phase_skipped = Some(value);
         }
     }
     if let Some(raw_body) = raw_body {
-        if raw_body == TupleItem::Null {
+        if raw_body == &TupleItem::Null {
             params.body = None;
         } else if let TupleItem::Cell(cell) = raw_body {
-            params.body = Some(cell);
+            params.body = Some(cell.clone());
         }
     }
 
@@ -411,8 +385,8 @@ pub fn process_txs_and_search_params(
         .0
         .iter()
         .filter_map(|el| match el {
-            TupleItem::Tuple(tuple) => match &tuple[0] {
-                TupleItem::Cell(cell) => Some(cell),
+            TupleItem::Tuple(tuple) => match tuple.first() {
+                Some(TupleItem::Cell(cell)) => Some(cell),
                 _ => None,
             },
             _ => None,
@@ -423,12 +397,49 @@ pub fn process_txs_and_search_params(
     Some((params, parsed_txs))
 }
 
-fn read_int_like_param(item: &TupleItem) -> Option<BigInt> {
+fn read_int_like_param(item: &TupleItem) -> Option<&BigInt> {
     match item {
-        TupleItem::Int(num) => Some(num.clone()),
+        TupleItem::Int(num) => Some(num),
         TupleItem::Tuple(items) => items.first().and_then(read_int_like_param),
         TupleItem::TypedTuple { inner, .. } => inner.0.first().and_then(read_int_like_param),
         _ => None,
+    }
+}
+
+fn read_bool_like_param(item: &TupleItem) -> Option<bool> {
+    match item {
+        TupleItem::Int(num) => Some(*num == BigInt::from(-1)),
+        _ => None,
+    }
+}
+
+fn read_optional_address_param(item: Option<&TupleItem>) -> Option<Option<IntAddr>> {
+    let Some(item) = item else {
+        return Some(None);
+    };
+
+    match item {
+        TupleItem::Null => Some(None),
+        TupleItem::Tuple(raw_addr) => match raw_addr.first() {
+            Some(TupleItem::Slice(cell)) => {
+                let mut slice = cell.as_slice().ok()?;
+                if let Ok(address) = IntAddr::load_from(&mut slice) {
+                    Some(Some(address))
+                } else {
+                    Some(None)
+                }
+            }
+            _ => Some(None),
+        },
+        TupleItem::Slice(cell) => {
+            let mut slice = cell.as_slice().ok()?;
+            if let Ok(address) = IntAddr::load_from(&mut slice) {
+                Some(Some(address))
+            } else {
+                Some(None)
+            }
+        }
+        _ => Some(None),
     }
 }
 
