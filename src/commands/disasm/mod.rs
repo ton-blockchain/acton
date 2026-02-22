@@ -99,7 +99,7 @@ pub fn disasm_cmd(
                 custom_networks,
                 api_key,
             )?;
-            match client.get_library_by_hash(&lib_hash.to_string()) {
+            match client.get_library_by_hash(&lib_hash) {
                 Ok(lib_cell) => {
                     final_cell = lib_cell;
                 }

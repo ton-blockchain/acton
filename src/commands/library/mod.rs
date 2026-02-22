@@ -296,6 +296,7 @@ pub fn fetch_cmd(
         println!("  {} Fetching library: {}", "→".blue().bold(), hash);
     }
 
+    let hash = HashBytes::from_str(&hash).context("Invalid library hash format")?;
     let library_cell = client.get_library_by_hash(&hash)?;
 
     if !json {

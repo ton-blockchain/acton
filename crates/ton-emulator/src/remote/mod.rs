@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
+use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::StdAddr;
 
 /// Fetches account information from `TonCenter`.
@@ -74,12 +74,13 @@ pub fn get_account_info(
 /// * `api_key` - Optional `TonCenter` API key.
 pub fn get_library_by_hash(
     network: &Network,
-    hash: &str,
+    hash: &HashBytes,
     api_key: Option<String>,
     custom_networks: HashMap<String, CustomNetworkUrls>,
 ) -> anyhow::Result<Cell> {
     let base_url = network.toncenter_v2_url(&custom_networks)?;
     let url = format!("{base_url}/getLibraries");
+    let hash_hex = hash.to_string();
 
     let client = reqwest::blocking::Client::new();
     let mut request = client.get(&url).header("User-Agent", "acton-cli");
@@ -89,7 +90,7 @@ pub fn get_library_by_hash(
     }
 
     let response = request
-        .query(&[("libraries", hash)])
+        .query(&[("libraries", hash_hex.as_str())])
         .send()
         .context("Failed to send request to TonCenter for library")?;
 
@@ -118,7 +119,7 @@ pub fn get_library_by_hash(
         .context("Failed to parse TonCenter libraries response")?;
 
     if !data.ok || data.result.result.is_empty() {
-        anyhow::bail!("Library with hash {hash} not found");
+        anyhow::bail!("Library with hash {hash_hex} not found");
     }
 
     Boc::decode_base64(&data.result.result[0].data).context("Failed to decode library BOC data")

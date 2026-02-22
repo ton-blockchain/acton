@@ -16,7 +16,6 @@ use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use ton_source_map::{SourceLocation, SourceMap};
-use tonlib_core::TonAddress;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
@@ -363,8 +362,15 @@ impl Wallet {
     }
 
     #[must_use]
-    pub const fn address(&self) -> &TonAddress {
-        &self.wallet.address
+    pub fn address(&self) -> StdAddr {
+        StdAddr {
+            anycast: None,
+            address: HashBytes(
+                <[u8; 32]>::try_from(self.wallet.address.hash_part.as_slice())
+                    .expect("TonAddress hash part must be exactly 32 bytes"),
+            ),
+            workchain: self.wallet.address.workchain as i8,
+        }
     }
 }
 
@@ -445,11 +451,11 @@ impl Env<'_> {
     }
 
     #[must_use]
-    pub fn find_wallet_by_address(&self, addr: &IntAddr) -> Option<Wallet> {
+    pub fn find_wallet_by_address(&self, addr: &StdAddr) -> Option<Wallet> {
         let found = self
             .open_wallets
             .iter()
-            .find(|(_, w)| w.wallet.address.to_hex() == addr.to_string())?;
+            .find(|(_, wallet)| &wallet.address() == addr)?;
 
         Some(found.1.clone())
     }

@@ -726,7 +726,7 @@ impl<'a> FormatterContext<'a> {
         };
         let dst = match dst {
             IntAddr::Std(addr) => addr,
-            IntAddr::Var(_) => panic!("Var addresses are not supported anymore"),
+            IntAddr::Var(_) => return None,
         };
 
         let code = Self::account_code(&self.accounts, &dst);
@@ -941,7 +941,7 @@ impl<'a> FormatterContext<'a> {
         if let MsgInfo::Int(info) = &in_msg.info {
             let addr = match &info.dst {
                 IntAddr::Std(addr) => addr,
-                IntAddr::Var(_) => panic!("Var addresses are not supported anymore"),
+                IntAddr::Var(_) => return None,
             };
 
             let code = Self::account_code(&self.accounts, addr);
@@ -1017,7 +1017,7 @@ impl<'a> FormatterContext<'a> {
     fn get_contract_type(&self, addr: &IntAddr) -> Option<String> {
         let addr = match addr {
             IntAddr::Std(addr) => addr,
-            IntAddr::Var(_) => panic!("Var addresses are not supported anymore"),
+            IntAddr::Var(_) => return None,
         };
 
         // contract can be registered as an address with a name

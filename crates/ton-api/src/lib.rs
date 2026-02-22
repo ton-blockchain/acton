@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 pub use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
-use tycho_types::cell::Cell;
+use tycho_types::cell::{Cell, HashBytes};
 
 pub struct TonApiClient {
     client: reqwest::blocking::Client,
@@ -310,15 +310,16 @@ impl TonApiClient {
         Ok(data.result)
     }
 
-    pub fn get_library_by_hash(&self, hash: &str) -> anyhow::Result<Cell> {
+    pub fn get_library_by_hash(&self, hash: &HashBytes) -> anyhow::Result<Cell> {
         let url = format!(
             "{}/getLibraries",
             self.network.toncenter_v2_url(&self.custom_networks)?,
         );
+        let hash_hex = hash.to_string();
 
         let response = self
             .build_request(&url)
-            .query(&[("libraries", hash)])
+            .query(&[("libraries", hash_hex.as_str())])
             .send()
             .context("Failed to send request to TonCenter for library")?;
 
@@ -347,7 +348,7 @@ impl TonApiClient {
             .context("Failed to parse TonCenter libraries response")?;
 
         if !data.ok || data.result.result.is_empty() {
-            anyhow::bail!("Library with hash {hash} not found");
+            anyhow::bail!("Library with hash {hash_hex} not found");
         }
 
         Boc::decode_base64(&data.result.result[0].data).context("Failed to decode library BOC data")

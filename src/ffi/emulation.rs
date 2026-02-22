@@ -182,7 +182,12 @@ fn send_message_impl(
 ) -> anyhow::Result<()> {
     let emulator = &ctx.chain.emulator;
 
-    if let Some(wallet) = ctx.env.find_wallet_by_address(&src) {
+    let src_std = match &src {
+        IntAddr::Std(addr) => addr,
+        IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported anymore"),
+    };
+
+    if let Some(wallet) = ctx.env.find_wallet_by_address(src_std) {
         send_wallet_message(
             &msg,
             wallet,
@@ -375,7 +380,7 @@ fn send_message_debug(
 
     let dst = match &int_message.dst {
         IntAddr::Std(addr) => addr,
-        IntAddr::Var(_) => panic!("Var addresses are not supported anymore"),
+        IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported"),
     };
     let dest_account = ctx.chain.world_state.get_account(dst);
     let code = Emulator::get_code_cell(&msg, &dest_account);
@@ -1096,6 +1101,11 @@ fn load_library_by_hash_impl(
     stack: &mut Tuple,
     hash: String,
 ) -> anyhow::Result<()> {
+    let Ok(hash) = HashBytes::from_str(&hash) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
     let network = ctx.network();
     let custom_networks = ctx.env.config.custom_networks();
 
@@ -1148,17 +1158,13 @@ fn get_wallet_by_name_impl(
     stack: &mut Tuple,
     name: String,
 ) -> anyhow::Result<()> {
-    if let Some(wallet) = ctx.env.open_wallets.get(&name) {
-        let addr = wallet.address();
-        let addr = StdAddr::new(
-            addr.workchain as i8,
-            HashBytes(<[u8; 32]>::try_from(addr.hash_part.as_slice())?),
-        );
-        stack.push(TupleItem::Cell(to_cell(&addr)));
+    let Some(wallet) = ctx.env.open_wallets.get(&name) else {
+        stack.push(TupleItem::Null);
         return Ok(());
-    }
+    };
 
-    stack.push(TupleItem::Null);
+    let addr = wallet.address();
+    stack.push(TupleItem::Cell(to_cell(&addr)));
 
     Ok(())
 }

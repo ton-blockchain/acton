@@ -124,7 +124,7 @@ impl Emulator {
         };
         let dst = match dst {
             IntAddr::Std(dst) => dst,
-            IntAddr::Var(_) => panic!("Var address is not supported anymore"),
+            IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported"),
         };
 
         let shard_account_before = state.get_account(&dst);

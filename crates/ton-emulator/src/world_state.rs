@@ -119,7 +119,7 @@ impl LocalAccountsState {
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct RemoteCacheKey {
     fork_block_number: Option<u64>,
-    fork_net: String,
+    fork_net: Network,
     address: StdAddr,
 }
 
@@ -222,7 +222,7 @@ impl RemoteAccountState {
         // return cached version if it already resolved earlier in current suite
         let cache_key = RemoteCacheKey {
             fork_block_number: self.fork_block_number,
-            fork_net: self.fork_net.to_string(),
+            fork_net: self.fork_net.clone(),
             address: address.clone(),
         };
         if let Some(cached) = self.cache.get(&cache_key) {
