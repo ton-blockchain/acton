@@ -105,8 +105,8 @@ get fun `test-format-message`() {
         ihrDisabled: true,
         bounce: false,
         bounced: false,
-        src: kQC5PHBsPEHzypAUMCGXCD5pNDAA2DozF5CZxqKiB1/dtgb3,
-        dest: kQC0663BO7+gCwST4bHolxt85JLRMaFVZgJfblE7oumFduR9 (counter),
+        src: kQC5PHBsPEHzypAUMCGXCD5pNDAA2DozF5CZxqKiB1_dtgb3,
+        dest: kQC0663BO7-gCwST4bHolxt85JLRMaFVZgJfblE7oumFduR9 (counter),
         value: CurrencyCollection {
             grams: 1999900000,
             other: null
