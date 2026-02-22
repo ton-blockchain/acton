@@ -20,7 +20,7 @@ src = ".jetton/contracts/jetton-wallet-contract.tolk"
 depends = []
 
 [test]
-include = [".jetton/**"]
+include = ["tests/acton-stdlib/**", ".jetton/**"]
 
 [test.mutation]
 
