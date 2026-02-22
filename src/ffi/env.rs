@@ -35,12 +35,7 @@ extension!(env_bool in (Context) with (name: String) using env_bool_impl);
 fn env_bool_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
-            let v = val.to_lowercase();
-            if v == "true" || v == "1" {
-                stack.push_bool(true);
-            } else {
-                stack.push_bool(false);
-            }
+            stack.push_bool(val == "1" || val.eq_ignore_ascii_case("true"));
         }
         Err(_) => stack.push(TupleItem::Null),
     }

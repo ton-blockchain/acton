@@ -2,7 +2,7 @@ use crate::commands::common::error_fmt;
 use crate::context::{Context, KnownAddress, Wallet, to_cell};
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
-use crate::ffi::assert::process_txs_and_search_params;
+use crate::ffi::assert::parse_search_params;
 use crate::formatter::FormatterContext;
 use acton_config::config::Explorer;
 use anyhow::Context as AnyhowContext;
@@ -603,7 +603,7 @@ fn find_transaction_by_params_impl(
         return Ok(());
     }
 
-    let (params, parsed_txs) = if let Some(value) = process_txs_and_search_params(&txs, &params) {
+    let params = if let Some(value) = parse_search_params(&params) {
         value
     } else {
         stack.push(TupleItem::Null);
@@ -615,158 +615,167 @@ fn find_transaction_by_params_impl(
         || params.value.is_some()
         || params.from.is_some()
         || params.to.is_some();
+    let expected_body_hash = params.body.as_ref().map(|body| body.repr_hash());
 
-    let found = parsed_txs.iter().filter(|tx| {
-        if let Some(expected_deploy) = params.deploy {
-            let is_deploy = tx.orig_status == AccountStatus::NotExists
-                && tx.end_status == AccountStatus::Active;
-            if expected_deploy != is_deploy {
-                // Deploy flag mismatch
-                return false;
-            }
-        }
-
-        let in_msg = tx.load_in_msg();
-        if let Ok(Some(in_msg)) = &in_msg
-            && let MsgInfo::Int(info) = &in_msg.info
-        {
-            if let Some(expected_opcode) = &params.opcode {
-                let mut slice = in_msg.body;
-                let Ok(opcode) = slice.load_u32() else {
-                    // No opcode at all
+    let mut found = txs
+        .iter()
+        .filter_map(|el| match el {
+            TupleItem::Tuple(tuple) => match tuple.first() {
+                Some(TupleItem::Cell(cell)) => Some(cell),
+                _ => None,
+            },
+            _ => None,
+        })
+        .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)))
+        .filter(|(tx, _)| {
+            if let Some(expected_deploy) = params.deploy {
+                let is_deploy = tx.orig_status == AccountStatus::NotExists
+                    && tx.end_status == AccountStatus::Active;
+                if expected_deploy != is_deploy {
+                    // Deploy flag mismatch
                     return false;
-                };
-                if *expected_opcode != opcode {
-                    if params.bounced == Some(true) {
-                        // if bounced, try to match opcode after 0xFFFFFFFF
-                        let Ok(bounced_opcode) = slice.load_u32() else {
-                            // No bounced opcode at all
-                            return false;
-                        };
-                        if *expected_opcode != bounced_opcode {
-                            // Bounced opcode mismatch
+                }
+            }
+
+            let in_msg = tx.load_in_msg();
+            if let Ok(Some(in_msg)) = &in_msg
+                && let MsgInfo::Int(info) = &in_msg.info
+            {
+                if let Some(expected_opcode) = &params.opcode {
+                    let mut slice = in_msg.body;
+                    let Ok(opcode) = slice.load_u32() else {
+                        // No opcode at all
+                        return false;
+                    };
+                    if *expected_opcode != opcode {
+                        if params.bounced == Some(true) {
+                            // if bounced, try to match opcode after 0xFFFFFFFF
+                            let Ok(bounced_opcode) = slice.load_u32() else {
+                                // No bounced opcode at all
+                                return false;
+                            };
+                            if *expected_opcode != bounced_opcode {
+                                // Bounced opcode mismatch
+                                return false;
+                            }
+                        } else {
+                            // Opcode mismatch
                             return false;
                         }
-                    } else {
-                        // Opcode mismatch
+                    }
+                }
+
+                if let Some(expected_bounced) = &params.bounced
+                    && *expected_bounced != info.bounced
+                {
+                    // Bounced value mismatch
+                    return false;
+                }
+
+                if let Some(expected_bounce) = &params.bounce
+                    && *expected_bounce != info.bounce
+                {
+                    // Bounce value mismatch
+                    return false;
+                }
+
+                if let Some(expected_value) = &params.value
+                    && (*expected_value) != info.value.tokens.into()
+                {
+                    // Message value mismatch
+                    return false;
+                }
+
+                if let Some(expected_from_addr) = &params.from
+                    && (*expected_from_addr) != info.src
+                {
+                    // Source address mismatch
+                    return false;
+                }
+
+                if let Some(expected_to_addr) = &params.to
+                    && (*expected_to_addr) != info.dst
+                {
+                    // Destination address mismatch
+                    return false;
+                }
+
+                if let Some(expected_hash) = expected_body_hash.as_ref() {
+                    let body_cell = to_cell(&in_msg.body);
+                    let actual_hash = body_cell.repr_hash();
+                    if expected_hash != &actual_hash {
+                        // Message body hash mismatch
                         return false;
                     }
                 }
-            }
-
-            if let Some(expected_bounced) = &params.bounced
-                && *expected_bounced != info.bounced
-            {
-                // Bounced value mismatch
+            } else if requires_internal_in_msg {
                 return false;
             }
 
-            if let Some(expected_bounce) = &params.bounce
-                && *expected_bounce != info.bounce
-            {
-                // Bounce value mismatch
+            let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
                 return false;
-            }
-
-            if let Some(expected_value) = &params.value
-                && (*expected_value) != info.value.tokens.into()
-            {
-                // Message value mismatch
-                return false;
-            }
-
-            if let Some(expected_from_addr) = &params.from
-                && (*expected_from_addr) != info.src
-            {
-                // Source address mismatch
-                return false;
-            }
-
-            if let Some(expected_to_addr) = &params.to
-                && (*expected_to_addr) != info.dst
-            {
-                // Destination address mismatch
-                return false;
-            }
-
-            if let Some(expected_body) = &params.body {
-                let expected_hash = expected_body.repr_hash();
-                let body_cell = to_cell(&in_msg.body);
-                let actual_hash = body_cell.repr_hash();
-                if expected_hash != actual_hash {
-                    // Message body hash mismatch
-                    return false;
-                }
-            }
-        } else if requires_internal_in_msg {
-            return false;
-        }
-
-        let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
-            return false;
-        };
-
-        if let Some(expected_compute_skipped) = params.compute_phase_skipped {
-            let is_skipped = matches!(info.compute_phase, ComputePhase::Skipped(_));
-            if expected_compute_skipped != is_skipped {
-                // Compute phase skipped mismatch
-                return false;
-            }
-        }
-
-        if let Some(expected_aborted) = params.aborted
-            && expected_aborted != info.aborted
-        {
-            // Aborted mismatch
-            return false;
-        }
-
-        if let Some(expected_action_exit_code) = params.action_exit_code {
-            if let Some(action_phase) = &info.action_phase {
-                if action_phase.result_code != expected_action_exit_code {
-                    // Action exit code mismatch
-                    return false;
-                }
-            } else {
-                // Action phase is missing but expected
-                return false;
-            }
-        }
-
-        if let ComputePhase::Executed(compute) = &info.compute_phase
-            && let Some(expected_exit_code) = params.exit_code
-            && compute.exit_code != expected_exit_code as i32
-        {
-            // Exit code mismatch
-            return false;
-        }
-
-        if let Some(expected_success) = params.success {
-            let action_phase_success = if let Some(action_phase) = &info.action_phase {
-                action_phase.success
-            } else {
-                false // np action phase, no success
             };
 
-            if let ComputePhase::Executed(compute) = &info.compute_phase
-                && (action_phase_success && compute.success) != expected_success
+            if let Some(expected_compute_skipped) = params.compute_phase_skipped {
+                let is_skipped = matches!(info.compute_phase, ComputePhase::Skipped(_));
+                if expected_compute_skipped != is_skipped {
+                    // Compute phase skipped mismatch
+                    return false;
+                }
+            }
+
+            if let Some(expected_aborted) = params.aborted
+                && expected_aborted != info.aborted
             {
-                // Success mismatch
+                // Aborted mismatch
                 return false;
             }
-        }
 
-        true
-    });
+            if let Some(expected_action_exit_code) = params.action_exit_code {
+                if let Some(action_phase) = &info.action_phase {
+                    if action_phase.result_code != expected_action_exit_code {
+                        // Action exit code mismatch
+                        return false;
+                    }
+                } else {
+                    // Action phase is missing but expected
+                    return false;
+                }
+            }
 
-    let txs = found.collect::<Vec<_>>();
-    let Some(&first) = txs.first() else {
+            if let ComputePhase::Executed(compute) = &info.compute_phase
+                && let Some(expected_exit_code) = params.exit_code
+                && compute.exit_code != expected_exit_code as i32
+            {
+                // Exit code mismatch
+                return false;
+            }
+
+            if let Some(expected_success) = params.success {
+                let action_phase_success = if let Some(action_phase) = &info.action_phase {
+                    action_phase.success
+                } else {
+                    false // np action phase, no success
+                };
+
+                if let ComputePhase::Executed(compute) = &info.compute_phase
+                    && (action_phase_success && compute.success) != expected_success
+                {
+                    // Success mismatch
+                    return false;
+                }
+            }
+
+            true
+        });
+
+    let Some((_, first)) = found.next() else {
         // No transaction found
         stack.push(TupleItem::Null);
         return Ok(());
     };
 
-    stack.push(TupleItem::Cell(to_cell(first)));
+    stack.push(TupleItem::Cell(first.clone()));
     Ok(())
 }
 

@@ -264,6 +264,26 @@ pub fn process_txs_and_search_params(
     txs: &Tuple,
     params: &Tuple,
 ) -> Option<(TransactionNotFoundParams, Vec<Transaction>)> {
+    let params = parse_search_params(params)?;
+
+    let parsed_txs = txs
+        .0
+        .iter()
+        .filter_map(|el| match el {
+            TupleItem::Tuple(tuple) => match tuple.first() {
+                Some(TupleItem::Cell(cell)) => Some(cell),
+                _ => None,
+            },
+            _ => None,
+        })
+        .filter_map(|x| x.parse::<Transaction>().ok())
+        .collect::<Vec<_>>();
+
+    Some((params, parsed_txs))
+}
+
+#[must_use]
+pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> {
     let item_from_end = |idx_from_end: usize| {
         params
             .0
@@ -381,20 +401,7 @@ pub fn process_txs_and_search_params(
         }
     }
 
-    let parsed_txs = txs
-        .0
-        .iter()
-        .filter_map(|el| match el {
-            TupleItem::Tuple(tuple) => match tuple.first() {
-                Some(TupleItem::Cell(cell)) => Some(cell),
-                _ => None,
-            },
-            _ => None,
-        })
-        .filter_map(|x| x.parse::<Transaction>().ok())
-        .collect::<Vec<_>>();
-
-    Some((params, parsed_txs))
+    Some(params)
 }
 
 fn read_int_like_param(item: &TupleItem) -> Option<&BigInt> {
@@ -408,7 +415,7 @@ fn read_int_like_param(item: &TupleItem) -> Option<&BigInt> {
 
 fn read_bool_like_param(item: &TupleItem) -> Option<bool> {
     match item {
-        TupleItem::Int(num) => Some(*num == BigInt::from(-1)),
+        TupleItem::Int(num) => Some(num.to_i64() == Some(-1)),
         _ => None,
     }
 }
