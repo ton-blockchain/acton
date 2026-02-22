@@ -6,13 +6,14 @@ Arguments:
   [CONTRACT_ID]  Contract ID to build (defaults to all if not specified)
 
 Options:
-      --clear-cache        Clear compilation cache before building
-      --color <WHEN>       Control when to use colored output [default: auto] [possible values: auto, always, never]
-      --graph <GRAPH>      Generate dependency graph as SVG file (requires graphviz)
-      --out-dir <OUT_DIR>  Output directory for build artifacts [default: build]
-      --output-fift <DIR>  Directory to save compiled Fift files
-      --info               Show compiled contract info
-  -h, --help               Print help
+      --clear-cache           Clear compilation cache before building
+      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --graph <GRAPH>         Generate dependency graph as SVG file (requires graphviz)
+      --manifest-path <PATH>  Path to Acton.toml
+      --out-dir <OUT_DIR>     Output directory for build artifacts [default: build]
+      --output-fift <DIR>     Directory to save compiled Fift files
+      --info                  Show compiled contract info
+  -h, --help                  Print help
 
 Configuration:
      # Configure contracts in Acton.toml

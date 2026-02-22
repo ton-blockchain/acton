@@ -17,6 +17,7 @@ clap = { workspace = true }
 toml = { workspace = true }
 ton-networks = { workspace = true }
 owo-colors = { workspace = true }
+path-absolutize= { workspace = true }
 
 [lints]
 workspace = true
