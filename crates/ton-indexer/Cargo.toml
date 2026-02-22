@@ -19,7 +19,7 @@ anyhow = { workspace = true }
 crc = { workspace = true }
 num-bigint = { workspace = true }
 serde_json = { workspace = true }
-sha2 = "0.10"
+sha2 = { workspace = true }
 
 [lints]
 workspace = true

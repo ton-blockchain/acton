@@ -19,7 +19,7 @@ rustc-hash = { workspace = true }
 dunce = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

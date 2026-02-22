@@ -47,6 +47,7 @@ ton-source-map = { path = "crates/ton-source-map" }
 tolkfmt = { path = "crates/tolkfmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-litenode = { path = "crates/ton-litenode" }
+ton-ls = { path = "crates/ton-ls" }
 ton-indexer = { path = "crates/ton-indexer" }
 
 # remote crates
@@ -128,6 +129,10 @@ similar = { version = "2.7.0", features = ["inline"] }
 # actin check
 codespan-reporting = "0.11.1"
 
+# acton ls
+tower-lsp = "0.20"
+lsp-types = "0.94.1"
+
 # other
 rustc-hash = "2.1.1"
 smol_str = "0.3.5"
@@ -148,6 +153,8 @@ pretty = "0.12.5"
 winnow = "0.7.13"
 dunce = "1.0.5"
 path-absolutize = "3.1.1"
+tracing = "0.1"
+function_name = "0.3.0"
 
 [dependencies]
 # local creates
@@ -160,8 +167,8 @@ tolk-syntax = { workspace = true }
 tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }
 tolk-linter = { workspace = true }
-ton-ls = { path = "crates/ton-ls" }
-tower-lsp = "0.20"
+ton-ls = { workspace = true }
+tower-lsp = { workspace = true }
 dashmap = { workspace = true }
 tvmffi = { workspace = true }
 vmlogs = { workspace = true }
@@ -250,8 +257,8 @@ similar = { workspace = true }
 
 # actin check
 codespan-reporting = { workspace = true }
-rustc-hash = "2.1.1"
-function_name = "0.3.0"
+rustc-hash = { workspace = true }
+function_name = { workspace = true }
 path-absolutize = { workspace = true }
 
 [dev-dependencies]
