@@ -1,11 +1,14 @@
 use crate::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::{Result, anyhow};
+use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 pub use ton_networks::{CustomNetworkUrls, Network};
+
+static MANIFEST_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone)]
 pub enum Explorer {
@@ -300,7 +303,7 @@ impl ContractConfig {
 
 impl ActonConfig {
     pub fn load() -> Result<Self> {
-        let config_path = Path::new("Acton.toml");
+        let config_path = manifest_path();
         if !config_path.exists() {
             return Err(anyhow!(
                 "Acton.toml not found. Run 'acton init' to initialize Acton in the project."
@@ -331,7 +334,7 @@ impl ActonConfig {
         }
 
         // 2. Load local wallets.toml
-        let local_wallets_path = Path::new("wallets.toml");
+        let local_wallets_path = project_root().join("wallets.toml");
         if local_wallets_path.exists() {
             let local_content = fs::read_to_string(local_wallets_path)?;
             let local_wallets: WalletsFile = toml::from_str(&local_content)?;
@@ -363,7 +366,7 @@ impl ActonConfig {
         }
 
         // 2. Load local libraries.toml
-        let local_libraries_path = Path::new("libraries.toml");
+        let local_libraries_path = project_root().join("libraries.toml");
         if local_libraries_path.exists() {
             let local_content = fs::read_to_string(local_libraries_path)?;
             let local_libraries: LibrariesFile = toml::from_str(&local_content)?;
@@ -435,6 +438,44 @@ impl ActonConfig {
             }
         }
         result
+    }
+}
+
+#[must_use]
+pub fn manifest_path() -> &'static Path {
+    MANIFEST_PATH
+        .get_or_init(|| {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join("Acton.toml")
+        })
+        .as_path()
+}
+
+#[must_use]
+pub fn project_root() -> &'static Path {
+    manifest_path().parent().unwrap_or_else(|| Path::new("."))
+}
+
+pub fn init_manifest_path(path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref();
+    let mut resolved = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        path.absolutize()?.to_path_buf()
+    };
+
+    if resolved.is_dir() {
+        resolved = resolved.join("Acton.toml");
+    }
+
+    match MANIFEST_PATH.set(resolved.clone()) {
+        Ok(()) => Ok(()),
+        Err(existing) if existing == resolved => Ok(()),
+        Err(existing) => Err(anyhow!(
+            "Manifest path already initialized to {}",
+            existing.display()
+        )),
     }
 }
 

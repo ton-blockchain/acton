@@ -20,7 +20,7 @@ use acton::commands::wallet::{WalletCommand, wallet_cmd};
 use acton::commands::wrapper::wrapper_cmd;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
-use acton_config::config::{ActonConfig, Explorer, Network};
+use acton_config::config::{ActonConfig, Explorer, Network, init_manifest_path};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use clap::builder::styling::Style;
 use clap::builder::{StyledStr, Styles};
@@ -32,6 +32,7 @@ use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
 use std::fs::OpenOptions;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
@@ -54,6 +55,9 @@ struct Cli {
         help = "Control when to use colored output"
     )]
     color: ColorMode,
+
+    #[arg(long, global = true, value_name = "PATH", help = "Path to Acton.toml")]
+    manifest_path: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -1160,6 +1164,32 @@ fn example_completions_usage() -> StyledStr {
     )
 }
 
+fn configure_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<()> {
+    let is_custom_manifest = manifest_path.is_some();
+    let manifest_path = manifest_path.unwrap_or_else(|| PathBuf::from("Acton.toml"));
+    let mut resolved_manifest_path = if manifest_path.is_absolute() {
+        manifest_path
+    } else {
+        env::current_dir()?.join(manifest_path)
+    };
+
+    if resolved_manifest_path.is_dir() {
+        resolved_manifest_path = resolved_manifest_path.join("Acton.toml");
+    }
+
+    init_manifest_path(&resolved_manifest_path)?;
+
+    // Keep relative paths in commands stable by working from the manifest directory.
+    if is_custom_manifest
+        && let Some(project_dir) = resolved_manifest_path.parent()
+        && project_dir.exists()
+    {
+        env::set_current_dir(project_dir)?;
+    }
+
+    Ok(())
+}
+
 fn main() {
     CompleteEnv::with_factory(Cli::command).complete();
 
@@ -1169,8 +1199,17 @@ fn main() {
             .homepage("https://github.com/i582/acton")
     );
     dotenv().ok();
-    let Cli { color, command } = Cli::parse();
+    let Cli {
+        color,
+        manifest_path,
+        command,
+    } = Cli::parse();
     init_color_mode(color);
+
+    if let Err(err) = configure_manifest_path(manifest_path) {
+        eprintln!("{} {}", "Error:".red(), err);
+        process::exit(1);
+    }
 
     if !matches!(command, Commands::Ls { .. }) {
         // for language server we set up own logging

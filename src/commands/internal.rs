@@ -1,10 +1,11 @@
+use acton_config::config::manifest_path;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 use toml_edit::{DocumentMut, Item, Table, value};
 
 pub fn internal_register_contract(path: &str, id: Option<String>) -> Result<()> {
-    let config_path = Path::new("Acton.toml");
+    let config_path = manifest_path();
     if !config_path.exists() {
         anyhow::bail!("Acton.toml not found");
     }

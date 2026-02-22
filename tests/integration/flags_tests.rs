@@ -1,10 +1,19 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use std::fs;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
+
+const PASSING_TEST: &str = r#"
+import "../../lib/testing/expect"
+
+get fun `test-manifest-path-works`() {
+    expect(1).toEqual(1);
+}
+"#;
 
 #[test]
 fn test_run_specific_test_file() {
@@ -225,7 +234,7 @@ fn test_fail_fast() {
         .assert_contains("second-fail")
         .assert_contains("third-pass")
         .assert_contains("fourth-pass")
-        .assert_snapshot_matches("integration/snapshots/test_without_fail_fast.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/flags/test_without_fail_fast.stdout.txt");
 
     // With fail-fast: should stop after second test
     project
@@ -240,5 +249,201 @@ fn test_fail_fast() {
         .assert_contains("second-fail")
         .assert_not_contains("third-pass")
         .assert_not_contains("fourth-pass")
-        .assert_snapshot_matches("integration/snapshots/test_with_fail_fast.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/flags/test_with_fail_fast.stdout.txt");
+}
+
+#[test]
+fn test_manifest_path_allows_running_outside_project_root() {
+    let project = ProjectBuilder::new("manifest-path-outside")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("Project should have a parent directory");
+    let manifest_path = project.path().join("Acton.toml");
+    let manifest_path = manifest_path.to_string_lossy().to_string();
+
+    project
+        .acton()
+        .check()
+        .current_dir(project_parent)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_allows_running_outside_project_root_without_manifest.stderr.txt",
+        );
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg(&manifest_path)
+        .check()
+        .current_dir(project_parent)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_allows_running_outside_project_root_with_manifest.stdout.txt",
+        );
+}
+
+#[test]
+fn test_manifest_path_accepts_project_directory() {
+    let project = ProjectBuilder::new("manifest-path-directory")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("Project should have a parent directory");
+    let manifest_dir = project.path().to_string_lossy().to_string();
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg(&manifest_dir)
+        .check()
+        .current_dir(project_parent)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_accepts_project_directory.stdout.txt",
+        );
+}
+
+#[test]
+fn test_manifest_path_accepts_relative_path_from_parent() {
+    let project = ProjectBuilder::new("manifest-path-relative")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("Project should have a parent directory");
+    let project_dir_name = project
+        .path()
+        .file_name()
+        .expect("Project directory should have a name")
+        .to_string_lossy()
+        .to_string();
+    let relative_manifest_path = format!("{project_dir_name}/Acton.toml");
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg(&relative_manifest_path)
+        .check()
+        .current_dir(project_parent)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_accepts_relative_path_from_parent.stdout.txt",
+        );
+}
+
+#[test]
+fn test_manifest_path_missing_file_returns_clear_error() {
+    let project = ProjectBuilder::new("manifest-path-missing")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let project_parent = project
+        .path()
+        .parent()
+        .expect("Project should have a parent directory");
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg("missing/Acton.toml")
+        .check()
+        .current_dir(project_parent)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_missing_file_returns_clear_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_manifest_path_build_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-path-build-from-nested")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let output = project
+        .acton()
+        .arg("--manifest-path")
+        .arg("../Acton.toml")
+        .build()
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_build_works_from_nested_directory.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "build/simple.json",
+            "integration/snapshots/flags/test_manifest_path_build_works_from_nested_directory.build_simple_json.txt",
+        );
+}
+
+#[test]
+fn test_manifest_path_check_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-path-check-from-nested")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg("../Acton.toml")
+        .check()
+        .current_dir(&nested_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_check_works_from_nested_directory.stdout.txt",
+        );
+}
+
+#[test]
+fn test_manifest_path_test_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-path-test-from-nested")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("manifest_path", PASSING_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg("../Acton.toml")
+        .test()
+        .current_dir(&nested_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_path_test_works_from_nested_directory.stdout.txt",
+        );
 }
