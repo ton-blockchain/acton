@@ -14,7 +14,7 @@ Mutants:  3
   ✗ Survived             3
   ! Compile errors       0
 
-  ◆ Mutation Score 0.0%
+  ◆ Mutation Score       0.0%
 
 Survived Mutants
 ────────────────────────────────────────────────────────────

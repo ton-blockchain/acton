@@ -7,6 +7,7 @@ Arguments:
 
 Options:
       --clear-cache        Clear compilation cache before building
+      --color <WHEN>       Control when to use colored output [default: auto] [possible values: auto, always, never]
       --graph <GRAPH>      Generate dependency graph as SVG file (requires graphviz)
       --out-dir <OUT_DIR>  Output directory for build artifacts [default: build]
       --output-fift <DIR>  Directory to save compiled Fift files

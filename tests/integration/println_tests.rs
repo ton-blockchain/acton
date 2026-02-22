@@ -1,3 +1,4 @@
+use acton_config::color::ColorMode;
 use crate::support::assertions::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 
@@ -53,6 +54,8 @@ fn test_println_formatting() {
     project
         .acton()
         .script("scripts/main.tolk")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
@@ -93,6 +96,8 @@ fn test_println_tuples_and_tensors() {
     project
         .acton()
         .script("scripts/main.tolk")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
@@ -141,6 +146,8 @@ fn test_println_nesting_complex() {
     project
         .acton()
         .script("scripts/main.tolk")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
@@ -175,6 +182,8 @@ fn test_println_various_slices() {
     project
         .acton()
         .script("scripts/main.tolk")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(

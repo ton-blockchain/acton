@@ -15,6 +15,16 @@ pub enum ColorMode {
     Never,
 }
 
+impl fmt::Display for ColorMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ColorMode::Auto => write!(f, "auto"),
+            ColorMode::Always => write!(f, "always"),
+            ColorMode::Never => write!(f, "never"),
+        }
+    }
+}
+
 static COLOR_MODE: AtomicU8 = AtomicU8::new(ColorMode::Auto as u8);
 static AUTO_COLOR_ENABLED: OnceLock<bool> = OnceLock::new();
 

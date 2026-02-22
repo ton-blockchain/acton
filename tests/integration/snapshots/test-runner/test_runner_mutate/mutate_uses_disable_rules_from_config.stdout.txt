@@ -11,7 +11,7 @@ Mutants:  0
   ✗ Survived             0
   ! Compile errors       0
 
-  ◆ Mutation Score 0.0%
+  ◆ Mutation Score       0.0%
 
 ✓ Excellent! All mutants were killed!
 

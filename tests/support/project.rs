@@ -1,5 +1,6 @@
 use crate::common::{acton_exe, assert_ui};
 use crate::support::assertions::TestOutput;
+use acton_config::color::ColorMode;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -684,6 +685,7 @@ impl Project {
             script_fork_net: None,
             build_info: false,
             force_no_color_env: true,
+            color_mode: None,
         }
     }
 
@@ -730,6 +732,7 @@ pub(crate) struct ActonCommand {
     pub(crate) script_fork_net: Option<String>,
     pub(crate) build_info: bool,
     pub(crate) force_no_color_env: bool,
+    pub(crate) color_mode: Option<ColorMode>,
 }
 
 #[allow(dead_code)]
@@ -828,6 +831,11 @@ impl ActonCommand {
     /// Use this when you need to validate auto color detection behavior.
     pub(crate) fn keep_color_env(mut self) -> Self {
         self.force_no_color_env = false;
+        self
+    }
+
+    pub(crate) fn color_mode(mut self, mode: ColorMode) -> Self {
+        self.color_mode = Some(mode);
         self
     }
 
@@ -1365,6 +1373,10 @@ impl ActonCommand {
 
         if let Some(source_map_path) = self.compile_source_map {
             self.cmd = self.cmd.arg("--source-map").arg(source_map_path);
+        }
+
+        if let Some(mode) = self.color_mode {
+            self.cmd = self.cmd.arg("--color").arg(mode.to_string());
         }
 
         if self.force_no_color_env {

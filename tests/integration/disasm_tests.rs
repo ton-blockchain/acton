@@ -208,7 +208,7 @@ fn test_disasm_no_input_provided() {
         .disasm()
         .run()
         .failure()
-        .assert_stderr_contains(" Either --string/-s, --address or BOC_FILE argument must be provided, run with --help for more information");
+        .assert_stderr_contains(" Either --string, -s, --address or BOC_FILE argument must be provided, run with --help for more information");
 }
 
 #[test]
