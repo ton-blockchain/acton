@@ -517,3 +517,26 @@ fn test_manifest_auto_detect_test_works_from_nested_directory() {
             "integration/snapshots/flags/test_manifest_auto_detect_test_works_from_nested_directory.stdout.txt",
         );
 }
+
+#[test]
+fn test_manifest_auto_detect_stops_at_git_boundary() {
+    let project = ProjectBuilder::new("manifest-auto-git-boundary")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let subrepo_dir = project.path().join("subrepo");
+    let nested_dir = subrepo_dir.join("nested");
+    fs::create_dir_all(subrepo_dir.join(".git")).expect("Failed to create .git boundary");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    project
+        .acton()
+        .check()
+        .current_dir(&nested_dir)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_manifest_auto_detect_stops_at_git_boundary.stderr.txt",
+        );
+}

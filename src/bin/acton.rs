@@ -1165,8 +1165,17 @@ fn example_completions_usage() -> StyledStr {
 }
 
 fn find_manifest_in_ancestors(start_dir: &Path) -> Option<PathBuf> {
+    let git_boundary = start_dir
+        .ancestors()
+        .find(|dir| dir.join(".git").exists())
+        .map(Path::to_path_buf);
+
     start_dir
         .ancestors()
+        .take_while(|dir| match &git_boundary {
+            Some(boundary) => dir.starts_with(boundary),
+            None => true,
+        })
         .map(|dir| dir.join("Acton.toml"))
         .find(|candidate| candidate.is_file())
 }
