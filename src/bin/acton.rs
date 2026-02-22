@@ -820,21 +820,59 @@ fn example_build_usage() -> StyledStr {
     let mut writer = StyledStr::new();
     let styled = Styles::styled();
 
-    let config_example = String::from(
-        r#"[contracts.wallet]
-     name = "Wallet Contract"
-     src = "contracts/wallet.tolk"
-     output = "wallet.boc"
-     depends = ["child"]
-     # or as library with custom function name and output path
-     depends = [
-       { name = "child", kind = "library_ref", function = "getChildCode", path = "child_dep.tolk" }
-     ]"#,
-    );
-    let build_config_example = String::from(
-        r#"[build]
-     output-fift = "build/fift""#,
-    );
+    let dim = |text: &str| text.dimmed().to_string();
+    let green = |text: &str| text.green().to_string();
+
+    let config_example = [
+        format!("{}contracts.wallet{}", dim("["), dim("]")),
+        format!(
+            "     name{}{}",
+            dim(" = "),
+            green("\"Wallet Contract\"")
+        ),
+        format!(
+            "     src{}{}",
+            dim(" = "),
+            green("\"contracts/wallet.tolk\"")
+        ),
+        format!("     output{}{}", dim(" = "), green("\"wallet.boc\"")),
+        format!(
+            "     depends{}{}{}{}",
+            dim(" = "),
+            dim("["),
+            green("\"child\""),
+            dim("]")
+        ),
+        format!(
+            "     {}",
+            dim("# or as library with custom function name and output path")
+        ),
+        format!("     depends{}{}", dim(" = "), dim("[")),
+        format!(
+            "       {} name{}{}{}, kind{}{}{}, function{}{}{}, path{}{} {}",
+            dim("{"),
+            dim(" = "),
+            green("\"child\""),
+            dim(","),
+            dim(" = "),
+            green("\"library_ref\""),
+            dim(","),
+            dim(" = "),
+            green("\"getChildCode\""),
+            dim(","),
+            dim(" = "),
+            green("\"child_dep.tolk\""),
+            dim("}")
+        ),
+        format!("     {}", dim("]")),
+    ]
+    .join("\n");
+
+    let build_config_example = [
+        format!("{}build{}", dim("["), dim("]")),
+        format!("     output-fift{}{}", dim(" = "), green("\"build/fift\"")),
+    ]
+    .join("\n");
 
     let build_examples = Vec::from([
         ("Build all contracts", "acton build"),
