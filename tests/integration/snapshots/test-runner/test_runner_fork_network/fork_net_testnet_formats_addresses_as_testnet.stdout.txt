@@ -10,6 +10,6 @@
  > tests/address.test.tolk (1 test)
   ✓ testnet-format [TIME]
     └─ Test output:
-       kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+       kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD
 
  ✓ 1 passed in 1 file

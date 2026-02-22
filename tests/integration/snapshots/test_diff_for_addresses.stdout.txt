@@ -11,8 +11,8 @@
   ✗ diff [TIME]
     └─ Error: expect(actual).toEqual(expected)
         (
-            kQC2jeGorIAFh2LXwsDjHfRK+GSo9UzchdIEMh24A7T7AMGn,
-            kQD///////////////////////////////////////////Bi
+            kQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AMGn,
+            kQD___________________________________________Bi
         )
       └─ at tests/simple.test[LINE]
 

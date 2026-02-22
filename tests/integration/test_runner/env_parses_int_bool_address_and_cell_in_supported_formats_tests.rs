@@ -29,7 +29,7 @@ fn env_parses_int_bool_address_and_cell_in_supported_formats() {
                 expect(env<bool>("Z_ENV_BOOL_ONE")).toEqual(true);
                 expect(env<bool>("Z_ENV_BOOL_ZERO")).toEqual(false);
 
-                val fallbackAddress = address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ");
+                val fallbackAddress = address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
                 val parsedAddress = envOr<address>("Z_ENV_ADDRESS_RAW", fallbackAddress);
                 expect(parsedAddress).toEqual(address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147"));
 
@@ -116,7 +116,7 @@ fn env_or_uses_defaults_only_for_null_paths() {
                 expect(envOr<bool>("Z_OR_MISSING_BOOL", true)).toEqual(true);
                 expect(envOr<bool>("Z_OR_BAD_BOOL", true)).toEqual(false);
 
-                val fallbackAddress = address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ");
+                val fallbackAddress = address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
                 expect(envOr<address>("Z_OR_MISSING_ADDRESS", fallbackAddress)).toEqual(fallbackAddress);
                 expect(envOr<address>("Z_OR_BAD_ADDRESS", fallbackAddress)).toEqual(fallbackAddress);
 

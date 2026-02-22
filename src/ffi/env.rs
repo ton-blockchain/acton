@@ -7,7 +7,7 @@ use ton_executor::BaseExecutor;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
-use tycho_types::models::IntAddr;
+use tycho_types::models::{StdAddr, StdAddrFormat};
 
 extension!(env_int in (Context) with (name: String) using env_int_impl);
 fn env_int_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
@@ -73,7 +73,7 @@ extension!(env_address in (Context) with (name: String) using env_address_impl);
 fn env_address_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
-            if let Ok(addr) = IntAddr::from_str(&val) {
+            if let Ok((addr, _)) = StdAddr::from_str_ext(&val, StdAddrFormat::any()) {
                 let mut builder = CellBuilder::new();
                 if addr.store_into(&mut builder, Cell::empty_context()).is_ok()
                     && let Ok(cell) = builder.build()

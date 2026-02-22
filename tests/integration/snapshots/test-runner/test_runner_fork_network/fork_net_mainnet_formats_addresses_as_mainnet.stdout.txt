@@ -10,6 +10,6 @@
  > tests/address.test.tolk (1 test)
   ✓ mainnet-format [TIME]
     └─ Test output:
-       EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ
+       EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ
 
  ✓ 1 passed in 1 file

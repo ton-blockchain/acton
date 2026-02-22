@@ -125,7 +125,7 @@ fn env_or_uses_defaults_for_invalid_int_address_and_cell_values() {
             import "../../lib/testing/expect"
 
             get fun `test-env-or-invalid-fallbacks`() {
-                val fallbackAddress = address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ");
+                val fallbackAddress = address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
                 val fallbackCell = beginCell().storeUint(777, 32).endCell();
 
                 expect(env<int>("T_BAD_INT")).toBeNull();

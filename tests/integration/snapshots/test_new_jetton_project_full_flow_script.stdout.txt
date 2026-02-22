@@ -6,4 +6,4 @@ Deploying Jetton with JettonInfo {
 }
 Deploying Jetton contract...
 Minting tokens: 1000000000
-Succesfully minted and transfered 1000000000 tokens to kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD (deployer)
+Succesfully minted and transfered 1000000000 tokens to kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD (deployer)

@@ -9,7 +9,7 @@
 
  > tests/aj_vm_helpers.test.tolk (1 test)
   ✗ aj-stdlib-vm-convert-address-invalid [TIME]
-    └─ Error: Failed to convert address from not-an-address: Invalid address (Address: not-an-address, message: Invalid hex address string: wrong address format)
+    └─ Error: invalid address format
 
  ✗ 1 failed in 1 file
 

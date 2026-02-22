@@ -23,7 +23,7 @@ use tycho_types::cell::{Cell, CellFamily, HashBytes, Lazy};
 use tycho_types::dict;
 use tycho_types::models::{
     Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
-    StorageInfo,
+    StdAddr, StdAddrFormat, StorageInfo,
 };
 
 /// Represents the source of the world state.
@@ -270,7 +270,7 @@ impl RemoteAccountState {
         let acc = ShardAccount {
             account: Lazy::new(&OptionalAccount(Some(Account {
                 balance: CurrencyCollection::new(balance),
-                address: IntAddr::from_str(address)?,
+                address: IntAddr::Std(StdAddr::from_str_ext(address, StdAddrFormat::any())?.0),
                 last_trans_lt: info.last_transaction_id.lt.parse()?,
                 state: account_state,
                 storage_stat: StorageInfo::default(),

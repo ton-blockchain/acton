@@ -22,9 +22,9 @@ use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, Load};
 use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, ExecutedComputePhase, IntAddr, MsgInfo,
-    RelaxedMessage, RelaxedMsgInfo, ReserveCurrencyFlags, SendMsgFlags, ShardAccount, Transaction,
-    TxInfo,
+    AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, DisplayBase64StdAddr,
+    ExecutedComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo, ReserveCurrencyFlags,
+    SendMsgFlags, ShardAccount, Transaction, TxInfo,
 };
 use tycho_types::num::Tokens;
 
@@ -113,7 +113,20 @@ impl<'a> FormatterContext<'a> {
 
     fn address_to_string(&self, address: &IntAddr) -> String {
         match address {
-            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
+            IntAddr::Std(addr) => {
+                let need_mainnet_address = self.fork_net == Some(Network::Mainnet)
+                    || self.network == Some(Network::Mainnet);
+
+                let display = DisplayBase64StdAddr {
+                    addr,
+                    flags: Base64StdAddrFlags {
+                        testnet: !need_mainnet_address,
+                        base64_url: true,
+                        bounceable: true,
+                    },
+                };
+                display.to_string()
+            }
             _ => address.to_string(),
         }
     }
@@ -411,18 +424,20 @@ impl<'a> FormatterContext<'a> {
         if is_root {
             let in_msg = &tx.load_in_msg();
             if let Ok(Some(in_msg)) = in_msg {
-                let src_addr = match &in_msg.info {
-                    MsgInfo::Int(info) => info.src.clone(),
-                    _ => panic!("Expected internal message"),
-                };
-                let src_formatted =
-                    self.format_address_with_letter(&src_addr, contract_letters, show_full_names);
-                tx_builder += &format!(
-                    "{} {} {}\n",
-                    "N/A".dimmed(),
-                    "->".dimmed(),
-                    src_formatted.trim()
-                );
+                if let MsgInfo::Int(info) = &in_msg.info {
+                    let src_addr = info.src.clone();
+                    let src_formatted = self.format_address_with_letter(
+                        &src_addr,
+                        contract_letters,
+                        show_full_names,
+                    );
+                    tx_builder += &format!(
+                        "{} {} {}\n",
+                        "N/A".dimmed(),
+                        "->".dimmed(),
+                        src_formatted.trim()
+                    );
+                }
                 tx_builder += "└── ".dimmed().to_string().as_str();
             }
         }
@@ -988,13 +1003,7 @@ impl<'a> FormatterContext<'a> {
     }
 
     fn get_contract_type(&self, addr: &IntAddr) -> Option<String> {
-        let known_address = self
-            .known_addresses
-            .addresses
-            .iter()
-            .find(|(address, _)| address.to_string() == addr.to_string());
-
-        if let Some((_, known_address)) = known_address {
+        if let Some(known_address) = self.known_addresses.addresses.get(addr) {
             return Some(known_address.name.clone());
         }
 
@@ -1008,12 +1017,9 @@ impl<'a> FormatterContext<'a> {
                 AccountState::Frozen(_) => None,
             };
 
-            let known_code_cell = self
-                .known_code_cells
-                .iter()
-                .find(|(hash, _info)| code_hash == Some((*hash).clone()));
-
-            if let Some((_, known_code_cell)) = known_code_cell {
+            if let Some(code_hash) = code_hash
+                && let Some(known_code_cell) = self.known_code_cells.get(&code_hash)
+            {
                 return Some(known_code_cell.clone());
             }
         }
@@ -1026,9 +1032,12 @@ impl<'a> FormatterContext<'a> {
         };
 
         let code = info.code?;
-        let compilation_result = self.build_cache.built.iter().find(|(_, result)| {
-            result.code_hash.to_ascii_lowercase() == code.repr_hash().to_string()
-        });
+        let code_hash = code.repr_hash().to_string();
+        let compilation_result = self
+            .build_cache
+            .built
+            .iter()
+            .find(|(_, result)| result.code_hash.eq_ignore_ascii_case(&code_hash));
 
         if let Some((_, result)) = compilation_result {
             return Some(result.name.clone());
@@ -1716,14 +1725,16 @@ impl<'a> FormatterContext<'a> {
         failure: &TransactionGenericAssertFailure,
         abi: Arc<ContractAbi>,
     ) -> FailedTransactionContext {
-        let from_address = failure.params.from.as_ref().map(|addr| match addr {
-            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
-            _ => addr.to_string(),
-        });
-        let to_address = failure.params.to.as_ref().map(|addr| match addr {
-            IntAddr::Std(addr) => addr.display_base64(false).to_string(),
-            _ => addr.to_string(),
-        });
+        let from_address = failure
+            .params
+            .from
+            .as_ref()
+            .map(|addr| self.address_to_string(addr));
+        let to_address = failure
+            .params
+            .to
+            .as_ref()
+            .map(|addr| self.address_to_string(addr));
         let params = self
             .format_search_transaction_parameters(failure, abi)
             .into_iter()

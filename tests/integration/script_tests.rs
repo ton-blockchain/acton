@@ -899,7 +899,7 @@ fn test_script_address_print_default() {
             import "../../lib/io"
 
             fun main() {
-                println(address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println(address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
             }
         "#,
         )
@@ -907,7 +907,7 @@ fn test_script_address_print_default() {
 
     let output = project.acton().script("scripts/hello.tolk").run().code(0);
 
-    output.assert_contains("kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD");
+    output.assert_contains("kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
 }
 
 #[test]
@@ -919,7 +919,7 @@ fn test_script_address_print_fork_testnet() {
             import "../../lib/io"
 
             fun main() {
-                println(address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println(address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
             }
         "#,
         )
@@ -932,7 +932,7 @@ fn test_script_address_print_fork_testnet() {
         .run()
         .success();
 
-    output.assert_contains("kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD");
+    output.assert_contains("kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
 }
 
 #[test]
@@ -944,7 +944,7 @@ fn test_script_address_print_fork_mainnet() {
             import "../../lib/io"
 
             fun main() {
-                println(address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println(address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
             }
         "#,
         )
@@ -957,7 +957,7 @@ fn test_script_address_print_fork_mainnet() {
         .run()
         .success();
 
-    output.assert_contains("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ");
+    output.assert_contains("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
 }
 
 #[test]
@@ -969,7 +969,7 @@ fn test_script_address_print_broadcast_net_testnet() {
             import "../../lib/io"
 
             fun main() {
-                println(address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println(address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
             }
         "#,
         )
@@ -982,7 +982,7 @@ fn test_script_address_print_broadcast_net_testnet() {
         .run()
         .success();
 
-    output.assert_contains("kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD");
+    output.assert_contains("kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
 }
 
 #[test]
@@ -994,7 +994,7 @@ fn test_script_address_print_broadcast_net_mainnet() {
             import "../../lib/io"
 
             fun main() {
-                println(address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println(address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
             }
         "#,
         )
@@ -1007,7 +1007,7 @@ fn test_script_address_print_broadcast_net_mainnet() {
         .run()
         .success();
 
-    output.assert_contains("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ");
+    output.assert_contains("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ");
 }
 
 #[test]
@@ -1063,7 +1063,7 @@ fn test_script_env_vars() {
         .env("TEST_SLICE", "hello")
         .env(
             "TEST_ADDRESS",
-            "EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ",
+            "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ",
         )
         .env("TEST_CELL", &cell_hex)
         .run()
@@ -1071,7 +1071,7 @@ fn test_script_env_vars() {
         .assert_contains("int: 123")
         .assert_contains("bool: true")
         .assert_contains("slice: hello")
-        .assert_contains("address: kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD")
+        .assert_contains("address: kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD")
         .assert_contains("cell: 123");
 }
 
@@ -1143,7 +1143,7 @@ fn test_script_env_vars_extended() {
         .assert_contains("bool_1: true")
         .assert_contains("bool_false: false")
         .assert_contains("bool_0: false")
-        .assert_contains("address_raw: kQCDVtBfh+xRQbNJxeGqfwwXXDq8GP6zCKTVVTkeklmBRxCZ")
+        .assert_contains("address_raw: kQCDVtBfh-xRQbNJxeGqfwwXXDq8GP6zCKTVVTkeklmBRxCZ")
         .assert_contains("cell_b64: 456");
 }
 
@@ -1166,7 +1166,7 @@ fn test_script_env_or_vars() {
                 val s = envOr<string>("TEST_SLICE", "default");
                 println1("string: {}", s);
 
-                val a = envOr<address>("TEST_ADDRESS", address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                val a = envOr<address>("TEST_ADDRESS", address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
                 println1("address: {}", a);
             }
         "#,
@@ -1181,7 +1181,7 @@ fn test_script_env_or_vars() {
         .assert_contains("int: 42")
         .assert_contains("bool: false")
         .assert_contains("string: default")
-        .assert_contains("address: kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD");
+        .assert_contains("address: kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD");
 }
 
 #[test]

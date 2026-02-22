@@ -9,7 +9,7 @@
 
  > tests/aj_vm_helpers.test.tolk (1 test)
   ✗ aj-stdlib-vm-cell-from-hex-invalid [TIME]
-    └─ Error: Failed to decode cell hex deadbeef: Bag of cells deserialization error (BoC deserialization error: Unsupported cell magic number: 3735928559)
+    └─ Error: Failed to decode cell hex deadbeef: unexpected EOF
 
  ✗ 1 failed in 1 file
 

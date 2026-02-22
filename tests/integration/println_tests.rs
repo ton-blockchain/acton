@@ -34,7 +34,7 @@ fn test_println_formatting() {
                 // 3. Nested struct
                 println(Nested {
                     s: Simple { a: 42, b: false },
-                    addr: address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"),
+                    addr: address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"),
                     opt: 7,
                     str: "some string",
                 });

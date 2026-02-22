@@ -2,11 +2,11 @@ Step 1 (before):
   Bytecode position: ABB4F57D8C707186D1009CEAAD8AC32DEC068294A7F6427C80701F77FFE36535:2
   Code:
      67| }
-     68| 
+     68|
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
                  ^^^^^^^^^^^^^^^^^^^
-     71| 
+     71|
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
      73|     println(format1("Counter: {}", counterRes));
 
@@ -14,11 +14,11 @@ Step 2 (step_over):
   Bytecode position: ABB4F57D8C707186D1009CEAAD8AC32DEC068294A7F6427C80701F77FFE36535:2
   Code:
      67| }
-     68| 
+     68|
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
                                        ^^^^^^^^^^^
-     71| 
+     71|
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
      73|     println(format1("Counter: {}", counterRes));
 
@@ -26,31 +26,31 @@ Step 3 (step_over):
   Bytecode position: DF17C65B061BB04F6BEF906CBCC7C203905E77A98E71CCC87F9A5B69B20C2C7A:728
   Code:
      67| }
-     68| 
+     68|
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
                                        ^^^^^^^^^^^
-     71| 
+     71|
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
      73|     println(format1("Counter: {}", counterRes));
   Variables:
     '4 = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
-    '7 = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+    '7 = kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD
 
 Step 4 (step_over):
   Bytecode position: DF17C65B061BB04F6BEF906CBCC7C203905E77A98E71CCC87F9A5B69B20C2C7A:728
   Code:
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
-     71| 
+     71|
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
                  ^^^^^^^^^^
      73|     println(format1("Counter: {}", counterRes));
-     74| 
+     74|
      75|     val info = net.getAccountState(counter.address)!;
   Variables:
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
-    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+    deployer = kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD
 
 Step 5 (step_over):
   Bytecode position: AEFCCEEF39B87F2417E5F4C51C82C46AC03B2285B6CA19CB2745750EB817E708:8
@@ -66,7 +66,7 @@ Step 5 (step_over):
   Variables:
     '328 = currentCounter
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
-    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+    deployer = kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD
 
 Step 6 (step_over):
   Bytecode position: AEFCCEEF39B87F2417E5F4C51C82C46AC03B2285B6CA19CB2745750EB817E708:16
@@ -83,54 +83,54 @@ Step 6 (step_over):
     '329 = null
     '328 = currentCounter
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
-    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+    deployer = kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD
 
 Step 7 (step_over):
   Bytecode position: AEFCCEEF39B87F2417E5F4C51C82C46AC03B2285B6CA19CB2745750EB817E708:16
   Code:
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
-     71| 
+     71|
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      73|     println(format1("Counter: {}", counterRes));
-     74| 
+     74|
      75|     val info = net.getAccountState(counter.address)!;
   Variables:
     '329 = null
     '328 = currentCounter
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
-    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+    deployer = kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD
 
 Step 8 (step_over):
   Bytecode position: AEFCCEEF39B87F2417E5F4C51C82C46AC03B2285B6CA19CB2745750EB817E708:184
   Code:
      69| fun main() {
      70|     val (counter, deployer) = setupTest();
-     71| 
+     71|
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
      73|     println(format1("Counter: {}", counterRes));
-     74| 
+     74|
      75|     val info = net.getAccountState(counter.address)!;
   Variables:
     '330 = 0
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
-    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+    deployer = kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD
 
 Step 9 (step_over):
   Bytecode position: AEFCCEEF39B87F2417E5F4C51C82C46AC03B2285B6CA19CB2745750EB817E708:192
   Code:
      70|     val (counter, deployer) = setupTest();
-     71| 
+     71|
      72|     val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter");
      73|     println(format1("Counter: {}", counterRes));
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     74| 
+     74|
      75|     val info = net.getAccountState(counter.address)!;
      76|     println(format1("Balance: {:ton}", info.storage.balance.grams));
   Variables:
     '338 = Counter: {}
     counterRes = 0
     counter.address = kQC5pmNoIja6+8bIG7LsYHYwsJ+OIzV14UnM1IsMqeE8bLec
-    deployer = kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD
+    deployer = kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD

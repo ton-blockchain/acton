@@ -17,6 +17,8 @@ pub enum ArgError {
     TypeMismatch { expected: &'static str },
     #[error("cell parse error")]
     CellParse,
+    #[error("invalid snake bytes")]
+    InvalidSnakeBytes,
 }
 
 /// A trait for converting `TupleItem` to a Rust type.
@@ -64,7 +66,7 @@ impl FromStack for Vec<u8> {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
         match item {
             TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
-                Tuple::parse_snake_bytes(&cell).ok_or(ArgError::CellParse)
+                Tuple::parse_snake_bytes(&cell).ok_or(ArgError::InvalidSnakeBytes)
             }
             _ => Err(ArgError::TypeMismatch {
                 expected: "Slice(bytes)",

@@ -6,8 +6,8 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
-const RAW_ADDRESS_MAINNET: &str = "EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ";
-const RAW_ADDRESS_TESTNET: &str = "kQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHB5iD";
+const RAW_ADDRESS_MAINNET: &str = "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ";
+const RAW_ADDRESS_TESTNET: &str = "kQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHB5iD";
 
 #[test]
 fn fork_net_mainnet_formats_addresses_as_mainnet() {
@@ -19,7 +19,7 @@ fn fork_net_mainnet_formats_addresses_as_mainnet() {
             import "../../lib/io"
 
             get fun `test-mainnet-format`() {
-                println(address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println(address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
             }
         "#,
         )
@@ -49,7 +49,7 @@ fn fork_net_testnet_formats_addresses_as_testnet() {
             import "../../lib/io"
 
             get fun `test-testnet-format`() {
-                println(address("EQBvDB/H7FFBs0nF4ap/DBdcOrwY/rMIpNVVOR6SWYFHByMJ"));
+                println(address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"));
             }
         "#,
         )

@@ -201,7 +201,7 @@ get fun `test-aj-stdlib-vm-convert-address-invalid`() {
     val _ = vm.convertAddress("not-an-address");
 }
 "#,
-        "Failed to convert address from not-an-address",
+        "invalid address format",
         "integration/snapshots/test-runner/set_time_and_logical_time_update_c7_slots/convert_address_reports_invalid_input.stdout.txt",
     );
 }
