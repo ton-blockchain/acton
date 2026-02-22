@@ -5,6 +5,7 @@ use crate::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use thiserror::Error;
 use tycho_types::cell::Cell;
+use tycho_types::models::{IntAddr, StdAddr};
 
 /// An error type for converting `TupleItem` to a Rust type.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -95,6 +96,34 @@ impl FromStack for Cell {
         match item {
             TupleItem::Cell(c) => Ok(c),
             _ => Err(ArgError::TypeMismatch { expected: "Cell" }),
+        }
+    }
+}
+
+/// Convert a `TupleItem` to a standard TON address.
+impl FromStack for StdAddr {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        match item {
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
+                cell.parse::<StdAddr>().map_err(|_| ArgError::CellParse)
+            }
+            _ => Err(ArgError::TypeMismatch {
+                expected: "Slice(StdAddr)",
+            }),
+        }
+    }
+}
+
+/// Convert a `TupleItem` to a internal TON address.
+impl FromStack for IntAddr {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        match item {
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
+                cell.parse::<IntAddr>().map_err(|_| ArgError::CellParse)
+            }
+            _ => Err(ArgError::TypeMismatch {
+                expected: "Slice(IntAddr)",
+            }),
         }
     }
 }

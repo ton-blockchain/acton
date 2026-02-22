@@ -26,9 +26,7 @@ use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
 use ton_executor::message::{EmulationResult, RunTransactionArgs};
-use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell as TonArcCell;
-use tonlib_core::tlb_types::block::msg_address::MsgAddrIntStd;
 use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
@@ -180,29 +178,16 @@ fn build_impl(
     Ok(())
 }
 
-extension!(send_message in (Context) with (src: Cell, msg: Cell) using send_message_impl);
+extension!(send_message in (Context) with (src: IntAddr, msg: Cell) using send_message_impl);
 fn send_message_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
-    src: Cell,
+    src: IntAddr,
     msg: Cell,
 ) -> anyhow::Result<()> {
     let emulator = &ctx.chain.emulator;
 
-    let msg_cell = msg.clone();
-    let src_cell = src;
-
-    let src_addr = src_cell.parse::<IntAddr>().map_err(|err| {
-        let from_slice = src_cell.as_slice_allow_exotic();
-        anyhow::anyhow!(
-            "Failed to decode src address from x{{{}}} with length={}: {}",
-            from_slice.display_data(),
-            from_slice.size_bits(),
-            err
-        )
-    })?;
-
-    if let Some(wallet) = ctx.env.find_wallet_by_address(&src_addr) {
+    if let Some(wallet) = ctx.env.find_wallet_by_address(&src) {
         send_wallet_message(
             &msg,
             wallet,
@@ -222,7 +207,7 @@ fn send_message_impl(
             out_msg_count: Default::default(),
             orig_status: AccountStatus::Uninit,
             end_status: AccountStatus::Uninit,
-            in_msg: Some(msg_cell),
+            in_msg: Some(msg),
             out_msgs: Default::default(),
             total_fees: Default::default(),
             state_update: Lazy::new(&HashUpdate {
@@ -260,13 +245,13 @@ fn send_message_impl(
         return Ok(());
     }
 
-    let libs = ctx.chain.build_libs(&src_addr);
+    let libs = ctx.chain.build_libs(&src);
     let world_state = &mut ctx.chain.world_state;
 
     let emulations = if ctx.debug.is_enabled() {
-        send_message_debug(ctx, &msg_cell, &libs, Some(src_addr))?
+        send_message_debug(ctx, &msg, &libs, Some(src))?
     } else {
-        emulator.send_message(world_state, msg_cell, &libs, Some(src_addr))?
+        emulator.send_message(world_state, msg, &libs, Some(src))?
     };
 
     if let [SendMessageResult::Error(error), ..] = &emulations[..]
@@ -578,33 +563,21 @@ fn send_message_debug(
     Ok(all_results)
 }
 
-extension!(send_single_message in (Context) with (src: Cell, msg: Cell) using send_single_message_impl);
+extension!(send_single_message in (Context) with (src: IntAddr, msg: Cell) using send_single_message_impl);
 fn send_single_message_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
-    src: Cell,
+    src: IntAddr,
     msg: Cell,
 ) -> anyhow::Result<()> {
     let emulator = &ctx.chain.emulator;
 
     let msg_cell = msg;
-    let src_cell = src;
-
-    let src_addr = src_cell.parse::<IntAddr>().map_err(|err| {
-        let from_slice = src_cell.as_slice_allow_exotic();
-        anyhow::anyhow!(
-            "Failed to decode src address from x{{{}}} with length={}: {}",
-            from_slice.display_data(),
-            from_slice.size_bits(),
-            err
-        )
-    })?;
-
-    let libs = ctx.chain.build_libs(&src_addr);
+    let libs = ctx.chain.build_libs(&src);
     let world_state = &mut ctx.chain.world_state;
 
     let emulation = emulator
-        .send_transaction(world_state, msg_cell, &libs, Some(src_addr))
+        .send_transaction(world_state, msg_cell, &libs, Some(src))
         .context("Cannot emulate transaction")?;
 
     let SendMessageResult::Success(emulation) = emulation else {
@@ -808,7 +781,7 @@ fn find_transaction_by_params_impl(
     Ok(())
 }
 
-extension!(run_get_method in (Context) with (args: Tuple, return_type_name: String, name: String, id: BigInt, code: Cell, address: Cell) using run_get_method_impl);
+extension!(run_get_method in (Context) with (args: Tuple, return_type_name: String, name: String, id: BigInt, code: Cell, address: StdAddr) using run_get_method_impl);
 #[allow(clippy::too_many_arguments)]
 fn run_get_method_impl(
     ctx: &mut Context,
@@ -818,19 +791,11 @@ fn run_get_method_impl(
     name: String,
     id: BigInt,
     code: Cell,
-    address: Cell,
+    addr: StdAddr,
 ) -> anyhow::Result<()> {
     let args = args.unwrap_empty().unwrap_tuple();
     let world_state = &mut ctx.chain.world_state;
-    let address_boc = Boc::encode_hex(&address);
-
-    let address_std = MsgAddrIntStd::from_boc_hex(address_boc.as_str())
-        .context("Failed to parse address from BOC hex")?;
-    let address_hash = address_std.address.clone();
-    let dst_addr_str = format!("{}:{}", &address_std.workchain, hex::encode(&address_hash));
-
-    let dest_address =
-        TonAddress::from_msg_address(address_std).context("Failed to create TonAddress")?;
+    let dst_addr_str = addr.to_string();
 
     let shard_account = world_state.get_account(&dst_addr_str);
     let state = shard_account
@@ -846,9 +811,7 @@ fn run_get_method_impl(
         Cell::default()
     };
 
-    let libs = ctx
-        .chain
-        .build_libs_with_hash_owner(&HashBytes::from_slice(address_hash.as_slice()));
+    let libs = ctx.chain.build_libs_with_hash_owner(&addr.address);
     let libs_root = libs.into_root();
     let world_state = &mut ctx.chain.world_state;
 
@@ -862,7 +825,7 @@ fn run_get_method_impl(
         data: Boc::encode_base64(data),
         verbosity: ctx.env.default_log_level,
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
-        address: dest_address.to_string(),
+        address: addr.to_string(),
         unixtime: duration_since_epoch.as_secs().try_into()?,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -1012,19 +975,16 @@ fn suggest_name<'a>(input: &str, candidates: &'a [&'a str]) -> Option<&'a str> {
     if best_dist <= 3 { best } else { None }
 }
 
-extension!(is_deployed in (Context) with (address: Cell) using is_deployed_impl);
-fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: Cell) -> anyhow::Result<()> {
-    // TODO: looks ugly
-    let dst_addr_str = cell_address_to_raw(address).context("Failed to decode address")?;
-
-    let is_deployed = ctx.chain.world_state.check_deployed(&dst_addr_str);
+extension!(is_deployed in (Context) with (address: StdAddr) using is_deployed_impl);
+fn is_deployed_impl(ctx: &mut Context, stack: &mut Tuple, address: StdAddr) -> anyhow::Result<()> {
+    let is_deployed = ctx.chain.world_state.check_deployed(&address.to_string());
     stack.push_bool(is_deployed);
     Ok(())
 }
 
-extension!(get_deployed_code in (Context) with (addr: Cell) using get_deployed_code_impl);
-fn get_deployed_code_impl(ctx: &mut Context, stk: &mut Tuple, addr: Cell) -> anyhow::Result<()> {
-    let dst_addr_str = cell_address_to_raw(addr).context("Failed to decode address")?;
+extension!(get_deployed_code in (Context) with (addr: StdAddr) using get_deployed_code_impl);
+fn get_deployed_code_impl(ctx: &mut Context, stk: &mut Tuple, addr: StdAddr) -> anyhow::Result<()> {
+    let dst_addr_str = addr.to_string();
 
     let is_deployed = ctx.chain.world_state.check_deployed(&dst_addr_str);
     if !is_deployed {
@@ -1042,11 +1002,6 @@ fn get_deployed_code_impl(ctx: &mut Context, stk: &mut Tuple, addr: Cell) -> any
 
     stk.push(TupleItem::Cell(cell));
     Ok(())
-}
-
-fn cell_address_to_raw(address: Cell) -> anyhow::Result<String> {
-    let addr = address.parse::<StdAddr>()?;
-    Ok(addr.to_string())
 }
 
 fn get_address_code(account: &ShardAccount) -> Option<Cell> {
@@ -1082,21 +1037,17 @@ fn type_name_by_opcode_impl(ctx: &mut Context, stk: &mut Tuple, id: BigInt) -> a
     Ok(())
 }
 
-extension!(register_address in (Context) with (name: String, address: Cell) using register_address_impl);
+extension!(register_address in (Context) with (name: String, address: IntAddr) using register_address_impl);
 fn register_address_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
     name: String,
-    address: Cell,
+    address: IntAddr,
 ) -> anyhow::Result<()> {
-    let addr = address
-        .parse::<IntAddr>()
-        .context("Failed to load address from slice")?;
-
     ctx.build
         .known_addresses
         .addresses
-        .insert(addr, KnownAddress { name });
+        .insert(address, KnownAddress { name });
     Ok(())
 }
 
@@ -1112,12 +1063,8 @@ fn register_code_impl(
     Ok(())
 }
 
-extension!(account_state in (Context) with (addr: Cell) using account_state_impl);
-fn account_state_impl(ctx: &mut Context, stk: &mut Tuple, addr: Cell) -> anyhow::Result<()> {
-    let addr = addr
-        .parse::<IntAddr>()
-        .context("Failed to load internal address from slice")?;
-
+extension!(account_state in (Context) with (addr: StdAddr) using account_state_impl);
+fn account_state_impl(ctx: &mut Context, stk: &mut Tuple, addr: StdAddr) -> anyhow::Result<()> {
     let Ok(account) = ctx
         .chain
         .world_state
@@ -1227,7 +1174,7 @@ fn get_wallet_by_name_impl(
     Ok(())
 }
 
-extension!(wait_for_transaction in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: BigInt, ext_message_hash: Cell, address: Cell) using wait_for_transaction_impl);
+extension!(wait_for_transaction in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: BigInt, ext_message_hash: Cell, address: StdAddr) using wait_for_transaction_impl);
 #[allow(clippy::too_many_arguments)]
 fn wait_for_transaction_impl(
     ctx: &mut Context,
@@ -1236,7 +1183,7 @@ fn wait_for_transaction_impl(
     attempts: BigInt,
     quiet: BigInt,
     ext_message_hash: Cell,
-    address: Cell,
+    address: StdAddr,
 ) -> anyhow::Result<()> {
     if !ctx.is_broadcasting {
         // In emulation mode waitForTransaction is a no-op.
@@ -1252,7 +1199,7 @@ fn wait_for_transaction_impl(
         anyhow::bail!("Attempt number must be positive");
     }
 
-    let address_str = cell_address_to_raw(address).context("Failed to decode address")?;
+    let address_str = address.to_string();
 
     let network = ctx.network();
 
@@ -1404,36 +1351,26 @@ fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     Ok(())
 }
 
-extension!(get_shard_account in (Context) with (addr: TupleItem) using get_shard_account_impl);
+extension!(get_shard_account in (Context) with (addr: StdAddr) using get_shard_account_impl);
 fn get_shard_account_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
-    addr: TupleItem,
+    addr: StdAddr,
 ) -> anyhow::Result<()> {
-    let addr_cell = match addr {
-        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
-        _ => anyhow::bail!("Expected address as Cell or Slice"),
-    };
-
-    let raw_addr = cell_address_to_raw(addr_cell).context("Failed to decode address")?;
+    let raw_addr = addr.to_string();
     let shard_account = ctx.chain.world_state.get_account(&raw_addr);
     let shard_account_cell = to_cell(&shard_account);
     stack.push(TupleItem::Cell(shard_account_cell));
     Ok(())
 }
 
-extension!(set_shard_account in (Context) with (shard_account: TupleItem, addr: TupleItem) using set_shard_account_impl);
+extension!(set_shard_account in (Context) with (shard_account: TupleItem, addr: StdAddr) using set_shard_account_impl);
 fn set_shard_account_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
     shard_account: TupleItem,
-    addr: TupleItem,
+    addr: StdAddr,
 ) -> anyhow::Result<()> {
-    let addr_cell = match addr {
-        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
-        _ => anyhow::bail!("Expected address as Cell or Slice"),
-    };
-    let raw_addr = cell_address_to_raw(addr_cell).context("Failed to decode address")?;
     let shard_account = match shard_account {
         TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell
             .parse::<ShardAccount>()
@@ -1449,7 +1386,7 @@ fn set_shard_account_impl(
 
     ctx.chain
         .world_state
-        .update_account(&raw_addr, &shard_account);
+        .update_account(&addr.to_string(), &shard_account);
     Ok(())
 }
 
