@@ -378,10 +378,8 @@ fn send_message_debug(
         anyhow::bail!("Emulator only supports internal messages for now");
     };
 
-    let dest_account = ctx
-        .chain
-        .world_state
-        .get_account(&int_message.dst.to_string());
+    let dst_addr_str = int_message.dst.to_string();
+    let dest_account = ctx.chain.world_state.get_account(&dst_addr_str);
     let code = Emulator::get_code_cell(&message_obj, &dest_account);
 
     let step_executor = StepExecutor::new().expect("Failed to create executor");
@@ -485,7 +483,7 @@ fn send_message_debug(
 
     ctx.chain
         .world_state
-        .update_account(&int_message.dst.to_string(), &shard_account);
+        .update_account(&dst_addr_str, &shard_account);
 
     let tx_cell = Boc::decode_base64(result.transaction.as_ref())
         .context("Failed to decode transaction BoC")?;
@@ -498,8 +496,6 @@ fn send_message_debug(
         .filter_map(Result::ok)
         .map(|it| to_cell(&it))
         .collect::<Vec<_>>();
-
-    let code = Emulator::get_code_cell(&message_obj, &dest_account);
 
     let send_result = SendMessageResultSuccess {
         raw_transaction: result.transaction,
@@ -764,16 +760,13 @@ fn find_transaction_by_params_impl(
     });
 
     let txs = found.collect::<Vec<_>>();
-    let Some(first) = txs.first() else {
+    let Some(&first) = txs.first() else {
         // No transaction found
         stack.push(TupleItem::Null);
         return Ok(());
     };
 
-    let tx_boc = Boc::encode(to_cell(&first));
-    let tx_cell = Boc::decode(&tx_boc)?;
-
-    stack.push(TupleItem::Cell(tx_cell));
+    stack.push(TupleItem::Cell(to_cell(first)));
     Ok(())
 }
 
@@ -791,9 +784,9 @@ fn run_get_method_impl(
 ) -> anyhow::Result<()> {
     let args = args.unwrap_empty().unwrap_tuple();
     let world_state = &mut ctx.chain.world_state;
-    let dst_addr_str = addr.to_string();
+    let addr_str = addr.to_string();
 
-    let shard_account = world_state.get_account(&dst_addr_str);
+    let shard_account = world_state.get_account(&addr_str);
     let state = shard_account
         .account
         .load()
@@ -821,7 +814,7 @@ fn run_get_method_impl(
         data: Boc::encode_base64(data),
         verbosity: ctx.env.default_log_level,
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
-        address: addr.to_string(),
+        address: addr_str,
         unixtime: duration_since_epoch.as_secs().try_into()?,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -833,13 +826,12 @@ fn run_get_method_impl(
     };
 
     let config_b64 = world_state.get_config_b64();
+    let args_b64 = serialize_tuple(&args)
+        .map(|t| Boc::encode_base64(&t))
+        .context("Cannot serialize tuple")?;
 
     let result = if ctx.debug.is_enabled() {
-        let args = serialize_tuple(&args)
-            .map(|t| Boc::encode_base64(&t))
-            .context("Cannot serialize tuple")?;
-
-        let step_executor = StepGetExecutor::new(&args, &params, Some(&config_b64))
+        let step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
             .context("Cannot create get executor")?;
 
         let source_map = ctx
@@ -860,7 +852,7 @@ fn run_get_method_impl(
             .context("Cannot send response")?;
 
         step_executor
-            .prepare(method_id, &args)
+            .prepare(method_id, &args_b64)
             .context("Cannot prepare get method")?;
 
         // Step to update internal state
@@ -889,11 +881,8 @@ fn run_get_method_impl(
             .context("Cannot run get method")?
     } else {
         let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
-        let args = serialize_tuple(&args)
-            .map(|t| Boc::encode_base64(&t))
-            .context("Cannot serialize tuple")?;
         executor
-            .run_get_method(&args, &params, Some(&config_b64))
+            .run_get_method(&args_b64, &params, Some(&config_b64))
             .context("Cannot run get method")?
     };
 

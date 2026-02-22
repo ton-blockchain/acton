@@ -246,14 +246,17 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
     Ok(tokens)
 }
 
-fn format_default(ctx: &mut Context, type_name: &str, arg: TupleItem) -> String {
+fn format_default(
+    formatter: &crate::formatter::FormatterContext<'_>,
+    type_name: &str,
+    arg: TupleItem,
+) -> String {
     let typed_arg = arg.to_typed(type_name);
-    let formatter = crate::formatter::FormatterContext::from_context(ctx);
     formatter.format(&typed_arg)
 }
 
 fn format_single_arg(
-    ctx: &mut Context,
+    formatter: &crate::formatter::FormatterContext<'_>,
     kind: PlaceholderKind,
     type_name: &str,
     arg: TupleItem,
@@ -266,7 +269,7 @@ fn format_single_arg(
             {
                 return format!("{value:x}");
             }
-            format_default(ctx, type_name, arg)
+            format_default(formatter, type_name, arg)
         }
         PlaceholderKind::Ton => {
             if let TupleItem::Tuple(items) = &arg
@@ -276,9 +279,9 @@ fn format_single_arg(
                 let amount = value.to_f64().unwrap_or(0.0) / 1e9;
                 return format!("{amount} TON");
             }
-            format_default(ctx, type_name, arg)
+            format_default(formatter, type_name, arg)
         }
-        PlaceholderKind::Plain => format_default(ctx, type_name, arg),
+        PlaceholderKind::Plain => format_default(formatter, type_name, arg),
     }
 }
 
@@ -290,13 +293,14 @@ fn format_args(
     let tokens = parse_format(&fmt)?;
     let mut out = String::with_capacity(fmt.len());
     let mut args_iter = args.into_iter();
+    let formatter = crate::formatter::FormatterContext::from_context(ctx);
 
     for token in tokens {
         match token {
             FormatToken::Literal(text) => out.push_str(&text),
             FormatToken::Placeholder(kind) => {
                 if let Some((type_name, arg)) = args_iter.next() {
-                    let formatted = format_single_arg(ctx, kind, &type_name, arg);
+                    let formatted = format_single_arg(&formatter, kind, &type_name, arg);
                     out.push_str(&formatted);
                 } else {
                     out.push_str(placeholder_repr(kind));
