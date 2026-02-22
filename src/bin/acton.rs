@@ -845,7 +845,7 @@ fn example_build_usage() -> StyledStr {
         ),
         format!("     depends{}{}", dim(" = "), dim("[")),
         format!(
-            "       {} name{}{}{}, kind{}{}{}, function{}{}{}, path{}{} {}",
+            "       {} name{}{}{} kind{}{}{} function{}{}{} path{}{} {}",
             dim("{"),
             dim(" = "),
             green("\"child\""),
