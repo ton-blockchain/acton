@@ -1,10 +1,10 @@
 use crate::context::Wallet;
+use acton_config::color::OwoColorize;
 use acton_config::config;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
 use hmac::{Hmac, Mac};
 use keyring::Entry;
-use owo_colors::OwoColorize;
 use rand::Rng;
 use retrace::Network;
 use ring::pbkdf2;

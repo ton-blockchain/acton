@@ -1,10 +1,10 @@
 use crate::commands::common::error_fmt;
 use crate::file_build_cache::FileBuildCache;
 use crate::stdlib;
+use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, ContractDependency, DependencyKind};
 use anyhow::anyhow;
 use log::debug;
-use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::fs::File;
@@ -194,12 +194,13 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
         let mut whole_error = String::new();
 
         for (contract, err) in compile_errors {
-            whole_error += color_print::cformat!("In <yellow>{contract}</>:\n\n{err}\n").as_str();
+            whole_error += format!("In {}:\n\n{err}\n", contract.yellow()).as_str();
         }
 
         whole_error.push_str(
-            color_print::cformat!(
-                "<red>Build failed</> with {} error{}",
+            format!(
+                "{} with {} error{}",
+                "Build failed".red(),
                 failure_count,
                 if failure_count == 1 { "" } else { "s" }
             )

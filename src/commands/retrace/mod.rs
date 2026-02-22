@@ -1,5 +1,5 @@
 use crate::formatter::FormatterContext;
-use owo_colors::OwoColorize;
+use acton_config::color::OwoColorize;
 use retrace::{ComputeInfo, Network, retrace};
 use std::collections::HashMap;
 use std::str::FromStr;

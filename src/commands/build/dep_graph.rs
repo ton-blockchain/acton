@@ -1,6 +1,6 @@
+use acton_config::color::OwoColorize;
 use acton_config::config::{ContractConfig, DependencyKind};
 use anyhow::anyhow;
-use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fs;
 use std::process::Command;

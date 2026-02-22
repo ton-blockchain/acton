@@ -1,8 +1,8 @@
 use crate::commands::common::error_fmt;
+use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, LintLevel};
 use anyhow::anyhow;
 use globset::{Glob, GlobSetBuilder};
-use owo_colors::OwoColorize;
 use serde_json;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;

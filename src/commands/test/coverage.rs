@@ -1,7 +1,7 @@
 use crate::context::{BuildCache, EmulationsState};
 use crate::vmtrace::{HighLevelTrace, HighLevelTraceStep, HighLevelTraceStepMapped};
+use acton_config::color::OwoColorize;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
-use owo_colors::OwoColorize;
 use retrace::trace::{Trace, TraceStep};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};

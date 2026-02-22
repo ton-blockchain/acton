@@ -1,9 +1,9 @@
 use crate::commands::common::error_fmt;
 use crate::file_build_cache::FileBuildCache;
+use acton_config::color::OwoColorize;
 use acton_config::config;
 use anyhow::anyhow;
 use log::info;
-use owo_colors::OwoColorize;
 use serde_json;
 use std::fs;
 use std::path::Path;
@@ -165,9 +165,10 @@ fn handle_compilation_result(
         if let Some(source_map_data) = &source_map {
             if let Ok(json_string) = serde_json::to_string_pretty(source_map_data) {
                 fs::write(source_map_path, json_string).map_err(|err| {
-                    anyhow!(color_print::cformat!(
-                        "Failed to save source map <yellow>{source_map_path}</>: {err}"
-                    ))
+                    anyhow!(
+                        "Failed to save source map {}: {err}",
+                        source_map_path.yellow()
+                    )
                 })?;
             } else {
                 eprintln!("Warning: Failed to serialize source map");
@@ -188,11 +189,8 @@ fn handle_compilation_result(
             );
         }
 
-        fs::write(fift_path, &fift_code).map_err(|err| {
-            anyhow!(color_print::cformat!(
-                "Failed to save Fift file <yellow>{fift_path}</>: {err}"
-            ))
-        })?;
+        fs::write(fift_path, &fift_code)
+            .map_err(|err| anyhow!("Failed to save Fift file {}: {err}", fift_path.yellow()))?;
     }
 
     if let Some(abi) = &abi
@@ -208,11 +206,8 @@ fn handle_compilation_result(
             );
         }
 
-        fs::write(abi_path, serde_json::to_string_pretty(abi)?).map_err(|err| {
-            anyhow!(color_print::cformat!(
-                "Failed to save ABI file <yellow>{abi_path}</>: {err}"
-            ))
-        })?;
+        fs::write(abi_path, serde_json::to_string_pretty(abi)?)
+            .map_err(|err| anyhow!("Failed to save ABI file {}: {err}", abi_path.yellow()))?;
     }
 
     if let Some(boc_path) = &boc {
@@ -227,11 +222,8 @@ fn handle_compilation_result(
         }
 
         let bytes = Boc::encode(code);
-        fs::write(boc_path, bytes).map_err(|err| {
-            anyhow!(color_print::cformat!(
-                "Failed to save BoC file <yellow>{boc_path}</>: {err}"
-            ))
-        })?;
+        fs::write(boc_path, bytes)
+            .map_err(|err| anyhow!("Failed to save BoC file {}: {err}", boc_path.yellow()))?;
         return Ok(());
     }
 

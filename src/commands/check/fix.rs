@@ -1,4 +1,4 @@
-use owo_colors::OwoColorize;
+use acton_config::color::OwoColorize;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::PathBuf;

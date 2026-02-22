@@ -1,12 +1,12 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
 use crate::wallets::open_wallets;
+use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, global_libraries_path};
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Local};
 use inquire::{Select, Text};
 use num_bigint::BigUint;
-use owo_colors::OwoColorize;
 use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
@@ -63,9 +63,7 @@ pub fn publish_cmd(
             .unwrap_or_else(|_| PathBuf::from(contract.src.clone()));
 
         if contract_path.extension() != Some("tolk".as_ref()) {
-            anyhow::bail!(color_print::cformat!(
-                "Contract source must be a <yellow>.tolk</> file"
-            ));
+            anyhow::bail!("Contract source must be a {} file", ".tolk".yellow());
         }
 
         contract_id = Some(contract_key.clone());

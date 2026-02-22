@@ -1,8 +1,8 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
 use crate::stdlib;
+use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig};
 use inquire::{Select, Text};
-use owo_colors::OwoColorize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
@@ -70,11 +70,12 @@ pub fn new_cmd(
     } else {
         let path = Path::new(path).to_path_buf();
         if path.exists() {
-            anyhow::bail!(color_print::cformat!(
-                "Directory <yellow>{}</> is already exists, if you want to create a new project inside this directory run following commands:\n  <bold>cd {}</>\n  <bold>acton new .</>",
-                path.display(),
-                path.display()
-            ))
+            anyhow::bail!(
+                "Directory {} already exists, if you want to create a new project inside this directory run following commands:\n  {}\n  {}",
+                path.display().to_string().yellow(),
+                format!("cd {}", path.display()).bold(),
+                "acton new .".bold()
+            )
         }
         path
     };

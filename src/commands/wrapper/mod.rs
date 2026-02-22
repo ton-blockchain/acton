@@ -1,7 +1,7 @@
 use crate::commands::common::error_fmt;
+use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::anyhow;
-use owo_colors::OwoColorize;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -43,11 +43,12 @@ fn build_model(
     let contract_path = project_root.join(&contract_config.src);
 
     if !contract_path.exists() {
-        anyhow::bail!(color_print::cformat!(
-            "Contract file for <yellow>{contract_id}</> not found: <yellow>{}</> (specified in Acton.toml as <yellow>{}</>)",
-            contract_path.display(),
-            contract_config.src
-        ));
+        anyhow::bail!(
+            "Contract file for {} not found: {} (specified in Acton.toml as {})",
+            contract_id.yellow(),
+            contract_path.display().to_string().yellow(),
+            contract_config.src.yellow()
+        );
     }
 
     let content: Arc<str> = fs::read_to_string(&contract_path)

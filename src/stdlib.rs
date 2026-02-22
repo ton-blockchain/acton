@@ -1,5 +1,5 @@
+use acton_config::color::OwoColorize;
 use include_dir::{Dir, include_dir};
-use owo_colors::OwoColorize;
 use std::fs;
 use std::path::Path;
 

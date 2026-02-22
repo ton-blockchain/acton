@@ -1,6 +1,6 @@
+use acton_config::color::OwoColorize;
 use anyhow::{Context, Result, bail};
 use flate2::read::GzDecoder;
-use owo_colors::OwoColorize;
 use semver::Version;
 use std::env;
 use std::fs::{self, File};

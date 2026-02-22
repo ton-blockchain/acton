@@ -1,12 +1,12 @@
 use crate::commands::common::{create_symlink, error_fmt, select_wallet};
 use crate::wallets;
+use acton_config::color::OwoColorize;
 use acton_config::config;
 use acton_config::config::{ActonConfig, WalletsFile, global_wallets_path};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
 use log::error;
-use owo_colors::OwoColorize;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;

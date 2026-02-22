@@ -1,4 +1,4 @@
-use owo_colors::OwoColorize;
+use acton_config::color::OwoColorize;
 use retrace::Network;
 use std::str::FromStr;
 use std::sync::Arc;

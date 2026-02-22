@@ -1,3 +1,4 @@
+use acton_config::color::{ColorMode, color_mode};
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::{
@@ -23,7 +24,11 @@ pub(super) fn emit_diagnostics(
         file_id_map.insert(info.id(), cs_file_id);
     }
 
-    let writer = StandardStream::stderr(ColorChoice::Auto);
+    let writer = StandardStream::stderr(match color_mode() {
+        ColorMode::Auto => ColorChoice::Auto,
+        ColorMode::Always => ColorChoice::Always,
+        ColorMode::Never => ColorChoice::Never,
+    });
     let mut config = term::Config::default();
 
     let mut styles = term::Styles::default();

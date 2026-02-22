@@ -1,6 +1,6 @@
 use crate::commands::common::error_fmt;
+use acton_config::color::OwoColorize;
 use anyhow::anyhow;
-use owo_colors::OwoColorize;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
@@ -25,9 +25,12 @@ pub fn disasm_cmd(
     follow_libraries: bool,
 ) -> anyhow::Result<()> {
     if boc_file.is_some() && boc_string.is_some() {
-        anyhow::bail!(color_print::cformat!(
-            "Cannot provide both <yellow>--string</>/<yellow>-s</> and <yellow>BOC_FILE</> argument"
-        ));
+        anyhow::bail!(
+            "Cannot provide both {}/{} and {} argument",
+            "--string".yellow(),
+            "-s".yellow(),
+            "BOC_FILE".yellow()
+        );
     }
 
     let network = net.as_deref().map(Network::from_str).transpose()?;
@@ -39,21 +42,15 @@ pub fn disasm_cmd(
             anyhow::bail!(error_fmt::file_not_found(&path));
         }
 
-        let metadata = fs::metadata(&path).map_err(|err| {
-            anyhow!(color_print::cformat!(
-                "Cannot access <yellow>{path}</>: {err}"
-            ))
-        })?;
+        let metadata =
+            fs::metadata(&path).map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
         if !metadata.is_file() {
             anyhow::bail!("{} is not a file", path.yellow());
         }
 
         // BoC file can be binary file or file with hex/base64 encoded data
-        let binary_data = fs::read(&path).map_err(|err| {
-            anyhow!(color_print::cformat!(
-                "Cannot access <yellow>{path}</>: {err}"
-            ))
-        })?;
+        let binary_data =
+            fs::read(&path).map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
         if let Ok(cell) = Boc::decode_base64(binary_data.trim_ascii()) {
             Boc::encode_hex(cell)
         } else if let Ok(cell) = Boc::decode_hex(binary_data.trim_ascii()) {
@@ -64,9 +61,14 @@ pub fn disasm_cmd(
     } else if let Some(addr) = address {
         remote::fetch_contract_boc(network.clone(), &addr, api_key.as_deref())?
     } else {
-        anyhow::bail!(color_print::cformat!(
-            "Either <yellow>--string</>/<yellow>-s</>, <yellow>--address</> or <yellow>BOC_FILE</> argument must be provided, run with <yellow>--help</> for more information"
-        ));
+        anyhow::bail!(
+            "Either {}, {}, {} or {} argument must be provided, run with {} for more information",
+            "--string".yellow(),
+            "-s".yellow(),
+            "--address".yellow(),
+            "BOC_FILE".yellow(),
+            "--help".yellow()
+        );
     };
 
     let cell = if let Ok(cell) = Boc::decode_hex(&boc_data) {

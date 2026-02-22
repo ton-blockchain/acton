@@ -9,10 +9,10 @@ use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
 use crate::wallets;
 use crate::{ffi, stdlib};
+use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, Explorer};
 use anyhow::anyhow;
 use log::error;
-use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -78,11 +78,8 @@ pub fn script_cmd(
         Network::from_str(net)?; // validate network
     }
 
-    let content = fs::read_to_string(path).map_err(|err| {
-        anyhow!(color_print::cformat!(
-            "Cannot access <yellow>{path}</>: {err}"
-        ))
-    })?;
+    let content = fs::read_to_string(path)
+        .map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
 
     let stack = parse_stack_args(args)?;
 
@@ -374,9 +371,7 @@ fn parse_stack_args(args: Vec<String>) -> anyhow::Result<Tuple> {
         let mut input = arg.as_str();
         let value = vm_stack_value(&mut input).map_err(|e| {
             error!("Failed to parse stack value '{arg}': {e}");
-            anyhow!(color_print::cformat!(
-                "Failed to parse argument <yellow>{arg}</>"
-            ))
+            anyhow!("Failed to parse argument {}", arg.yellow())
         })?;
 
         if !input.trim().is_empty() {

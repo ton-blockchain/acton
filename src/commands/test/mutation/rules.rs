@@ -1,4 +1,4 @@
-use owo_colors::OwoColorize;
+use acton_config::color::OwoColorize;
 use tree_sitter::Node;
 
 pub(super) fn rules() -> Vec<MutationRule> {

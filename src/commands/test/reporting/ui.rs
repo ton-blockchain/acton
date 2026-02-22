@@ -1,4 +1,5 @@
 use crate::commands::test::reporting::{TestReport, TestReporter};
+use acton_config::color::OwoColorize;
 use axum::{
     Router,
     extract::{Path as AxumPath, Query, State},
@@ -8,7 +9,6 @@ use axum::{
 };
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
-use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

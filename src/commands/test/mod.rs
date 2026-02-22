@@ -23,13 +23,13 @@ use crate::debugger::debug_context::DebugContext;
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractDependency, DependencyKind};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::anyhow;
 use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
-use owo_colors::OwoColorize;
 use path_absolutize::Absolutize;
 use regex::Regex;
 use rustc_hash::FxHashMap;
@@ -564,10 +564,8 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     {
         // there is some `--filter` and no test ran, likely something is wrong
         println!(
-            "{}",
-            color_print::cformat!(
-                "\nNo tests matched filter <yellow>{filter}</>, please check the filter spelling/pattern."
-            )
+            "\nNo tests matched filter {}, please check the filter spelling/pattern.",
+            filter.yellow()
         );
         process::exit(1);
     }
@@ -805,9 +803,7 @@ fn run_file_tests(
         let regex = match Regex::new(pattern) {
             Ok(r) => r,
             Err(e) => {
-                anyhow::bail!(color_print::cformat!(
-                    "Invalid regex pattern <yellow>{pattern}</>: {e}"
-                ));
+                anyhow::bail!("Invalid regex pattern {}: {e}", pattern.yellow());
             }
         };
         tests

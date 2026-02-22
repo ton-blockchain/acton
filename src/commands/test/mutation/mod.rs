@@ -1,9 +1,9 @@
 use crate::commands::common::error_fmt;
 use crate::commands::test::TestConfig;
 use crate::commands::test::mutation::rules::{MutationEdit, MutationMatcher, MutationRule, rules};
+use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::anyhow;
-use owo_colors::OwoColorize;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::{fs, process};

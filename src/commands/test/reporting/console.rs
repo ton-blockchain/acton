@@ -3,7 +3,7 @@ use crate::commands::test::TestDescriptor;
 use crate::context::AssertFailure;
 use crate::formatter::FormatterContext;
 use crate::{exit_codes, retrace};
-use owo_colors::OwoColorize;
+use acton_config::color::OwoColorize;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};

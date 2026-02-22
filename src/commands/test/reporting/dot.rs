@@ -1,5 +1,5 @@
 use super::{TestReport, TestReporter, TestStatus};
-use owo_colors::OwoColorize;
+use acton_config::color::OwoColorize;
 use std::io::{Write, stdout};
 
 pub(crate) struct DotReporter {

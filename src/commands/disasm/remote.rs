@@ -1,4 +1,5 @@
 use crate::commands::common::error_fmt;
+use acton_config::color::OwoColorize;
 use anyhow::Context;
 use std::str::FromStr;
 use ton_api::{Network, TonApiClient};
@@ -41,8 +42,9 @@ pub(super) fn fetch_contract_boc(
             api_key.map(ToString::to_string),
         )?;
         testnet_client.get_contract_boc(address).with_context(|| {
-            color_print::cformat!(
-                "Contract with address <yellow>{address}</> not found on both mainnet and testnet",
+            format!(
+                "Contract with address {} not found on both mainnet and testnet",
+                address.yellow()
             )
         })
     }

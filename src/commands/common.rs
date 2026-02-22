@@ -4,8 +4,8 @@ use inquire::Select;
 use std::path::Path;
 
 pub mod error_fmt {
+    use acton_config::color::OwoColorize;
     use acton_config::config::ActonConfig;
-    use owo_colors::OwoColorize;
     use std::path::Path;
 
     #[must_use]
@@ -111,8 +111,11 @@ pub mod error_fmt {
             ""
         };
 
-        color_print::cformat!(
-            "Address <yellow>{addr}</> is not a valid address. {hint}Enter valid address in user-friendly <green>EQ...</> or raw format <green>0:abcd...</>"
+        format!(
+            "Address {} is not a valid address. {hint}Enter valid address in user-friendly {} or raw format {}",
+            addr.yellow(),
+            "EQ...".green(),
+            "0:abcd...".green()
         )
     }
 

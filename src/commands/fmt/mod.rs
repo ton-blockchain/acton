@@ -1,7 +1,7 @@
+use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, Result};
 use globset::{Glob, GlobSetBuilder};
-use owo_colors::OwoColorize;
 use similar::{ChangeTag, TextDiff};
 use std::fs;
 use std::path::PathBuf;
@@ -90,12 +90,20 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
 
                         for hunk in diff.unified_diff().context_radius(3).iter_hunks() {
                             for change in hunk.iter_changes() {
-                                let (sign, style) = match change.tag() {
-                                    ChangeTag::Delete => ("-", owo_colors::Style::new().red()),
-                                    ChangeTag::Insert => ("+", owo_colors::Style::new().green()),
-                                    ChangeTag::Equal => (" ", owo_colors::Style::new().dimmed()),
+                                let (sign, value) = match change.tag() {
+                                    ChangeTag::Delete => {
+                                        ("-".red().to_string(), change.value().red().to_string())
+                                    }
+                                    ChangeTag::Insert => (
+                                        "+".green().to_string(),
+                                        change.value().green().to_string(),
+                                    ),
+                                    ChangeTag::Equal => (
+                                        " ".dimmed().to_string(),
+                                        change.value().dimmed().to_string(),
+                                    ),
                                 };
-                                print!("{}{}", style.style(sign), style.style(change.value()));
+                                print!("{sign}{value}");
                             }
                         }
                         println!();

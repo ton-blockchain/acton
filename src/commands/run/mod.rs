@@ -1,7 +1,7 @@
 use crate::commands::common::error_fmt;
+use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::anyhow;
-use owo_colors::OwoColorize;
 use std::process::{Command, Stdio};
 
 pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {

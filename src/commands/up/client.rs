@@ -1,6 +1,6 @@
+use acton_config::color::OwoColorize;
 use anyhow::{Context, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
-use owo_colors::OwoColorize;
 use reqwest::blocking::Client;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;

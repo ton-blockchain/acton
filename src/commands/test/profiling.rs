@@ -1,7 +1,7 @@
 use crate::commands::test::TestRunner;
+use acton_config::color::OwoColorize;
 use chrono;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
-use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};

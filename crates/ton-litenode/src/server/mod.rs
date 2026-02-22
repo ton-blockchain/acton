@@ -3,7 +3,7 @@ pub mod models;
 pub mod router;
 
 use crate::litenode::LiteNode;
-use owo_colors::OwoColorize;
+use acton_config::color::OwoColorize;
 use std::sync::Arc;
 
 pub struct ServerArgs {

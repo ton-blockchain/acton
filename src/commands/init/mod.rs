@@ -1,7 +1,7 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
 use crate::stdlib;
+use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig};
-use owo_colors::OwoColorize;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;

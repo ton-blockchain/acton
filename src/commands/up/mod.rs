@@ -4,8 +4,8 @@ mod workflow;
 #[cfg(test)]
 mod tests;
 
+use acton_config::color::OwoColorize;
 use anyhow::Result;
-use owo_colors::OwoColorize;
 use std::env;
 
 use client::{GitHubClient, ReleaseClient};

@@ -1,10 +1,10 @@
 use crate::debugger::debug_context::DebugContext;
 use crate::file_build_cache::FileBuildCache;
+use acton_config::color::OwoColorize;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
-use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -119,12 +119,12 @@ impl AssertFailure {
         let available_wallets = env.open_wallets.keys().cloned().collect::<Vec<_>>();
 
         if !has_wallets_config || available_wallets.is_empty() {
-            color_print::cformat!(
+            format!(
                 "Wallet {} not found in Acton.toml. Wallets are not configured yet.
 
 To add wallets, run {} or add the following section to your Acton.toml:
 
-<dim># Example wallet configuration</>
+{}
 [wallets.{}]
 type = \"v4r2\"
 workchain = 0
@@ -137,6 +137,7 @@ See https://i582.github.io/acton/docs/scripting/setup-wallets/ for more informat
 ",
                 failure.wallet_name.yellow(),
                 "acton wallet new".green(),
+                "# Example wallet configuration".dimmed(),
                 failure.wallet_name
             )
         } else {

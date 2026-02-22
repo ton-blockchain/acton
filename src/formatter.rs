@@ -6,10 +6,10 @@ use crate::context::{
 };
 use crate::retrace::{ExecutedAction, InstalledActions};
 use crate::{context, exit_codes, retrace};
+use acton_config::color::OwoColorize;
 use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use owo_colors::OwoColorize;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};

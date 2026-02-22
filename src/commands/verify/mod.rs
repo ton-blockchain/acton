@@ -1,10 +1,10 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::wallets::open_wallets;
+use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
 use base64::Engine;
 use num_bigint::BigUint;
-use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -41,15 +41,15 @@ pub fn verify_cmd(
     println!("  {} Contract: {}", "→".blue().bold(), contract_key.cyan());
 
     if contract_path.extension() == Some("boc".as_ref()) {
-        anyhow::bail!(color_print::cformat!(
-            "Cannot verify precompiled <yellow>.boc</> files. Please specify a <yellow>.tolk</> source file."
-        ));
+        anyhow::bail!(
+            "Cannot verify precompiled {} files. Please specify a {} source file.",
+            ".boc".yellow(),
+            ".tolk".yellow()
+        );
     }
 
     if contract_path.extension() != Some("tolk".as_ref()) {
-        anyhow::bail!(color_print::cformat!(
-            "Contract source must be a <yellow>.tolk</> file"
-        ));
+        anyhow::bail!("Contract source must be a {} file", ".tolk".yellow());
     }
 
     println!("  {} Compiling contract", "→".blue().bold());
