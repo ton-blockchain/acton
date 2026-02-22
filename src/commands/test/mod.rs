@@ -51,12 +51,10 @@ use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use ton_source_map::SourceMap;
-use tonlib_core::TonAddress;
-use tonlib_core::cell::{ArcCell, Cell, CellBuilder};
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellBuilder};
 use tycho_types::models::ShardAccount;
 use walkdir::WalkDir;
 
@@ -91,12 +89,12 @@ pub struct TestRunner<'a> {
     emulations: EmulationsState,
     transport: DapTransport,
     reporter_manager: &'a mut ReporterManager,
-    mutation_overrides: BTreeMap<String, ArcCell>,
+    mutation_overrides: BTreeMap<String, Cell>,
     remote_cache: RemoteSnapshotCache,
     abi_parse_cache: ContractAbiParseCache,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
-    ref_contracts: BTreeMap<String, tycho_types::cell::Cell>,
+    ref_contracts: BTreeMap<String, Cell>,
 }
 
 impl<'a> TestRunner<'a> {
@@ -105,7 +103,7 @@ impl<'a> TestRunner<'a> {
         config: TestConfig,
         cache: &'a mut FileBuildCache,
         reporter_manager: &'a mut ReporterManager,
-        mutation_overrides: BTreeMap<String, ArcCell>,
+        mutation_overrides: BTreeMap<String, Cell>,
     ) -> TestRunner<'a> {
         let transport = if config.debug {
             crate::debugger::start_dap_server(config.debug_port)
@@ -223,8 +221,8 @@ impl<'a> TestRunner<'a> {
     fn execute_test(
         &mut self,
         test: &TestDescriptor,
-        code_cell: &Arc<Cell>,
-        dest_address: &TonAddress,
+        code_cell: &Cell,
+        dest_address: &str,
         abi: Arc<ContractAbi>,
         source_map: Arc<SourceMap>,
     ) -> anyhow::Result<TestResult> {
@@ -234,13 +232,11 @@ impl<'a> TestRunner<'a> {
         let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
         let params = RunGetMethodArgs {
-            code: code_cell
-                .to_boc_b64(false)
-                .map_err(|err| anyhow!("Failed to encode code cell to BoC: {err}"))?,
-            data: ArcCell::default().to_boc_b64(false)?, // for tests, we use empty cell as a data
+            code: Boc::encode_base64(code_cell),
+            data: Boc::encode_base64(Cell::default()), // for tests, we use empty cell as a data
             verbosity,
             libs: Default::default(),
-            address: dest_address.to_string(),
+            address: dest_address.to_owned(),
             unixtime: duration_since_epoch.as_secs().try_into()?,
             balance: "10".to_owned(),
             rand_seed: "0000000000000000000000000000000000000000000000000000000000000000"
@@ -585,9 +581,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     Ok(())
 }
 
-fn build_overrides_for_mutations(
-    config: &TestConfig,
-) -> anyhow::Result<BTreeMap<String, Arc<Cell>>> {
+fn build_overrides_for_mutations(config: &TestConfig) -> anyhow::Result<BTreeMap<String, Cell>> {
     let mut mutation_overrides = BTreeMap::new();
 
     if let Some((name, code_b64)) = config
@@ -596,7 +590,8 @@ fn build_overrides_for_mutations(
         .unwrap_or(&String::new())
         .split_once(':')
     {
-        let code_cell = ArcCell::from_boc_b64(code_b64)?;
+        let code_cell = Boc::decode_base64(code_b64)
+            .map_err(|e| anyhow!("Failed to decode mutation override for {name}: {e}"))?;
         mutation_overrides.insert(name.to_owned(), code_cell);
     }
     Ok(mutation_overrides)
@@ -787,7 +782,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         }
     };
 
-    let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
+    let code_cell = Boc::decode_base64(&result.code_boc64)?;
     let source_map = result.source_map.unwrap_or_default();
     let stats = run_file_tests(
         runner,
@@ -804,7 +799,7 @@ fn run_file_tests(
     runner: &mut TestRunner,
     file_path: &str,
     tests: Vec<TestDescriptor>,
-    code: &ArcCell,
+    code: &Cell,
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
@@ -1017,8 +1012,8 @@ fn run_file_tests(
                 runner.build_cache.memoize(
                     &test.name,
                     &file_path,
-                    &code.to_boc_b64(false)?,
-                    &code.cell_hash()?.to_hex().to_ascii_uppercase(),
+                    &Boc::encode_base64(code),
+                    &code.repr_hash().to_string().to_ascii_uppercase(),
                     source_map.clone(),
                     Some(
                         contract_abi(
@@ -1058,16 +1053,21 @@ fn run_file_tests(
     })
 }
 
-fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
-    let state_init = CellBuilder::new()
-        .store_bit(false)?
-        .store_bit(false)?
-        .store_ref_cell_optional(Some(code))?
-        .store_ref_cell_optional(Some(&ArcCell::default()))?
-        .store_bit(false)?
-        .build()?;
+fn contract_address(code: &Cell) -> anyhow::Result<String> {
+    let mut state_init_builder = CellBuilder::new();
+    state_init_builder.store_bit(false)?; // split_depth absent
+    state_init_builder.store_bit(false)?; // tick_tock absent
+    state_init_builder.store_bit(true)?; // code present
+    state_init_builder.store_reference(code.clone())?;
+    state_init_builder.store_bit(true)?; // data present
+    state_init_builder.store_reference(Cell::default())?;
+    state_init_builder.store_bit(false)?; // library absent
 
-    Ok(TonAddress::new(0, state_init.cell_hash()))
+    let state_init = state_init_builder.build()?;
+    Ok(format!(
+        "0:{}",
+        hex::encode(state_init.repr_hash().as_array())
+    ))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

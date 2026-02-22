@@ -17,7 +17,6 @@ use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use ton_source_map::{SourceLocation, SourceMap};
 use tonlib_core::TonAddress;
-use tonlib_core::cell::ArcCell;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
@@ -375,7 +374,7 @@ pub struct Env<'a> {
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,
-    pub build_override: BTreeMap<String, ArcCell>, // contract ID -> code
+    pub build_override: BTreeMap<String, Cell>, // contract ID -> code
     pub explorer: Option<Explorer>,
     pub fork_net: Option<Network>,
     pub api_key: Option<String>,

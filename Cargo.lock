@@ -3297,7 +3297,6 @@ dependencies = [
  "serde_json",
  "sha2",
  "ton-executor",
- "tonlib-core",
  "tvmffi",
  "tycho-types",
 ]

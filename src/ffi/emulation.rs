@@ -79,7 +79,7 @@ fn build_impl(
 
     if let Some(override_code) = ctx.env.build_override.get(id.as_str()) {
         debug!("Overriding code for {name}");
-        stk.push(TupleItem::Cell(ton_to_tycho_cell(override_code)?));
+        stk.push(TupleItem::Cell(override_code.clone()));
         return Ok(());
     }
 

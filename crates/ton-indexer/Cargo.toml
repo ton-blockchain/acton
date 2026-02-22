@@ -15,7 +15,6 @@ ton-executor = { workspace = true }
 tvmffi = { workspace = true }
 tycho-types = { workspace = true }
 base64 = { workspace = true }
-tonlib-core = "0.26.6"
 anyhow = { workspace = true }
 crc = { workspace = true }
 num-bigint = { workspace = true }
