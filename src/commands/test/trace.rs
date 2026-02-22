@@ -134,10 +134,8 @@ pub(super) fn dump_test_transactions(
 
     for (name, info) in known_contracts {
         let contract_file = contracts_dir.join(format!("{name}.json"));
-        if !contract_file.exists() {
-            let info_json = serde_json::to_string(&info)?;
-            fs::write(contract_file, info_json)?;
-        }
+        let info_json = serde_json::to_string(&info)?;
+        fs::write(contract_file, info_json)?;
     }
 
     let filename = format!("{}_trace.json", test.name);

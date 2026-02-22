@@ -376,8 +376,8 @@ pub(super) fn print_coverage_summary(coverage: &Coverage) {
 
     files_with_percentage.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
 
+    let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
     for (percentage, file_coverage) in files_with_percentage {
-        let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
         let relative_path = Path::new(&file_coverage.file)
             .strip_prefix(&cwd)
             .unwrap_or_else(|_| Path::new(&file_coverage.file))

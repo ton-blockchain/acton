@@ -2,7 +2,9 @@ use super::{TestReport, TestReporter, TestStatus, TestSuiteStats, escape_xml, ex
 use crate::commands::test::TestDescriptor;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 use std::collections::BTreeMap;
+use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -37,8 +39,7 @@ struct JUnitTestSuite {
 
 pub(crate) struct JUnitReporter {
     config: JUnitConfig,
-    suites: BTreeMap<Arc<str>, JUnitTestSuite>,
-    current_suite: Option<Arc<str>>,
+    suites: BTreeMap<PathBuf, JUnitTestSuite>,
 }
 
 impl JUnitReporter {
@@ -46,7 +47,6 @@ impl JUnitReporter {
         Self {
             config,
             suites: BTreeMap::new(),
-            current_suite: None,
         }
     }
 
@@ -129,7 +129,7 @@ impl JUnitReporter {
             return Ok(());
         }
 
-        let filename = format!("TEST-{}.xml", suite.name.replace(['/', '\\'], "_"));
+        let filename = self.suite_output_filename(suite);
 
         let file_path = self.config.output_dir.join(filename);
         let mut file = File::create(&file_path)?;
@@ -143,6 +143,36 @@ impl JUnitReporter {
             .map_err(|e| anyhow::anyhow!("Failed to serialize JUnit report: {e}"))?;
 
         Ok(())
+    }
+
+    fn suite_output_filename(&self, suite: &JUnitTestSuite) -> String {
+        let sanitized_name: String = suite
+            .name
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                    ch
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+
+        let basename = format!("TEST-{sanitized_name}");
+        let same_name_count = self
+            .suites
+            .values()
+            .filter(|item| item.name == suite.name)
+            .count();
+
+        if same_name_count <= 1 {
+            return format!("{basename}.xml");
+        }
+
+        let mut hasher = DefaultHasher::new();
+        suite.file_path.hash(&mut hasher);
+        let suffix = hasher.finish();
+        format!("{basename}-{suffix:016x}.xml")
     }
 }
 
@@ -158,44 +188,40 @@ impl TestReporter for JUnitReporter {
         _tests: &[TestDescriptor],
     ) -> anyhow::Result<()> {
         let suite_name = extract_suite_name(file_path);
-        self.current_suite = Some(suite_name.clone());
+        let suite_id = file_path.to_owned();
 
         let suite = JUnitTestSuite {
-            name: suite_name.clone(),
-            file_path: file_path.to_owned(),
+            name: suite_name,
+            file_path: suite_id.clone(),
             tests: Vec::new(),
             stats: TestSuiteStats::default(),
             timestamp: SystemTime::now(),
         };
 
-        self.suites.insert(suite_name, suite);
+        self.suites.insert(suite_id, suite);
         Ok(())
     }
 
     fn on_suite_finished(
         &mut self,
-        _file_path: &Path,
+        file_path: &Path,
         stats: &TestSuiteStats,
     ) -> anyhow::Result<()> {
-        if let Some(ref suite_name) = self.current_suite {
-            if let Some(suite) = self.suites.get_mut(suite_name) {
-                suite.stats = stats.clone();
-            }
-
-            if !self.config.merge_suites
-                && let Some(suite) = self.suites.get(suite_name)
-            {
-                self.write_suite_file(suite)?;
-            }
+        if let Some(suite) = self.suites.get_mut(file_path) {
+            suite.stats = stats.clone();
         }
-        self.current_suite = None;
+
+        if !self.config.merge_suites
+            && let Some(suite) = self.suites.get(file_path)
+        {
+            self.write_suite_file(suite)?;
+        }
+
         Ok(())
     }
 
     fn on_test_finished(&mut self, test: &TestReport) -> anyhow::Result<()> {
-        if let Some(ref suite_name) = self.current_suite
-            && let Some(suite) = self.suites.get_mut(suite_name)
-        {
+        if let Some(suite) = self.suites.get_mut(&test.file_path) {
             suite.tests.push(test.clone());
         }
         Ok(())

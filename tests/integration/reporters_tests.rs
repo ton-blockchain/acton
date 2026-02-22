@@ -169,6 +169,32 @@ fn test_teamcity_reporter_multiple_files() {
 }
 
 #[test]
+fn test_teamcity_reporter_escapes_location_hint_special_chars() {
+    let project = ProjectBuilder::new("teamcity_location_hint_escape")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "escape",
+            r#"
+            get fun `test teamcity '|[]`() {
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("teamcity")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_teamcity_reporter_escapes_location_hint_special_chars.stdout.txt",
+        );
+}
+
+#[test]
 fn test_junit_reporter_multiple_files_with_failures() {
     ProjectBuilder::new("multi_file_junit_failures")
         .contract("simple", SIMPLE_CONTRACT)
@@ -219,6 +245,41 @@ fn test_junit_reporter_multiple_files_with_failures() {
         )
         .assert_snapshot_matches(
             "integration/snapshots/test_junit_multiple_files_with_failures.stdout.txt",
+        );
+}
+
+#[test]
+fn test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs() {
+    let project = ProjectBuilder::new("junit_merge_same_basename")
+        .contract("simple", SIMPLE_CONTRACT)
+        .raw_file(
+            "tests/a/shared.test.tolk",
+            r#"
+            get fun `test-shared-a`() {
+            }
+        "#,
+        )
+        .raw_file(
+            "tests/b/shared.test.tolk",
+            r#"
+            get fun `test-shared-b`() {
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("junit")
+        .with_junit_merge()
+        .run()
+        .success()
+        .assert_passed(2)
+        .assert_file_snapshot_matches(
+            "test-results/junit-results.xml",
+            "integration/snapshots/test_junit_reporter_merge_keeps_suites_with_same_basename_in_different_dirs.xml.gen",
         );
 }
 
