@@ -88,7 +88,7 @@ pub fn parse_jetton_content(content_cell: Cell) -> Value {
         // Off-chain: read URI
         let remaining = parser.load_remaining();
         let mut builder = CellBuilder::new();
-        if builder.store_slice(&remaining).is_ok()
+        if builder.store_slice(remaining).is_ok()
             && let Ok(cell) = builder.build()
             && let Some(uri) = Tuple::parse_snake_string(&cell)
         {

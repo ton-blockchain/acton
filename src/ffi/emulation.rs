@@ -845,7 +845,7 @@ fn run_get_method_impl(
         let source_map = ctx
             .build
             .build_cache
-            .result_for_code(&Some(code.clone()))
+            .result_for_code(&Some(code))
             .map(|res| res.1.source_map);
 
         let dbg_ctx = ctx.debug.ctx();
@@ -1130,10 +1130,7 @@ fn load_library_by_hash_impl(
         return Ok(());
     };
 
-    match api_client
-        .get_library_by_hash(hash.as_str())
-        .map(|lib| lib.clone())
-    {
+    match api_client.get_library_by_hash(hash.as_str()) {
         Ok(cell) => {
             stack.push(TupleItem::Cell(cell));
         }
@@ -1367,11 +1364,15 @@ fn set_shard_account_impl(
     shard_account: Option<ShardAccount>,
     addr: StdAddr,
 ) -> anyhow::Result<()> {
-    let shard_account = shard_account.unwrap_or_else(|| ShardAccount {
-        account: Lazy::new(&OptionalAccount(None)).expect("Failed to create empty shard account"),
-        last_trans_hash: HashBytes::ZERO,
-        last_trans_lt: 0,
-    });
+    let shard_account = match shard_account {
+        Some(shard_account) => shard_account,
+        None => ShardAccount {
+            account: Lazy::new(&OptionalAccount(None))
+                .context("Failed to create empty shard account")?,
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        },
+    };
 
     ctx.chain
         .world_state

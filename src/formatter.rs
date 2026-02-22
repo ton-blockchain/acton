@@ -120,34 +120,24 @@ impl<'a> FormatterContext<'a> {
 
     fn format_address_slice(&self, slice: &Cell, colorize: bool) -> String {
         let mut parser = slice.as_slice_allow_exotic();
-        if let Ok(address) = IntAddr::load_from(&mut parser) {
-            let addr = Self::cell_to_addr(slice);
-            let address_base64 = self.address_to_string(&address);
+        let Ok(addr) = IntAddr::load_from(&mut parser) else {
+            return Boc::encode_hex(slice);
+        };
 
-            let addr_str = if colorize {
-                address_base64.cyan().to_string()
-            } else {
-                address_base64
-            };
+        let addr_base64 = self.address_to_string(&addr);
 
-            if let Some(addr) = &addr {
-                let contract_type = self.get_contract_type(addr);
-                if let Some(contract_type) = contract_type {
-                    return format!("{addr_str} ({contract_type})");
-                }
-            }
+        let addr_str = if colorize {
+            addr_base64.cyan().to_string()
+        } else {
+            addr_base64
+        };
 
-            return addr_str;
+        let contract_type = self.get_contract_type(&addr);
+        if let Some(contract_type) = contract_type {
+            return format!("{addr_str} ({contract_type})");
         }
 
-        Boc::encode_hex(slice)
-    }
-
-    fn cell_to_addr(cell: &Cell) -> Option<IntAddr> {
-        let cell = cell.clone();
-        let mut slice = cell.as_slice().ok()?;
-        let addr = IntAddr::load_from(&mut slice);
-        addr.ok()
+        addr_str
     }
 
     /// Format transaction list as a tree

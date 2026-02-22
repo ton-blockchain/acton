@@ -32,7 +32,6 @@ use ton_source_map::SourceMap;
 use tonlib_core::TonAddress;
 use tonlib_core::cell::{ArcCell, CellBuilder};
 use tonlib_core::tlb_types::tlb::TLB;
-use tvmffi::compat::CellCompatExt;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -288,7 +287,7 @@ fn execute_script<'a>(
         network: None,
     };
 
-    let stack = serialize_tuple(&stack)?.to_boc_b64(false)?;
+    let stack = Boc::encode_base64(serialize_tuple(&stack)?);
 
     let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
     ffi::register(&mut executor, &mut ctx);
