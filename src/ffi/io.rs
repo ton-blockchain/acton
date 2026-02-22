@@ -5,7 +5,6 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
-use tvmffi::from_stack::FromStack;
 use tvmffi::stack::{Tuple, TupleItem};
 
 extension!(println in (Context) with (s: TupleItem, type_name: String) using println_impl);
@@ -325,26 +324,13 @@ fn prompt_impl(
     Ok(())
 }
 
-extension!(select in (Context) with (variants: TupleItem, message: String) using select_impl);
+extension!(select in (Context) with (variants: Vec<String>, message: String) using select_impl);
 fn select_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
-    variants: TupleItem,
+    variants: Vec<String>,
     message: String,
 ) -> anyhow::Result<()> {
-    let TupleItem::Tuple(raw_variants) = variants else {
-        stack.push_string("");
-        return Ok(());
-    };
-
-    let variants = raw_variants
-        .iter()
-        .filter_map(|var| {
-            let str = String::from_item((*var).clone());
-            str.ok()
-        })
-        .collect::<Vec<_>>();
-
     let result = Select::new(&message, variants)
         .with_starting_cursor(0)
         .prompt()

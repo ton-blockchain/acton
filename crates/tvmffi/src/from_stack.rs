@@ -5,7 +5,8 @@ use crate::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use thiserror::Error;
 use tycho_types::cell::Cell;
-use tycho_types::models::{IntAddr, StdAddr};
+use tycho_types::cell::HashBytes;
+use tycho_types::models::{IntAddr, ShardAccount, StdAddr};
 
 /// An error type for converting `TupleItem` to a Rust type.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -32,6 +33,18 @@ impl FromStack for TupleItem {
     }
 }
 
+/// Convert a `TupleItem` to an optional value.
+///
+/// `TupleItem::Null` is mapped to `None`, all other values are decoded as `Some(T)`.
+impl<T: FromStack> FromStack for Option<T> {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        match item {
+            TupleItem::Null => Ok(None),
+            other => T::from_item(other).map(Some),
+        }
+    }
+}
+
 /// Convert a `TupleItem` to a String.
 /// Note that this conversion is automatically handle snake strings.
 impl FromStack for String {
@@ -43,6 +56,40 @@ impl FromStack for String {
                 expected: "Slice(String)",
             }),
         }
+    }
+}
+
+/// Convert a `TupleItem` to bytes represented as a snake string in a cell/slice.
+impl FromStack for Vec<u8> {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        match item {
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
+                Tuple::parse_snake_bytes(&cell).ok_or(ArgError::CellParse)
+            }
+            _ => Err(ArgError::TypeMismatch {
+                expected: "Slice(bytes)",
+            }),
+        }
+    }
+}
+
+/// Convert a `TupleItem` to a list of strings.
+impl FromStack for Vec<String> {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        let items = match item {
+            TupleItem::Tuple(tuple) => tuple.0,
+            TupleItem::TypedTuple { inner, .. } => inner.0,
+            _ => {
+                return Err(ArgError::TypeMismatch {
+                    expected: "Tuple(String[])",
+                });
+            }
+        };
+
+        items
+            .into_iter()
+            .map(String::from_item)
+            .collect::<Result<Vec<_>, _>>()
     }
 }
 
@@ -128,11 +175,46 @@ impl FromStack for IntAddr {
     }
 }
 
+/// Convert a `TupleItem` to a 32-byte hash.
+impl FromStack for HashBytes {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        let cell = match item {
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
+            _ => {
+                return Err(ArgError::TypeMismatch {
+                    expected: "Slice(HashBytes)",
+                });
+            }
+        };
+
+        let mut slice = cell.as_slice().map_err(|_| ArgError::CellParse)?;
+        if slice.size_bits() != 256 || slice.size_refs() != 0 {
+            return Err(ArgError::CellParse);
+        }
+        slice.load_u256().map_err(|_| ArgError::CellParse)
+    }
+}
+
+/// Convert a `TupleItem` to `ShardAccount`.
+impl FromStack for ShardAccount {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        match item {
+            TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell
+                .parse::<ShardAccount>()
+                .map_err(|_| ArgError::CellParse),
+            _ => Err(ArgError::TypeMismatch {
+                expected: "Slice(ShardAccount)",
+            }),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::stack::{Tuple, TupleItem};
-    use tycho_types::cell::CellBuilder;
+    use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
+    use tycho_types::models::{OptionalAccount, ShardAccount, StdAddr};
 
     #[test]
     fn test_string_from_stack() {
@@ -311,6 +393,78 @@ mod tests {
             result,
             Err(ArgError::TypeMismatch { expected: "Cell" })
         ));
+    }
+
+    #[test]
+    fn test_option_from_stack() {
+        let none_val = Option::<BigInt>::from_item(TupleItem::Null).unwrap();
+        assert_eq!(none_val, None);
+
+        let some_val = Option::<BigInt>::from_item(TupleItem::Int(BigInt::from(7))).unwrap();
+        assert_eq!(some_val, Some(BigInt::from(7)));
+    }
+
+    #[test]
+    fn test_vec_u8_from_stack() {
+        let bytes = vec![1u8, 2, 3, 4, 255];
+        let mut tuple = Tuple::empty();
+        tuple.push_bytes(&bytes);
+        let item = tuple.0[0].clone();
+
+        let parsed = Vec::<u8>::from_item(item).unwrap();
+        assert_eq!(parsed, bytes);
+    }
+
+    #[test]
+    fn test_vec_string_from_stack() {
+        let mut words = Tuple::empty();
+        words.push_string("one");
+        words.push_string("two");
+        words.push_string("three");
+
+        let parsed = Vec::<String>::from_item(TupleItem::Tuple(words)).unwrap();
+        assert_eq!(parsed, vec!["one", "two", "three"]);
+    }
+
+    #[test]
+    fn test_hash_bytes_from_stack() {
+        let hash = HashBytes([0xAB; 32]);
+        let mut builder = CellBuilder::new();
+        builder.store_u256(&hash).unwrap();
+        let cell = builder.build().unwrap();
+
+        let parsed = HashBytes::from_item(TupleItem::Slice(cell)).unwrap();
+        assert_eq!(parsed, hash);
+    }
+
+    #[test]
+    fn test_std_addr_from_stack() {
+        let addr = StdAddr::new(-1, HashBytes([0x11; 32]));
+        let mut builder = CellBuilder::new();
+        addr.store_into(&mut builder, Cell::empty_context())
+            .unwrap();
+        let cell = builder.build().unwrap();
+
+        let parsed = StdAddr::from_item(TupleItem::Cell(cell)).unwrap();
+        assert_eq!(parsed, addr);
+    }
+
+    #[test]
+    fn test_shard_account_from_stack() {
+        let shard = ShardAccount {
+            account: Lazy::new(&OptionalAccount(None)).unwrap(),
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        };
+        let mut builder = CellBuilder::new();
+        shard
+            .store_into(&mut builder, Cell::empty_context())
+            .unwrap();
+        let cell = builder.build().unwrap();
+
+        let parsed = ShardAccount::from_item(TupleItem::Slice(cell)).unwrap();
+        assert_eq!(parsed.last_trans_lt, 0);
+        assert_eq!(parsed.last_trans_hash, HashBytes::ZERO);
     }
 
     #[test]

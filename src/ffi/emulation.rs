@@ -278,9 +278,6 @@ fn send_message_impl(
 }
 
 fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<TupleItem> {
-    let Ok(tx) = Boc::decode_base64(emulation.raw_transaction.as_ref()) else {
-        return None;
-    };
     let child_txs = Tuple(
         emulation
             .child_transactions
@@ -304,10 +301,7 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
         parsed_tx
             .iter_out_msgs()
             .filter_map(Result::ok)
-            .filter_map(|msg| {
-                let cell = to_cell(&msg);
-                Some(cell)
-            })
+            .map(|msg| to_cell(&msg))
             .map(TupleItem::Cell)
             .collect::<Vec<_>>(),
     );
@@ -329,8 +323,10 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
             .collect::<Vec<_>>(),
     );
 
+    let tx_cell = to_cell(&emulation.transaction);
+
     Some(TupleItem::Tuple(Tuple(vec![
-        TupleItem::Cell(tx),
+        TupleItem::Cell(tx_cell),
         TupleItem::Tuple(child_txs),
         parent_lt,
         TupleItem::Cell(actions),
@@ -1051,7 +1047,7 @@ fn register_address_impl(
     Ok(())
 }
 
-extension!(register_code in (Context) with (name: String, address: Cell) using register_code_impl);
+extension!(register_code in (Context) with (name: String, code: Cell) using register_code_impl);
 fn register_code_impl(
     ctx: &mut Context,
     _: &mut Tuple,
@@ -1174,7 +1170,7 @@ fn get_wallet_by_name_impl(
     Ok(())
 }
 
-extension!(wait_for_transaction in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: BigInt, ext_message_hash: Cell, address: StdAddr) using wait_for_transaction_impl);
+extension!(wait_for_transaction in (Context) with (sleep_duration: BigInt, attempts: BigInt, quiet: BigInt, ext_message_hash: HashBytes, address: StdAddr) using wait_for_transaction_impl);
 #[allow(clippy::too_many_arguments)]
 fn wait_for_transaction_impl(
     ctx: &mut Context,
@@ -1182,7 +1178,7 @@ fn wait_for_transaction_impl(
     sleep_duration: BigInt,
     attempts: BigInt,
     quiet: BigInt,
-    ext_message_hash: Cell,
+    ext_message_hash: HashBytes,
     address: StdAddr,
 ) -> anyhow::Result<()> {
     if !ctx.is_broadcasting {
@@ -1213,7 +1209,7 @@ fn wait_for_transaction_impl(
         }
     };
 
-    let ext_message_hash_bytes = ext_message_hash.data();
+    let ext_message_hash_bytes = ext_message_hash.as_slice();
 
     if api_key.is_none() && network != Network::Custom("localnet".into()) {
         std::thread::sleep(Duration::from_millis(1000)); // rate limit
@@ -1364,25 +1360,18 @@ fn get_shard_account_impl(
     Ok(())
 }
 
-extension!(set_shard_account in (Context) with (shard_account: TupleItem, addr: StdAddr) using set_shard_account_impl);
+extension!(set_shard_account in (Context) with (shard_account: Option<ShardAccount>, addr: StdAddr) using set_shard_account_impl);
 fn set_shard_account_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
-    shard_account: TupleItem,
+    shard_account: Option<ShardAccount>,
     addr: StdAddr,
 ) -> anyhow::Result<()> {
-    let shard_account = match shard_account {
-        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell
-            .parse::<ShardAccount>()
-            .context("Failed to parse shard account")?,
-        TupleItem::Null => ShardAccount {
-            account: Lazy::new(&OptionalAccount(None))
-                .context("Failed to create empty shard account")?,
-            last_trans_hash: HashBytes::ZERO,
-            last_trans_lt: 0,
-        },
-        _ => anyhow::bail!("Expected shard account as Cell or Slice"),
-    };
+    let shard_account = shard_account.unwrap_or_else(|| ShardAccount {
+        account: Lazy::new(&OptionalAccount(None)).expect("Failed to create empty shard account"),
+        last_trans_hash: HashBytes::ZERO,
+        last_trans_lt: 0,
+    });
 
     ctx.chain
         .world_state

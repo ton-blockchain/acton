@@ -47,23 +47,15 @@ fn mnemonic_new_impl(_ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()
     Ok(())
 }
 
-extension!(mnemonic_to_key_pair in (Context) with (words: Tuple) using mnemonic_to_key_pair_impl);
+extension!(mnemonic_to_key_pair in (Context) with (words: Vec<String>) using mnemonic_to_key_pair_impl);
 fn mnemonic_to_key_pair_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
-    words: Tuple,
+    words: Vec<String>,
 ) -> anyhow::Result<()> {
-    let word_strings: Vec<String> = words
-        .iter()
-        .map(|item| match item {
-            TupleItem::Cell(cell) | TupleItem::Slice(cell) => Tuple::parse_snake_string(cell)
-                .ok_or_else(|| anyhow::anyhow!("cannot parse string from cell")),
-            _ => anyhow::bail!("expected string items in mnemonic tuple"),
-        })
-        .collect::<anyhow::Result<Vec<String>>>()?;
-    let word_strs: Vec<&str> = word_strings.iter().map(String::as_str).collect();
+    let words = words.iter().map(String::as_str).collect();
 
-    let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::new(word_strs, &None)?;
+    let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::new(words, &None)?;
     let key_pair = mnemonic.to_key_pair()?;
 
     // Return KeyPair { privateKey: bytes32, publicKey: bytes32 }
@@ -75,6 +67,7 @@ fn mnemonic_to_key_pair_impl(
     let mut result = Tuple::empty();
     result.push(TupleItem::Int(private_key));
     result.push(TupleItem::Int(public_key));
+
     stack.push(TupleItem::Tuple(result));
     Ok(())
 }

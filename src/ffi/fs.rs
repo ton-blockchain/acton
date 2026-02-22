@@ -32,20 +32,14 @@ fn write_string_impl(
     Ok(())
 }
 
-extension!(write_bytes in (Context) with (data: TupleItem, path: String) using write_bytes_impl);
+extension!(write_bytes in (Context) with (data: Vec<u8>, path: String) using write_bytes_impl);
 fn write_bytes_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
-    data: TupleItem,
+    data: Vec<u8>,
     path: String,
 ) -> anyhow::Result<()> {
-    let data = match data {
-        TupleItem::Slice(cell) | TupleItem::Cell(cell) => Tuple::parse_snake_bytes(&cell),
-        _ => None,
-    };
-    let success = data
-        .map(|bytes| std::fs::write(&path, bytes).is_ok())
-        .unwrap_or(false);
+    let success = std::fs::write(&path, data).is_ok();
     stack.push_bool(success);
     Ok(())
 }
