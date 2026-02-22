@@ -683,6 +683,7 @@ impl Project {
             test_fail_fast: false,
             script_fork_net: None,
             build_info: false,
+            force_no_color_env: true,
         }
     }
 
@@ -728,6 +729,7 @@ pub(crate) struct ActonCommand {
     pub(crate) test_fail_fast: bool,
     pub(crate) script_fork_net: Option<String>,
     pub(crate) build_info: bool,
+    pub(crate) force_no_color_env: bool,
 }
 
 #[allow(dead_code)]
@@ -812,6 +814,20 @@ impl ActonCommand {
 
     pub(crate) fn env(mut self, key: &str, value: &str) -> Self {
         self.cmd = self.cmd.env(key, value);
+        self
+    }
+
+    pub(crate) fn env_remove(mut self, key: &str) -> Self {
+        self.cmd = self.cmd.env_remove(key);
+        self
+    }
+
+    /// Keep process color-related environment variables unchanged.
+    ///
+    /// By default, tests force `NO_COLOR=1` for stable snapshots.
+    /// Use this when you need to validate auto color detection behavior.
+    pub(crate) fn keep_color_env(mut self) -> Self {
+        self.force_no_color_env = false;
         self
     }
 
@@ -1351,7 +1367,9 @@ impl ActonCommand {
             self.cmd = self.cmd.arg("--source-map").arg(source_map_path);
         }
 
-        self.cmd = self.cmd.env("NO_COLOR", "1");
+        if self.force_no_color_env {
+            self.cmd = self.cmd.env("NO_COLOR", "1");
+        }
         let output = self.cmd.assert();
         TestOutput {
             output,

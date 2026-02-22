@@ -137,6 +137,7 @@ impl FixtureProject {
             test_fail_fast: false,
             script_fork_net: None,
             build_info: false,
+            force_no_color_env: true,
         }
     }
 
