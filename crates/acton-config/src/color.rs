@@ -81,7 +81,7 @@ pub struct Styled<'a, T: ?Sized> {
 
 impl<'a, T: ?Sized> Styled<'a, T> {
     #[must_use]
-    pub fn new(value: &'a T) -> Self {
+    pub const fn new(value: &'a T) -> Self {
         Self {
             value,
             style: Style::new(),
@@ -89,7 +89,7 @@ impl<'a, T: ?Sized> Styled<'a, T> {
     }
 
     #[must_use]
-    pub fn style(mut self, style: Style) -> Self {
+    pub const fn style(mut self, style: Style) -> Self {
         self.style = style;
         self
     }
