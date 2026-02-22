@@ -168,56 +168,59 @@ impl<'a> FormatterContext<'a> {
     fn parse_send_results(&self, tx_items: &[TupleItem]) -> Vec<SendResult> {
         tx_items
             .iter()
-            .filter_map(|el| match el {
-                TupleItem::Tuple(tuple) => match (
-                    tuple[0].clone(),
-                    tuple[1].clone(),
-                    tuple[3].clone(),
-                    tuple[4].clone(),
-                    tuple[6].clone(), // externals
-                ) {
-                    (
-                        TupleItem::Cell(tx),
-                        TupleItem::Tuple(child_ids),
-                        TupleItem::Cell(actions),
-                        TupleItem::Tuple(out_messages),
-                        TupleItem::Tuple(externals),
-                    ) => {
-                        let tx = tx.parse::<Transaction>().ok()?;
-                        Some(SendResult {
-                            tx,
-                            children_ids: child_ids
-                                .iter()
-                                .filter_map(|id| match id {
-                                    TupleItem::Int(int) => int.to_i64(),
-                                    _ => None,
-                                })
-                                .collect(),
-                            parent_lt: match tuple[2].clone() {
-                                TupleItem::Null => None,
-                                TupleItem::Int(int) => int.to_i64(),
-                                _ => None,
-                            },
-                            actions,
-                            out_messages: out_messages
-                                .iter()
-                                .filter_map(|msg| match msg {
-                                    TupleItem::Cell(cell) => Some(cell.clone()),
-                                    _ => None,
-                                })
-                                .collect(),
-                            externals: externals
-                                .iter()
-                                .filter_map(|ext| match ext {
-                                    TupleItem::Cell(cell) => Some(cell.clone()),
-                                    _ => None,
-                                })
-                                .collect(),
+            .filter_map(|el| {
+                let TupleItem::Tuple(tuple) = el else {
+                    return None;
+                };
+
+                let (
+                    Some(TupleItem::Cell(tx)),
+                    Some(TupleItem::Tuple(child_ids)),
+                    Some(TupleItem::Cell(actions)),
+                    Some(TupleItem::Tuple(out_messages)),
+                    Some(TupleItem::Tuple(externals)),
+                ) = (
+                    tuple.first(),
+                    tuple.get(1),
+                    tuple.get(3),
+                    tuple.get(4),
+                    tuple.get(6), // externals
+                )
+                else {
+                    return None;
+                };
+
+                let tx = tx.parse::<Transaction>().ok()?;
+                Some(SendResult {
+                    tx,
+                    children_ids: child_ids
+                        .iter()
+                        .filter_map(|id| match id {
+                            TupleItem::Int(int) => int.to_i64(),
+                            _ => None,
                         })
-                    }
-                    _ => None,
-                },
-                _ => None,
+                        .collect(),
+                    parent_lt: match tuple.get(2) {
+                        Some(TupleItem::Null) => None,
+                        Some(TupleItem::Int(int)) => int.to_i64(),
+                        _ => None,
+                    },
+                    actions: actions.clone(),
+                    out_messages: out_messages
+                        .iter()
+                        .filter_map(|msg| match msg {
+                            TupleItem::Cell(cell) => Some(cell.clone()),
+                            _ => None,
+                        })
+                        .collect(),
+                    externals: externals
+                        .iter()
+                        .filter_map(|ext| match ext {
+                            TupleItem::Cell(cell) => Some(cell.clone()),
+                            _ => None,
+                        })
+                        .collect(),
+                })
             })
             .collect::<Vec<_>>()
     }
