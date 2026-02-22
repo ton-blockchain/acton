@@ -62,6 +62,7 @@ use std::rc::Rc;
 pub struct GetExecutor {
     inner: NonNull<c_void>,
     ext_methods: HashSet<i32>, // track extension methods to catch redefinitions
+    params_cstr: CString,
     phantom: PhantomData<Rc<()>>, // mark as !Send and !Sync
 }
 
@@ -78,6 +79,7 @@ impl GetExecutor {
         Ok(Self {
             inner,
             ext_methods: HashSet::new(),
+            params_cstr,
             phantom: PhantomData,
         })
     }
@@ -95,9 +97,6 @@ impl GetExecutor {
         args: &RunGetMethodArgs,
         config_b64: Option<&str>,
     ) -> anyhow::Result<GetMethodResult> {
-        let params_str = serde_json::to_string(args).context("Failed to serialize args to JSON")?;
-        let params_cstr = CString::new(params_str).context("Args JSON contains null bytes")?;
-
         let stack_b64_cstr = CString::new(stack_b64).context("Stack BoC contains null bytes")?;
 
         let config_cstr = config_b64
@@ -114,7 +113,7 @@ impl GetExecutor {
 
             run_get_method(
                 self.inner.as_ptr(),
-                params_cstr.as_ptr(),
+                self.params_cstr.as_ptr(),
                 stack_b64_cstr.as_ptr(),
                 config_ptr,
             )
