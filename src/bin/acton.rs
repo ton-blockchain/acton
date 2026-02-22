@@ -825,11 +825,7 @@ fn example_build_usage() -> StyledStr {
 
     let config_example = [
         format!("{}contracts.wallet{}", dim("["), dim("]")),
-        format!(
-            "     name{}{}",
-            dim(" = "),
-            green("\"Wallet Contract\"")
-        ),
+        format!("     name{}{}", dim(" = "), green("\"Wallet Contract\"")),
         format!(
             "     src{}{}",
             dim(" = "),

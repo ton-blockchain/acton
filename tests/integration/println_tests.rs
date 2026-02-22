@@ -1,6 +1,6 @@
-use acton_config::color::ColorMode;
 use crate::support::assertions::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use acton_config::color::ColorMode;
 
 #[test]
 fn test_println_formatting() {
