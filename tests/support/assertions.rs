@@ -70,6 +70,7 @@ pub(crate) trait TestOutputExt {
     fn get_normalized_stderr(&self) -> String;
     fn assert_snapshot_matches(&self, path: &str) -> &Self;
     fn assert_stdout_svg_snapshot_matches(&self, path: &str) -> &Self;
+    fn assert_stderr_svg_snapshot_matches(&self, path: &str) -> &Self;
     fn assert_stderr_snapshot_matches(&self, path: &str) -> &Self;
     fn assert_file_exists(&self, path: &str) -> &Self;
     fn assert_file_contains(&self, path: &str, content: &str) -> &Self;
@@ -201,6 +202,23 @@ impl TestOutputExt for TestSuccess {
 
     fn assert_stdout_svg_snapshot_matches(&self, path: &str) -> &Self {
         let normalized = self.get_normalized_stdout_keep_ansi();
+        let assertion = assertion();
+
+        let mut snapshot_path = std::env::current_dir().expect("Failed to get current dir");
+        snapshot_path.push("tests");
+        snapshot_path.push(path);
+
+        let expected = Data::read_from(&snapshot_path, Some(snapbox::data::DataFormat::TermSvg));
+
+        assertion.eq(
+            Data::from(normalized).coerce_to(snapbox::data::DataFormat::TermSvg),
+            expected,
+        );
+        self
+    }
+
+    fn assert_stderr_svg_snapshot_matches(&self, path: &str) -> &Self {
+        let normalized = normalize_output_keep_ansi(&self.get_stderr(), &self.project_path);
         let assertion = assertion();
 
         let mut snapshot_path = std::env::current_dir().expect("Failed to get current dir");
@@ -413,6 +431,23 @@ impl TestOutputExt for TestFailure {
 
     fn assert_stdout_svg_snapshot_matches(&self, path: &str) -> &Self {
         let normalized = self.get_normalized_stdout_keep_ansi();
+        let assertion = assertion();
+
+        let mut snapshot_path = std::env::current_dir().expect("Failed to get current dir");
+        snapshot_path.push("tests");
+        snapshot_path.push(path);
+
+        let expected = Data::read_from(&snapshot_path, Some(snapbox::data::DataFormat::TermSvg));
+
+        assertion.eq(
+            Data::from(normalized).coerce_to(snapbox::data::DataFormat::TermSvg),
+            expected,
+        );
+        self
+    }
+
+    fn assert_stderr_svg_snapshot_matches(&self, path: &str) -> &Self {
+        let normalized = normalize_output_keep_ansi(&self.get_stderr(), &self.project_path);
         let assertion = assertion();
 
         let mut snapshot_path = std::env::current_dir().expect("Failed to get current dir");

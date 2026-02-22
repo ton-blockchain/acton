@@ -4,6 +4,7 @@ mod basic_unit_tests;
 mod build;
 mod build_tests;
 mod check;
+mod color_output_tests;
 mod compile_tests;
 mod config_tests;
 mod coverage_tests;

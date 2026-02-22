@@ -51,7 +51,7 @@ struct Cli {
         global = true,
         value_name = "WHEN",
         default_value_t = ColorMode::Auto,
-        help = "Control when to use colored output (auto, always, never)"
+        help = "Control when to use colored output"
     )]
     color: ColorMode,
 
