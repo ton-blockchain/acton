@@ -289,7 +289,7 @@ fn execute_script(
         ctx.debug.ctx().process_incoming_requests(true)?;
 
         let result = executor.finish(&params.code)?;
-        print_script_result(&mut ctx, ScriptResult { result });
+        print_script_result(&ctx, ScriptResult { result });
         return Ok(());
     }
 
