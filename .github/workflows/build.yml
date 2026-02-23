@@ -52,7 +52,7 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
