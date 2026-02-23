@@ -1,6 +1,9 @@
-error: expected <expression>, got `}`
+error[C001]: expected <expression>, got `}`
   --> [ROOT]/contracts/broken_helper[LINE]
   |
 4 |             }
   |             ^
 
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain C001

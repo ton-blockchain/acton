@@ -10,7 +10,7 @@ help: prefix with underscore: `_x`
 3 |                 val x =
   |                     ^ _x
 
-error: expected <expression>, got `}`
+error[C001]: expected <expression>, got `}`
   --> [ROOT]/contracts/main[LINE]
   |
 4 |             }
@@ -20,4 +20,4 @@ error: expected <expression>, got `}`
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E002
+For example: acton check --explain C001

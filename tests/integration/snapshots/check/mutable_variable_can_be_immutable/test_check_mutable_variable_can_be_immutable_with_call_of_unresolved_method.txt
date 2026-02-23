@@ -1,6 +1,9 @@
-error: method `some` not found
+error[C001]: method `some` not found
   --> [ROOT]/contracts/main[LINE]
   |
 6 |                 a.some();
   |                   ^^^^
 
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain C001

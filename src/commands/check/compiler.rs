@@ -56,7 +56,7 @@ pub(super) fn check_with_compiler(
         let diagnostic = Diagnostic {
             file_id: file_info.id(),
             severity: Severity::Error,
-            code: None,
+            code: Some("C001".to_owned()),
             rule: Rule::CompilerError,
             name: "compiler-error",
             message: compiler_error.message.clone(),

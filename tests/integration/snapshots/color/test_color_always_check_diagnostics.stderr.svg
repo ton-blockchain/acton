@@ -1,9 +1,10 @@
-<svg width="740px" height="146px" xmlns="http://www.w3.org/2000/svg">
+<svg width="740px" height="200px" xmlns="http://www.w3.org/2000/svg">
   <style>
     .fg { fill: #AAAAAA }
     .bg { fill: #000000 }
     .fg-blue { fill: #0000AA }
     .fg-red { fill: #AA0000 }
+    .fg-yellow { fill: #AA5500 }
     .container {
       padding: 0 10px;
       line-height: 18px;
@@ -19,7 +20,7 @@
   <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
 
   <text xml:space="preserve" class="container fg">
-    <tspan x="10px" y="28px"><tspan class="fg-red bold">error</tspan><tspan class="bold">: expected parameter name, got `{`</tspan>
+    <tspan x="10px" y="28px"><tspan class="fg-red bold">error[C001]</tspan><tspan class="bold">: expected parameter name, got `{`</tspan>
 </tspan>
     <tspan x="10px" y="46px"><tspan>  </tspan><tspan class="fg-blue">--&gt;</tspan><tspan> [ROOT]/contracts/main[LINE]</tspan>
 </tspan>
@@ -32,6 +33,12 @@
     <tspan x="10px" y="118px">
 </tspan>
     <tspan x="10px" y="136px">
+</tspan>
+    <tspan x="10px" y="154px"><tspan>Use </tspan><tspan class="fg-yellow">acton check --explain &lt;CODE&gt;</tspan><tspan> to get detailed explanation of a rule.</tspan>
+</tspan>
+    <tspan x="10px" y="172px"><tspan>For example: acton check --explain C001</tspan>
+</tspan>
+    <tspan x="10px" y="190px">
 </tspan>
   </text>
 
