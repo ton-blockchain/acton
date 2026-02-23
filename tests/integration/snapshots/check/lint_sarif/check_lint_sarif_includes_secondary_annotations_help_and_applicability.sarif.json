@@ -48,6 +48,7 @@
                 }
               ],
               "description": {
+                "markdown": "rename `_value` to `value`",
                 "text": "rename `_value` to `value`"
               },
               "properties": {
@@ -59,6 +60,7 @@
           "locations": [
             {
               "message": {
+                "markdown": "`_value` is marked as unused but used here",
                 "text": "`_value` is marked as unused but used here"
               },
               "physicalLocation": {
@@ -81,6 +83,7 @@
             }
           ],
           "message": {
+            "markdown": "identifier marked as unused is used",
             "text": "identifier marked as unused is used"
           },
           "properties": {
@@ -90,6 +93,7 @@
           "relatedLocations": [
             {
               "message": {
+                "markdown": "declared with leading underscore here",
                 "text": "declared with leading underscore here"
               },
               "physicalLocation": {
@@ -122,7 +126,12 @@
           "rules": [
             {
               "fullDescription": {
-                "text": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk\nfun main() {\n    val _value = 10;\n    _value;\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```\n"
+                "markdown": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk\nfun main() {\n    val _value = 10;\n    _value;\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```\n",
+                "text": "What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\nWhy is this bad?\nPrefixing with _ means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\nExample\nfun main() {\n    val _value = 10;\n    _value;\n}\n\nUse instead:\nfun main() {\n    val value = 10;\n    value;\n}\n"
+              },
+              "help": {
+                "markdown": "### What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\n### Why is this bad?\nPrefixing with `_` means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\n### Example\n```tolk\nfun main() {\n    val _value = 10;\n    _value;\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    val value = 10;\n    value;\n}\n```\n",
+                "text": "What it does\nChecks for usages of identifiers explicitly marked as unused with a leading underscore.\n\nWhy is this bad?\nPrefixing with _ means the identifier is intentionally unused.\nUsing it later is misleading and makes code harder to read.\n\nExample\nfun main() {\n    val _value = 10;\n    _value;\n}\n\nUse instead:\nfun main() {\n    val value = 10;\n    value;\n}\n"
               },
               "helpUri": "[ACTON_DOCS_URL]/linter/e010-used-ignored-identifier",
               "id": "E010",
@@ -135,7 +144,8 @@
                 "actonRuleGroupStatus": "stable"
               },
               "shortDescription": {
-                "text": "Checks for usages of identifiers explicitly marked as unused with a leading underscore."
+                "markdown": "E010: identifier marked as unused is used",
+                "text": "E010: identifier marked as unused is used"
               }
             }
           ]

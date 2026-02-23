@@ -35,6 +35,7 @@
                 }
               ],
               "description": {
+                "markdown": "prefix with underscore: `_x`",
                 "text": "prefix with underscore: `_x`"
               },
               "properties": {
@@ -46,6 +47,7 @@
           "locations": [
             {
               "message": {
+                "markdown": "unused variable `x`",
                 "text": "unused variable `x`"
               },
               "physicalLocation": {
@@ -71,6 +73,7 @@
             }
           ],
           "message": {
+            "markdown": "variable is unused",
             "text": "variable is unused"
           },
           "properties": {
@@ -87,7 +90,12 @@
           "rules": [
             {
               "fullDescription": {
-                "text": "### What it does\nChecks for variables and parameters that are declared but never used.\n\n### Why is this bad?\nUnused variables and parameters clutter the code and can be a sign of a bug.\n\n### Example\n```tolk\nfun main() {\n    val x = 1;\n    println(\"hello\");\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    println(\"hello\");\n}\n```\nOr prefix with an underscore if the variable is intentionally unused:\n```tolk\nfun main() {\n    val _x = 1;\n    println(\"hello\");\n}\n```\n"
+                "markdown": "### What it does\nChecks for variables and parameters that are declared but never used.\n\n### Why is this bad?\nUnused variables and parameters clutter the code and can be a sign of a bug.\n\n### Example\n```tolk\nfun main() {\n    val x = 1;\n    println(\"hello\");\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    println(\"hello\");\n}\n```\nOr prefix with an underscore if the variable is intentionally unused:\n```tolk\nfun main() {\n    val _x = 1;\n    println(\"hello\");\n}\n```\n",
+                "text": "What it does\nChecks for variables and parameters that are declared but never used.\n\nWhy is this bad?\nUnused variables and parameters clutter the code and can be a sign of a bug.\n\nExample\nfun main() {\n    val x = 1;\n    println(\"hello\");\n}\n\nUse instead:\nfun main() {\n    println(\"hello\");\n}\nOr prefix with an underscore if the variable is intentionally unused:\nfun main() {\n    val _x = 1;\n    println(\"hello\");\n}\n"
+              },
+              "help": {
+                "markdown": "### What it does\nChecks for variables and parameters that are declared but never used.\n\n### Why is this bad?\nUnused variables and parameters clutter the code and can be a sign of a bug.\n\n### Example\n```tolk\nfun main() {\n    val x = 1;\n    println(\"hello\");\n}\n```\n\nUse instead:\n```tolk\nfun main() {\n    println(\"hello\");\n}\n```\nOr prefix with an underscore if the variable is intentionally unused:\n```tolk\nfun main() {\n    val _x = 1;\n    println(\"hello\");\n}\n```\n",
+                "text": "What it does\nChecks for variables and parameters that are declared but never used.\n\nWhy is this bad?\nUnused variables and parameters clutter the code and can be a sign of a bug.\n\nExample\nfun main() {\n    val x = 1;\n    println(\"hello\");\n}\n\nUse instead:\nfun main() {\n    println(\"hello\");\n}\nOr prefix with an underscore if the variable is intentionally unused:\nfun main() {\n    val _x = 1;\n    println(\"hello\");\n}\n"
               },
               "helpUri": "[ACTON_DOCS_URL]/linter/e002-unused-variable",
               "id": "E002",
@@ -100,7 +108,8 @@
                 "actonRuleGroupStatus": "stable"
               },
               "shortDescription": {
-                "text": "Checks for variables and parameters that are declared but never used."
+                "markdown": "E002: variable is unused",
+                "text": "E002: variable is unused"
               }
             }
           ]

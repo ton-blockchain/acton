@@ -172,7 +172,7 @@ fn diagnostic_to_result(
         message: sarif::Message {
             arguments: None,
             id: None,
-            markdown: None,
+            markdown: Some(diagnostic.message.clone()),
             properties: None,
             text: Some(diagnostic.message.clone()),
         },
@@ -198,12 +198,18 @@ fn diagnostic_to_rule_descriptor(
     diagnostic: &Diagnostic,
     rule_id: String,
 ) -> sarif::ReportingDescriptor {
-    let explanation = diagnostic.rule.explanation().map(str::to_string);
-    let short_description_text = explanation
+    let explanation_markdown = diagnostic.rule.explanation().map(str::to_string);
+    let full_description_markdown = explanation_markdown.clone();
+    let explanation_text = explanation_markdown
         .as_deref()
-        .and_then(extract_short_description)
-        .map(str::to_string)
-        .unwrap_or_else(|| diagnostic.message.clone());
+        .map(markdown_to_plain_text)
+        .unwrap_or_default();
+    let short_description_text = format!("{rule_id}: {}", diagnostic.message);
+    let full_description_text = if explanation_text.trim().is_empty() {
+        diagnostic.message.clone()
+    } else {
+        truncate_for_github_description(&explanation_text)
+    };
     let (group_status, group_since) = rule_group_status_and_since(diagnostic.rule.group());
 
     sarif::ReportingDescriptor {
@@ -211,13 +217,21 @@ fn diagnostic_to_rule_descriptor(
         deprecated_guids: None,
         deprecated_ids: None,
         deprecated_names: None,
-        full_description: explanation.map(|text| sarif::MultiformatMessageString {
-            markdown: None,
+        full_description: Some(sarif::MultiformatMessageString {
+            markdown: full_description_markdown,
             properties: None,
-            text,
+            text: full_description_text,
         }),
         guid: None,
-        help: None,
+        help: explanation_markdown.map(|markdown| sarif::MultiformatMessageString {
+            markdown: Some(markdown),
+            properties: None,
+            text: if explanation_text.trim().is_empty() {
+                diagnostic.message.clone()
+            } else {
+                explanation_text
+            },
+        }),
         help_uri: diagnostic.code.as_deref().map(|code| {
             format!(
                 "{DOCS_BASE_URL}/linter/{}-{}",
@@ -249,7 +263,7 @@ fn diagnostic_to_rule_descriptor(
         }),
         relationships: None,
         short_description: Some(sarif::MultiformatMessageString {
-            markdown: None,
+            markdown: Some(short_description_text.clone()),
             properties: None,
             text: short_description_text,
         }),
@@ -336,7 +350,7 @@ fn annotation_to_location(
         message: annotation.message.clone().map(|text| sarif::Message {
             arguments: None,
             id: None,
-            markdown: None,
+            markdown: Some(text.clone()),
             properties: None,
             text: Some(text),
         }),
@@ -406,7 +420,7 @@ fn diagnostic_fixes(
             description: Some(sarif::Message {
                 arguments: None,
                 id: None,
-                markdown: None,
+                markdown: Some(fix.message.clone()),
                 properties: None,
                 text: Some(fix.message.clone()),
             }),
@@ -426,13 +440,44 @@ fn diagnostic_fixes(
     if fixes.is_empty() { None } else { Some(fixes) }
 }
 
-fn extract_short_description(explanation: &str) -> Option<&str> {
-    explanation.lines().map(str::trim).find(|line| {
-        !line.is_empty()
-            && !line.starts_with("###")
-            && !line.starts_with("```")
-            && !line.starts_with("Use instead:")
-    })
+fn markdown_to_plain_text(markdown: &str) -> String {
+    let mut result = String::with_capacity(markdown.len());
+    let mut in_code_block = false;
+
+    for line in markdown.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+
+        if in_code_block {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        let without_heading = trimmed.trim_start_matches('#').trim_start();
+        let without_inline_code = without_heading.replace('`', "");
+        result.push_str(&without_inline_code);
+        result.push('\n');
+    }
+
+    result
+}
+
+fn truncate_for_github_description(text: &str) -> String {
+    const GITHUB_FULL_DESCRIPTION_LIMIT: usize = 1024;
+    if text.chars().count() <= GITHUB_FULL_DESCRIPTION_LIMIT {
+        return text.to_string();
+    }
+
+    let truncated = text
+        .chars()
+        .take(GITHUB_FULL_DESCRIPTION_LIMIT.saturating_sub(1))
+        .collect::<String>();
+    format!("{truncated}…")
 }
 
 const fn rule_group_status_and_since(
