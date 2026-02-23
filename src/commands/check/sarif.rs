@@ -234,7 +234,7 @@ fn diagnostic_to_rule_descriptor(
         }),
         help_uri: diagnostic.code.as_deref().map(|code| {
             format!(
-                "{DOCS_BASE_URL}/linter/{}-{}",
+                "{DOCS_BASE_URL}/linting/rules/{}-{}",
                 code.to_ascii_lowercase(),
                 diagnostic.rule.name()
             )

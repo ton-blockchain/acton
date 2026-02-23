@@ -1,0 +1,60 @@
+---
+title: "Outputs and CI"
+description: "Use JSON, SARIF, and exit codes in automation"
+---
+
+## Console Output
+
+Default mode prints diagnostics in terminal with source locations.
+
+If autofixes are available and `--fix` is not used, Acton prints a reminder to rerun with `--fix`.
+
+## JSON Output
+
+```bash
+acton check --json
+```
+
+This prints a JSON object to stdout with:
+
+- `success`
+- `diagnostics` (array)
+
+Use this mode for editor integrations and custom tooling.
+
+## SARIF Report
+
+Write SARIF to a file:
+
+```bash
+acton check --sarif .acton/reports/lint.sarif
+```
+
+Or configure it in `Acton.toml`:
+
+```toml
+[lint.output.sarif]
+path = ".acton/reports/lint.sarif"
+```
+
+When both are set, CLI wins for that run:
+
+```bash
+acton check --sarif reports/ci.sarif
+```
+
+## Exit Code Rules
+
+`acton check` exits with non-zero code when:
+
+- At least one error is reported
+- Warning count is greater than `max-warnings`
+
+`max-warnings = 0` means "fail on any warning".
+
+Example CI policy:
+
+```toml
+[lint]
+max-warnings = 0
+```

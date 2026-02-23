@@ -1,7 +1,6 @@
 ---
 title: "Checking Tolk contracts"
 description: "Lint Tolk files and contracts"
-icon: CheckCircle
 ---
 
 The `acton check` command runs the Tolk linter on your project. By default, it checks all contracts from `Acton.toml` and any `*.test.tolk` files in the workspace.
@@ -23,7 +22,8 @@ acton check <path-to-file.tolk>
 | `--sarif <PATH>`   | String | Write SARIF report to file.          |
 | `--explain <CODE>` | String | Explain a rule.                      |
 
-For a full list of lint checks, see the [Linter Rules](/docs/linter) section.
+For setup and configuration, see [Linting](/docs/linting).
+For the full rules catalog, see [Linter Rules](/docs/linting/rules).
 
 ## Examples
 

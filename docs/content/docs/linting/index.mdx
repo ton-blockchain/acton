@@ -1,0 +1,46 @@
+---
+title: "Linting"
+description: "Catch common issues and enforce best practices in Tolk code"
+icon: FileCheck
+---
+
+This section contains guides and reference documentation for Acton's linter.
+
+`acton check` helps catch common issues and enforce best practices in Tolk code.
+It supports project-wide checks, target-specific checks, automatic fixes, JSON output, and SARIF reports.
+
+## Basic Usage
+
+```bash
+acton check
+acton check counter
+acton check contracts/counter.tolk
+```
+
+## Common Workflows
+
+```bash
+# Apply automatic fixes where available
+acton check --fix
+
+# Explain a specific diagnostic code
+acton check --explain E002
+
+# Machine-readable output
+acton check --json
+acton check --sarif .acton/reports/lint.sarif
+```
+
+## Learn more
+
+<Cards>
+  <Card href="/docs/linting/configuration" title="Configuration">
+    Configure lint policy with `[lint]`, `[lint.rules]`, per-contract overrides, `exclude`, and `max-warnings`.
+  </Card>
+  <Card href="/docs/linting/outputs-and-ci" title="Outputs and CI">
+    Use JSON and SARIF outputs, and configure CI behavior via exit codes and warning thresholds.
+  </Card>
+  <Card href="/docs/linting/rules" title="Rules">
+    Browse all lint checks, diagnostic codes, stability status, and quick-fix availability.
+  </Card>
+</Cards>

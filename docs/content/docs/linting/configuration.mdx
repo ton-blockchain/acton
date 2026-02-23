@@ -1,0 +1,96 @@
+---
+title: "Configuration"
+description: "Configure lint behavior in Acton.toml"
+---
+
+Use the `[lint]` section for global linter behavior, and `[lint.rules]` for rule levels.
+
+## `[lint]` Settings
+
+| Field          | Type       | Default   | Description                                                                                         |
+|:---------------|:-----------|:----------|:----------------------------------------------------------------------------------------------------|
+| `exclude`      | `string[]` | `[]`      | Glob patterns used to hide lint diagnostics for matching files.                                     |
+| `max-warnings` | `integer`  | unlimited | Warning threshold. If warnings are greater than this value, `acton check` exits with non-zero code. |
+| `output`       | `object`   | not set   | Report outputs. Currently supports `[lint.output.sarif]`.                                           |
+
+Example:
+
+```toml
+[lint]
+exclude = ["contracts/generated/*.tolk", "contracts/legacy.tolk"]
+max-warnings = 0
+
+[lint.output.sarif]
+path = ".acton/reports/lint.sarif"
+```
+
+Behavior notes:
+
+- In project-wide mode (`acton check` without target), contracts matching `exclude` are skipped as roots.
+- If you pass an explicit target (`acton check <contract-id>` or `acton check <file.tolk>`), that root target is still analyzed.
+- Excluded dependency files can still be parsed/resolved, but their lint diagnostics are filtered out.
+- Compiler errors are never filtered by `exclude`.
+
+## `[lint.rules]` Global Rule Levels
+
+Set rule levels for the entire project:
+
+```toml
+[lint.rules]
+unused-variable = "deny"
+mutable-variable-can-be-immutable = "warn"
+```
+
+Supported levels:
+
+| Level   | Effect |
+|:--------|:-------|
+| `allow` | Disable the rule |
+| `warn`  | Report as warning |
+| `deny`  | Report as error |
+
+## Per-Contract Overrides
+
+Override rule levels for one contract id:
+
+```toml
+[contracts.counter]
+name = "Counter"
+src = "contracts/counter.tolk"
+
+[lint.rules]
+unused-variable = "deny"
+
+[lint.rules.counter]
+unused-variable = "allow"
+```
+
+The subsection key (`counter` above) must match the contract key under `[contracts]`.
+
+## Inline Suppressions
+
+You can suppress diagnostics for the next line with an inline comment:
+
+```tolk
+// acton-disable-next-line <rule-name>[, <rule-name>...]
+```
+
+Examples:
+
+```tolk
+// acton-disable-next-line unused-variable
+val x = 1;
+
+// acton-disable-next-line unused-variable, write-only-variable
+var tmp = 10;
+tmp = 20;
+
+// acton-disable-next-line all
+val legacy = oldLogic();
+```
+
+Notes:
+
+- Suppression applies only to the immediately following line.
+- Use lint rule names (for example `unused-variable`), not diagnostic codes (for example `E002`).
+- `all` suppresses all lints for the next line.

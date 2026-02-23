@@ -153,6 +153,7 @@ disable-rules = ["flip_plus"]
 Configures the Tolk linter (`acton check`).
 
 Use `[lint]` for linter-wide settings and `[lint.rules]` for rule severities.
+For practical workflows and CI usage, see [Linting](/docs/linting).
 
 ### General Settings
 
@@ -176,12 +177,7 @@ Excluded dependency files are still parsed for imports/types, but lint diagnosti
 When you pass an explicit target to `acton check` (contract id or file path), that target is checked even if it matches `exclude`.
 Compiler errors are never hidden by `exclude`.
 CLI flag `acton check --sarif <PATH>` overrides `lint.output.sarif.path` for the current run.
-
-| Level   | Description                                                                 |
-|:--------|:----------------------------------------------------------------------------|
-| `allow` | Rule is disabled.                                                           |
-| `warn`  | Rule violation is reported as a warning (default for most rules).           |
-| `deny`  | Rule violation is reported as an error, failing the check.                  |
+For one-off line-level suppressions in source code, use `// acton-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
 
 ### Global Configuration
 
@@ -193,6 +189,12 @@ Example:
 unused-variable = "deny"
 mutable-variable-can-be-immutable = "warn"
 ```
+
+| Level   | Description                                                                 |
+|:--------|:----------------------------------------------------------------------------|
+| `allow` | Rule is disabled.                                                           |
+| `warn`  | Rule violation is reported as a warning (default for most rules).           |
+| `deny`  | Rule violation is reported as an error, failing the check.                  |
 
 ### Contract Overrides
 
