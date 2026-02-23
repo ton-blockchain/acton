@@ -1237,6 +1237,15 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn wallet_remove(mut self) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wallet")
+            .arg("remove")
+            .current_dir(&self.project.path);
+        self
+    }
+
     pub(crate) fn with_duration(mut self, duration: &str) -> Self {
         self.cmd = self.cmd.arg("--duration").arg(duration);
         self

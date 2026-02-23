@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
+use std::io::{IsTerminal, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use toml_edit::{DocumentMut, Item, Table, value};
@@ -120,6 +121,15 @@ pub enum WalletCommand {
         #[arg(help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
     },
+    #[command(about = "Remove wallet")]
+    Remove {
+        #[arg(help = "Name of the wallet (prompts if not provided)")]
+        name: Option<String>,
+        #[arg(short = 'y', long, help = "Skip confirmation prompt")]
+        yes: bool,
+        #[arg(long, help = "Output result as JSON")]
+        json: bool,
+    },
     #[command(about = "Request testnet TONs from faucet")]
     Airdrop {
         #[arg(help = "Name of the wallet (prompts if not provided)")]
@@ -156,6 +166,7 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             json,
         } => list_wallets(balance, api_key, json),
         WalletCommand::Get { name } => get_mnemonic(name),
+        WalletCommand::Remove { name, yes, json } => remove_wallet(name, yes, json),
         WalletCommand::Airdrop {
             name,
             faucet_url,
@@ -324,6 +335,117 @@ fn get_mnemonic(name: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn remove_wallet(name: Option<String>, yes: bool, json: bool) -> anyhow::Result<()> {
+    let config = ActonConfig::load()?;
+
+    let name = select_wallet(name, &config)?;
+
+    let wallet = config
+        .get_wallet(&name)
+        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
+
+    let remove_confirmed = confirm_wallet_removal(&name, yes, json)?;
+    if !remove_confirmed {
+        return Ok(());
+    }
+
+    let is_global = remove_wallet_with_merged_precedence(&name, &config)?;
+
+    let keyring_mnemonic_removed = if let Some(keyring_id) = wallet.keys.mnemonic_keyring.as_deref()
+    {
+        wallets::delete_mnemonic_from_keyring(keyring_id)?;
+        true
+    } else {
+        false
+    };
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "success": true,
+                "name": name,
+                "is_global": is_global,
+                "keyring_mnemonic_removed": keyring_mnemonic_removed,
+            }))?
+        );
+    } else {
+        let config_label = if is_global {
+            "global.wallets.toml"
+        } else {
+            "wallets.toml"
+        };
+        if keyring_mnemonic_removed {
+            println!(
+                "{} Wallet mnemonic removed from system keyring",
+                "✓".green()
+            );
+        }
+        println!(
+            "{} Wallet {} removed from {}",
+            "✓".green(),
+            name.cyan().bold(),
+            config_label.cyan()
+        );
+    }
+
+    Ok(())
+}
+
+fn confirm_wallet_removal(name: &str, yes: bool, json: bool) -> anyhow::Result<bool> {
+    if yes {
+        return Ok(true);
+    }
+
+    if !stdin().is_terminal() || !stdout().is_terminal() {
+        anyhow::bail!(
+            "Confirmation required to remove wallet {}. This action cannot be undone.\nRe-run with -y/--yes in non-interactive mode.",
+            name.yellow()
+        );
+    }
+
+    let confirmed = Confirm::new(&format!(
+        "Remove wallet '{}'? This action cannot be undone.",
+        name
+    ))
+    .with_default(false)
+    .prompt()?;
+
+    if !confirmed {
+        if json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "success": false,
+                    "cancelled": true,
+                    "message": "Wallet removal cancelled by user"
+                }))?
+            );
+        } else {
+            println!("{}", "Wallet removal cancelled.".yellow());
+        }
+    }
+
+    Ok(confirmed)
+}
+
+fn remove_wallet_with_merged_precedence(name: &str, config: &ActonConfig) -> anyhow::Result<bool> {
+    // global first, then local override.
+    // So removal should target local first (effective winner), then global.
+    let local_path = PathBuf::from("wallets.toml");
+    if remove_wallet_from_config_file(&local_path, name)? {
+        return Ok(false);
+    }
+
+    if let Some(global_path) = global_wallets_path()
+        && remove_wallet_from_config_file(&global_path, name)?
+    {
+        return Ok(true);
+    }
+
+    anyhow::bail!(error_fmt::wallet_not_found(config, name));
+}
+
 fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
 
@@ -475,6 +597,38 @@ fn get_wallet_address(wallet: &config::WalletConfig) -> anyhow::Result<String> {
         wallet_id,
     )?;
     Ok(ton_wallet.address.to_base64_url_flags(false, true))
+}
+
+fn remove_wallet_from_config_file(config_path: &Path, name: &str) -> anyhow::Result<bool> {
+    if !config_path.exists() {
+        return Ok(false);
+    }
+
+    let content = fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read {}", config_path.display()))?;
+    let mut doc = content
+        .parse::<DocumentMut>()
+        .with_context(|| format!("Failed to parse {} as TOML", config_path.display()))?;
+
+    let Some(wallets_item) = doc.get_mut("wallets") else {
+        return Ok(false);
+    };
+    let wallets = wallets_item
+        .as_table_mut()
+        .context("wallets is not a table")?;
+
+    if wallets.remove(name).is_none() {
+        return Ok(false);
+    }
+
+    if wallets.is_empty() {
+        doc.remove("wallets");
+    }
+
+    fs::write(config_path, doc.to_string())
+        .with_context(|| format!("Failed to write to {}", config_path.display()))?;
+
+    Ok(true)
 }
 
 fn wallet_version_to_string(v: &WalletVersion) -> String {

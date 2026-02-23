@@ -4,7 +4,7 @@ use acton_config::config;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
 use hmac::{Hmac, Mac};
-use keyring::Entry;
+use keyring::{Entry, Error as KeyringError};
 use rand::Rng;
 use retrace::Network;
 use ring::pbkdf2;
@@ -35,6 +35,16 @@ pub fn store_mnemonic_in_keyring(id: &str, mnemonic: &str) -> anyhow::Result<()>
     entry
         .set_password(mnemonic)
         .with_context(|| format!("Failed to store mnemonic in keyring for {id}"))
+}
+
+pub fn delete_mnemonic_from_keyring(id: &str) -> anyhow::Result<()> {
+    let entry = Entry::new(KEYRING_SERVICE, id)?;
+    match entry.delete_credential() {
+        Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
+        Err(err) => {
+            Err(err).with_context(|| format!("Failed to delete mnemonic in keyring for {id}"))
+        }
+    }
 }
 
 #[must_use]

@@ -3,7 +3,7 @@ title: "Managing Wallets"
 description: "Learn how to create and manage testnet wallets for your Acton projects"
 ---
 
-The `wallet` command allows you to generate new wallets for testing purposes and list existing ones. It automatically creates a wallet configuration and offers to store the mnemonic securely in the system keyring or in the configuration file.
+The `wallet` command allows you to generate, import, list, inspect, and remove wallets for testing purposes. It automatically creates wallet configurations and offers to store mnemonics securely in the system keyring or in configuration files.
 
 <Callout type="warn">
     Wallets created by this command are configured for **testnet** by default.
@@ -155,6 +155,44 @@ Available wallets:
   deployer (v5r1) — 2.4457 TON
   shared (v4r2) — 0.5000 TON
 ```
+
+---
+
+### `acton wallet remove`
+
+Safely removes a wallet from configuration.
+
+```bash
+acton wallet remove [NAME]
+```
+
+If the wallet uses `mnemonic-keyring`, Acton also removes the mnemonic from your system keyring/keychain.
+By default, Acton asks for confirmation and shows that this action cannot be undone.
+
+#### Options
+
+| Option        | Type | Description                                  |
+|---------------|------|----------------------------------------------|
+| `-y`, `--yes` | Flag | Skip confirmation prompt (for CI/scripts)    |
+| `--json`      | Flag | Output result as JSON                        |
+
+#### Examples
+
+```bash
+# Remove wallet by name
+acton wallet remove deployer
+
+# Interactive mode (if name is omitted)
+acton wallet remove
+
+# JSON output
+acton wallet remove deployer --json -y
+```
+
+#### Notes
+
+- If both local and global wallets have the same name, local `wallets.toml` takes precedence and is removed first.
+- Removing a wallet from config does not remove external files referenced via `mnemonic-file` or environment variables.
 
 ## Getting Testnet Coins
 

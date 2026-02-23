@@ -1,7 +1,11 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use keyring::{Entry, Error as KeyringError};
 use serde_json::Value;
 use std::fs;
+
+const KEYRING_SERVICE: &str = "ton.acton.wallet";
+const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
 
 #[test]
 fn test_wallet_new_local() {
@@ -384,6 +388,259 @@ fn test_wallet_get_not_found() {
         .failure();
 
     output.assert_contains("Wallet non-existent not found");
+}
+
+#[test]
+fn test_wallet_remove_local() {
+    let project = ProjectBuilder::new("wallet-remove-local").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("remove-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .wallet_remove()
+        .arg("remove-wallet")
+        .arg("-y")
+        .run()
+        .success();
+
+    let wallets_toml = fs::read_to_string(project.path().join("wallets.toml")).unwrap_or_default();
+    assert!(!wallets_toml.contains("[wallets.remove-wallet]"));
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/wallet/test_wallet_remove_local.stdout.txt",
+    );
+}
+
+#[test]
+fn test_wallet_remove_global() {
+    let project = ProjectBuilder::new("wallet-remove-global").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .wallet_import()
+        .arg("--name")
+        .arg("remove-remote-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--global")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .wallet_remove()
+        .arg("remove-remote-wallet")
+        .arg("-y")
+        .run()
+        .success();
+
+    let global_wallets = home_path
+        .join(".config")
+        .join("acton")
+        .join("wallets")
+        .join("global.wallets.toml");
+    let global_toml = fs::read_to_string(global_wallets).unwrap_or_default();
+    assert!(!global_toml.contains("[wallets.remove-remote-wallet]"));
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/wallet/test_wallet_remove_global.stdout.txt",
+    );
+}
+
+#[test]
+fn test_wallet_remove_prefers_local_when_names_overlap() {
+    let project = ProjectBuilder::new("wallet-remove-prefers-local").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .wallet_import()
+        .arg("--name")
+        .arg("shared-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--global")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .wallet_import()
+        .arg("--name")
+        .arg("shared-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .wallet_remove()
+        .arg("shared-wallet")
+        .arg("-y")
+        .run()
+        .success();
+
+    let local_toml = fs::read_to_string(project.path().join("wallets.toml")).unwrap_or_default();
+    assert!(!local_toml.contains("[wallets.shared-wallet]"));
+
+    let global_wallets = home_path
+        .join(".config")
+        .join("acton")
+        .join("wallets")
+        .join("global.wallets.toml");
+    let global_toml = fs::read_to_string(global_wallets).unwrap_or_default();
+    assert!(global_toml.contains("[wallets.shared-wallet]"));
+
+    output.assert_contains("removed from wallets.toml");
+}
+
+#[test]
+fn test_wallet_remove_not_found() {
+    let project = ProjectBuilder::new("wallet-remove-not-found").build();
+
+    let output = project
+        .acton()
+        .wallet_remove()
+        .arg("non-existent")
+        .run()
+        .failure();
+
+    output.assert_contains("Wallet non-existent not found");
+}
+
+#[test]
+fn test_wallet_remove_requires_confirmation_in_non_interactive_mode() {
+    let project = ProjectBuilder::new("wallet-remove-confirmation-required").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("confirm-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .wallet_remove()
+        .arg("confirm-wallet")
+        .run()
+        .failure();
+
+    output.assert_contains("This action cannot be undone");
+    output.assert_contains("Re-run with -y/--yes in non-interactive mode");
+}
+
+#[test]
+fn test_wallet_remove_deletes_keyring_mnemonic() {
+    if !acton::wallets::is_keyring_supported() {
+        return;
+    }
+
+    let project = ProjectBuilder::new("wallet-remove-keyring").build();
+    let keyring_id = format!(
+        "wallet-remove-keyring-{}",
+        project.path().file_name().unwrap().to_string_lossy()
+    );
+
+    let entry = Entry::new(KEYRING_SERVICE, &keyring_id).unwrap();
+    let _ = entry.delete_credential();
+    entry.set_password(TEST_MNEMONIC).unwrap();
+
+    fs::write(
+        project.path().join("wallets.toml"),
+        format!(
+            r#"[wallets.secure-wallet]
+kind = "v5r1"
+workchain = 0
+keys = {{ mnemonic-keyring = "{keyring_id}" }}
+"#
+        ),
+    )
+    .unwrap();
+
+    let output = project
+        .acton()
+        .wallet_remove()
+        .arg("secure-wallet")
+        .arg("-y")
+        .run()
+        .success();
+
+    let wallets_toml = fs::read_to_string(project.path().join("wallets.toml")).unwrap_or_default();
+    assert!(!wallets_toml.contains("[wallets.secure-wallet]"));
+
+    let err = Entry::new(KEYRING_SERVICE, &keyring_id)
+        .unwrap()
+        .get_password()
+        .expect_err("keyring entry should be deleted");
+    assert!(matches!(err, KeyringError::NoEntry));
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/wallet/test_wallet_remove_keyring.stdout.txt",
+    );
+}
+
+#[test]
+fn test_wallet_remove_json() {
+    let project = ProjectBuilder::new("wallet-remove-json").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("remove-json-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .wallet_remove()
+        .arg("remove-json-wallet")
+        .arg("-y")
+        .arg("--json")
+        .run()
+        .success();
+
+    let stdout = output.get_stdout();
+    let json: Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(json["success"], true);
+    assert_eq!(json["name"], "remove-json-wallet");
+    assert_eq!(json["is_global"], false);
+    assert_eq!(json["keyring_mnemonic_removed"], false);
 }
 
 #[test]

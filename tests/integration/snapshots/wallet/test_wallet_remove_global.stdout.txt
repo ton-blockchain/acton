@@ -1,0 +1,1 @@
+✓ Wallet remove-remote-wallet removed from global.wallets.toml

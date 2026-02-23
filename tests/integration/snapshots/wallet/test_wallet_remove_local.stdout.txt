@@ -1,0 +1,1 @@
+✓ Wallet remove-wallet removed from wallets.toml

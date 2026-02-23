@@ -1,0 +1,2 @@
+✓ Wallet mnemonic removed from system keyring
+✓ Wallet secure-wallet removed from wallets.toml

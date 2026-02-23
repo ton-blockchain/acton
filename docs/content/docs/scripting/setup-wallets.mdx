@@ -142,6 +142,29 @@ acton wallet get deployer
 
 This will display the mnemonic phrase, regardless of whether it's stored in a plain text file, environment variable, or secure system keyring.
 
+### Removing a Wallet
+
+If a wallet is no longer needed, remove it with:
+
+```bash
+acton wallet remove deployer
+```
+
+If the wallet uses secure storage (`mnemonic-keyring`), Acton also removes the mnemonic from your system keyring/keychain.
+
+Use interactive mode to pick a wallet from the list:
+
+```bash
+acton wallet remove
+```
+
+Acton asks for confirmation before removal and warns that the action cannot be undone.
+For CI or other non-interactive scripts, use:
+
+```bash
+acton wallet remove deployer -y
+```
+
 ## Address Safety Checks
 
 To prevent accidental use of wrong wallets, configure expected addresses:
