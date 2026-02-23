@@ -20,6 +20,7 @@ acton check <path-to-file.tolk>
 |:-------------------|:-------|:-------------------------------------|
 | `--fix`            | Flag   | Automatically apply available fixes. |
 | `--json`           | Flag   | Output results as JSON.              |
+| `--sarif <PATH>`   | String | Write SARIF report to file.          |
 | `--explain <CODE>` | String | Explain a rule.                      |
 
 For a full list of lint checks, see the [Linter Rules](/docs/linter) section.
@@ -35,4 +36,7 @@ acton check counter
 
 # Check a single file
 acton check counter.tolk
+
+# Write SARIF report
+acton check --sarif .acton/reports/lint.sarif
 ```

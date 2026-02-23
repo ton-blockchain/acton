@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[ROOT]/contracts/main.tolk"
+                },
+                "region": {
+                  "endColumn": 22,
+                  "endLine": 3,
+                  "startColumn": 21,
+                  "startLine": 3
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "variable is unused"
+          },
+          "ruleId": "E002"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "acton check",
+          "rules": [
+            {
+              "id": "E002",
+              "name": "unused-variable",
+              "shortDescription": {
+                "text": "variable is unused"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

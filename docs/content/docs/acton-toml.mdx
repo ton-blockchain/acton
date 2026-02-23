@@ -160,17 +160,22 @@ Use `[lint]` for linter-wide settings and `[lint.rules]` for rule severities.
 |:---------------|:-----------|:--------------------------------------------------------------------------------------------------------|
 | `exclude`      | `string[]` | Glob patterns for files to exclude from lint diagnostics. Excluded contract roots are skipped entirely. |
 | `max-warnings` | `integer`  | Maximum warning count allowed before `acton check` exits with non-zero code. Default: unlimited.        |
+| `output`       | `object`   | Report output settings. Use `[lint.output.sarif]` to write SARIF report to file.                        |
 
 Example:
 ```toml
 [lint]
 exclude = ["contracts/generated/*.tolk", "contracts/legacy.tolk"]
 max-warnings = 0 # fail on any warning
+
+[lint.output.sarif]
+path = ".acton/reports/lint.sarif"
 ```
 
 Excluded dependency files are still parsed for imports/types, but lint diagnostics for them are hidden.
 When you pass an explicit target to `acton check` (contract id or file path), that target is checked even if it matches `exclude`.
 Compiler errors are never hidden by `exclude`.
+CLI flag `acton check --sarif <PATH>` overrides `lint.output.sarif.path` for the current run.
 
 | Level   | Description                                                                 |
 |:--------|:----------------------------------------------------------------------------|

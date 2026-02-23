@@ -144,6 +144,18 @@ pub struct LintRules {
     pub entries: BTreeMap<String, LintEntry>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct LintOutputSarifConfig {
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct LintOutputConfig {
+    pub sarif: Option<LintOutputSarifConfig>,
+}
+
 const fn default_max_warnings() -> usize {
     usize::MAX
 }
@@ -154,6 +166,7 @@ pub struct LintConfig {
     pub exclude: Option<Vec<String>>,
     #[serde(default = "default_max_warnings")]
     pub max_warnings: usize,
+    pub output: Option<LintOutputConfig>,
     pub rules: Option<LintRules>,
     #[serde(flatten)]
     pub metadata: BTreeMap<String, toml::Value>,
@@ -164,6 +177,7 @@ impl Default for LintConfig {
         Self {
             exclude: None,
             max_warnings: default_max_warnings(),
+            output: None,
             rules: None,
             metadata: BTreeMap::new(),
         }
@@ -711,6 +725,9 @@ version = "0.1.0"
 exclude = ["contracts/skip.tolk"]
 max-warnings = 3
 
+[lint.output.sarif]
+path = ".acton/reports/lint.sarif"
+
 [lint.rules]
 unused-variable = "deny"
 mutable-variable-can-be-immutable = "warn"
@@ -726,6 +743,15 @@ unused-variable = "allow"
             &vec!["contracts/skip.tolk".to_string()]
         );
         assert_eq!(lint_settings.max_warnings, 3);
+        assert_eq!(
+            lint_settings
+                .output
+                .as_ref()
+                .and_then(|output| output.sarif.as_ref())
+                .and_then(|sarif| sarif.path.as_ref())
+                .map(String::as_str),
+            Some(".acton/reports/lint.sarif")
+        );
 
         let lint = lint_settings.rules.as_ref().unwrap();
 

@@ -26,6 +26,7 @@ mod fix;
 mod json;
 mod pos;
 mod render;
+mod sarif;
 
 pub(super) struct LintExcludes {
     project_root: PathBuf,
@@ -92,12 +93,35 @@ fn diagnostics_summary(diagnostics: &[Diagnostic]) -> (usize, usize) {
     (error_count, warning_count)
 }
 
+fn resolve_sarif_output_path(
+    cwd: &Path,
+    config: &ActonConfig,
+    cli_sarif_path: Option<String>,
+) -> Option<PathBuf> {
+    let path = cli_sarif_path.or_else(|| {
+        config
+            .lint
+            .as_ref()
+            .and_then(|lint| lint.output.as_ref())
+            .and_then(|output| output.sarif.as_ref())
+            .and_then(|sarif| sarif.path.clone())
+    })?;
+
+    let path = PathBuf::from(path);
+    if path.is_absolute() {
+        Some(path)
+    } else {
+        Some(cwd.join(path))
+    }
+}
+
 pub fn check_cmd(
     fix: bool,
     json: bool,
     explain: Option<String>,
     list_lint_rules: bool,
     target: Option<String>,
+    sarif_path: Option<String>,
 ) -> anyhow::Result<()> {
     if list_lint_rules {
         return check_list::check_list_cmd();
@@ -181,6 +205,10 @@ pub fn check_cmd(
         .collect::<HashSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
+
+    if let Some(sarif_path) = resolve_sarif_output_path(&cwd, &config, sarif_path) {
+        sarif::write_report(&all_diagnostics, &file_db, &sarif_path)?;
+    }
 
     if json {
         let json_output = serde_json::json!({

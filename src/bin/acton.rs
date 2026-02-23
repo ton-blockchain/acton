@@ -501,6 +501,8 @@ enum Commands {
         fix: bool,
         #[arg(long, help = "Output results as JSON")]
         json: bool,
+        #[arg(long, value_name = "PATH", help = "Write SARIF report to file")]
+        sarif: Option<String>,
         #[arg(long, help = "Explain a rule")]
         explain: Option<String>,
         #[arg(long, hide = true)]
@@ -1533,9 +1535,10 @@ fn main() {
             target,
             fix,
             json,
+            sarif,
             explain,
             list_lint_rules,
-        } => check_cmd(fix, json, explain, list_lint_rules, target),
+        } => check_cmd(fix, json, explain, list_lint_rules, target, sarif),
         Commands::Up {
             version,
             canary,
