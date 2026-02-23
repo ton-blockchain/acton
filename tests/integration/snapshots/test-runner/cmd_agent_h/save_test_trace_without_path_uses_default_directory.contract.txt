@@ -1,1 +1,30 @@
-{"name":"simple","code_boc64":"te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==","source_map":{"high_level":{"version":"","language":null,"compiler_version":null,"globals":[],"locations":[]},"debug_marks":{}},"abi":{"name":"simple","entryPoint":{"pos":{"row":1,"column":4,"uri":"[ROOT]/contracts/simple.tolk"}},"externalEntryPoint":null,"storage":null,"getMethods":[],"messages":[],"types":[],"exitCodes":[]}}
+{
+  "abi": {
+    "entryPoint": {
+      "pos": {
+        "column": 4,
+        "row": 1,
+        "uri": "[ROOT]/contracts/simple.tolk"
+      }
+    },
+    "exitCodes": [],
+    "externalEntryPoint": null,
+    "getMethods": [],
+    "messages": [],
+    "name": "simple",
+    "storage": null,
+    "types": []
+  },
+  "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
+  "name": "simple",
+  "source_map": {
+    "debug_marks": {},
+    "high_level": {
+      "compiler_version": null,
+      "globals": [],
+      "language": null,
+      "locations": [],
+      "version": ""
+    }
+  }
+}
