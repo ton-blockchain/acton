@@ -31,8 +31,8 @@ jobs:
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/master' }}
+#        with:
+#          save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install Rust
         run: rustup toolchain install
