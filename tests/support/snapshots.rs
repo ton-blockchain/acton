@@ -2,49 +2,110 @@ use crate::common::{assert_ui, strip_ansi};
 use crate::regex;
 use snapbox::IntoData;
 use snapbox::filter::Filter;
+use std::mem;
 use std::path::Path;
 
 pub(crate) fn normalize_output(stdout: &str, project_path: &Path) -> String {
-    normalize_output_internal(stdout, project_path, true)
+    normalize_output_internal(stdout, project_path, true, true)
 }
 
 #[allow(dead_code)]
 pub(crate) fn normalize_output_keep_ansi(stdout: &str, project_path: &Path) -> String {
-    normalize_output_internal(stdout, project_path, false)
+    normalize_output_internal(stdout, project_path, false, true)
 }
 
-fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> String {
+#[allow(dead_code)]
+pub(crate) fn normalize_output_preserve_escapes(stdout: &str, project_path: &Path) -> String {
+    let content = strip_ansi(stdout);
+    let mut value: serde_json::Value = serde_json::from_str(&content).unwrap_or_else(|err| {
+        panic!("Expected valid JSON content for snapshot normalization: {err}");
+    });
+
+    let redactions = build_redactions(project_path);
+    redact_json_value(&mut value, &redactions);
+
+    serde_json::to_string_pretty(&value)
+        .expect("failed to serialize normalized JSON snapshot")
+        .replace("\r\n", "\n")
+}
+
+fn normalize_output_internal(
+    stdout: &str,
+    project_path: &Path,
+    strip: bool,
+    use_path_filter: bool,
+) -> String {
     let content = if strip {
         strip_ansi(stdout)
     } else {
         stdout.to_string()
     };
     let content = content.into_data();
-    let content = snapbox::filter::FilterPaths.filter(content.into_data());
+    let content = if use_path_filter {
+        snapbox::filter::FilterPaths.filter(content.into_data())
+    } else {
+        content.into_data()
+    };
     let content = snapbox::filter::FilterNewlines.filter(content);
     let content = content.render().expect("came in as a String");
 
+    let redactions = build_redactions(project_path);
+
+    redactions.redact(&content)
+}
+
+fn build_redactions(project_path: &Path) -> snapbox::Redactions {
     let assert1 = assert_ui();
     let mut redactions = assert1.redactions().clone();
 
-    let mut tmp_dir = project_path.to_string_lossy().to_string();
-    if cfg!(windows) {
-        // since Windows uses backslashes `\` as separators,
-        // while snapshots use Unix paths and slashes `/`,
-        // we will explicitly replace Windows separators with Unix separators in this case
-        tmp_dir = tmp_dir.replace("\\", "/");
-    }
+    let tmp_dir_raw = project_path.to_string_lossy().to_string();
+    let tmp_dir_unix = if cfg!(windows) {
+        tmp_dir_raw.replace("\\", "/")
+    } else {
+        tmp_dir_raw.clone()
+    };
+    let tmp_dir_raw_escaped = tmp_dir_raw.replace('\\', "\\\\");
+    let tmp_dir_unix_escaped = tmp_dir_unix.replace('\\', "\\\\");
 
     let current_version = env!("CARGO_PKG_VERSION");
 
-    let lib_dir = Path::new(tmp_dir.as_str()).parent().unwrap().join("lib");
-    redactions.insert("[ROOT]", tmp_dir.clone()).unwrap();
-    redactions.insert("[ACTON_LIB]", lib_dir.clone()).unwrap();
+    let lib_dir_raw = project_path
+        .parent()
+        .unwrap_or(project_path)
+        .join("lib")
+        .to_string_lossy()
+        .to_string();
+    let lib_dir_unix = if cfg!(windows) {
+        lib_dir_raw.replace("\\", "/")
+    } else {
+        lib_dir_raw.clone()
+    };
+    let lib_dir_raw_escaped = lib_dir_raw.replace('\\', "\\\\");
+    let lib_dir_unix_escaped = lib_dir_unix.replace('\\', "\\\\");
+
+    redactions.insert("[ROOT]", tmp_dir_raw.clone()).unwrap();
+    redactions.insert("[ROOT]", tmp_dir_unix.clone()).unwrap();
+    redactions.insert("[ROOT]", tmp_dir_raw_escaped).unwrap();
+    redactions.insert("[ROOT]", tmp_dir_unix_escaped).unwrap();
+
+    redactions.insert("[ACTON_LIB]", lib_dir_raw).unwrap();
     redactions
-        .insert(
-            "[ACTON_LIB]",
-            "/private".to_owned() + lib_dir.to_str().unwrap(),
-        )
+        .insert("[ACTON_LIB]", lib_dir_unix.clone())
+        .unwrap();
+    redactions
+        .insert("[ACTON_LIB]", lib_dir_raw_escaped)
+        .unwrap();
+    redactions
+        .insert("[ACTON_LIB]", lib_dir_unix_escaped)
+        .unwrap();
+    redactions
+        .insert("[ACTON_LIB]", "/private".to_owned() + lib_dir_unix.as_str())
+        .unwrap();
+    redactions
+        .insert("[ROOT]", "/private".to_owned() + tmp_dir_raw.as_str())
+        .unwrap();
+    redactions
+        .insert("[ROOT]", "/private".to_owned() + tmp_dir_unix.as_str())
         .unwrap();
     redactions
         .insert(
@@ -60,9 +121,6 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
         .unwrap();
     redactions
         .insert("[TIMESTAMP]", regex!(r"Timestamp: \d+"))
-        .unwrap();
-    redactions
-        .insert("[ROOT]", "/private".to_owned() + tmp_dir.as_str())
         .unwrap();
     redactions
         .insert("[BOC_HEX]", regex!("b5ee[\\d\\w]*"))
@@ -125,5 +183,28 @@ fn normalize_output_internal(stdout: &str, project_path: &Path, strip: bool) -> 
         .insert("[ACTON_DOCS_URL]", "https://i582.github.io/acton/docs")
         .unwrap();
 
-    redactions.redact(&content)
+    redactions
+}
+
+#[allow(dead_code)]
+fn redact_json_value(value: &mut serde_json::Value, redactions: &snapbox::Redactions) {
+    match value {
+        serde_json::Value::String(text) => {
+            *text = redactions.redact(text);
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                redact_json_value(item, redactions);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            let old = mem::take(object);
+            for (key, mut item) in old {
+                let key = redactions.redact(&key);
+                redact_json_value(&mut item, redactions);
+                object.insert(key, item);
+            }
+        }
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+    }
 }

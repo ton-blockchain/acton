@@ -1,8 +1,10 @@
 use crate::common::{assertion, strip_ansi};
-use crate::support::snapshots::{normalize_output, normalize_output_keep_ansi};
+use crate::support::snapshots::{
+    normalize_output, normalize_output_keep_ansi, normalize_output_preserve_escapes,
+};
 use snapbox::Data;
 use snapbox::cmd::OutputAssert;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[allow(dead_code)]
 pub(crate) struct TestOutput {
@@ -75,6 +77,35 @@ pub(crate) trait TestOutputExt {
     fn assert_file_exists(&self, path: &str) -> &Self;
     fn assert_file_contains(&self, path: &str, content: &str) -> &Self;
     fn assert_file_snapshot_matches(&self, file_path: &str, snapshot_path: &str) -> &Self;
+}
+
+#[allow(dead_code)]
+fn is_json_like_snapshot_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+}
+
+#[allow(dead_code)]
+fn normalize_file_snapshot_content(
+    file_content: &str,
+    file_path: &Path,
+    project_path: &Path,
+) -> String {
+    if is_json_like_snapshot_file(file_path) {
+        normalize_output_preserve_escapes(file_content, project_path)
+    } else {
+        normalize_output(file_content, project_path)
+    }
+}
+
+#[allow(dead_code)]
+fn snapshot_assert_for_file(file_path: &Path) -> snapbox::Assert {
+    if is_json_like_snapshot_file(file_path) {
+        assertion().normalize_paths(false)
+    } else {
+        assertion()
+    }
 }
 
 impl TestOutputExt for TestSuccess {
@@ -290,17 +321,16 @@ impl TestOutputExt for TestSuccess {
             panic!("Failed to read file '{}': {}", full_file_path.display(), e)
         });
 
-        let assertion = assertion();
+        let assertion = snapshot_assert_for_file(&full_file_path);
 
         let mut snapshot_full_path = std::env::current_dir().expect("Failed to get current dir");
         snapshot_full_path.push("tests");
         snapshot_full_path.push(snapshot_path);
 
         let expected = Data::read_from(&snapshot_full_path, None);
-        assertion.eq(
-            normalize_output(&file_content, &self.project_path.clone()),
-            expected,
-        );
+        let normalized =
+            normalize_file_snapshot_content(&file_content, &full_file_path, &self.project_path);
+        assertion.eq(normalized, expected);
         self
     }
 }
@@ -519,17 +549,16 @@ impl TestOutputExt for TestFailure {
             panic!("Failed to read file '{}': {}", full_file_path.display(), e)
         });
 
-        let assertion = assertion();
+        let assertion = snapshot_assert_for_file(&full_file_path);
 
         let mut snapshot_full_path = std::env::current_dir().expect("Failed to get current dir");
         snapshot_full_path.push("tests");
         snapshot_full_path.push(snapshot_path);
 
         let expected = Data::read_from(&snapshot_full_path, None);
-        assertion.eq(
-            normalize_output(&file_content, &self.project_path.clone()),
-            expected,
-        );
+        let normalized =
+            normalize_file_snapshot_content(&file_content, &full_file_path, &self.project_path);
+        assertion.eq(normalized, expected);
         self
     }
 }
