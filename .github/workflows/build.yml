@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Cache Cargo
-        uses: ubicloud/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
@@ -52,7 +52,7 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-artifacts
-        uses: ubicloud/cache@v4
+        uses: actions/cache@v4
         with:
           path: ton-repo/artifacts
           key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
