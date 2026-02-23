@@ -207,7 +207,7 @@ pub fn check_cmd(
         .collect::<Vec<_>>();
 
     if let Some(sarif_path) = resolve_sarif_output_path(&cwd, &config, sarif_path) {
-        sarif::write_report(&all_diagnostics, &file_db, &sarif_path)?;
+        sarif::write_report(&all_diagnostics, &file_db, &cwd, &sarif_path)?;
     }
 
     if json {
@@ -276,7 +276,7 @@ pub fn check_cmd(
                     eprintln!();
                 }
                 eprintln!(
-                    "Warning limit exceeded: {} {} (max warnings: {}).",
+                    "Warning limit exceeded: {} {} (max-warnings = {}).",
                     warning_count,
                     if warning_count == 1 {
                         "warning"

@@ -12,7 +12,7 @@ help: prefix with underscore: `_x`
 
 
 1 issue can be fixed automatically, rerun with --fix flag.
-Warning limit exceeded: 1 warning (max warnings: 0).
+Warning limit exceeded: 1 warning (max-warnings = 0).
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
 For example: acton check --explain E002

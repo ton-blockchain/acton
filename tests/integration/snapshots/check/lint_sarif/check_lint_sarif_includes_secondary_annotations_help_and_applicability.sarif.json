@@ -1,0 +1,147 @@
+{
+  "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json",
+  "runs": [
+    {
+      "originalUriBaseIds": {
+        "SRCROOT": {
+          "uri": "[ROOT]/"
+        }
+      },
+      "results": [
+        {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "contracts/main.tolk",
+                    "uriBaseId": "SRCROOT"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "byteLength": 6,
+                        "byteOffset": 46,
+                        "endColumn": 27,
+                        "endLine": 3,
+                        "startColumn": 21,
+                        "startLine": 3
+                      },
+                      "insertedContent": {
+                        "text": "value"
+                      }
+                    },
+                    {
+                      "deletedRegion": {
+                        "byteLength": 6,
+                        "byteOffset": 74,
+                        "endColumn": 23,
+                        "endLine": 4,
+                        "startColumn": 17,
+                        "startLine": 4
+                      },
+                      "insertedContent": {
+                        "text": "value"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "rename `_value` to `value`"
+              },
+              "properties": {
+                "actonApplicability": "auto"
+              }
+            }
+          ],
+          "level": "warning",
+          "locations": [
+            {
+              "message": {
+                "text": "`_value` is marked as unused but used here"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "contracts/main.tolk",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "byteLength": 6,
+                  "byteOffset": 74,
+                  "endColumn": 23,
+                  "endLine": 4,
+                  "startColumn": 17,
+                  "startLine": 4
+                }
+              },
+              "properties": {
+                "actonIsPrimary": true
+              }
+            }
+          ],
+          "message": {
+            "text": "identifier marked as unused is used"
+          },
+          "properties": {
+            "actonDiagnosticName": "used-ignored-identifier",
+            "actonHelp": "remove leading underscore if this identifier should be used"
+          },
+          "relatedLocations": [
+            {
+              "message": {
+                "text": "declared with leading underscore here"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "contracts/main.tolk",
+                  "uriBaseId": "SRCROOT"
+                },
+                "region": {
+                  "byteLength": 6,
+                  "byteOffset": 46,
+                  "endColumn": 27,
+                  "endLine": 3,
+                  "startColumn": 21,
+                  "startLine": 3
+                }
+              },
+              "properties": {
+                "actonIsPrimary": false
+              }
+            }
+          ],
+          "ruleId": "E010",
+          "ruleIndex": 0
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "[ACTON_DOCS_URL]/commands/check",
+          "name": "acton check",
+          "rules": [
+            {
+              "fullDescription": {
+                "text": "### What it does/nChecks for usages of identifiers explicitly marked as unused with a leading underscore./n/n### Why is this bad?/nPrefixing with `_` means the identifier is intentionally unused./nUsing it later is misleading and makes code harder to read./n/n### Example/n```tolk/nfun main() {/n    val _value = 10;/n    _value;/n}/n```/n/nUse instead:/n```tolk/nfun main() {/n    val value = 10;/n    value;/n}/n```/n"
+              },
+              "helpUri": "[ACTON_DOCS_URL]/linter/e010-used-ignored-identifier",
+              "id": "E010",
+              "name": "used-ignored-identifier",
+              "properties": {
+                "actonDefinitionFile": "crates/tolk-linter/src/rules/ast/used_ignored_identifier.rs",
+                "actonDefinitionLine": 29,
+                "actonFixAvailability": "Always",
+                "actonRuleGroupSince": "v0.0.1",
+                "actonRuleGroupStatus": "stable"
+              },
+              "shortDescription": {
+                "text": "Checks for usages of identifiers explicitly marked as unused with a leading underscore."
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

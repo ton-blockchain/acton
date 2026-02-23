@@ -1,40 +1,106 @@
 {
-  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "$schema": "https://schemastore.azurewebsites.net/schemas/json/sarif-2.1.0.json",
   "runs": [
     {
+      "originalUriBaseIds": {
+        "SRCROOT": {
+          "uri": "[ROOT]/"
+        }
+      },
       "results": [
         {
+          "fixes": [
+            {
+              "artifactChanges": [
+                {
+                  "artifactLocation": {
+                    "uri": "contracts/main.tolk",
+                    "uriBaseId": "SRCROOT"
+                  },
+                  "replacements": [
+                    {
+                      "deletedRegion": {
+                        "byteLength": 1,
+                        "byteOffset": 46,
+                        "endColumn": 22,
+                        "endLine": 3,
+                        "startColumn": 21,
+                        "startLine": 3
+                      },
+                      "insertedContent": {
+                        "text": "_x"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "description": {
+                "text": "prefix with underscore: `_x`"
+              },
+              "properties": {
+                "actonApplicability": "auto"
+              }
+            }
+          ],
           "level": "warning",
           "locations": [
             {
+              "message": {
+                "text": "unused variable `x`"
+              },
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "[ROOT]/contracts/main.tolk"
+                  "uri": "contracts/main.tolk",
+                  "uriBaseId": "SRCROOT"
                 },
                 "region": {
+                  "byteLength": 1,
+                  "byteOffset": 46,
                   "endColumn": 22,
                   "endLine": 3,
                   "startColumn": 21,
                   "startLine": 3
                 }
+              },
+              "properties": {
+                "tags": [
+                  "unnecessary"
+                ],
+                "actonIsPrimary": true
               }
             }
           ],
           "message": {
             "text": "variable is unused"
           },
-          "ruleId": "E002"
+          "properties": {
+            "actonDiagnosticName": "unused-variable"
+          },
+          "ruleId": "E002",
+          "ruleIndex": 0
         }
       ],
       "tool": {
         "driver": {
+          "informationUri": "[ACTON_DOCS_URL]/commands/check",
           "name": "acton check",
           "rules": [
             {
+              "fullDescription": {
+                "text": "### What it does/nChecks for variables and parameters that are declared but never used./n/n### Why is this bad?/nUnused variables and parameters clutter the code and can be a sign of a bug./n/n### Example/n```tolk/nfun main() {/n    val x = 1;/n    println(/"hello/");/n}/n```/n/nUse instead:/n```tolk/nfun main() {/n    println(/"hello/");/n}/n```/nOr prefix with an underscore if the variable is intentionally unused:/n```tolk/nfun main() {/n    val _x = 1;/n    println(/"hello/");/n}/n```/n"
+              },
+              "helpUri": "[ACTON_DOCS_URL]/linter/e002-unused-variable",
               "id": "E002",
               "name": "unused-variable",
+              "properties": {
+                "actonDefinitionFile": "crates/tolk-linter/src/rules/ast/unused_variable.rs",
+                "actonDefinitionLine": 36,
+                "actonFixAvailability": "Always",
+                "actonRuleGroupSince": "v0.0.1",
+                "actonRuleGroupStatus": "stable"
+              },
               "shortDescription": {
-                "text": "variable is unused"
+                "text": "Checks for variables and parameters that are declared but never used."
               }
             }
           ]
