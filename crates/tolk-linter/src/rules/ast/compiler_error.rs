@@ -3,7 +3,12 @@ use crate::rules::violation::Violation;
 use tolk_macros::ViolationMetadata;
 
 /// ### What it does
-/// Reports any compiler error.
+/// Reports compiler and parse errors.
+///
+/// ### Behavior notes
+/// - This diagnostic is emitted outside per-rule lint processing.
+///   Inline suppressions and `[lint.rules]` settings do not disable it.
+/// - In machine-readable output, compiler errors use code `C001`.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct CompilerError;

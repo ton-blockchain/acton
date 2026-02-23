@@ -11,10 +11,10 @@ For setup, configuration, and CI usage, start with [Linting](/docs/linting).
 
 | Code | Rule | Status | Quick fix | What it does |
 |:-----|:-----|:-------|:----------|:-------------|
-| [C001](./c001-compiler-error) | [`compiler-error`](./c001-compiler-error) | Stable since `v0.0.1` | not available | Reports any compiler error. |
+| [C001](./c001-compiler-error) | [`compiler-error`](./c001-compiler-error) | Stable since `v0.0.1` | not available | Reports compiler and parse errors. |
 | [E001](./e001-field-init-can-be-folded) | [`field-init-can-be-folded`](./e001-field-init-can-be-folded) | Stable since `v0.0.1` | always available | Checks for struct initialization where the field name and the variable used to initialize it are the same. |
 | [E002](./e002-unused-variable) | [`unused-variable`](./e002-unused-variable) | Stable since `v0.0.1` | always available | Checks for variables and parameters that are declared but never used. |
-| [E003](./e003-mutable-variable-can-be-immutable) | [`mutable-variable-can-be-immutable`](./e003-mutable-variable-can-be-immutable) | Stable since `v0.0.1` | always available | Checks for variables that are declared as mutable (`var`) but are never mutated. |
+| [E003](./e003-mutable-variable-can-be-immutable) | [`mutable-variable-can-be-immutable`](./e003-mutable-variable-can-be-immutable) | Stable since `v0.0.1` | sometimes available | Checks for variables that are declared as mutable (`var`) but are never mutated. |
 | [E004](./e004-deprecated-symbol-use) | [`deprecated-symbol-use`](./e004-deprecated-symbol-use) | Stable since `v0.0.1` | not available | Checks for usage of deprecated symbols in code. |
 | [E005](./e005-write-only-variable) | [`write-only-variable`](./e005-write-only-variable) | Stable since `v0.0.1` | not available | Checks for variables that are written to but never read. |
 | [E006](./e006-unused-import) | [`unused-import`](./e006-unused-import) | Stable since `v0.0.1` | sometimes available | Checks for imports that are never used in the file. |

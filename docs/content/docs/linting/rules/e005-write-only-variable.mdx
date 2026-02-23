@@ -34,4 +34,10 @@ fun main() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/write_only_variable.rs#L29" />
+### Behavior notes
+- Locals prefixed with `_` are ignored.
+- Variables with zero usages are handled by `unused-variable`.
+- This rule only reports variables with writes and no reads.
+  Operations that imply reads (for example `+=`) do not match this rule.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/write_only_variable.rs#L35" />

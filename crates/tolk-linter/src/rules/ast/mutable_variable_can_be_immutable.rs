@@ -30,12 +30,19 @@ use tolk_syntax::{VarDeclLhs, match_parents};
 ///     println(x);
 /// }
 /// ```
+///
+/// ### Behavior notes
+/// - Variables with zero usages are handled by `unused-variable` and are not reported here.
+/// - A variable is considered mutated when write usage is detected
+///   (for example `=`, `+=`, `mutate arg`, field/index writes, mutable method calls).
+/// - Autofix is available for simple `var x = ...` declarations.
+///   Destructuring declarations still warn but may not have a fix.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct MutableVariableCanBeImmutable;
 
 impl Violation for MutableVariableCanBeImmutable {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     fn message(&self) -> String {
         "variable can be immutable".to_string()

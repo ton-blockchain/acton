@@ -27,6 +27,11 @@ use tolk_syntax::{LambdaParameter, Parameter, TryFromNode};
 ///     return value + 1;
 /// }
 /// ```
+///
+/// ### Behavior notes
+/// - Parameters with zero usages are not reported by this rule.
+/// - Passing a parameter as `mutate a` counts as write usage and suppresses this diagnostic.
+/// - Autofix removes the `mutate` keyword (and one trailing whitespace if present).
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct MutableParameterCanBeImmutable;

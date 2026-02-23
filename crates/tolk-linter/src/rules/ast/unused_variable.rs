@@ -33,6 +33,11 @@ use tolk_syntax::{HasName, Ident, LambdaParameter, Parameter, TryFromNode, VarDe
 ///     println("hello");
 /// }
 /// ```
+///
+/// ### Behavior notes
+/// - Locals prefixed with `_` are intentionally ignored.
+/// - The rule also skips type parameters, implicit asm/builtin parameters, and `self`.
+/// - Autofix prefixes the declaration identifier with `_`.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct UnusedVariable;

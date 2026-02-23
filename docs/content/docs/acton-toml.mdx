@@ -178,6 +178,7 @@ When you pass an explicit target to `acton check` (contract id or file path), th
 Compiler errors are never hidden by `exclude`.
 CLI flag `acton check --sarif <PATH>` overrides `lint.output.sarif.path` for the current run.
 For one-off line-level suppressions in source code, use `// acton-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
+Suppressions use rule names (for example `unused-variable`) and do not affect compiler/parser diagnostics (`C001`).
 
 ### Global Configuration
 

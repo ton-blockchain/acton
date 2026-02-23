@@ -22,6 +22,8 @@ This prints a JSON object to stdout with:
 
 Use this mode for editor integrations and custom tooling.
 
+`--json` never applies file edits. Even if you pass `--fix`, fixes are only reported in JSON output and must be applied separately.
+
 ## SARIF Report
 
 Write SARIF to a file:
@@ -58,3 +60,5 @@ Example CI policy:
 [lint]
 max-warnings = 0
 ```
+
+These exit rules are the same for console and JSON modes.

@@ -28,6 +28,11 @@ use tolk_resolver::resolve_index::Resolved;
 ///     println("hello");
 /// }
 /// ```
+///
+/// ### Behavior notes
+/// - Autofix is available only when the unused import can be removed as a whole-line edit.
+/// - If multiple imports share one line, warning is emitted but autofix is skipped.
+/// - Whole-line autofix also removes inline comments attached to that import line.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct UnusedImport;

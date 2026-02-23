@@ -1,6 +1,6 @@
 ---
 title: "C001: compiler-error"
-description: "Reports any compiler error."
+description: "Reports compiler and parse errors."
 ---
 
 import { SourceCodeLink } from '@/components/SourceCodeLink';
@@ -13,6 +13,11 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 - `Quick fix`: not available
 
 ### What it does
-Reports any compiler error.
+Reports compiler and parse errors.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/compiler_error.rs#L7" />
+### Behavior notes
+- This diagnostic is emitted outside per-rule lint processing.
+  Inline suppressions and `[lint.rules]` settings do not disable it.
+- In machine-readable output, compiler errors use code `C001`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/compiler_error.rs#L12" />

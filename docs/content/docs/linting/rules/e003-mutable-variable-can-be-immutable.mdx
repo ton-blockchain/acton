@@ -10,7 +10,7 @@ import { SourceCodeLink } from '@/components/SourceCodeLink';
 - `Code`: `E003`
 - `Rule`: `mutable-variable-can-be-immutable`
 - `Status`: Stable since `v0.0.1`
-- `Quick fix`: always available
+- `Quick fix`: sometimes available
 
 ### What it does
 Checks for variables that are declared as mutable (`var`) but are never mutated.
@@ -34,4 +34,11 @@ fun main() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/mutable_variable_can_be_immutable.rs#L33" />
+### Behavior notes
+- Variables with zero usages are handled by `unused-variable` and are not reported here.
+- A variable is considered mutated when write usage is detected
+  (for example `=`, `+=`, `mutate arg`, field/index writes, mutable method calls).
+- Autofix is available for simple `var x = ...` declarations.
+  Destructuring declarations still warn but may not have a fix.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/mutable_variable_can_be_immutable.rs#L40" />

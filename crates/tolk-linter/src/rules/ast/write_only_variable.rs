@@ -26,6 +26,12 @@ use tolk_resolver::file_index::FileId;
 ///     println("hello");
 /// }
 /// ```
+///
+/// ### Behavior notes
+/// - Locals prefixed with `_` are ignored.
+/// - Variables with zero usages are handled by `unused-variable`.
+/// - This rule only reports variables with writes and no reads.
+///   Operations that imply reads (for example `+=`) do not match this rule.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct WriteOnlyVariable;

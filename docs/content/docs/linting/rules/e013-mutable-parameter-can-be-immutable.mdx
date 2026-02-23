@@ -32,4 +32,9 @@ fun increment(value: int): int {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/mutable_parameter_can_be_immutable.rs#L30" />
+### Behavior notes
+- Parameters with zero usages are not reported by this rule.
+- Passing a parameter as `mutate a` counts as write usage and suppresses this diagnostic.
+- Autofix removes the `mutate` keyword (and one trailing whitespace if present).
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/mutable_parameter_can_be_immutable.rs#L35" />

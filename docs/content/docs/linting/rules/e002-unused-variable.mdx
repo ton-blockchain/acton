@@ -40,4 +40,9 @@ fun main() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/unused_variable.rs#L36" />
+### Behavior notes
+- Locals prefixed with `_` are intentionally ignored.
+- The rule also skips type parameters, implicit asm/builtin parameters, and `self`.
+- Autofix prefixes the declaration identifier with `_`.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/unused_variable.rs#L41" />

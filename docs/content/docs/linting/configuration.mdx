@@ -92,5 +92,8 @@ val legacy = oldLogic();
 Notes:
 
 - Suppression applies only to the immediately following line.
+- The suppression comment must use `//` and be placed directly above the target line.
 - Use lint rule names (for example `unused-variable`), not diagnostic codes (for example `E002`).
+- Unknown rule names in the suppression list are ignored.
 - `all` suppresses all lints for the next line.
+- Suppressions apply to linter diagnostics only. Compiler/parser diagnostics (`C001`) are not suppressed.
