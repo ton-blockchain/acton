@@ -1,0 +1,22 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_linear_mid
+    Finished in [TIME]
+   Compiling fm_linear_root
+    Finished in [TIME]
+   Compiling fm_linear_sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_linear.test.tolk (1 test)
+  ✓ formatter-linear-chain-println [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1828
+           └── FmRelay 0.1994148 TON -> fm_linear_mid C                                gas=1782
+               └── FmDelivered 0.1 TON -> fm_linear_sink D                             gas=333
+
+ ✓ 1 passed in 1 file

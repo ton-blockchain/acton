@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_destroy
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_destroy.test.tolk (1 test)
+  ✓ formatter-account-destroyed-println [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmDestroyNow 0.2 TON -> EQBstq..62kAiU B                                    gas=1557
+           ├── account destroyed
+           └── empty 1.198846 TON -> sender A                                          gas=309
+
+ ✓ 1 passed in 1 file

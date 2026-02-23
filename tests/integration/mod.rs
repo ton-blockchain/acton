@@ -13,6 +13,7 @@ mod disasm_tests;
 mod fixture_tests;
 mod flags_tests;
 mod fmt_tests;
+mod formatter;
 mod incremental_tests;
 mod init_tests;
 mod library_tests;

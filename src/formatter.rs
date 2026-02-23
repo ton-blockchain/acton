@@ -265,7 +265,7 @@ impl<'a> FormatterContext<'a> {
             let letter_str = if index < 26 {
                 letter.to_string()
             } else {
-                let cycle = index / 26 + 1;
+                let cycle = index / 26;
                 format!("{letter}{cycle}")
             };
 
@@ -440,6 +440,13 @@ impl<'a> FormatterContext<'a> {
                         "->".dimmed(),
                         src_formatted.trim()
                     );
+                } else if matches!(&in_msg.info, MsgInfo::ExtIn(_)) {
+                    tx_builder += &format!(
+                        "{} {} {}\n",
+                        "N/A".dimmed(),
+                        "->".dimmed(),
+                        "external".dimmed()
+                    );
                 }
                 tx_builder += "└── ".dimmed().to_string().as_str();
             }
@@ -466,13 +473,34 @@ impl<'a> FormatterContext<'a> {
         contract_letters: &HashMap<IntAddr, String>,
         show_full_names: bool,
     ) -> String {
-        let Some(in_msg) = &tx.in_msg else {
-            return String::new();
-        };
-        let Ok(in_msg) = in_msg.parse::<RelaxedMessage>() else {
-            return String::new();
-        };
-        self.format_single_message(&in_msg, contract_letters, show_full_names)
+        if let Some(in_msg) = &tx.in_msg
+            && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
+        {
+            let message_part =
+                self.format_single_message(&in_msg, contract_letters, show_full_names);
+            if !message_part.is_empty() {
+                return message_part;
+            }
+        }
+
+        if let Ok(Some(in_msg)) = tx.load_in_msg()
+            && let MsgInfo::ExtIn(info) = &in_msg.info
+        {
+            let mut body = in_msg.body;
+            let opcode = body.load_u32().unwrap_or(0);
+            let message_name = self.get_message_name(opcode);
+            let destination = self.format_address_with_letter(&info.dst, contract_letters, true);
+
+            return format!(
+                "{} {} {} {}",
+                "ext-in".blue(),
+                message_name,
+                "->".dimmed(),
+                destination
+            );
+        }
+
+        String::new()
     }
 
     fn format_single_message(

@@ -1,0 +1,22 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_fanout_left
+    Finished in [TIME]
+   Compiling fm_fanout_right
+    Finished in [TIME]
+   Compiling fm_fanout_root
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_fanout.test.tolk (1 test)
+  ✓ formatter-fanout-chain-println [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmFanKick 0.5 TON -> fm_fanout_root B                                       gas=3108
+           ├── FmLeftNotice 0.0996 TON -> fm_fanout_left C                             gas=333
+           └── FmRightNotice 0.1 TON -> fm_fanout_right D                              gas=486
+
+ ✓ 1 passed in 1 file

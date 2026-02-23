@@ -1,0 +1,31 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_flags
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_flags.test.tolk (1 test)
+  ✓ formatter-flags-after-gas-variants [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmFlagsOk 0.2 TON -> fm_flags B                                             gas=516
+       
+       N/A -> sender A
+       └── FmFlagsThrow 0.2 TON -> fm_flags B                                          gas=682 exit_code=10 aborted
+           └── Compute phase failed: Dictionary error
+       
+       N/A -> sender A
+       └── FmFlagsActionFail 0.2 TON -> fm_flags B                                     gas=1245 aborted action_result_code=37
+           ├── Action phase failed
+           ├── Description: Not enough Toncoin
+           ├── Re-run with --backtrace full to get actions location
+           └── Executed actions:
+               └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON
+       
+       N/A -> sender A
+       └── FmFlagsOk 0.2 TON -> EQAAAA..ALrXfh B                                       compute phase skipped aborted
+
+ ✓ 1 passed in 1 file

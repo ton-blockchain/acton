@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_external_root
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_external.test.tolk (1 test)
+  ✓ formatter-external-out-println-destinations [TIME]
+    └─ Test output:
+       N/A -> external
+       └── ext-in FmExternalTrigger -> fm_external_root A                              gas=2757
+           ├── ext-out FmExternalNoneDest -> none
+           └── ext-out FmExternalAddressDest -> 0xa1b2c3d4 (32 bits)
+
+ ✓ 1 passed in 1 file

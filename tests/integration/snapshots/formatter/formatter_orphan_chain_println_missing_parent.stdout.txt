@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_linear_mid
+    Finished in [TIME]
+   Compiling fm_linear_root
+    Finished in [TIME]
+   Compiling fm_linear_sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_linear.test.tolk (1 test)
+  ✓ formatter-orphan-chain-println-missing-parent [TIME]
+    └─ Test output:
+       N/A -> fm_linear_root A
+       └── FmRelay 0.1994148 TON -> fm_linear_mid B                                    gas=1782
+           └── FmDelivered 0.1 TON -> fm_linear_sink C                                 gas=333
+
+ ✓ 1 passed in 1 file

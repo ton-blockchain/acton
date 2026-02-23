@@ -1,0 +1,24 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_action_child
+    Finished in [TIME]
+   Compiling fm_action_fail
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_action.test.tolk (1 test)
+  ✓ formatter-action-phase-failure-println-with-backtrace-full [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── empty 0.2 TON -> fm_action_fail B                                           gas=2347 aborted action_result_code=37
+           ├── account created
+           ├── Action phase failed
+           ├── Description: Not enough Toncoin
+           └── Executed actions:
+               ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL  balance: 0.0990612 TON  at contracts/fm_action_fail[LINE]
+               └── empty 0.5 TON -> EQBS+c..jFM7dP        balance: 0 TON          at contracts/fm_action_fail[LINE]
+
+ ✓ 1 passed in 1 file
