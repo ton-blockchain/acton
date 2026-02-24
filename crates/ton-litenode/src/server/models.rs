@@ -30,6 +30,16 @@ pub struct GetAddressInformationRequest {
 }
 
 #[derive(Deserialize)]
+pub struct AddressRequest {
+    pub address: String,
+}
+
+#[derive(Deserialize)]
+pub struct DetectHashRequest {
+    pub hash: String,
+}
+
+#[derive(Deserialize)]
 pub struct GetTransactionsRequest {
     pub address: String,
     #[serde(default = "default_limit")]

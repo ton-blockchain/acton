@@ -1,11 +1,15 @@
 use super::utils::{get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
+use crate::api::toncenter_v2::map_detect_address;
 use crate::litenode::LiteNode;
 use crate::server::models::*;
+use crate::types::Hash256;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
+use base64::Engine;
 use serde_json::Value;
 use std::sync::Arc;
+use tycho_types::models::{StdAddr, StdAddrFormat};
 
 pub async fn json_rpc(
     State(node): State<Arc<LiteNode>>,
@@ -79,6 +83,27 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
             node.run_get_method(req.address, method_str, req.stack, req.seqno)
                 .await
                 .map(|r| v2::map_run_get_method(&r, false))?
+        }
+        "detectAddress" => {
+            let req: AddressRequest = parse_params(params, method)?;
+            let (addr, flags) = parse_std_addr(&req.address)?;
+            let given_type = detect_given_type(&req.address, flags.bounceable);
+            map_detect_address(&addr, flags, given_type)
+        }
+        "detectHash" => {
+            let req: DetectHashRequest = parse_params(params, method)?;
+            let hash = parse_hash_any(&req.hash)?;
+            v2::map_detect_hash(&hash)
+        }
+        "packAddress" => {
+            let req: AddressRequest = parse_params(params, method)?;
+            let (addr, flags) = parse_std_addr(&req.address)?;
+            v2::map_pack_address(&addr, flags.testnet)
+        }
+        "unpackAddress" => {
+            let req: AddressRequest = parse_params(params, method)?;
+            let (addr, _) = parse_std_addr(&req.address)?;
+            v2::map_unpack_address(&addr)
         }
         "getAddressInformation" => {
             let req: GetAddressInformationRequest = parse_params(params, method)?;
@@ -189,4 +214,48 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
         })),
     )
         .into_response())
+}
+
+fn parse_std_addr(
+    address: &str,
+) -> anyhow::Result<(StdAddr, tycho_types::models::Base64StdAddrFlags)> {
+    StdAddr::from_str_ext(address, StdAddrFormat::any())
+        .map_err(|e| anyhow::anyhow!("Invalid address format: {e}"))
+}
+
+fn detect_given_type(address: &str, bounceable: bool) -> &'static str {
+    if address.contains(':') {
+        "raw_form"
+    } else if bounceable {
+        "friendly_bounceable"
+    } else {
+        "friendly_non_bounceable"
+    }
+}
+
+fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
+    if let Ok(parsed) = Hash256::from_hex(hash) {
+        return Ok(parsed);
+    }
+    if let Ok(parsed) = Hash256::from_base64(hash) {
+        return Ok(parsed);
+    }
+
+    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE.decode(hash)
+        && bytes.len() == 32
+    {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&bytes);
+        return Ok(Hash256(arr));
+    }
+
+    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(hash)
+        && bytes.len() == 32
+    {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&bytes);
+        return Ok(Hash256(arr));
+    }
+
+    anyhow::bail!("Invalid hash format")
 }

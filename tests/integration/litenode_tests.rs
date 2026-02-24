@@ -173,6 +173,81 @@ fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
     node.stop();
 }
 
+#[test]
+fn litenode_supports_utils_detect_and_pack_endpoints() {
+    let project = ProjectBuilder::new("litenode-utils-endpoints").build();
+    let node = project.litenode().start();
+
+    let raw_address = "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79";
+    let detect_address = node.get_json(&format!("/api/v2/detectAddress?address={raw_address}"));
+    assert_eq!(
+        detect_address["ok"].as_bool(),
+        Some(true),
+        "detectAddress failed: {}",
+        serde_json::to_string_pretty(&detect_address).unwrap_or_default()
+    );
+    assert_eq!(
+        detect_address["result"]["@type"].as_str(),
+        Some("ext.utils.detectedAddress")
+    );
+    assert_eq!(
+        detect_address["result"]["raw_form"].as_str(),
+        Some(raw_address)
+    );
+    assert_eq!(
+        detect_address["result"]["given_type"].as_str(),
+        Some("raw_form")
+    );
+    assert_eq!(detect_address["result"]["test_only"].as_bool(), Some(false));
+
+    let bounceable_b64url = detect_address["result"]["bounceable"]["b64url"]
+        .as_str()
+        .expect("Missing bounceable b64url")
+        .to_string();
+    let detect_address_friendly = node.get_json(&format!(
+        "/api/v2/detectAddress?address={bounceable_b64url}"
+    ));
+    assert_eq!(
+        detect_address_friendly["result"]["given_type"].as_str(),
+        Some("friendly_bounceable")
+    );
+    assert_eq!(
+        detect_address_friendly["result"]["raw_form"].as_str(),
+        Some(raw_address)
+    );
+
+    let pack_address = node.get_json(&format!("/api/v2/packAddress?address={raw_address}"));
+    let packed = pack_address["result"]
+        .as_str()
+        .expect("packAddress result must be string");
+    assert_eq!(packed, bounceable_b64url);
+
+    let unpack_address = node.get_json(&format!("/api/v2/unpackAddress?address={packed}"));
+    assert_eq!(unpack_address["result"].as_str(), Some(raw_address));
+
+    let hex_hash = "abababababababababababababababababababababababababababababababab";
+    let detect_hash_hex = node.get_json(&format!("/api/v2/detectHash?hash={hex_hash}"));
+    assert_eq!(
+        detect_hash_hex["ok"].as_bool(),
+        Some(true),
+        "detectHash(hex) failed: {}",
+        serde_json::to_string_pretty(&detect_hash_hex).unwrap_or_default()
+    );
+    assert_eq!(
+        detect_hash_hex["result"]["@type"].as_str(),
+        Some("ext.utils.detectedHash")
+    );
+    assert_eq!(detect_hash_hex["result"]["hex"].as_str(), Some(hex_hash));
+
+    let hash_b64url = detect_hash_hex["result"]["b64url"]
+        .as_str()
+        .expect("Missing detectHash b64url");
+    let detect_hash_b64url = node.get_json(&format!("/api/v2/detectHash?hash={hash_b64url}"));
+    assert_eq!(detect_hash_b64url["result"]["hex"].as_str(), Some(hex_hash));
+
+    node.stop();
+}
+
 fn append_localnet_network(project_path: &Path, base_url: &str) {
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =

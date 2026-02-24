@@ -10,6 +10,7 @@ use serde_json::value::Value;
 use tvmffi::json_stack::{legacy_stack_to_json, stack_to_json};
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 
 pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
     serde_json::json!({
@@ -270,6 +271,89 @@ pub fn map_out_msg_queue_sizes(mi: &LiteNodeMasterchainInfo) -> Value {
         }],
         "ext_msg_queue_size_limit": 0
     })
+}
+
+pub fn map_detect_address(addr: &StdAddr, flags: Base64StdAddrFlags, given_type: &str) -> Value {
+    let bounceable_b64 = DisplayBase64StdAddr {
+        addr,
+        flags: Base64StdAddrFlags {
+            testnet: flags.testnet,
+            base64_url: false,
+            bounceable: true,
+        },
+    }
+    .to_string();
+    let bounceable_b64url = DisplayBase64StdAddr {
+        addr,
+        flags: Base64StdAddrFlags {
+            testnet: flags.testnet,
+            base64_url: true,
+            bounceable: true,
+        },
+    }
+    .to_string();
+
+    let non_bounceable_b64 = DisplayBase64StdAddr {
+        addr,
+        flags: Base64StdAddrFlags {
+            testnet: flags.testnet,
+            base64_url: false,
+            bounceable: false,
+        },
+    }
+    .to_string();
+    let non_bounceable_b64url = DisplayBase64StdAddr {
+        addr,
+        flags: Base64StdAddrFlags {
+            testnet: flags.testnet,
+            base64_url: true,
+            bounceable: false,
+        },
+    }
+    .to_string();
+
+    serde_json::json!({
+        "@type": "ext.utils.detectedAddress",
+        "raw_form": addr.to_string(),
+        "bounceable": {
+            "@type": "ext.utils.detectedAddressVariant",
+            "b64": bounceable_b64,
+            "b64url": bounceable_b64url,
+        },
+        "non_bounceable": {
+            "@type": "ext.utils.detectedAddressVariant",
+            "b64": non_bounceable_b64,
+            "b64url": non_bounceable_b64url,
+        },
+        "given_type": given_type,
+        "test_only": flags.testnet
+    })
+}
+
+pub fn map_detect_hash(hash: &crate::types::Hash256) -> Value {
+    serde_json::json!({
+        "@type": "ext.utils.detectedHash",
+        "b64": hash.to_base64(),
+        "b64url": base64::engine::general_purpose::URL_SAFE.encode(hash.0),
+        "hex": hash.to_hex(),
+    })
+}
+
+pub fn map_pack_address(addr: &StdAddr, test_only: bool) -> Value {
+    DisplayBase64StdAddr {
+        addr,
+        flags: Base64StdAddrFlags {
+            testnet: test_only,
+            base64_url: true,
+            bounceable: true,
+        },
+    }
+    .to_string()
+    .into()
+}
+
+pub fn map_unpack_address(addr: &StdAddr) -> Value {
+    addr.to_string().into()
 }
 
 fn encode_optional_boc(data: Option<&BocBytes>) -> String {
