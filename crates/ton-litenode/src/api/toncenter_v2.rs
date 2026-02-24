@@ -1,9 +1,10 @@
 use crate::litenode::{
     LiteNodeAccountState, LiteNodeBlockHeader, LiteNodeBlockId, LiteNodeBlockTransactions,
     LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult, LiteNodeTransaction,
+    LiteNodeTransactionId,
 };
 use crate::storage::AccountStatus;
-use crate::types::BocBytes;
+use crate::types::{Addr, BocBytes};
 use base64::Engine;
 use serde_json::value::Value;
 use tvmffi::json_stack::{legacy_stack_to_json, stack_to_json};
@@ -26,6 +27,28 @@ pub fn map_transactions(txs: &Vec<LiteNodeTransaction>) -> Value {
     txs.iter().map(map_transaction).collect::<Vec<_>>().into()
 }
 
+pub fn map_transactions_std(txs: &[LiteNodeTransaction], limit: usize) -> Value {
+    let (txs_to_return, previous_id) = if txs.len() > limit {
+        (
+            txs[..limit].to_vec(),
+            txs.get(limit)
+                .map(|tx| tx.transaction_id.clone())
+                .unwrap_or_default(),
+        )
+    } else {
+        (txs.to_vec(), LiteNodeTransactionId::default())
+    };
+
+    serde_json::json!({
+        "@type": "raw.transactions",
+        "transactions": txs_to_return
+            .iter()
+            .map(map_transaction_std)
+            .collect::<Vec<_>>(),
+        "previous_transaction_id": map_internal_transaction_id(&previous_id)
+    })
+}
+
 pub fn map_transaction(tx: &LiteNodeTransaction) -> Value {
     serde_json::json!({
         "@type": "ext.transaction",
@@ -36,16 +59,27 @@ pub fn map_transaction(tx: &LiteNodeTransaction) -> Value {
         "data": base64::engine::general_purpose::STANDARD.encode(&tx.data),
         "success": tx.success,
         "exit_code": tx.exit_code,
-        "transaction_id": {
-            "@type": "internal.transactionId",
-            "lt": tx.transaction_id.lt.to_string(),
-            "hash": tx.transaction_id.hash.to_hex()
-        },
+        "transaction_id": map_internal_transaction_id(&tx.transaction_id),
         "fee": tx.total_fees.to_string(),
         "storage_fee": tx.storage_fees.to_string(),
         "other_fee": tx.other_fees.to_string(),
         "in_msg": map_message(&tx.in_msg),
         "out_msgs": tx.out_msgs.iter().map(map_message).collect::<Vec<_>>()
+    })
+}
+
+pub fn map_transaction_std(tx: &LiteNodeTransaction) -> Value {
+    serde_json::json!({
+        "@type": "raw.transaction",
+        "address": map_account_address(&tx.address),
+        "utime": tx.utime,
+        "data": base64::engine::general_purpose::STANDARD.encode(&tx.data),
+        "transaction_id": map_internal_transaction_id(&tx.transaction_id),
+        "fee": tx.total_fees.to_string(),
+        "storage_fee": tx.storage_fees.to_string(),
+        "other_fee": tx.other_fees.to_string(),
+        "in_msg": map_message_std(&tx.in_msg),
+        "out_msgs": tx.out_msgs.iter().map(map_message_std).collect::<Vec<_>>()
     })
 }
 
@@ -73,16 +107,35 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
     })
 }
 
+pub fn map_message_std(msg: &crate::litenode::LiteNodeMessage) -> Value {
+    if msg.hash.0 == [0; 32] {
+        return serde_json::json!({ "@type": "msg.message" });
+    }
+    serde_json::json!({
+        "@type": "raw.message",
+        "hash": msg.hash.to_hex(),
+        "source": map_optional_account_address(msg.source.as_ref()),
+        "destination": map_optional_account_address(msg.destination.as_ref()),
+        "value": msg.value.to_string(),
+        "fwd_fee": msg.fwd_fee.to_string(),
+        "ihr_fee": msg.ihr_fee.to_string(),
+        "created_lt": msg.created_lt.to_string(),
+        "body_hash": msg.body_hash.to_hex(),
+        "msg_data": {
+            "@type": "msg.dataRaw",
+            "body": base64::engine::general_purpose::STANDARD.encode(&msg.body),
+            "init_state": base64::engine::general_purpose::STANDARD.encode(&msg.init_state)
+        },
+        "extra_currencies": []
+    })
+}
+
 pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
     serde_json::json!({
         "@type": "raw.fullAccountState",
         "balance": s.balance.to_string(),
         "extra_currencies": [],
-        "last_transaction_id": {
-            "@type": "internal.transactionId",
-            "lt": s.last_transaction_id.lt.to_string(),
-            "hash": s.last_transaction_id.hash.to_hex()
-        },
+        "last_transaction_id": map_internal_transaction_id(&s.last_transaction_id),
         "block_id": map_block_id(&s.block_id),
         "code": encode_optional_boc(s.code.as_ref()),
         "data": encode_optional_boc(s.data.as_ref()),
@@ -103,11 +156,7 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
         "address": { "@type": "accountAddress", "account_address": s.address.to_string() },
         "balance": s.balance.to_string(),
         "extra_currencies": [],
-        "last_transaction_id": {
-            "@type": "internal.transactionId",
-            "lt": s.last_transaction_id.lt.to_string(),
-            "hash": s.last_transaction_id.hash.to_hex()
-        },
+        "last_transaction_id": map_internal_transaction_id(&s.last_transaction_id),
         "block_id": map_block_id(&s.block_id),
         "sync_utime": s.sync_utime,
         "account_state": match s.state {
@@ -147,11 +196,7 @@ pub fn map_run_get_method(r: &LiteNodeRunGetMethodResult, is_legacy: bool) -> Va
         "exit_code": r.exit_code,
         "vm_log": r.vm_log,
         "block_id": map_block_id(&r.block_id),
-        "last_transaction_id": {
-            "@type": "internal.transactionId",
-            "lt": r.last_transaction_id.lt.to_string(),
-            "hash": r.last_transaction_id.hash.to_hex()
-        },
+        "last_transaction_id": map_internal_transaction_id(&r.last_transaction_id),
     })
 }
 
@@ -230,4 +275,26 @@ pub fn map_out_msg_queue_sizes(mi: &LiteNodeMasterchainInfo) -> Value {
 fn encode_optional_boc(data: Option<&BocBytes>) -> String {
     data.map(|c| base64::engine::general_purpose::STANDARD.encode(c))
         .unwrap_or_default()
+}
+
+fn map_internal_transaction_id(id: &LiteNodeTransactionId) -> Value {
+    serde_json::json!({
+        "@type": "internal.transactionId",
+        "lt": id.lt.to_string(),
+        "hash": id.hash.to_hex()
+    })
+}
+
+fn map_account_address(addr: &Addr) -> Value {
+    serde_json::json!({
+        "@type": "accountAddress",
+        "account_address": addr.to_string()
+    })
+}
+
+fn map_optional_account_address(addr: Option<&Addr>) -> Value {
+    serde_json::json!({
+        "@type": "accountAddress",
+        "account_address": addr.map(ToString::to_string).unwrap_or_default()
+    })
 }

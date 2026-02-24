@@ -9,9 +9,9 @@
         "@type": "blocks.outMsgQueueSize",
         "id": {
           "@type": "ton.blockIdExt",
-          "file_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-          "root_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-          "seqno": 0,
+          "file_hash": "[HASH]",
+          "root_hash": "[HASH]",
+          "seqno": "[SEQNO]",
           "shard": "-9223372036854775808",
           "workchain": 0
         },

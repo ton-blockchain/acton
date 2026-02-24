@@ -123,6 +123,25 @@ pub async fn get_transactions(
     .await
 }
 
+pub async fn get_transactions_std(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetTransactionsRequest>,
+) -> Json<Value> {
+    let page_limit = payload.limit;
+    let fetch_limit = page_limit.saturating_add(1);
+    handle_result(
+        node.get_transactions(
+            payload.address,
+            fetch_limit,
+            payload.lt,
+            payload.hash,
+            payload.to_lt,
+        ),
+        |res| v2::map_transactions_std(res, page_limit),
+    )
+    .await
+}
+
 pub async fn get_block_header(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,

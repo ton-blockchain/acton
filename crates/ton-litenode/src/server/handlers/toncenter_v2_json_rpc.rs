@@ -110,6 +110,14 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
                 .await
                 .map(|r| v2::map_transactions(&r))?
         }
+        "getTransactionsStd" => {
+            let req: GetTransactionsRequest = parse_params(params, method)?;
+            let page_limit = req.limit;
+            let fetch_limit = page_limit.saturating_add(1);
+            node.get_transactions(req.address, fetch_limit, req.lt, req.hash, req.to_lt)
+                .await
+                .map(|r| v2::map_transactions_std(&r, page_limit))?
+        }
         "getBlockHeader" => {
             let req: GetBlockRequest = parse_params(params, method)?;
             node.get_block_header(req.seqno as u32)
