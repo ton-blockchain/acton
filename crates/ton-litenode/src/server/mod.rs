@@ -27,7 +27,7 @@ pub async fn run_server(node: Arc<LiteNode>, args: ServerArgs) -> anyhow::Result
             .fork_block_number
             .map(|seqno| format!("{fork_network} at seqno {seqno}"))
             .unwrap_or(fork_network);
-        println!("    {} from {}", "Forking".green().bold(), fork_source);
+        println!("     {} from {}", "Forking".green().bold(), fork_source);
     }
     axum::serve(listener, app).await?;
     Ok(())

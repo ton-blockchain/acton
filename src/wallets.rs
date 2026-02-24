@@ -179,6 +179,57 @@ pub fn open_wallets(
     Ok(open_wallets)
 }
 
+pub fn open_selected_wallets(
+    config: &ActonConfig,
+    wallet_names: &[String],
+    net: &Network,
+) -> anyhow::Result<BTreeMap<String, Wallet>> {
+    let configured_wallets = config
+        .wallets
+        .as_ref()
+        .map(|wallets| wallets.wallets.clone())
+        .unwrap_or_default();
+
+    if configured_wallets.is_empty() {
+        anyhow::bail!("No wallets are configured in Acton.toml");
+    }
+
+    let mut selected_wallets = BTreeMap::new();
+    let mut missing_wallets = Vec::new();
+
+    for wallet_name in wallet_names {
+        let wallet_name = wallet_name.trim();
+        if wallet_name.is_empty() {
+            continue;
+        }
+
+        if selected_wallets.contains_key(wallet_name) {
+            continue;
+        }
+
+        let Some(wallet_config) = configured_wallets.get(wallet_name).cloned() else {
+            missing_wallets.push(wallet_name.to_owned());
+            continue;
+        };
+
+        selected_wallets.insert(wallet_name.to_owned(), wallet_config);
+    }
+
+    if !missing_wallets.is_empty() {
+        anyhow::bail!(
+            "Wallets are not found in Acton.toml: {}",
+            missing_wallets.join(", ")
+        );
+    }
+
+    let mut selected_config = config.clone();
+    selected_config.wallets = Some(config::WalletsConfig {
+        wallets: selected_wallets,
+    });
+
+    open_wallets(&selected_config, Some(net), true)
+}
+
 #[must_use]
 pub fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
     match wallet {

@@ -625,6 +625,13 @@ pub enum LitenodeCommand {
             value_name = "SEQNO"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            value_delimiter = ',',
+            help = "Wallet names to auto-fund and deploy on startup (default: [litenode].accounts)",
+            value_name = "NAME[,NAME...]"
+        )]
+        accounts: Option<Vec<String>>,
         #[arg(long, help = "TonCenter API key for blockchain queries")]
         api_key: Option<String>,
         #[arg(long, help = "Path to SQLite database for persistent storage")]
@@ -736,6 +743,10 @@ fn example_litenode_usage() -> StyledStr {
             (
                 "Fork LiteNode from a specific historical block",
                 "acton litenode start --fork-net testnet --fork-block-number 55000000",
+            ),
+            (
+                "Auto-fund and deploy configured wallets",
+                "acton litenode start --accounts deployer,user",
             ),
             (
                 "Request 100 TON from faucet to specified address",
@@ -1599,11 +1610,12 @@ fn main() {
                 port,
                 fork_net,
                 fork_block_number,
+                accounts,
                 api_key,
                 db_path,
             } => {
                 let resolved_litenode =
-                    resolve_litenode_settings(port, fork_net, fork_block_number);
+                    resolve_litenode_settings(port, fork_net, fork_block_number, accounts);
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
@@ -1614,6 +1626,7 @@ fn main() {
                         db_path,
                         resolved_litenode.fork_net,
                         resolved_litenode.fork_block_number,
+                        resolved_litenode.accounts,
                         api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     )
                     .await
@@ -1646,22 +1659,25 @@ struct ResolvedLitenodeSettings {
     port: u16,
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
+    accounts: Vec<String>,
 }
 
 fn resolve_litenode_port(cli_port: Option<u16>) -> u16 {
-    resolve_litenode_settings(cli_port, None, None).port
+    resolve_litenode_settings(cli_port, None, None, None).port
 }
 
 fn resolve_litenode_settings(
     cli_port: Option<u16>,
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
+    cli_accounts: Option<Vec<String>>,
 ) -> ResolvedLitenodeSettings {
     let config = load_litenode_settings_from_config();
     ResolvedLitenodeSettings {
         port: cli_port.or(config.port).unwrap_or(3000),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
+        accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
     }
 }
 

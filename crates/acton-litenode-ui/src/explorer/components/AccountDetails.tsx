@@ -155,7 +155,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
             <TableBody>
               {paginatedTransactions.map(tx => {
                 const inMsg = tx.in_msg
-                const inMsgSrc = parseAddress(inMsg.source?.account_address || "")
+                const inMsgSrc = parseAddress(inMsg.source || "")
                 const isIncoming = inMsgSrc && browsedAddr ? !inMsgSrc.equals(browsedAddr) : false
 
                 const inValue = BigInt(tx.in_msg.value || "0")
@@ -168,9 +168,8 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                 const valueStr = formatNano(displayValue.toString())
 
                 const address = isIncoming
-                  ? tx.in_msg.source?.account_address || ""
-                  : tx.out_msgs.find(m => m.destination?.account_address)?.destination
-                      ?.account_address || ""
+                  ? tx.in_msg.source || ""
+                  : tx.out_msgs.find(m => m.destination)?.destination || ""
 
                 const displayAddressFallback = isIncoming ? "External" : "Contract"
 

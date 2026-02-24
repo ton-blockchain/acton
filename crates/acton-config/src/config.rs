@@ -204,6 +204,7 @@ pub struct LitenodeSettings {
     pub port: Option<u16>,
     pub fork_net: Option<String>,
     pub fork_block_number: Option<u64>,
+    pub accounts: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -956,6 +957,7 @@ version = "0.1.0"
 port = 3015
 fork-net = "testnet"
 fork-block-number = 1234567
+accounts = ["deployer", "user"]
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -963,5 +965,9 @@ fork-block-number = 1234567
         assert_eq!(litenode.port, Some(3015));
         assert_eq!(litenode.fork_net.as_deref(), Some("testnet"));
         assert_eq!(litenode.fork_block_number, Some(1234567));
+        assert_eq!(
+            litenode.accounts,
+            Some(vec!["deployer".to_string(), "user".to_string()])
+        );
     }
 }

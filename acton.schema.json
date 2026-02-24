@@ -197,6 +197,13 @@
           "type": "integer",
           "description": "Block sequence number used by `acton litenode start` when forking from historical state",
           "minimum": 0
+        },
+        "accounts": {
+          "type": "array",
+          "description": "Wallet names from [wallets] that are automatically funded and deployed on `acton litenode start`",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

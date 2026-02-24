@@ -37,8 +37,8 @@ export interface Message {
   readonly "@type": "raw.message" | "msg.message"
   readonly hash?: string
   readonly opcode?: string
-  readonly source?: AccountAddress
-  readonly destination?: AccountAddress
+  readonly source?: string
+  readonly destination?: string
   readonly value?: string
   readonly fwd_fee?: string
   readonly ihr_fee?: string

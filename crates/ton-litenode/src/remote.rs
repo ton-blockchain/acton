@@ -6,12 +6,13 @@ use serde::{Deserialize, Serialize};
 use ton_api::TonApiClient;
 use ton_networks::Network;
 use tycho_types::boc::Boc;
-use tycho_types::cell::{CellBuilder, CellFamily, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Lazy, Store};
 use tycho_types::models::{
-    Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
-    StdAddr, StorageInfo,
+    Account, AccountState, CurrencyCollection, ExtraCurrencyCollection, IntAddr, OptionalAccount,
+    ShardAccount, StateInit, StdAddr, StorageInfo,
 };
 use tycho_types::num::Tokens;
+use tycho_types::prelude::HashBytes;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteProvider {
@@ -90,11 +91,11 @@ pub fn fetch_remote_shard_account(
         address: IntAddr::Std(StdAddr {
             anycast: None,
             workchain: addr.workchain as i8,
-            address: tycho_types::prelude::HashBytes(addr.addr),
+            address: HashBytes(addr.addr),
         }),
         balance: CurrencyCollection {
             tokens: Tokens::new(balance),
-            other: tycho_types::models::ExtraCurrencyCollection::new(),
+            other: ExtraCurrencyCollection::new(),
         },
         state: account_state,
         last_trans_lt,
@@ -102,15 +103,13 @@ pub fn fetch_remote_shard_account(
     };
 
     let sa = ShardAccount {
-        account: tycho_types::cell::Lazy::new(&OptionalAccount(Some(acc)))?,
-        last_trans_hash: tycho_types::prelude::HashBytes(
-            last_trans_hash.map(|h| h.0).unwrap_or([0; 32]),
-        ),
+        account: Lazy::new(&OptionalAccount(Some(acc)))?,
+        last_trans_hash: HashBytes(last_trans_hash.map(|h| h.0).unwrap_or([0; 32])),
         last_trans_lt,
     };
 
     let mut builder = CellBuilder::new();
-    sa.store_into(&mut builder, tycho_types::cell::Cell::empty_context())?;
+    sa.store_into(&mut builder, Cell::empty_context())?;
     let cell = builder.build()?;
     let boc = Boc::encode(cell);
     let account_hash = compute_boc_hash(&boc)?;
