@@ -37,6 +37,7 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
             get(get_block_transactions_ext),
         )
         .route("/v2/getMasterchainInfo", get(get_masterchain_info))
+        .route("/v2/getOutMsgQueueSize", get(get_out_msg_queue_size))
         .route("/v2/getShards", get(get_shards))
         .route("/v2/shards", get(get_shards))
         .route("/v2/lookupBlock", get(lookup_block));

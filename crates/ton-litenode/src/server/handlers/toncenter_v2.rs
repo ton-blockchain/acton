@@ -178,6 +178,10 @@ pub async fn get_masterchain_info(State(node): State<Arc<LiteNode>>) -> Json<Val
     handle_result(node.get_masterchain_info(), v2::map_masterchain_info).await
 }
 
+pub async fn get_out_msg_queue_size(State(node): State<Arc<LiteNode>>) -> Json<Value> {
+    handle_result(node.get_masterchain_info(), v2::map_out_msg_queue_sizes).await
+}
+
 pub async fn get_shards(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetBlockRequest>,

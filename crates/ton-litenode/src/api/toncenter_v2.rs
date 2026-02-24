@@ -215,6 +215,18 @@ pub fn map_lookup_block(id: &LiteNodeBlockId) -> Value {
     map_block_id(id)
 }
 
+pub fn map_out_msg_queue_sizes(mi: &LiteNodeMasterchainInfo) -> Value {
+    serde_json::json!({
+        "@type": "blocks.outMsgQueueSizes",
+        "shards": [{
+            "@type": "blocks.outMsgQueueSize",
+            "id": map_block_id(&mi.last),
+            "size": 0
+        }],
+        "ext_msg_queue_size_limit": 0
+    })
+}
+
 fn encode_optional_boc(data: Option<&BocBytes>) -> String {
     data.map(|c| base64::engine::general_purpose::STANDARD.encode(c))
         .unwrap_or_default()

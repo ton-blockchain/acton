@@ -132,6 +132,10 @@ async fn json_rpc_router(node: Arc<LiteNode>, payload: JsonRpcRequest) -> anyhow
             .get_masterchain_info()
             .await
             .map(|r| v2::map_masterchain_info(&r))?,
+        "getOutMsgQueueSize" => node
+            .get_masterchain_info()
+            .await
+            .map(|r| v2::map_out_msg_queue_sizes(&r))?,
         "shards" => {
             let req: GetBlockRequest = parse_params(params, method)?;
             node.get_shards(req.seqno as u32)
