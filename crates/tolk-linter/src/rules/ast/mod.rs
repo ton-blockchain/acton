@@ -1,6 +1,7 @@
 pub mod acton_import_in_contract;
 pub mod asm_function_missing_safety_comment;
 pub mod compiler_error;
+pub mod dangerous_send_mode_missing_safety_comment;
 pub mod deprecated_symbol_use;
 pub mod field_init_can_be_folded;
 pub mod import_path_can_use_mappings;
@@ -13,6 +14,7 @@ pub mod name_case_checker;
 pub mod no_bounce_handler;
 pub mod pure_function_call_unused;
 pub mod reserve_mode_literal;
+pub mod safety_comment_helpers;
 pub mod send_mode_literal;
 pub mod several_not_null_assertions;
 pub mod unused_import;

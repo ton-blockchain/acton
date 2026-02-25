@@ -1,3 +1,4 @@
+use crate::ast::dangerous_send_mode_missing_safety_comment::DangerousSendModeMissingSafetyComment;
 use crate::ast::{
     acton_import_in_contract, asm_function_missing_safety_comment, compiler_error,
     deprecated_symbol_use, field_init_can_be_folded, import_path_can_use_mappings,
@@ -77,6 +78,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E018") => import_path_can_use_mappings::ImportPathCanUseMappings,
         (Tolk, "E019") => several_not_null_assertions::SeveralNotNullAssertions,
         (Tolk, "E020") => reserve_mode_literal::ReserveModeLiteral,
+        (Tolk, "E021") => DangerousSendModeMissingSafetyComment,
         (Tolk, "C001") => compiler_error::CompilerError,
         (Tolk, "S001") => name_case_checker::NameCaseChecker,
         _ => return None,

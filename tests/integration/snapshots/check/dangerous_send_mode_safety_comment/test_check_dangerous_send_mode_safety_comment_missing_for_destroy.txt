@@ -1,0 +1,11 @@
+warning[E021]: send with dangerous mode requires safety comment
+  --> [ROOT]/contracts/main[LINE]
+  |
+8 |                 outMsg.send(SEND_MODE_DESTROY | SEND_MODE_CARRY_ALL_BALANCE);
+  |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ add `// SAFETY: ...` above this `send` call
+  |
+  = document why this dangerous send mode is safe in this context and which invariants are required
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E021

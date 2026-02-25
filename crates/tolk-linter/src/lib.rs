@@ -2,7 +2,8 @@ extern crate core;
 
 use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{
-    acton_import_in_contract, deprecated_symbol_use, no_bounce_handler, several_not_null_assertions,
+    acton_import_in_contract, dangerous_send_mode_missing_safety_comment, deprecated_symbol_use,
+    no_bounce_handler, several_not_null_assertions,
 };
 use crate::rules::ast::{
     asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
@@ -490,6 +491,17 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
                 Rule::ReserveModeLiteral,
                 reserve_mode_literal::check_call(self.checker, self.file_id, node, Some(inference))
             );
+
+            run_rule!(
+                self.checker,
+                Rule::DangerousSendModeMissingSafetyComment,
+                dangerous_send_mode_missing_safety_comment::check_call(
+                    self.checker,
+                    self.file_id,
+                    node,
+                    Some(inference)
+                )
+            );
         } else {
             run_rule!(
                 self.checker,
@@ -501,6 +513,17 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
                 self.checker,
                 Rule::ReserveModeLiteral,
                 reserve_mode_literal::check_call(self.checker, self.file_id, node, None)
+            );
+
+            run_rule!(
+                self.checker,
+                Rule::DangerousSendModeMissingSafetyComment,
+                dangerous_send_mode_missing_safety_comment::check_call(
+                    self.checker,
+                    self.file_id,
+                    node,
+                    None
+                )
             );
         }
 

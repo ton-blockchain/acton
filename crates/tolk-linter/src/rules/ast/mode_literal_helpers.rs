@@ -95,7 +95,7 @@ fn rewrite_bin(bin: &Bin, source: &str, flags: &[(u32, &str)]) -> RewrittenMode 
     }
 }
 
-fn parse_int_literal(raw: &str) -> Option<u32> {
+pub(super) fn parse_int_literal(raw: &str) -> Option<u32> {
     let normalized = raw.replace('_', "");
 
     if let Some(hex) = normalized
