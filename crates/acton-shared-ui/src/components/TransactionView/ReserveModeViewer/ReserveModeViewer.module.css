@@ -5,6 +5,11 @@
   font-size: 0.85rem;
 }
 
+.modeItem {
+  display: inline-flex;
+  align-items: center;
+}
+
 .constant {
   color: var(--color-todo);
   text-decoration: underline dotted;
@@ -18,4 +23,9 @@
 .empty {
   color: var(--text-muted);
   font-style: italic;
+}
+
+.tooltipDescription {
+  color: var(--text-secondary);
+  line-height: 1.4;
 }

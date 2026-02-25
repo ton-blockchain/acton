@@ -1,13 +1,13 @@
 import type {OutAction} from "@ton/core"
-import type React from "react"
-import {useState} from "react"
+import React, {useState} from "react"
 
 import type {ContractData} from "@/types/transaction"
 import {fmt, DataBlock} from "@/index"
+import {parseSendMode} from "@/components/TransactionView/SendModeViewer/parser"
+import {parseReserveMode} from "@/utils/transaction"
 
 import {ContractChip} from "../ContractChip/ContractChip"
 import {ReserveModeViewer} from "../ReserveModeViewer/ReserveModeViewer"
-import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 
 import styles from "./ActionsSummary.module.css"
 
@@ -78,6 +78,21 @@ const formatBoolean = (v: boolean): React.JSX.Element => (
   <span className={v ? styles.booleanTrue : styles.booleanFalse}>{v ? "Yes" : "No"}</span>
 )
 
+const formatModeNames = (names: readonly string[]): string =>
+  names.length > 0 ? names.join(" + ") : "—"
+
+const formatSendModeNames = (mode: number): string => {
+  return formatModeNames(parseSendMode(mode).map(flag => flag.name))
+}
+
+const getReserveModeNames = (mode: number): readonly string[] => {
+  return parseReserveMode(mode).map(flag => flag.name)
+}
+
+const formatReserveModeNames = (mode: number): string => {
+  return formatModeNames(getReserveModeNames(mode))
+}
+
 const renderActionDetails = (
   action: OutAction,
   contractAddress: string,
@@ -97,9 +112,7 @@ const renderActionDetails = (
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Mode:</span>
-              <div className={styles.detailValue}>
-                <SendModeViewer mode={action.mode} />
-              </div>
+              <span className={styles.detailValue}>{formatSendModeNames(action.mode)}</span>
             </div>
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Type:</span>
@@ -269,7 +282,7 @@ export function ActionsSummary({
       case "reserve": {
         return {
           title: "Reserve",
-          description: `Mode: ${action.mode}`,
+          description: `Mode: ${formatReserveModeNames(action.mode)}`,
           value: fmt.formatCurrency(action.currency.coins),
         }
       }
@@ -306,6 +319,19 @@ export function ActionsSummary({
                   </div>
                 )
               }
+            } else if (action.type === "reserve") {
+              const reserveModeNames = getReserveModeNames(action.mode)
+              enhancedDescription = (
+                <span>
+                  Mode:{" "}
+                  {reserveModeNames.map((modeName, modeIndex) => (
+                    <React.Fragment key={`${modeName}-${modeIndex}`}>
+                      {modeIndex > 0 && <span className={styles.modeSummarySeparator}> + </span>}
+                      <span className={styles.modeSummaryName}>{modeName}</span>
+                    </React.Fragment>
+                  ))}
+                </span>
+              )
             }
 
             return (

@@ -1,6 +1,7 @@
 .container {
   width: 100%;
   position: relative;
+  padding-bottom: var(--spacing-sm);
 }
 
 .scrollWrapper {
@@ -92,6 +93,14 @@
   white-space: nowrap;
 }
 
+.modeSummaryName {
+  color: var(--color-todo);
+}
+
+.modeSummarySeparator {
+  color: var(--text-secondary);
+}
+
 .actionDescriptionWithChip {
   display: flex;
   align-items: center;
@@ -109,7 +118,7 @@
 }
 
 .detailsContainer {
-  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+  padding: var(--spacing-mds) var(--spacing-md);
   border-radius: var(--border-radius-sm);
   margin-top: var(--spacing-sm);
   background-color: var(--bg-color);
@@ -139,7 +148,7 @@
 .detailRow {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-mds);
   min-height: 24px;
 }
 

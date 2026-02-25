@@ -1,5 +1,6 @@
 import type React from "react"
 
+import {Tooltip} from "@/components/Tooltip/Tooltip"
 import {parseReserveMode} from "@/utils/transaction"
 
 import styles from "./ReserveModeViewer.module.css"
@@ -16,11 +17,16 @@ export const ReserveModeViewer: React.FC<ReserveModeViewerProps> = ({mode}) => {
   return (
     <div className={styles.container}>
       {flags.map((flag, index) => (
-        <span key={flag.value} title={flag.description}>
+        <span key={`${flag.name}-${flag.value}`} className={styles.modeItem}>
           {index > 0 && <span className={styles.plus}> + </span>}
-          <span className={styles.constant}>
-            {flag.name} ({flag.value})
-          </span>
+          <Tooltip
+            content={<div className={styles.tooltipDescription}>{flag.description}</div>}
+            variant="hover"
+          >
+            <span className={styles.constant}>
+              {flag.name} ({flag.value})
+            </span>
+          </Tooltip>
         </span>
       ))}
     </div>
