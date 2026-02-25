@@ -43,6 +43,21 @@
   margin-top: var(--spacing-xs);
 }
 
+.tooltipDocs {
+  font-size: var(--font-size-xs);
+  margin-top: var(--spacing-xs);
+  color: var(--text-secondary);
+}
+
+.tooltipLink {
+  color: var(--link-color);
+  text-decoration: underline;
+}
+
+.tooltipLink:hover {
+  opacity: 0.8;
+}
+
 .tooltipPhase {
   margin-top: var(--spacing-xs);
 }

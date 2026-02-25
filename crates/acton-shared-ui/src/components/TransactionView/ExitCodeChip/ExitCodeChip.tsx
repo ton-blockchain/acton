@@ -2,7 +2,7 @@ import type {Abi} from "@/types"
 import {Tooltip} from "@/index"
 
 import styles from "./ExitCodeViewer.module.css"
-import {EXIT_CODE_DESCRIPTIONS} from "./error-codes"
+import {EXIT_CODE_DESCRIPTIONS, getExitCodeDocsUrl, type ExitCodeDescription} from "./error-codes"
 
 interface ExitCodeViewerProps {
   readonly exitCode: number | undefined
@@ -14,9 +14,9 @@ export function ExitCodeChip({exitCode, abi}: ExitCodeViewerProps) {
     return <span className={styles.exitCode}>—</span>
   }
 
-  const standardDescription = (
-    EXIT_CODE_DESCRIPTIONS as Record<number, {name: string; description: string; phase: string}>
-  )[exitCode] ?? {
+  const standardDescription = (EXIT_CODE_DESCRIPTIONS as Record<number, ExitCodeDescription>)[
+    exitCode
+  ] ?? {
     name: "Custom error",
     description: "User defined error",
     phase: "Compute phase",
@@ -27,6 +27,7 @@ export function ExitCodeChip({exitCode, abi}: ExitCodeViewerProps) {
   const displayName = standardDescription?.name ?? (customErrorDescription ? "Custom error" : "")
   const description = customErrorDescription ?? standardDescription?.description
   const phase = standardDescription?.phase
+  const docsUrl = getExitCodeDocsUrl(exitCode)
 
   const tooltipContent = (
     <div className={styles.tooltipContent}>
@@ -34,6 +35,14 @@ export function ExitCodeChip({exitCode, abi}: ExitCodeViewerProps) {
         <div className={styles.tooltipSection}>
           <div className={styles.tooltipLabel}>Description:</div>
           <div className={styles.tooltipDescription}>{description}</div>
+          {docsUrl && (
+            <div className={styles.tooltipDocs}>
+              Learn more in{" "}
+              <a href={docsUrl} target="_blank" rel="noreferrer" className={styles.tooltipLink}>
+                documentation
+              </a>
+            </div>
+          )}
         </div>
       )}
       {phase && (

@@ -12,7 +12,7 @@
   background-color: var(--bg-color);
   border-radius: var(--border-radius-md);
   box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
-  min-width: 200px;
+  min-width: 250px;
   max-width: 320px;
   font-size: var(--font-size-sm);
   line-height: 1.4;
