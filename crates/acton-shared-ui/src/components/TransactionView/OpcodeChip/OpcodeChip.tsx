@@ -41,7 +41,7 @@ export const OpcodeChip: React.FC<OpcodeChipProps> = ({opcode, abiName, showOpco
   return (
     <div className={styles.opcodeChip}>
       <span className={styles.opcodeText}>{displayText}</span>
-      {displaySubText && <span className={styles.opcodeSubText}>{`··${displaySubText}`}</span>}
+      {displaySubText && <span className={styles.opcodeSubText}>{`· ${displaySubText}`}</span>}
       {copyValue && (
         <button
           type="button"
