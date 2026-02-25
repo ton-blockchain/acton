@@ -484,6 +484,10 @@ fn generate_tolk_dependency_content(
 ///
 /// - Contract: `{dependency_key}`
 /// - Path: `{contract_path}`
+///
+/// # Safety
+///
+/// This function always return valid cell with contract code.
 @pure
 fun {func_name}(): cell asm \"\"\"
 {asm_code}

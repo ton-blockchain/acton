@@ -9,6 +9,10 @@
 ///
 /// - Contract: `123contract`
 /// - Path: `contracts/123contract.tolk`
+///
+/// # Safety
+///
+/// This function always returns the correct cell with the contract code.
 @pure
 fun contract_123contractCompiledCode(): cell asm """
     "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==" base64>B B>boc PUSHREF
