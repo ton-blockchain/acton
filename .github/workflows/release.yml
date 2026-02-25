@@ -17,6 +17,12 @@ jobs:
     runs-on: ubicloud-standard-4
     if: true
 
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+
     outputs:
       arch: ${{ steps.detect-arch.outputs.arch }}
 
@@ -30,7 +36,9 @@ jobs:
           save-if: false
 
       - name: Install Rust
-        run: rustup toolchain install
+        run: |
+          rustup target add ${{ matrix.target }}
+          rustup toolchain install
 
       - name: Installing additional Rust components
         uses: taiki-e/install-action@v2
@@ -68,6 +76,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y graphviz
+
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get install -y musl-tools
 
       - name: Maximize Build Space
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -120,7 +133,7 @@ jobs:
           CXX: g++
         run: |
           just build-ui
-          cargo build --profile release-size --bin acton
+          cargo build --profile release-size --target ${{ matrix.target }} --bin acton
 
       - name: Test acton binary
         run: |
