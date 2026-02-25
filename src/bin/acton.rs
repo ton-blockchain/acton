@@ -25,7 +25,7 @@ use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory};
 use clap::{Parser, Subcommand};
 use clap_complete::CompleteEnv;
-use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
+use clap_complete::engine::{ArgValueCompleter, CompletionCandidate, PathCompleter};
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
@@ -391,7 +391,7 @@ enum Commands {
         after_help = example_run_usage()
     )]
     Run {
-        #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(complete_scripts))]
+        #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(PathCompleter::file()))]
         script: String,
         #[arg(
             help = "Arguments to pass to the script",
@@ -775,31 +775,38 @@ fn example_test_usage() -> StyledStr {
     writer
 }
 
-fn complete_contracts(_current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
-    let Ok(config) = ActonConfig::load() else {
+fn complete_contracts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let Some(config) = load_config_for_completion() else {
         return vec![];
     };
 
+    let current = current.to_string_lossy();
     config
         .contracts
         .unwrap_or_default()
         .contracts
         .keys()
+        .filter(|contract| contract.starts_with(current.as_ref()))
         .map(CompletionCandidate::new)
         .collect()
 }
 
-fn complete_scripts(_current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
-    let Ok(config) = ActonConfig::load() else {
-        return vec![];
-    };
+fn load_config_for_completion() -> Option<ActonConfig> {
+    let mut current = env::current_dir().ok()?;
 
-    config
-        .scripts
-        .unwrap_or_default()
-        .keys()
-        .map(CompletionCandidate::new)
-        .collect()
+    loop {
+        let config_path = current.join("Acton.toml");
+        if config_path.is_file() {
+            let content = fs::read_to_string(config_path).ok()?;
+            return toml::from_str::<ActonConfig>(&content).ok();
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    None
 }
 
 fn example_build_usage() -> StyledStr {
