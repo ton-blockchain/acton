@@ -49,9 +49,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             Expr::Assign(assignment) => self.infer_assignment(assignment, flow, as_cond),
             Expr::SetAssign(assignment) => self.infer_set_assignment(assignment, flow, as_cond),
             Expr::Unary(unary_op) => self.infer_unary_operator(unary_op, flow, as_cond),
-            Expr::Bin(binary_op) => {
-                self.infer_binary_expression(binary_op, flow, as_cond, hint)
-            }
+            Expr::Bin(binary_op) => self.infer_binary_expression(binary_op, flow, as_cond, hint),
             Expr::Ternary(ternary_op) => {
                 self.infer_ternary_operator(ternary_op, flow, as_cond, hint)
             }
@@ -266,15 +264,15 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             VarDeclPattern::TupleVars(lhs_tuple) => {
                 let rhs_unwrapped = self.intrn().unwrap_alias(rhs_ty);
                 let mut repeated_item_ty = None;
-                let rhs_items = if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone()
-                {
-                    items
-                } else if let TyData::Array(item_ty) = self.intrn().data(rhs_unwrapped) {
-                    repeated_item_ty = Some(*item_ty);
-                    Vec::new()
-                } else {
-                    return;
-                };
+                let rhs_items =
+                    if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone() {
+                        items
+                    } else if let TyData::Array(item_ty) = self.intrn().data(rhs_unwrapped) {
+                        repeated_item_ty = Some(*item_ty);
+                        Vec::new()
+                    } else {
+                        return;
+                    };
 
                 let vars: Vec<_> = lhs_tuple.vars().collect();
                 let mut types_list = Vec::with_capacity(vars.len());
@@ -495,15 +493,15 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             Expr::Tuple(lhs_tuple) => {
                 let rhs_unwrapped = self.intrn().unwrap_alias(rhs_ty);
                 let mut repeated_item_ty = None;
-                let rhs_items = if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone()
-                {
-                    items
-                } else if let TyData::Array(item_ty) = self.intrn().data(rhs_unwrapped) {
-                    repeated_item_ty = Some(*item_ty);
-                    Vec::new()
-                } else {
-                    return;
-                };
+                let rhs_items =
+                    if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone() {
+                        items
+                    } else if let TyData::Array(item_ty) = self.intrn().data(rhs_unwrapped) {
+                        repeated_item_ty = Some(*item_ty);
+                        Vec::new()
+                    } else {
+                        return;
+                    };
 
                 let mut types_list = Vec::with_capacity(lhs_tuple.elements().count());
                 for (i, element) in lhs_tuple.elements().enumerate() {
@@ -802,8 +800,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
 
         let intrn = self.intrn();
         let out_flow = after_true.out_flow.merge_flow(&after_false.out_flow, intrn);
-        let true_flow = after_true.true_flow.merge_flow(&after_false.true_flow, intrn);
-        let false_flow = after_true.false_flow.merge_flow(&after_false.false_flow, intrn);
+        let true_flow = after_true
+            .true_flow
+            .merge_flow(&after_false.true_flow, intrn);
+        let false_flow = after_true
+            .false_flow
+            .merge_flow(&after_false.false_flow, intrn);
 
         ExprFlow::new(out_flow, true_flow, false_flow)
     }
@@ -2057,13 +2059,15 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         hint: Option<TyId>,
     ) -> ExprFlow {
         let mut flow = flow;
-        let tensor_hint = hint.and_then(|h| self.pick_unique_tensor_hint(h)).and_then(|h| {
-            if let TyData::Tensor(items) = self.intrn().data(h).clone() {
-                Some(items)
-            } else {
-                None
-            }
-        });
+        let tensor_hint = hint
+            .and_then(|h| self.pick_unique_tensor_hint(h))
+            .and_then(|h| {
+                if let TyData::Tensor(items) = self.intrn().data(h).clone() {
+                    Some(items)
+                } else {
+                    None
+                }
+            });
 
         let elements: Vec<_> = v.elements().collect();
         let mut types_list = Vec::with_capacity(elements.len());

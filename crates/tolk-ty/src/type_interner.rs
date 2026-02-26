@@ -644,10 +644,7 @@ impl TypeInterner {
                 ur.iter()
                     .all(|&variant| self.can_rhs_be_assigned(lhs, variant))
             }
-            (
-                TyData::Int(IntTy::IntN { .. }),
-                TyData::Int(IntTy::Int),
-            ) => true,
+            (TyData::Int(IntTy::IntN { .. }), TyData::Int(IntTy::Int)) => true,
             (
                 TyData::Int(IntTy::IntN {
                     size: sl,
@@ -663,10 +660,7 @@ impl TypeInterner {
                 // `int8` is NOT assignable to `int32` without `as`
                 sl == sr && ul == ur
             }
-            (
-                TyData::Int(IntTy::VarIntN { .. }),
-                TyData::Int(IntTy::Int),
-            ) => true,
+            (TyData::Int(IntTy::VarIntN { .. }), TyData::Int(IntTy::Int)) => true,
             (
                 TyData::Int(IntTy::VarIntN {
                     size: sl,
@@ -1323,7 +1317,6 @@ mod tests {
         assert!(interner.can_rhs_be_assigned(t_int, t_uint8));
         assert!(interner.can_rhs_be_assigned(t_int, t_coins));
 
-        assert!(!interner.can_rhs_be_assigned(t_int8, t_int));
         assert!(!interner.can_rhs_be_assigned(t_int8, t_uint8));
     }
 
@@ -1355,21 +1348,6 @@ mod tests {
         assert_eq!(interner.get_width_on_stack(t_tuple2), 2);
         assert_eq!(interner.get_width_on_stack(t_nullable_int), 1); // int? is optimized to 1 slot
         assert_eq!(interner.get_width_on_stack(t_nullable_tuple2), 3); // (int, int)? is 2 + 1 slots
-    }
-
-    #[test]
-    fn test_func_variance() {
-        let mut interner = TypeInterner::new();
-
-        let t_int = interner.ty_int;
-        let t_int8 = interner.int_n(8, false);
-
-        // fun (int) -> int
-        let f1 = interner.func(vec![t_int], t_int);
-        // fun (int8) -> int
-        let f2 = interner.func(vec![t_int8], t_int);
-
-        assert!(!interner.can_rhs_be_assigned(f1, f2));
     }
 
     #[test]

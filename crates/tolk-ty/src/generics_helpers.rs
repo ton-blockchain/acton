@@ -134,20 +134,20 @@ impl GenericSubstitutionsDeducing {
             }
             (TyData::Tensor(p_items), _) => {
                 // `arg: (int, T)` called as `f((5, cs))` => T is slice
-                if let TyData::Tensor(a_items) = arg_unwrapped_data.clone() {
-                    if p_items.len() == a_items.len() {
-                        for (&p, &a) in p_items.iter().zip(a_items.iter()) {
-                            self.consider_next_condition(p, a, interner);
-                        }
+                if let TyData::Tensor(a_items) = arg_unwrapped_data
+                    && p_items.len() == a_items.len()
+                {
+                    for (&p, &a) in p_items.iter().zip(a_items.iter()) {
+                        self.consider_next_condition(p, a, interner);
                     }
                 }
             }
             (TyData::Tuple(p_items), _) => {
-                if let TyData::Tuple(a_items) = arg_unwrapped_data.clone() {
-                    if p_items.len() == a_items.len() {
-                        for (&p, &a) in p_items.iter().zip(a_items.iter()) {
-                            self.consider_next_condition(p, a, interner);
-                        }
+                if let TyData::Tuple(a_items) = arg_unwrapped_data
+                    && p_items.len() == a_items.len()
+                {
+                    for (&p, &a) in p_items.iter().zip(a_items.iter()) {
+                        self.consider_next_condition(p, a, interner);
                     }
                 }
             }
@@ -162,14 +162,13 @@ impl GenericSubstitutionsDeducing {
                 if let TyData::Func {
                     params: a_params,
                     return_ty: a_ret,
-                } = arg_unwrapped_data.clone()
+                } = arg_unwrapped_data
+                    && p_params.len() == a_params.len()
                 {
-                    if p_params.len() == a_params.len() {
-                        for (&p, &a) in p_params.iter().zip(a_params.iter()) {
-                            self.consider_next_condition(p, a, interner);
-                        }
-                        self.consider_next_condition(p_ret, a_ret, interner);
+                    for (&p, &a) in p_params.iter().zip(a_params.iter()) {
+                        self.consider_next_condition(p, a, interner);
                     }
+                    self.consider_next_condition(p_ret, a_ret, interner);
                 }
             }
             (
@@ -259,16 +258,17 @@ impl GenericSubstitutionsDeducing {
                     } => {
                         // `arg: WrapperAlias<T>` called as `f(wrappedInt)` => T is int
                         let p_data = interner.data(p_inner).clone();
-                        let mut matched_by_alias = false;
-                        if let TyData::TypeAlias { def: p_def, .. } = p_data
+                        let matched_by_alias = if let TyData::TypeAlias { def: p_def, .. } = p_data
                             && p_def == a_def
                             && p_args.len() == a_args.len()
                         {
                             for (&p, &a) in p_args.iter().zip(a_args.iter()) {
                                 self.consider_next_condition(p, a, interner);
                             }
-                            matched_by_alias = true;
-                        }
+                            true
+                        } else {
+                            false
+                        };
 
                         if !matched_by_alias {
                             // `arg: Wrapper<T>` called as `f(wrapperAliasValue)` =>
