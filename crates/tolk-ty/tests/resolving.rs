@@ -261,3 +261,8 @@ fn test_struct_fields() {
 fn test_type_parameters() {
     run_resolve_tests_from_file(&get_test_path("type-parameters.test"));
 }
+
+#[test]
+fn test_array_methods() {
+    run_resolve_tests_from_file(&get_test_path("array-methods.test"));
+}

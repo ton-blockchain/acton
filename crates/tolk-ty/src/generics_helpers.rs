@@ -73,6 +73,12 @@ impl GenericSubstitutionsDeducing {
                 // `(arg: T)` called as `f([1, 2])` => T is [int, int]
                 self.substitutions.set_type_t(name, arg_ty);
             }
+            (TyData::Array(p_item), _) => {
+                let arg_unwrapped = interner.unwrap_alias(arg_ty);
+                if let TyData::Array(a_item) = interner.data(arg_unwrapped) {
+                    self.consider_next_condition(p_item, *a_item, interner);
+                }
+            }
             (TyData::Union(p_variants), TyData::Union(a_variants)) => {
                 // `arg: T1 | T2` called as `f(intOrBuilder)` => T1 is int, T2 is builder
                 // `arg: int | T1` called as `f(builderOrIntOrSlice)` => T1 is builder|slice

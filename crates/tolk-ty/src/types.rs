@@ -29,6 +29,8 @@ pub enum TyData {
     Tensor(Vec<TyId>),
     /// A tuple type (e.g. `[int, int]`).
     Tuple(Vec<TyId>),
+    /// An array type (e.g. `array<int>`).
+    Array(TyId),
     /// A union type (e.g. `int | null`).
     Union(Vec<TyId>),
     Func {

@@ -1848,90 +1848,14 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         ExprFlow::create(flow, as_cond)
     }
 
-    fn array_type_def_id(&self, ty: TyId) -> Option<SymbolId> {
-        let ty = self.const_intrn().unwrap_alias(ty);
-        match self.const_intrn().data(ty) {
-            TyData::Struct { name, def, .. } => {
-                if name.as_ref() == "array" {
-                    Some(*def)
-                } else {
-                    None
-                }
-            }
-            TyData::GenericTypeWithTs { inner_ty, .. } => {
-                if let TyData::Struct { name, def, .. } = self.const_intrn().data(*inner_ty)
-                    && name.as_ref() == "array"
-                {
-                    return Some(*def);
-                }
-                None
-            }
-            _ => None,
-        }
-    }
-
-    fn array_symbol_id(&self) -> Option<SymbolId> {
-        let symbols = self
-            .ctx
-            .type_db
-            .project_index
-            .global_symbols()
-            .get("array")?;
-        for symbol_id in symbols {
-            if let Some(symbol) = self.ctx.type_db.project_index.resolve_symbol(*symbol_id)
-                && matches!(symbol.kind, SymbolKind::Struct { .. })
-            {
-                return Some(*symbol_id);
-            }
-        }
-        None
-    }
-
-    fn array_type_from_element(&mut self, element_ty: TyId, preferred_hint: Option<TyId>) -> TyId {
-        let preferred_def = preferred_hint.and_then(|hint| self.array_type_def_id(hint));
-        let array_def = preferred_def.or_else(|| self.array_symbol_id());
-
-        if let Some(def_id) = array_def {
-            let name = self
-                .ctx
-                .type_db
-                .project_index
-                .resolve_symbol(def_id)
-                .map(|s| s.name.clone())
-                .unwrap_or_else(|| "array".into());
-
-            return self
-                .intrn()
-                .struct_instantiation(def_id, name, def_id, vec![element_ty]);
-        }
-
-        // If array type isn't available, keep old tuple fallback.
-        self.intrn().tuple(vec![element_ty])
+    fn array_type_from_element(&mut self, element_ty: TyId, _preferred_hint: Option<TyId>) -> TyId {
+        self.intrn().array(element_ty)
     }
 
     fn array_element_type(&self, ty: TyId) -> Option<TyId> {
         let ty = self.const_intrn().unwrap_alias(ty);
         match self.const_intrn().data(ty) {
-            TyData::Struct { name, args, .. } => {
-                if name.as_ref() == "array" {
-                    return args
-                        .as_ref()
-                        .and_then(|args| args.first().copied())
-                        .or_else(|| Some(self.const_intrn().ty_unknown));
-                }
-                None
-            }
-            TyData::GenericTypeWithTs { inner_ty, types } => {
-                if let TyData::Struct { name, .. } = self.const_intrn().data(*inner_ty)
-                    && name.as_ref() == "array"
-                {
-                    return types
-                        .first()
-                        .copied()
-                        .or_else(|| Some(self.const_intrn().ty_unknown));
-                }
-                None
-            }
+            TyData::Array(item) => Some(*item),
             _ => None,
         }
     }

@@ -156,6 +156,11 @@ impl TypeInterner {
         self.intern(TyData::Tuple(elements))
     }
 
+    /// Creates an array type.
+    pub fn array(&mut self, element_ty: TyId) -> TyId {
+        self.intern(TyData::Array(element_ty))
+    }
+
     /// Creates a tensor type.
     pub fn tensor(&mut self, elements: Vec<TyId>) -> TyId {
         self.intern(TyData::Tensor(elements))
@@ -389,6 +394,7 @@ impl TypeInterner {
             TyData::Tensor(items) | TyData::Tuple(items) | TyData::Union(items) => {
                 items.iter().any(|&item| self.has_generics(item))
             }
+            TyData::Array(item) => self.has_generics(*item),
             TyData::Func { params, return_ty } => {
                 params.iter().any(|&p| self.has_generics(p)) || self.has_generics(*return_ty)
             }
@@ -498,6 +504,7 @@ impl TypeInterner {
                     .zip(tb.iter())
                     .all(|(&ea, &eb)| self.equals(ea, eb))
             }
+            (TyData::Array(ta), TyData::Array(tb)) => self.equals(*ta, *tb),
             (
                 TyData::Func {
                     params: pa,
@@ -558,20 +565,7 @@ impl TypeInterner {
     fn array_element_type(&self, ty: TyId) -> Option<TyId> {
         let ty = self.unwrap_alias(ty);
         match self.data(ty) {
-            TyData::Struct { name, args, .. } => {
-                if name.as_ref() == "array" {
-                    return args.as_ref().and_then(|args| args.first().copied());
-                }
-                None
-            }
-            TyData::GenericTypeWithTs { inner_ty, types } => {
-                if let TyData::Struct { name, .. } = self.data(*inner_ty)
-                    && name.as_ref() == "array"
-                {
-                    return types.first().copied();
-                }
-                None
-            }
+            TyData::Array(item) => Some(*item),
             _ => None,
         }
     }
@@ -702,22 +696,12 @@ impl TypeInterner {
                     .zip(tr.iter())
                     .all(|(&el, &er)| self.can_rhs_be_assigned(el, er))
             }
-            _ if self.array_element_type(lhs).is_some() => {
-                let Some(item_l) = self.array_element_type(lhs) else {
-                    return false;
-                };
-
-                if let Some(item_r) = self.array_element_type(rhs) {
-                    return self.can_rhs_be_assigned(item_l, item_r);
-                }
-                if let TyData::Tuple(items) = dr {
-                    return items
-                        .iter()
-                        .all(|&item| self.can_rhs_be_assigned(item_l, item));
-                }
-
-                false
+            (TyData::Array(item_l), TyData::Array(item_r)) => {
+                self.can_rhs_be_assigned(*item_l, *item_r)
             }
+            (TyData::Array(item_l), TyData::Tuple(items)) => items
+                .iter()
+                .all(|&item| self.can_rhs_be_assigned(*item_l, item)),
             (TyData::MapKV { key: kl, value: vl }, TyData::MapKV { key: kr, value: vr }) => {
                 self.equals(*kl, *kr) && self.equals(*vl, *vr)
             }
@@ -1064,24 +1048,7 @@ impl TypeInterner {
             (self.array_element_type(a), self.array_element_type(b))
         {
             let item_lca = self.calculate_type_lca(item_a, item_b);
-
-            let pick_array_def = |this: &TypeInterner, ty: TyId| -> Option<(SymbolId, Arc<str>)> {
-                let unwrapped = this.unwrap_alias(ty);
-                match this.data(unwrapped) {
-                    TyData::Struct { def, name, .. } => Some((*def, name.clone())),
-                    TyData::GenericTypeWithTs { inner_ty, .. } => {
-                        if let TyData::Struct { def, name, .. } = this.data(*inner_ty) {
-                            return Some((*def, name.clone()));
-                        }
-                        None
-                    }
-                    _ => None,
-                }
-            };
-
-            if let Some((def, name)) = pick_array_def(self, a).or_else(|| pick_array_def(self, b)) {
-                return self.struct_instantiation(def, name, def, vec![item_lca]);
-            }
+            return self.array(item_lca);
         }
 
         // became_union parameter omitted for simplicity since we don't need it

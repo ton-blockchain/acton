@@ -1,0 +1,101 @@
+========================================================================
+Array generic instance method
+========================================================================
+fun array<T>.arrayMethodInstanceUnique(self): T {}
+
+fun main(a: array<int>) {
+    a.<caret>arrayMethodInstanceUnique();
+}
+------------------------------------------------------------------------
+3:6 -> 0:13 resolved
+
+========================================================================
+Array generic static method
+========================================================================
+fun array<T>.arrayMethodStaticUnique(): array<T> {}
+
+fun main() {
+    array<int>.<caret>arrayMethodStaticUnique();
+}
+------------------------------------------------------------------------
+3:15 -> 0:13 resolved
+
+========================================================================
+Array method through alias
+========================================================================
+type IntArray = array<int>
+
+fun array<T>.arrayMethodAliasUnique(self, value: T): void {}
+
+fun main(a: IntArray) {
+    a.<caret>arrayMethodAliasUnique(10);
+}
+------------------------------------------------------------------------
+5:6 -> 2:13 resolved
+
+========================================================================
+Array method with method generics
+========================================================================
+fun array<T>.arrayMethodGenericUnique<U>(self, f: (T) -> U): array<U> {}
+
+fun inc(x: int): int { return x + 1; }
+
+fun main(a: array<int>) {
+    a.<caret>arrayMethodGenericUnique(inc);
+}
+------------------------------------------------------------------------
+5:6 -> 0:13 resolved
+
+========================================================================
+Array specialized instance methods with same name
+========================================================================
+fun array<int>.sameName(self): int {}
+fun array<slice>.sameName(self): slice {}
+fun array<T>.sameName(self): T {}
+
+fun main(ai: array<int>, aslice: array<slice>, ab: array<builder>) {
+    ai.<caret>sameName();
+    aslice.<caret>sameName();
+    ab.<caret>sameName();
+}
+------------------------------------------------------------------------
+5:7 -> 0:15 resolved
+6:11 -> 1:17 resolved
+7:7 -> 2:13 resolved
+
+========================================================================
+Array specialized static methods with same name
+========================================================================
+fun array<int>.sameStatic(): array<int> {}
+fun array<slice>.sameStatic(): array<slice> {}
+fun array<T>.sameStatic(): array<T> {}
+
+fun main() {
+    array<int>.<caret>sameStatic();
+    array<slice>.<caret>sameStatic();
+    array<builder>.<caret>sameStatic();
+}
+------------------------------------------------------------------------
+5:15 -> 0:15 resolved
+6:17 -> 1:17 resolved
+7:19 -> 2:13 resolved
+
+========================================================================
+Array specialized methods with same name via aliases
+========================================================================
+type IntArray = array<int>
+type SliceArray = array<slice>
+
+fun array<int>.sameAlias(self): int {}
+fun array<slice>.sameAlias(self): slice {}
+fun array<T>.sameAlias(self): T {}
+
+fun main(ai: IntArray, aslice: SliceArray, ab: array<builder>) {
+    ai.<caret>sameAlias();
+    aslice.<caret>sameAlias();
+    ab.<caret>sameAlias();
+}
+------------------------------------------------------------------------
+8:7 -> 3:15 resolved
+9:11 -> 4:17 resolved
+10:7 -> 5:13 resolved

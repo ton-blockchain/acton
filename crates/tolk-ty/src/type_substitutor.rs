@@ -79,6 +79,13 @@ impl<'a> TypeSubstitutor<'a> {
                 }
                 self.interner.intern(TyData::Tuple(elements))
             }
+            TyData::Array(old_element) => {
+                let element_ty = self.substitute(old_element, mapping);
+                if element_ty == old_element {
+                    return id;
+                }
+                self.interner.array(element_ty)
+            }
             TyData::Union(old_elements) => {
                 let mut changed = false;
                 let mut elements = Vec::new();

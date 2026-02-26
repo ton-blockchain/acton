@@ -224,6 +224,11 @@ fn test_types_string() {
 }
 
 #[test]
+fn test_types_array() {
+    run_tests_from_file(&get_test_path("array.test"));
+}
+
+#[test]
 fn test_types_funcs() {
     run_tests_from_file(&get_test_path("funcs.test"));
 }

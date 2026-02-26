@@ -47,6 +47,7 @@ impl<'a> TypeFormatter<'a> {
                 let parts = elements.iter().map(|t| self.format(*t)).collect::<Vec<_>>();
                 format!("[{}]", parts.join(", "))
             }
+            TyData::Array(element_ty) => format!("array<{}>", self.format(*element_ty)),
             TyData::Tensor(elements) => {
                 let parts = elements.iter().map(|t| self.format(*t)).collect::<Vec<_>>();
                 format!("({})", parts.join(", "))
@@ -160,12 +161,14 @@ mod tests {
 
         // int | bool
         let t_union = interner.union(vec![t_int, interner.ty_bool]);
+        let t_array = interner.array(t_int);
 
         let formatter = TypeFormatter::new(&interner);
         assert_eq!(formatter.format(t_tuple), "[int, bool]");
         assert_eq!(formatter.format(t_func), "(int, bool) -> void");
         assert_eq!(formatter.format(t_struct), "MyStruct");
         assert_eq!(formatter.format(t_inst), "MyStruct<int>");
+        assert_eq!(formatter.format(t_array), "array<int>");
         assert_eq!(formatter.format(t_union), "int | bool");
     }
 }

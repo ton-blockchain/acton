@@ -194,15 +194,23 @@ impl<'a> TypeDb<'a> {
                     SymbolKind::Struct {
                         type_parameters, ..
                     } => {
-                        let base_ty = self.intrn.struct_ty(*id, name.clone());
-                        if type_parameters.is_empty() {
-                            Some(base_ty)
-                        } else {
-                            let type_parameters = type_parameters
-                                .iter()
+                        if name.as_ref() == "array" {
+                            let element_ty = type_parameters
+                                .first()
                                 .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
-                                .collect();
-                            Some(self.intrn.generic_type_with_ts(base_ty, type_parameters))
+                                .unwrap_or(self.intrn.ty_unknown);
+                            Some(self.intrn.array(element_ty))
+                        } else {
+                            let base_ty = self.intrn.struct_ty(*id, name.clone());
+                            if type_parameters.is_empty() {
+                                Some(base_ty)
+                            } else {
+                                let type_parameters = type_parameters
+                                    .iter()
+                                    .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
+                                    .collect();
+                                Some(self.intrn.generic_type_with_ts(base_ty, type_parameters))
+                            }
                         }
                     }
                     SymbolKind::Enum { .. } => Some(self.intrn.enum_ty(*id, name.clone())),
@@ -593,6 +601,13 @@ impl<'a> TypeDb<'a> {
             .collect::<Vec<_>>();
 
         let non_generic = tys.iter().all(|t| !self.intrn.has_generics(*t));
+
+        if matches!(self.intrn.data(inner_ty), TyData::Array(_)) {
+            return Some(
+                self.intrn
+                    .array(*tys.first().unwrap_or(&self.intrn.ty_unknown)),
+            );
+        }
 
         let inner_data = self.intrn.data(inner_ty);
         if let TyData::GenericTypeWithTs { inner_ty, .. } = inner_data {

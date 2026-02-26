@@ -77,6 +77,10 @@ pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeS
                 depth: 1 + max_depth,
             }
         }
+        TyData::Array(item) => ShapeScore {
+            kind: ShapeKind::Instantiated,
+            depth: 1 + calculate_shape_score(*item, interner).depth,
+        },
         TyData::GenericTypeWithTs { types, .. } => {
             let mut max_depth = 0;
             for &t in types {
