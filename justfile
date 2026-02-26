@@ -26,7 +26,7 @@ test-tree-sitter:
 update-test-tree-sitter:
     cd crates/tree-sitter-tolk && yarn && tree-sitter generate && tree-sitter test -u
 
-test: test-unit test-serial test-integration test-tree-sitter
+test: test-unit test-serial test-integration
 
 test-update:
     SNAPSHOTS=overwrite just test

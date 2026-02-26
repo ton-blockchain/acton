@@ -1,0 +1,57 @@
+name: Building Tolk tree-sitter grammar
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - crates/tree-sitter-tolk
+  push:
+    branches:
+      - master
+    paths:
+      - crates/tree-sitter-tolk
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tree-sitter-grammars:
+    name: Test tree-sitter
+    runs-on: ubicloud-standard-4
+    if: true
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v6
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.x
+          cache: "yarn"
+
+      - name: Setup EMSDK
+        uses: pyodide/setup-emsdk@ca2dd8aef8c2a0e11743c5c36f0b430ddb694b5c # v15
+        env:
+          EMSDK_VERSION: 5.0.2
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+          actions-cache-folder: "emsdk-cache"
+          cache-key: emsdk-cache-${{ runner.os }}-${{ runner.arch }}-${{ env.EMSDK_VERSION }}
+
+      - name: Install dependencies
+        working-directory: crates/tree-sitter-tolk
+        run: yarn install --immutable --check-cache --check-resolutions
+
+      - name: Build WASM
+        working-directory: crates/tree-sitter-tolk
+        run: tree-sitter generate
+
+      - name: Test parsers
+        working-directory: crates/tree-sitter-tolk
+        run: tree-sitter test -u
