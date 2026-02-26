@@ -846,31 +846,53 @@ fn example_test_usage() -> StyledStr {
     writer
 }
 
-fn complete_contracts(_current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
-    let Ok(config) = ActonConfig::load() else {
+fn complete_contracts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let Some(config) = load_config_for_completion() else {
         return vec![];
     };
 
+    let current = current.to_string_lossy();
     config
         .contracts
         .unwrap_or_default()
         .contracts
         .keys()
+        .filter(|contract| contract.starts_with(current.as_ref()))
         .map(CompletionCandidate::new)
         .collect()
 }
 
-fn complete_scripts(_current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
-    let Ok(config) = ActonConfig::load() else {
+fn complete_scripts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let Some(config) = load_config_for_completion() else {
         return vec![];
     };
 
+    let current = current.to_string_lossy();
     config
         .scripts
         .unwrap_or_default()
         .keys()
+        .filter(|script| script.starts_with(current.as_ref()))
         .map(CompletionCandidate::new)
         .collect()
+}
+
+fn load_config_for_completion() -> Option<ActonConfig> {
+    let mut current = env::current_dir().ok()?;
+
+    loop {
+        let config_path = current.join("Acton.toml");
+        if config_path.is_file() {
+            let content = fs::read_to_string(config_path).ok()?;
+            return toml::from_str::<ActonConfig>(&content).ok();
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    None
 }
 
 fn example_build_usage() -> StyledStr {
