@@ -4,9 +4,11 @@ use crate::type_substitutor::TypeSubstitutor;
 use crate::types::{AddressKind, TyData};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
+use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{
     FileId, OptionalSyntaxNodeSpanExt, Span, Symbol, SymbolId, SymbolKind,
+    TypeParameter as DeclTypeParameter,
 };
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::resolve_index::{LocalDefKind, Resolved};
@@ -135,13 +137,13 @@ impl<'a> TypeDb<'a> {
         let unwrapped = self.intrn.unwrap_alias(struct_ty);
         match self.intrn.data(unwrapped) {
             TyData::Struct { def, .. } => Some(*def),
-            TyData::GenericTypeWithTs { inner_ty, .. } => {
-                if let TyData::Struct { def, .. } = self.intrn.data(*inner_ty) {
-                    Some(*def)
-                } else {
-                    None
-                }
-            }
+            TyData::TypeAlias { inner_ty, .. } => self.find_struct(*inner_ty),
+            TyData::GenericTypeWithTs { inner_ty, .. } => match self.intrn.data(*inner_ty) {
+                TyData::Struct { def, .. } => Some(*def),
+                TyData::TypeAlias { inner_ty, .. } => self.find_struct(*inner_ty),
+                TyData::GenericTypeWithTs { inner_ty, .. } => self.find_struct(*inner_ty),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -205,10 +207,8 @@ impl<'a> TypeDb<'a> {
                             if type_parameters.is_empty() {
                                 Some(base_ty)
                             } else {
-                                let type_parameters = type_parameters
-                                    .iter()
-                                    .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
-                                    .collect();
+                                let type_parameters =
+                                    self.lower_declared_type_parameters(symbol, type_parameters);
                                 Some(self.intrn.generic_type_with_ts(base_ty, type_parameters))
                             }
                         }
@@ -229,6 +229,69 @@ impl<'a> TypeDb<'a> {
                 let _ = self.get_top_level_type(Some(&symbol.kind), symbol.id);
             }
         }
+    }
+
+    fn lower_declared_type_parameters(
+        &mut self,
+        symbol: &Symbol,
+        fallback: &[DeclTypeParameter],
+    ) -> Vec<TyId> {
+        let file_id = symbol.id.file_id;
+        let from_decl = if let Some(file) = self.file_db.get_by_id(file_id) {
+            if let Some(decl) = file.find_syntax_declaration(symbol.id) {
+                decl.type_parameters().map(|params| {
+                    params
+                        .parameters()
+                        .map(|param| {
+                            let name = param
+                                .name()
+                                .and_then(|n| self.file_db.text_of(file_id, &n))
+                                .unwrap_or_else(|| "unknown".into());
+                            let default_ty = self.lower_opt_type(file_id, param.default().as_ref());
+                            self.intrn.type_parameter(name.to_string(), default_ty)
+                        })
+                        .collect::<Vec<_>>()
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some(type_parameters) = from_decl {
+            return type_parameters;
+        }
+
+        fallback
+            .iter()
+            .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
+            .collect()
+    }
+
+    fn local_type_parameter_default(
+        &mut self,
+        file_id: FileId,
+        local_def_span: Span,
+    ) -> Option<TyId> {
+        let file = self.file_db.get_by_id(file_id)?;
+        for top_level in file.source().top_levels() {
+            let Some(type_parameters) = top_level.type_parameters() else {
+                continue;
+            };
+
+            for param in type_parameters.parameters() {
+                let Some(param_name) = param.name() else {
+                    continue;
+                };
+                if param_name.span().contains(local_def_span.start())
+                    || local_def_span.contains(param_name.span().start())
+                {
+                    return self.lower_opt_type(file_id, param.default().as_ref());
+                }
+            }
+        }
+        None
     }
 
     fn infer_single_symbol_type(&mut self, symbol_id: SymbolId) -> Option<TyId> {
@@ -382,16 +445,12 @@ impl<'a> TypeDb<'a> {
                                 .name()
                                 .and_then(|n| self.file_db.text_of(file_id, &n))
                                 .unwrap_or_else(|| "unknown".into());
-                            self.intrn.type_parameter(name.to_string(), None)
+                            let default_ty = self.lower_opt_type(file_id, p.default().as_ref());
+                            self.intrn.type_parameter(name.to_string(), default_ty)
                         })
                         .collect::<Vec<_>>();
 
-                    let alias_ty = self.intrn.type_alias_instantiation(
-                        symbol.id,
-                        name,
-                        inner,
-                        type_params.clone(),
-                    );
+                    let alias_ty = self.intrn.type_alias(symbol.id, name, inner);
                     return Some(self.intrn.generic_type_with_ts(alias_ty, type_params));
                 }
 
@@ -474,8 +533,11 @@ impl<'a> TypeDb<'a> {
             let resolved_index = self.project_index.get_resolved_uses(file_id)?;
             let local = resolved_index.find_local_at(type_ident.0.start_byte())?;
             if matches!(local.kind, LocalDefKind::TypeParameter) {
-                // TODO: default type
-                return Some(self.intrn.type_parameter(local.name.to_string(), None));
+                let default_ty = self.local_type_parameter_default(file_id, local.def_span);
+                return Some(
+                    self.intrn
+                        .type_parameter(local.name.to_string(), default_ty),
+                );
             }
             return None;
         };
@@ -486,8 +548,11 @@ impl<'a> TypeDb<'a> {
                     && let Some(resolved) = resolved.find_local(local)
                     && matches!(resolved.kind, LocalDefKind::TypeParameter)
                 {
-                    // TODO: default type
-                    return Some(self.intrn.type_parameter(resolved.name.to_string(), None));
+                    let default_ty = self.local_type_parameter_default(file_id, resolved.def_span);
+                    return Some(
+                        self.intrn
+                            .type_parameter(resolved.name.to_string(), default_ty),
+                    );
                 }
                 return None;
             }
@@ -609,9 +674,10 @@ impl<'a> TypeDb<'a> {
         let inner_ty = self.lower_type(file_id, &Type::TypeIdent(name_node));
 
         let types = args_list;
-        let tys = types
+        let mut tys = types
             .map(|t| self.lower_type(file_id, &t))
             .collect::<Vec<_>>();
+        self.append_missing_generic_defaults(inner_ty, &mut tys);
 
         let non_generic = tys.iter().all(|t| !self.intrn.has_generics(*t));
 
@@ -698,6 +764,26 @@ impl<'a> TypeDb<'a> {
         }
 
         Some(self.intrn.generic_type_with_ts(inner_ty, tys))
+    }
+
+    fn append_missing_generic_defaults(&self, inner_ty: TyId, provided: &mut Vec<TyId>) {
+        let TyData::GenericTypeWithTs { types, .. } = self.intrn.data(inner_ty).clone() else {
+            return;
+        };
+        if provided.len() >= types.len() {
+            return;
+        }
+
+        for &formal in types.iter().skip(provided.len()) {
+            let default_ty = match self.intrn.data(formal) {
+                TyData::TypeParameter {
+                    default_type: Some(default_ty),
+                    ..
+                } => *default_ty,
+                _ => self.intrn.ty_undefined,
+            };
+            provided.push(default_ty);
+        }
     }
 
     fn convert_function_type(&mut self, func: &FunCallableType, file_id: FileId) -> Option<TyId> {

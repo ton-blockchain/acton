@@ -1,9 +1,11 @@
 use crate::flow_inference::{FlowContext, InferenceContext, InferenceResult, SinkExpr};
 use crate::type_db::TypeDb;
 use crate::type_interner::{TyId, TypeInterner};
+use crate::type_substitutor::TypeSubstitutor;
 use crate::type_unify::TypeInferringUnifyStrategy;
 use crate::types::TyData;
 use log::warn;
+use rustc_hash::FxHashMap;
 use smol_str::SmolStr;
 use std::collections::VecDeque;
 use tolk_resolver::file_index::{
@@ -104,6 +106,15 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         self.ctx
             .type_db
             .lower_opt_type(self.ctx.file_id, ty.as_ref())
+    }
+
+    pub(crate) fn apply_defaults_to_type(&mut self, ty: TyId) -> TyId {
+        if !self.intrn().has_generics(ty) {
+            return ty;
+        }
+        let mapping = FxHashMap::default();
+        let mut substitutor = TypeSubstitutor::new_with_defaults(self.intrn());
+        substitutor.substitute(ty, &mapping)
     }
 
     pub(crate) const fn local_id_of(&self, span: Span) -> LocalDefId {
@@ -284,7 +295,14 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         symbol_id: SymbolId,
     ) -> Option<()> {
         let mut body_start = FlowContext::new();
-        let declared_return_ty = self.lower_or_none(v.return_type());
+        let is_generic_declaration = v.type_parameters().is_some();
+        let declared_return_ty = self.lower_or_none(v.return_type()).map(|ty| {
+            if is_generic_declaration {
+                ty
+            } else {
+                self.apply_defaults_to_type(ty)
+            }
+        });
 
         self.infer_type_parameters(v);
 
@@ -301,7 +319,14 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
                 continue;
             };
 
-            let param_type = self.lower(param.typ());
+            let param_type = {
+                let ty = self.lower(param.typ());
+                if is_generic_declaration {
+                    ty
+                } else {
+                    self.apply_defaults_to_type(ty)
+                }
+            };
             body_start.register_known_type(self.sink_of(&param), param_type);
             self.ctx.set_node_type(&name, param_type);
 
@@ -325,12 +350,26 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
 
     pub(crate) fn infer_method<'t>(&mut self, v: &Method<'t>, symbol_id: SymbolId) -> Option<()> {
         let mut body_start = FlowContext::new();
-        let declared_return_ty = self.lower_or_none(v.return_type());
+        let is_generic_declaration = v.type_parameters().is_some();
+        let declared_return_ty = self.lower_or_none(v.return_type()).map(|ty| {
+            if is_generic_declaration {
+                ty
+            } else {
+                self.apply_defaults_to_type(ty)
+            }
+        });
         self.ctx.declared_return_ty = declared_return_ty;
 
         self.infer_type_parameters(v);
 
-        let receiver_type = self.lower(v.receiver_type());
+        let receiver_type = {
+            let ty = self.lower(v.receiver_type());
+            if is_generic_declaration {
+                ty
+            } else {
+                self.apply_defaults_to_type(ty)
+            }
+        };
 
         for param in v.parameters() {
             let Some(name) = param.name() else {
@@ -345,7 +384,14 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
                 continue;
             }
 
-            let param_type = self.lower(param.typ());
+            let param_type = {
+                let ty = self.lower(param.typ());
+                if is_generic_declaration {
+                    ty
+                } else {
+                    self.apply_defaults_to_type(ty)
+                }
+            };
             body_start.register_known_type(self.sink_of(&param), param_type);
             self.ctx.set_node_type(&name, param_type);
 

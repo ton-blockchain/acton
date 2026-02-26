@@ -59,10 +59,27 @@ impl<'a> TypeFormatter<'a> {
             }
             TyData::Union(elements) => {
                 if let Some((inner, _)) = self.interner.as_nullable_union(id) {
-                    return format!("{}?", self.format(inner));
+                    let inner_text = self.format(inner);
+                    let inner = self.interner.unwrap_alias(inner);
+                    let needs_parens = matches!(self.interner.data(inner), TyData::Func { .. });
+                    if needs_parens {
+                        return format!("({inner_text})?");
+                    }
+                    return format!("{inner_text}?");
                 }
 
-                let parts = elements.iter().map(|t| self.format(*t)).collect::<Vec<_>>();
+                let parts = elements
+                    .iter()
+                    .map(|t| {
+                        let text = self.format(*t);
+                        let t = self.interner.unwrap_alias(*t);
+                        if matches!(self.interner.data(t), TyData::Func { .. }) {
+                            format!("({text})")
+                        } else {
+                            text
+                        }
+                    })
+                    .collect::<Vec<_>>();
                 parts.join(" | ")
             }
             TyData::Struct { name, args, .. } => {
@@ -85,7 +102,13 @@ impl<'a> TypeFormatter<'a> {
                     .map(|t| self.format(*t))
                     .collect::<Vec<_>>()
                     .join(", ");
-                format!("{}<{}>", self.format(*inner_ty), a)
+                let base = match self.interner.data(*inner_ty) {
+                    TyData::Struct { name, .. } | TyData::TypeAlias { name, .. } => {
+                        name.to_string()
+                    }
+                    _ => self.format(*inner_ty),
+                };
+                format!("{base}<{a}>")
             }
             TyData::Auto => "auto".to_string(),
         }

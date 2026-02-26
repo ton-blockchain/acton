@@ -4,19 +4,38 @@ use rustc_hash::FxHashMap;
 
 pub(crate) struct TypeSubstitutor<'a> {
     interner: &'a mut TypeInterner,
+    apply_defaults: bool,
 }
 
 impl<'a> TypeSubstitutor<'a> {
     pub(crate) const fn new(interner: &'a mut TypeInterner) -> Self {
-        Self { interner }
+        Self {
+            interner,
+            apply_defaults: false,
+        }
+    }
+
+    pub(crate) const fn new_with_defaults(interner: &'a mut TypeInterner) -> Self {
+        Self {
+            interner,
+            apply_defaults: true,
+        }
     }
 
     pub(crate) fn substitute(&mut self, id: TyId, mapping: &FxHashMap<String, TyId>) -> TyId {
         let data = self.interner.data(id).clone();
         match data {
-            TyData::TypeParameter { ref name, .. } => {
+            TyData::TypeParameter {
+                ref name,
+                default_type,
+            } => {
                 if let Some(&new_id) = mapping.get(name) {
                     return new_id;
+                }
+                if self.apply_defaults
+                    && let Some(default_ty) = default_type
+                {
+                    return self.substitute(default_ty, mapping);
                 }
                 id
             }
@@ -99,7 +118,7 @@ impl<'a> TypeSubstitutor<'a> {
                 if !changed {
                     return id;
                 }
-                self.interner.intern(TyData::Union(elements))
+                self.interner.union(elements)
             }
             TyData::Func {
                 params: ref old_params,

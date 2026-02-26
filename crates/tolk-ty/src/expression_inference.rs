@@ -17,10 +17,10 @@ use tolk_resolver::file_index::SymbolId;
 use tolk_resolver::resolve_index::{LocalDefId, LocalDefKind, NameUse, NameUseKind, Resolved};
 use tolk_resolver::{AstNodeSpanExt, Span, Symbol, SymbolKind};
 use tolk_syntax::{
-    AsCast, Assign, AstNode, Bin, BoolLit, Call, DotAccess, DotAccessField, Expr, HasGenericParams,
-    HasName, Ident, Instantiation, IsType, Lambda, Lazy, Match, MatchArmBody, MatchPattern,
-    NotNull, NullLit, NumberLit, ObjectLit, Paren, SetAssign, StringLit, Tensor, Ternary, TopLevel,
-    Tuple, Type, Unary, Underscore, VarDecl, VarDeclPattern,
+    AsCast, Assign, AstNode, Bin, BoolLit, Call, DotAccess, DotAccessField, Expr, HasName, Ident,
+    Instantiation, IsType, Lambda, Lazy, Match, MatchArmBody, MatchPattern, NotNull, NullLit,
+    NumberLit, ObjectLit, Paren, SetAssign, StringLit, Tensor, Ternary, TopLevel, Tuple, Type,
+    Unary, Underscore, VarDecl, VarDeclPattern,
 };
 
 impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
@@ -290,7 +290,8 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 let declared_type = if var.is_redefinition() {
                     current_ty
                 } else {
-                    self.lower(var.typ())
+                    let ty = self.lower(var.typ());
+                    self.apply_defaults_to_type(ty)
                 };
 
                 let smartcasted_type = if !var.is_redefinition()
@@ -777,7 +778,10 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         as_cond: bool,
     ) -> ExprFlow {
         let expr = try_expr_flow!(flow, v.expr());
-        let cast_ty = self.lower(v.casted_to());
+        let cast_ty = {
+            let ty = self.lower(v.casted_to());
+            self.apply_defaults_to_type(ty)
+        };
 
         // for `expr as <type>`, use this type for hint, so that `t.tupleAt(0) as int` is ok
         let after_expr = self.infer_expr(expr, flow, false, Some(cast_ty));
@@ -1480,8 +1484,8 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                                     name: field_name.into(),
                                     resolved: Resolved::Global(member.id),
                                 });
-                                self.ctx.set_node_type(&v, receiver_type); // `Color.Red` is `Color`
-                                self.ctx.set_node_type(&field, receiver_type); // type of field itself
+                                self.ctx.set_node_type(&v, unwrapped); // `ColorAlias.Red` is `Color`
+                                self.ctx.set_node_type(&field, unwrapped); // type of field itself
                                 return ExprFlow::create(flow, as_cond);
                             }
                         }
@@ -1655,7 +1659,13 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
         } else if let Some(fun_ref) = fun_ref {
             let symbol = self.ctx.type_db.project_index.resolve_symbol(fun_ref);
-            let typ = self.ctx.get_top_level_type(fun_ref);
+            let mut typ = self.ctx.get_top_level_type(fun_ref);
+            if let Some(current) = typ
+                && self.const_intrn().has_generics(current)
+            {
+                let mut substitutor = TypeSubstitutor::new_with_defaults(self.intrn());
+                typ = Some(substitutor.substitute(current, &substituted_ts.mapping));
+            }
             let f_callable = typ
                 .map(|t| self.const_intrn().unwrap_alias(t))
                 .and_then(|t| self.return_type_or_none(t));
@@ -1678,6 +1688,14 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 let func_ty = self.intrn().func(f_callable.0, return_ty);
                 self.ctx.set_node_type(&v, func_ty);
             }
+
+            self.ctx.set_resolved(NameUse {
+                decl: self.ctx.decl_start,
+                span: field.span(),
+                kind: NameUseKind::Value,
+                name: field_name.into(),
+                resolved: Resolved::Global(fun_ref),
+            });
         }
 
         ExprFlow::create(flow, as_cond)
@@ -1928,7 +1946,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         }
 
         let final_return_ty = if self.intrn().has_generics(return_ty) {
-            let mut substitutor = TypeSubstitutor::new(self.intrn());
+            let mut substitutor = TypeSubstitutor::new_with_defaults(self.intrn());
             substitutor.substitute(return_ty, &deducing_ts.substitutions.mapping)
         } else {
             return_ty
@@ -2473,22 +2491,14 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // `User { ... }` / `UserAlias { ... }` / `Wrapper { ... }` / `Wrapper<int> { ... }`
         if let Some(type_node) = v.typ() {
             let explicit_type = self.lower(Some(type_node));
-            let unwrapped = self.const_intrn().unwrap_alias(explicit_type);
-
-            match self.const_intrn().data(unwrapped) {
-                TyData::Struct { name, def, .. } => {
-                    // `Wrapper` / `Wrapper<int>`
-                    struct_def_id = Some(*def);
-                    struct_name = Some(name.clone());
-                }
-                TyData::GenericTypeWithTs { inner_ty, .. } => {
-                    if let TyData::Struct { name, def, .. } = self.const_intrn().data(*inner_ty) {
-                        // if `type WAlias<T> = Wrapper<T>`, here `Wrapper` (generic struct)
-                        struct_def_id = Some(*def);
-                        struct_name = Some(name.clone());
-                    }
-                }
-                _ => {}
+            if let Some(def) = self.ctx.type_db.find_struct(explicit_type) {
+                struct_def_id = Some(def);
+                struct_name = self
+                    .ctx
+                    .type_db
+                    .project_index
+                    .resolve_symbol(def)
+                    .map(|sym| sym.name.clone());
             }
 
             explicit_ty = Some(explicit_type);
@@ -2510,37 +2520,36 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         if struct_def_id.is_none()
             && let Some(h) = hint
         {
-            let unwrapped = self.const_intrn().unwrap_alias(h);
-            match self.const_intrn().data(unwrapped) {
-                TyData::Struct { name, def, .. } => {
-                    struct_def_id = Some(*def);
-                    struct_name = Some(name.clone());
-                }
-                TyData::Union(variants) => {
+            if let Some(def) = self.ctx.type_db.find_struct(h) {
+                struct_def_id = Some(def);
+                struct_name = self
+                    .ctx
+                    .type_db
+                    .project_index
+                    .resolve_symbol(def)
+                    .map(|sym| sym.name.clone());
+            } else {
+                let unwrapped = self.const_intrn().unwrap_alias(h);
+                if let TyData::Union(variants) = self.const_intrn().data(unwrapped) {
                     // Find struct in variants
                     let mut found_def = None;
                     for &var in variants {
-                        let v_unwrapped = self.const_intrn().unwrap_alias(var);
-                        if let TyData::Struct { name, def, .. } =
-                            self.const_intrn().data(v_unwrapped)
-                        {
+                        if let Some(def) = self.ctx.type_db.find_struct(var) {
                             if found_def.is_some() {
                                 found_def = None; // Ambiguous
                                 break;
                             }
-                            struct_name = Some(name.clone());
-                            found_def = Some(*def);
+                            struct_name = self
+                                .ctx
+                                .type_db
+                                .project_index
+                                .resolve_symbol(def)
+                                .map(|sym| sym.name.clone());
+                            found_def = Some(def);
                         }
                     }
                     struct_def_id = found_def;
                 }
-                TyData::GenericTypeWithTs { inner_ty, .. } => {
-                    if let TyData::Struct { name, def, .. } = self.const_intrn().data(*inner_ty) {
-                        struct_def_id = Some(*def);
-                        struct_name = Some(name.clone());
-                    }
-                }
-                _ => {}
             }
         }
 
@@ -2576,7 +2585,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 }
 
                 if let Some(val) = arg.value() {
-                    let after_val = self.infer_expr(val, flow, false, Some(field.declared_type));
+                    let after_val = self.infer_expr(val, flow, false, Some(field_ty));
                     flow = after_val.out_flow;
 
                     let val_ty = self.ctx.get_node_type_or_unknown(&val);
@@ -2595,16 +2604,17 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
         }
 
-        let result_ty = if let Some(explicit_ty) = explicit_ty {
-            if self.const_intrn().has_generics(explicit_ty) {
-                let mut substitutor = TypeSubstitutor::new(self.intrn());
-                substitutor.substitute(explicit_ty, &deducing_ts.substitutions.mapping)
-            } else {
-                explicit_ty
-            }
-        } else {
-            self.intrn().struct_ty(def_id, struct_name)
-        };
+        let mut result_ty = explicit_ty
+            .or_else(|| self.ctx.get_top_level_type(def_id))
+            .unwrap_or_else(|| self.intrn().struct_ty(def_id, struct_name));
+
+        if self.const_intrn().has_generics(result_ty) {
+            let mut substitutor = TypeSubstitutor::new_with_defaults(self.intrn());
+            result_ty = substitutor.substitute(result_ty, &deducing_ts.substitutions.mapping);
+        }
+        if explicit_ty.is_some() {
+            result_ty = self.intrn().unwrap_alias(result_ty);
+        }
 
         self.ctx.set_node_type(&v, result_ty);
         ExprFlow::create(flow, as_cond)
@@ -2619,8 +2629,27 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let Some(expr) = v.expr() else {
             return ExprFlow::create(flow, as_cond);
         };
+        let mut flow = flow;
 
-        if let Some(resolved) = self.ctx.get_resolved_node(&expr)
+        // Dot-access instantiations (`obj.method<T>`) need dot resolution to expose method symbol.
+        if let Expr::DotAccess(dot) = expr {
+            flow = self
+                .infer_dot_access(dot, flow, false, None, None, None)
+                .out_flow;
+        }
+
+        let resolved_symbol = match expr {
+            Expr::Ident(ident) => self.ctx.get_resolved_node(&ident),
+            Expr::DotAccess(dot) => match dot.field() {
+                Some(DotAccessField::Ident(field_ident)) => {
+                    self.ctx.get_resolved_node(&field_ident)
+                }
+                _ => None,
+            },
+            _ => self.ctx.get_resolved_node(&expr),
+        };
+
+        if let Some(resolved) = resolved_symbol
             && let Resolved::Global(id) = resolved.resolved
             && let Some(symbol) = self.ctx.type_db.project_index.resolve_symbol(id)
         {
@@ -2628,62 +2657,42 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 && let Some(ty) = self.ctx.type_db.convert_instantiated(&v, self.ctx.file_id)
             {
                 self.ctx.set_node_type(&v, ty);
-            } else {
-                // function call with explicit generics
-                // this is mess, but ok for now
-                if let Some(file) = self.ctx.type_db.file_db.get_by_id(symbol.id.file_id)
-                    && let Some(element) = file.find_syntax_declaration(symbol.id)
+            } else if let Some(instantiation_types) = v.instantiation_ts() {
+                let mut substituted_ts = GenericsSubstitutions::new();
+                let provided_types = instantiation_types
+                    .types()
+                    .map(|t| self.ctx.type_db.lower_type(self.ctx.file_id, &t))
+                    .collect::<Vec<_>>();
+
+                let type_parameters = match &symbol.kind {
+                    SymbolKind::Function {
+                        type_parameters, ..
+                    } => Some(type_parameters),
+                    SymbolKind::Method {
+                        type_parameters, ..
+                    } => Some(type_parameters),
+                    SymbolKind::GetMethod {
+                        type_parameters, ..
+                    } => Some(type_parameters),
+                    _ => None,
+                };
+
+                if let Some(type_parameters) = type_parameters {
+                    for (param, ty) in type_parameters.iter().zip(provided_types) {
+                        substituted_ts.set_type_t(param.name.to_string(), ty);
+                    }
+                }
+
+                if let Some(mut func_ty) = self
+                    .ctx
+                    .get_node_type(&expr)
+                    .or_else(|| self.ctx.get_top_level_type(symbol.id))
                 {
-                    let Some(type_parameters) = element.type_parameters() else {
-                        return ExprFlow::create(flow, as_cond);
-                    };
-                    let type_parameters = type_parameters.parameters();
-                    let Some(instantiation_types) = v.instantiation_ts() else {
-                        return ExprFlow::create(flow, as_cond);
-                    };
-                    let tys = instantiation_types
-                        .types()
-                        .map(|t| self.ctx.type_db.lower_type(file.id(), &t))
-                        .collect::<Vec<_>>();
-
-                    let mut substituted_ts = GenericsSubstitutions::new();
-                    for (param, ty) in type_parameters.zip(tys) {
-                        let Some(name) = param.name() else { continue };
-                        let Some(name) = self.ctx.type_db.file_db.text_of(file.id(), &name) else {
-                            continue;
-                        };
-
-                        substituted_ts.set_type_t(name.to_string(), ty);
+                    if self.intrn().has_generics(func_ty) {
+                        let mut substitutor = TypeSubstitutor::new_with_defaults(self.intrn());
+                        func_ty = substitutor.substitute(func_ty, &substituted_ts.mapping);
                     }
-
-                    let typ = self.ctx.get_top_level_type(symbol.id);
-                    let f_callable = typ
-                        .map(|t| self.const_intrn().unwrap_alias(t))
-                        .and_then(|t| self.return_type_or_none(t));
-
-                    if let Some(f_callable) = f_callable {
-                        let mut return_ty = f_callable.1;
-
-                        // if return type is omitted we need to infer function body first
-                        // once inferred, subsequent `return_ty` for this function will be non-auto
-                        if return_ty == self.const_intrn().ty_auto
-                            && let Some(inferred_ty) =
-                                self.infer_auto_return_type_of_function(symbol)
-                        {
-                            let func_ty = self.intrn().func(f_callable.0.clone(), inferred_ty);
-                            self.ctx.set_top_level_type(symbol.id, func_ty);
-                            return_ty = inferred_ty
-                        }
-
-                        let mut func_ty = self.intrn().func(f_callable.0, return_ty);
-
-                        if self.intrn().has_generics(func_ty) {
-                            let mut substitutor = TypeSubstitutor::new(self.intrn());
-                            func_ty = substitutor.substitute(func_ty, &substituted_ts.mapping)
-                        }
-
-                        self.ctx.set_node_type(&v, func_ty);
-                    }
+                    self.ctx.set_node_type(&v, func_ty);
                 }
             }
 
