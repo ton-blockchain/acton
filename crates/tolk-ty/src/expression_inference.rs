@@ -2698,14 +2698,6 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             let field_name = self.text_of(&name_node);
 
             if let Some(field) = self.ctx.type_db.find_struct_field(def_id, &field_name) {
-                self.ctx.set_resolved(NameUse {
-                    decl: self.ctx.decl_start,
-                    span: name_node.span(),
-                    kind: NameUseKind::Value,
-                    name: field.name.clone(),
-                    resolved: Resolved::Global(field.id),
-                });
-
                 let mut field_ty = field.declared_type;
                 if self.const_intrn().has_generics(field_ty) {
                     field_ty = deducing_ts.replace_ts_with_currently_deduced(field_ty, self.intrn())
@@ -2733,6 +2725,16 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     }
                     self.ctx.set_node_type(&arg, val_ty);
                 }
+
+                // Keep field reference for object-literal key after inferring value.
+                // For shorthand (`{ field }`), value inference must use the original local resolution.
+                self.ctx.set_resolved(NameUse {
+                    decl: self.ctx.decl_start,
+                    span: name_node.span(),
+                    kind: NameUseKind::Value,
+                    name: field.name.clone(),
+                    resolved: Resolved::Global(field.id),
+                });
             } else if let Some(val) = arg.value() {
                 // unknown field, just infer value type
                 flow = self.infer_expr(val, flow, false, None).out_flow;
