@@ -25,7 +25,7 @@ use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory};
 use clap::{Parser, Subcommand};
 use clap_complete::CompleteEnv;
-use clap_complete::engine::{ArgValueCompleter, CompletionCandidate, PathCompleter};
+use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
@@ -391,7 +391,7 @@ enum Commands {
         after_help = example_run_usage()
     )]
     Run {
-        #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(PathCompleter::file()))]
+        #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(complete_scripts))]
         script: String,
         #[arg(
             help = "Arguments to pass to the script",
@@ -787,6 +787,21 @@ fn complete_contracts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
         .contracts
         .keys()
         .filter(|contract| contract.starts_with(current.as_ref()))
+        .map(CompletionCandidate::new)
+        .collect()
+}
+
+fn complete_scripts(current: &std::ffi::OsStr) -> Vec<CompletionCandidate> {
+    let Some(config) = load_config_for_completion() else {
+        return vec![];
+    };
+
+    let current = current.to_string_lossy();
+    config
+        .scripts
+        .unwrap_or_default()
+        .keys()
+        .filter(|script| script.starts_with(current.as_ref()))
         .map(CompletionCandidate::new)
         .collect()
 }
