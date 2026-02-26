@@ -38,3 +38,36 @@ get fun `test-secure-random-bytes`() {
     // Two calls should produce different results (with overwhelming probability)
     expect(bytes1).toNotEqual(bytes2);
 }
+
+get fun `test-generate-key-pair`() {
+    val kp = crypto.generateKeyPair();
+
+    expect(kp.privateKey).toNotEqual(0);
+    expect(kp.publicKey).toNotEqual(0);
+
+    // Generated key pair must produce valid signatures
+    val data = beginCell().storeUint(0xDEAD, 16).endCell();
+    val signature = crypto.sign(kp.privateKey, data);
+    val valid = isSignatureValid(data.hash(), signature, kp.publicKey);
+    expect(valid).toBeTrue();
+}
+
+get fun `test-seed-to-key-pair-deterministic`() {
+    // Same seed must produce the same key pair
+    val seed = 12345;
+    val kp1 = crypto.seedToKeyPair(seed);
+    val kp2 = crypto.seedToKeyPair(seed);
+
+    expect(kp1.privateKey).toEqual(kp2.privateKey);
+    expect(kp1.publicKey).toEqual(kp2.publicKey);
+}
+
+get fun `test-seed-to-key-pair-signs-correctly`() {
+    val seed = 99999;
+    val kp = crypto.seedToKeyPair(seed);
+
+    val data = beginCell().storeUint(0xCAFE, 16).endCell();
+    val signature = crypto.sign(kp.privateKey, data);
+    val valid = isSignatureValid(data.hash(), signature, kp.publicKey);
+    expect(valid).toBeTrue();
+}

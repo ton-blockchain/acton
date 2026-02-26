@@ -148,6 +148,38 @@ fun crypto.getFastRandomBytes(bytesNum: uint16, seed: int? = null): slice {
     return res.toSlice();
 }
 
+/// Generates a random Ed25519 [KeyPair] without creating a mnemonic.
+///
+/// Much faster than [crypto.createMnemonic] + [Mnemonic.toKeyPair] because it
+/// skips BIP39 word generation.  Use this when you don't need the mnemonic itself.
+///
+/// Example:
+/// ```tolk
+/// val kp = crypto.generateKeyPair();
+/// ```
+fun crypto.generateKeyPair(): KeyPair {
+    val seed = crypto.getSecureRandomBytes(32).loadUint(256);
+    return crypto.seedToKeyPair(seed);
+}
+
+/// Derives an Ed25519 [KeyPair] from a 256-bit seed.
+///
+/// The seed is used as the Ed25519 private key seed; the corresponding public
+/// key is computed deterministically.  The same seed always yields the same key pair.
+///
+/// Example:
+/// ```tolk
+/// val kp = crypto.seedToKeyPair(mySeed);
+/// ```
+fun crypto.seedToKeyPair(seed: uint256): KeyPair {
+    val [privateKey, publicKey] = ffi.__seedToKeyPair(seed);
+    return KeyPair {
+        privateKey,
+        publicKey,
+    };
+}
+
+fun ffi.__seedToKeyPair(seed: uint256): [int, int] asm "404 EXTCALL";
 fun ffi.createMnemonic(): Mnemonic asm "401 EXTCALL"
 fun ffi.__mnemonicToKeyPair(words: Mnemonic): [int, int] asm "402 EXTCALL";
 fun ffi.__getSecureRandomBytes(bytesNum: uint16): slice asm "400 EXTCALL"
