@@ -809,7 +809,7 @@ impl<'a> TypeDb<'a> {
     }
 
     fn append_missing_generic_defaults(&self, inner_ty: TyId, provided: &mut Vec<TyId>) {
-        let TyData::GenericTypeWithTs { types, .. } = self.intrn.data(inner_ty).clone() else {
+        let TyData::GenericTypeWithTs { types, .. } = self.intrn.data(inner_ty) else {
             return;
         };
         if provided.len() >= types.len() {

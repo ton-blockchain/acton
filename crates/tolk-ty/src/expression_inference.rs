@@ -49,7 +49,9 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             Expr::Assign(assignment) => self.infer_assignment(assignment, flow, as_cond),
             Expr::SetAssign(assignment) => self.infer_set_assignment(assignment, flow, as_cond),
             Expr::Unary(unary_op) => self.infer_unary_operator(unary_op, flow, as_cond),
-            Expr::Bin(binary_op) => self.infer_binary_expression(binary_op, flow, as_cond),
+            Expr::Bin(binary_op) => {
+                self.infer_binary_expression(binary_op, flow, as_cond, hint)
+            }
             Expr::Ternary(ternary_op) => {
                 self.infer_ternary_operator(ternary_op, flow, as_cond, hint)
             }
@@ -586,13 +588,14 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         v: Bin<'t>,
         flow: FlowContext,
         as_cond: bool,
+        hint: Option<TyId>,
     ) -> ExprFlow {
         let lhs = try_expr_flow!(flow, v.left());
         let operator = try_expr_flow!(flow, v.operator());
         let operator_name = try_expr_flow!(flow, self.text_or_none(&operator));
 
         if operator_name == "??" {
-            let after_lhs = self.infer_expr(lhs, flow, false, None);
+            let after_lhs = self.infer_expr(lhs, flow, false, hint);
             let lhs_type = self.ctx.get_node_type_or_unknown(&lhs);
 
             let Some(rhs) = v.right() else {
@@ -605,7 +608,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 rhs_flow.register_known_type(s_expr, self.intrn().ty_null);
             }
 
-            let after_rhs = self.infer_expr(rhs, rhs_flow, false, None);
+            let after_rhs = self.infer_expr(rhs, rhs_flow, false, hint);
             let ty_null = self.intrn().ty_null;
             let without_null_ty = self
                 .intrn()
@@ -621,8 +624,8 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             } else {
                 let rhs_ty = self.ctx.get_node_type_or_unknown(&rhs);
                 let mut branches_unifier = TypeInferringUnifyStrategy::new();
-                branches_unifier.unify_with(without_null_ty, None, self.intrn());
-                branches_unifier.unify_with(rhs_ty, None, self.intrn());
+                branches_unifier.unify_with(without_null_ty, hint, self.intrn());
+                branches_unifier.unify_with(rhs_ty, hint, self.intrn());
                 let result_ty = branches_unifier.get_result(self.intrn());
                 self.ctx.set_node_type(&v, result_ty);
             }
@@ -2317,10 +2320,11 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             return ExprFlow::create(flow, as_cond);
         }
 
-        let mut inferred_element_ty = types_list[0];
-        for ty in types_list.iter().skip(1).copied() {
-            inferred_element_ty = self.intrn().calculate_type_lca(inferred_element_ty, ty);
+        let mut unifier = TypeInferringUnifyStrategy::new();
+        for ty in types_list.iter().copied() {
+            unifier.unify_with(ty, None, self.intrn());
         }
+        let inferred_element_ty = unifier.get_result(self.intrn());
         let ty = self.array_type_from_element(inferred_element_ty, array_hint);
 
         self.ctx.set_node_type(&v, ty);
@@ -2735,21 +2739,11 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
         }
 
-        let mut result_ty = self
-            .ctx
-            .get_top_level_type(def_id)
-            .unwrap_or_else(|| self.intrn().struct_ty(def_id, struct_name.clone()));
-
-        if let Some(explicit_ty) = explicit_ty
-            && self.const_intrn().has_generics(result_ty)
-        {
-            deducing_ts.auto_deduce_from_argument(result_ty, explicit_ty, self.intrn());
-        }
-        if let Some(hint_ty) = hint
-            && self.const_intrn().has_generics(result_ty)
-        {
-            deducing_ts.auto_deduce_from_argument(result_ty, hint_ty, self.intrn());
-        }
+        let mut result_ty = explicit_ty.unwrap_or_else(|| {
+            self.ctx
+                .get_top_level_type(def_id)
+                .unwrap_or_else(|| self.intrn().struct_ty(def_id, struct_name.clone()))
+        });
 
         if self.const_intrn().has_generics(result_ty) {
             let mut substitutor = TypeSubstitutor::new_with_defaults(self.intrn());
