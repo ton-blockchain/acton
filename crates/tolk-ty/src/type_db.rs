@@ -70,6 +70,8 @@ pub struct TypeDb<'a> {
     /// Keeps track of definitions that have already been processed or are currently
     /// being processed (to handle `A -> B -> A` dependencies).
     currently_lowering: FxHashSet<SymbolId>,
+    method_receivers_loaded: bool,
+    treat_unresolved_as_type_parameter: bool,
 }
 
 impl<'a> TypeDb<'a> {
@@ -91,9 +93,32 @@ impl<'a> TypeDb<'a> {
             top_level_types: FxHashMap::default(),
             receiver_types: FxHashMap::default(),
             currently_lowering: FxHashSet::default(),
+            method_receivers_loaded: false,
+            treat_unresolved_as_type_parameter: false,
         };
         db.collect_top_level_types();
         db
+    }
+
+    pub fn ensure_method_receivers_loaded(&mut self) {
+        if self.method_receivers_loaded {
+            return;
+        }
+
+        let mut method_ids = Vec::new();
+        for file_index in self.project_index.files().values() {
+            for symbol in &file_index.decls {
+                if matches!(symbol.kind, SymbolKind::Method { .. }) {
+                    method_ids.push(symbol.id);
+                }
+            }
+        }
+
+        for method_id in method_ids {
+            let _ = self.get_top_level_type(None, method_id);
+        }
+
+        self.method_receivers_loaded = true;
     }
 
     /// Retrieves the type of top-level symbol (function, global, struct, etc.).
@@ -395,9 +420,15 @@ impl<'a> TypeDb<'a> {
                     })
                     .collect::<Vec<_>>();
 
-                let receiver_ty = self
-                    .lower_opt_type(file_id, m.receiver_type().as_ref())
-                    .unwrap_or(self.intrn.ty_undefined);
+                let receiver_ty = if let Some(receiver_type_node) = m.receiver_type() {
+                    let old_flag =
+                        std::mem::replace(&mut self.treat_unresolved_as_type_parameter, true);
+                    let lowered = self.lower_type(file_id, &receiver_type_node);
+                    self.treat_unresolved_as_type_parameter = old_flag;
+                    lowered
+                } else {
+                    self.intrn.ty_undefined
+                };
 
                 self.receiver_types.insert(symbol.id, receiver_ty);
 
@@ -520,7 +551,15 @@ impl<'a> TypeDb<'a> {
                 }
 
                 // fallback to text search for builtin types
-                self.as_primitive_type(&text)
+                if let Some(primitive) = self.as_primitive_type(&text) {
+                    return Some(primitive);
+                }
+
+                if self.treat_unresolved_as_type_parameter {
+                    return Some(self.intrn.type_parameter(text.to_string(), None));
+                }
+
+                None
             }
         }
     }
@@ -533,6 +572,9 @@ impl<'a> TypeDb<'a> {
             let resolved_index = self.project_index.get_resolved_uses(file_id)?;
             let local = resolved_index.find_local_at(type_ident.0.start_byte())?;
             if matches!(local.kind, LocalDefKind::TypeParameter) {
+                if let Some(primitive) = self.as_primitive_type(local.name.as_ref()) {
+                    return Some(primitive);
+                }
                 let default_ty = self.local_type_parameter_default(file_id, local.def_span);
                 return Some(
                     self.intrn
@@ -548,6 +590,9 @@ impl<'a> TypeDb<'a> {
                     && let Some(resolved) = resolved.find_local(local)
                     && matches!(resolved.kind, LocalDefKind::TypeParameter)
                 {
+                    if let Some(primitive) = self.as_primitive_type(resolved.name.as_ref()) {
+                        return Some(primitive);
+                    }
                     let default_ty = self.local_type_parameter_default(file_id, resolved.def_span);
                     return Some(
                         self.intrn

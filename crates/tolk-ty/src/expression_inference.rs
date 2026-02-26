@@ -583,6 +583,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
 
             let after_rhs = self.infer_expr(rhs, rhs_flow, false, None);
             let ty_null = self.intrn().ty_null;
+            let lhs_can_be_null = self.intrn().can_rhs_be_assigned(lhs_type, ty_null);
             let lhs_unwrapped = self.const_intrn().unwrap_alias(lhs_type);
             let without_null_ty =
                 if matches!(self.const_intrn().data(lhs_unwrapped), TyData::Union(_)) {
@@ -595,6 +596,9 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             if lhs_type == ty_null {
                 let rhs_ty = self.ctx.get_node_type_or_unknown(&rhs);
                 self.ctx.set_node_type(&v, rhs_ty);
+            } else if !lhs_can_be_null {
+                // Left side is definitely non-null, so `lhs ?? rhs` has type of lhs.
+                self.ctx.set_node_type(&v, lhs_type);
             } else if without_null_ty == self.intrn().ty_never {
                 self.ctx.set_node_type(&v, lhs_type);
             } else {
@@ -738,6 +742,8 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
     ) -> ExprFlow {
         let cond = try_expr_flow!(flow, v.condition());
         let after_cond = self.infer_expr(cond, flow, true, None);
+        let true_reachable = !after_cond.true_flow.is_unreachable();
+        let false_reachable = !after_cond.false_flow.is_unreachable();
 
         let when_true = try_expr_flow!(after_cond.out_flow, v.consequence());
         let when_false = try_expr_flow!(after_cond.out_flow, v.alternative());
@@ -750,8 +756,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let mut branches_unifier = TypeInferringUnifyStrategy::new();
         let true_ty = self.ctx.get_node_type_or_unknown(&when_true);
         let false_ty = self.ctx.get_node_type_or_unknown(&when_false);
-        branches_unifier.unify_with(true_ty, hint, self.intrn());
-        branches_unifier.unify_with(false_ty, hint, self.intrn());
+        if true_reachable {
+            branches_unifier.unify_with(true_ty, hint, self.intrn());
+        }
+        if false_reachable {
+            branches_unifier.unify_with(false_ty, hint, self.intrn());
+        }
 
         // if branches_unifier.is_union_of_different_types() {
         //     // `... ? intVar : sliceVar` results in `int | slice`, probably it's not what the user expected
@@ -760,12 +770,24 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         //     // TODO: report error if hint is unknown?
         // }
 
-        let ty = branches_unifier.get_result(self.const_intrn());
+        let ty = if true_reachable && !false_reachable {
+            true_ty
+        } else if false_reachable && !true_reachable {
+            false_ty
+        } else {
+            branches_unifier.get_result(self.const_intrn())
+        };
         self.ctx.set_node_type(&v.0, ty);
 
-        let out_flow = after_true
-            .out_flow
-            .merge_flow(&after_false.out_flow, self.intrn());
+        let out_flow = if true_reachable && !false_reachable {
+            after_true.out_flow.clone()
+        } else if false_reachable && !true_reachable {
+            after_false.out_flow.clone()
+        } else {
+            after_true
+                .out_flow
+                .merge_flow(&after_false.out_flow, self.intrn())
+        };
 
         ExprFlow::new(out_flow, after_true.true_flow, after_false.false_flow)
     }
@@ -1706,6 +1728,8 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         field_name: &SmolStr,
         receiver_type: TyId,
     ) -> Result<Option<MethodCallCandidate>, String> {
+        self.ctx.type_db.ensure_method_receivers_loaded();
+
         let key = MethodKey(receiver_type, field_name.clone());
         if let Some(cached) = self.ctx.computed_methods.get(&key) {
             return Ok(cached.clone());
