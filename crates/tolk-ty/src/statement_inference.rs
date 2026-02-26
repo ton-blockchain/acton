@@ -70,11 +70,19 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
 
     //+ CHECKED
     fn process_repeat_stmt(&mut self, v: Repeat<'t>, flow: FlowContext) -> FlowContext {
+        // loops are inferred twice, to merge body outcome with the state before the loop
+        // in `repeat` (as opposed to `while`), a condition is not boolean, it's a number
         let count = try_flow!(flow, v.count());
         let body = try_flow!(flow, v.body());
 
         let after_count = self.infer_expr(count, flow, false, None);
-        self.process_block_stmt(body, after_count.out_flow)
+        let loop_entry_flow = after_count.out_flow.clone();
+        let body_out = self.process_block_stmt(body, after_count.out_flow);
+
+        // second time, to refine all types
+        let merged = loop_entry_flow.merge_flow(&body_out, self.intrn());
+        let body_out2 = self.process_block_stmt(body, merged.clone());
+        merged.merge_flow(&body_out2, self.intrn())
     }
 
     //+ CHECKED
@@ -90,12 +98,16 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let body_flow = self.process_block_stmt(body, after_cond.true_flow);
 
         // second time, to refine all types
-        let next_flow = loop_entry_flow.merge_flow(&body_flow, self.intrn());
-        let after_cond2 = self.infer_expr(condition, next_flow, true, None);
+        let mut flow = loop_entry_flow.merge_flow(&body_flow, self.intrn());
+        let after_cond2 = self.infer_expr(condition, flow.clone(), true, None);
+        let body_flow2 = self.process_block_stmt(body, after_cond2.true_flow);
 
-        self.process_block_stmt(body, after_cond2.true_flow);
+        // unlike do_while (where cond is last and already sees body effects), in while cond precedes body,
+        // so merge second body output back and re-evaluate the condition (third time!)
+        flow = flow.merge_flow(&body_flow2, self.intrn());
+        let after_cond3 = self.infer_expr(condition, flow, true, None);
 
-        after_cond2.false_flow
+        after_cond3.false_flow
     }
 
     //+ CHECKED
@@ -105,14 +117,13 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let body = try_flow!(flow, v.body());
 
         let loop_entry_flow = flow.clone();
-        let next_flow = self.process_block_stmt(body, flow);
-
-        let after_cond = self.infer_expr(condition, next_flow, true, None);
+        let flow = self.process_block_stmt(body, flow);
+        let after_cond = self.infer_expr(condition, flow, true, None);
 
         // second time
-        let next_flow = loop_entry_flow.merge_flow(&after_cond.true_flow, self.intrn());
-        let body_flow = self.process_block_stmt(body, next_flow);
-        let after_cond2 = self.infer_expr(condition, body_flow, true, None);
+        let flow = loop_entry_flow.merge_flow(&after_cond.true_flow, self.intrn());
+        let flow = self.process_block_stmt(body, flow);
+        let after_cond2 = self.infer_expr(condition, flow, true, None);
 
         after_cond2.false_flow
     }

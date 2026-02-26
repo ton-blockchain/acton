@@ -68,6 +68,7 @@ impl GenericSubstitutionsDeducing {
 
         let param_data = interner.data(param_ty).clone();
         let arg_data = interner.data(arg_ty).clone();
+        let arg_unwrapped_data = interner.data(interner.unwrap_alias(arg_ty)).clone();
         match (param_data, arg_data.clone()) {
             (TyData::TypeParameter { name, .. }, _) => {
                 // `(arg: T)` called as `f([1, 2])` => T is [int, int]
@@ -116,12 +117,22 @@ impl GenericSubstitutionsDeducing {
                     self.consider_next_condition(p_v, arg_ty, interner);
                 }
             }
-            (TyData::Tensor(p_items), TyData::Tensor(a_items))
-            | (TyData::Tuple(p_items), TyData::Tuple(a_items)) => {
+            (TyData::Tensor(p_items), _) => {
                 // `arg: (int, T)` called as `f((5, cs))` => T is slice
-                if p_items.len() == a_items.len() {
-                    for (&p, &a) in p_items.iter().zip(a_items.iter()) {
-                        self.consider_next_condition(p, a, interner);
+                if let TyData::Tensor(a_items) = arg_unwrapped_data.clone() {
+                    if p_items.len() == a_items.len() {
+                        for (&p, &a) in p_items.iter().zip(a_items.iter()) {
+                            self.consider_next_condition(p, a, interner);
+                        }
+                    }
+                }
+            }
+            (TyData::Tuple(p_items), _) => {
+                if let TyData::Tuple(a_items) = arg_unwrapped_data.clone() {
+                    if p_items.len() == a_items.len() {
+                        for (&p, &a) in p_items.iter().zip(a_items.iter()) {
+                            self.consider_next_condition(p, a, interner);
+                        }
                     }
                 }
             }
@@ -130,17 +141,20 @@ impl GenericSubstitutionsDeducing {
                     params: p_params,
                     return_ty: p_ret,
                 },
-                TyData::Func {
-                    params: a_params,
-                    return_ty: a_ret,
-                },
+                _,
             ) => {
                 // `arg: fun(TArg) -> TResult` called as `f(calcTupleLen)` => TArg is tuple, TResult is int
-                if p_params.len() == a_params.len() {
-                    for (&p, &a) in p_params.iter().zip(a_params.iter()) {
-                        self.consider_next_condition(p, a, interner);
+                if let TyData::Func {
+                    params: a_params,
+                    return_ty: a_ret,
+                } = arg_unwrapped_data.clone()
+                {
+                    if p_params.len() == a_params.len() {
+                        for (&p, &a) in p_params.iter().zip(a_params.iter()) {
+                            self.consider_next_condition(p, a, interner);
+                        }
+                        self.consider_next_condition(p_ret, a_ret, interner);
                     }
-                    self.consider_next_condition(p_ret, a_ret, interner);
                 }
             }
             (

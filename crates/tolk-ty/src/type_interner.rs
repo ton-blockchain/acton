@@ -645,6 +645,10 @@ impl TypeInterner {
                     .all(|&variant| self.can_rhs_be_assigned(lhs, variant))
             }
             (
+                TyData::Int(IntTy::IntN { .. }),
+                TyData::Int(IntTy::Int),
+            ) => true,
+            (
                 TyData::Int(IntTy::IntN {
                     size: sl,
                     unsigned: ul,
@@ -659,10 +663,28 @@ impl TypeInterner {
                 // `int8` is NOT assignable to `int32` without `as`
                 sl == sr && ul == ur
             }
+            (
+                TyData::Int(IntTy::VarIntN { .. }),
+                TyData::Int(IntTy::Int),
+            ) => true,
+            (
+                TyData::Int(IntTy::VarIntN {
+                    size: sl,
+                    unsigned: ul,
+                    ..
+                }),
+                TyData::Int(IntTy::VarIntN {
+                    size: sr,
+                    unsigned: ur,
+                    ..
+                }),
+            ) => sl == sr && ul == ur,
             (TyData::Int(il), _) => match il {
                 IntTy::Int => matches!(
                     dr,
-                    TyData::Int(IntTy::IntN { .. }) | TyData::Int(IntTy::Coins)
+                    TyData::Int(IntTy::IntN { .. })
+                        | TyData::Int(IntTy::VarIntN { .. })
+                        | TyData::Int(IntTy::Coins)
                 ),
                 IntTy::Coins => matches!(dr, TyData::Int(IntTy::Int)),
                 _ => false,
@@ -1114,6 +1136,11 @@ impl TypeInterner {
     /// example: `int | slice | builder | bool` - `bool | slice` = `int | builder`
     /// what for: `if (x != null)` / `if (x is T)`, to smart cast x inside if
     pub fn calculate_type_subtract_rhs_type(&mut self, ty: TyId, subtract_ty: TyId) -> TyId {
+        if self.equals(ty, self.ty_unknown) && self.equals(subtract_ty, self.ty_null) {
+            // `unknown - null = unknown`
+            return self.ty_unknown;
+        }
+
         let lhs_union = match self.collect_union_variants_for_subtract(ty, 0) {
             Some(variants) => variants,
             None => return self.ty_never,
