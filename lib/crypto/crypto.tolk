@@ -163,7 +163,6 @@ fun crypto.generateKeyPair(): KeyPair {
 }
 
 /// Derives an Ed25519 [KeyPair] from a 256-bit seed.
-///
 /// The seed is used as the Ed25519 private key seed; the corresponding public
 /// key is computed deterministically.  The same seed always yields the same key pair.
 ///

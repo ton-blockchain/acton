@@ -179,3 +179,38 @@ val bytes = crypto.getFastRandomBytes(16, 42);
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L131" />
 
+## `crypto.generateKeyPair`
+
+```tolk
+fun crypto.generateKeyPair(): KeyPair
+```
+
+Generates a random Ed25519 [KeyPair](#keypair) without creating a mnemonic.
+
+Much faster than [crypto.createMnemonic](#cryptocreatemnemonic) + [Mnemonic.toKeyPair](#mnemonictokeypair) because it
+skips BIP39 word generation.  Use this when you don't need the mnemonic itself.
+
+Example:
+```tolk
+val kp = crypto.generateKeyPair();
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L160" />
+
+## `crypto.seedToKeyPair`
+
+```tolk
+fun crypto.seedToKeyPair(seed: uint256): KeyPair
+```
+
+Derives an Ed25519 [KeyPair](#keypair) from a 256-bit seed.
+The seed is used as the Ed25519 private key seed; the corresponding public
+key is computed deterministically.  The same seed always yields the same key pair.
+
+Example:
+```tolk
+val kp = crypto.seedToKeyPair(mySeed);
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L173" />
+
