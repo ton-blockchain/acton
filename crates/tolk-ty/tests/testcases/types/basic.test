@@ -207,7 +207,7 @@ struct Foo {
 
 fun main() {
     val data = { data: 10, other: true };
-    //! ^ unknown
+    //! ^ undefined
 }
 ------------------------------------------------------------------------
 ok

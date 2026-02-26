@@ -155,7 +155,7 @@ impl<'a> TypeDb<'a> {
                         .top_level_types
                         .get(&field.id)
                         .cloned()
-                        .unwrap_or(self.intrn.ty_unknown);
+                        .unwrap_or(self.intrn.ty_undefined);
                     return Some(StructField {
                         id: field.id,
                         name: field.name.clone(),
@@ -198,7 +198,7 @@ impl<'a> TypeDb<'a> {
                             let element_ty = type_parameters
                                 .first()
                                 .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
-                                .unwrap_or(self.intrn.ty_unknown);
+                                .unwrap_or(self.intrn.ty_undefined);
                             Some(self.intrn.array(element_ty))
                         } else {
                             let base_ty = self.intrn.struct_ty(*id, name.clone());
@@ -300,7 +300,7 @@ impl<'a> TypeDb<'a> {
                     .parameters()
                     .map(|p| {
                         self.lower_opt_type(file_id, p.typ().as_ref())
-                            .unwrap_or(self.intrn.ty_unknown)
+                            .unwrap_or(self.intrn.ty_undefined)
                     })
                     .collect();
                 Some(self.intrn.func(params, return_ty))
@@ -321,13 +321,13 @@ impl<'a> TypeDb<'a> {
                     .parameters_ext(source.as_ref(), true)
                     .map(|p| {
                         self.lower_opt_type(file_id, p.typ().as_ref())
-                            .unwrap_or(self.intrn.ty_unknown)
+                            .unwrap_or(self.intrn.ty_undefined)
                     })
                     .collect::<Vec<_>>();
 
                 let receiver_ty = self
                     .lower_opt_type(file_id, m.receiver_type().as_ref())
-                    .unwrap_or(self.intrn.ty_unknown);
+                    .unwrap_or(self.intrn.ty_undefined);
 
                 self.receiver_types.insert(symbol.id, receiver_ty);
 
@@ -346,7 +346,7 @@ impl<'a> TypeDb<'a> {
                     .parameters()
                     .map(|p| {
                         self.lower_opt_type(file_id, p.typ().as_ref())
-                            .unwrap_or(self.intrn.ty_unknown)
+                            .unwrap_or(self.intrn.ty_undefined)
                     })
                     .collect();
                 Some(self.intrn.func(params, return_ty))
@@ -363,7 +363,7 @@ impl<'a> TypeDb<'a> {
                             .text(file_id, decl.name().map(|n| n.syntax()).span())?;
                         self.as_primitive_type(&name)?
                     }
-                    _ => self.intrn.ty_unknown,
+                    _ => self.intrn.ty_undefined,
                 };
 
                 let name = symbol.name.clone();
@@ -406,7 +406,7 @@ impl<'a> TypeDb<'a> {
 
         let ty = self
             .lower_type_impl(file_id, type_node)
-            .unwrap_or(self.intrn.ty_unknown);
+            .unwrap_or(self.intrn.ty_undefined);
         self.type_lower_cache.insert(type_node.syntax().id(), ty);
         ty
     }
@@ -427,7 +427,7 @@ impl<'a> TypeDb<'a> {
             Type::UnionType(union) => self.convert_union_type(union, file_id),
             Type::ParenthesizedType(paren) => self.lower_opt_type(file_id, paren.inner().as_ref()),
             Type::NullLit(_) => Some(self.intrn.ty_null),
-            Type::Unmapped(_) => Some(self.intrn.ty_unknown),
+            Type::Unmapped(_) => Some(self.intrn.ty_undefined),
         }
     }
 
@@ -491,6 +491,7 @@ impl<'a> TypeDb<'a> {
             "void" => Some(self.intrn.ty_void),
             "never" => Some(self.intrn.ty_never),
             "null" => Some(self.intrn.ty_null),
+            "unknown" => Some(self.intrn.ty_unknown),
             "tuple" => Some(self.intrn.ty_untyped_tuple),
             "coins" => Some(self.intrn.ty_coins),
             "cell" => Some(self.intrn.ty_cell),
@@ -605,7 +606,7 @@ impl<'a> TypeDb<'a> {
         if matches!(self.intrn.data(inner_ty), TyData::Array(_)) {
             return Some(
                 self.intrn
-                    .array(*tys.first().unwrap_or(&self.intrn.ty_unknown)),
+                    .array(*tys.first().unwrap_or(&self.intrn.ty_undefined)),
             );
         }
 
@@ -665,7 +666,7 @@ impl<'a> TypeDb<'a> {
         let params_ty = self.lower_opt_type(file_id, func.param_types().as_ref())?;
         let return_ty = self
             .lower_opt_type(file_id, func.return_type().as_ref())
-            .unwrap_or(self.intrn.ty_unknown);
+            .unwrap_or(self.intrn.ty_undefined);
 
         let params_ty_data = self.intrn.data(params_ty);
         let param_types = if let TyData::Tensor(tensor) = params_ty_data {

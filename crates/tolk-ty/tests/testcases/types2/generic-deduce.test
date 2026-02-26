@@ -344,6 +344,6 @@ fun main() {
         } };
 }
 ------------------------------------------------------------------------
-type inference error at offset 110: expected Foo<Bar>, got Foo<unknown>
+type inference error at offset 110: expected Foo<Bar>, got Foo<undefined>
 type inference error at offset 157: unknown type
 type inference error at offset 198: unknown type

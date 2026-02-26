@@ -392,7 +392,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
 
     pub fn get_node_type_or_unknown<'node, Node: AstNode<'node>>(&self, node: &Node) -> TyId {
         self.get_type(node.syntax().span())
-            .unwrap_or(self.type_db.intrn.ty_unknown)
+            .unwrap_or(self.type_db.intrn.ty_undefined)
     }
 
     pub fn get_type(&self, span: Span) -> Option<TyId> {

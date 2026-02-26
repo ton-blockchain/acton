@@ -116,7 +116,7 @@ fn collect_locals_hints(
             continue;
         };
 
-        if ty_id == interner.ty_unknown {
+        if ty_id == interner.ty_undefined {
             continue;
         }
 
@@ -145,7 +145,7 @@ fn collect_return_ty_hint(
         return;
     };
 
-    if inferred_ty == interner.ty_unknown {
+    if inferred_ty == interner.ty_undefined {
         return;
     }
 
@@ -221,7 +221,7 @@ fn collect_constants_hints(
         return;
     };
 
-    if ty_id == interner.ty_unknown {
+    if ty_id == interner.ty_undefined {
         return;
     }
 

@@ -37,6 +37,7 @@ impl<'a> TypeFormatter<'a> {
             }
             TyData::Void => "void".to_string(),
             TyData::Null => "null".to_string(),
+            TyData::Undefined => "undefined".to_string(),
             TyData::Unknown => "unknown".to_string(),
             TyData::Never => "never".to_string(),
             TyData::UntypedTuple => "tuple".to_string(),
@@ -114,6 +115,7 @@ mod tests {
         let formatter = TypeFormatter::new(&interner);
 
         assert_eq!(formatter.format(interner.ty_bool), "bool");
+        assert_eq!(formatter.format(interner.ty_undefined), "undefined");
         assert_eq!(formatter.format(interner.ty_unknown), "unknown");
         assert_eq!(formatter.format(interner.ty_never), "never");
         assert_eq!(formatter.format(interner.ty_void), "void");

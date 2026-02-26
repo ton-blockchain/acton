@@ -148,7 +148,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let mut flow = flow;
         // `var v = rhs`, inferring is called for `v`
         // at the moment of inferring left side of assignment, we don't know type of rhs (since lhs is executed first)
-        // so, mark `v` as unknown
+        // so, mark `v` as undefined placeholder
         // later, v's inferred_type will be reassigned; see process_assignment_lhs_after_infer_rhs()
         if v.is_redefinition() {
             // for `a: redef` we need to find original declaration of `a` and set its type.
@@ -160,12 +160,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                         .expression_types
                         .get(&decl_span)
                         .cloned()
-                        .unwrap_or_else(|| self.const_intrn().ty_unknown)
+                        .unwrap_or_else(|| self.const_intrn().ty_undefined)
                 } else {
-                    self.const_intrn().ty_unknown
+                    self.const_intrn().ty_undefined
                 }
             } else {
-                self.const_intrn().ty_unknown
+                self.const_intrn().ty_undefined
             };
             self.ctx.set_node_type(&v, ty);
         } else {
@@ -179,7 +179,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
 
             if let Some(sink) = self.extract_sink_expression_from_var_decl(v) {
-                flow.register_known_type(sink, self.intrn().ty_unknown); // unknown before assigned
+                flow.register_known_type(sink, self.intrn().ty_undefined); // undefined before assigned
             }
         }
         ExprFlow::create(flow, as_cond)
@@ -247,7 +247,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     let item_rhs_ty = rhs_items
                         .get(i)
                         .cloned()
-                        .unwrap_or_else(|| self.intrn().ty_unknown);
+                        .unwrap_or_else(|| self.intrn().ty_undefined);
                     self.process_var_declaration_lhs_after_infer_rhs(*element, item_rhs_ty, flow);
                     types_list.push(self.ctx.get_node_type_or_unknown(&element.syntax()));
                 }
@@ -269,7 +269,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     let item_rhs_ty = rhs_items
                         .get(i)
                         .cloned()
-                        .unwrap_or_else(|| self.intrn().ty_unknown);
+                        .unwrap_or_else(|| self.intrn().ty_undefined);
                     self.process_var_declaration_lhs_after_infer_rhs(*element, item_rhs_ty, flow);
                     types_list.push(self.ctx.get_node_type_or_unknown(&element.syntax()));
                 }
@@ -278,7 +278,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
             VarDeclPattern::VarDecl(var) => {
                 let current_ty = self.ctx.get_node_type_or_unknown(&var);
-                if current_ty == self.intrn().ty_unknown {
+                if current_ty == self.intrn().ty_undefined {
                     self.ctx.set_node_type(&var, rhs_ty);
 
                     if let Some(name) = var.name() {
@@ -293,8 +293,8 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 };
 
                 let smartcasted_type = if !var.is_redefinition()
-                    && declared_type != self.intrn().ty_unknown
-                    && rhs_ty != self.intrn().ty_unknown
+                    && declared_type != self.intrn().ty_undefined
+                    && rhs_ty != self.intrn().ty_undefined
                 {
                     self.calc_smart_cast_type_on_assignment(declared_type, rhs_ty)
                 } else {
@@ -362,8 +362,10 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let lhs_ty = self.ctx.get_node_type(&lhs);
         let after_rhs = self.infer_expr(rhs, rhs_flow, false, lhs_ty);
 
-        self.ctx
-            .set_node_type(&v, lhs_ty.unwrap_or_else(|| self.const_intrn().ty_unknown));
+        self.ctx.set_node_type(
+            &v,
+            lhs_ty.unwrap_or_else(|| self.const_intrn().ty_undefined),
+        );
 
         ExprFlow::create(after_rhs.out_flow, as_cond)
     }
@@ -458,7 +460,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     let item_rhs_ty = rhs_items
                         .get(i)
                         .cloned()
-                        .unwrap_or_else(|| self.intrn().ty_unknown);
+                        .unwrap_or_else(|| self.intrn().ty_undefined);
                     self.process_assignment_lhs_after_infer_rhs(element, item_rhs_ty, flow);
                     types_list.push(self.ctx.get_node_type_or_unknown(&element));
                 }
@@ -481,7 +483,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     let item_rhs_ty = rhs_items
                         .get(i)
                         .cloned()
-                        .unwrap_or_else(|| self.intrn().ty_unknown);
+                        .unwrap_or_else(|| self.intrn().ty_undefined);
                     self.process_assignment_lhs_after_infer_rhs(element, item_rhs_ty, flow);
                     types_list.push(self.ctx.get_node_type_or_unknown(&element));
                 }
@@ -991,7 +993,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                         .expression_types
                         .get(&decl_span)
                         .cloned()
-                        .unwrap_or_else(|| self.intrn().ty_unknown);
+                        .unwrap_or_else(|| self.intrn().ty_undefined);
                 }
             }
             Expr::DotAccess(dot) => {
@@ -1003,7 +1005,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 let obj_ty = self.intrn().unwrap_alias(obj_ty);
 
                 let Some(field) = dot.field() else {
-                    return self.intrn().ty_unknown;
+                    return self.intrn().ty_undefined;
                 };
 
                 match field {
@@ -1292,7 +1294,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             let declared_type = self
                 .ctx
                 .get_type(span)
-                .unwrap_or_else(|| self.intrn().ty_unknown);
+                .unwrap_or_else(|| self.intrn().ty_undefined);
 
             let declared_or_smart_casted =
                 flow.smart_cast_or_original(sink_expr, declared_type, self.intrn());
@@ -1339,7 +1341,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let obj_type = self
             .ctx
             .get_node_type(&obj)
-            .unwrap_or_else(|| self.const_intrn().ty_unknown);
+            .unwrap_or_else(|| self.const_intrn().ty_undefined);
 
         let unwrapped_obj_type = self.intrn().unwrap_alias(obj_type);
 
@@ -1437,6 +1439,9 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             match self.intrn().data(unwrapped_obj_type).clone() {
                 TyData::Tensor(items) => {
                     if index_at >= items.len() {
+                        let unknown_ty = self.const_intrn().ty_unknown;
+                        self.ctx.set_node_type(&v, unknown_ty);
+                        self.ctx.set_node_type(&field, unknown_ty);
                         return ExprFlow::create(flow, as_cond);
                     }
 
@@ -1451,6 +1456,9 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 }
                 TyData::Tuple(items) => {
                     if index_at >= items.len() {
+                        let unknown_ty = self.const_intrn().ty_unknown;
+                        self.ctx.set_node_type(&v, unknown_ty);
+                        self.ctx.set_node_type(&field, unknown_ty);
                         return ExprFlow::create(flow, as_cond);
                     }
 
@@ -1464,7 +1472,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     return ExprFlow::create(flow, as_cond);
                 }
                 TyData::UntypedTuple => {
-                    let item_type = hint.unwrap_or_else(|| self.intrn().ty_unknown);
+                    let item_type = hint.unwrap_or_else(|| self.intrn().ty_undefined);
 
                     self.ctx.set_node_type(&v, item_type);
                     self.ctx.set_node_type(&field, item_type);
@@ -1747,7 +1755,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 .0
                 .get(param_idx)
                 .cloned()
-                .unwrap_or_else(|| self.intrn().ty_unknown);
+                .unwrap_or_else(|| self.intrn().ty_undefined);
 
             param_ty = if self.intrn().has_generics(param_ty) {
                 // `fun f<T>(a:T, b:T)` T was fixated on `a`, use it as hint for `b`
@@ -1869,7 +1877,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     return args
                         .as_ref()
                         .and_then(|args| args.first().copied())
-                        .or_else(|| Some(self.const_intrn().ty_unknown));
+                        .or_else(|| Some(self.const_intrn().ty_undefined));
                 }
                 None
             }
@@ -1880,7 +1888,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     return types
                         .first()
                         .copied()
-                        .or_else(|| Some(self.const_intrn().ty_unknown));
+                        .or_else(|| Some(self.const_intrn().ty_undefined));
                 }
                 None
             }
@@ -1975,7 +1983,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         if effective_hint
             .map(|h| {
                 let unwrapped = self.const_intrn().unwrap_alias(h);
-                matches!(self.const_intrn().data(unwrapped), TyData::Unknown)
+                matches!(self.const_intrn().data(unwrapped), TyData::Undefined)
             })
             .unwrap_or(true)
         {
@@ -2084,7 +2092,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             {
                 h_params[i]
             } else {
-                self.const_intrn().ty_unknown
+                self.const_intrn().ty_undefined
             };
             params_types.push(param_ty);
 
@@ -2106,7 +2114,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         {
             *h_ret
         } else {
-            self.const_intrn().ty_unknown
+            self.const_intrn().ty_undefined
         };
 
         if let Some(body) = v.body() {
@@ -2114,7 +2122,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             let old_declared_return_type = self.ctx.declared_return_ty;
             let old_inferred_return_type = self.ctx.inferred_return_type;
 
-            self.ctx.declared_return_ty = if return_type == self.const_intrn().ty_unknown {
+            self.ctx.declared_return_ty = if return_type == self.const_intrn().ty_undefined {
                 None
             } else {
                 Some(return_type)
@@ -2177,7 +2185,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         let subject_ty = if let Some(expr) = subject_expr {
             self.ctx.get_node_type_or_unknown(&expr.syntax())
         } else {
-            self.intrn().ty_unknown
+            self.intrn().ty_undefined
         };
 
         let mut branches_unifier = TypeInferringUnifyStrategy::new();

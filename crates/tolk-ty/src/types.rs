@@ -79,6 +79,7 @@ pub enum TyData {
     Never,
     /// Type of function without explicit return type.
     Auto,
+    Undefined,
     Unknown,
 }
 

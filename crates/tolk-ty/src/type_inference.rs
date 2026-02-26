@@ -97,7 +97,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
 
     pub(crate) fn lower(&mut self, ty: Option<Type<'_>>) -> TyId {
         self.lower_or_none(ty)
-            .unwrap_or(self.ctx.type_db.intrn.ty_unknown)
+            .unwrap_or(self.ctx.type_db.intrn.ty_undefined)
     }
 
     pub(crate) fn lower_or_none(&mut self, ty: Option<Type<'_>>) -> Option<TyId> {
@@ -152,7 +152,7 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         let ty = self
             .ctx
             .get_top_level_type(symbol_id)
-            .unwrap_or_else(|| self.intrn().ty_unknown);
+            .unwrap_or_else(|| self.intrn().ty_undefined);
         self.ctx.set_node_type(&name_ident, ty);
         self.ctx.set_node_type(v, ty);
 

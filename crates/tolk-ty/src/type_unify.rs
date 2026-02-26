@@ -36,7 +36,7 @@ impl TypeInferringUnifyStrategy {
         // example: `var r = ... ? int8 : int16`, will be inferred as `int8 | int16` (via unification)
         // but `var r: int = ... ? int8 : int16`, will be inferred as `int` (it's dest_hint)
         if let Some(dest_hint) = dest_hint
-            && !type_interner.is_type_unknown_from_var_lhs_decl(dest_hint)
+            && !type_interner.is_type_undefined_from_var_lhs_decl(dest_hint)
         {
             let unwrapped = type_interner.unwrap_alias(dest_hint);
             if !matches!(type_interner.data(unwrapped), TyData::Union(_))
@@ -63,6 +63,6 @@ impl TypeInferringUnifyStrategy {
     }
 
     pub(crate) fn get_result(&self, type_interner: &TypeInterner) -> TyId {
-        self.unified_result.unwrap_or(type_interner.ty_unknown)
+        self.unified_result.unwrap_or(type_interner.ty_undefined)
     }
 }

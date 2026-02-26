@@ -34,6 +34,7 @@ pub struct TypeInterner {
     arena: Vec<TyData>,           // TyId -> TyData
     map: FxHashMap<TyData, TyId>, // TyData -> TyId
 
+    pub ty_undefined: TyId,
     pub ty_unknown: TyId,
     pub ty_auto: TyId, // special type for omitted return type of functions
     pub ty_int: TyId,
@@ -64,6 +65,7 @@ impl TypeInterner {
         let mut this = Self {
             arena: Vec::new(),
             map: FxHashMap::default(),
+            ty_undefined: TyId(0),
             ty_unknown: TyId(0),
             ty_int: TyId(0),
             ty_coins: TyId(0),
@@ -82,7 +84,8 @@ impl TypeInterner {
             ty_auto: TyId(0),
         };
 
-        // ty_unknown always go first for easier debugging (TyId = 0)
+        // ty_undefined always go first for easier debugging (TyId = 0)
+        this.ty_undefined = this.intern(TyData::Undefined);
         this.ty_unknown = this.intern(TyData::Unknown);
         this.ty_auto = this.intern(TyData::Auto);
         this.ty_int = this.intern(TyData::Int(IntTy::Int));
@@ -294,16 +297,16 @@ impl TypeInterner {
         self.intern(TyData::TypeParameter { name, default_type })
     }
 
-    /// when `var v = rhs`, `v` is `unknown` before assignment (before rhs->inferred_type is assigned to it);
-    /// when `var (v1,v2,v3) = rhs`, left side is `(unknown,unknown,unknown)`
-    pub(crate) fn is_type_unknown_from_var_lhs_decl(&self, id: TyId) -> bool {
-        if id == self.ty_unknown {
+    /// when `var v = rhs`, `v` is `undefined` before assignment (before rhs->inferred_type is assigned to it);
+    /// when `var (v1,v2,v3) = rhs`, left side is `(undefined,undefined,undefined)`
+    pub(crate) fn is_type_undefined_from_var_lhs_decl(&self, id: TyId) -> bool {
+        if id == self.ty_undefined {
             return true;
         }
         if let TyData::Tensor(items) = self.data(id) {
             return items
                 .iter()
-                .all(|&item| self.is_type_unknown_from_var_lhs_decl(item));
+                .all(|&item| self.is_type_undefined_from_var_lhs_decl(item));
         }
         false
     }
@@ -453,6 +456,7 @@ impl TypeInterner {
             (TyData::Void, TyData::Void) => true,
             (TyData::Null, TyData::Null) => true,
             (TyData::Never, TyData::Never) => true,
+            (TyData::Undefined, TyData::Undefined) => true,
             (TyData::Unknown, TyData::Unknown) => true,
             (TyData::UntypedTuple, TyData::UntypedTuple) => true,
             (TyData::Bits { size: sa }, TyData::Bits { size: sb }) => sa == sb,
@@ -583,6 +587,9 @@ impl TypeInterner {
         let dr = self.data(rhs);
 
         if matches!(dl, TyData::Unknown) {
+            return true;
+        }
+        if matches!(dl, TyData::Undefined) {
             return true;
         }
         if matches!(dr, TyData::Never) {
@@ -813,7 +820,7 @@ impl TypeInterner {
                 .iter()
                 .zip(tt.iter())
                 .all(|(&f, &t)| self.can_be_casted_with_as_operator(f, t)),
-            (TyData::Unknown, _) => self.get_width_on_stack(to) == 1, // 'unknown' can be cast to any TVM value
+            (TyData::Unknown | TyData::Undefined, _) => self.get_width_on_stack(to) == 1,
             (TyData::Never, _) => true,
             _ => false,
         }
@@ -1001,6 +1008,10 @@ impl TypeInterner {
             return a;
         }
 
+        if a == self.ty_undefined || b == self.ty_undefined {
+            return self.ty_undefined;
+        }
+
         if a == self.ty_unknown || b == self.ty_unknown {
             return self.ty_unknown;
         }
@@ -1120,6 +1131,22 @@ impl TypeInterner {
 mod tests {
     use super::*;
     use tolk_resolver::file_index::SymbolId;
+
+    #[test]
+    fn test_builtin_type_ids_stable_order() {
+        let interner = TypeInterner::new();
+
+        assert_eq!(interner.ty_undefined, TyId(0));
+        assert_eq!(interner.ty_unknown, TyId(1));
+        assert!(matches!(
+            interner.data(interner.ty_undefined),
+            TyData::Undefined
+        ));
+        assert!(matches!(
+            interner.data(interner.ty_unknown),
+            TyData::Unknown
+        ));
+    }
 
     #[test]
     fn test_alias_nominal_equality() {
@@ -1368,11 +1395,11 @@ mod tests {
 
         let t_int = interner.ty_int;
         let t_null = interner.ty_null;
-        let t_unknown = interner.ty_unknown;
+        let t_undefined = interner.ty_undefined;
         let t_never = interner.ty_never;
 
         assert_eq!(interner.calculate_type_lca(t_int, t_int), t_int);
-        assert_eq!(interner.calculate_type_lca(t_int, t_unknown), t_unknown);
+        assert_eq!(interner.calculate_type_lca(t_int, t_undefined), t_undefined);
         assert_eq!(interner.calculate_type_lca(t_int, t_never), t_int);
 
         let t_int_nullable = interner.calculate_type_lca(t_int, t_null);
