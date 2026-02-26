@@ -73,7 +73,7 @@ fmt-ui:
     bun run fmt
 
 play-tree-sitter:
-    cd crates/tree-sitter-tolk && yarn && tree-sitter generate && tree-sitter build --wasm && tree-sitter playground
+    cd crates/tree-sitter-tolk && yarn && npx tree-sitter generate && npx tree-sitter build --wasm && npx tree-sitter playground
 
 precommit: fmt fmt-ui build build-ui check check-ui
 
