@@ -235,19 +235,25 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         match pat {
             VarDeclPattern::TensorVars(lhs_tensor) => {
                 let rhs_unwrapped = self.intrn().unwrap_alias(rhs_ty);
+                let vars: Vec<_> = lhs_tensor.vars().collect();
                 let rhs_items =
                     if let TyData::Tensor(items) = self.intrn().data(rhs_unwrapped).clone() {
-                        items
+                        Some(items)
                     } else {
-                        return;
+                        None
                     };
-
-                let vars: Vec<_> = lhs_tensor.vars().collect();
                 let mut types_list = Vec::with_capacity(vars.len());
                 for (i, element) in vars.iter().enumerate() {
                     let item_rhs_ty = rhs_items
-                        .get(i)
-                        .cloned()
+                        .as_ref()
+                        .and_then(|items| items.get(i).copied())
+                        .or_else(|| {
+                            if rhs_items.is_none() && vars.len() == 1 {
+                                Some(rhs_ty)
+                            } else {
+                                None
+                            }
+                        })
                         .unwrap_or_else(|| self.intrn().ty_undefined);
                     self.process_var_declaration_lhs_after_infer_rhs(*element, item_rhs_ty, flow);
                     types_list.push(self.ctx.get_node_type_or_unknown(&element.syntax()));
@@ -257,12 +263,16 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             }
             VarDeclPattern::TupleVars(lhs_tuple) => {
                 let rhs_unwrapped = self.intrn().unwrap_alias(rhs_ty);
-                let rhs_items =
-                    if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone() {
-                        items
-                    } else {
-                        return;
-                    };
+                let mut repeated_item_ty = None;
+                let rhs_items = if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone()
+                {
+                    items
+                } else if let TyData::Array(item_ty) = self.intrn().data(rhs_unwrapped) {
+                    repeated_item_ty = Some(*item_ty);
+                    Vec::new()
+                } else {
+                    return;
+                };
 
                 let vars: Vec<_> = lhs_tuple.vars().collect();
                 let mut types_list = Vec::with_capacity(vars.len());
@@ -270,6 +280,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                     let item_rhs_ty = rhs_items
                         .get(i)
                         .cloned()
+                        .or(repeated_item_ty)
                         .unwrap_or_else(|| self.intrn().ty_undefined);
                     self.process_var_declaration_lhs_after_infer_rhs(*element, item_rhs_ty, flow);
                     types_list.push(self.ctx.get_node_type_or_unknown(&element.syntax()));
@@ -450,21 +461,29 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             // dig recursively into v1 and v2 with corresponding rhs i-th item of a tensor
             Expr::Tensor(lhs_tensor) => {
                 let rhs_unwrapped = self.intrn().unwrap_alias(rhs_ty);
+                let elements: Vec<_> = lhs_tensor.elements().collect();
                 let rhs_items =
                     if let TyData::Tensor(items) = self.intrn().data(rhs_unwrapped).clone() {
-                        items
+                        Some(items)
                     } else {
-                        return;
+                        None
                     };
 
-                let mut types_list = Vec::with_capacity(lhs_tensor.elements().count());
-                for (i, element) in lhs_tensor.elements().enumerate() {
+                let mut types_list = Vec::with_capacity(elements.len());
+                for (i, element) in elements.iter().enumerate() {
                     let item_rhs_ty = rhs_items
-                        .get(i)
-                        .cloned()
+                        .as_ref()
+                        .and_then(|items| items.get(i).copied())
+                        .or_else(|| {
+                            if rhs_items.is_none() && elements.len() == 1 {
+                                Some(rhs_ty)
+                            } else {
+                                None
+                            }
+                        })
                         .unwrap_or_else(|| self.intrn().ty_undefined);
-                    self.process_assignment_lhs_after_infer_rhs(element, item_rhs_ty, flow);
-                    types_list.push(self.ctx.get_node_type_or_unknown(&element));
+                    self.process_assignment_lhs_after_infer_rhs(*element, item_rhs_ty, flow);
+                    types_list.push(self.ctx.get_node_type_or_unknown(element));
                 }
                 let ty = self.intrn().tensor(types_list);
                 self.ctx.set_node_type(&lhs_tensor.0, ty);
@@ -473,18 +492,23 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             // dig recursively into v1 and v2 with corresponding rhs i-th item of a tuple
             Expr::Tuple(lhs_tuple) => {
                 let rhs_unwrapped = self.intrn().unwrap_alias(rhs_ty);
-                let rhs_items =
-                    if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone() {
-                        items
-                    } else {
-                        return;
-                    };
+                let mut repeated_item_ty = None;
+                let rhs_items = if let TyData::Tuple(items) = self.intrn().data(rhs_unwrapped).clone()
+                {
+                    items
+                } else if let TyData::Array(item_ty) = self.intrn().data(rhs_unwrapped) {
+                    repeated_item_ty = Some(*item_ty);
+                    Vec::new()
+                } else {
+                    return;
+                };
 
                 let mut types_list = Vec::with_capacity(lhs_tuple.elements().count());
                 for (i, element) in lhs_tuple.elements().enumerate() {
                     let item_rhs_ty = rhs_items
                         .get(i)
                         .cloned()
+                        .or(repeated_item_ty)
                         .unwrap_or_else(|| self.intrn().ty_undefined);
                     self.process_assignment_lhs_after_infer_rhs(element, item_rhs_ty, flow);
                     types_list.push(self.ctx.get_node_type_or_unknown(&element));
@@ -1924,11 +1948,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
                 if let SymbolKind::Method {
                     is_mutable: true, ..
                 } = &declaration.kind
-                    && self.const_intrn().equals(self_obj_ty, param_ty)
                     && let Some(s_expr) = self.extract_sink_expression(self_expr)
                 {
-                    let ty = self.calc_declared_type_before_smart_cast(self_expr);
-                    self.ctx.set_node_type(&self_expr, ty);
+                    if !self.const_intrn().equals(self_obj_ty, param_ty) {
+                        let ty = self.calc_declared_type_before_smart_cast(self_expr);
+                        self.ctx.set_node_type(&self_expr, ty);
+                    }
                     flow.register_known_type(s_expr, param_ty);
                 }
             }
