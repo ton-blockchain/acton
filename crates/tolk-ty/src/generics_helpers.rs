@@ -69,6 +69,21 @@ impl GenericSubstitutionsDeducing {
         let param_data = interner.data(param_ty).clone();
         let arg_data = interner.data(arg_ty).clone();
         let arg_unwrapped_data = interner.data(interner.unwrap_alias(arg_ty)).clone();
+
+        // When argument is nullable union `X | null` but parameter is not a union itself,
+        // deduce generics from the non-null side (`X`) to preserve smart-cast behavior on init:
+        // `var v: Wrapper<int>? = wrap0()` should infer `T = int`.
+        if !matches!(param_data, TyData::Union(_) | TyData::TypeParameter { .. })
+            && let TyData::Union(a_variants) = arg_unwrapped_data.clone()
+            && a_variants.len() == 2
+            && a_variants.contains(&interner.ty_null)
+            && let Some(non_null_variant) =
+                a_variants.iter().copied().find(|&v| v != interner.ty_null)
+        {
+            self.consider_next_condition(param_ty, non_null_variant, interner);
+            return;
+        }
+
         match (param_data, arg_data.clone()) {
             (TyData::TypeParameter { name, .. }, _) => {
                 // `(arg: T)` called as `f([1, 2])` => T is [int, int]
@@ -238,17 +253,29 @@ impl GenericSubstitutionsDeducing {
                 match arg_data {
                     TyData::TypeAlias {
                         def: a_def,
+                        inner_ty: _a_inner,
                         args: Some(a_args),
                         ..
                     } => {
                         // `arg: WrapperAlias<T>` called as `f(wrappedInt)` => T is int
                         let p_data = interner.data(p_inner).clone();
+                        let mut matched_by_alias = false;
                         if let TyData::TypeAlias { def: p_def, .. } = p_data
                             && p_def == a_def
                             && p_args.len() == a_args.len()
                         {
                             for (&p, &a) in p_args.iter().zip(a_args.iter()) {
                                 self.consider_next_condition(p, a, interner);
+                            }
+                            matched_by_alias = true;
+                        }
+
+                        if !matched_by_alias {
+                            // `arg: Wrapper<T>` called as `f(wrapperAliasValue)` =>
+                            // unwrap alias and continue matching by underlying constructor.
+                            let a_unwrapped = interner.unwrap_alias(arg_ty);
+                            if a_unwrapped != arg_ty {
+                                self.consider_next_condition(param_ty, a_unwrapped, interner);
                             }
                         }
                     }
