@@ -590,9 +590,6 @@ impl<'a> TypeDb<'a> {
                     && let Some(resolved) = resolved.find_local(local)
                     && matches!(resolved.kind, LocalDefKind::TypeParameter)
                 {
-                    if let Some(primitive) = self.as_primitive_type(resolved.name.as_ref()) {
-                        return Some(primitive);
-                    }
                     let default_ty = self.local_type_parameter_default(file_id, resolved.def_span);
                     return Some(
                         self.intrn

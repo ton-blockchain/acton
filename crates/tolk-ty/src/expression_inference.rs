@@ -800,10 +800,16 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         as_cond: bool,
     ) -> ExprFlow {
         let expr = try_expr_flow!(flow, v.expr());
-        let cast_ty = {
-            let ty = self.lower(v.casted_to());
-            self.apply_defaults_to_type(ty)
-        };
+        let mut cast_ty = self.lower(v.casted_to());
+        if !self.intrn().has_generics(cast_ty) {
+            cast_ty = self.apply_defaults_to_type(cast_ty);
+        } else if let TyData::TypeParameter {
+            default_type: Some(default_ty),
+            ..
+        } = self.intrn().data(cast_ty)
+        {
+            cast_ty = *default_ty;
+        }
 
         // for `expr as <type>`, use this type for hint, so that `t.tupleAt(0) as int` is ok
         let after_expr = self.infer_expr(expr, flow, false, Some(cast_ty));
@@ -1745,7 +1751,7 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         v: Call<'t>,
         flow: FlowContext,
         as_cond: bool,
-        _hint: Option<TyId>,
+        hint: Option<TyId>,
     ) -> ExprFlow {
         let mut flow = flow;
         let callee = try_expr_flow!(flow, v.callee());
@@ -1894,6 +1900,14 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
         // for `obj.method()` obj is the first argument (passed to `self` parameter)
         if let Some(self_expr) = self_obj {
             let self_obj_ty = self.ctx.get_node_type(&self_expr);
+
+            if let Some(self_obj_ty) = self_obj_ty
+                && let Some(&receiver_ty) = self.ctx.type_db.receiver_types.get(&fun_ref)
+                && self.intrn().has_generics(receiver_ty)
+            {
+                deducing_ts.auto_deduce_from_argument(receiver_ty, self_obj_ty, self.intrn());
+            }
+
             let params = &f_callable.0;
             if let Some(&param_ty) = params.first()
                 && let Some(self_obj_ty) = self_obj_ty
@@ -1967,6 +1981,12 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
             let func_ty = self.intrn().func(f_callable.0.clone(), inferred_ty);
             self.ctx.set_top_level_type(declaration.id, func_ty);
             return_ty = inferred_ty
+        }
+
+        if let Some(hint_ty) = hint
+            && self.intrn().has_generics(return_ty)
+        {
+            deducing_ts.auto_deduce_from_argument(return_ty, hint_ty, self.intrn());
         }
 
         let final_return_ty = if self.intrn().has_generics(return_ty) {

@@ -144,6 +144,75 @@ impl GenericSubstitutionsDeducing {
                 }
             }
             (
+                TyData::Struct {
+                    def: p_def,
+                    args: Some(p_args),
+                    ..
+                },
+                _,
+            ) => {
+                let arg_unwrapped_data = interner.data(interner.unwrap_alias(arg_ty)).clone();
+                match arg_unwrapped_data {
+                    TyData::Struct {
+                        def: a_def,
+                        args: Some(a_args),
+                        ..
+                    } if p_def == a_def && p_args.len() == a_args.len() => {
+                        for (&p, &a) in p_args.iter().zip(a_args.iter()) {
+                            self.consider_next_condition(p, a, interner);
+                        }
+                    }
+                    TyData::GenericTypeWithTs {
+                        inner_ty: a_inner,
+                        types: a_args,
+                    } => {
+                        if let TyData::Struct { def: a_def, .. } =
+                            interner.data(interner.unwrap_alias(a_inner))
+                            && p_def == *a_def
+                            && p_args.len() == a_args.len()
+                        {
+                            for (&p, &a) in p_args.iter().zip(a_args.iter()) {
+                                self.consider_next_condition(p, a, interner);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            (
+                TyData::TypeAlias {
+                    def: p_def,
+                    args: Some(p_args),
+                    ..
+                },
+                _,
+            ) => match arg_data {
+                TyData::TypeAlias {
+                    def: a_def,
+                    args: Some(a_args),
+                    ..
+                } if p_def == a_def && p_args.len() == a_args.len() => {
+                    for (&p, &a) in p_args.iter().zip(a_args.iter()) {
+                        self.consider_next_condition(p, a, interner);
+                    }
+                }
+                TyData::GenericTypeWithTs {
+                    inner_ty: a_inner,
+                    types: a_args,
+                } => {
+                    if let TyData::TypeAlias { def: a_def, .. } =
+                        interner.data(interner.unwrap_alias(a_inner))
+                        && p_def == *a_def
+                        && p_args.len() == a_args.len()
+                    {
+                        for (&p, &a) in p_args.iter().zip(a_args.iter()) {
+                            self.consider_next_condition(p, a, interner);
+                        }
+                    }
+                }
+                _ => {}
+            },
+            (
                 TyData::GenericTypeWithTs {
                     inner_ty: p_inner,
                     types: p_args,
