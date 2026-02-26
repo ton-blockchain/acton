@@ -1,0 +1,17 @@
+========================================================================
+Operators precedence 1
+========================================================================
+const a = 1 + 2 * !3 << 4;
+------------------------------------------------------------------------
+
+(source_file
+  (constant_declaration
+    name: (identifier)
+    value: (binary_operator
+      (binary_operator
+        (number_literal)
+        (binary_operator
+          (number_literal)
+          (unary_operator
+            argument: (number_literal))))
+      (number_literal))))

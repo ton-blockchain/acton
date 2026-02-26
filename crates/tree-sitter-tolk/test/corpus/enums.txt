@@ -1,0 +1,68 @@
+========================================================================
+Enum with members
+========================================================================
+
+enum Color {
+    Red,
+    Blue,
+}
+
+------------------------------------------------------------------------
+
+(source_file
+  (enum_declaration
+    (identifier)
+    (enum_body
+      (enum_member_declaration
+        (identifier))
+      (enum_member_declaration
+        (identifier)))))
+
+========================================================================
+Enum with members with default values
+========================================================================
+
+enum Color {
+    Red = 10,
+    Blue = 200 + 100,
+}
+
+------------------------------------------------------------------------
+
+(source_file
+  (enum_declaration
+    (identifier)
+    (enum_body
+      (enum_member_declaration
+        (identifier)
+        (number_literal))
+      (enum_member_declaration
+        (identifier)
+        (binary_operator
+          (number_literal)
+          (number_literal))))))
+
+========================================================================
+Enum with backed type
+========================================================================
+
+enum Color: uint8 {
+    Red = 10,
+    Blue = 200 + 100,
+}
+
+------------------------------------------------------------------------
+
+(source_file
+  (enum_declaration
+    (identifier)
+    (type_identifier)
+    (enum_body
+      (enum_member_declaration
+        (identifier)
+        (number_literal))
+      (enum_member_declaration
+        (identifier)
+        (binary_operator
+          (number_literal)
+          (number_literal))))))

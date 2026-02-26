@@ -20,7 +20,13 @@ test-integration:
     # we need test by test execution due to single debug port
     # {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
 
-test: test-unit test-serial test-integration
+test-tree-sitter:
+    cd crates/tree-sitter-tolk && yarn && tree-sitter generate && tree-sitter test
+
+update-test-tree-sitter:
+    cd crates/tree-sitter-tolk && yarn && tree-sitter generate && tree-sitter test -u
+
+test: test-unit test-serial test-integration test-tree-sitter
 
 test-update:
     SNAPSHOTS=overwrite just test
@@ -65,6 +71,9 @@ check-ui:
 
 fmt-ui:
     bun run fmt
+
+play-tree-sitter:
+    cd crates/tree-sitter-tolk && yarn && tree-sitter generate && tree-sitter build --wasm && tree-sitter playground
 
 precommit: fmt fmt-ui build build-ui check check-ui
 

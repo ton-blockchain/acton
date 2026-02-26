@@ -1,0 +1,84 @@
+========================================================================
+Generics 1
+========================================================================
+fun main() {
+    f;
+    f<int>;
+    f<int?>();
+    obj.f;
+    obj.f<T>;
+    obj.f<slice>();
+}
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (block_statement
+      (expression_statement
+        (identifier))
+      (expression_statement
+        (generic_instantiation
+          (identifier)
+          (instantiationT_list
+            (type_identifier))))
+      (expression_statement
+        (function_call
+          (generic_instantiation
+            (identifier)
+            (instantiationT_list
+              (nullable_type
+                (type_identifier))))
+          (argument_list)))
+      (expression_statement
+        (dot_access
+          (identifier)
+          (identifier)))
+      (expression_statement
+        (generic_instantiation
+          (dot_access
+            (identifier)
+            (identifier))
+          (instantiationT_list
+            (type_identifier))))
+      (expression_statement
+        (function_call
+          (generic_instantiation
+            (dot_access
+              (identifier)
+              (identifier))
+            (instantiationT_list
+              (type_identifier)))
+          (argument_list))))))
+
+========================================================================
+Generics 2
+========================================================================
+fun main() {
+    Slice<int>.parse;
+    Slice<int>.parse();
+}
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block_statement
+      (expression_statement
+        (dot_access
+          obj: (generic_instantiation
+            expr: (identifier)
+            instantiationTs: (instantiationT_list
+              types: (type_identifier)))
+          field: (identifier)))
+      (expression_statement
+        (function_call
+          callee: (dot_access
+            obj: (generic_instantiation
+              expr: (identifier)
+              instantiationTs: (instantiationT_list
+                types: (type_identifier)))
+            field: (identifier))
+          arguments: (argument_list))))))

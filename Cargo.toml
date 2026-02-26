@@ -49,6 +49,7 @@ ton-networks = { path = "crates/ton-networks" }
 ton-litenode = { path = "crates/ton-litenode" }
 ton-ls = { path = "crates/ton-ls" }
 ton-indexer = { path = "crates/ton-indexer" }
+tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
 
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
@@ -138,7 +139,7 @@ rustc-hash = "2.1.1"
 smol_str = "0.3.5"
 dashmap = "7.0.0-rc2"
 expect-test = "1.5.0"
-tree-sitter-tolk = "0.0.5"
+#tree-sitter-tolk = "0.0.5"
 memchr = "2.7.6"
 pkg-config = "0.3.32"
 thiserror = "2.0.18"

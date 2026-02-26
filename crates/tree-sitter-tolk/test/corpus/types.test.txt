@@ -1,0 +1,218 @@
+========================================================================
+Parse simple types
+========================================================================
+
+global g: int;
+global g: (slice, int);
+global g: [slice, (tuple)];
+global g: never;
+global g: address;
+
+------------------------------------------------------------------------
+
+(source_file
+  (global_var_declaration
+    (identifier)
+    (type_identifier))
+  (global_var_declaration
+    (identifier)
+    (tensor_type
+      (type_identifier)
+      (type_identifier)))
+  (global_var_declaration
+    (identifier)
+    (tuple_type
+      (type_identifier)
+      (parenthesized_type
+        (type_identifier))))
+  (global_var_declaration
+    (identifier)
+    (type_identifier))
+  (global_var_declaration
+    (identifier)
+    (type_identifier)))
+
+========================================================================
+Parse callable types
+========================================================================
+
+global g: () -> void;
+global g: int -> [slice];
+global g: (int) -> (cell, builder) -> [[slice]];
+
+------------------------------------------------------------------------
+
+(source_file
+  (global_var_declaration
+    (identifier)
+    (fun_callable_type
+      (tensor_type)
+      (type_identifier)))
+  (global_var_declaration
+    (identifier)
+    (fun_callable_type
+      (type_identifier)
+      (tuple_type
+        (type_identifier))))
+  (global_var_declaration
+    (identifier)
+    (fun_callable_type
+      (parenthesized_type
+        (type_identifier))
+      (fun_callable_type
+        (tensor_type
+          (type_identifier)
+          (type_identifier))
+        (tuple_type
+          (tuple_type
+            (type_identifier)))))))
+
+========================================================================
+Parse nullable types
+========================================================================
+
+global g: int?;
+global g: (int, slice)??;
+global g: int -> [slice]?;
+
+------------------------------------------------------------------------
+
+(source_file
+  (global_var_declaration
+    (identifier)
+    (nullable_type
+      (type_identifier)))
+  (global_var_declaration
+    (identifier)
+    (nullable_type
+      (nullable_type
+        (tensor_type
+          (type_identifier)
+          (type_identifier)))))
+  (global_var_declaration
+    (identifier)
+    (fun_callable_type
+      (type_identifier)
+      (nullable_type
+        (tuple_type
+          (type_identifier))))))
+
+========================================================================
+Parse intN types
+========================================================================
+
+global g: int32;
+global g: coins?;
+
+------------------------------------------------------------------------
+
+(source_file
+  (global_var_declaration
+    (identifier)
+    (type_identifier))
+  (global_var_declaration
+    (identifier)
+    (nullable_type
+      (type_identifier))))
+
+========================================================================
+Parse union types
+========================================================================
+
+global g: int32 | int64 |;
+global g: SomeStruct | coins? | (int|int);
+
+------------------------------------------------------------------------
+
+(source_file
+  (global_var_declaration
+    (identifier)
+    (union_type
+      (type_identifier)
+      (type_identifier)))
+  (global_var_declaration
+    (identifier)
+    (union_type
+      (type_identifier)
+      (union_type
+        (nullable_type
+          (type_identifier))
+        (parenthesized_type
+          (union_type
+            (type_identifier)
+            (type_identifier)))))))
+
+========================================================================
+Parse type aliases
+========================================================================
+
+type MInt = int;
+type s = (int, string | bool?);
+type F<T> = int;
+type F<T> = Container<T>;
+
+------------------------------------------------------------------------
+
+(source_file
+  (type_alias_declaration
+    (identifier)
+    (type_identifier))
+  (type_alias_declaration
+    (identifier)
+    (tensor_type
+      (type_identifier)
+      (union_type
+        (type_identifier)
+        (nullable_type
+          (type_identifier)))))
+  (type_alias_declaration
+    (identifier)
+    (type_parameters
+      (type_parameter
+        (identifier)))
+    (type_identifier))
+  (type_alias_declaration
+    (identifier)
+    (type_parameters
+      (type_parameter
+        (identifier)))
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (type_identifier)))))
+
+========================================================================
+Parse generics
+========================================================================
+
+global a: Container<slice>;
+global b: Container < Container < slice > >;
+global c: Container<Container<slice>>;
+
+------------------------------------------------------------------------
+
+(source_file
+  (global_var_declaration
+    (identifier)
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (type_identifier))))
+  (global_var_declaration
+    (identifier)
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (type_instantiatedTs
+          (type_identifier)
+          (instantiationT_list
+            (type_identifier))))))
+  (global_var_declaration
+    (identifier)
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (type_instantiatedTs
+          (type_identifier)
+          (instantiationT_list
+            (type_identifier)))))))

@@ -1,0 +1,37 @@
+{
+    "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+    "grammars": [
+        {
+            "name": "tolk",
+            "camelcase": "Tolk",
+            "title": "Tolk",
+            "scope": "source.tolk",
+            "file-types": ["tolk"],
+            "highlights": ["queries/highlights.scm"],
+            "injection-regex": "^tolk$",
+            "class-name": "TreeSitterTolk"
+        }
+    ],
+    "metadata": {
+        "version": "0.4.5",
+        "license": "MIT",
+        "description": "Tolk grammar for tree-sitter",
+        "authors": [
+            {
+                "name": "TON Core"
+            }
+        ],
+        "links": {
+            "repository": "https://github.com/ton-blockchain/tree-sitter-tolk"
+        }
+    },
+    "bindings": {
+        "c": true,
+        "go": true,
+        "node": true,
+        "python": true,
+        "rust": true,
+        "swift": true,
+        "zig": false
+    }
+}

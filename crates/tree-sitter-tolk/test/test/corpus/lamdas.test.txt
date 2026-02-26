@@ -1,0 +1,52 @@
+========================================================================
+Simple lambdas
+========================================================================
+fun main() {
+    fun() {}
+    fun(a) {}
+    fun(): int {}
+    fun(a, b: int) {}
+    fun(
+        a,
+        b,
+    ) {}
+}
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (block_statement
+      (expression_statement
+        (lambda_expression
+          (parameter_list)
+          (block_statement)))
+      (expression_statement
+        (lambda_expression
+          (parameter_list
+            (parameter_declaration
+              (identifier)))
+          (block_statement)))
+      (expression_statement
+        (lambda_expression
+          (parameter_list)
+          (type_identifier)
+          (block_statement)))
+      (expression_statement
+        (lambda_expression
+          (parameter_list
+            (parameter_declaration
+              (identifier))
+            (parameter_declaration
+              (identifier)
+              (type_identifier)))
+          (block_statement)))
+      (expression_statement
+        (lambda_expression
+          (parameter_list
+            (parameter_declaration
+              (identifier))
+            (parameter_declaration
+              (identifier)))
+          (block_statement))))))

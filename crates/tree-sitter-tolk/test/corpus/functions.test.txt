@@ -1,0 +1,348 @@
+========================================================================
+Simple functions
+========================================================================
+
+fun beginCell(): builder {}
+fun doSome(x: int) {}
+fun doAny<T>(x: T) {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list)
+    return_type: (type_identifier)
+    body: (block_statement))
+  (function_declaration
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)
+        type: (type_identifier)))
+    body: (block_statement))
+  (function_declaration
+    name: (identifier)
+    type_parameters: (type_parameters
+      (type_parameter
+        name: (identifier)))
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)
+        type: (type_identifier)))
+    body: (block_statement)))
+
+========================================================================
+Methods
+========================================================================
+
+fun tuple.get(self) {}
+fun builder?.store(mutate self, arg: int) {}
+fun Point.create() {}
+fun (int, int).getLast(self) {}
+fun [int, int].getLast(self) {}
+fun [int, int]?.getLast(self) {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (method_declaration
+    receiver: (method_receiver
+      receiver_type: (type_identifier))
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)))
+    body: (block_statement))
+  (method_declaration
+    receiver: (method_receiver
+      receiver_type: (nullable_type
+        inner: (type_identifier)))
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier))
+      (parameter_declaration
+        name: (identifier)
+        type: (type_identifier)))
+    body: (block_statement))
+  (method_declaration
+    receiver: (method_receiver
+      receiver_type: (type_identifier))
+    name: (identifier)
+    parameters: (parameter_list)
+    body: (block_statement))
+  (method_declaration
+    receiver: (method_receiver
+      receiver_type: (tensor_type
+        (type_identifier)
+        (type_identifier)))
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)))
+    body: (block_statement))
+  (method_declaration
+    receiver: (method_receiver
+      receiver_type: (tuple_type
+        (type_identifier)
+        (type_identifier)))
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)))
+    body: (block_statement))
+  (method_declaration
+    receiver: (method_receiver
+      receiver_type: (nullable_type
+        inner: (tuple_type
+          (type_identifier)
+          (type_identifier))))
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)))
+    body: (block_statement)))
+
+========================================================================
+Methods for generics
+========================================================================
+
+fun Container<T>.getItem() {}
+fun Pair<A, B>.createFrom<U, V>(f: U): Pair<A, B> {}
+fun Wrapper<T?>.createFromNull(): Wrapper<T?> {}
+fun (Pair<A, B>, Wrapper<T?>).createFromNull(): Wrapper<T?> {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (method_declaration
+    (method_receiver
+      (type_instantiatedTs
+        (type_identifier)
+        (instantiationT_list
+          (type_identifier))))
+    (identifier)
+    (parameter_list)
+    (block_statement))
+  (method_declaration
+    (method_receiver
+      (type_instantiatedTs
+        (type_identifier)
+        (instantiationT_list
+          (type_identifier)
+          (type_identifier))))
+    (identifier)
+    (type_parameters
+      (type_parameter
+        (identifier))
+      (type_parameter
+        (identifier)))
+    (parameter_list
+      (parameter_declaration
+        (identifier)
+        (type_identifier)))
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (type_identifier)
+        (type_identifier)))
+    (block_statement))
+  (method_declaration
+    (method_receiver
+      (type_instantiatedTs
+        (type_identifier)
+        (instantiationT_list
+          (nullable_type
+            (type_identifier)))))
+    (identifier)
+    (parameter_list)
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (nullable_type
+          (type_identifier))))
+    (block_statement))
+  (method_declaration
+    (method_receiver
+      (tensor_type
+        (type_instantiatedTs
+          (type_identifier)
+          (instantiationT_list
+            (type_identifier)
+            (type_identifier)))
+        (type_instantiatedTs
+          (type_identifier)
+          (instantiationT_list
+            (nullable_type
+              (type_identifier))))))
+    (identifier)
+    (parameter_list)
+    (type_instantiatedTs
+      (type_identifier)
+      (instantiationT_list
+        (nullable_type
+          (type_identifier))))
+    (block_statement)))
+
+========================================================================
+Method with annotation
+========================================================================
+
+@deprecated
+fun Message?.output(self): self {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (method_declaration
+    annotations: (annotation_list
+      (annotation
+        name: (identifier)))
+    receiver: (method_receiver
+      receiver_type: (nullable_type
+        inner: (type_identifier)))
+    name: (identifier)
+    parameters: (parameter_list
+      (parameter_declaration
+        name: (identifier)))
+    return_type: (type_identifier)
+    body: (block_statement)))
+
+========================================================================
+Function with generic parameters
+========================================================================
+
+fun f(a: Container<int>, b: Message<Container<never>>) {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (identifier)
+        (type_instantiatedTs
+          (type_identifier)
+          (instantiationT_list
+            (type_identifier))))
+      (parameter_declaration
+        (identifier)
+        (type_instantiatedTs
+          (type_identifier)
+          (instantiationT_list
+            (type_instantiatedTs
+              (type_identifier)
+              (instantiationT_list
+                (type_identifier)))))))
+    (block_statement)))
+
+========================================================================
+Default parameters
+========================================================================
+
+fun inc(x: int, by: int = 1+C) {}
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameter_list
+      (parameter_declaration
+        (identifier)
+        (type_identifier))
+      (parameter_declaration
+        (identifier)
+        (type_identifier)
+        (binary_operator
+          (number_literal)
+          (identifier))))
+    (block_statement)))
+
+========================================================================
+Assembly functions
+========================================================================
+
+fun foo() asm "FOO"
+fun foo() asm "FOO" "BAR" "BAZ"
+fun foo() asm """FOO"""
+fun foo() asm """
+    FOO
+"""
+fun foo() asm """
+    FOO
+    BAR
+    BAZ
+"""
+get fun foo() asm "FOO"
+get fun foo() asm (-> 1 0) "FOO"
+get fun foo() asm (a b) "FOO"
+get fun foo() asm (a b -> 1 0) "FOO"
+
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (string_literal)))
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (string_literal)
+      (string_literal)
+      (string_literal)))
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (string_literal)))
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (string_literal)))
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (string_literal)))
+  (get_method_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (string_literal)))
+  (get_method_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (asm_body_rearrange
+        (asm_body_rearrange_return
+          (number_literal)
+          (number_literal)))
+      (string_literal)))
+  (get_method_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (asm_body_rearrange
+        (asm_body_rearrange_params
+          (identifier)
+          (identifier)))
+      (string_literal)))
+  (get_method_declaration
+    (identifier)
+    (parameter_list)
+    (asm_body
+      (asm_body_rearrange
+        (asm_body_rearrange_params
+          (identifier)
+          (identifier))
+        (asm_body_rearrange_return
+          (number_literal)
+          (number_literal)))
+      (string_literal))))
