@@ -67,8 +67,8 @@ fn declared_pack_prefix_helpers_direct_calls_return_expected_values() {
         r#"
 get fun `test-ep-declared-pack-prefix-helpers-direct-calls`() {
     expect(EpDeclaredPrefixBody.getDeclaredPackPrefix()).toEqual(0xE5000001);
-    expect(never.getDeclaredPackPrefix()).toBeNull();
-    expect(never.getDeclaredPackPrefixLen()).toBeNull();
+    expect(never.getDeclaredPackPrefix()).toEqual(-1);
+    expect(never.getDeclaredPackPrefixLen()).toEqual(-1);
 }
 "#,
         "integration/snapshots/test-runner/declared_pack_prefix_helpers_direct_calls_return_expected_values/declared_pack_prefix_helpers_direct_calls_return_expected_values.stdout.txt",

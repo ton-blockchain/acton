@@ -363,8 +363,8 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
 /// val tx = result.unwrap();
 /// ```
 fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {}): Maybe<Transaction> {
-    val declaredPrefix: int? = Msg.getDeclaredPackPrefix();
-    if (declaredPrefix != null) {
+    val declaredPrefix = Msg.getDeclaredPackPrefix2();
+    if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
     }
     val tx = ffi.findTransactionByParams(self, params.toTuple());
@@ -1210,6 +1210,14 @@ fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: strin
 
         throw e
     }
+}
+
+fun T.getDeclaredPackPrefix2() {
+    return reflect.serializationPrefixOf<T>();
+}
+
+fun never.getDeclaredPackPrefix2() {
+    return -1;
 }
 
 fun __treasuryCode(): cell asm """
