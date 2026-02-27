@@ -1,5 +1,6 @@
 use crate::common::{acton_exe, assert_ui};
 use crate::support::assertions::TestOutput;
+use crate::support::tmp::create_tmp_dir;
 use acton_config::color::ColorMode;
 use std::collections::BTreeMap;
 use std::fs;
@@ -66,7 +67,7 @@ pub(crate) struct TestConfig {
 #[allow(dead_code)]
 impl ProjectBuilder {
     pub(crate) fn new(name: &str) -> Self {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let temp_dir = create_tmp_dir();
         Self {
             name: name.to_string(),
             temp_dir,

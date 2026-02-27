@@ -1,5 +1,6 @@
 use crate::debugging::{DebuggerClient, run_script_file};
 use crate::support::snapshots::normalize_output;
+use crate::support::tmp::create_tmp_dir;
 use dap::types::StackFrame;
 use std::cmp::max;
 use std::fs;
@@ -27,7 +28,7 @@ pub(crate) struct DebugBuilder {
 
 impl DebugBuilder {
     pub(crate) fn new(name: &str) -> Self {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let temp_dir = create_tmp_dir();
         Self {
             name: name.to_string(),
             temp_dir,
