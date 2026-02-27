@@ -36,15 +36,6 @@ jobs:
           cache-dependency-path: crates/tree-sitter-tolk/yarn.lock
           cache: "yarn"
 
-      - name: Setup EMSDK
-        uses: pyodide/setup-emsdk@ca2dd8aef8c2a0e11743c5c36f0b430ddb694b5c # v15
-        env:
-          EMSDK_VERSION: 5.0.2
-        with:
-          version: ${{ env.EMSDK_VERSION }}
-          actions-cache-folder: "emsdk-cache"
-          cache-key: emsdk-cache-${{ runner.os }}-${{ runner.arch }}-${{ env.EMSDK_VERSION }}
-
       - name: Install dependencies
         working-directory: crates/tree-sitter-tolk
         run: yarn install --immutable --check-cache --check-resolutions
