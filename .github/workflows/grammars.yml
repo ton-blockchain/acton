@@ -49,7 +49,7 @@ jobs:
         working-directory: crates/tree-sitter-tolk
         run: yarn install --immutable --check-cache --check-resolutions
 
-      - name: Build WASM
+      - name: Build
         working-directory: crates/tree-sitter-tolk
         run: yarn tree-sitter generate
 
