@@ -140,7 +140,10 @@ jobs:
           export CXX=clang++-16
           just build-ui
           ldd --version
-          cargo build --bin acton
+          cargo build --bin acton || {
+            cargo install cargo-zigbuild;
+            cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.35;
+          }
 
       - name: Test acton binary
         run: |
