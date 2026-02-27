@@ -33,6 +33,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22.x
+          cache-dependency-path: crates/tree-sitter-tolk/yarn.lock
           cache: "yarn"
 
       - name: Setup EMSDK

@@ -20,7 +20,7 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubicloud-standard-4
-    if: true
+    if: false
 
     outputs:
       arch: ${{ steps.detect-arch.outputs.arch }}
