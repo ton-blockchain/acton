@@ -1,6 +1,6 @@
 use crate::common::{acton_exe, assert_ui};
 use crate::support::assertions::TestOutput;
-use crate::support::tmp::create_tmp_dir;
+use crate::support::tempdir::create_tmp_dir;
 use acton_config::color::ColorMode;
 use std::collections::BTreeMap;
 use std::fs;

@@ -1,6 +1,6 @@
 use crate::debugging::{DebuggerClient, run_script_file};
 use crate::support::snapshots::normalize_output;
-use crate::support::tmp::create_tmp_dir;
+use crate::support::tempdir::create_tmp_dir;
 use dap::types::StackFrame;
 use std::cmp::max;
 use std::fs;
