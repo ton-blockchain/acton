@@ -1,0 +1,16 @@
+warning[E023]: converting slice to continuation requires safety comment
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |             fun transformSliceToContinuation(code: slice): continuation asm "BLESS";
+  |                 ----------------------------                                ------- `BLESS` is used here
+  |                 |                                                            
+  |                 callee resolves to `transformSliceToContinuation` which contains `BLESS`
+  .
+6 |                 return transformSliceToContinuation(code);
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ add `// SAFETY: ...` above this call
+  |
+  = BLESS allows to execute ANY user-code; document why this is safe and what preconditions must hold
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E023

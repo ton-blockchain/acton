@@ -3,6 +3,7 @@ use crate::support::project::ProjectBuilder;
 
 mod acton_import_tests;
 mod asm_safety_comment_tests;
+mod bless_safety_comment_tests;
 mod dangerous_send_mode_safety_comment_tests;
 mod deprecated_tests;
 mod field_init_can_be_folded_tests;

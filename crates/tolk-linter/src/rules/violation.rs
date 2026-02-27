@@ -1,3 +1,4 @@
+use crate::ast::bless_call_missing_safety_comment::BlessCallMissingSafetyComment;
 use crate::ast::dangerous_send_mode_missing_safety_comment::DangerousSendModeMissingSafetyComment;
 use crate::ast::{
     acton_import_in_contract, asm_function_missing_safety_comment, compiler_error,
@@ -80,6 +81,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E020") => reserve_mode_literal::ReserveModeLiteral,
         (Tolk, "E021") => DangerousSendModeMissingSafetyComment,
         (Tolk, "E022") => negated_is_type_can_use_not_is::NegatedIsTypeCanUseNotIs,
+        (Tolk, "E023") => BlessCallMissingSafetyComment,
         (Tolk, "C001") => compiler_error::CompilerError,
         (Tolk, "S001") => name_case_checker::NameCaseChecker,
         _ => return None,

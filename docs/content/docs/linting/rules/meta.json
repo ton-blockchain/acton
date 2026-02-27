@@ -23,6 +23,7 @@
     "e020-reserve-mode-literal",
     "e021-dangerous-send-mode-missing-safety-comment",
     "e022-negated-is-type-can-use-not-is",
+    "e023-bless-call-missing-safety-comment",
     "s001-name-case-checker"
   ]
 }

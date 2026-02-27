@@ -1,0 +1,19 @@
+warning[E023]: converting slice to continuation requires safety comment
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |                 return toCont(code);
+  |                        ^^^^^^ add `// SAFETY: ...` above this call
+  |
+  = BLESS allows to execute ANY user-code; document why this is safe and what preconditions must hold
+
+help[E023]: called function is declared here
+  --> [ROOT]/contracts/helpers[LINE]
+  |
+3 |                 fun toCont(code: slice): continuation asm "BLESS";
+  |                     ------                                ^^^^^^^ `BLESS` is used here (line 3)
+  |                     |                                      
+  |                     function `toCont` is declared here
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E023
