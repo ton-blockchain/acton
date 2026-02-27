@@ -51,8 +51,8 @@ jobs:
 
       - name: Build WASM
         working-directory: crates/tree-sitter-tolk
-        run: tree-sitter generate
+        run: yarn tree-sitter generate
 
       - name: Test parsers
         working-directory: crates/tree-sitter-tolk
-        run: tree-sitter test -u
+        run: yarn tree-sitter test -u
