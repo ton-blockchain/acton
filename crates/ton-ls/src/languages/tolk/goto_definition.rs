@@ -30,7 +30,7 @@ impl Backend {
 
         // find an import under cursor
         let imports = analysis.project_index.imports_of(file_info.id());
-        for import in imports.iter().flatten() {
+        for import in imports.into_iter().flatten() {
             if !import.import().span.contains(offset) {
                 // fast path
                 continue;

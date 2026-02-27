@@ -4,7 +4,7 @@
 //! `FileIndex`es and tracks the relationships between files through imports.
 
 use crate::file_db::FileDb;
-use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
+use crate::file_index::{FileId, FileIndex, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -40,8 +40,6 @@ pub struct ProjectIndex {
     pub(crate) files: FxHashMap<FileId, Arc<FileIndex>>,
     /// Map from `FileId` to a list of resolved imports in that file.
     pub(crate) imports: FxHashMap<FileId, Vec<ResolvedImport>>,
-    /// Map from `FileId` to a list of file IDs that import this file.
-    pub(crate) dependents: FxHashMap<FileId, Vec<FileId>>,
     /// Map from absolute file path to `FileId`.
     pub(crate) path_to_file_id: HashMap<PathBuf, FileId>,
     /// Path to the Tolk standard library, if provided.
@@ -89,42 +87,12 @@ impl ProjectIndex {
         &self.imports
     }
 
-    pub fn imports_of(&self, file_id: FileId) -> Option<Vec<ResolvedImport>> {
-        self.imports.get(&file_id).cloned()
+    pub fn imports_of(&self, file_id: FileId) -> Option<&[ResolvedImport]> {
+        self.imports.get(&file_id).map(Vec::as_slice)
     }
 
     pub const fn path_to_file_id(&self) -> &HashMap<PathBuf, FileId> {
         &self.path_to_file_id
-    }
-
-    pub const fn resolved_uses(&self) -> &FxHashMap<FileId, Arc<FileResolveIndex>> {
-        &self.resolved_uses
-    }
-
-    pub const fn dependents(&self) -> &FxHashMap<FileId, Vec<FileId>> {
-        &self.dependents
-    }
-
-    /// Returns a list of all file IDs that directly import the given file.
-    pub fn direct_dependents(&self, file_id: FileId) -> Vec<FileId> {
-        let Some(file) = self.files.get(&file_id) else {
-            // very unlikely and likely a bug
-            return Vec::new();
-        };
-        let is_common = file.source_kind == FileSource::Stdlib
-            && file.path.file_name().is_some_and(|n| n == "common.tolk");
-
-        if is_common {
-            // all files depend on common.tolk
-            return self.files.keys().cloned().collect();
-        }
-
-        let mut result = vec![file_id]; // include the file itself
-        if let Some(dependents) = self.dependents.get(&file_id) {
-            result.extend(dependents);
-        }
-
-        result
     }
 
     pub fn stdlib_path(&self) -> Option<&Path> {
@@ -350,7 +318,7 @@ impl<'a> ProjectIndexBuilder<'a> {
         self
     }
 
-    /// Builds the `ProjectIndex` by recursively following imports from the root file.
+    /// Builds the `ProjectIndex` by recursively following imports from the root files.
     pub fn build(self) -> anyhow::Result<ProjectIndex> {
         let mut errors = vec![];
         if self.root_paths.is_empty() {
@@ -462,16 +430,6 @@ impl<'a> ProjectIndexBuilder<'a> {
             errors.extend(file_errors);
         }
 
-        let mut dependents: FxHashMap<FileId, Vec<FileId>> =
-            FxHashMap::with_capacity_and_hasher(files.len(), Default::default());
-        for (id, file_imports) in &imports {
-            for import in file_imports {
-                if let Some(target_id) = import.target {
-                    dependents.entry(target_id).or_default().push(*id);
-                }
-            }
-        }
-
         let mut global_symbols = HashMap::new();
         for file in files.values() {
             for decl in &file.decls {
@@ -482,7 +440,6 @@ impl<'a> ProjectIndexBuilder<'a> {
         Ok(ProjectIndex {
             files,
             imports,
-            dependents,
             path_to_file_id,
             resolved_uses: Default::default(),
             stdlib_path: self.stdlib_path,
