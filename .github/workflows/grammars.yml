@@ -46,4 +46,4 @@ jobs:
 
       - name: Test parsers
         working-directory: crates/tree-sitter-tolk
-        run: yarn tree-sitter test -u
+        run: yarn tree-sitter test
