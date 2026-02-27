@@ -81,8 +81,8 @@ impl Compiler {
     pub fn new(opt_level: i64) -> Self {
         Self {
             opt_level,
-            with_stack_comments: false,
-            with_src_line_comments: false,
+            with_stack_comments: true,
+            with_src_line_comments: true,
             mappings: FxHashMap::default(),
         }
     }
