@@ -8,6 +8,10 @@ prebuilds/
 node_modules/
 package-lock.json
 
+# Yarn artifacts
+yarn-error.log
+.yarn/
+
 # Swift artifacts
 .build/
 Package.resolved
