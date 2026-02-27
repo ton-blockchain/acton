@@ -94,11 +94,16 @@ jobs:
       - name: Build TON static libraries
         # if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
+          cd ton-repo
+          # LLVM & Clang
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          ./llvm.sh 16 clang
           export CC=clang-16
           export CXX=clang++-16
           export AR=llvm-ar-16
           export RANLIB=llvm-ranlib-16
-          cd ton-repo
+          # Static libraries
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
           ./build-ubuntu-static.sh -a -c
