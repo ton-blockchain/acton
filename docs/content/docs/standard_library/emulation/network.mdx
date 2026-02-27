@@ -324,7 +324,7 @@ struct ExternalOutSearchParams {
 ## `Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches`
 
 ```tolk
-fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>(
+fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = unknown>(
     self,
     params: ExternalOutSearchParams = {}
 ): bool
@@ -335,7 +335,7 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>
 ## `SendResultList.findExternalOutMessage`
 
 ```tolk
-fun SendResultList.findExternalOutMessage<TBody = never>(
+fun SendResultList.findExternalOutMessage<TBody = unknown>(
     self,
     params: ExternalOutSearchParams = {}
 ): Maybe<Message<TBody, ExternalOutMessageInfo>>
@@ -368,7 +368,7 @@ If the message is not found, returns None.
 ## `SendResultList.findTransaction`
 
 ```tolk
-fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {}): Maybe<Transaction>
+fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {}): Maybe<Transaction>
 ```
 
 Find a transaction in the send result list by specified parameters.

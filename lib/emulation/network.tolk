@@ -269,7 +269,7 @@ struct ExternalOutSearchParams {
     to: any_address? = null
 }
 
-fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>(
+fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = unknown>(
     self,
     params: ExternalOutSearchParams = {}
 ): bool {
@@ -319,7 +319,7 @@ fun Message<RemainingBitsAndRefs, ExternalOutMessageInfo>.matches<TBody = never>
 /// ```
 ///
 /// If the message is not found, returns None.
-fun SendResultList.findExternalOutMessage<TBody = never>(
+fun SendResultList.findExternalOutMessage<TBody = unknown>(
     self,
     params: ExternalOutSearchParams = {}
 ): Maybe<Message<TBody, ExternalOutMessageInfo>> {
@@ -362,7 +362,7 @@ fun SendResultList.findExternalOutMessage<TBody = never>(
 /// expect(result).toBeDefined();
 /// val tx = result.unwrap();
 /// ```
-fun SendResultList.findTransaction<Msg = never>(self, params: SearchParams = {}): Maybe<Transaction> {
+fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {}): Maybe<Transaction> {
     val declaredPrefix = Msg.getDeclaredPackPrefix2();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -1163,7 +1163,7 @@ fun T.externalOutPrefix() {
     return reflect.serializationPrefixOf<T>();
 }
 
-fun never.externalOutPrefix() {
+fun unknown.externalOutPrefix() {
     return -1;
 }
 
@@ -1171,7 +1171,7 @@ fun T.externalOutPrefixLen() {
     return reflect.serializationPrefixLenOf<T>();
 }
 
-fun never.externalOutPrefixLen() {
+fun unknown.externalOutPrefixLen() {
     return 0;
 }
 
@@ -1179,7 +1179,7 @@ fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T {
     return T.fromSlice(body);
 }
 
-fun never.decodeExternalOutBody(_: RemainingBitsAndRefs): never {
+fun unknown.decodeExternalOutBody(_: RemainingBitsAndRefs): never {
     throw 0;
 }
 
@@ -1216,7 +1216,7 @@ fun T.getDeclaredPackPrefix2() {
     return reflect.serializationPrefixOf<T>();
 }
 
-fun never.getDeclaredPackPrefix2() {
+fun unknown.getDeclaredPackPrefix2() {
     return -1;
 }
 

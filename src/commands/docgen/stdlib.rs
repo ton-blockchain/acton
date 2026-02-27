@@ -253,6 +253,7 @@ fn skip_symbol(s: &SymbolInfo) -> bool {
         || s.name.starts_with("expect_impl.")
         || s.name.starts_with("impl_msg.")
         || s.name.starts_with("never.")
+        || s.name.starts_with("unknown.")
         || s.name.contains("__")
 }
 

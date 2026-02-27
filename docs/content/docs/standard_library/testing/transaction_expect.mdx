@@ -42,7 +42,7 @@ expect(failResults).toHaveFailedTx({
 ## `Expectation<SendResultList>.toHaveSuccessfulDeploy`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {})
 ```
 
 Expect the transaction list to have a successful deploy transaction.
@@ -63,7 +63,7 @@ expect(txs).toHaveSuccessfulDeploy({
 ## `Expectation<SendResultList>.toHaveSuccessfulTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {})
 ```
 
 Expect the transaction list to have a successful transaction.
@@ -89,7 +89,7 @@ expect(txs).toHaveSuccessfulTx({
 ## `Expectation<SendResultList>.toHaveTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {})
 ```
 
 Expect the transaction list to have a transaction with specified parameters.
@@ -112,7 +112,7 @@ expect(txs).toHaveTx({
 ## `Expectation<SendResultList>.toNotHaveTx`
 
 ```tolk
-fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {})
 ```
 
 Expect the transaction list to NOT have a transaction with specified parameters.
@@ -130,7 +130,7 @@ expect(txs).toNotHaveTx({
 ## `Expectation<SendResultList>.toHaveBouncedTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {})
 ```
 
 Expect the transaction list to have a **bounced** transaction.
@@ -148,7 +148,7 @@ expect(txs).toHaveBouncedTx({
 ## `Expectation<SendResultList>.toHaveFailedTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {})
 ```
 
 Expect the transaction list to have a **failed** transaction.

@@ -49,7 +49,7 @@ import "../ffi/ffi"
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {}) {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -86,7 +86,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = never>(self, params
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {}) {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -122,7 +122,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = never>(self, params: Se
 ///     actionExitCode: 37,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {}) {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -149,7 +149,7 @@ fun Expectation<SendResultList>.toHaveTx<Msg = never>(self, params: SearchParams
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {}) {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -176,7 +176,7 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = never>(self, params: SearchPar
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {}) {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -212,7 +212,7 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = never>(self, params: Searc
 ///     exitCode: 123,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveFailedTx<Msg = never>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {}) {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -318,10 +318,10 @@ fun T.getDeclaredPackPrefix() {
     return reflect.serializationPrefixOf<T>();
 }
 
-fun never.getDeclaredPackPrefix() {
+fun unknown.getDeclaredPackPrefix() {
     return -1;
 }
 
-fun never.getDeclaredPackPrefixLen() {
+fun unknown.getDeclaredPackPrefixLen() {
     return -1;
 }
