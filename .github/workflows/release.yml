@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build-linux:
-    runs-on: ubicloud-standard-4
+    runs-on: ubicloud-standard-4-ubuntu-2204
     if: true
 
     outputs:
