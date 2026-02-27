@@ -96,7 +96,7 @@ cargo test --test integration_test
 cargo test --test debug_test -- --test-threads 1
 ```
 
-To save test artifacts:
+To preserve test artifacts:
 
 ```
 DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1 just test
