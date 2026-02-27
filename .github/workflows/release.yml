@@ -130,7 +130,9 @@ jobs:
           export CC=clang-16
           export CXX=clang++-16
           just build-ui
-          cargo build --profile release-size --bin acton
+          # Flags here enforce static linking against the system glibc version.
+          # Such linking is important for Tree-sitter and OpenSSL, among others.
+          RUSTFLAGS="-C target-feature=-crt-static" cargo build --profile release-size --bin acton
 
       - name: Test acton binary
         run: |
