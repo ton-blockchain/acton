@@ -62,7 +62,7 @@ jobs:
         run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
 
       - name: Install system dependencies (cache not exist)
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        # if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev graphviz
@@ -75,14 +75,14 @@ jobs:
           sudo apt-get install -y graphviz
 
       - name: Maximize Build Space
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        # if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
           tool-cache: false
           large-packages: false
 
       - name: Clone TON repository
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        # if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
         with:
           repository: i582/ton
@@ -92,7 +92,7 @@ jobs:
           path: ton-repo
 
       - name: Build TON static libraries
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        # if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
           export CC=clang-16
           export CXX=clang++-16
@@ -104,7 +104,7 @@ jobs:
           ./build-ubuntu-static.sh -a -c
 
       - name: Show ccache stats
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        # if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: ccache -s
 
       - name: Copy TON artifacts to objs directory
