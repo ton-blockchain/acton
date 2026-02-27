@@ -5,12 +5,12 @@ on:
     branches:
       - master
     paths:
-      - crates/tree-sitter-tolk
+      - crates/tree-sitter-tolk/**
   push:
     branches:
       - master
     paths:
-      - crates/tree-sitter-tolk
+      - crates/tree-sitter-tolk/**
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
