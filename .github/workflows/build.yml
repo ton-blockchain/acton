@@ -66,7 +66,7 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          ./llvm.sh 16 clang
+          sudo ./llvm.sh 16 clang
           rm llvm.sh
 
       - name: Install system dependencies (cache not exist)
