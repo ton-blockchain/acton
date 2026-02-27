@@ -126,9 +126,6 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Build acton binary
-        # env:
-        #   CC: gcc
-        #   CXX: g++
         run: |
           export CC=clang-16
           export CXX=clang++-16

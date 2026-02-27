@@ -132,15 +132,17 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Build acton binary
-        # env:
-        #   CC: gcc
-        #   CXX: g++
         run: |
           export CC=clang-16
           export CXX=clang++-16
           just build-ui
-          ldd --version
-          cargo build --bin acton || {
+          RUSTFLAGS="-C target-feature=-crt-static" cargo build --bin acton || {
+            tmp=$(mktemp -d);
+            pushd "$tmp";
+            wget https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz;
+            tar xJf zig-x86_64-linux-0.15.2.tar.xz
+            export PATH="$PATH:$tmp/zig-x86_64-linux-0.15.2";
+            popd;
             cargo install cargo-zigbuild;
             cargo zigbuild --release --target x86_64-unknown-linux-gnu.2.35;
           }
