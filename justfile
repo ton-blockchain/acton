@@ -21,10 +21,10 @@ test-integration:
     # {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
 
 test-tree-sitter:
-    cd crates/tree-sitter-tolk && yarn && tree-sitter generate && tree-sitter test
+    cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
 
 update-test-tree-sitter:
-    cd crates/tree-sitter-tolk && yarn && tree-sitter generate && tree-sitter test -u
+    cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test -u
 
 test: test-unit test-serial test-integration
 
