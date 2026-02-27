@@ -40,6 +40,13 @@ jobs:
         with:
           tool: nextest,just
 
+      - name: Install LLVM and Clang
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 16 clang
+          rm llvm.sh
+
       - name: Get TON commit hash
         id: ton-commit
         run: |
@@ -58,14 +65,6 @@ jobs:
 
       - name: Check cache hit
         run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
-
-      - name: Install LLVM and Clang
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 16 clang
-          rm llvm.sh
 
       - name: Install system dependencies (cache not exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
