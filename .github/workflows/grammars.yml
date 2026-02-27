@@ -19,7 +19,10 @@ concurrency:
 jobs:
   tree-sitter-grammars:
     name: Test tree-sitter
-    runs-on: ubicloud-standard-4-ubuntu-2204
+    strategy:
+      matrix:
+        os: [ubicloud-standard-4-ubuntu-2204]
+    runs-on: ${{ matrix.os }}
     if: true
 
     steps:
