@@ -136,7 +136,7 @@ jobs:
           export CC=clang-16
           export CXX=clang++-16
           just build-ui
-          # Flags here enforce static linking against the system glibc version.
+          # Flags here enforce dynamic linking against the system glibc version.
           # Such linking is important for Tree-sitter and OpenSSL, among others.
           # Alternative place for these flags could be .cargo/config.toml:
           #     [target.x86_64-unknown-linux-gnu]
