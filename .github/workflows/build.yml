@@ -103,11 +103,12 @@ jobs:
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        env:
+          CC: clang-16
+          CXX: clang++-16
+          AR: llvm-ar-16
+          RANLIB: llvm-ranlib-16
         run: |
-          export CC=clang-16
-          export CXX=clang++-16
-          export AR=llvm-ar-16
-          export RANLIB=llvm-ranlib-16
           cd ton-repo
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
@@ -131,9 +132,10 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Build acton binary
+        env:
+          CC: clang-16
+          CXX: clang++-16
         run: |
-          export CC=clang-16
-          export CXX=clang++-16
           just build-ui
           cargo build --bin acton
 
