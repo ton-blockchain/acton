@@ -1,6 +1,5 @@
-use super::render::{
-    arg_as_i64, arg_to_string, format_func_slice_expr, format_instruction_line, push_line,
-};
+use super::ast::StmtAst;
+use super::render::{arg_as_i64, arg_to_string, format_func_slice_expr, format_instruction_line};
 use crate::types::{ArgValue, Code, Instruction, PlainInstruction};
 use std::collections::BTreeMap;
 
@@ -83,13 +82,13 @@ impl LiftState {
         StackValue::Expr(p)
     }
 
-    fn pop_expr(&mut self, lines: &mut Vec<String>, depth: usize) -> String {
+    fn pop_expr(&mut self, stmts: &mut Vec<StmtAst>, depth: usize) -> String {
         match self.pop_value() {
             StackValue::Expr(v) => v,
             StackValue::Continuation(_) => {
                 let name = self.new_temp();
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     format!("var {name} = 0; ;; continuation used as scalar value"),
                 );
@@ -100,11 +99,11 @@ impl LiftState {
 
     fn pop_expr_expect(
         &mut self,
-        lines: &mut Vec<String>,
+        stmts: &mut Vec<StmtAst>,
         depth: usize,
         expected: ValueType,
     ) -> String {
-        let expr = self.pop_expr(lines, depth);
+        let expr = self.pop_expr(stmts, depth);
         self.refine_expr_type(&expr, expected);
         expr
     }
@@ -210,29 +209,29 @@ pub(crate) struct LiftContext {
 
 #[derive(Default)]
 pub(crate) struct LiftResult {
-    pub(crate) lines: Vec<String>,
+    pub(crate) stmts: Vec<StmtAst>,
 }
 
 pub(crate) fn lift_instructions(
     instructions: &[Instruction],
     state: &mut LiftState,
-    lines: &mut Vec<String>,
+    stmts: &mut Vec<StmtAst>,
     depth: usize,
     ctx: &LiftContext,
 ) {
     for instruction in instructions {
         match instruction {
-            Instruction::Plain(plain) => lift_plain_instruction(plain, state, lines, depth, ctx),
+            Instruction::Plain(plain) => lift_plain_instruction(plain, state, stmts, depth, ctx),
             Instruction::Ref(reference) => {
                 if let ArgValue::Code { code, .. } = &reference.code {
                     // Code refs in a continuation chain are executed sequentially
                     // (implicit jump to next ref), so they must mutate the same state.
-                    lift_instructions(&code.instructions, state, lines, depth, ctx);
+                    lift_instructions(&code.instructions, state, stmts, depth, ctx);
                 }
             }
             Instruction::ExoticCell(_) => {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     ";; exotic cell ignored in structured pass".to_string(),
                 );
@@ -244,7 +243,7 @@ pub(crate) fn lift_instructions(
 fn lift_plain_instruction(
     plain: &PlainInstruction,
     state: &mut LiftState,
-    lines: &mut Vec<String>,
+    stmts: &mut Vec<StmtAst>,
     depth: usize,
     ctx: &LiftContext,
 ) {
@@ -260,58 +259,64 @@ fn lift_plain_instruction(
             let cont = first_code_arg(plain).or_else(|| state.pop_cont());
             let Some(cont) = cont else {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     format!(";; {} without continuation", plain.name),
                 );
                 return;
             };
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
-
-            let negate = plain.name == "IFNOTJMP";
-            if negate {
-                push_line(lines, depth, format!("ifnot ({cond}) {{"));
-            } else {
-                push_line(lines, depth, format!("if ({cond}) {{"));
-            }
-
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let mut child = state.clone();
-            lift_instructions(&cont.instructions, &mut child, lines, depth + 1, ctx);
+            let mut then_body = Vec::new();
+            lift_instructions(
+                &cont.instructions,
+                &mut child,
+                &mut then_body,
+                depth + 1,
+                ctx,
+            );
             state.absorb_counters(&child);
 
             if ctx.ifjmp_unit_return {
-                push_line(lines, depth + 1, "return ();".to_string());
+                then_body.push(StmtAst::Return(None));
                 state.has_explicit_return = true;
             }
 
-            push_line(lines, depth, "}".to_string());
+            if !then_body.is_empty() {
+                stmts.push(StmtAst::If {
+                    negated: plain.name == "IFNOTJMP",
+                    condition: cond,
+                    then_body,
+                    else_body: None,
+                });
+            }
             return;
         }
         "IF" | "IFREF" => {
             let cont = first_code_arg(plain).or_else(|| state.pop_cont());
             let Some(cont) = cont else {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     format!(";; {} without continuation", plain.name),
                 );
                 return;
             };
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let base_state = state.clone();
             let mut child = state.clone();
-            let mut child_lines = Vec::new();
+            let mut child_stmts = Vec::new();
             lift_instructions(
                 &cont.instructions,
                 &mut child,
-                &mut child_lines,
+                &mut child_stmts,
                 depth + 1,
                 ctx,
             );
             if let Some(cond_value) = parse_const_int_expr(&cond) {
                 state.absorb_counters(&child);
                 if cond_value != 0 {
-                    lines.extend(child_lines);
+                    stmts.extend(child_stmts);
                     state.stack = child.stack;
                 } else {
                     state.stack = base_state.stack;
@@ -319,20 +324,23 @@ fn lift_plain_instruction(
                 return;
             }
             state.absorb_counters(&child);
-            let mut pre_if_lines = Vec::new();
+            let mut pre_if_stmts = Vec::new();
             let merged = merge_if_stacks(
                 &child,
                 &base_state,
                 state,
-                &mut pre_if_lines,
-                &mut child_lines,
-                depth,
+                &mut pre_if_stmts,
+                &mut child_stmts,
+                depth
             );
-            lines.extend(pre_if_lines);
-            if !child_lines.is_empty() {
-                push_line(lines, depth, format!("if ({cond}) {{"));
-                lines.extend(child_lines);
-                push_line(lines, depth, "}".to_string());
+            stmts.extend(pre_if_stmts);
+            if !child_stmts.is_empty() {
+                stmts.push(StmtAst::If {
+                    negated: false,
+                    condition: cond,
+                    then_body: child_stmts,
+                    else_body: None,
+                });
             }
             if !merged {
                 state.stack = base_state.stack;
@@ -347,12 +355,12 @@ fn lift_plain_instruction(
                 n if n >= 2 => (
                     Some(code_args.remove(0)),
                     Some(code_args.remove(0)),
-                    state.pop_expr_expect(lines, depth, ValueType::Int),
+                    state.pop_expr_expect(stmts, depth, ValueType::Int),
                 ),
                 1 => {
                     let inline = code_args.remove(0);
                     let stacked = state.pop_cont();
-                    let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
+                    let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
                     if plain.name == "IFREFELSE" {
                         (Some(inline), stacked, cond)
                     } else {
@@ -362,14 +370,14 @@ fn lift_plain_instruction(
                 _ => {
                     let else_c = state.pop_cont();
                     let then_c = state.pop_cont();
-                    let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
+                    let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
                     (then_c, else_c, cond)
                 }
             };
 
             let Some(then_cont) = then_cont else {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     ";; IFELSE missing then continuation".to_string(),
                 );
@@ -377,7 +385,7 @@ fn lift_plain_instruction(
             };
             let Some(else_cont) = else_cont else {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     ";; IFELSE missing else continuation".to_string(),
                 );
@@ -385,20 +393,20 @@ fn lift_plain_instruction(
             };
 
             let mut then_state = state.clone();
-            let mut then_lines = Vec::new();
+            let mut then_stmts = Vec::new();
             lift_instructions(
                 &then_cont.instructions,
                 &mut then_state,
-                &mut then_lines,
+                &mut then_stmts,
                 depth + 1,
                 ctx,
             );
             let mut else_state = state.clone();
-            let mut else_lines = Vec::new();
+            let mut else_stmts = Vec::new();
             lift_instructions(
                 &else_cont.instructions,
                 &mut else_state,
-                &mut else_lines,
+                &mut else_stmts,
                 depth + 1,
                 ctx,
             );
@@ -406,35 +414,36 @@ fn lift_plain_instruction(
                 state.absorb_counters(&then_state);
                 state.absorb_counters(&else_state);
                 if cond_value != 0 {
-                    lines.extend(then_lines);
+                    stmts.extend(then_stmts);
                     state.stack = then_state.stack;
                 } else {
-                    lines.extend(else_lines);
+                    stmts.extend(else_stmts);
                     state.stack = else_state.stack;
                 }
                 return;
             }
             state.absorb_counters(&then_state);
             state.absorb_counters(&else_state);
-            let mut pre_if_lines = Vec::new();
+            let mut pre_if_stmts = Vec::new();
             let merged = merge_ifelse_stacks(
                 &cond,
                 &then_state,
                 &else_state,
                 state,
-                &mut pre_if_lines,
-                &mut then_lines,
-                &mut else_lines,
+                &mut pre_if_stmts,
+                &mut then_stmts,
+                &mut else_stmts,
                 depth,
                 merge_base_next_temp,
             );
-            lines.extend(pre_if_lines);
-            if !then_lines.is_empty() || !else_lines.is_empty() {
-                push_line(lines, depth, format!("if ({cond}) {{"));
-                lines.extend(then_lines);
-                push_line(lines, depth, "} else {".to_string());
-                lines.extend(else_lines);
-                push_line(lines, depth, "}".to_string());
+            stmts.extend(pre_if_stmts);
+            if !then_stmts.is_empty() || !else_stmts.is_empty() {
+                stmts.push(StmtAst::If {
+                    negated: false,
+                    condition: cond,
+                    then_body: then_stmts,
+                    else_body: Some(else_stmts),
+                });
             }
             if !merged {
                 state.stack.clear();
@@ -446,7 +455,7 @@ fn lift_plain_instruction(
             let cond_cont = state.pop_cont();
             let Some(cond_cont) = cond_cont else {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     ";; WHILE missing condition continuation".to_string(),
                 );
@@ -454,7 +463,7 @@ fn lift_plain_instruction(
             };
             let Some(body_cont) = body_cont else {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     ";; WHILE missing body continuation".to_string(),
                 );
@@ -462,38 +471,48 @@ fn lift_plain_instruction(
             };
 
             let loop_cond = state.new_temp();
-            push_line(lines, depth, format!("var {loop_cond} = 0;"));
-            push_line(lines, depth, "do {".to_string());
+            stmts.push(StmtAst::VarDecl {
+                name: loop_cond.clone(),
+                expr: "0".to_string(),
+            });
 
             let mut cond_state = state.clone();
-            let mut cond_lines = Vec::new();
+            let mut cond_stmts = Vec::new();
             lift_instructions(
                 &cond_cont.instructions,
                 &mut cond_state,
-                &mut cond_lines,
+                &mut cond_stmts,
                 depth + 1,
                 ctx,
             );
-            for line in cond_lines {
-                lines.push(line);
-            }
             let cond_expr = cond_state
                 .peek_expr_for_return()
                 .unwrap_or_else(|| "0".to_string());
-            push_line(lines, depth + 1, format!("{loop_cond} = {cond_expr};"));
-            push_line(lines, depth + 1, format!("if ({loop_cond}) {{"));
-
             let mut body_state = state.clone();
+            let mut body_stmts = Vec::new();
             lift_instructions(
                 &body_cont.instructions,
                 &mut body_state,
-                lines,
+                &mut body_stmts,
                 depth + 2,
                 ctx,
             );
 
-            push_line(lines, depth + 1, "}".to_string());
-            push_line(lines, depth, format!("}} until (({loop_cond}) == 0);"));
+            let mut do_body = cond_stmts;
+            do_body.push(StmtAst::Assign {
+                target: loop_cond.clone(),
+                expr: cond_expr,
+            });
+            do_body.push(StmtAst::If {
+                negated: false,
+                condition: loop_cond.clone(),
+                then_body: body_stmts,
+                else_body: None,
+            });
+            stmts.push(StmtAst::DoUntil {
+                body: do_body,
+                condition: format!("({loop_cond}) == 0"),
+            });
             state.absorb_counters(&cond_state);
             state.absorb_counters(&body_state);
             state.stack.clear();
@@ -502,15 +521,14 @@ fn lift_plain_instruction(
         "REPEAT" => {
             let cont = first_code_arg(plain).or_else(|| state.pop_cont());
             let Some(cont) = cont else {
-                push_line(lines, depth, ";; REPEAT missing continuation".to_string());
+                push_line(stmts, depth, ";; REPEAT missing continuation".to_string());
                 return;
             };
-            let count = state.pop_expr(lines, depth);
-
-            push_line(lines, depth, format!("repeat ({count}) {{"));
+            let count = state.pop_expr(stmts, depth);
             let mut child = state.clone();
-            lift_instructions(&cont.instructions, &mut child, lines, depth + 1, ctx);
-            push_line(lines, depth, "}".to_string());
+            let mut body = Vec::new();
+            lift_instructions(&cont.instructions, &mut child, &mut body, depth + 1, ctx);
+            stmts.push(StmtAst::Repeat { count, body });
 
             state.absorb_counters(&child);
             state.stack.clear();
@@ -519,35 +537,44 @@ fn lift_plain_instruction(
         "UNTIL" => {
             let cont = state.pop_cont().or_else(|| first_code_arg(plain));
             let Some(cont) = cont else {
-                push_line(lines, depth, ";; UNTIL missing continuation".to_string());
+                push_line(stmts, depth, ";; UNTIL missing continuation".to_string());
                 return;
             };
 
-            push_line(lines, depth, "do {".to_string());
             let mut child = state.clone();
-            let mut block_lines = Vec::new();
-            lift_instructions(&cont.instructions, &mut child, &mut block_lines, depth + 1, ctx);
+            let mut body = Vec::new();
+            lift_instructions(&cont.instructions, &mut child, &mut body, depth + 1, ctx);
             let cond_expr = child
                 .peek_expr_for_return()
                 .unwrap_or_else(|| "0".to_string());
-            for line in block_lines {
-                lines.push(line);
-            }
-            push_line(lines, depth, format!("}} until ({cond_expr});"));
+            stmts.push(StmtAst::DoUntil {
+                body,
+                condition: cond_expr,
+            });
 
             state.absorb_counters(&child);
             state.stack.clear();
             return;
         }
         "IFRET" => {
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
-            push_line(lines, depth, format!("if ({cond}) {{ return (); }}"));
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            stmts.push(StmtAst::If {
+                negated: false,
+                condition: cond,
+                then_body: vec![StmtAst::Return(None)],
+                else_body: None,
+            });
             state.has_explicit_return = true;
             return;
         }
         "IFNOTRET" => {
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
-            push_line(lines, depth, format!("ifnot ({cond}) {{ return (); }}"));
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            stmts.push(StmtAst::If {
+                negated: true,
+                condition: cond,
+                then_body: vec![StmtAst::Return(None)],
+                else_body: None,
+            });
             state.has_explicit_return = true;
             return;
         }
@@ -935,11 +962,11 @@ fn lift_plain_instruction(
     }
 
     if plain.name == "SDEQ" {
-        let rhs = state.pop_expr_expect(lines, depth, ValueType::Slice);
-        let lhs = state.pop_expr_expect(lines, depth, ValueType::Slice);
+        let rhs = state.pop_expr_expect(stmts, depth, ValueType::Slice);
+        let lhs = state.pop_expr_expect(stmts, depth, ValueType::Slice);
         let t = state.new_temp();
         push_line(
-            lines,
+            stmts,
             depth,
             format!("var {t} = equal_slices_bits({lhs}, {rhs});"),
         );
@@ -948,11 +975,11 @@ fn lift_plain_instruction(
     }
 
     if plain.name == "SBITREFS" {
-        let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+        let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
         let bits = state.new_temp();
         let refs = state.new_temp();
         push_line(
-            lines,
+            stmts,
             depth,
             format!("var ({bits}, {refs}) = slice_bits_refs({src});"),
         );
@@ -962,43 +989,43 @@ fn lift_plain_instruction(
     }
 
     if let Some(op) = binary_symbol(&plain.name) {
-        let rhs = state.pop_expr_expect(lines, depth, ValueType::Int);
-        let lhs = state.pop_expr_expect(lines, depth, ValueType::Int);
+        let rhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
+        let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_line(lines, depth, format!("var {t} = ({lhs}) {op} ({rhs});"));
+        push_line(stmts, depth, format!("var {t} = ({lhs}) {op} ({rhs});"));
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
 
     if let Some((op, imm)) = immediate_binary_op(plain) {
-        let lhs = state.pop_expr_expect(lines, depth, ValueType::Int);
+        let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_line(lines, depth, format!("var {t} = ({lhs}) {op} ({imm});"));
+        push_line(stmts, depth, format!("var {t} = ({lhs}) {op} ({imm});"));
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
 
     if plain.name == "INC" || plain.name == "DEC" {
-        let lhs = state.pop_expr_expect(lines, depth, ValueType::Int);
+        let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
         let op = if plain.name == "INC" { "+" } else { "-" };
-        push_line(lines, depth, format!("var {t} = ({lhs}) {op} 1;"));
+        push_line(stmts, depth, format!("var {t} = ({lhs}) {op} 1;"));
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
 
     if plain.name == "NEGATE" {
-        let lhs = state.pop_expr_expect(lines, depth, ValueType::Int);
+        let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_line(lines, depth, format!("var {t} = -({lhs});"));
+        push_line(stmts, depth, format!("var {t} = -({lhs});"));
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
 
     if plain.name == "NOT" {
-        let lhs = state.pop_expr_expect(lines, depth, ValueType::Int);
+        let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_line(lines, depth, format!("var {t} = ~({lhs});"));
+        push_line(stmts, depth, format!("var {t} = ~({lhs});"));
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
@@ -1007,7 +1034,7 @@ fn lift_plain_instruction(
         "LDU" | "LDUX" => {
             let dynamic_len = plain.name == "LDUX";
             let bits = if dynamic_len {
-                state.pop_expr_expect(lines, depth, ValueType::Int)
+                state.pop_expr_expect(stmts, depth, ValueType::Int)
             } else {
                 plain
                     .args
@@ -1015,11 +1042,11 @@ fn lift_plain_instruction(
                     .and_then(arg_to_string)
                     .unwrap_or_else(|| "0".to_string())
             };
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let value = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({next_slice}, {value}) = load_uint({src}, {bits});"),
             );
@@ -1030,7 +1057,7 @@ fn lift_plain_instruction(
         "LDI" | "LDIX" => {
             let dynamic_len = plain.name == "LDIX";
             let bits = if dynamic_len {
-                state.pop_expr_expect(lines, depth, ValueType::Int)
+                state.pop_expr_expect(stmts, depth, ValueType::Int)
             } else {
                 plain
                     .args
@@ -1038,11 +1065,11 @@ fn lift_plain_instruction(
                     .and_then(arg_to_string)
                     .unwrap_or_else(|| "0".to_string())
             };
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let value = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({next_slice}, {value}) = load_int({src}, {bits});"),
             );
@@ -1053,7 +1080,7 @@ fn lift_plain_instruction(
         "PLDU" | "PLDUX" => {
             let dynamic_len = plain.name == "PLDUX";
             let bits = if dynamic_len {
-                state.pop_expr_expect(lines, depth, ValueType::Int)
+                state.pop_expr_expect(stmts, depth, ValueType::Int)
             } else {
                 plain
                     .args
@@ -1061,16 +1088,16 @@ fn lift_plain_instruction(
                     .and_then(arg_to_string)
                     .unwrap_or_else(|| "0".to_string())
             };
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = preload_uint({src}, {bits});"));
+            push_line(stmts, depth, format!("var {t} = preload_uint({src}, {bits});"));
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "PLDI" | "PLDIX" => {
             let dynamic_len = plain.name == "PLDIX";
             let bits = if dynamic_len {
-                state.pop_expr_expect(lines, depth, ValueType::Int)
+                state.pop_expr_expect(stmts, depth, ValueType::Int)
             } else {
                 plain
                     .args
@@ -1078,14 +1105,14 @@ fn lift_plain_instruction(
                     .and_then(arg_to_string)
                     .unwrap_or_else(|| "0".to_string())
             };
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = preload_int({src}, {bits});"));
+            push_line(stmts, depth, format!("var {t} = preload_int({src}, {bits});"));
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "LDSLICEX" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let bits = plain
                 .args
                 .first()
@@ -1094,7 +1121,7 @@ fn lift_plain_instruction(
             let next_slice = state.new_temp();
             let loaded = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({next_slice}, {loaded}) = load_bits({src}, {bits});"),
             );
@@ -1103,23 +1130,23 @@ fn lift_plain_instruction(
             return;
         }
         "PLDSLICEX" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let bits = plain
                 .args
                 .first()
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = preload_bits({src}, {bits});"));
+            push_line(stmts, depth, format!("var {t} = preload_bits({src}, {bits});"));
             state.push_typed_expr(t, ValueType::Slice);
             return;
         }
         "LDMSGADDR" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let remainder = state.new_temp();
             let addr = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({remainder}, {addr}) = load_msg_addr({src});"),
             );
@@ -1130,14 +1157,14 @@ fn lift_plain_instruction(
             return;
         }
         "LDGRAMS" | "LDVARUINT16" | "LDREF" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let fn_name = stdlib_function_for_instruction(&plain.name)
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
             let next_slice = state.new_temp();
             let value = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({next_slice}, {value}) = {fn_name}({src});"),
             );
@@ -1151,11 +1178,11 @@ fn lift_plain_instruction(
             return;
         }
         "LDOPTREF" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let value = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({next_slice}, {value}) = load_maybe_ref({src});"),
             );
@@ -1164,9 +1191,9 @@ fn lift_plain_instruction(
             return;
         }
         "PLDOPTREF" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = preload_maybe_ref({src});"));
+            push_line(stmts, depth, format!("var {t} = preload_maybe_ref({src});"));
             state.push_typed_expr(t, ValueType::Cell);
             return;
         }
@@ -1178,12 +1205,12 @@ fn lift_plain_instruction(
                 "SEMPTY" => ValueType::Slice,
                 _ => ValueType::Unknown,
             };
-            let src = state.pop_expr_expect(lines, depth, in_ty);
+            let src = state.pop_expr_expect(stmts, depth, in_ty);
             let t = state.new_temp();
             let fn_name = stdlib_function_for_instruction(&plain.name)
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
-            push_line(lines, depth, format!("var {t} = {fn_name}({src});"));
+            push_line(stmts, depth, format!("var {t} = {fn_name}({src});"));
             let out_ty = match plain.name.as_str() {
                 "CTOS" => ValueType::Slice,
                 "ENDC" => ValueType::Cell,
@@ -1202,23 +1229,23 @@ fn lift_plain_instruction(
             return;
         }
         "DIVMOD" => {
-            let rhs = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let lhs = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let rhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let q = state.new_temp();
             let r = state.new_temp();
-            push_line(lines, depth, format!("var ({q}, {r}) = divmod({lhs}, {rhs});"));
+            push_line(stmts, depth, format!("var ({q}, {r}) = divmod({lhs}, {rhs});"));
             state.push_typed_expr(q, ValueType::Int);
             state.push_typed_expr(r, ValueType::Int);
             return;
         }
         "MULDIVMOD" => {
-            let z = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let y = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let x = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let z = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let y = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let x = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let q = state.new_temp();
             let r = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({q}, {r}) = muldivmod({x}, {y}, {z});"),
             );
@@ -1227,25 +1254,25 @@ fn lift_plain_instruction(
             return;
         }
         "MIN" | "MAX" => {
-            let rhs = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let lhs = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let rhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             let fn_name = if plain.name == "MIN" { "min" } else { "max" };
-            push_line(lines, depth, format!("var {t} = {fn_name}({lhs}, {rhs});"));
+            push_line(stmts, depth, format!("var {t} = {fn_name}({lhs}, {rhs});"));
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "ABS" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = abs({src});"));
+            push_line(stmts, depth, format!("var {t} = abs({src});"));
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "MULDIV" | "MULDIVR" | "MULDIVC" => {
-            let z = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let y = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let x = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let z = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let y = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let x = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             let fn_name = match plain.name.as_str() {
                 "MULDIV" => "muldiv",
@@ -1253,7 +1280,7 @@ fn lift_plain_instruction(
                 "MULDIVC" => "muldivc",
                 _ => unreachable!(),
             };
-            push_line(lines, depth, format!("var {t} = {fn_name}({x}, {y}, {z});"));
+            push_line(stmts, depth, format!("var {t} = {fn_name}({x}, {y}, {z});"));
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1263,8 +1290,8 @@ fn lift_plain_instruction(
                 .first()
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
-            let builder = state.pop_expr_expect(lines, depth, ValueType::Builder);
-            let value = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let builder = state.pop_expr_expect(stmts, depth, ValueType::Builder);
+            let value = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             let fn_name = if plain.name == "STU" {
                 "store_uint"
@@ -1272,7 +1299,7 @@ fn lift_plain_instruction(
                 "store_int"
             };
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = {fn_name}({builder}, {value}, {bits});"),
             );
@@ -1280,9 +1307,9 @@ fn lift_plain_instruction(
             return;
         }
         "STUX" | "STIX" => {
-            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let builder = state.pop_expr_expect(lines, depth, ValueType::Builder);
-            let value = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let bits = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let builder = state.pop_expr_expect(stmts, depth, ValueType::Builder);
+            let value = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             let fn_name = if plain.name == "STUX" {
                 "store_uint"
@@ -1290,7 +1317,7 @@ fn lift_plain_instruction(
                 "store_int"
             };
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = {fn_name}({builder}, {value}, {bits});"),
             );
@@ -1302,14 +1329,14 @@ fn lift_plain_instruction(
                 "STSLICER" => ValueType::Slice,
                 _ => ValueType::Int,
             };
-            let value = state.pop_expr_expect(lines, depth, value_ty);
-            let builder = state.pop_expr_expect(lines, depth, ValueType::Builder);
+            let value = state.pop_expr_expect(stmts, depth, value_ty);
+            let builder = state.pop_expr_expect(stmts, depth, ValueType::Builder);
             let t = state.new_temp();
             let fn_name = stdlib_function_for_instruction(&plain.name)
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = {fn_name}({builder}, {value});"),
             );
@@ -1317,14 +1344,14 @@ fn lift_plain_instruction(
             return;
         }
         "STREF" | "STDICT" | "STOPTREF" => {
-            let builder = state.pop_expr_expect(lines, depth, ValueType::Builder);
-            let value = state.pop_expr_expect(lines, depth, ValueType::Cell);
+            let builder = state.pop_expr_expect(stmts, depth, ValueType::Builder);
+            let value = state.pop_expr_expect(stmts, depth, ValueType::Cell);
             let t = state.new_temp();
             let fn_name = stdlib_function_for_instruction(&plain.name)
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = {fn_name}({builder}, {value});"),
             );
@@ -1332,34 +1359,34 @@ fn lift_plain_instruction(
             return;
         }
         "SDSKIPFIRST" => {
-            let len = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let len = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = skip_bits({src}, {len});"));
+            push_line(stmts, depth, format!("var {t} = skip_bits({src}, {len});"));
             state.push_typed_expr(t, ValueType::Slice);
             return;
         }
         "INDEXVAR" => {
-            let index = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let tuple = state.pop_expr(lines, depth);
+            let index = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let tuple = state.pop_expr(stmts, depth);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = at({tuple}, {index});"));
+            push_line(stmts, depth, format!("var {t} = at({tuple}, {index});"));
             state.push_typed_expr(t, ValueType::Unknown);
             return;
         }
         "SKIPDICT" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = skip_dict({src});"));
+            push_line(stmts, depth, format!("var {t} = skip_dict({src});"));
             state.push_typed_expr(t, ValueType::Slice);
             return;
         }
         "SKIPOPTREF" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let skipped = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({next_slice}, {skipped}) = load_maybe_ref({src});"),
             );
@@ -1367,8 +1394,8 @@ fn lift_plain_instruction(
             return;
         }
         "ENDS" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
-            push_line(lines, depth, format!("end_parse({src});"));
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
+            push_line(stmts, depth, format!("end_parse({src});"));
             return;
         }
         "GETGLOB" => {
@@ -1381,13 +1408,13 @@ fn lift_plain_instruction(
             return;
         }
         "SETGLOB" => {
-            let value = state.pop_expr(lines, depth);
+            let value = state.pop_expr(stmts, depth);
             let slot = plain
                 .args
                 .first()
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
-            push_line(lines, depth, format!("__glob_{slot} = {value};"));
+            push_line(stmts, depth, format!("__glob_{slot} = {value};"));
             return;
         }
         "CALLDICT" => {
@@ -1406,17 +1433,17 @@ fn lift_plain_instruction(
                 .unwrap_or(0);
             let mut args = Vec::with_capacity(arity);
             for _ in 0..arity {
-                args.push(state.pop_expr(lines, depth));
+                args.push(state.pop_expr(stmts, depth));
             }
             args.reverse();
 
-            let args_joined = args.join(", ");
             let t = state.new_temp();
+            let args_joined = args.join(", ");
             if args_joined.is_empty() {
-                push_line(lines, depth, format!("var {t} = __dict_method_{target}();"));
+                push_line(stmts, depth, format!("var {t} = __dict_method_{target}();"));
             } else {
                 push_line(
-                    lines,
+                    stmts,
                     depth,
                     format!("var {t} = __dict_method_{target}({args_joined});"),
                 );
@@ -1431,23 +1458,23 @@ fn lift_plain_instruction(
                 .and_then(arg_as_i64)
                 .unwrap_or(0)
                 .max(0) as usize;
-            let method_id = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let method_id = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let mut args = Vec::with_capacity(argc);
             for _ in 0..argc {
-                args.push(state.pop_expr(lines, depth));
+                args.push(state.pop_expr(stmts, depth));
             }
             args.reverse();
 
             match argc {
-                0 => push_line(lines, depth, format!("run_method0({method_id});")),
-                1 => push_line(lines, depth, format!("run_method1({method_id}, {});", args[0])),
+                0 => push_line(stmts, depth, format!("run_method0({method_id});")),
+                1 => push_line(stmts, depth, format!("run_method1({method_id}, {});", args[0])),
                 2 => push_line(
-                    lines,
+                    stmts,
                     depth,
                     format!("run_method2({method_id}, {}, {});", args[0], args[1]),
                 ),
                 3 => push_line(
-                    lines,
+                    stmts,
                     depth,
                     format!(
                         "run_method3({method_id}, {}, {}, {});",
@@ -1455,7 +1482,7 @@ fn lift_plain_instruction(
                     ),
                 ),
                 _ => push_line(
-                    lines,
+                    stmts,
                     depth,
                     format!(
                         ";; unsupported CALLXARGS arity {argc} with method id {method_id}"
@@ -1468,7 +1495,7 @@ fn lift_plain_instruction(
             let cont = first_code_arg(plain).or_else(|| state.pop_cont());
             if let Some(cont) = cont {
                 let mut child = state.clone();
-                lift_instructions(&cont.instructions, &mut child, lines, depth, ctx);
+                lift_instructions(&cont.instructions, &mut child, stmts, depth, ctx);
                 state.absorb_counters(&child);
                 state.stack = child.stack;
                 state.has_explicit_return |= child.has_explicit_return;
@@ -1481,7 +1508,7 @@ fn lift_plain_instruction(
                 Some("c3") => state.push_typed_expr("get_c3()", ValueType::Unknown),
                 _ => {
                     push_line(
-                        lines,
+                        stmts,
                         depth,
                         format!(
                             ";; unhandled {}",
@@ -1493,16 +1520,16 @@ fn lift_plain_instruction(
             return;
         }
         "POPCTR" => {
-            let value = state.pop_expr(lines, depth);
+            let value = state.pop_expr(stmts, depth);
             match plain.args.first().and_then(arg_to_string).as_deref() {
                 Some("c4") => {
                     state.refine_expr_type(&value, ValueType::Cell);
-                    push_line(lines, depth, format!("set_data({value});"));
+                    push_line(stmts, depth, format!("set_data({value});"));
                 }
-                Some("c3") => push_line(lines, depth, format!("set_c3({value});")),
+                Some("c3") => push_line(stmts, depth, format!("set_c3({value});")),
                 _ => {
                     push_line(
-                        lines,
+                        stmts,
                         depth,
                         format!(
                             ";; unhandled {}",
@@ -1523,14 +1550,14 @@ fn lift_plain_instruction(
         }
         "DUEPAYMENT" => {
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = my_storage_due();"));
+            push_line(stmts, depth, format!("var {t} = my_storage_due();"));
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "ISNULL" => {
-            let src = state.pop_expr(lines, depth);
+            let src = state.pop_expr(stmts, depth);
             let t = state.new_temp();
-            push_line(lines, depth, format!("var {t} = null?({src});"));
+            push_line(stmts, depth, format!("var {t} = null?({src});"));
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1538,21 +1565,21 @@ fn lift_plain_instruction(
             return;
         }
         "DUMP" => {
-            let value = state.pop_expr(lines, depth);
-            push_line(lines, depth, format!("~dump({value});"));
+            let value = state.pop_expr(stmts, depth);
+            push_line(stmts, depth, format!("~dump({value});"));
             return;
         }
         "STRDUMP" => {
-            let value = state.pop_expr(lines, depth);
-            push_line(lines, depth, format!("~strdump({value});"));
+            let value = state.pop_expr(stmts, depth);
+            push_line(stmts, depth, format!("~strdump({value});"));
             return;
         }
         "REWRITESTDADDR" => {
-            let src = state.pop_expr_expect(lines, depth, ValueType::Slice);
+            let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let workchain = state.new_temp();
             let addr = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var ({workchain}, {addr}) = parse_std_addr({src});"),
             );
@@ -1563,11 +1590,11 @@ fn lift_plain_instruction(
         }
         "GETORIGINALFWDFEE" => {
             // stdlib: get_original_fwd_fee(workchain, fwd_fee) asm(fwd_fee workchain)
-            let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let fwd_fee = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let workchain = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let fwd_fee = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = get_original_fwd_fee({workchain}, {fwd_fee});"),
             );
@@ -1576,11 +1603,11 @@ fn lift_plain_instruction(
         }
         "GETGASFEE" => {
             // stdlib: get_compute_fee(workchain, gas_used) asm(gas_used workchain)
-            let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let gas_used = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let workchain = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let gas_used = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = get_compute_fee({workchain}, {gas_used});"),
             );
@@ -1590,12 +1617,12 @@ fn lift_plain_instruction(
         "GETFORWARDFEESIMPLE" => {
             // stdlib: get_simple_forward_fee(workchain, bits, cells)
             // asm(cells bits workchain)
-            let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let workchain = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let bits = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let cells = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = get_simple_forward_fee({workchain}, {bits}, {cells});"),
             );
@@ -1604,12 +1631,12 @@ fn lift_plain_instruction(
         }
         "GETFORWARDFEE" => {
             // stdlib: get_forward_fee(workchain, bits, cells) asm(cells bits workchain)
-            let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let workchain = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let bits = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let cells = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = get_forward_fee({workchain}, {bits}, {cells});"),
             );
@@ -1619,13 +1646,13 @@ fn lift_plain_instruction(
         "GETSTORAGEFEE" => {
             // stdlib: get_storage_fee(workchain, seconds, bits, cells)
             // asm(cells bits seconds workchain)
-            let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let seconds = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let workchain = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let seconds = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let bits = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let cells = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!(
                     "var {t} = get_storage_fee({workchain}, {seconds}, {bits}, {cells});"
@@ -1637,7 +1664,7 @@ fn lift_plain_instruction(
         "GETPRECOMPILEDGAS" => {
             let t = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = get_precompiled_gas_consumption();"),
             );
@@ -1645,13 +1672,13 @@ fn lift_plain_instruction(
             return;
         }
         "DICTUSETREF" => {
-            let key_len = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let dict = state.pop_expr_expect(lines, depth, ValueType::Cell);
-            let index = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let value = state.pop_expr_expect(lines, depth, ValueType::Cell);
+            let key_len = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let dict = state.pop_expr_expect(stmts, depth, ValueType::Cell);
+            let index = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let value = state.pop_expr_expect(stmts, depth, ValueType::Cell);
             let t = state.new_temp();
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("var {t} = udict_set_ref({dict}, {key_len}, {index}, {value});"),
             );
@@ -1664,11 +1691,11 @@ fn lift_plain_instruction(
                 .first()
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             if plain.name == "THROWIF" {
-                push_line(lines, depth, format!("throw_if({code}, {cond});"));
+                push_line(stmts, depth, format!("throw_if({code}, {cond});"));
             } else {
-                push_line(lines, depth, format!("throw_unless({code}, {cond});"));
+                push_line(stmts, depth, format!("throw_unless({code}, {cond});"));
             }
             return;
         }
@@ -1678,8 +1705,8 @@ fn lift_plain_instruction(
                 .first()
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
-            let arg = state.pop_expr(lines, depth);
-            push_line(lines, depth, format!("throw_arg({arg}, {code});"));
+            let arg = state.pop_expr(stmts, depth);
+            push_line(stmts, depth, format!("throw_arg({arg}, {code});"));
             return;
         }
         "THROWARGIF" => {
@@ -1688,9 +1715,9 @@ fn lift_plain_instruction(
                 .first()
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
-            let cond = state.pop_expr(lines, depth);
-            let arg = state.pop_expr(lines, depth);
-            push_line(lines, depth, format!("throw_arg_if({arg}, {code}, {cond});"));
+            let cond = state.pop_expr(stmts, depth);
+            let arg = state.pop_expr(stmts, depth);
+            push_line(stmts, depth, format!("throw_arg_if({arg}, {code}, {cond});"));
             return;
         }
         "THROWARGIFNOT" => {
@@ -1699,75 +1726,75 @@ fn lift_plain_instruction(
                 .first()
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
-            let cond = state.pop_expr(lines, depth);
-            let arg = state.pop_expr(lines, depth);
+            let cond = state.pop_expr(stmts, depth);
+            let arg = state.pop_expr(stmts, depth);
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("throw_arg_unless({arg}, {code}, {cond});"),
             );
             return;
         }
         "THROWANY" => {
-            let code = state.pop_expr_expect(lines, depth, ValueType::Int);
-            push_line(lines, depth, format!("throw({code});"));
+            let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            push_line(stmts, depth, format!("throw({code});"));
             return;
         }
         "THROWARGANY" => {
-            let code = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let arg = state.pop_expr(lines, depth);
-            push_line(lines, depth, format!("throw_arg({arg}, {code});"));
+            let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let arg = state.pop_expr(stmts, depth);
+            push_line(stmts, depth, format!("throw_arg({arg}, {code});"));
             return;
         }
         "THROWANYIFNOT" => {
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let code = state.pop_expr_expect(lines, depth, ValueType::Int);
-            push_line(lines, depth, format!("throw_unless({code}, {cond});"));
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            push_line(stmts, depth, format!("throw_unless({code}, {cond});"));
             return;
         }
         "THROWARGANYIFNOT" => {
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let code = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let arg = state.pop_expr(lines, depth);
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let arg = state.pop_expr(stmts, depth);
             push_line(
-                lines,
+                stmts,
                 depth,
                 format!("throw_arg_unless({arg}, {code}, {cond});"),
             );
             return;
         }
         "THROWANYIF" => {
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let code = state.pop_expr_expect(lines, depth, ValueType::Int);
-            push_line(lines, depth, format!("throw_if({code}, {cond});"));
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            push_line(stmts, depth, format!("throw_if({code}, {cond});"));
             return;
         }
         "THROWARGANYIF" => {
-            let cond = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let code = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let arg = state.pop_expr(lines, depth);
-            push_line(lines, depth, format!("throw_arg_if({arg}, {code}, {cond});"));
+            let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let arg = state.pop_expr(stmts, depth);
+            push_line(stmts, depth, format!("throw_arg_if({arg}, {code}, {cond});"));
             return;
         }
         "RAWRESERVE" => {
-            let mode = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let amount = state.pop_expr_expect(lines, depth, ValueType::Int);
-            push_line(lines, depth, format!("raw_reserve({amount}, {mode});"));
+            let mode = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let amount = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            push_line(stmts, depth, format!("raw_reserve({amount}, {mode});"));
             return;
         }
         "SENDRAWMSG" => {
-            let mode = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let msg = state.pop_expr_expect(lines, depth, ValueType::Cell);
-            push_line(lines, depth, format!("send_raw_message({msg}, {mode});"));
+            let mode = state.pop_expr_expect(stmts, depth, ValueType::Int);
+            let msg = state.pop_expr_expect(stmts, depth, ValueType::Cell);
+            push_line(stmts, depth, format!("send_raw_message({msg}, {mode});"));
             return;
         }
         "SETCODE" => {
-            let code = state.pop_expr_expect(lines, depth, ValueType::Cell);
-            push_line(lines, depth, format!("set_code({code});"));
+            let code = state.pop_expr_expect(stmts, depth, ValueType::Cell);
+            push_line(stmts, depth, format!("set_code({code});"));
             return;
         }
         "RET" | "RETALT" => {
-            push_line(lines, depth, "return ();".to_string());
+            stmts.push(StmtAst::Return(None));
             state.has_explicit_return = true;
             return;
         }
@@ -1775,7 +1802,7 @@ fn lift_plain_instruction(
     }
 
     push_line(
-        lines,
+        stmts,
         depth,
         format!(
             ";; unhandled {}",
@@ -1814,8 +1841,8 @@ fn merge_if_stacks(
     then_state: &LiftState,
     else_state: &LiftState,
     state: &mut LiftState,
-    pre_if_lines: &mut Vec<String>,
-    then_lines: &mut Vec<String>,
+    pre_if_stmts: &mut Vec<StmtAst>,
+    then_stmts: &mut Vec<StmtAst>,
     depth: usize,
 ) -> bool {
     if then_state.stack.len() != else_state.stack.len() {
@@ -1836,8 +1863,8 @@ fn merge_if_stacks(
         }
 
         let merged = state.new_temp();
-        push_line(pre_if_lines, depth, format!("var {merged} = {else_expr};"));
-        push_line(then_lines, depth + 1, format!("{merged} = {then_expr};"));
+        push_line(pre_if_stmts, depth, format!("var {merged} = {else_expr};"));
+        push_line(then_stmts, depth + 1, format!("{merged} = {then_expr};"));
         let then_ty = then_state.expr_type_of(then_expr);
         let else_ty = else_state.expr_type_of(else_expr);
         let merged_ty = merged_value_type(then_expr, then_ty, else_expr, else_ty);
@@ -1852,9 +1879,9 @@ fn merge_ifelse_stacks(
     then_state: &LiftState,
     else_state: &LiftState,
     state: &mut LiftState,
-    pre_if_lines: &mut Vec<String>,
-    then_lines: &mut Vec<String>,
-    else_lines: &mut Vec<String>,
+    pre_if_stmts: &mut Vec<StmtAst>,
+    then_stmts: &mut Vec<StmtAst>,
+    else_stmts: &mut Vec<StmtAst>,
     depth: usize,
     base_next_temp: usize,
 ) -> bool {
@@ -1883,20 +1910,32 @@ fn merge_ifelse_stacks(
             && !is_branch_local_temp_expr(else_expr, base_next_temp)
         {
             push_line(
-                pre_if_lines,
+                pre_if_stmts,
                 depth,
                 format!("var {merged} = ({cond}) ? ({then_expr}) : ({else_expr});"),
             );
         } else {
             let init_expr = if merged_ty == ValueType::Int { "0" } else { "null()" };
-            push_line(pre_if_lines, depth, format!("var {merged} = {init_expr};"));
-            push_line(then_lines, depth + 1, format!("{merged} = {then_expr};"));
-            push_line(else_lines, depth + 1, format!("{merged} = {else_expr};"));
+            push_line(pre_if_stmts, depth, format!("var {merged} = {init_expr};"));
+            push_line(then_stmts, depth + 1, format!("{merged} = {then_expr};"));
+            push_line(else_stmts, depth + 1, format!("{merged} = {else_expr};"));
         }
         state.push_typed_expr(merged, merged_ty);
     }
 
     true
+}
+
+fn push_line(stmts: &mut Vec<StmtAst>, _depth: usize, line: String) {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if trimmed.starts_with(";;") {
+        stmts.push(StmtAst::Comment(trimmed.to_string()));
+    } else {
+        stmts.push(StmtAst::Expr(trimmed.to_string()));
+    }
 }
 
 fn is_branch_local_temp_expr(expr: &str, base_next_temp: usize) -> bool {

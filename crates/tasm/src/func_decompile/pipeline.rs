@@ -1,6 +1,7 @@
+use super::ast::{MethodAst, StmtAst, render_method_ast};
 use super::method_model::{
-    MethodKind, ReturnKind, classify_method, collect_call_targets, extract_method_dictionary,
-    infer_params_for_method, infer_return_kind, render_method_signature,
+    MethodKind, ReturnKind, build_method_signature_ast, classify_method, collect_call_targets,
+    extract_method_dictionary, infer_params_for_method, infer_return_kind, render_method_signature,
 };
 use super::render::{format_cell_literal, format_instruction_line};
 use super::stage_patterns::{MethodPatterns, apply_pattern_rewrites};
@@ -70,8 +71,8 @@ fn initial_stack_params_for_method(kind: MethodKind, params: &[String]) -> Vec<S
     params.to_vec()
 }
 
-fn select_recv_internal_params(lines: &[String]) -> Vec<String> {
-    if lines.iter().any(|line| contains_ident(line, "balance")) {
+fn select_recv_internal_params(stmts: &[StmtAst]) -> Vec<String> {
+    if stmts.iter().any(|stmt| stmt_contains_ident(stmt, "balance")) {
         vec![
             "balance".to_string(),
             "msg_value".to_string(),
@@ -87,7 +88,38 @@ fn select_recv_internal_params(lines: &[String]) -> Vec<String> {
     }
 }
 
-fn contains_ident(text: &str, ident: &str) -> bool {
+fn stmt_contains_ident(stmt: &StmtAst, ident: &str) -> bool {
+    match stmt {
+        StmtAst::Comment(line) | StmtAst::Expr(line) => contains_ident_text(line, ident),
+        StmtAst::VarDecl { name, expr } => name == ident || contains_ident_text(expr, ident),
+        StmtAst::Assign { target, expr } => {
+            contains_ident_text(target, ident) || contains_ident_text(expr, ident)
+        }
+        StmtAst::Return(Some(expr)) => contains_ident_text(expr, ident),
+        StmtAst::Return(None) => false,
+        StmtAst::If {
+            condition,
+            then_body,
+            else_body,
+            ..
+        } => {
+            contains_ident_text(condition, ident)
+                || then_body.iter().any(|s| stmt_contains_ident(s, ident))
+                || else_body
+                    .as_ref()
+                    .is_some_and(|body| body.iter().any(|s| stmt_contains_ident(s, ident)))
+        }
+        StmtAst::Repeat { count, body } => {
+            contains_ident_text(count, ident) || body.iter().any(|s| stmt_contains_ident(s, ident))
+        }
+        StmtAst::DoUntil { body, condition } => {
+            contains_ident_text(condition, ident)
+                || body.iter().any(|s| stmt_contains_ident(s, ident))
+        }
+    }
+}
+
+fn contains_ident_text(text: &str, ident: &str) -> bool {
     let bytes = text.as_bytes();
     let needle = ident.as_bytes();
     if needle.is_empty() || bytes.len() < needle.len() {
@@ -185,22 +217,29 @@ impl FuncDecompiler {
         out.push_str("#pragma version >=0.4.0;\n\n");
 
         let Some(dict) = extract_method_dictionary(code) else {
-            out.push_str("() decompiled_entry() impure {\n");
-            out.push_str(
-                "    ;; No DICTPUSHCONST method table found; falling back to linear block\n",
-            );
+            let signature = super::ast::MethodSignatureAst {
+                return_type: "()".to_string(),
+                name: "decompiled_entry".to_string(),
+                params: Vec::new(),
+                qualifiers: vec!["impure".to_string()],
+            };
+            let leading_comments =
+                vec![";; No DICTPUSHCONST method table found; falling back to linear block"
+                    .to_string()];
             let mut lift = LiftResult::default();
             let mut state = LiftState::default();
             let lift_ctx = LiftContext::default();
-            lift_instructions(&code.instructions, &mut state, &mut lift.lines, 1, &lift_ctx);
-            for line in &lift.lines {
-                out.push_str(line);
-                out.push('\n');
-            }
+            lift_instructions(&code.instructions, &mut state, &mut lift.stmts, 1, &lift_ctx);
+            let mut body = lift.stmts;
             if self.options.include_raw_tasm_fallback {
-                self.render_raw_fallback(&mut out, &code.instructions, 1);
+                body.extend(self.collect_raw_fallback_stmts(&code.instructions));
             }
-            out.push_str("}\n");
+            let method_ast = MethodAst {
+                signature,
+                leading_comments,
+                body,
+            };
+            render_method_ast(&method_ast, &mut out);
             return out;
         };
 
@@ -214,8 +253,8 @@ impl FuncDecompiler {
             let patterns = MethodPatterns::analyze(method);
             let kind = classify_method(method, &called_targets, &patterns);
             let mut state = LiftState::default();
-            let mut lines = Vec::new();
-            lift_instructions(&method.instructions, &mut state, &mut lines, 1, &empty_ctx);
+            let mut stmts = Vec::new();
+            lift_instructions(&method.instructions, &mut state, &mut stmts, 1, &empty_ctx);
             let params = infer_params_for_method(kind, &state);
             calldict_arity.insert(method.id, params.len());
         }
@@ -258,11 +297,11 @@ impl FuncDecompiler {
             };
 
             let mut infer_state = LiftState::default();
-            let mut infer_lines = Vec::new();
+            let mut infer_stmts = Vec::new();
             lift_instructions(
                 &method.instructions,
                 &mut infer_state,
-                &mut infer_lines,
+                &mut infer_stmts,
                 1,
                 &method_lift_ctx,
             );
@@ -271,11 +310,11 @@ impl FuncDecompiler {
             let mut state = LiftState::default();
             let initial_stack = initial_stack_params_for_method(kind, &params);
             state.seed_stack_with_exprs(&initial_stack);
-            let mut lines = Vec::new();
+            let mut stmts = Vec::new();
             lift_instructions(
                 &method.instructions,
                 &mut state,
-                &mut lines,
+                &mut stmts,
                 1,
                 &method_lift_ctx,
             );
@@ -303,7 +342,7 @@ impl FuncDecompiler {
             let kind = classify_method(method, &called_targets, &patterns);
 
             let mut infer_state = LiftState::default();
-            let mut infer_lines = Vec::new();
+            let mut infer_stmts = Vec::new();
             let method_lift_ctx = LiftContext {
                 calldict_arity: lift_ctx.calldict_arity.clone(),
                 ifjmp_unit_return: kind == MethodKind::RecvInternal,
@@ -313,7 +352,7 @@ impl FuncDecompiler {
             lift_instructions(
                 &method.instructions,
                 &mut infer_state,
-                &mut infer_lines,
+                &mut infer_stmts,
                 1,
                 &method_lift_ctx,
             );
@@ -322,17 +361,17 @@ impl FuncDecompiler {
             let mut state = LiftState::default();
             let initial_stack = initial_stack_params_for_method(kind, &params);
             state.seed_stack_with_exprs(&initial_stack);
-            let mut lines = Vec::new();
+            let mut stmts = Vec::new();
             lift_instructions(
                 &method.instructions,
                 &mut state,
-                &mut lines,
+                &mut stmts,
                 1,
                 &method_lift_ctx,
             );
 
             if kind == MethodKind::RecvInternal {
-                params = select_recv_internal_params(&lines);
+                params = select_recv_internal_params(&stmts);
             }
 
             let return_kind = infer_return_kind(kind, &state);
@@ -340,23 +379,18 @@ impl FuncDecompiler {
                 .iter()
                 .map(|name| state.param_type(name))
                 .collect::<Vec<_>>();
-            out.push_str(&render_method_signature(
+            let signature = build_method_signature_ast(
                 method,
                 kind,
                 &params,
                 &param_types,
                 &return_kind,
-            ));
-            out.push('\n');
+            );
+            let leading_comments = self.collect_pattern_comments(method, &patterns, kind, &params);
 
-            self.render_patterns(&mut out, method, &patterns, kind, &params);
-
-            let mut rewritten = lines;
+            let mut rewritten = stmts;
             apply_pattern_rewrites(&mut rewritten, &patterns);
-            for line in &rewritten {
-                out.push_str(line);
-                out.push('\n');
-            }
+            let mut body = rewritten;
 
             if kind != MethodKind::RecvInternal
                 && !state.has_explicit_return()
@@ -368,76 +402,81 @@ impl FuncDecompiler {
                         if let Some(ret) = return_values.first() {
                             match return_kind {
                                 ReturnKind::Tuple(_) => {
-                                    let _ = writeln!(out, "    return ({ret});");
+                                    body.push(StmtAst::Return(Some(format!("({ret})"))));
                                 }
                                 ReturnKind::Unit => {}
                                 _ => {
-                                    let _ = writeln!(out, "    return {ret};");
+                                    body.push(StmtAst::Return(Some(ret.clone())));
                                 }
                             }
                         }
                     }
                     _ => {
                         let joined = return_values.join(", ");
-                        let _ = writeln!(out, "    return ({joined});");
+                        body.push(StmtAst::Return(Some(format!("({joined})"))));
                     }
                 }
             }
 
             if self.options.include_raw_tasm_fallback {
-                self.render_raw_fallback(&mut out, &method.instructions, 1);
+                body.extend(self.collect_raw_fallback_stmts(&method.instructions));
             }
 
-            out.push_str("}\n\n");
+            let method_ast = MethodAst {
+                signature,
+                leading_comments,
+                body,
+            };
+            render_method_ast(&method_ast, &mut out);
         }
 
         out
     }
 
-    fn render_patterns(
+    fn collect_pattern_comments(
         &self,
-        out: &mut String,
         method: &Method,
         patterns: &MethodPatterns,
         kind: MethodKind,
         params: &[String],
-    ) {
-        let _ = writeln!(out, "    ;; dict_method_id: {}", method.id);
+    ) -> Vec<String> {
+        let mut comments = Vec::new();
+        comments.push(format!(";; dict_method_id: {}", method.id));
 
         if kind == MethodKind::RecvInternal {
-            out.push_str("    ;; recovered role: recv_internal handler\n");
+            comments.push(";; recovered role: recv_internal handler".to_string());
         } else if kind == MethodKind::Getter {
-            out.push_str("    ;; recovered role: get-method\n");
+            comments.push(";; recovered role: get-method".to_string());
         } else if kind == MethodKind::Helper {
-            out.push_str("    ;; recovered role: helper (called via CALLDICT)\n");
+            comments.push(";; recovered role: helper (called via CALLDICT)".to_string());
         }
 
         if !params.is_empty() {
-            let _ = writeln!(out, "    ;; inferred params: {}", params.join(", "));
+            comments.push(format!(";; inferred params: {}", params.join(", ")));
         }
 
         if patterns.has_bounce_guard {
-            out.push_str("    ;; pattern: bounced message guard (msg_flags & 1)\n");
+            comments.push(";; pattern: bounced message guard (msg_flags & 1)".to_string());
         }
         if patterns.has_empty_body_guard {
-            out.push_str("    ;; pattern: empty body early return\n");
+            comments.push(";; pattern: empty body early return".to_string());
         }
         if patterns.has_op_and_query_id {
-            out.push_str("    ;; pattern: body starts with op:uint32 and query_id:uint64\n");
+            comments.push(";; pattern: body starts with op:uint32 and query_id:uint64".to_string());
         }
 
         if !patterns.opcodes.is_empty() {
-            out.push_str("    ;; recovered opcode dispatch candidates:\n");
+            comments.push(";; recovered opcode dispatch candidates:".to_string());
             for opcode in &patterns.opcodes {
-                let _ = writeln!(out, "    ;;   if (op == 0x{opcode:08x}) {{ ... }}");
+                comments.push(format!(";;   if (op == 0x{opcode:08x}) {{ ... }}"));
             }
         }
 
         if let Some(layout) = &patterns.storage_load_layout {
-            let _ = writeln!(out, "    ;; storage load layout: {}", layout.join(" -> "));
+            comments.push(format!(";; storage load layout: {}", layout.join(" -> ")));
         }
         if let Some(layout) = &patterns.storage_save_layout {
-            let _ = writeln!(out, "    ;; storage save layout: {}", layout.join(" -> "));
+            comments.push(format!(";; storage save layout: {}", layout.join(" -> ")));
         }
 
         if !patterns.call_targets.is_empty() {
@@ -447,7 +486,7 @@ impl FuncDecompiler {
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            let _ = writeln!(out, "    ;; calls helpers: CALLDICT {joined}");
+            comments.push(format!(";; calls helpers: CALLDICT {joined}"));
         }
         if !patterns.getglob_slots.is_empty() {
             let joined = patterns
@@ -456,7 +495,7 @@ impl FuncDecompiler {
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            let _ = writeln!(out, "    ;; reads globals: {joined}");
+            comments.push(format!(";; reads globals: {joined}"));
         }
         if !patterns.setglob_slots.is_empty() {
             let joined = patterns
@@ -465,16 +504,16 @@ impl FuncDecompiler {
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            let _ = writeln!(out, "    ;; writes globals: {joined}");
+            comments.push(format!(";; writes globals: {joined}"));
         }
         if patterns.has_raw_reserve {
-            out.push_str("    ;; pattern: RAWRESERVE present\n");
+            comments.push(";; pattern: RAWRESERVE present".to_string());
         }
         if patterns.has_send_raw_msg {
-            out.push_str("    ;; pattern: SENDRAWMSG present\n");
+            comments.push(";; pattern: SENDRAWMSG present".to_string());
         }
         if patterns.has_set_code {
-            out.push_str("    ;; pattern: SETCODE present (upgrade branch)\n");
+            comments.push(";; pattern: SETCODE present (upgrade branch)".to_string());
         }
         if !patterns.throw_codes.is_empty() {
             let joined = patterns
@@ -483,14 +522,14 @@ impl FuncDecompiler {
                 .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(", ");
-            let _ = writeln!(out, "    ;; throw codes: {joined}");
+            comments.push(format!(";; throw codes: {joined}"));
         }
+        comments
     }
 
-    fn render_raw_fallback(&self, out: &mut String, instructions: &[Instruction], depth: usize) {
-        let indent = "    ".repeat(depth);
-        out.push_str(&indent);
-        out.push_str(";; low-level fallback (TASM)\n");
+    fn collect_raw_fallback_stmts(&self, instructions: &[Instruction]) -> Vec<StmtAst> {
+        let mut out = Vec::new();
+        out.push(StmtAst::comment(";; low-level fallback (TASM)"));
 
         let max = if self.options.max_raw_tasm_lines_per_method == 0 {
             usize::MAX
@@ -500,18 +539,17 @@ impl FuncDecompiler {
 
         for (idx, instruction) in instructions.iter().enumerate() {
             if idx >= max {
-                let _ = writeln!(
-                    out,
-                    "{indent};; ... truncated {} instructions",
+                out.push(StmtAst::comment(format!(
+                    ";; ... truncated {} instructions",
                     instructions.len().saturating_sub(idx)
-                );
+                )));
                 break;
             }
-            let _ = writeln!(
-                out,
-                "{indent};; {}",
-                format_instruction_line(instruction, depth + 1)
-            );
+            out.push(StmtAst::comment(format!(
+                ";; {}",
+                format_instruction_line(instruction, 1)
+            )));
         }
+        out
     }
 }

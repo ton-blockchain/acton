@@ -8,6 +8,8 @@
 
 slice __tasm_slice_lit_0() asm "x{399_} PUSHSLICE";
 
+cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
+
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
     ;; dict_method_id: 0
     ;; recovered role: recv_internal handler
@@ -322,7 +324,9 @@ slice __tasm_slice_lit_0() asm "x{399_} PUSHSLICE";
         return ();
     }
     var v253 = (v42) == (3547469196);
-    if (v253) { return (); }
+    if (v253) {
+        return ();
+    }
     throw(((1 << 16) - 1));
     ;; low-level fallback (TASM)
     ;; POP s2
@@ -368,6 +372,28 @@ slice __tasm_slice_lit_0() asm "x{399_} PUSHSLICE";
     ;; POP s9
     ;; PUSH s5
     ;; ref { { PUSHINT_LONG 2078119902; EQUAL; PUSHCONT { POP s5; XCHG_0I s5; LDGRAMS; LDMSGADDR; MYADDR...  }; IFJMP; PUSH s5...  } }
+}
+
+cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20) {
+    ;; dict_method_id: 20
+    ;; recovered role: helper (called via CALLDICT)
+    ;; inferred params: arg0, arg1, arg2
+    ;; storage save layout: STU
+    var v0 = store_uint(begin_cell(), 0, 8);
+    var v1 = store_slice(v0, arg2);
+    var v2 = end_cell(v1);
+    var v3 = udict_set_ref(arg0, (1 << 8), arg1, v2);
+    return v3;
+    ;; low-level fallback (TASM)
+    ;; PUSHINT_4 0
+    ;; NEWC
+    ;; STU 8
+    ;; SWAP
+    ;; STSLICER
+    ;; ENDC
+    ;; XCHG_0I s2
+    ;; PUSHPOW2 8
+    ;; DICTUSETREF
 }
 
 slice method_78683() impure method_id(78683) {
@@ -483,10 +509,8 @@ slice method_103289(slice arg0) impure method_id(103289) {
     var (v9, v10) = load_ref(v7);
     end_parse(v9);
     var v11 = begin_parse(v10);
-    var v12 = null();
-    v12~set_token_snake_metadata_entry(51065135818459385347574250312853146822620586594996463797054414300406918686668, v11);
-    var v13 = v12;
-    v13~set_token_snake_metadata_entry(107878361799212983662495570378745491379550006934010968359181619763835345146430, __tasm_slice_lit_0());
+    var v12 = __dict_method_20(null(), 51065135818459385347574250312853146822620586594996463797054414300406918686668, v11);
+    var v13 = __dict_method_20(v12, 107878361799212983662495570378745491379550006934010968359181619763835345146430, __tasm_slice_lit_0());
     var v14 = store_uint(begin_cell(), 0, 8);
     var v15 = store_dict(v14, v13);
     var v16 = end_cell(v15);

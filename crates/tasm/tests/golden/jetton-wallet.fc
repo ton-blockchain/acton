@@ -272,7 +272,9 @@
         return ();
     }
     var v246 = (v41) == (3547469196);
-    if (v246) { return (); }
+    if (v246) {
+        return ();
+    }
     throw(((1 << 16) - 1));
     ;; low-level fallback (TASM)
     ;; SWAP

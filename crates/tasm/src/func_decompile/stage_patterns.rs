@@ -1,4 +1,5 @@
 use super::inspect::flatten_plain_instructions;
+use super::ast::StmtAst;
 use super::render::{arg_as_i64, arg_as_u64};
 use crate::types::{ArgValue, Method, PlainInstruction};
 
@@ -75,11 +76,14 @@ impl MethodPatterns {
     }
 }
 
-pub(crate) fn apply_pattern_rewrites(lines: &mut [String], patterns: &MethodPatterns) {
+pub(crate) fn apply_pattern_rewrites(stmts: &mut [StmtAst], patterns: &MethodPatterns) {
     if patterns.has_op_and_query_id {
-        for line in lines {
-            if line.contains("__ldu(") && line.contains(", 32)") {
-                *line = line.replace("var ", "var op_");
+        for stmt in stmts {
+            if let StmtAst::Expr(line) = stmt
+                && line.contains("__ldu(")
+                && line.contains(", 32)")
+            {
+                *line = line.replacen("var ", "var op_", 1);
                 break;
             }
         }

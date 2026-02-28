@@ -1,4 +1,5 @@
 use super::inspect::{as_plain, flatten_plain_instructions};
+use super::ast::{MethodSignatureAst, ParamAst};
 use super::render::arg_as_u64;
 use super::stage_patterns::MethodPatterns;
 use super::stage_stack::{LiftState, ValueType};
@@ -68,22 +69,42 @@ pub(crate) fn render_method_signature(
     param_types: &[ValueType],
     ret: &ReturnKind,
 ) -> String {
-    let rendered_params = render_param_list(kind, params, param_types);
-    let ret_ty = return_type_name(ret);
-    match kind {
-        MethodKind::RecvInternal => format!("() recv_internal({rendered_params}) impure {{"),
-        MethodKind::Getter => format!(
-            "{ret_ty} get_method_{}({}) method_id({}) {{",
-            method.id, rendered_params, method.id
+    build_method_signature_ast(method, kind, params, param_types, ret).render()
+}
+
+pub(crate) fn build_method_signature_ast(
+    method: &Method,
+    kind: MethodKind,
+    params: &[String],
+    param_types: &[ValueType],
+    ret: &ReturnKind,
+) -> MethodSignatureAst {
+    let params = render_param_pairs(kind, params, param_types);
+    let return_type = return_type_name(ret);
+    let (name, qualifiers) = match kind {
+        MethodKind::RecvInternal => (
+            "recv_internal".to_string(),
+            vec!["impure".to_string()],
         ),
-        MethodKind::Helper => format!(
-            "{ret_ty} __dict_method_{}({}) impure method_id({}) {{",
-            method.id, rendered_params, method.id
+        MethodKind::Getter => (
+            format!("get_method_{}", method.id),
+            vec![format!("method_id({})", method.id)],
         ),
-        MethodKind::External => format!(
-            "{ret_ty} method_{}({}) impure method_id({}) {{",
-            method.id, rendered_params, method.id
+        MethodKind::Helper => (
+            format!("__dict_method_{}", method.id),
+            vec!["impure".to_string(), format!("method_id({})", method.id)],
         ),
+        MethodKind::External => (
+            format!("method_{}", method.id),
+            vec!["impure".to_string(), format!("method_id({})", method.id)],
+        ),
+    };
+
+    MethodSignatureAst {
+        return_type,
+        name,
+        params,
+        qualifiers,
     }
 }
 
@@ -145,29 +166,45 @@ fn tuple_item_type_name(ty: ValueType) -> &'static str {
     }
 }
 
-fn render_param_list(kind: MethodKind, params: &[String], param_types: &[ValueType]) -> String {
+fn render_param_pairs(kind: MethodKind, params: &[String], param_types: &[ValueType]) -> Vec<ParamAst> {
     if kind == MethodKind::RecvInternal {
         return match params.len() {
-            4 => "int balance, int msg_value, cell in_msg_full, slice in_msg_body".to_string(),
-            3 => "int msg_value, cell in_msg_full, slice in_msg_body".to_string(),
-            2 => "cell in_msg_full, slice in_msg_body".to_string(),
-            1 => "slice in_msg_body".to_string(),
-            _ => String::new(),
+            4 => vec![
+                ParamAst { ty: "int".to_string(), name: "balance".to_string() },
+                ParamAst { ty: "int".to_string(), name: "msg_value".to_string() },
+                ParamAst { ty: "cell".to_string(), name: "in_msg_full".to_string() },
+                ParamAst { ty: "slice".to_string(), name: "in_msg_body".to_string() },
+            ],
+            3 => vec![
+                ParamAst { ty: "int".to_string(), name: "msg_value".to_string() },
+                ParamAst { ty: "cell".to_string(), name: "in_msg_full".to_string() },
+                ParamAst { ty: "slice".to_string(), name: "in_msg_body".to_string() },
+            ],
+            2 => vec![
+                ParamAst { ty: "cell".to_string(), name: "in_msg_full".to_string() },
+                ParamAst { ty: "slice".to_string(), name: "in_msg_body".to_string() },
+            ],
+            1 => vec![
+                ParamAst { ty: "slice".to_string(), name: "in_msg_body".to_string() },
+            ],
+            _ => Vec::new(),
         };
     }
 
     if params.is_empty() {
-        String::new()
+        Vec::new()
     } else {
         params
             .iter()
             .enumerate()
             .map(|(idx, p)| {
                 let ty = param_types.get(idx).copied().unwrap_or(ValueType::Unknown);
-                format!("{} {p}", param_type_name(ty))
+                ParamAst {
+                    ty: param_type_name(ty).to_string(),
+                    name: p.clone(),
+                }
             })
             .collect::<Vec<_>>()
-            .join(", ")
     }
 }
 

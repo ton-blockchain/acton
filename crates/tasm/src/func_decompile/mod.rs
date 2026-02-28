@@ -1,3 +1,4 @@
+mod ast;
 mod inspect;
 mod method_model;
 mod pipeline;
