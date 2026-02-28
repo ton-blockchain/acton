@@ -46,6 +46,15 @@ jobs:
         with:
           tool: nextest,just
 
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0 # v2.0.9
+        with:
+          # adds itself to PATH and LD_LIBRARY_PATH
+          # accessible via env.LLVM_PATH
+          version: "16.0.6"
+          cached: true
+          env: true # sets CC and CXX
+
       - name: Get TON commit hash
         id: ton-commit
         run: |
@@ -62,40 +71,15 @@ jobs:
           key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
           restore-keys: ton-artifacts-${{ matrix.os }}-
 
-      - name: Cache LLVM and Clang
-        id: cache-llvm
-        uses: actions/cache@v5
-        with:
-          path: |
-            /usr/lib/llvm-16
-            /usr/bin/lld-16
-            /usr/bin/clang-16
-            /usr/bin/clang++-16
-            /usr/bin/llvm-ar-16
-            /usr/bin/llvm-ranlib-16
-          key: llvm-${{ matrix.os }}
-
-      - run: echo nothingburger
-
       - name: Check cache hits
         run: |
           echo 'TON artifacts: ${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
-          echo 'LLVM and Clang: ${{ steps.cache-llvm.outputs.cache-hit }}'
-
-      - name: Install LLVM and Clang
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 16 clang
-          rm llvm.sh
 
       - name: Install system dependencies (cache not exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev graphviz
-          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache graphviz
 
       - name: Install system dependencies (cache exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit == 'true'
@@ -122,16 +106,70 @@ jobs:
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        env:
-          CC: clang-16
-          CXX: clang++-16
-          AR: llvm-ar-16
-          RANLIB: llvm-ranlib-16
         run: |
           cd ton-repo
-          cp assembly/native/build-ubuntu-static.sh .
-          chmod +x build-ubuntu-static.sh
-          ./build-ubuntu-static.sh -a -c
+          mkdir -p ~/.ccache
+          export CCACHE_DIR=~/.ccache
+          ccache -M 0
+          if [ ! -d "build" ]; then
+            mkdir build
+            cd build
+          else
+            cd build
+            rm -rf .ninja* CMakeCache.txt
+          fi
+          if [ ! -d "../openssl_3" ]; then
+            git clone https://github.com/openssl/openssl ../openssl_3
+            cd ../openssl_3
+            opensslPath=`pwd`
+            git checkout openssl-3.1.4
+            ./config
+            make build_libs -j$(nproc)
+            test $? -eq 0 || { echo "Can't compile openssl_3"; exit 1; }
+            cd ../build
+          else
+            opensslPath=$(pwd)/../openssl_3
+            echo "Using compiled openssl_3"
+          fi
+          cmake -GNinja -DTON_USE_JEMALLOC=ON .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DOPENSSL_ROOT_DIR=$opensslPath \
+          -DOPENSSL_INCLUDE_DIR=$opensslPath/include \
+          -DOPENSSL_CRYPTO_LIBRARY=$opensslPath/libcrypto.so \
+          -DEMULATOR_STATIC=1
+          test $? -eq 0 || { echo "Can't configure ton"; exit 1; }
+          ninja emulator tolkfiftlib
+          test $? -eq 0 || { echo "Can't compile ton"; exit 1; }
+          emulator_deps=$(ninja -n -v emulator | tr ' ' '\n' | grep '\.a$' | sort -u)
+          rm -f libemulator.a
+          {
+            echo "create libemulator.a"
+            echo "addlib emulator/libemulator_static.a"
+            echo "addlib emulator/libemulator.a"
+            for a in $emulator_deps; do
+              echo "addlib $a"
+            done
+            if [ -f /usr/lib/x86_64-linux-gnu/libsodium.a ]; then echo "addlib /usr/lib/x86_64-linux-gnu/libsodium.a"; fi
+            if [ -f "$OPENSSL_CRYPTO_A" ]; then echo "addlib $OPENSSL_CRYPTO_A"; fi
+            if [ -f /usr/lib/x86_64-linux-gnu/libz.a ]; then echo "addlib /usr/lib/x86_64-linux-gnu/libz.a"; fi
+            echo "save"
+            echo "end"
+          } | llvm-ar -M
+          ranlib libemulator.a
+          rm -f libtolk.a
+          llvm-objcopy-16 \
+            --redefine-sym version=tolk_version \
+            tolk/libtolkfiftlib.a \
+            libtolk.a
+          cd ..
+          echo Creating artifacts...
+          rm -rf artifacts
+          mkdir artifacts
+          cp build/libemulator.a artifacts/
+          cp build/libtolk.a artifacts/
+          cp -r crypto/smartcont/tolk-stdlib artifacts/tolk-stdlib
+          cp -r crypto/fift/lib artifacts/fift-stdlib
+          chmod -R +x artifacts/*
 
       - name: Show ccache stats
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -151,9 +189,6 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Build acton binary
-        env:
-          CC: clang-16
-          CXX: clang++-16
         run: |
           just build-ui
           cargo build --bin acton
