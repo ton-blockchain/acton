@@ -235,7 +235,17 @@ impl FuncDecompiler {
             }
 
             let return_kind = infer_return_kind(kind, &state);
-            out.push_str(&render_method_signature(method, kind, &params, return_kind));
+            let param_types = params
+                .iter()
+                .map(|name| state.param_type(name))
+                .collect::<Vec<_>>();
+            out.push_str(&render_method_signature(
+                method,
+                kind,
+                &params,
+                &param_types,
+                return_kind,
+            ));
             out.push('\n');
 
             self.render_patterns(&mut out, method, &patterns, kind, &params);

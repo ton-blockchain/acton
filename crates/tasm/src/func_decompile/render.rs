@@ -1,7 +1,9 @@
 use crate::types::{ArgValue, Instruction};
+use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
+use tycho_types::util::Bitstring;
 
 pub(crate) fn push_line(lines: &mut Vec<String>, depth: usize, line: String) {
     lines.push(format!("{}{}", "    ".repeat(depth), line));
@@ -77,6 +79,53 @@ pub(crate) fn format_cell_literal(cell: &Cell) -> String {
     } else {
         format!("boc{{{}}}", Boc::encode_hex(cell.clone()))
     }
+}
+
+pub(crate) fn format_func_slice_expr(cell: &Cell) -> String {
+    let slice = cell.as_slice_allow_exotic();
+    if slice.size_refs() != 0 {
+        // Non-empty refs cannot be represented as a plain slice constant in FunC.
+        return "\"\"".to_string();
+    }
+
+    let bits_hex = slice.display_data().to_string();
+    bitstring_hex_to_func_slice_expr(&bits_hex).unwrap_or_else(|| "\"\"".to_string())
+}
+
+fn bitstring_hex_to_func_slice_expr(bits_hex: &str) -> Option<String> {
+    let (bytes, bit_len) = Bitstring::from_hex_str(bits_hex).ok()?;
+    if bit_len == 0 {
+        return Some("\"\"".to_string());
+    }
+
+    let total_bits = bit_len as usize;
+    let mut offset = 0usize;
+    let mut builder_expr = "begin_cell()".to_string();
+    while offset < total_bits {
+        let chunk_len = (total_bits - offset).min(256);
+        let chunk_value = bits_to_biguint(&bytes, offset, chunk_len);
+        builder_expr = format!("store_uint({builder_expr}, {chunk_value}, {chunk_len})");
+        offset += chunk_len;
+    }
+
+    Some(format!("begin_parse(end_cell({builder_expr}))"))
+}
+
+fn bits_to_biguint(bytes: &[u8], start_bit: usize, bit_len: usize) -> BigUint {
+    let mut value = BigUint::default();
+    for bit_idx in start_bit..(start_bit + bit_len) {
+        value <<= 1usize;
+        if bit_is_one(bytes, bit_idx) {
+            value += BigUint::from(1u8);
+        }
+    }
+    value
+}
+
+fn bit_is_one(bytes: &[u8], bit_idx: usize) -> bool {
+    let byte = bytes.get(bit_idx / 8).copied().unwrap_or(0);
+    let shift = 7 - (bit_idx % 8);
+    ((byte >> shift) & 1) != 0
 }
 
 pub(crate) fn arg_to_string(arg: &ArgValue) -> Option<String> {

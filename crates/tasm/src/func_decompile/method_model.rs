@@ -65,9 +65,10 @@ pub(crate) fn render_method_signature(
     method: &Method,
     kind: MethodKind,
     params: &[String],
+    param_types: &[ValueType],
     ret: ReturnKind,
 ) -> String {
-    let rendered_params = render_param_list(kind, params);
+    let rendered_params = render_param_list(kind, params, param_types);
     let ret_ty = return_type_name(ret);
     match kind {
         MethodKind::RecvInternal => format!("() recv_internal({rendered_params}) impure {{"),
@@ -115,7 +116,7 @@ fn return_type_name(ret: ReturnKind) -> &'static str {
     }
 }
 
-fn render_param_list(kind: MethodKind, params: &[String]) -> String {
+fn render_param_list(kind: MethodKind, params: &[String], param_types: &[ValueType]) -> String {
     if kind == MethodKind::RecvInternal {
         return match params.len() {
             4 => "int balance, int msg_value, cell in_msg_full, slice in_msg_body".to_string(),
@@ -131,9 +132,23 @@ fn render_param_list(kind: MethodKind, params: &[String]) -> String {
     } else {
         params
             .iter()
-            .map(|p| format!("int {p}"))
+            .enumerate()
+            .map(|(idx, p)| {
+                let ty = param_types.get(idx).copied().unwrap_or(ValueType::Unknown);
+                format!("{} {p}", param_type_name(ty))
+            })
             .collect::<Vec<_>>()
             .join(", ")
+    }
+}
+
+fn param_type_name(ty: ValueType) -> &'static str {
+    match ty {
+        ValueType::Int => "int",
+        ValueType::Cell => "cell",
+        ValueType::Slice => "slice",
+        ValueType::Builder => "builder",
+        ValueType::Unknown => "int",
     }
 }
 
