@@ -75,6 +75,8 @@ jobs:
             /usr/bin/llvm-ranlib-16
           key: llvm-${{ matrix.os }}
 
+      - run: echo nothingburger
+
       - name: Check cache hits
         run: |
           echo 'TON artifacts: ${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
