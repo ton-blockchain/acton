@@ -55,6 +55,18 @@ jobs:
           cached: true
           env: true # sets CC and CXX
 
+      - name: Symlink LLVM and Clang
+        run: |
+          sudo ln -s libclang-11.so.1 /lib/x86_64-linux-gnu/libclang.so
+          ls -s llvm-16 llvm
+          cd ../bin
+          ln -s lld-16 lld
+          ln -s llvm-ar-16 llvm-ar
+          ln -s llvm-ranlib-16 llvm-ranlib
+          ln -s clang-16 clang
+          ln -s clang++-16 clang++
+        working-directory: ${{ env.LLVM_PATH }}/lib
+
       - name: Get TON commit hash
         id: ton-commit
         run: |
