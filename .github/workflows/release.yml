@@ -14,7 +14,10 @@ permissions:
 
 jobs:
   build-linux:
-    runs-on: ubicloud-standard-4
+    strategy:
+      matrix:
+        os: [ ubicloud-standard-4-ubuntu-2204 ]
+    runs-on: ${{ matrix.os }}
     if: true
 
     outputs:
@@ -37,6 +40,13 @@ jobs:
         with:
           tool: nextest,just
 
+      - name: Install LLVM and Clang (don't cache)
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 16 clang
+          rm llvm.sh
+
       - name: Get TON commit hash
         id: ton-commit
         run: |
@@ -50,11 +60,12 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ton-repo/artifacts
-          key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ runner.os }}-
+          key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-artifacts-${{ matrix.os }}-
 
-      - name: Check cache hit
-        run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
+      - name: Check cache hits
+        run: |
+          echo 'TON artifacts: ${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
 
       - name: Install system dependencies (cache not exist)
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
@@ -87,11 +98,12 @@ jobs:
 
       - name: Build TON static libraries
         if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
+        env:
+          CC: clang-16
+          CXX: clang++-16
+          AR: llvm-ar-16
+          RANLIB: llvm-ranlib-16
         run: |
-          export CC=clang-16
-          export CXX=clang++-16
-          export AR=llvm-ar-16
-          export RANLIB=llvm-ranlib-16
           cd ton-repo
           cp assembly/native/build-ubuntu-static.sh .
           chmod +x build-ubuntu-static.sh
@@ -116,8 +128,8 @@ jobs:
 
       - name: Build acton binary
         env:
-          CC: gcc
-          CXX: g++
+          CC: clang-16
+          CXX: clang++-16
         run: |
           just build-ui
           cargo build --profile release-size --bin acton

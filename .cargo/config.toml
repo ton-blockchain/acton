@@ -1,3 +1,8 @@
 # uncomment for flamegraph collection
 #[build]
 #rustflags = ["-C", "force-frame-pointers=yes"]
+
+# Enforce dynamic linking against the system glibc version,
+# which is important for Tree-sitter and OpenSSL, among others.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-feature=-crt-static"]
