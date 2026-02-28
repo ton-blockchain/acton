@@ -28,6 +28,7 @@
     "e025-divide-before-multiply",
     "e026-duplicated-condition",
     "e027-identical-conditional-branches",
+    "e028-no-global-variables",
     "s001-name-case-checker"
   ]
 }
