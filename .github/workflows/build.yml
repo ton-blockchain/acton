@@ -135,12 +135,7 @@ jobs:
           export CC=clang-16
           export CXX=clang++-16
           just build-ui
-          # Flags here enforce dynamic linking against the system glibc version.
-          # Such linking is important for Tree-sitter and OpenSSL, among others.
-          # Alternative place for these flags could be .cargo/config.toml:
-          #     [target.x86_64-unknown-linux-gnu]
-          #     rustflags = ["-C", "target-feature=-crt-static"]
-          RUSTFLAGS="-C target-feature=-crt-static" cargo build --bin acton
+          cargo build --bin acton
 
       - name: Test acton binary
         run: |
