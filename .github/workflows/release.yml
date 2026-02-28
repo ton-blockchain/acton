@@ -40,7 +40,7 @@ jobs:
         with:
           tool: nextest,just
 
-      - name: Install LLVM and Clang
+      - name: Install LLVM and Clang (don't cache)
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
