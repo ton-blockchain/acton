@@ -3,6 +3,7 @@ use anyhow::bail;
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use std::io::{IsTerminal, stdin};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvmffi::stack::{Tuple, TupleItem};
@@ -319,10 +320,14 @@ fn prompt_impl(
     placeholder: String,
     message: String,
 ) -> anyhow::Result<()> {
-    let text = Text::new(&message)
-        .with_placeholder(&placeholder)
-        .prompt()
-        .unwrap_or_default();
+    let text = if stdin().is_terminal() {
+        Text::new(&message)
+            .with_placeholder(&placeholder)
+            .prompt()
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
 
     stack.push_string(&text);
     Ok(())
@@ -335,10 +340,14 @@ fn select_impl(
     variants: Vec<String>,
     message: String,
 ) -> anyhow::Result<()> {
-    let result = Select::new(&message, variants)
-        .with_starting_cursor(0)
-        .prompt()
-        .unwrap_or_default();
+    let result = if stdin().is_terminal() {
+        Select::new(&message, variants)
+            .with_starting_cursor(0)
+            .prompt()
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
 
     stack.push_string(&result);
     Ok(())
@@ -352,11 +361,15 @@ fn confirm_impl(
     default: BigInt,
     message: String,
 ) -> anyhow::Result<()> {
-    let res = Confirm::new(&message)
-        .with_default(default != BigInt::ZERO)
-        .with_help_message(&help_message)
-        .prompt()
-        .unwrap_or(false);
+    let res = if stdin().is_terminal() {
+        Confirm::new(&message)
+            .with_default(default != BigInt::ZERO)
+            .with_help_message(&help_message)
+            .prompt()
+            .unwrap_or(false)
+    } else {
+        false
+    };
 
     stack.push_bool(res);
     Ok(())
