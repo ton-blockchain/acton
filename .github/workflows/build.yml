@@ -57,7 +57,6 @@ jobs:
 
       - name: Symlink LLVM and Clang
         run: |
-          sudo ln -s libclang-11.so.1 /lib/x86_64-linux-gnu/libclang.so
           ls -s llvm-16 llvm
           cd ../bin
           ln -s lld-16 lld
