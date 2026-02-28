@@ -1644,7 +1644,7 @@ fn main() {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .expect("Failed to initialize tokio runtime for langauge server");
+                .expect("Failed to initialize tokio runtime for language server");
             rt.block_on(ls_cmd(port, stdio, log_file, no_log))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),

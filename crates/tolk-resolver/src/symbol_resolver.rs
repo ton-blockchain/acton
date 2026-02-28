@@ -96,7 +96,7 @@ pub struct Scope {
     pub symbols: HashMap<Arc<str>, LocalDefId>,
     /// Index of the parent scope in the `SymbolResolver`'s scope list.
     pub parent: Option<usize>,
-    /// If this scope fpr lambda.
+    /// Indicates whether this scope is for a lambda.
     pub is_lambda: bool,
 }
 

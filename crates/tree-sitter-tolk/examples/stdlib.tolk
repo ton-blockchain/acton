@@ -544,7 +544,7 @@ fun isEndOfSliceBits(self: slice): int
 fun isEndOfSliceRefs(self: slice): int
     asm "SREMPTY";
 
-/// Checks whether data parts of two slices coinside.
+/// Checks whether data parts of two slices coincide.
 @pure
 fun isSliceBitsEqual(self: slice, b: slice): int
     asm "SDEQ";
@@ -675,7 +675,7 @@ fun storeMessageQueryId(mutate self: builder, queryId: int): self
 
 /// SEND MODES - https://docs.ton.org/tvm.pdf page 137, SENDRAWMSG
 
-/// mode = 0 is used for ordinary messages; the gas fees are deducted from the senging amount; action phaes should NOT be ignored.
+/// mode = 0 is used for ordinary messages; the gas fees are deducted from the sending amount; action phases should NOT be ignored.
 const SEND_MODE_REGULAR = 0;
 /// +1 means that the sender wants to pay transfer fees separately.
 const SEND_MODE_PAY_FEES_SEPARATELY = 1;

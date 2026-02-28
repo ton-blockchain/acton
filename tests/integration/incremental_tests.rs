@@ -318,7 +318,7 @@ fn test_incremental_library_file_change() {
     )
     .expect("Write lib");
 
-    // Should recompile main tha depends on lib
+    // Should recompile main that depends on lib
     let second = project.acton().build().run().success();
     let order = CompilationOrder::from_stdout(&second.get_normalized_stdout());
 

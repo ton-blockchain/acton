@@ -61,5 +61,5 @@ fun main() {
         return;
     }
 
-    println(format2("Succesfully minted and transfered {} tokens to {}", supply, deployer.address));
+    println(format2("Successfully minted and transferred {} tokens to {}", supply, deployer.address));
 }

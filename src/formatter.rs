@@ -908,23 +908,23 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 } => {
                     let message = installed_actions.find_message(hash);
 
-                    let (loc, formated) = if let Some(message) = message {
+                    let (loc, formatted) = if let Some(message) = message {
                         let msg = message.message();
 
-                        let formated = match msg {
+                        let formatted = match msg {
                             Some(msg) => self.format_single_message(&msg, contract_letters, false),
                             None => hash.to_string(),
                         };
 
                         (
                             self.find_source_loc(tx, &message.loc_hash, message.loc_offset),
-                            formated,
+                            formatted,
                         )
                     } else {
                         (None, "msg: ".to_owned() + hash)
                     };
 
-                    let message_part = formated;
+                    let message_part = formatted;
                     let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
                     let location_part = loc
                         .map(|l| format!("at {}", l.format()))

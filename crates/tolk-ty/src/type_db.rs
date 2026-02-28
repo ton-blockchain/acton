@@ -756,14 +756,14 @@ impl<'a> TypeDb<'a> {
                         type_parameters, ..
                     } = &resolved.kind
                     {
-                        let mut substituion = GenericsSubstitutions::new();
+                        let mut substitution = GenericsSubstitutions::new();
 
                         for (param, &ty) in type_parameters.iter().zip(&tys) {
-                            substituion.set_type_t(param.name.to_string(), ty);
+                            substitution.set_type_t(param.name.to_string(), ty);
                         }
 
                         let mut substitutor = TypeSubstitutor::new(self.intrn);
-                        inner_ty = substitutor.substitute(inner_ty, &substituion.mapping)
+                        inner_ty = substitutor.substitute(inner_ty, &substitution.mapping)
                     }
 
                     return Some(

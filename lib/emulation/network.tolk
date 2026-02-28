@@ -240,7 +240,7 @@ struct SearchParams {
     value: coins? = null,
     /// Exit code of the transaction.
     exitCode: int32? = null
-    /// Whether the transaction is succesfull (both compute and action phase).
+    /// Whether the transaction is successful (both compute and action phase).
     success: bool? = null,
     /// Whether the compute phase of transaction was aborted and transaction was reverted.
     aborted: bool? = null,
@@ -470,8 +470,8 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
     };
 }
 
-/// Sends external incoming message to the spefied destination address.
-/// Read more about External incomming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
+/// Sends an external incoming message to the specified destination address.
+/// Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
 fun net.sendExternal(msg: OutMessage): SendResultList {
     // from and mode fields do not affect anything in case of an ExtIn message
     return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell())!;

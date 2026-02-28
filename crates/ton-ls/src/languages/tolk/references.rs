@@ -40,12 +40,12 @@ impl Backend {
 
         match resolved {
             Resolved::Global(symbol_id) => self.global_references(analysis, symbol_id),
-            Resolved::Local(local_id) => self.local_refences(analysis, uri, &file, local_id),
+            Resolved::Local(local_id) => self.local_references(analysis, uri, &file, local_id),
             Resolved::Unresolved => None,
         }
     }
 
-    fn local_refences(
+    fn local_references(
         &self,
         analysis: Ref<Url, Arc<AnalysisResult>>,
         uri: &Url,
