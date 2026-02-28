@@ -1562,8 +1562,9 @@ fn lift_plain_instruction(
             return;
         }
         "GETORIGINALFWDFEE" => {
-            let fwd_fee = state.pop_expr_expect(lines, depth, ValueType::Int);
+            // stdlib: get_original_fwd_fee(workchain, fwd_fee) asm(fwd_fee workchain)
             let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let fwd_fee = state.pop_expr_expect(lines, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
                 lines,
@@ -1574,8 +1575,9 @@ fn lift_plain_instruction(
             return;
         }
         "GETGASFEE" => {
-            let gas_used = state.pop_expr_expect(lines, depth, ValueType::Int);
+            // stdlib: get_compute_fee(workchain, gas_used) asm(gas_used workchain)
             let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let gas_used = state.pop_expr_expect(lines, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
                 lines,
@@ -1586,9 +1588,11 @@ fn lift_plain_instruction(
             return;
         }
         "GETFORWARDFEESIMPLE" => {
-            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
+            // stdlib: get_simple_forward_fee(workchain, bits, cells)
+            // asm(cells bits workchain)
             let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
                 lines,
@@ -1599,9 +1603,10 @@ fn lift_plain_instruction(
             return;
         }
         "GETFORWARDFEE" => {
-            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
+            // stdlib: get_forward_fee(workchain, bits, cells) asm(cells bits workchain)
             let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
                 lines,
@@ -1612,10 +1617,12 @@ fn lift_plain_instruction(
             return;
         }
         "GETSTORAGEFEE" => {
-            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
-            let seconds = state.pop_expr_expect(lines, depth, ValueType::Int);
+            // stdlib: get_storage_fee(workchain, seconds, bits, cells)
+            // asm(cells bits seconds workchain)
             let workchain = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let seconds = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let bits = state.pop_expr_expect(lines, depth, ValueType::Int);
+            let cells = state.pop_expr_expect(lines, depth, ValueType::Int);
             let t = state.new_temp();
             push_line(
                 lines,

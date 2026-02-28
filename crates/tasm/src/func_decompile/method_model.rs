@@ -77,8 +77,8 @@ pub(crate) fn render_method_signature(
             method.id, rendered_params, method.id
         ),
         MethodKind::Helper => format!(
-            "{ret_ty} __dict_method_{}({}) impure {{",
-            method.id, rendered_params
+            "{ret_ty} __dict_method_{}({}) impure method_id({}) {{",
+            method.id, rendered_params, method.id
         ),
         MethodKind::External => format!(
             "{ret_ty} method_{}({}) impure method_id({}) {{",
