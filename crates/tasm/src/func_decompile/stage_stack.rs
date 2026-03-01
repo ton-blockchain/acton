@@ -1,4 +1,4 @@
-use super::ast::StmtAst;
+use super::ast::{ExprAst, StmtAst};
 use super::render::{arg_as_i64, arg_to_string, format_func_slice_expr, format_instruction_line};
 use crate::types::{ArgValue, Code, Instruction, PlainInstruction};
 use std::collections::BTreeMap;
@@ -470,7 +470,7 @@ fn lift_plain_instruction(
             let loop_cond = state.new_temp();
             stmts.push(StmtAst::VarDecl {
                 name: loop_cond.clone(),
-                expr: "0".to_string(),
+                expr: ExprAst::Atom("0".to_string()),
             });
 
             let mut cond_state = state.clone();
@@ -498,7 +498,7 @@ fn lift_plain_instruction(
             let mut do_body = cond_stmts;
             do_body.push(StmtAst::Assign {
                 target: loop_cond.clone(),
-                expr: cond_expr,
+                expr: ExprAst::Atom(cond_expr),
             });
             do_body.push(StmtAst::If {
                 negated: false,
@@ -962,7 +962,7 @@ fn lift_plain_instruction(
         let rhs = state.pop_expr_expect(stmts, depth, ValueType::Slice);
         let lhs = state.pop_expr_expect(stmts, depth, ValueType::Slice);
         let t = state.new_temp();
-        push_var(stmts, t.clone(), format!("equal_slices_bits({lhs}, {rhs})"));
+        push_var_call(stmts, t.clone(), "equal_slices_bits", vec![lhs, rhs]);
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
@@ -971,7 +971,7 @@ fn lift_plain_instruction(
         let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
         let bits = state.new_temp();
         let refs = state.new_temp();
-        push_var(stmts, format!("({bits}, {refs})"), format!("slice_bits_refs({src})"));
+        push_var_call(stmts, format!("({bits}, {refs})"), "slice_bits_refs", vec![src]);
         state.push_typed_expr(bits, ValueType::Int);
         state.push_typed_expr(refs, ValueType::Int);
         return;
@@ -1034,7 +1034,12 @@ fn lift_plain_instruction(
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let value = state.new_temp();
-            push_var(stmts, format!("({next_slice}, {value})"), format!("load_uint({src}, {bits})"));
+            push_var_call(
+                stmts,
+                format!("({next_slice}, {value})"),
+                "load_uint",
+                vec![src, bits],
+            );
             state.push_typed_expr(value, ValueType::Int);
             state.push_typed_expr(next_slice, ValueType::Slice);
             return;
@@ -1053,7 +1058,12 @@ fn lift_plain_instruction(
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let value = state.new_temp();
-            push_var(stmts, format!("({next_slice}, {value})"), format!("load_int({src}, {bits})"));
+            push_var_call(
+                stmts,
+                format!("({next_slice}, {value})"),
+                "load_int",
+                vec![src, bits],
+            );
             state.push_typed_expr(value, ValueType::Int);
             state.push_typed_expr(next_slice, ValueType::Slice);
             return;
@@ -1071,7 +1081,7 @@ fn lift_plain_instruction(
             };
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("preload_uint({src}, {bits})"));
+            push_var_call(stmts, t.clone(), "preload_uint", vec![src, bits]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1088,7 +1098,7 @@ fn lift_plain_instruction(
             };
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("preload_int({src}, {bits})"));
+            push_var_call(stmts, t.clone(), "preload_int", vec![src, bits]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1101,7 +1111,12 @@ fn lift_plain_instruction(
                 .unwrap_or_else(|| "0".to_string());
             let next_slice = state.new_temp();
             let loaded = state.new_temp();
-            push_var(stmts, format!("({next_slice}, {loaded})"), format!("load_bits({src}, {bits})"));
+            push_var_call(
+                stmts,
+                format!("({next_slice}, {loaded})"),
+                "load_bits",
+                vec![src, bits],
+            );
             state.push_typed_expr(loaded, ValueType::Slice);
             state.push_typed_expr(next_slice, ValueType::Slice);
             return;
@@ -1114,7 +1129,7 @@ fn lift_plain_instruction(
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("preload_bits({src}, {bits})"));
+            push_var_call(stmts, t.clone(), "preload_bits", vec![src, bits]);
             state.push_typed_expr(t, ValueType::Slice);
             return;
         }
@@ -1122,7 +1137,12 @@ fn lift_plain_instruction(
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let remainder = state.new_temp();
             let addr = state.new_temp();
-            push_var(stmts, format!("({remainder}, {addr})"), format!("load_msg_addr({src})"));
+            push_var_call(
+                stmts,
+                format!("({remainder}, {addr})"),
+                "load_msg_addr",
+                vec![src],
+            );
             // TVM stack after LDMSGADDR is addr, remainder(top); stdlib
             // signature is (remainder, addr) because of asm(-> 1 0).
             state.push_typed_expr(addr, ValueType::Slice);
@@ -1136,7 +1156,7 @@ fn lift_plain_instruction(
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
             let next_slice = state.new_temp();
             let value = state.new_temp();
-            push_var(stmts, format!("({next_slice}, {value})"), format!("{fn_name}({src})"));
+            push_var_call(stmts, format!("({next_slice}, {value})"), fn_name, vec![src]);
             let value_ty = match plain.name.as_str() {
                 "LDGRAMS" | "LDVARUINT16" => ValueType::Int,
                 "LDREF" => ValueType::Cell,
@@ -1150,7 +1170,12 @@ fn lift_plain_instruction(
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let value = state.new_temp();
-            push_var(stmts, format!("({next_slice}, {value})"), format!("load_maybe_ref({src})"));
+            push_var_call(
+                stmts,
+                format!("({next_slice}, {value})"),
+                "load_maybe_ref",
+                vec![src],
+            );
             state.push_typed_expr(value, ValueType::Cell);
             state.push_typed_expr(next_slice, ValueType::Slice);
             return;
@@ -1158,7 +1183,7 @@ fn lift_plain_instruction(
         "PLDOPTREF" => {
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("preload_maybe_ref({src})"));
+            push_var_call(stmts, t.clone(), "preload_maybe_ref", vec![src]);
             state.push_typed_expr(t, ValueType::Cell);
             return;
         }
@@ -1175,7 +1200,7 @@ fn lift_plain_instruction(
             let fn_name = stdlib_function_for_instruction(&plain.name)
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
-            push_var(stmts, t.clone(), format!("{fn_name}({src})"));
+            push_var_call(stmts, t.clone(), fn_name, vec![src]);
             let out_ty = match plain.name.as_str() {
                 "CTOS" => ValueType::Slice,
                 "ENDC" => ValueType::Cell,
@@ -1198,7 +1223,7 @@ fn lift_plain_instruction(
             let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let q = state.new_temp();
             let r = state.new_temp();
-            push_var(stmts, format!("({q}, {r})"), format!("divmod({lhs}, {rhs})"));
+            push_var_call(stmts, format!("({q}, {r})"), "divmod", vec![lhs, rhs]);
             state.push_typed_expr(q, ValueType::Int);
             state.push_typed_expr(r, ValueType::Int);
             return;
@@ -1209,7 +1234,7 @@ fn lift_plain_instruction(
             let x = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let q = state.new_temp();
             let r = state.new_temp();
-            push_var(stmts, format!("({q}, {r})"), format!("muldivmod({x}, {y}, {z})"));
+            push_var_call(stmts, format!("({q}, {r})"), "muldivmod", vec![x, y, z]);
             state.push_typed_expr(q, ValueType::Int);
             state.push_typed_expr(r, ValueType::Int);
             return;
@@ -1219,14 +1244,14 @@ fn lift_plain_instruction(
             let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
             let fn_name = if plain.name == "MIN" { "min" } else { "max" };
-            push_var(stmts, t.clone(), format!("{fn_name}({lhs}, {rhs})"));
+            push_var_call(stmts, t.clone(), fn_name, vec![lhs, rhs]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "ABS" => {
             let src = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("abs({src})"));
+            push_var_call(stmts, t.clone(), "abs", vec![src]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1241,7 +1266,7 @@ fn lift_plain_instruction(
                 "MULDIVC" => "muldivc",
                 _ => unreachable!(),
             };
-            push_var(stmts, t.clone(), format!("{fn_name}({x}, {y}, {z})"));
+            push_var_call(stmts, t.clone(), fn_name, vec![x, y, z]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1259,7 +1284,7 @@ fn lift_plain_instruction(
             } else {
                 "store_int"
             };
-            push_var(stmts, t.clone(), format!("{fn_name}({builder}, {value}, {bits})"));
+            push_var_call(stmts, t.clone(), fn_name, vec![builder, value, bits]);
             state.push_typed_expr(t, ValueType::Builder);
             return;
         }
@@ -1273,7 +1298,7 @@ fn lift_plain_instruction(
             } else {
                 "store_int"
             };
-            push_var(stmts, t.clone(), format!("{fn_name}({builder}, {value}, {bits})"));
+            push_var_call(stmts, t.clone(), fn_name, vec![builder, value, bits]);
             state.push_typed_expr(t, ValueType::Builder);
             return;
         }
@@ -1288,7 +1313,7 @@ fn lift_plain_instruction(
             let fn_name = stdlib_function_for_instruction(&plain.name)
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
-            push_var(stmts, t.clone(), format!("{fn_name}({builder}, {value})"));
+            push_var_call(stmts, t.clone(), fn_name, vec![builder, value]);
             state.push_typed_expr(t, ValueType::Builder);
             return;
         }
@@ -1299,7 +1324,7 @@ fn lift_plain_instruction(
             let fn_name = stdlib_function_for_instruction(&plain.name)
                 .map(str::to_owned)
                 .unwrap_or_else(|| format!("__{}", plain.name.to_lowercase()));
-            push_var(stmts, t.clone(), format!("{fn_name}({builder}, {value})"));
+            push_var_call(stmts, t.clone(), fn_name, vec![builder, value]);
             state.push_typed_expr(t, ValueType::Builder);
             return;
         }
@@ -1307,7 +1332,7 @@ fn lift_plain_instruction(
             let len = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("skip_bits({src}, {len})"));
+            push_var_call(stmts, t.clone(), "skip_bits", vec![src, len]);
             state.push_typed_expr(t, ValueType::Slice);
             return;
         }
@@ -1315,14 +1340,14 @@ fn lift_plain_instruction(
             let index = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let tuple = state.pop_expr(stmts, depth);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("at({tuple}, {index})"));
+            push_var_call(stmts, t.clone(), "at", vec![tuple, index]);
             state.push_typed_expr(t, ValueType::Unknown);
             return;
         }
         "SKIPDICT" => {
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("skip_dict({src})"));
+            push_var_call(stmts, t.clone(), "skip_dict", vec![src]);
             state.push_typed_expr(t, ValueType::Slice);
             return;
         }
@@ -1330,13 +1355,18 @@ fn lift_plain_instruction(
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let next_slice = state.new_temp();
             let skipped = state.new_temp();
-            push_var(stmts, format!("({next_slice}, {skipped})"), format!("load_maybe_ref({src})"));
+            push_var_call(
+                stmts,
+                format!("({next_slice}, {skipped})"),
+                "load_maybe_ref",
+                vec![src],
+            );
             state.push_typed_expr(next_slice, ValueType::Slice);
             return;
         }
         "ENDS" => {
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
-            push_line(stmts, depth, format!("end_parse({src});"));
+            push_call(stmts, "end_parse", vec![src]);
             return;
         }
         "GETGLOB" => {
@@ -1379,11 +1409,10 @@ fn lift_plain_instruction(
             args.reverse();
 
             let t = state.new_temp();
-            let args_joined = args.join(", ");
-            if args_joined.is_empty() {
-                push_var(stmts, t.clone(), format!("__dict_method_{target}()"));
+            if args.is_empty() {
+                push_var_call(stmts, t.clone(), format!("__dict_method_{target}"), Vec::new());
             } else {
-                push_var(stmts, t.clone(), format!("__dict_method_{target}({args_joined})"));
+                push_var_call(stmts, t.clone(), format!("__dict_method_{target}"), args);
             }
             state.push_typed_expr(t, ValueType::Unknown);
             return;
@@ -1403,20 +1432,17 @@ fn lift_plain_instruction(
             args.reverse();
 
             match argc {
-                0 => push_line(stmts, depth, format!("run_method0({method_id});")),
-                1 => push_line(stmts, depth, format!("run_method1({method_id}, {});", args[0])),
-                2 => push_line(
+                0 => push_call(stmts, "run_method0", vec![method_id]),
+                1 => push_call(stmts, "run_method1", vec![method_id, args[0].clone()]),
+                2 => push_call(
                     stmts,
-                    depth,
-                    format!("run_method2({method_id}, {}, {});", args[0], args[1]),
+                    "run_method2",
+                    vec![method_id, args[0].clone(), args[1].clone()],
                 ),
-                3 => push_line(
+                3 => push_call(
                     stmts,
-                    depth,
-                    format!(
-                        "run_method3({method_id}, {}, {}, {});",
-                        args[0], args[1], args[2]
-                    ),
+                    "run_method3",
+                    vec![method_id, args[0].clone(), args[1].clone(), args[2].clone()],
                 ),
                 _ => push_line(
                     stmts,
@@ -1461,9 +1487,9 @@ fn lift_plain_instruction(
             match plain.args.first().and_then(arg_to_string).as_deref() {
                 Some("c4") => {
                     state.refine_expr_type(&value, ValueType::Cell);
-                    push_line(stmts, depth, format!("set_data({value});"));
+                    push_call(stmts, "set_data", vec![value]);
                 }
-                Some("c3") => push_line(stmts, depth, format!("set_c3({value});")),
+                Some("c3") => push_call(stmts, "set_c3", vec![value]),
                 _ => {
                     push_line(
                         stmts,
@@ -1487,14 +1513,14 @@ fn lift_plain_instruction(
         }
         "DUEPAYMENT" => {
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("my_storage_due()"));
+            push_var_call(stmts, t.clone(), "my_storage_due", Vec::new());
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "ISNULL" => {
             let src = state.pop_expr(stmts, depth);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("null?({src})"));
+            push_var_call(stmts, t.clone(), "null?", vec![src]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1503,19 +1529,24 @@ fn lift_plain_instruction(
         }
         "DUMP" => {
             let value = state.pop_expr(stmts, depth);
-            push_line(stmts, depth, format!("~dump({value});"));
+            push_call(stmts, "~dump", vec![value]);
             return;
         }
         "STRDUMP" => {
             let value = state.pop_expr(stmts, depth);
-            push_line(stmts, depth, format!("~strdump({value});"));
+            push_call(stmts, "~strdump", vec![value]);
             return;
         }
         "REWRITESTDADDR" => {
             let src = state.pop_expr_expect(stmts, depth, ValueType::Slice);
             let workchain = state.new_temp();
             let addr = state.new_temp();
-            push_var(stmts, format!("({workchain}, {addr})"), format!("parse_std_addr({src})"));
+            push_var_call(
+                stmts,
+                format!("({workchain}, {addr})"),
+                "parse_std_addr",
+                vec![src],
+            );
             // parse_std_addr returns workchain id and address integer.
             state.push_typed_expr(workchain, ValueType::Int);
             state.push_typed_expr(addr, ValueType::Int);
@@ -1526,7 +1557,12 @@ fn lift_plain_instruction(
             let workchain = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let fwd_fee = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("get_original_fwd_fee({workchain}, {fwd_fee})"));
+            push_var_call(
+                stmts,
+                t.clone(),
+                "get_original_fwd_fee",
+                vec![workchain, fwd_fee],
+            );
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1535,7 +1571,7 @@ fn lift_plain_instruction(
             let workchain = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let gas_used = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("get_compute_fee({workchain}, {gas_used})"));
+            push_var_call(stmts, t.clone(), "get_compute_fee", vec![workchain, gas_used]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1546,7 +1582,12 @@ fn lift_plain_instruction(
             let bits = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let cells = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("get_simple_forward_fee({workchain}, {bits}, {cells})"));
+            push_var_call(
+                stmts,
+                t.clone(),
+                "get_simple_forward_fee",
+                vec![workchain, bits, cells],
+            );
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1556,7 +1597,7 @@ fn lift_plain_instruction(
             let bits = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let cells = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("get_forward_fee({workchain}, {bits}, {cells})"));
+            push_var_call(stmts, t.clone(), "get_forward_fee", vec![workchain, bits, cells]);
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1568,13 +1609,18 @@ fn lift_plain_instruction(
             let bits = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let cells = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("get_storage_fee({workchain}, {seconds}, {bits}, {cells})"));
+            push_var_call(
+                stmts,
+                t.clone(),
+                "get_storage_fee",
+                vec![workchain, seconds, bits, cells],
+            );
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
         "GETPRECOMPILEDGAS" => {
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("get_precompiled_gas_consumption()"));
+            push_var_call(stmts, t.clone(), "get_precompiled_gas_consumption", Vec::new());
             state.push_typed_expr(t, ValueType::Int);
             return;
         }
@@ -1584,7 +1630,12 @@ fn lift_plain_instruction(
             let index = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let value = state.pop_expr_expect(stmts, depth, ValueType::Cell);
             let t = state.new_temp();
-            push_var(stmts, t.clone(), format!("udict_set_ref({dict}, {key_len}, {index}, {value})"));
+            push_var_call(
+                stmts,
+                t.clone(),
+                "udict_set_ref",
+                vec![dict, key_len, index, value],
+            );
             state.push_typed_expr(t, ValueType::Cell);
             return;
         }
@@ -1596,9 +1647,9 @@ fn lift_plain_instruction(
                 .unwrap_or_else(|| "0".to_string());
             let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             if plain.name == "THROWIF" {
-                push_line(stmts, depth, format!("throw_if({code}, {cond});"));
+                push_call(stmts, "throw_if", vec![code, cond]);
             } else {
-                push_line(stmts, depth, format!("throw_unless({code}, {cond});"));
+                push_call(stmts, "throw_unless", vec![code, cond]);
             }
             return;
         }
@@ -1609,7 +1660,7 @@ fn lift_plain_instruction(
                 .and_then(arg_to_string)
                 .unwrap_or_else(|| "0".to_string());
             let arg = state.pop_expr(stmts, depth);
-            push_line(stmts, depth, format!("throw_arg({arg}, {code});"));
+            push_call(stmts, "throw_arg", vec![arg, code]);
             return;
         }
         "THROWARGIF" => {
@@ -1620,7 +1671,7 @@ fn lift_plain_instruction(
                 .unwrap_or_else(|| "0".to_string());
             let cond = state.pop_expr(stmts, depth);
             let arg = state.pop_expr(stmts, depth);
-            push_line(stmts, depth, format!("throw_arg_if({arg}, {code}, {cond});"));
+            push_call(stmts, "throw_arg_if", vec![arg, code, cond]);
             return;
         }
         "THROWARGIFNOT" => {
@@ -1631,69 +1682,61 @@ fn lift_plain_instruction(
                 .unwrap_or_else(|| "0".to_string());
             let cond = state.pop_expr(stmts, depth);
             let arg = state.pop_expr(stmts, depth);
-            push_line(
-                stmts,
-                depth,
-                format!("throw_arg_unless({arg}, {code}, {cond});"),
-            );
+            push_call(stmts, "throw_arg_unless", vec![arg, code, cond]);
             return;
         }
         "THROWANY" => {
             let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
-            push_line(stmts, depth, format!("throw({code});"));
+            push_call(stmts, "throw", vec![code]);
             return;
         }
         "THROWARGANY" => {
             let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let arg = state.pop_expr(stmts, depth);
-            push_line(stmts, depth, format!("throw_arg({arg}, {code});"));
+            push_call(stmts, "throw_arg", vec![arg, code]);
             return;
         }
         "THROWANYIFNOT" => {
             let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
-            push_line(stmts, depth, format!("throw_unless({code}, {cond});"));
+            push_call(stmts, "throw_unless", vec![code, cond]);
             return;
         }
         "THROWARGANYIFNOT" => {
             let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let arg = state.pop_expr(stmts, depth);
-            push_line(
-                stmts,
-                depth,
-                format!("throw_arg_unless({arg}, {code}, {cond});"),
-            );
+            push_call(stmts, "throw_arg_unless", vec![arg, code, cond]);
             return;
         }
         "THROWANYIF" => {
             let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
-            push_line(stmts, depth, format!("throw_if({code}, {cond});"));
+            push_call(stmts, "throw_if", vec![code, cond]);
             return;
         }
         "THROWARGANYIF" => {
             let cond = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let code = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let arg = state.pop_expr(stmts, depth);
-            push_line(stmts, depth, format!("throw_arg_if({arg}, {code}, {cond});"));
+            push_call(stmts, "throw_arg_if", vec![arg, code, cond]);
             return;
         }
         "RAWRESERVE" => {
             let mode = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let amount = state.pop_expr_expect(stmts, depth, ValueType::Int);
-            push_line(stmts, depth, format!("raw_reserve({amount}, {mode});"));
+            push_call(stmts, "raw_reserve", vec![amount, mode]);
             return;
         }
         "SENDRAWMSG" => {
             let mode = state.pop_expr_expect(stmts, depth, ValueType::Int);
             let msg = state.pop_expr_expect(stmts, depth, ValueType::Cell);
-            push_line(stmts, depth, format!("send_raw_message({msg}, {mode});"));
+            push_call(stmts, "send_raw_message", vec![msg, mode]);
             return;
         }
         "SETCODE" => {
             let code = state.pop_expr_expect(stmts, depth, ValueType::Cell);
-            push_line(stmts, depth, format!("set_code({code});"));
+            push_call(stmts, "set_code", vec![code]);
             return;
         }
         "RET" | "RETALT" => {
@@ -1840,14 +1883,56 @@ fn push_line(stmts: &mut Vec<StmtAst>, _depth: usize, line: String) {
 fn push_var(stmts: &mut Vec<StmtAst>, name: impl Into<String>, expr: impl Into<String>) {
     stmts.push(StmtAst::VarDecl {
         name: name.into(),
-        expr: expr.into(),
+        expr: ExprAst::Atom(expr.into()),
     });
 }
 
 fn push_assign(stmts: &mut Vec<StmtAst>, target: impl Into<String>, expr: impl Into<String>) {
     stmts.push(StmtAst::Assign {
         target: target.into(),
-        expr: expr.into(),
+        expr: ExprAst::Atom(expr.into()),
+    });
+}
+
+fn atom_expr(value: impl Into<String>) -> ExprAst {
+    ExprAst::Atom(value.into())
+}
+
+fn call_expr(callee: impl Into<String>, args: Vec<String>) -> ExprAst {
+    ExprAst::Call {
+        callee: callee.into(),
+        args: args.into_iter().map(atom_expr).collect(),
+    }
+}
+
+fn push_var_call(
+    stmts: &mut Vec<StmtAst>,
+    name: impl Into<String>,
+    callee: impl Into<String>,
+    args: Vec<String>,
+) {
+    stmts.push(StmtAst::VarDecl {
+        name: name.into(),
+        expr: call_expr(callee, args),
+    });
+}
+
+fn push_assign_call(
+    stmts: &mut Vec<StmtAst>,
+    target: impl Into<String>,
+    callee: impl Into<String>,
+    args: Vec<String>,
+) {
+    stmts.push(StmtAst::Assign {
+        target: target.into(),
+        expr: call_expr(callee, args),
+    });
+}
+
+fn push_call(stmts: &mut Vec<StmtAst>, callee: impl Into<String>, args: Vec<String>) {
+    stmts.push(StmtAst::Call {
+        callee: callee.into(),
+        args: args.into_iter().map(atom_expr).collect(),
     });
 }
 

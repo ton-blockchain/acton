@@ -1,4 +1,4 @@
-use super::ast::{MethodAst, StmtAst, render_method_ast};
+use super::ast::{ExprAst, MethodAst, StmtAst, render_method_ast};
 use super::method_model::{
     MethodKind, ReturnKind, build_method_signature_ast, classify_method, collect_call_targets,
     extract_method_dictionary, infer_params_for_method, infer_return_kind, render_method_signature,
@@ -91,12 +91,15 @@ fn select_recv_internal_params(stmts: &[StmtAst]) -> Vec<String> {
 fn stmt_contains_ident(stmt: &StmtAst, ident: &str) -> bool {
     match stmt {
         StmtAst::Comment(line) | StmtAst::Expr(line) => contains_ident_text(line, ident),
-        StmtAst::VarDecl { name, expr } => name == ident || contains_ident_text(expr, ident),
+        StmtAst::VarDecl { name, expr } => name == ident || expr_contains_ident(expr, ident),
         StmtAst::Assign { target, expr } => {
-            contains_ident_text(target, ident) || contains_ident_text(expr, ident)
+            contains_ident_text(target, ident) || expr_contains_ident(expr, ident)
         }
-        StmtAst::Return(Some(expr)) => contains_ident_text(expr, ident),
+        StmtAst::Return(Some(expr)) => expr_contains_ident(expr, ident),
         StmtAst::Return(None) => false,
+        StmtAst::Call { callee, args } => {
+            contains_ident_text(callee, ident) || args.iter().any(|a| expr_contains_ident(a, ident))
+        }
         StmtAst::If {
             condition,
             then_body,
@@ -115,6 +118,16 @@ fn stmt_contains_ident(stmt: &StmtAst, ident: &str) -> bool {
         StmtAst::DoUntil { body, condition } => {
             contains_ident_text(condition, ident)
                 || body.iter().any(|s| stmt_contains_ident(s, ident))
+        }
+    }
+}
+
+fn expr_contains_ident(expr: &ExprAst, ident: &str) -> bool {
+    match expr {
+        ExprAst::Atom(text) => contains_ident_text(text, ident),
+        ExprAst::Call { callee, args } => {
+            contains_ident_text(callee, ident)
+                || args.iter().any(|arg| expr_contains_ident(arg, ident))
         }
     }
 }
@@ -402,18 +415,22 @@ impl FuncDecompiler {
                         if let Some(ret) = return_values.first() {
                             match return_kind {
                                 ReturnKind::Tuple(_) => {
-                                    body.push(StmtAst::Return(Some(format!("({ret})"))));
+                                    body.push(StmtAst::Return(Some(ExprAst::Atom(format!(
+                                        "({ret})"
+                                    )))));
                                 }
                                 ReturnKind::Unit => {}
                                 _ => {
-                                    body.push(StmtAst::Return(Some(ret.clone())));
+                                    body.push(StmtAst::Return(Some(ExprAst::Atom(ret.clone()))));
                                 }
                             }
                         }
                     }
                     _ => {
                         let joined = return_values.join(", ");
-                        body.push(StmtAst::Return(Some(format!("({joined})"))));
+                        body.push(StmtAst::Return(Some(ExprAst::Atom(format!(
+                            "({joined})"
+                        )))));
                     }
                 }
             }

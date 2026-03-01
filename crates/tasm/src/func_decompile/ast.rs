@@ -15,17 +15,30 @@ pub(crate) struct MethodSignatureAst {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ExprAst {
+    Atom(String),
+    Call {
+        callee: String,
+        args: Vec<ExprAst>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum StmtAst {
     Comment(String),
     VarDecl {
         name: String,
-        expr: String,
+        expr: ExprAst,
     },
     Assign {
         target: String,
-        expr: String,
+        expr: ExprAst,
     },
-    Return(Option<String>),
+    Return(Option<ExprAst>),
+    Call {
+        callee: String,
+        args: Vec<ExprAst>,
+    },
     If {
         negated: bool,
         condition: String,
@@ -84,7 +97,7 @@ impl StmtAst {
     pub(crate) fn var(name: impl Into<String>, expr: impl Into<String>) -> Self {
         Self::VarDecl {
             name: name.into(),
-            expr: expr.into(),
+            expr: ExprAst::Atom(expr.into()),
         }
     }
 
@@ -92,7 +105,7 @@ impl StmtAst {
     pub(crate) fn assign(target: impl Into<String>, expr: impl Into<String>) -> Self {
         Self::Assign {
             target: target.into(),
-            expr: expr.into(),
+            expr: ExprAst::Atom(expr.into()),
         }
     }
 }
@@ -119,16 +132,20 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
             let _ = writeln!(out, "{indent}{line}");
         }
         StmtAst::VarDecl { name, expr } => {
-            let _ = writeln!(out, "{indent}var {name} = {expr};");
+            let _ = writeln!(out, "{indent}var {name} = {};", render_expr(expr));
         }
         StmtAst::Assign { target, expr } => {
-            let _ = writeln!(out, "{indent}{target} = {expr};");
+            let _ = writeln!(out, "{indent}{target} = {};", render_expr(expr));
         }
         StmtAst::Return(Some(expr)) => {
-            let _ = writeln!(out, "{indent}return {expr};");
+            let _ = writeln!(out, "{indent}return {};", render_expr(expr));
         }
         StmtAst::Return(None) => {
             let _ = writeln!(out, "{indent}return ();");
+        }
+        StmtAst::Call { callee, args } => {
+            let rendered_args = args.iter().map(render_expr).collect::<Vec<_>>().join(", ");
+            let _ = writeln!(out, "{indent}{callee}({rendered_args});");
         }
         StmtAst::If {
             negated,
@@ -161,9 +178,19 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
     }
 }
 
+fn render_expr(expr: &ExprAst) -> String {
+    match expr {
+        ExprAst::Atom(s) => s.clone(),
+        ExprAst::Call { callee, args } => {
+            let rendered_args = args.iter().map(render_expr).collect::<Vec<_>>().join(", ");
+            format!("{callee}({rendered_args})")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{MethodAst, MethodSignatureAst, ParamAst, StmtAst, render_method_ast};
+    use super::{ExprAst, MethodAst, MethodSignatureAst, ParamAst, StmtAst, render_method_ast};
 
     #[test]
     fn renders_structured_ast() {
@@ -190,7 +217,7 @@ mod tests {
                     body: vec![StmtAst::assign("v0", "v0 + 1")],
                     condition: "v0 > 10".to_string(),
                 },
-                StmtAst::Return(Some("v0".to_string())),
+                StmtAst::Return(Some(ExprAst::Atom("v0".to_string()))),
             ],
         };
 
