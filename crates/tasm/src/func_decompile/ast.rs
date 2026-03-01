@@ -258,20 +258,32 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
                 out,
                 "{indent}var {} = {};",
                 render_tensor_expr(binding),
-                render_expr(expr)
+                render_expr_with_indent(expr, &indent)
             );
         }
         StmtAst::Assign { target, expr } => {
-            let _ = writeln!(out, "{indent}{target} = {};", render_expr(expr));
+            let _ = writeln!(
+                out,
+                "{indent}{target} = {};",
+                render_expr_with_indent(expr, &indent)
+            );
         }
         StmtAst::Return(Some(expr)) => {
-            let _ = writeln!(out, "{indent}return {};", render_expr(expr));
+            let _ = writeln!(
+                out,
+                "{indent}return {};",
+                render_expr_with_indent(expr, &indent)
+            );
         }
         StmtAst::Return(None) => {
             let _ = writeln!(out, "{indent}return ();");
         }
         StmtAst::Call { callee, args } => {
-            let rendered_args = args.iter().map(render_expr).collect::<Vec<_>>().join(", ");
+            let rendered_args = args
+                .iter()
+                .map(|arg| render_expr_with_indent(arg, &indent))
+                .collect::<Vec<_>>()
+                .join(", ");
             let _ = writeln!(out, "{indent}{callee}({rendered_args});");
         }
         StmtAst::If {
@@ -281,7 +293,11 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
             else_body,
         } => {
             let keyword = if *negated { "ifnot" } else { "if" };
-            let _ = writeln!(out, "{indent}{keyword} ({}) {{", render_expr(condition));
+            let _ = writeln!(
+                out,
+                "{indent}{keyword} ({}) {{",
+                render_expr_with_indent(condition, &indent)
+            );
             render_stmt_list(then_body, depth + 1, out);
             if let Some(else_body) = else_body {
                 let _ = writeln!(out, "{indent}}} else {{");
@@ -290,19 +306,31 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
             let _ = writeln!(out, "{indent}}}");
         }
         StmtAst::Repeat { count, body } => {
-            let _ = writeln!(out, "{indent}repeat ({}) {{", render_expr(count));
+            let _ = writeln!(
+                out,
+                "{indent}repeat ({}) {{",
+                render_expr_with_indent(count, &indent)
+            );
             render_stmt_list(body, depth + 1, out);
             let _ = writeln!(out, "{indent}}}");
         }
         StmtAst::DoUntil { body, condition } => {
             let _ = writeln!(out, "{indent}do {{");
             render_stmt_list(body, depth + 1, out);
-            let _ = writeln!(out, "{indent}}} until ({});", render_expr(condition));
+            let _ = writeln!(
+                out,
+                "{indent}}} until ({});",
+                render_expr_with_indent(condition, &indent)
+            );
         }
     }
 }
 
 fn render_expr(expr: &ExprAst) -> String {
+    render_expr_with_indent(expr, "")
+}
+
+fn render_expr_with_indent(expr: &ExprAst, indent: &str) -> String {
     match expr {
         ExprAst::Ident(s) => s.clone(),
         ExprAst::Number(s) => s.clone(),
@@ -310,7 +338,7 @@ fn render_expr(expr: &ExprAst) -> String {
         ExprAst::CellLiteral(s) => s.clone(),
         ExprAst::NullLiteral => "null()".to_string(),
         ExprAst::Unary { op, expr } => {
-            let inner = render_expr(expr);
+            let inner = render_expr_with_indent(expr, indent);
             let is_bit_not = matches!(op, UnaryOp::BitNot);
             if is_atomic_expr(expr) {
                 if is_bit_not {
@@ -331,8 +359,8 @@ fn render_expr(expr: &ExprAst) -> String {
             wrap_lhs,
             wrap_rhs,
         } => {
-            let lhs_rendered = render_expr(lhs);
-            let rhs_rendered = render_expr(rhs);
+            let lhs_rendered = render_expr_with_indent(lhs, indent);
+            let rhs_rendered = render_expr_with_indent(rhs, indent);
             let lhs = if *wrap_lhs && !is_atomic_expr(lhs) {
                 format!("({lhs_rendered})")
             } else {
@@ -350,9 +378,9 @@ fn render_expr(expr: &ExprAst) -> String {
             then_expr,
             else_expr,
         } => {
-            let condition_rendered = render_expr(condition);
-            let then_rendered = render_expr(then_expr);
-            let else_rendered = render_expr(else_expr);
+            let condition_rendered = render_expr_with_indent(condition, indent);
+            let then_rendered = render_expr_with_indent(then_expr, indent);
+            let else_rendered = render_expr_with_indent(else_expr, indent);
             let condition = if matches!(condition.as_ref(), ExprAst::Ternary { .. }) {
                 format!("({condition_rendered})")
             } else {
@@ -371,31 +399,89 @@ fn render_expr(expr: &ExprAst) -> String {
             format!("{} ? {} : {}", condition, then_expr, else_expr)
         }
         ExprAst::Tuple(items) => {
-            let rendered = items.iter().map(render_expr).collect::<Vec<_>>().join(", ");
+            let rendered = items
+                .iter()
+                .map(|item| render_expr_with_indent(item, indent))
+                .collect::<Vec<_>>()
+                .join(", ");
             format!("({rendered})")
         }
         ExprAst::Call { callee, args } => {
-            let rendered_args = args.iter().map(render_expr).collect::<Vec<_>>().join(", ");
+            let rendered_args = args
+                .iter()
+                .map(|arg| render_expr_with_indent(arg, indent))
+                .collect::<Vec<_>>()
+                .join(", ");
             format!("{callee}({rendered_args})")
         }
-        ExprAst::MethodCall {
-            receiver,
-            method,
-            modifying,
-            args,
-        } => {
-            let receiver_expr = receiver.as_ref();
-            let receiver = render_expr(receiver_expr);
-            let receiver = if is_atomic_expr(receiver_expr) {
-                receiver
-            } else {
-                format!("({receiver})")
-            };
-            let rendered_args = args.iter().map(render_expr).collect::<Vec<_>>().join(", ");
-            let op = if *modifying { "~" } else { "." };
-            format!("{receiver}{op}{method}({rendered_args})")
-        }
+        ExprAst::MethodCall { .. } => render_method_call_expr(expr, indent),
     }
+}
+
+fn render_method_call_expr(expr: &ExprAst, indent: &str) -> String {
+    let Some((base, segments)) = flatten_method_chain(expr) else {
+        return render_expr_with_indent(expr, indent);
+    };
+    if segments.is_empty() {
+        return render_expr_with_indent(&base, indent);
+    }
+
+    let base_rendered = render_expr_with_indent(&base, indent);
+    let base_rendered = if is_atomic_expr(&base) {
+        base_rendered
+    } else {
+        format!("({base_rendered})")
+    };
+
+    if segments.len() == 1 {
+        let (method, modifying, args) = &segments[0];
+        let rendered_args = args
+            .iter()
+            .map(|arg| render_expr_with_indent(arg, indent))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let op = if *modifying { "~" } else { "." };
+        return format!("{base_rendered}{op}{method}({rendered_args})");
+    }
+
+    let continuation_indent = format!("{indent}    ");
+    let mut out = base_rendered;
+    for (method, modifying, args) in segments {
+        let rendered_args = args
+            .iter()
+            .map(|arg| render_expr_with_indent(arg, &continuation_indent))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let op = if modifying { "~" } else { "." };
+        out.push('\n');
+        out.push_str(&continuation_indent);
+        out.push_str(op);
+        out.push_str(&method);
+        out.push('(');
+        out.push_str(&rendered_args);
+        out.push(')');
+    }
+    out
+}
+
+fn flatten_method_chain(expr: &ExprAst) -> Option<(ExprAst, Vec<(String, bool, Vec<ExprAst>)>)> {
+    let ExprAst::MethodCall {
+        receiver,
+        method,
+        modifying,
+        args,
+    } = expr
+    else {
+        return None;
+    };
+
+    let (base, mut segments) = if let Some((base, segments)) = flatten_method_chain(receiver) {
+        (base, segments)
+    } else {
+        (receiver.as_ref().clone(), Vec::new())
+    };
+    segments.push((method.clone(), *modifying, args.clone()));
+    Some((base, segments))
 }
 
 fn is_atomic_expr(expr: &ExprAst) -> bool {

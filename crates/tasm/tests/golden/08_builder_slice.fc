@@ -2,9 +2,7 @@
 #pragma version >=0.4.0;
 
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    var v0 = begin_cell().store_uint(msg_value, 16);
-    var v1 = end_cell(v0);
-    var v2 = begin_parse(v1);
+    var v2 = begin_parse(end_cell(begin_cell().store_uint(msg_value, 16)));
     var (v3, v4) = load_uint(v2, 16);
 }
 

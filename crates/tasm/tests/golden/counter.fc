@@ -7,24 +7,18 @@
     end_parse(v0);
     if (slice_empty?(in_msg_body)) {
         var v4 = v2 + 1;
-        var v5 = begin_cell().store_uint(v4, 32);
-        var v6 = end_cell(v5);
-        set_data(v6);
+        set_data(end_cell(begin_cell().store_uint(v4, 32)));
         return ();
     }
     var (v7, v8) = load_uint(in_msg_body, 32);
     if (v8 == 1) {
         var v10 = v2 + 1;
-        var v11 = begin_cell().store_uint(v10, 32);
-        var v12 = end_cell(v11);
-        set_data(v12);
+        set_data(end_cell(begin_cell().store_uint(v10, 32)));
         return ();
     }
     if (v8 == 2) {
         var v14 = v2 - 1;
-        var v15 = begin_cell().store_uint(v14, 32);
-        var v16 = end_cell(v15);
-        set_data(v16);
+        set_data(end_cell(begin_cell().store_uint(v14, 32)));
         return ();
     }
 }

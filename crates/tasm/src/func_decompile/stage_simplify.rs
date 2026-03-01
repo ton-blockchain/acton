@@ -35,6 +35,7 @@ fn simplify_stmt_list(stmts: &mut Vec<StmtAst>) {
     }
 
     rewrite_store_calls_stmt_list(stmts);
+    collapse_store_chain_stmt_list(stmts);
 }
 
 fn inline_condition_temp_once(stmts: &mut Vec<StmtAst>, index: &BlockDefUseIndex) -> bool {
@@ -288,6 +289,129 @@ fn replace_ident_in_first_arg(args: &mut [ExprAst], ident: &str, replacement: Ex
 fn rewrite_store_calls_stmt_list(stmts: &mut [StmtAst]) {
     for stmt in stmts {
         rewrite_store_calls_stmt(stmt);
+    }
+}
+
+fn collapse_store_chain_stmt_list(stmts: &mut Vec<StmtAst>) {
+    loop {
+        let index = build_block_def_use_index(stmts);
+        let mut changed = false;
+
+        for def_idx in 0..stmts.len().saturating_sub(1) {
+            let (var_name, init_expr) = match &stmts[def_idx] {
+                StmtAst::VarDecl {
+                    binding: Var::Name(name),
+                    expr,
+                } => (name.clone(), expr.clone()),
+                _ => continue,
+            };
+            if !is_store_chain_expr(&init_expr) {
+                continue;
+            }
+            if !has_single_immediate_use(&index, def_idx, &var_name) {
+                continue;
+            }
+
+            let next_stmt = match stmts.get_mut(def_idx + 1) {
+                Some(stmt) => stmt,
+                None => continue,
+            };
+            if !replace_ident_in_stmt_once(next_stmt, &var_name, &init_expr) {
+                continue;
+            }
+
+            stmts.remove(def_idx);
+            changed = true;
+            break;
+        }
+
+        if !changed {
+            break;
+        }
+    }
+}
+
+fn is_store_chain_expr(expr: &ExprAst) -> bool {
+    match expr {
+        ExprAst::Call { callee, args } if callee == "begin_cell" && args.is_empty() => true,
+        ExprAst::MethodCall {
+            method, modifying, ..
+        } => !*modifying && method.starts_with("store_"),
+        ExprAst::Call { callee, args } if callee == "end_cell" && args.len() == 1 => true,
+        _ => false,
+    }
+}
+
+fn replace_ident_in_stmt_once(stmt: &mut StmtAst, ident: &str, replacement: &ExprAst) -> bool {
+    let mut replaced = 0_usize;
+    match stmt {
+        StmtAst::VarDecl { expr, .. }
+        | StmtAst::Assign { expr, .. }
+        | StmtAst::Return(Some(expr)) => {
+            replace_ident_in_expr(expr, ident, replacement, &mut replaced);
+        }
+        StmtAst::Call { args, .. } => {
+            for arg in args {
+                replace_ident_in_expr(arg, ident, replacement, &mut replaced);
+            }
+        }
+        StmtAst::Comment(_)
+        | StmtAst::Return(None)
+        | StmtAst::If { .. }
+        | StmtAst::Repeat { .. }
+        | StmtAst::DoUntil { .. } => {}
+    }
+    replaced == 1
+}
+
+fn replace_ident_in_expr(
+    expr: &mut ExprAst,
+    ident: &str,
+    replacement: &ExprAst,
+    replaced: &mut usize,
+) {
+    if matches!(expr, ExprAst::Ident(name) if name == ident) {
+        *expr = replacement.clone();
+        *replaced += 1;
+        return;
+    }
+
+    match expr {
+        ExprAst::Unary { expr, .. } => replace_ident_in_expr(expr, ident, replacement, replaced),
+        ExprAst::Binary { lhs, rhs, .. } => {
+            replace_ident_in_expr(lhs, ident, replacement, replaced);
+            replace_ident_in_expr(rhs, ident, replacement, replaced);
+        }
+        ExprAst::Ternary {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            replace_ident_in_expr(condition, ident, replacement, replaced);
+            replace_ident_in_expr(then_expr, ident, replacement, replaced);
+            replace_ident_in_expr(else_expr, ident, replacement, replaced);
+        }
+        ExprAst::Tuple(items) => {
+            for item in items {
+                replace_ident_in_expr(item, ident, replacement, replaced);
+            }
+        }
+        ExprAst::Call { args, .. } => {
+            for arg in args {
+                replace_ident_in_expr(arg, ident, replacement, replaced);
+            }
+        }
+        ExprAst::MethodCall { receiver, args, .. } => {
+            replace_ident_in_expr(receiver, ident, replacement, replaced);
+            for arg in args {
+                replace_ident_in_expr(arg, ident, replacement, replaced);
+            }
+        }
+        ExprAst::Ident(_)
+        | ExprAst::Number(_)
+        | ExprAst::StringLiteral(_)
+        | ExprAst::CellLiteral(_)
+        | ExprAst::NullLiteral => {}
     }
 }
 
@@ -850,6 +974,87 @@ mod tests {
                 }
                 _ => panic!("expected non-modifying method call"),
             }
+        }
+    }
+
+    #[test]
+    fn collapses_linear_store_chain_into_final_use() {
+        let mut body = vec![
+            StmtAst::VarDecl {
+                binding: Var::name("v23"),
+                expr: ExprAst::Call {
+                    callee: "store_grams".to_string(),
+                    args: vec![
+                        ExprAst::Call {
+                            callee: "begin_cell".to_string(),
+                            args: vec![],
+                        },
+                        ident("v22"),
+                    ],
+                },
+            },
+            StmtAst::VarDecl {
+                binding: Var::name("v24"),
+                expr: ExprAst::Call {
+                    callee: "store_slice".to_string(),
+                    args: vec![ident("v23"), ident("v15")],
+                },
+            },
+            StmtAst::VarDecl {
+                binding: Var::name("v25"),
+                expr: ExprAst::Call {
+                    callee: "store_slice".to_string(),
+                    args: vec![ident("v24"), ident("v17")],
+                },
+            },
+            StmtAst::VarDecl {
+                binding: Var::name("v26"),
+                expr: ExprAst::Call {
+                    callee: "store_ref".to_string(),
+                    args: vec![ident("v25"), ident("v19")],
+                },
+            },
+            StmtAst::VarDecl {
+                binding: Var::name("v27"),
+                expr: ExprAst::Call {
+                    callee: "store_ref".to_string(),
+                    args: vec![ident("v26"), ident("v21")],
+                },
+            },
+            StmtAst::VarDecl {
+                binding: Var::name("v28"),
+                expr: ExprAst::Call {
+                    callee: "end_cell".to_string(),
+                    args: vec![ident("v27")],
+                },
+            },
+            StmtAst::Call {
+                callee: "set_data".to_string(),
+                args: vec![ident("v28")],
+            },
+        ];
+
+        simplify_method_body(&mut body);
+
+        assert_eq!(body.len(), 1);
+        match &body[0] {
+            StmtAst::Call { callee, args } => {
+                assert_eq!(callee, "set_data");
+                assert_eq!(args.len(), 1);
+                assert!(!matches!(args[0], ExprAst::Ident(_)));
+                match &args[0] {
+                    ExprAst::Call {
+                        callee: end_callee,
+                        args: end_args,
+                    } => {
+                        assert_eq!(end_callee, "end_cell");
+                        assert_eq!(end_args.len(), 1);
+                        assert!(matches!(end_args[0], ExprAst::MethodCall { .. }));
+                    }
+                    _ => panic!("expected end_cell call"),
+                }
+            }
+            _ => panic!("expected set_data call"),
         }
     }
 }

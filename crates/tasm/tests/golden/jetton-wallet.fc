@@ -20,12 +20,11 @@
         var v19 = skip_bits(v14, 64);
         var (v20, v21) = load_grams(v19);
         var v22 = v9 + v21;
-        var v23 = begin_cell().store_uint(v7, 4);
-        var v24 = v23.store_grams(v22);
-        var v25 = v24.store_slice(v11);
-        var v26 = v25.store_slice(v13);
-        var v27 = end_cell(v26);
-        set_data(v27);
+        set_data(end_cell(begin_cell()
+            .store_uint(v7, 4)
+            .store_grams(v22)
+            .store_slice(v11)
+            .store_slice(v13)));
         return ();
     }
     var v29 = v1~load_msg_addr();
@@ -54,22 +53,20 @@
         var v62 = v56 - v46;
         var v63 = v62 > -1;
         throw_unless(47, v63);
-        var v64 = begin_cell().store_uint(0, 4);
-        var v65 = v64.store_grams(0);
-        var v66 = v65.store_slice(v48);
-        var v67 = v66.store_slice(v60);
-        var v68 = end_cell(v67);
-        var v69 = begin_cell().store_uint(0, 2);
-        var v70 = v69.store_dict(my_code());
-        var v71 = v70.store_dict(v68);
-        var v72 = v71.store_uint(0, 1);
-        var v73 = end_cell(v72);
+        var v73 = end_cell(begin_cell()
+            .store_uint(0, 2)
+            .store_dict(my_code())
+            .store_dict(end_cell(begin_cell()
+                .store_uint(0, 4)
+                .store_grams(0)
+                .store_slice(v48)
+                .store_slice(v60)))
+            .store_uint(0, 1));
         var v74 = cell_hash(v73);
-        var v75 = begin_cell().store_uint(4, 3);
-        var v76 = v75.store_int(0, 8);
-        var v77 = v76.store_uint(v74, 256);
-        var v78 = end_cell(v77);
-        var v79 = begin_parse(v78);
+        var v79 = begin_parse(end_cell(begin_cell()
+            .store_uint(4, 3)
+            .store_int(0, 8)
+            .store_uint(v74, 256)));
         var v81 = v47~load_msg_addr();
         var v82 = skip_dict(v47);
         var (v83, v84) = load_grams(v82);
@@ -81,21 +78,20 @@
             throw_unless(49, v90);
         } else {
         }
-        var v91 = begin_cell().store_uint(395134233, 32);
-        var v92 = v91.store_uint(v44, 64);
-        var v93 = v92.store_grams(v46);
-        var v94 = v93.store_slice(v58);
-        var v95 = v94.store_slice(v81);
-        var v96 = v95.store_grams(v84);
-        var v97 = v96.store_slice(v83);
-        var v98 = end_cell(v97);
-        var v99 = begin_cell().store_uint(24, 6);
-        var v100 = v99.store_slice(v79);
-        var v101 = v100.store_grams(0);
-        var v102 = v101.store_uint(7, 108);
-        var v103 = v102.store_ref(v73);
-        var v104 = v103.store_ref(v98);
-        var v105 = end_cell(v104);
+        var v105 = end_cell(begin_cell()
+            .store_uint(24, 6)
+            .store_slice(v79)
+            .store_grams(0)
+            .store_uint(7, 108)
+            .store_ref(v73)
+            .store_ref(end_cell(begin_cell()
+                .store_uint(395134233, 32)
+                .store_uint(v44, 64)
+                .store_grams(v46)
+                .store_slice(v58)
+                .store_slice(v81)
+                .store_grams(v84)
+                .store_slice(v83))));
         var v106 = v84 ? 2 : 1;
         var v107 = get_precompiled_gas_consumption();
         var v109 = null?(v107) ? 10065 : v107;
@@ -113,12 +109,11 @@
         var v122 = msg_value > v121;
         throw_unless(48, v122);
         send_raw_message(v105, 80);
-        var v123 = begin_cell().store_uint(v54, 4);
-        var v124 = v123.store_grams(v62);
-        var v125 = v124.store_slice(v58);
-        var v126 = v125.store_slice(v60);
-        var v127 = end_cell(v126);
-        set_data(v127);
+        set_data(end_cell(begin_cell()
+            .store_uint(v54, 4)
+            .store_grams(v62)
+            .store_slice(v58)
+            .store_slice(v60)));
         return ();
     }
     if (v41 == 395134233) {
@@ -133,41 +128,36 @@
         var v143 = v40~load_msg_addr();
         var (v144, v145) = load_msg_addr(v40);
         var v146 = equal_slices_bits(v137, v29);
-        var v147 = begin_cell().store_uint(0, 4);
-        var v148 = v147.store_grams(0);
-        var v149 = v148.store_slice(v143);
-        var v150 = v149.store_slice(v137);
-        var v151 = end_cell(v150);
-        var v152 = begin_cell().store_uint(0, 2);
-        var v153 = v152.store_dict(my_code());
-        var v154 = v153.store_dict(v151);
-        var v155 = v154.store_uint(0, 1);
-        var v156 = end_cell(v155);
-        var v157 = cell_hash(v156);
-        var v158 = begin_cell().store_uint(4, 3);
-        var v159 = v158.store_int(0, 8);
-        var v160 = v159.store_uint(v157, 256);
-        var v161 = end_cell(v160);
-        var v162 = begin_parse(v161);
+        var v157 = cell_hash(end_cell(begin_cell()
+            .store_uint(0, 2)
+            .store_dict(my_code())
+            .store_dict(end_cell(begin_cell()
+                .store_uint(0, 4)
+                .store_grams(0)
+                .store_slice(v143)
+                .store_slice(v137)))
+            .store_uint(0, 1)));
+        var v162 = begin_parse(end_cell(begin_cell()
+            .store_uint(4, 3)
+            .store_int(0, 8)
+            .store_uint(v157, 256)));
         var v163 = equal_slices_bits(v162, v29);
         var v164 = v146 | v163;
         throw_unless(74, v164);
         var v165 = v133 + v141;
         var (v166, v167) = load_grams(v144);
         if (v167) {
-            var v168 = begin_cell().store_uint(1935855772, 32);
-            var v169 = v168.store_uint(v139, 64);
-            var v170 = v169.store_grams(v141);
-            var v171 = v170.store_slice(v143);
-            var v172 = v171.store_slice(v166);
-            var v173 = end_cell(v172);
-            var v174 = begin_cell().store_uint(16, 6);
-            var v175 = v174.store_slice(v135);
-            var v176 = v175.store_grams(v167);
-            var v177 = v176.store_uint(1, 107);
-            var v178 = v177.store_ref(v173);
-            var v179 = end_cell(v178);
-            send_raw_message(v179, 17);
+            send_raw_message(end_cell(begin_cell()
+                .store_uint(16, 6)
+                .store_slice(v135)
+                .store_grams(v167)
+                .store_uint(1, 107)
+                .store_ref(end_cell(begin_cell()
+                    .store_uint(1935855772, 32)
+                    .store_uint(v139, 64)
+                    .store_grams(v141)
+                    .store_slice(v143)
+                    .store_slice(v166)))), 17);
         } else {
         }
         var v180 = preload_uint(v145, 2);
@@ -178,22 +168,20 @@
             var v186 = get_storage_fee(0, 157680000, 1033, 3);
             var v187 = max(v185, v186);
             raw_reserve(v187, 2);
-            var v188 = begin_cell().store_uint(16, 6);
-            var v189 = v188.store_slice(v145);
-            var v190 = v189.store_grams(0);
-            var v191 = v190.store_uint(0, 107);
-            var v192 = v191.store_uint(3576854235, 32);
-            var v193 = v192.store_uint(v139, 64);
-            var v194 = end_cell(v193);
-            send_raw_message(v194, 130);
+            send_raw_message(end_cell(begin_cell()
+                .store_uint(16, 6)
+                .store_slice(v145)
+                .store_grams(0)
+                .store_uint(0, 107)
+                .store_uint(3576854235, 32)
+                .store_uint(v139, 64)), 130);
         } else {
         }
-        var v195 = begin_cell().store_uint(v131, 4);
-        var v196 = v195.store_grams(v165);
-        var v197 = v196.store_slice(v135);
-        var v198 = v197.store_slice(v137);
-        var v199 = end_cell(v198);
-        set_data(v199);
+        set_data(end_cell(begin_cell()
+            .store_uint(v131, 4)
+            .store_grams(v165)
+            .store_slice(v135)
+            .store_slice(v137)));
         return ();
     }
     if (v41 == 1499400124) {
@@ -213,18 +201,17 @@
         throw_unless(73, v218);
         var v219 = v217 > -1;
         throw_unless(47, v219);
-        var v220 = begin_cell().store_uint(2078119902, 32);
-        var v221 = v220.store_uint(v211, 64);
-        var v222 = v221.store_grams(v213);
-        var v223 = v222.store_slice(v207);
-        var v224 = v223.store_slice(v215);
-        var v225 = end_cell(v224);
-        var v226 = begin_cell().store_uint(24, 6);
-        var v227 = v226.store_slice(v209);
-        var v228 = v227.store_grams(0);
-        var v229 = v228.store_uint(1, 107);
-        var v230 = v229.store_ref(v225);
-        var v231 = end_cell(v230);
+        var v231 = end_cell(begin_cell()
+            .store_uint(24, 6)
+            .store_slice(v209)
+            .store_grams(0)
+            .store_uint(1, 107)
+            .store_ref(end_cell(begin_cell()
+                .store_uint(2078119902, 32)
+                .store_uint(v211, 64)
+                .store_grams(v213)
+                .store_slice(v207)
+                .store_slice(v215))));
         var v232 = get_precompiled_gas_consumption();
         var v233 = null?(v232);
         var v234 = v232;
@@ -239,12 +226,11 @@
         var v240 = msg_value > v239;
         throw_unless(48, v240);
         send_raw_message(v231, 80);
-        var v241 = begin_cell().store_uint(v203, 4);
-        var v242 = v241.store_grams(v217);
-        var v243 = v242.store_slice(v207);
-        var v244 = v243.store_slice(v209);
-        var v245 = end_cell(v244);
-        set_data(v245);
+        set_data(end_cell(begin_cell()
+            .store_uint(v203, 4)
+            .store_grams(v217)
+            .store_slice(v207)
+            .store_slice(v209)));
         return ();
     }
     if (v41 == 3547469196) {
