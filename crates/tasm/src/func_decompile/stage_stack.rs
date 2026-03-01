@@ -1,7 +1,7 @@
 use super::ast::{ExprAst, StmtAst, Var, render_expr_ast};
 use super::render::{arg_as_i64, arg_to_string, format_func_slice_expr, format_instruction_line};
 use crate::types::{ArgValue, Code, Instruction, PlainInstruction};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ValueType {
@@ -22,7 +22,7 @@ enum StackValue {
 pub(crate) struct LiftState {
     stack: Vec<StackValue>,
     params: Vec<String>,
-    expr_types: BTreeMap<String, ValueType>,
+    expr_types: HashMap<ExprAst, ValueType>,
     next_param: usize,
     next_temp: usize,
     has_explicit_return: bool,
@@ -30,9 +30,9 @@ pub(crate) struct LiftState {
 
 impl LiftState {
     fn push_expr(&mut self, expr: impl Into<String>) {
-        let expr = expr.into();
-        let ty = infer_literal_type(&expr);
-        self.push_typed_expr_ast(atom_expr(expr), ty);
+        let expr = atom_expr(expr);
+        let ty = infer_expr_type(&expr);
+        self.push_typed_expr_ast(expr, ty);
     }
 
     fn push_typed_expr(&mut self, expr: impl Into<String>, ty: ValueType) {
@@ -40,18 +40,18 @@ impl LiftState {
     }
 
     fn push_typed_expr_ast(&mut self, expr: ExprAst, ty: ValueType) {
-        self.expr_types.insert(expr_key(&expr), ty);
+        self.expr_types.insert(expr.clone(), ty);
         self.stack.push(StackValue::Expr(expr));
     }
 
-    fn expr_type_of(&self, expr: &str) -> ValueType {
+    fn expr_type_of(&self, expr: &ExprAst) -> ValueType {
         self.expr_types
             .get(expr)
             .copied()
-            .unwrap_or_else(|| infer_literal_type(expr))
+            .unwrap_or_else(|| infer_expr_type(expr))
     }
 
-    fn refine_expr_type(&mut self, expr: &str, expected: ValueType) {
+    fn refine_expr_type(&mut self, expr: &ExprAst, expected: ValueType) {
         if expected == ValueType::Unknown {
             return;
         }
@@ -59,11 +59,11 @@ impl LiftState {
         let current = self.expr_type_of(expr);
         match current {
             ValueType::Unknown => {
-                self.expr_types.insert(expr.to_string(), expected);
+                self.expr_types.insert(expr.clone(), expected);
             }
             _ if current == expected => {}
             _ => {
-                self.expr_types.insert(expr.to_string(), ValueType::Unknown);
+                self.expr_types.insert(expr.clone(), ValueType::Unknown);
             }
         }
     }
@@ -86,7 +86,7 @@ impl LiftState {
     }
 
     fn pop_expr(&mut self, stmts: &mut Vec<StmtAst>, depth: usize) -> String {
-        expr_key(&self.pop_expr_ast(stmts, depth))
+        render_expr_ast(&self.pop_expr_ast(stmts, depth))
     }
 
     fn pop_expr_ast(&mut self, stmts: &mut Vec<StmtAst>, depth: usize) -> ExprAst {
@@ -111,9 +111,7 @@ impl LiftState {
         depth: usize,
         expected: ValueType,
     ) -> String {
-        let expr = self.pop_expr(stmts, depth);
-        self.refine_expr_type(&expr, expected);
-        expr
+        render_expr_ast(&self.pop_expr_expect_ast(stmts, depth, expected))
     }
 
     fn pop_expr_expect_ast(
@@ -123,7 +121,7 @@ impl LiftState {
         expected: ValueType,
     ) -> ExprAst {
         let expr = self.pop_expr_ast(stmts, depth);
-        self.refine_expr_type(&expr_key(&expr), expected);
+        self.refine_expr_type(&expr, expected);
         expr
     }
 
@@ -146,7 +144,7 @@ impl LiftState {
 
     pub(crate) fn peek_expr_type_for_return(&self) -> Option<ValueType> {
         self.stack.last().and_then(|v| match v {
-            StackValue::Expr(e) => Some(self.expr_type_of(&expr_key(e))),
+            StackValue::Expr(e) => Some(self.expr_type_of(e)),
             StackValue::Continuation(_) => None,
         })
     }
@@ -165,7 +163,7 @@ impl LiftState {
         self.stack
             .iter()
             .filter_map(|v| match v {
-                StackValue::Expr(e) => Some(self.expr_type_of(&expr_key(e))),
+                StackValue::Expr(e) => Some(self.expr_type_of(e)),
                 StackValue::Continuation(_) => None,
             })
             .collect()
@@ -197,7 +195,7 @@ impl LiftState {
     }
 
     pub(crate) fn param_type(&self, param: &str) -> ValueType {
-        self.expr_type_of(param)
+        self.expr_type_of(&atom_expr(param))
     }
 
     pub(crate) fn seed_stack_with_exprs(&mut self, exprs: &[String]) {
@@ -206,7 +204,7 @@ impl LiftState {
                 "balance" | "msg_value" => ValueType::Int,
                 "in_msg_full" => ValueType::Cell,
                 "in_msg_body" => ValueType::Slice,
-                _ => infer_literal_type(expr),
+                _ => infer_expr_type(&atom_expr(expr)),
             };
             self.push_typed_expr(expr.clone(), ty);
             if let Some(idx) = parse_arg_param_index(expr) {
@@ -1276,11 +1274,17 @@ fn lift_plain_instruction(
             return;
         }
         "NEWC" => {
-            state.push_typed_expr("begin_cell()", ValueType::Builder);
+            state.push_typed_expr_ast(
+                call_expr("begin_cell", Vec::<ExprAst>::new()),
+                ValueType::Builder,
+            );
             return;
         }
         "NEWDICT" => {
-            state.push_typed_expr("new_dict()", ValueType::Cell);
+            state.push_typed_expr_ast(
+                call_expr("new_dict", Vec::<ExprAst>::new()),
+                ValueType::Cell,
+            );
             return;
         }
         "DIVMOD" => {
@@ -1544,7 +1548,7 @@ fn lift_plain_instruction(
                     depth,
                     format!(
                         ";; unsupported CALLXARGS arity {argc} with method id {}",
-                        expr_key(&method_id)
+                        render_expr_ast(&method_id)
                     ),
                 ),
             }
@@ -1563,8 +1567,14 @@ fn lift_plain_instruction(
         }
         "PUSHCTR" => {
             match plain.args.first().and_then(arg_to_string).as_deref() {
-                Some("c4") => state.push_typed_expr("get_data()", ValueType::Cell),
-                Some("c3") => state.push_typed_expr("get_c3()", ValueType::Unknown),
+                Some("c4") => state.push_typed_expr_ast(
+                    call_expr("get_data", Vec::<ExprAst>::new()),
+                    ValueType::Cell,
+                ),
+                Some("c3") => state.push_typed_expr_ast(
+                    call_expr("get_c3", Vec::<ExprAst>::new()),
+                    ValueType::Unknown,
+                ),
                 _ => {
                     push_line(
                         stmts,
@@ -1582,7 +1592,7 @@ fn lift_plain_instruction(
             let value = state.pop_expr_ast(stmts, depth);
             match plain.args.first().and_then(arg_to_string).as_deref() {
                 Some("c4") => {
-                    state.refine_expr_type(&expr_key(&value), ValueType::Cell);
+                    state.refine_expr_type(&value, ValueType::Cell);
                     push_call(stmts, "set_data", vec![value]);
                 }
                 Some("c3") => push_call(stmts, "set_c3", vec![value]),
@@ -1600,11 +1610,17 @@ fn lift_plain_instruction(
             return;
         }
         "MYADDR" => {
-            state.push_typed_expr("my_address()", ValueType::Slice);
+            state.push_typed_expr_ast(
+                call_expr("my_address", Vec::<ExprAst>::new()),
+                ValueType::Slice,
+            );
             return;
         }
         "MYCODE" => {
-            state.push_typed_expr("my_code()", ValueType::Cell);
+            state.push_typed_expr_ast(
+                call_expr("my_code", Vec::<ExprAst>::new()),
+                ValueType::Cell,
+            );
             return;
         }
         "DUEPAYMENT" => {
@@ -1912,21 +1928,21 @@ fn merge_if_stacks(
         };
 
         if then_expr == else_expr {
-            let ty = then_state.expr_type_of(&expr_key(then_expr));
+            let ty = then_state.expr_type_of(then_expr);
             state.push_typed_expr_ast(then_expr.clone(), ty);
             continue;
         }
 
         let merged = state.new_temp();
-        let then_expr_text = expr_key(then_expr);
-        let else_expr_text = expr_key(else_expr);
+        let then_expr_text = render_expr_ast(then_expr);
+        let else_expr_text = render_expr_ast(else_expr);
         pre_if_stmts.push(StmtAst::VarDecl {
             binding: merged.clone().into(),
             expr: else_expr.clone(),
         });
         push_assign_expr(then_stmts, merged.clone(), then_expr.clone());
-        let then_ty = then_state.expr_type_of(&then_expr_text);
-        let else_ty = else_state.expr_type_of(&else_expr_text);
+        let then_ty = then_state.expr_type_of(then_expr);
+        let else_ty = else_state.expr_type_of(else_expr);
         let merged_ty = merged_value_type(&then_expr_text, then_ty, &else_expr_text, else_ty);
         state.push_typed_expr(merged, merged_ty);
     }
@@ -1957,16 +1973,16 @@ fn merge_ifelse_stacks(
         };
 
         if then_expr == else_expr {
-            let ty = then_state.expr_type_of(&expr_key(then_expr));
+            let ty = then_state.expr_type_of(then_expr);
             state.push_typed_expr_ast(then_expr.clone(), ty);
             continue;
         }
 
         let merged = state.new_temp();
-        let then_expr_text = expr_key(then_expr);
-        let else_expr_text = expr_key(else_expr);
-        let then_ty = then_state.expr_type_of(&then_expr_text);
-        let else_ty = else_state.expr_type_of(&else_expr_text);
+        let then_expr_text = render_expr_ast(then_expr);
+        let else_expr_text = render_expr_ast(else_expr);
+        let then_ty = then_state.expr_type_of(then_expr);
+        let else_ty = else_state.expr_type_of(else_expr);
         let merged_ty = merged_value_type(&then_expr_text, then_ty, &else_expr_text, else_ty);
         if !is_branch_local_temp_expr(&then_expr_text, base_next_temp)
             && !is_branch_local_temp_expr(&else_expr_text, base_next_temp)
@@ -2025,16 +2041,7 @@ fn push_assign_expr(stmts: &mut Vec<StmtAst>, target: impl Into<String>, expr: E
 }
 
 fn atom_expr(value: impl Into<String>) -> ExprAst {
-    let value = value.into();
-    if value == "null()" {
-        ExprAst::NullLiteral
-    } else {
-        ExprAst::Atom(value)
-    }
-}
-
-fn expr_key(expr: &ExprAst) -> String {
-    render_expr_ast(expr)
+    ExprAst::from(value.into())
 }
 
 fn call_expr<T>(callee: impl Into<String>, args: Vec<T>) -> ExprAst
@@ -2169,13 +2176,21 @@ fn stdlib_function_for_instruction(name: &str) -> Option<&'static str> {
     }
 }
 
-fn infer_literal_type(expr: &str) -> ValueType {
+fn infer_expr_type(expr: &ExprAst) -> ValueType {
     match expr {
-        "begin_cell()" => ValueType::Builder,
-        "get_data()" | "my_code()" => ValueType::Cell,
-        "my_address()" => ValueType::Slice,
-        _ if expr.starts_with("x{") => ValueType::Slice,
-        _ if expr.parse::<i128>().is_ok() => ValueType::Int,
+        ExprAst::Number(_) => ValueType::Int,
+        ExprAst::NullLiteral => ValueType::Unknown,
+        ExprAst::Call { callee, args } if args.is_empty() => match callee.as_str() {
+            "begin_cell" => ValueType::Builder,
+            "new_dict" | "get_data" | "my_code" => ValueType::Cell,
+            "my_address" => ValueType::Slice,
+            _ => ValueType::Unknown,
+        },
+        ExprAst::Atom(text) => match text.as_str() {
+            _ if text.starts_with("x{") => ValueType::Slice,
+            _ if text.parse::<i128>().is_ok() => ValueType::Int,
+            _ => ValueType::Unknown,
+        },
         _ => ValueType::Unknown,
     }
 }
@@ -2277,5 +2292,9 @@ fn parse_const_int_expr(expr: &str) -> Option<i128> {
 }
 
 fn parse_const_int_expr_ast(expr: &ExprAst) -> Option<i128> {
-    parse_const_int_expr(&expr_key(expr))
+    match expr {
+        ExprAst::Number(value) => value.parse::<i128>().ok(),
+        ExprAst::Atom(value) => parse_const_int_expr(value),
+        _ => parse_const_int_expr(&render_expr_ast(expr)),
+    }
 }

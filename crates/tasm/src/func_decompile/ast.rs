@@ -14,9 +14,10 @@ pub(crate) struct MethodSignatureAst {
     pub qualifiers: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum ExprAst {
     Atom(String),
+    Number(String),
     NullLiteral,
     Unary {
         op: String,
@@ -45,6 +46,8 @@ impl From<String> for ExprAst {
     fn from(value: String) -> Self {
         if value == "null()" {
             Self::NullLiteral
+        } else if is_decimal_number(&value) {
+            Self::Number(value)
         } else {
             Self::Atom(value)
         }
@@ -55,6 +58,15 @@ impl From<&str> for ExprAst {
     fn from(value: &str) -> Self {
         Self::from(value.to_string())
     }
+}
+
+fn is_decimal_number(value: &str) -> bool {
+    let s = value.trim();
+    if s.is_empty() {
+        return false;
+    }
+    let body = s.strip_prefix('-').unwrap_or(s);
+    !body.is_empty() && body.chars().all(|ch| ch.is_ascii_digit())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -264,6 +276,7 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
 fn render_expr(expr: &ExprAst) -> String {
     match expr {
         ExprAst::Atom(s) => s.clone(),
+        ExprAst::Number(s) => s.clone(),
         ExprAst::NullLiteral => "null()".to_string(),
         ExprAst::Unary { op, expr } => {
             format!("{op}({})", render_expr(expr))
