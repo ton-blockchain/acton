@@ -10,6 +10,7 @@ mod config_tests;
 mod coverage_tests;
 mod diff_tests;
 mod disasm_tests;
+mod doc;
 mod fixture_tests;
 mod flags_tests;
 mod fmt_tests;

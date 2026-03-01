@@ -12,6 +12,7 @@
     "library",
     "wallet",
     "litenode",
+    "doc",
     "shell-completions"
   ]
 }

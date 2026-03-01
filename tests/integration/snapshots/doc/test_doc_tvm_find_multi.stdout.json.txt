@@ -1,0 +1,16 @@
+[
+  {
+    "query": "SENRAWMSG",
+    "matches": [
+      "SENDRAWMSG",
+      "SENDMSG",
+      "SETNUMVARARGS"
+    ]
+  },
+  {
+    "query": "outcomng",
+    "matches": [
+      "SENDMSG"
+    ]
+  }
+]

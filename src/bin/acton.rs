@@ -3,6 +3,7 @@ use acton::commands::build::build_cmd;
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
 use acton::commands::disasm::disasm_cmd;
+use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
 use acton::commands::fmt::fmt_cmd;
 use acton::commands::init::init_cmd;
@@ -554,6 +555,14 @@ enum Commands {
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
     },
+    #[command(
+        about = "Lookup reference documentation",
+        after_help = example_doc_usage()
+    )]
+    Doc {
+        #[command(subcommand)]
+        command: DocCommand,
+    },
     #[command(about = "LSP server for the TON languages and technologies")]
     Ls {
         #[arg(long, help = "Port to listen on (TCP)")]
@@ -739,6 +748,29 @@ pub enum LibraryCommand {
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum DocCommand {
+    #[command(about = "Lookup an instruction in the TVM specification")]
+    Tvm {
+        #[arg(
+            help = "Instruction name(s) or search query (for example: ADD SENDRAWMSG)",
+            num_args = 1..
+        )]
+        instruction: Vec<String>,
+        #[arg(short = 'f', long, help = "Find instructions by fuzzy query")]
+        find: bool,
+        #[arg(
+            short = 'd',
+            long,
+            requires = "find",
+            help = "Include instruction descriptions in fuzzy search"
+        )]
+        description: bool,
+        #[arg(long, help = "Output instruction entry as JSON")]
+        json: bool,
     },
 }
 
@@ -1228,6 +1260,34 @@ fn example_fmt_usage() -> StyledStr {
     )
 }
 
+fn example_doc_usage() -> StyledStr {
+    format_examples(
+        &[
+            (
+                "Show text documentation for TVM instruction ADD",
+                "acton doc tvm ADD",
+            ),
+            (
+                "Show text documentation for several instructions",
+                "acton doc tvm ADD SUB",
+            ),
+            (
+                "Show raw JSON entry for TVM instruction SENDRAWMSG",
+                "acton doc tvm SENDRAWMSG --json",
+            ),
+            (
+                "Find TVM instructions by fuzzy query",
+                "acton doc tvm SENRAWMSG --find",
+            ),
+            (
+                "Find by fuzzy query in names and descriptions",
+                "acton doc tvm outcomng --find --description",
+            ),
+        ],
+        "",
+    )
+}
+
 fn example_completions_usage() -> StyledStr {
     format_examples(
         &[
@@ -1630,6 +1690,14 @@ fn main() {
             result
         }
         Commands::Fmt { paths, check } => fmt_cmd(paths, check),
+        Commands::Doc { command } => match command {
+            DocCommand::Tvm {
+                instruction,
+                find,
+                description,
+                json,
+            } => doc_tvm_cmd(&instruction, json, find, description),
+        },
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())

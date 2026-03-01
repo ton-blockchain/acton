@@ -5,6 +5,12 @@
 
 use std::convert::Infallible;
 
+pub const TVM_SPEC_JSON: &str = include_str!("../spec/tvm-specification.json");
+
+pub fn load_tvm_specification() -> serde_json::Result<Specification> {
+    serde_json::from_str(TVM_SPEC_JSON)
+}
+
 pub mod error {
     pub struct ConversionError(std::borrow::Cow<'static, str>);
     impl std::error::Error for ConversionError {}
