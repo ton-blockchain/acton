@@ -44,9 +44,7 @@ pub(crate) fn run_simple_test_with_mappings(
     mappings: &[(&str, &str)],
     name: &str,
 ) {
-    let mut builder = ProjectBuilder::new(&format!("check-{name}"))
-        .contract("main", content)
-        .with_lint_level("unauthorized-access", "warn");
+    let mut builder = ProjectBuilder::new(&format!("check-{name}")).contract("main", content);
     for (path, file_content) in files {
         builder = builder.file(path, file_content);
     }
