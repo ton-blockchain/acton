@@ -90,7 +90,7 @@ fn select_recv_internal_params(stmts: &[StmtAst]) -> Vec<String> {
 
 fn stmt_contains_ident(stmt: &StmtAst, ident: &str) -> bool {
     match stmt {
-        StmtAst::Comment(line) | StmtAst::Expr(line) => contains_ident_text(line, ident),
+        StmtAst::Comment(line) => contains_ident_text(line, ident),
         StmtAst::VarDecl { binding, expr } => {
             tensor_contains_ident(binding, ident) || expr_contains_ident(expr, ident)
         }

@@ -77,17 +77,7 @@ impl MethodPatterns {
 }
 
 pub(crate) fn apply_pattern_rewrites(stmts: &mut [StmtAst], patterns: &MethodPatterns) {
-    if patterns.has_op_and_query_id {
-        for stmt in stmts {
-            if let StmtAst::Expr(line) = stmt
-                && line.contains("__ldu(")
-                && line.contains(", 32)")
-            {
-                *line = line.replacen("var ", "var op_", 1);
-                break;
-            }
-        }
-    }
+    let _ = (stmts, patterns);
 }
 
 fn has_op_and_query_load(instructions: &[&PlainInstruction]) -> bool {

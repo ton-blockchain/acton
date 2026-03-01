@@ -147,7 +147,6 @@ pub(crate) enum StmtAst {
         body: Vec<StmtAst>,
         condition: ExprAst,
     },
-    Expr(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -178,28 +177,25 @@ impl MethodSignatureAst {
 
 impl StmtAst {
     #[must_use]
-    pub(crate) fn expr(line: impl Into<String>) -> Self {
-        Self::Expr(line.into())
-    }
-
-    #[must_use]
     pub(crate) fn comment(line: impl Into<String>) -> Self {
         Self::Comment(line.into())
     }
 
     #[must_use]
-    pub(crate) fn var(name: impl Into<String>, expr: impl Into<String>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn var(name: impl Into<String>, expr: impl Into<ExprAst>) -> Self {
         Self::VarDecl {
             binding: Var::Name(name.into()),
-            expr: ExprAst::from(expr.into()),
+            expr: expr.into(),
         }
     }
 
     #[must_use]
-    pub(crate) fn assign(target: impl Into<String>, expr: impl Into<String>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn assign(target: impl Into<String>, expr: impl Into<ExprAst>) -> Self {
         Self::Assign {
             target: target.into(),
-            expr: ExprAst::from(expr.into()),
+            expr: expr.into(),
         }
     }
 }
@@ -270,9 +266,6 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
             let _ = writeln!(out, "{indent}do {{");
             render_stmt_list(body, depth + 1, out);
             let _ = writeln!(out, "{indent}}} until ({});", render_expr(condition));
-        }
-        StmtAst::Expr(line) => {
-            let _ = writeln!(out, "{indent}{line}");
         }
     }
 }

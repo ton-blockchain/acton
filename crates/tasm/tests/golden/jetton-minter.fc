@@ -327,7 +327,7 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
     if (v253) {
         return ();
     }
-    throw(((1 << 16) - 1));
+    throw((1 << 16) - 1);
     ;; low-level fallback (TASM)
     ;; POP s2
     ;; CTOS
@@ -382,7 +382,7 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20) {
     var v0 = store_uint(begin_cell(), 0, 8);
     var v1 = store_slice(v0, arg2);
     var v2 = end_cell(v1);
-    var v3 = udict_set_ref(arg0, (1 << 8), arg1, v2);
+    var v3 = udict_set_ref(arg0, 1 << 8, arg1, v2);
     return v3;
     ;; low-level fallback (TASM)
     ;; PUSHINT_4 0

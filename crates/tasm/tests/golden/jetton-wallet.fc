@@ -32,7 +32,7 @@
         var v16 = (v15) == (395134233);
         var v17 = (v15) == (2078119902);
         var v18 = (v16) | (v17);
-        throw_unless(((1 << 16) - 1), v18);
+        throw_unless((1 << 16) - 1, v18);
         var v19 = skip_bits(v14, 64);
         var (v20, v21) = load_grams(v19);
         var v22 = (v9) + (v21);
@@ -275,7 +275,7 @@
     if (v246) {
         return ();
     }
-    throw(((1 << 16) - 1));
+    throw((1 << 16) - 1);
     ;; low-level fallback (TASM)
     ;; SWAP
     ;; CTOS
