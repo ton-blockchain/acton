@@ -6,19 +6,22 @@
     var v2 = v0~load_uint(32);
     end_parse(v0);
     if (slice_empty?(in_msg_body)) {
-        var v4 = v2 + 1;
-        set_data(end_cell(begin_cell().store_uint(v4, 32)));
+        set_data(begin_cell()
+            .store_uint(v2 + 1, 32)
+            .end_cell());
         return ();
     }
     var (v7, v8) = load_uint(in_msg_body, 32);
     if (v8 == 1) {
-        var v10 = v2 + 1;
-        set_data(end_cell(begin_cell().store_uint(v10, 32)));
+        set_data(begin_cell()
+            .store_uint(v2 + 1, 32)
+            .end_cell());
         return ();
     }
     if (v8 == 2) {
-        var v14 = v2 - 1;
-        set_data(end_cell(begin_cell().store_uint(v14, 32)));
+        set_data(begin_cell()
+            .store_uint(v2 - 1, 32)
+            .end_cell());
         return ();
     }
 }

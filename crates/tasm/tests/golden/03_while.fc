@@ -4,8 +4,7 @@
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
     var v0 = 0;
     do {
-        var v1 = 0 < 4;
-        v0 = v1;
+        v0 = 0 < 4;
         if (v0) {
             var v1 = msg_value + 0;
             var v2 = 0 + 1;

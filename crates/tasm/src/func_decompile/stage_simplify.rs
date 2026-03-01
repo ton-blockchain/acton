@@ -36,6 +36,16 @@ fn simplify_stmt_list(stmts: &mut Vec<StmtAst>) {
 
     rewrite_store_calls_stmt_list(stmts);
     collapse_store_chain_stmt_list(stmts);
+
+    loop {
+        let index = build_block_def_use_index(stmts);
+        if rewrite_tuple_modifying_chain_once(stmts, &index) {
+            continue;
+        }
+        if !inline_single_use_value_once(stmts, &index) {
+            break;
+        }
+    }
 }
 
 fn inline_condition_temp_once(stmts: &mut Vec<StmtAst>, index: &BlockDefUseIndex) -> bool {
@@ -65,6 +75,62 @@ fn inline_condition_temp_once(stmts: &mut Vec<StmtAst>, index: &BlockDefUseIndex
     }
 
     false
+}
+
+fn inline_single_use_value_once(stmts: &mut Vec<StmtAst>, index: &BlockDefUseIndex) -> bool {
+    for def_idx in 0..stmts.len().saturating_sub(1) {
+        let (var_name, init_expr) = match &stmts[def_idx] {
+            StmtAst::VarDecl {
+                binding: Var::Name(name),
+                expr,
+            } => (name.clone(), expr.clone()),
+            _ => continue,
+        };
+
+        if !has_single_immediate_use(index, def_idx, &var_name) {
+            continue;
+        }
+
+        let next_stmt = match stmts.get_mut(def_idx + 1) {
+            Some(stmt) => stmt,
+            None => continue,
+        };
+        if !rewrite_next_stmt_value_site(next_stmt, &var_name, &init_expr) {
+            continue;
+        }
+
+        stmts.remove(def_idx);
+        return true;
+    }
+
+    false
+}
+
+fn rewrite_next_stmt_value_site(stmt: &mut StmtAst, ident: &str, replacement: &ExprAst) -> bool {
+    let mut replaced = 0_usize;
+    match stmt {
+        StmtAst::VarDecl { expr, .. }
+        | StmtAst::Assign { expr, .. }
+        | StmtAst::Return(Some(expr)) => {
+            replace_ident_in_expr(expr, ident, replacement, &mut replaced);
+        }
+        StmtAst::Call { args, .. } => {
+            for arg in args {
+                replace_ident_in_expr(arg, ident, replacement, &mut replaced);
+            }
+        }
+        StmtAst::If { condition, .. } => {
+            replace_ident_in_expr(condition, ident, replacement, &mut replaced);
+        }
+        StmtAst::Repeat { count, .. } => {
+            replace_ident_in_expr(count, ident, replacement, &mut replaced);
+        }
+        StmtAst::DoUntil { condition, .. } => {
+            replace_ident_in_expr(condition, ident, replacement, &mut replaced);
+        }
+        StmtAst::Comment(_) | StmtAst::Return(None) => {}
+    }
+    replaced == 1
 }
 
 fn rewrite_tuple_modifying_chain_once(stmts: &mut [StmtAst], index: &BlockDefUseIndex) -> bool {
@@ -486,6 +552,16 @@ fn rewrite_store_calls_expr(expr: &mut ExprAst) {
                     modifying: false,
                     args: moved_args,
                 };
+            } else if callee == "end_cell" && args.len() == 1 {
+                let mut moved_args = std::mem::take(args);
+                let receiver = moved_args.remove(0);
+                let method = std::mem::take(callee);
+                *expr = ExprAst::MethodCall {
+                    receiver: Box::new(receiver),
+                    method,
+                    modifying: false,
+                    args: Vec::new(),
+                };
             }
         }
         ExprAst::MethodCall { receiver, args, .. } => {
@@ -741,6 +817,65 @@ mod tests {
         match &body[1] {
             StmtAst::If { condition, .. } => assert_eq!(condition, &ident("v247")),
             _ => panic!("expected if"),
+        }
+    }
+
+    #[test]
+    fn inlines_single_use_into_var_decl_expr() {
+        let mut body = vec![
+            StmtAst::VarDecl {
+                binding: Var::name("v0"),
+                expr: num("7"),
+            },
+            StmtAst::VarDecl {
+                binding: Var::name("v1"),
+                expr: ExprAst::Binary {
+                    lhs: Box::new(ident("v0")),
+                    op: BinaryOp::Add,
+                    rhs: Box::new(num("1")),
+                    wrap_lhs: false,
+                    wrap_rhs: false,
+                },
+            },
+        ];
+
+        simplify_method_body(&mut body);
+
+        assert_eq!(body.len(), 1);
+        match &body[0] {
+            StmtAst::VarDecl { expr, .. } => match expr {
+                ExprAst::Binary { lhs, .. } => assert_eq!(lhs.as_ref(), &num("7")),
+                _ => panic!("expected binary expr"),
+            },
+            _ => panic!("expected var decl"),
+        }
+    }
+
+    #[test]
+    fn inlines_single_use_into_call_arg() {
+        let mut body = vec![
+            StmtAst::VarDecl {
+                binding: Var::name("v0"),
+                expr: ExprAst::Call {
+                    callee: "null?".to_string(),
+                    args: vec![ident("v87")],
+                },
+            },
+            StmtAst::Call {
+                callee: "touch".to_string(),
+                args: vec![ident("v0")],
+            },
+        ];
+
+        simplify_method_body(&mut body);
+
+        assert_eq!(body.len(), 1);
+        match &body[0] {
+            StmtAst::Call { args, .. } => {
+                assert_eq!(args.len(), 1);
+                assert_ne!(args[0], ident("v0"));
+            }
+            _ => panic!("expected call"),
         }
     }
 
@@ -1043,15 +1178,18 @@ mod tests {
                 assert_eq!(args.len(), 1);
                 assert!(!matches!(args[0], ExprAst::Ident(_)));
                 match &args[0] {
-                    ExprAst::Call {
-                        callee: end_callee,
-                        args: end_args,
+                    ExprAst::MethodCall {
+                        method,
+                        modifying,
+                        receiver,
+                        args: method_args,
                     } => {
-                        assert_eq!(end_callee, "end_cell");
-                        assert_eq!(end_args.len(), 1);
-                        assert!(matches!(end_args[0], ExprAst::MethodCall { .. }));
+                        assert_eq!(method, "end_cell");
+                        assert!(!*modifying);
+                        assert!(method_args.is_empty());
+                        assert!(matches!(receiver.as_ref(), ExprAst::MethodCall { .. }));
                     }
-                    _ => panic!("expected end_cell call"),
+                    _ => panic!("expected end_cell method call"),
                 }
             }
             _ => panic!("expected set_data call"),

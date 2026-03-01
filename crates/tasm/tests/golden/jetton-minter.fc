@@ -6,16 +6,13 @@ slice __tasm_slice_lit_0() asm "x{399_} PUSHSLICE";
 cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
 
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    var v0 = begin_parse(in_msg_full);
-    var (v1, v2) = load_uint(v0, 4);
+    var (v1, v2) = load_uint(begin_parse(in_msg_full), 4);
     if (v2 & 1) {
-        var v4 = skip_bits(in_msg_body, 32);
-        var (v5, v6) = load_uint(v4, 32);
+        var (v5, v6) = load_uint(skip_bits(in_msg_body, 32), 32);
         ifnot (v6 == 395134233) {
             return ();
         }
-        var v8 = skip_bits(v5, 64);
-        var (v9, v10) = load_grams(v8);
+        var (v9, v10) = load_grams(skip_bits(v5, 64));
         var v11 = begin_parse(get_data());
         var v13 = v11~load_grams();
         var v15 = v11~load_msg_addr();
@@ -23,13 +20,13 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
         var v19 = v11~load_ref();
         var v21 = v11~load_ref();
         end_parse(v11);
-        var v22 = v13 - v10;
-        set_data(end_cell(begin_cell()
-            .store_grams(v22)
+        set_data(begin_cell()
+            .store_grams(v13 - v10)
             .store_slice(v15)
             .store_slice(v17)
             .store_ref(v19)
-            .store_ref(v21)));
+            .store_ref(v21)
+            .end_cell());
         return ();
     }
     var v30 = v1~load_msg_addr();
@@ -49,19 +46,15 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
     var v55 = v45~load_ref();
     end_parse(v45);
     if (v42 == 1680571655) {
-        var v57 = equal_slices_bits(v30, v49);
-        throw_unless(73, v57);
+        throw_unless(73, equal_slices_bits(v30, v49));
         var (v58, v59) = load_msg_addr(v43);
         var (v60, v61) = parse_std_addr(v59);
-        var v62 = v60 == 0;
-        throw_unless(333, v62);
+        throw_unless(333, v60 == 0);
         var v64 = v58~load_grams();
         var v66 = v58~load_ref();
         end_parse(v58);
-        var v67 = begin_parse(v66);
-        var (v68, v69) = load_uint(v67, 32);
-        var v70 = v69 == 395134233;
-        throw_unless(72, v70);
+        var (v68, v69) = load_uint(begin_parse(v66), 32);
+        throw_unless(72, v69 == 395134233);
         var v71 = skip_bits(v68, 64);
         var v73 = v71~load_grams();
         var v75 = v71~load_msg_addr();
@@ -69,95 +62,81 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
         var (v78, v79) = load_grams(v71);
         if (preload_uint(v78, 1)) {
             var (v81, v82) = slice_bits_refs(v78);
-            var v83 = v82 == 1;
-            var v84 = v81 == 1;
-            var v85 = v83 & v84;
-            throw_unless(49, v85);
+            throw_unless(49, (v82 == 1) & (v81 == 1));
         } else {
         }
         var v86 = v79 ? 2 : 1;
         var v87 = get_precompiled_gas_consumption();
-        var v89 = null?(v87) ? 10065 : v87;
-        var v91 = null?(v87) ? 10435 : v87;
-        var v92 = v86 * v40;
-        var v93 = v79 + v92;
-        var v94 = get_simple_forward_fee(0, 931, 3);
-        var v95 = v93 + v94;
-        var v96 = get_compute_fee(0, v89);
-        var v97 = v95 + v96;
-        var v98 = get_compute_fee(0, v91);
-        var v99 = v97 + v98;
-        var v100 = get_storage_fee(0, 157680000, 1033, 3);
-        var v101 = v99 + v100;
-        var v102 = v64 > v101;
-        throw_unless(48, v102);
+        throw_unless(48, v64 > (((((v79 + (v86 * v40)) + get_simple_forward_fee(0, 931, 3)) + get_compute_fee(0, null?(v87) ? 10065 : v87)) + get_compute_fee(0, null?(v87) ? 10435 : v87)) + get_storage_fee(0, 157680000, 1033, 3)));
         raw_reserve(10000000, 0);
-        var v112 = end_cell(begin_cell()
+        var v112 = begin_cell()
             .store_uint(0, 2)
             .store_dict(v53)
-            .store_dict(end_cell(begin_cell()
+            .store_dict(begin_cell()
                 .store_uint(0, 4)
                 .store_grams(0)
                 .store_slice(v59)
-                .store_slice(my_address())))
-            .store_uint(0, 1));
-        var v113 = cell_hash(v112);
-        var v118 = begin_parse(end_cell(begin_cell()
-            .store_uint(4, 3)
-            .store_int(0, 8)
-            .store_uint(v113, 256)));
-        send_raw_message(end_cell(begin_cell()
+                .store_slice(my_address())
+                .end_cell())
+            .store_uint(0, 1)
+            .end_cell();
+        send_raw_message(begin_cell()
             .store_uint(24, 6)
-            .store_slice(v118)
+            .store_slice(begin_parse(begin_cell()
+                .store_uint(4, 3)
+                .store_int(0, 8)
+                .store_uint(cell_hash(v112), 256)
+                .end_cell()))
             .store_grams(v64)
             .store_uint(7, 108)
             .store_ref(v112)
-            .store_ref(v66)), 17);
-        var v126 = v47 + v73;
-        set_data(end_cell(begin_cell()
-            .store_grams(v126)
+            .store_ref(v66)
+            .end_cell(), 17);
+        set_data(begin_cell()
+            .store_grams(v47 + v73)
             .store_slice(v49)
             .store_slice(v51)
             .store_ref(v53)
-            .store_ref(v55)));
+            .store_ref(v55)
+            .end_cell());
         return ();
     }
     if (v42 == 2078119902) {
         var v135 = v43~load_grams();
         var (v136, v137) = load_msg_addr(v43);
-        var v148 = cell_hash(end_cell(begin_cell()
-            .store_uint(0, 2)
-            .store_dict(v53)
-            .store_dict(end_cell(begin_cell()
-                .store_uint(0, 4)
-                .store_grams(0)
-                .store_slice(v137)
-                .store_slice(my_address())))
-            .store_uint(0, 1)));
-        var v153 = begin_parse(end_cell(begin_cell()
+        throw_unless(74, equal_slices_bits(begin_parse(begin_cell()
             .store_uint(4, 3)
             .store_int(0, 8)
-            .store_uint(v148, 256)));
-        var v154 = equal_slices_bits(v153, v30);
-        throw_unless(74, v154);
-        var v155 = v47 - v135;
-        set_data(end_cell(begin_cell()
-            .store_grams(v155)
+            .store_uint(cell_hash(begin_cell()
+                .store_uint(0, 2)
+                .store_dict(v53)
+                .store_dict(begin_cell()
+                    .store_uint(0, 4)
+                    .store_grams(0)
+                    .store_slice(v137)
+                    .store_slice(my_address())
+                    .end_cell())
+                .store_uint(0, 1)
+                .end_cell()), 256)
+            .end_cell()), v30));
+        set_data(begin_cell()
+            .store_grams(v47 - v135)
             .store_slice(v49)
             .store_slice(v51)
             .store_ref(v53)
-            .store_ref(v55)));
+            .store_ref(v55)
+            .end_cell());
         var v163 = v136~load_msg_addr();
         end_parse(v136);
-        var v164 = preload_uint(v163, 2);
-        if (~ (v164 == 0)) {
-            send_raw_message(end_cell(begin_cell()
+        if (~ (preload_uint(v163, 2) == 0)) {
+            send_raw_message(begin_cell()
                 .store_uint(16, 6)
                 .store_slice(v163)
                 .store_grams(0)
                 .store_uint(0, 107)
                 .store_uint(3576854235, 32)
-                .store_uint(v44, 64)), 66);
+                .store_uint(v44, 64)
+                .end_cell(), 66);
         } else {
         }
         return ();
@@ -168,7 +147,9 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
         end_parse(v43);
         var v181 = null();
         if (v178) {
-            v181 = end_cell(begin_cell().store_slice(v176));
+            v181 = begin_cell()
+                .store_slice(v176)
+                .end_cell();
         } else {
             v181 = null();
         }
@@ -183,77 +164,81 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
         var v190 = v188 == 0;
         var v208 = null();
         if (v190) {
-            var v201 = cell_hash(end_cell(begin_cell()
-                .store_uint(0, 2)
-                .store_dict(v53)
-                .store_dict(end_cell(begin_cell()
-                    .store_uint(0, 4)
-                    .store_grams(0)
-                    .store_slice(v176)
-                    .store_slice(my_address())))
-                .store_uint(0, 1)));
-            var v206 = begin_parse(end_cell(begin_cell()
+            v208 = v187.store_slice(begin_parse(begin_cell()
                 .store_uint(4, 3)
                 .store_int(0, 8)
-                .store_uint(v201, 256)));
-            v208 = v187.store_slice(v206);
+                .store_uint(cell_hash(begin_cell()
+                    .store_uint(0, 2)
+                    .store_dict(v53)
+                    .store_dict(begin_cell()
+                        .store_uint(0, 4)
+                        .store_grams(0)
+                        .store_slice(v176)
+                        .store_slice(my_address())
+                        .end_cell())
+                    .store_uint(0, 1)
+                    .end_cell()), 256)
+                .end_cell()));
         } else {
             v208 = v187.store_uint(0, 2);
         }
-        send_raw_message(end_cell(v208.store_dict(v181)), 80);
+        send_raw_message(v208
+            .store_dict(v181)
+            .end_cell(), 80);
         return ();
     }
     if (v42 == 1694626644) {
-        var v212 = equal_slices_bits(v30, v49);
-        throw_unless(73, v212);
+        throw_unless(73, equal_slices_bits(v30, v49));
         var v214 = v43~load_msg_addr();
         end_parse(v43);
-        set_data(end_cell(begin_cell()
+        set_data(begin_cell()
             .store_grams(v47)
             .store_slice(v49)
             .store_slice(v214)
             .store_ref(v53)
-            .store_ref(v55)));
+            .store_ref(v55)
+            .end_cell());
         return ();
     }
     if (v42 == 4220051737) {
         end_parse(v43);
-        var v222 = equal_slices_bits(v30, v51);
-        throw_unless(73, v222);
-        set_data(end_cell(begin_cell()
+        throw_unless(73, equal_slices_bits(v30, v51));
+        set_data(begin_cell()
             .store_grams(v47)
             .store_slice(v51)
             .store_slice("")
             .store_ref(v53)
-            .store_ref(v55)));
+            .store_ref(v55)
+            .end_cell());
         return ();
     }
     if (v42 == 1949430305) {
-        var v230 = equal_slices_bits(v30, v49);
-        throw_unless(73, v230);
+        throw_unless(73, equal_slices_bits(v30, v49));
         end_parse(v43);
-        set_data(end_cell(begin_cell()
+        set_data(begin_cell()
             .store_grams(v47)
             .store_slice("")
             .store_slice("")
             .store_ref(v53)
-            .store_ref(v55)));
+            .store_ref(v55)
+            .end_cell());
         return ();
     }
     if (v42 == 3414567170) {
-        var v238 = equal_slices_bits(v30, v49);
-        throw_unless(73, v238);
-        set_data(end_cell(begin_cell()
+        throw_unless(73, equal_slices_bits(v30, v49));
+        set_data(begin_cell()
             .store_grams(v47)
             .store_slice(v49)
             .store_slice(v51)
             .store_ref(v53)
-            .store_ref(end_cell(begin_cell().store_slice(v43)))));
+            .store_ref(begin_cell()
+                .store_slice(v43)
+                .end_cell())
+            .end_cell());
         return ();
     }
     if (v42 == 621336170) {
-        var v248 = equal_slices_bits(v30, v49);
-        throw_unless(73, v248);
+        throw_unless(73, equal_slices_bits(v30, v49));
         var v250 = v43~load_ref();
         var v252 = v43~load_ref();
         end_parse(v43);
@@ -268,10 +253,10 @@ cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20);
 }
 
 cell __dict_method_20(cell arg0, int arg1, slice arg2) impure method_id(20) {
-    var v3 = udict_set_ref(arg0, 1 << 8, arg1, end_cell(begin_cell()
+    return udict_set_ref(arg0, 1 << 8, arg1, begin_cell()
         .store_uint(0, 8)
-        .store_slice(arg2)));
-    return v3;
+        .store_slice(arg2)
+        .end_cell());
 }
 
 slice method_78683() impure method_id(78683) {
@@ -293,20 +278,21 @@ slice method_103289(slice arg0) impure method_id(103289) {
     var v8 = v0~load_ref();
     var v10 = v0~load_ref();
     end_parse(v0);
-    var v21 = cell_hash(end_cell(begin_cell()
-        .store_uint(0, 2)
-        .store_dict(v8)
-        .store_dict(end_cell(begin_cell()
-            .store_uint(0, 4)
-            .store_grams(0)
-            .store_slice(arg0)
-            .store_slice(my_address())))
-        .store_uint(0, 1)));
-    var v26 = begin_parse(end_cell(begin_cell()
+    return begin_parse(begin_cell()
         .store_uint(4, 3)
         .store_int(0, 8)
-        .store_uint(v21, 256)));
-    return v26;
+        .store_uint(cell_hash(begin_cell()
+            .store_uint(0, 2)
+            .store_dict(v8)
+            .store_dict(begin_cell()
+                .store_uint(0, 4)
+                .store_grams(0)
+                .store_slice(arg0)
+                .store_slice(my_address())
+                .end_cell())
+            .store_uint(0, 1)
+            .end_cell()), 256)
+        .end_cell());
 }
 
 (int, int, slice, cell, cell) method_106029() impure method_id(106029) {
@@ -317,11 +303,9 @@ slice method_103289(slice arg0) impure method_id(103289) {
     var v8 = v0~load_ref();
     var v10 = v0~load_ref();
     end_parse(v0);
-    var v11 = begin_parse(v10);
-    var v12 = __dict_method_20(null(), 51065135818459385347574250312853146822620586594996463797054414300406918686668, v11);
-    var v13 = __dict_method_20(v12, 107878361799212983662495570378745491379550006934010968359181619763835345146430, __tasm_slice_lit_0());
-    return (v2, -1, v4, end_cell(begin_cell()
+    return (v2, -1, v4, begin_cell()
         .store_uint(0, 8)
-        .store_dict(v13)), v8);
+        .store_dict(__dict_method_20(__dict_method_20(null(), 51065135818459385347574250312853146822620586594996463797054414300406918686668, begin_parse(v10)), 107878361799212983662495570378745491379550006934010968359181619763835345146430, __tasm_slice_lit_0()))
+        .end_cell(), v8);
 }
 

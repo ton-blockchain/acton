@@ -3,8 +3,7 @@
 
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
     do {
-        var v0 = msg_value + 1;
-        var v1 = v0 > 5;
+        var v1 = (msg_value + 1) > 5;
     } until (v1);
 }
 

@@ -2,9 +2,7 @@
 #pragma version >=0.4.0;
 
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    var v0 = msg_value < 0;
-    throw_if(77, v0);
-    var v1 = msg_value > -1;
-    throw_unless(78, v1);
+    throw_if(77, msg_value < 0);
+    throw_unless(78, msg_value > -1);
 }
 

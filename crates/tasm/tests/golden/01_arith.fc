@@ -2,9 +2,7 @@
 #pragma version >=0.4.0;
 
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    var v0 = msg_value + 7;
-    var v1 = v0 * 3;
-    var v2 = v1 + -11;
+    var v2 = ((msg_value + 7) * 3) + -11;
     var v3 = v2 / 5;
     var v4 = v2 % 5;
 }
