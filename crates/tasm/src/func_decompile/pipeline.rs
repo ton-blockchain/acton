@@ -5,6 +5,7 @@ use super::method_model::{
 };
 use super::render::format_cell_literal;
 use super::stage_patterns::{MethodPatterns, apply_pattern_rewrites};
+use super::stage_rename::improve_variable_names;
 use super::stage_simplify::simplify_method_body;
 use super::stage_stack::{LiftContext, LiftResult, LiftState, lift_instructions};
 use crate::decompile::Disassembler;
@@ -260,6 +261,7 @@ impl FuncDecompiler {
             );
             let mut body = lift.stmts;
             simplify_method_body(&mut body);
+            improve_variable_names(&mut body);
             let method_ast = MethodAst {
                 signature,
                 leading_comments,
@@ -427,6 +429,7 @@ impl FuncDecompiler {
                 }
             }
             simplify_method_body(&mut body);
+            improve_variable_names(&mut body);
 
             let method_ast = MethodAst {
                 signature,

@@ -1,4 +1,4 @@
-use super::ast::{ExprAst, StmtAst, UnaryOp, Var};
+use super::ast::{BinaryOp, ExprAst, StmtAst, UnaryOp, Var};
 use std::collections::{BTreeMap, HashMap};
 
 #[derive(Debug, Clone)]
@@ -45,6 +45,107 @@ fn simplify_stmt_list(stmts: &mut Vec<StmtAst>) {
         if !inline_single_use_value_once(stmts, &index) {
             break;
         }
+    }
+
+    rewrite_comparison_patterns_stmt_list(stmts);
+}
+
+fn rewrite_comparison_patterns_stmt_list(stmts: &mut [StmtAst]) {
+    for stmt in stmts {
+        rewrite_comparison_patterns_stmt(stmt);
+    }
+}
+
+fn rewrite_comparison_patterns_stmt(stmt: &mut StmtAst) {
+    match stmt {
+        StmtAst::Comment(_) | StmtAst::Return(None) => {}
+        StmtAst::VarDecl { expr, .. }
+        | StmtAst::Assign { expr, .. }
+        | StmtAst::Return(Some(expr)) => rewrite_comparison_patterns_expr(expr),
+        StmtAst::Call { args, .. } => {
+            for arg in args {
+                rewrite_comparison_patterns_expr(arg);
+            }
+        }
+        StmtAst::If {
+            condition,
+            then_body,
+            else_body,
+            ..
+        } => {
+            rewrite_comparison_patterns_expr(condition);
+            rewrite_comparison_patterns_stmt_list(then_body);
+            if let Some(else_body) = else_body {
+                rewrite_comparison_patterns_stmt_list(else_body);
+            }
+        }
+        StmtAst::Repeat { count, body } => {
+            rewrite_comparison_patterns_expr(count);
+            rewrite_comparison_patterns_stmt_list(body);
+        }
+        StmtAst::DoUntil { body, condition } => {
+            rewrite_comparison_patterns_stmt_list(body);
+            rewrite_comparison_patterns_expr(condition);
+        }
+    }
+}
+
+fn rewrite_comparison_patterns_expr(expr: &mut ExprAst) {
+    match expr {
+        ExprAst::Unary { expr, .. } => rewrite_comparison_patterns_expr(expr),
+        ExprAst::Binary { lhs, rhs, .. } => {
+            rewrite_comparison_patterns_expr(lhs);
+            rewrite_comparison_patterns_expr(rhs);
+        }
+        ExprAst::Ternary {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            rewrite_comparison_patterns_expr(condition);
+            rewrite_comparison_patterns_expr(then_expr);
+            rewrite_comparison_patterns_expr(else_expr);
+        }
+        ExprAst::Tuple(items) => {
+            for item in items {
+                rewrite_comparison_patterns_expr(item);
+            }
+        }
+        ExprAst::Call { args, .. } => {
+            for arg in args {
+                rewrite_comparison_patterns_expr(arg);
+            }
+        }
+        ExprAst::MethodCall { receiver, args, .. } => {
+            rewrite_comparison_patterns_expr(receiver);
+            for arg in args {
+                rewrite_comparison_patterns_expr(arg);
+            }
+        }
+        ExprAst::Ident(_)
+        | ExprAst::Number(_)
+        | ExprAst::StringLiteral(_)
+        | ExprAst::CellLiteral(_)
+        | ExprAst::NullLiteral => {}
+    }
+
+    let ExprAst::Binary { op, rhs, .. } = expr else {
+        return;
+    };
+    if *op == BinaryOp::Greater && is_negative_one(rhs.as_ref()) {
+        *op = BinaryOp::GreaterOrEqual;
+        *rhs = Box::new(ExprAst::Number("0".to_string()));
+    }
+}
+
+fn is_negative_one(expr: &ExprAst) -> bool {
+    match expr {
+        ExprAst::Number(value) => value == "-1",
+        ExprAst::Unary {
+            op: UnaryOp::Negate,
+            expr,
+        } => matches!(expr.as_ref(), ExprAst::Number(value) if value == "1"),
+        _ => false,
     }
 }
 
@@ -553,6 +654,26 @@ fn rewrite_store_calls_expr(expr: &mut ExprAst) {
                     args: moved_args,
                 };
             } else if callee == "end_cell" && args.len() == 1 {
+                let mut moved_args = std::mem::take(args);
+                let receiver = moved_args.remove(0);
+                let method = std::mem::take(callee);
+                *expr = ExprAst::MethodCall {
+                    receiver: Box::new(receiver),
+                    method,
+                    modifying: false,
+                    args: Vec::new(),
+                };
+            } else if callee == "cell_hash" && args.len() == 1 {
+                let mut moved_args = std::mem::take(args);
+                let receiver = moved_args.remove(0);
+                let method = std::mem::take(callee);
+                *expr = ExprAst::MethodCall {
+                    receiver: Box::new(receiver),
+                    method,
+                    modifying: false,
+                    args: Vec::new(),
+                };
+            } else if callee == "begin_parse" && args.len() == 1 {
                 let mut moved_args = std::mem::take(args);
                 let receiver = moved_args.remove(0);
                 let method = std::mem::take(callee);
@@ -1113,6 +1234,76 @@ mod tests {
     }
 
     #[test]
+    fn rewrites_begin_parse_call_to_method_call() {
+        let mut body = vec![StmtAst::VarDecl {
+            binding: Var::name("v0"),
+            expr: ExprAst::Call {
+                callee: "begin_parse".to_string(),
+                args: vec![ExprAst::Call {
+                    callee: "get_data".to_string(),
+                    args: vec![],
+                }],
+            },
+        }];
+
+        simplify_method_body(&mut body);
+
+        assert_eq!(body.len(), 1);
+        let StmtAst::VarDecl { expr, .. } = &body[0] else {
+            panic!("expected var decl");
+        };
+        match expr {
+            ExprAst::MethodCall {
+                receiver,
+                method,
+                modifying,
+                args,
+            } => {
+                assert_eq!(method, "begin_parse");
+                assert!(!*modifying);
+                assert!(args.is_empty());
+                assert!(matches!(
+                    receiver.as_ref(),
+                    ExprAst::Call { callee, args } if callee == "get_data" && args.is_empty()
+                ));
+            }
+            _ => panic!("expected method call"),
+        }
+    }
+
+    #[test]
+    fn rewrites_cell_hash_call_to_method_call() {
+        let mut body = vec![StmtAst::VarDecl {
+            binding: Var::name("v0"),
+            expr: ExprAst::Call {
+                callee: "cell_hash".to_string(),
+                args: vec![ident("cell_0")],
+            },
+        }];
+
+        simplify_method_body(&mut body);
+
+        assert_eq!(body.len(), 1);
+        let StmtAst::VarDecl { expr, .. } = &body[0] else {
+            panic!("expected var decl");
+        };
+        match expr {
+            ExprAst::MethodCall {
+                receiver,
+                method,
+                modifying,
+                args,
+            } => {
+                assert_eq!(method, "cell_hash");
+                assert!(!*modifying);
+                assert!(args.is_empty());
+                assert!(matches!(receiver.as_ref(), ExprAst::Ident(name) if name == "cell_0"));
+            }
+            _ => panic!("expected method call"),
+        }
+    }
+
+    #[test]
     fn collapses_linear_store_chain_into_final_use() {
         let mut body = vec![
             StmtAst::VarDecl {
@@ -1193,6 +1384,35 @@ mod tests {
                 }
             }
             _ => panic!("expected set_data call"),
+        }
+    }
+
+    #[test]
+    fn rewrites_gt_minus_one_to_ge_zero() {
+        let mut body = vec![StmtAst::If {
+            negated: false,
+            condition: ExprAst::Binary {
+                lhs: Box::new(ident("x")),
+                op: BinaryOp::Greater,
+                rhs: Box::new(num("-1")),
+                wrap_lhs: false,
+                wrap_rhs: false,
+            },
+            then_body: vec![],
+            else_body: None,
+        }];
+
+        simplify_method_body(&mut body);
+
+        let StmtAst::If { condition, .. } = &body[0] else {
+            panic!("expected if");
+        };
+        match condition {
+            ExprAst::Binary { op, rhs, .. } => {
+                assert_eq!(*op, BinaryOp::GreaterOrEqual);
+                assert_eq!(rhs.as_ref(), &num("0"));
+            }
+            _ => panic!("expected binary condition"),
         }
     }
 }

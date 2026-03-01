@@ -2,23 +2,23 @@
 #pragma version >=0.4.0;
 
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
-    var v0 = begin_parse(get_data());
-    var v2 = v0~load_uint(32);
-    end_parse(v0);
+    var ds = get_data().begin_parse();
+    var v2 = ds~load_uint(32);
+    end_parse(ds);
     if (slice_empty?(in_msg_body)) {
         set_data(begin_cell()
             .store_uint(v2 + 1, 32)
             .end_cell());
         return ();
     }
-    var (v7, v8) = load_uint(in_msg_body, 32);
-    if (v8 == 1) {
+    var (in_msg_slice_0, opcode) = load_uint(in_msg_body, 32);
+    if (opcode == 1) {
         set_data(begin_cell()
             .store_uint(v2 + 1, 32)
             .end_cell());
         return ();
     }
-    if (v8 == 2) {
+    if (opcode == 2) {
         set_data(begin_cell()
             .store_uint(v2 - 1, 32)
             .end_cell());
@@ -27,9 +27,9 @@
 }
 
 int method_127487() impure method_id(127487) {
-    var v0 = begin_parse(get_data());
-    var v2 = v0~load_uint(32);
-    end_parse(v0);
+    var ds = get_data().begin_parse();
+    var v2 = ds~load_uint(32);
+    end_parse(ds);
     return v2;
 }
 

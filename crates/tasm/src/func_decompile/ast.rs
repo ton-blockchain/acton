@@ -299,7 +299,7 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
                 render_expr_with_indent(condition, &indent)
             );
             render_stmt_list(then_body, depth + 1, out);
-            if let Some(else_body) = else_body {
+            if let Some(else_body) = else_body.as_ref().filter(|b| !b.is_empty()) {
                 let _ = writeln!(out, "{indent}}} else {{");
                 render_stmt_list(else_body, depth + 1, out);
             }
@@ -574,5 +574,30 @@ mod tests {
         assert!(out.contains("do {"));
         assert!(out.contains("} until (v0 > 10);"));
         assert!(out.contains("return v0;"));
+    }
+
+    #[test]
+    fn does_not_render_empty_else_block() {
+        let ast = MethodAst {
+            signature: MethodSignatureAst {
+                return_type: "()".to_string(),
+                name: "method_1".to_string(),
+                params: vec![],
+                qualifiers: vec!["impure".to_string()],
+            },
+            leading_comments: vec![],
+            body: vec![StmtAst::If {
+                negated: false,
+                condition: ExprAst::Ident("cond".to_string()),
+                then_body: vec![StmtAst::Return(None)],
+                else_body: Some(vec![]),
+            }],
+        };
+
+        let mut out = String::new();
+        render_method_ast(&ast, &mut out);
+
+        assert!(out.contains("if (cond) {"));
+        assert!(!out.contains("} else {"));
     }
 }
