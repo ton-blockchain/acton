@@ -41,6 +41,22 @@ pub(crate) enum ExprAst {
     },
 }
 
+impl From<String> for ExprAst {
+    fn from(value: String) -> Self {
+        if value == "null()" {
+            Self::NullLiteral
+        } else {
+            Self::Atom(value)
+        }
+    }
+}
+
+impl From<&str> for ExprAst {
+    fn from(value: &str) -> Self {
+        Self::from(value.to_string())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Var {
     Name(String),
