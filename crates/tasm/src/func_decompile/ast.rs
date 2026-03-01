@@ -17,6 +17,24 @@ pub(crate) struct MethodSignatureAst {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ExprAst {
     Atom(String),
+    NullLiteral,
+    Unary {
+        op: String,
+        expr: Box<ExprAst>,
+    },
+    Binary {
+        lhs: Box<ExprAst>,
+        op: String,
+        rhs: Box<ExprAst>,
+        wrap_lhs: bool,
+        wrap_rhs: bool,
+    },
+    Ternary {
+        condition: Box<ExprAst>,
+        then_expr: Box<ExprAst>,
+        else_expr: Box<ExprAst>,
+    },
+    Tuple(Vec<ExprAst>),
     Call {
         callee: String,
         args: Vec<ExprAst>,
@@ -125,17 +143,27 @@ impl StmtAst {
 
     #[must_use]
     pub(crate) fn var(name: impl Into<String>, expr: impl Into<String>) -> Self {
+        let expr = expr.into();
         Self::VarDecl {
             binding: Var::Name(name.into()),
-            expr: ExprAst::Atom(expr.into()),
+            expr: if expr == "null()" {
+                ExprAst::NullLiteral
+            } else {
+                ExprAst::Atom(expr)
+            },
         }
     }
 
     #[must_use]
     pub(crate) fn assign(target: impl Into<String>, expr: impl Into<String>) -> Self {
+        let expr = expr.into();
         Self::Assign {
             target: target.into(),
-            expr: ExprAst::Atom(expr.into()),
+            expr: if expr == "null()" {
+                ExprAst::NullLiteral
+            } else {
+                ExprAst::Atom(expr)
+            },
         }
     }
 }
@@ -216,6 +244,39 @@ fn render_stmt(stmt: &StmtAst, depth: usize, out: &mut String) {
 fn render_expr(expr: &ExprAst) -> String {
     match expr {
         ExprAst::Atom(s) => s.clone(),
+        ExprAst::NullLiteral => "null()".to_string(),
+        ExprAst::Unary { op, expr } => {
+            format!("{op}({})", render_expr(expr))
+        }
+        ExprAst::Binary {
+            lhs,
+            op,
+            rhs,
+            wrap_lhs,
+            wrap_rhs,
+        } => {
+            let lhs = render_expr(lhs);
+            let rhs = render_expr(rhs);
+            let lhs = if *wrap_lhs { format!("({lhs})") } else { lhs };
+            let rhs = if *wrap_rhs { format!("({rhs})") } else { rhs };
+            format!("{lhs} {op} {rhs}")
+        }
+        ExprAst::Ternary {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            format!(
+                "({}) ? ({}) : ({})",
+                render_expr(condition),
+                render_expr(then_expr),
+                render_expr(else_expr)
+            )
+        }
+        ExprAst::Tuple(items) => {
+            let rendered = items.iter().map(render_expr).collect::<Vec<_>>().join(", ");
+            format!("({rendered})")
+        }
         ExprAst::Call { callee, args } => {
             let rendered_args = args.iter().map(render_expr).collect::<Vec<_>>().join(", ");
             format!("{callee}({rendered_args})")

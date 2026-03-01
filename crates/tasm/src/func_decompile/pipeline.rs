@@ -127,6 +127,21 @@ fn stmt_contains_ident(stmt: &StmtAst, ident: &str) -> bool {
 fn expr_contains_ident(expr: &ExprAst, ident: &str) -> bool {
     match expr {
         ExprAst::Atom(text) => contains_ident_text(text, ident),
+        ExprAst::NullLiteral => false,
+        ExprAst::Unary { expr, .. } => expr_contains_ident(expr, ident),
+        ExprAst::Binary { lhs, rhs, .. } => {
+            expr_contains_ident(lhs, ident) || expr_contains_ident(rhs, ident)
+        }
+        ExprAst::Ternary {
+            condition,
+            then_expr,
+            else_expr,
+        } => {
+            expr_contains_ident(condition, ident)
+                || expr_contains_ident(then_expr, ident)
+                || expr_contains_ident(else_expr, ident)
+        }
+        ExprAst::Tuple(items) => items.iter().any(|item| expr_contains_ident(item, ident)),
         ExprAst::Call { callee, args } => {
             contains_ident_text(callee, ident)
                 || args.iter().any(|arg| expr_contains_ident(arg, ident))
@@ -424,9 +439,9 @@ impl FuncDecompiler {
                         if let Some(ret) = return_values.first() {
                             match return_kind {
                                 ReturnKind::Tuple(_) => {
-                                    body.push(StmtAst::Return(Some(ExprAst::Atom(format!(
-                                        "({ret})"
-                                    )))));
+                                    body.push(StmtAst::Return(Some(ExprAst::Tuple(vec![
+                                        ExprAst::Atom(ret.clone()),
+                                    ]))));
                                 }
                                 ReturnKind::Unit => {}
                                 _ => {
@@ -436,10 +451,9 @@ impl FuncDecompiler {
                         }
                     }
                     _ => {
-                        let joined = return_values.join(", ");
-                        body.push(StmtAst::Return(Some(ExprAst::Atom(format!(
-                            "({joined})"
-                        )))));
+                        body.push(StmtAst::Return(Some(ExprAst::Tuple(
+                            return_values.into_iter().map(ExprAst::Atom).collect(),
+                        ))));
                     }
                 }
             }

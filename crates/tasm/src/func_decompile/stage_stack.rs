@@ -976,7 +976,10 @@ fn lift_plain_instruction(
         let rhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_var(stmts, t.clone(), format!("({lhs}) {op} ({rhs})"));
+        stmts.push(StmtAst::VarDecl {
+            binding: t.clone().into(),
+            expr: binary_expr(lhs, op, rhs),
+        });
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
@@ -984,7 +987,10 @@ fn lift_plain_instruction(
     if let Some((op, imm)) = immediate_binary_op(plain) {
         let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_var(stmts, t.clone(), format!("({lhs}) {op} ({imm})"));
+        stmts.push(StmtAst::VarDecl {
+            binding: t.clone().into(),
+            expr: binary_expr(lhs, op, imm),
+        });
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
@@ -993,7 +999,16 @@ fn lift_plain_instruction(
         let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
         let op = if plain.name == "INC" { "+" } else { "-" };
-        push_var(stmts, t.clone(), format!("({lhs}) {op} 1"));
+        stmts.push(StmtAst::VarDecl {
+            binding: t.clone().into(),
+            expr: ExprAst::Binary {
+                lhs: Box::new(atom_expr(lhs)),
+                op: op.to_string(),
+                rhs: Box::new(atom_expr("1")),
+                wrap_lhs: true,
+                wrap_rhs: false,
+            },
+        });
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
@@ -1001,7 +1016,10 @@ fn lift_plain_instruction(
     if plain.name == "NEGATE" {
         let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_var(stmts, t.clone(), format!("-({lhs})"));
+        stmts.push(StmtAst::VarDecl {
+            binding: t.clone().into(),
+            expr: unary_expr("-", lhs),
+        });
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
@@ -1009,7 +1027,10 @@ fn lift_plain_instruction(
     if plain.name == "NOT" {
         let lhs = state.pop_expr_expect(stmts, depth, ValueType::Int);
         let t = state.new_temp();
-        push_var(stmts, t.clone(), format!("~({lhs})"));
+        stmts.push(StmtAst::VarDecl {
+            binding: t.clone().into(),
+            expr: unary_expr("~", lhs),
+        });
         state.push_typed_expr(t, ValueType::Int);
         return;
     }
@@ -1891,11 +1912,10 @@ fn merge_ifelse_stacks(
         if !is_branch_local_temp_expr(then_expr, base_next_temp)
             && !is_branch_local_temp_expr(else_expr, base_next_temp)
         {
-            push_var(
-                pre_if_stmts,
-                merged.clone(),
-                format!("({cond}) ? ({then_expr}) : ({else_expr})"),
-            );
+            pre_if_stmts.push(StmtAst::VarDecl {
+                binding: merged.clone().into(),
+                expr: ternary_expr(cond, then_expr.clone(), else_expr.clone()),
+            });
         } else {
             let init_expr = if merged_ty == ValueType::Int {
                 "0"
@@ -1927,19 +1947,28 @@ fn push_line(stmts: &mut Vec<StmtAst>, _depth: usize, line: String) {
 fn push_var(stmts: &mut Vec<StmtAst>, binding: impl Into<Var>, expr: impl Into<String>) {
     stmts.push(StmtAst::VarDecl {
         binding: binding.into(),
-        expr: ExprAst::Atom(expr.into()),
+        expr: atom_expr(expr),
     });
 }
 
 fn push_assign(stmts: &mut Vec<StmtAst>, target: impl Into<String>, expr: impl Into<String>) {
+    push_assign_expr(stmts, target, atom_expr(expr));
+}
+
+fn push_assign_expr(stmts: &mut Vec<StmtAst>, target: impl Into<String>, expr: ExprAst) {
     stmts.push(StmtAst::Assign {
         target: target.into(),
-        expr: ExprAst::Atom(expr.into()),
+        expr,
     });
 }
 
 fn atom_expr(value: impl Into<String>) -> ExprAst {
-    ExprAst::Atom(value.into())
+    let value = value.into();
+    if value == "null()" {
+        ExprAst::NullLiteral
+    } else {
+        ExprAst::Atom(value)
+    }
 }
 
 fn call_expr(callee: impl Into<String>, args: Vec<String>) -> ExprAst {
@@ -1958,6 +1987,35 @@ fn push_call(stmts: &mut Vec<StmtAst>, callee: impl Into<String>, args: Vec<Stri
 
 fn tensor_var(items: Vec<String>) -> Var {
     Var::tensor(items.into_iter().map(Var::name).collect())
+}
+
+fn unary_expr(op: impl Into<String>, expr: impl Into<String>) -> ExprAst {
+    ExprAst::Unary {
+        op: op.into(),
+        expr: Box::new(atom_expr(expr)),
+    }
+}
+
+fn binary_expr(lhs: impl Into<String>, op: impl Into<String>, rhs: impl Into<String>) -> ExprAst {
+    ExprAst::Binary {
+        lhs: Box::new(atom_expr(lhs)),
+        op: op.into(),
+        rhs: Box::new(atom_expr(rhs)),
+        wrap_lhs: true,
+        wrap_rhs: true,
+    }
+}
+
+fn ternary_expr(
+    condition: impl Into<String>,
+    then_expr: impl Into<String>,
+    else_expr: impl Into<String>,
+) -> ExprAst {
+    ExprAst::Ternary {
+        condition: Box::new(atom_expr(condition)),
+        then_expr: Box::new(atom_expr(then_expr)),
+        else_expr: Box::new(atom_expr(else_expr)),
+    }
 }
 
 fn is_branch_local_temp_expr(expr: &str, base_next_temp: usize) -> bool {
