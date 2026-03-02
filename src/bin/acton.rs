@@ -1172,11 +1172,11 @@ fn example_script_usage() -> StyledStr {
             ),
             (
                 "Execute a deploy script and broadcast to testnet network",
-                "acton script scripts/deploy.tolk --net testnet",
+                "acton script scripts/deploy.tolk --broadcast",
             ),
             (
                 "Execute a deploy script and broadcast to mainnet network",
-                "acton script scripts/deploy.tolk --net mainnet",
+                "acton script scripts/deploy.tolk --broadcast --net mainnet",
             ),
         ],
         "https://i582.github.io/acton/docs/scripting",
