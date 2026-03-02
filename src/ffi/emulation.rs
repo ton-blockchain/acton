@@ -34,7 +34,11 @@ use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr, LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo};
+use tycho_types::models::{
+    AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr,
+    LibDescr, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
+    ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
+};
 
 fn tycho_to_ton_cell(cell: &Cell) -> anyhow::Result<TonArcCell> {
     TonArcCell::from_boc(&Boc::encode(cell)).map_err(Into::into)
@@ -183,11 +187,16 @@ fn send_message_impl(
         IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported anymore"),
     };
 
-    let parsed_msg = msg.parse::<Message<'_>>()?.info;
-    if parsed_msg.is_external_out() {
-        anyhow::bail!("External out messages can't initiate transactions!");
-    }
-    let is_external = parsed_msg.is_external_in();
+    // Internal messages are serialized as RelaxedMessage; ExtIn messages are not.
+    let is_external = match msg.parse::<RelaxedMessage<'_>>() {
+        Ok(parsed) => match parsed.info {
+            RelaxedMsgInfo::ExtOut(_) => {
+                anyhow::bail!("External out messages can't initiate transactions!");
+            }
+            RelaxedMsgInfo::Int(_) => false,
+        },
+        Err(_) => true,
+    };
 
     if let Some(wallet) = ctx.env.find_wallet_by_address(src_std) {
         send_wallet_message(
