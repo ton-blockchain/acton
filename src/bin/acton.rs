@@ -775,7 +775,7 @@ pub enum DocCommand {
 }
 
 #[inline]
-fn get_acton_version() -> &'static str {
+const fn get_acton_version() -> &'static str {
     concat!(
         env!("CARGO_PKG_VERSION"),
         " (",
