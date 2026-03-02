@@ -139,6 +139,35 @@ You can also check their balances on the testnet:
 acton wallet list --balance
 ```
 
+## Getting Testnet TON
+
+Newly created wallets have zero balance. Before running `--broadcast` flows on testnet, fund the wallet with testnet TON.
+
+### Option 1: Request Airdrop During Wallet Creation
+
+```bash
+acton wallet new --name deployer --local --airdrop
+```
+
+Acton creates the wallet and then immediately requests testnet TON from faucet.
+
+### Option 2: Request Airdrop for Existing Wallet
+
+```bash
+acton wallet airdrop deployer
+```
+
+If wallet name is omitted, Acton auto-selects a single configured wallet or asks you to choose when multiple wallets exist.
+
+### Verify Balance
+
+```bash
+acton wallet list --balance
+```
+
+If faucet is temporarily unavailable or rate-limited, retry later or use official TON testnet funding instructions:
+https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
+
 ### Retrieving a Wallet Mnemonic
 
 If you need to export the mnemonic phrase for a configured wallet (e.g., to import it into another app), use the `acton wallet export-mnemonic` command:
