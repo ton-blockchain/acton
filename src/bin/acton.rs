@@ -42,7 +42,7 @@ use ton_source_map::SourceMap;
 #[derive(Parser)]
 #[command(
     name = "acton",
-    version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")")
+    version = get_acton_version()
 )]
 #[command(about = "TON blockchain development tool")]
 #[command(color = ColorChoice::Auto)]
@@ -772,6 +772,18 @@ pub enum DocCommand {
         #[arg(long, help = "Output instruction entry as JSON")]
         json: bool,
     },
+}
+
+#[inline]
+fn get_acton_version() -> &'static str {
+    concat!(
+        env!("CARGO_PKG_VERSION"),
+        " (",
+        env!("GIT_HASH"),
+        " ",
+        env!("BUILD_DATE"),
+        ")"
+    )
 }
 
 fn example_litenode_usage() -> StyledStr {
