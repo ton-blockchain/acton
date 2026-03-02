@@ -154,8 +154,16 @@ help: rename to camelCase: badMethod
 34 |                 val fromMethod = instance.Bad_method();
    |                                           ^^^^^^^^^^ badMethod
 
+warning[E028]: global variable declarations are not allowed
+   --> [ROOT]/contracts/main[LINE]
+   |
+13 |             global Bad_global: int
+   |                    ^^^^^^^^^^ global variable declaration is not allowed
+   |
+   = move the variable into a function scope or contract storage
+
 
 9 issues can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain S001
+For example: acton check --explain E028

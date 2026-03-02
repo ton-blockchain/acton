@@ -1,3 +1,11 @@
+warning[E028]: global variable declarations are not allowed
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |             global foo: int
+  |                    ^^^ global variable declaration is not allowed
+  |
+  = move the variable into a function scope or contract storage
+
 warning[E004]: usage of deprecated symbol
   --> [ROOT]/contracts/main[LINE]
   |

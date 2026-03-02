@@ -16,6 +16,7 @@ pub mod mutable_variable_can_be_immutable;
 pub mod name_case_checker;
 pub mod negated_is_type_can_use_not_is;
 pub mod no_bounce_handler;
+pub mod no_global_variables;
 pub mod pure_function_call_unused;
 pub mod reserve_mode_literal;
 pub mod safety_comment_helpers;
