@@ -34,11 +34,7 @@ use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{
-    AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr,
-    LibDescr, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
-    ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
-};
+use tycho_types::models::{AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr, LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo};
 
 fn tycho_to_ton_cell(cell: &Cell) -> anyhow::Result<TonArcCell> {
     TonArcCell::from_boc(&Boc::encode(cell)).map_err(Into::into)
@@ -187,6 +183,12 @@ fn send_message_impl(
         IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported anymore"),
     };
 
+    let parsed_msg = msg.parse::<Message<'_>>()?.info;
+    if parsed_msg.is_external_out() {
+        anyhow::bail!("External out messages can't initiate transactions!");
+    }
+    let is_external = parsed_msg.is_external_in();
+
     if let Some(wallet) = ctx.env.find_wallet_by_address(src_std) {
         send_wallet_message(
             &msg,
@@ -254,13 +256,15 @@ fn send_message_impl(
         emulator.send_message(world_state, msg, &libs, Some(src))?
     };
 
-    if let [SendMessageResult::Error(_), ..] = &emulations[..]
+    if let [SendMessageResult::Error(error), ..] = &emulations[..]
         && emulations.len() == 1
     {
         // TODO return error with type when unions are supported in ffi
-        // ctx.asserts
-        //     .fail(format!("Cannot send message: {}", error.error));
-        stack.push(TupleItem::Null);
+        if is_external {
+            stack.push(TupleItem::Null);
+        }
+        ctx.asserts
+            .fail(format!("Cannot send message: {}", error.error));
         return Ok(());
     }
 
