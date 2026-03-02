@@ -64,6 +64,9 @@ fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
         TupleItem::Slice(c) => Ok(JsonStackEntry::Slice {
             slice: Boc::encode_base64(c),
         }),
+        TupleItem::Cont(c) => Ok(JsonStackEntry::Slice {
+            slice: Boc::encode_base64(c),
+        }),
         TupleItem::Builder(c) => Ok(JsonStackEntry::Builder {
             builder: Boc::encode_base64(c),
         }),
@@ -89,6 +92,7 @@ pub fn legacy_item_to_json(item: &TupleItem) -> anyhow::Result<Value> {
             }
             Ok(serde_json::json!(["num", format!("0x{i:x}")]))
         }
+        TupleItem::Cont(c) => Ok(serde_json::json!(["cont", { "bytes": Boc::encode_base64(c) }])),
         TupleItem::Cell(c) => Ok(serde_json::json!(["cell", { "bytes": Boc::encode_base64(c) }])),
         TupleItem::Slice(c) => Ok(serde_json::json!(["slice", { "bytes": Boc::encode_base64(c) }])),
         TupleItem::Builder(c) => {

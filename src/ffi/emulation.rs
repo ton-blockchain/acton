@@ -1389,6 +1389,27 @@ fn set_shard_account_impl(
     Ok(())
 }
 
+extension!(call_tolk_function in (Context) with (function: TupleItem, arg: BigInt, addr: StdAddr) using call_tolk_function_impl);
+fn call_tolk_function_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    function: TupleItem,
+    arg: BigInt,
+    addr: StdAddr,
+) -> anyhow::Result<()> {
+    let cont = match function {
+        TupleItem::Slice(cont) => cont,
+        _ => anyhow::bail!("Expected Slice, got {:?}", function),
+    };
+    let args_stack = Tuple(vec![TupleItem::Int(arg)]);
+    let mut empty_stack = Tuple(vec![]);
+    let res = run_get_method_impl(ctx, &mut empty_stack, args_stack, "int".parse()?, "inner-get-method".parse()?, BigInt::from(0), cont, addr);
+    if let Err(err) = res {
+        anyhow::bail!("Failed to call tolk function: {}", err);
+    }
+    Ok(())
+}
+
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     register_ext_methods!(executor, ctx, {
         6 => build : 2,
@@ -1419,5 +1440,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         33 => get_shard_account : 1,
         34 => set_shard_account : 2,
         35 => save_trace_name : 2,
+        501 => call_tolk_function : 3,
     });
 }

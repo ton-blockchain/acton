@@ -272,6 +272,7 @@ fun Expectation<Maybe<T>>.toBeDefined(self) {
         Assert.fail("expect(<actual>).toBeDefined()", self.location);
     }
 }
+
 /// Asserts that actual `Maybe<T>` value is `None`.
 ///
 /// Fails when actual value is `Some`.

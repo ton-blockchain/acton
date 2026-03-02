@@ -209,6 +209,7 @@ impl DebugContext {
 
     fn get_item_type(item: &TupleItem) -> String {
         match item {
+            TupleItem::Cont(_) => "cont".to_string(),
             TupleItem::Null => "null".to_string(),
             TupleItem::Int(_) => "int".to_string(),
             TupleItem::Nan => "nan".to_string(),

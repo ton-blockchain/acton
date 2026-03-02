@@ -1262,6 +1262,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                     "null".to_owned()
                 }
             }
+            TupleItem::Cont(cell) => {
+                let s = Boc::encode_hex(cell);
+                if colorize { s.dimmed().to_string() } else { s }
+            }
             TupleItem::Nan => "NaN".to_owned(),
             TupleItem::Cell(cell) => {
                 let s = Boc::encode_hex(cell);

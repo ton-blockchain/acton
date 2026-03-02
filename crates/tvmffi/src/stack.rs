@@ -110,6 +110,7 @@ pub enum TupleItem {
     Null,
     Int(BigInt),
     Nan,
+    Cont(Cell),
     Cell(Cell),
     Slice(Cell),
     Builder(Cell),

@@ -1,5 +1,5 @@
 use crate::stack::{Tuple, TupleItem};
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
@@ -39,6 +39,20 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
             builder.store_small_uint(0x02, 8)?;
             builder.store_uint(0, 7)?;
             builder.store_bigint(value, 257, true)?;
+        }
+        TupleItem::Cont(cell) => {
+            // TODO support continuation
+            // tag
+            builder.store_small_uint(0, 2)?;
+            // nargs
+            builder.store_uint(0, 1)?;
+            // stack
+            builder.store_uint(0, 1)?;
+            // savelist
+            builder.store_uint(0, 1)?;
+            // cp
+            builder.store_bit(true)?;
+            builder.store_uint(0, 16)?;
         }
         TupleItem::Nan => {
             builder.store_small_uint(0x02, 8)?;
@@ -99,6 +113,34 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
     Ok(())
 }
 
+pub fn parse_vm_cell_slice(parser: &mut CellSlice<'_>) -> Result<Cell, anyhow::Error> {
+    let start_bits = parser.load_uint(10)? as u16;
+    let end_bits = parser.load_uint(10)? as u16;
+    let start_refs = parser.load_uint(3)? as u8;
+    let end_refs = parser.load_uint(3)? as u8;
+
+    let cell_ref = parser.load_reference_cloned()?;
+
+    let mut parser = cell_ref.as_slice_allow_exotic();
+    parser.skip_first(start_bits, start_refs)?;
+
+    let root_data_size = end_bits.saturating_sub(start_bits);
+    let mut root_bits = vec![0u8; root_data_size.div_ceil(8) as usize];
+    parser.load_raw(&mut root_bits, root_data_size)?;
+
+    let mut builder = CellBuilder::new();
+    builder.store_raw(&root_bits, root_data_size)?;
+
+    for _ in start_refs..end_refs {
+        let next_ref = parser.load_reference_cloned()?;
+        builder.store_reference(next_ref)?;
+    }
+
+    let final_cell = builder.build()?;
+
+    Ok(final_cell)
+}
+
 /// Parse a tuple item from a cell parser
 pub fn parse_tuple_item(parser: &mut CellSlice<'_>) -> Result<TupleItem, anyhow::Error> {
     let kind = parser.load_small_uint(8)?;
@@ -122,33 +164,7 @@ pub fn parse_tuple_item(parser: &mut CellSlice<'_>) -> Result<TupleItem, anyhow:
             let cell = parser.load_reference_cloned()?;
             Ok(TupleItem::Cell(cell))
         }
-        4 => {
-            let start_bits = parser.load_uint(10)? as u16;
-            let end_bits = parser.load_uint(10)? as u16;
-            let start_refs = parser.load_uint(3)? as u8;
-            let end_refs = parser.load_uint(3)? as u8;
-
-            let cell_ref = parser.load_reference_cloned()?;
-
-            let mut parser = cell_ref.as_slice_allow_exotic();
-            parser.skip_first(start_bits, start_refs)?;
-
-            let root_data_size = end_bits.saturating_sub(start_bits);
-            let mut root_bits = vec![0u8; root_data_size.div_ceil(8) as usize];
-            parser.load_raw(&mut root_bits, root_data_size)?;
-
-            let mut builder = CellBuilder::new();
-            builder.store_raw(&root_bits, root_data_size)?;
-
-            for _ in start_refs..end_refs {
-                let next_ref = parser.load_reference_cloned()?;
-                builder.store_reference(next_ref)?;
-            }
-
-            let final_cell = builder.build()?;
-
-            Ok(TupleItem::Slice(final_cell))
-        }
+        4 => Ok(TupleItem::Slice(parse_vm_cell_slice(parser)?)),
         5 => {
             let cell = parser.load_reference_cloned()?;
             Ok(TupleItem::Builder(cell))
@@ -188,8 +204,31 @@ pub fn parse_tuple_item(parser: &mut CellSlice<'_>) -> Result<TupleItem, anyhow:
             Ok(TupleItem::Tuple(Tuple(items)))
         }
         6 => {
-            // TODO: support continuation
-            Ok(TupleItem::Null)
+            // TODO: fully support continuation
+            let tag = parser.load_uint(2)?;
+            if(tag != 0) {
+                return Err(anyhow!("Unsupported continuation tag: {tag}"));
+            }
+            let mut nargs = 0;
+            if(parser.load_bit()?) {
+                nargs = parser.load_uint(13)?;
+            }
+
+            if(parser.load_bit()?) {
+                return Err(anyhow!("cont_std with Stack is not supported"));
+            }
+
+            if(parser.load_bit()?) {
+                return Err(anyhow!("cont_std with Savelist is not supported"));
+            }
+
+            let mut cp = 0;
+            if(parser.load_bit()?) {
+                cp = parser.load_uint(16)?;
+            }
+
+            let cont = parse_vm_cell_slice(parser)?;
+            Ok(TupleItem::Cont(cont))
         }
         _ => Err(anyhow!("Unsupported stack item kind: {kind}")),
     }
