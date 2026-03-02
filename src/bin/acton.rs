@@ -1769,8 +1769,19 @@ fn main() {
     };
 
     if let Err(err) = result {
-        eprintln!("{} {}", "Error:".red(), err);
+        print_error(&err);
         process::exit(1)
+    }
+}
+
+fn print_error(err: &anyhow::Error) {
+    eprintln!("{} {}", "Error:".red(), err);
+
+    for cause in err.chain().skip(1) {
+        eprintln!("\nCaused by:");
+        for line in cause.to_string().lines() {
+            eprintln!("  {}", line);
+        }
     }
 }
 
