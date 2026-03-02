@@ -1,5 +1,5 @@
-use crate::common::{acton_exe, assert_ui};
-use crate::support::project::ActonCommand;
+use crate::common::acton_exe;
+use crate::support::project::{ActonCommand, ProcessCommandBuilder};
 use fs_extra::dir::{CopyOptions, copy};
 use include_dir::{Dir, include_dir};
 use std::collections::HashMap;
@@ -101,7 +101,7 @@ impl FixtureProject {
 
     /// Get `ActonCommand` builder for this project
     pub(crate) fn acton(&self) -> ActonCommand {
-        let cmd = snapbox::cmd::Command::new(acton_exe()).with_assert(assert_ui());
+        let cmd = ProcessCommandBuilder::new(acton_exe());
         ActonCommand {
             cmd,
             project: Arc::new(crate::support::project::ProjectRef {

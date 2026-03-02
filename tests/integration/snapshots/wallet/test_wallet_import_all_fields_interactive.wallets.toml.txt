@@ -1,0 +1,7 @@
+[wallets.interactive-wallet]
+kind = "v5r1"
+workchain = 0
+keys = { [MNEMONIC] }
+
+[wallets.interactive-wallet.expected]
+[WALLET_ADDRESS_TESTNET]

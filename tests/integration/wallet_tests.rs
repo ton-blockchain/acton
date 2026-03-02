@@ -3,6 +3,8 @@ use crate::support::project::ProjectBuilder;
 use acton::wallets;
 use serde_json::Value;
 use std::fs;
+#[cfg(unix)]
+use std::time::Duration;
 use ton_api::Network;
 use tonlib_core::cell::Cell;
 use tonlib_core::tlb_types::tlb::TLB;
@@ -292,6 +294,39 @@ fn test_wallet_import_local() {
     output.assert_file_snapshot_matches(
         "wallets.toml",
         "integration/snapshots/wallet/test_wallet_import_local.wallets.toml.txt",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_wallet_import_all_fields_interactive() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-import-all-fields-interactive").build();
+    let mut session = project
+        .acton()
+        .wallet_import()
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Wallet name:");
+    session.send_line("interactive-wallet", "failed to send wallet name");
+
+    session.expect("Save wallet to:");
+    session.send_line("", "failed to select default local wallet config");
+
+    session.expect("Enter mnemonic (24 words):");
+    session.send_line(TEST_MNEMONIC, "failed to send mnemonic");
+
+    session.expect("Wallet type:");
+    session.send_line("", "failed to select default wallet type");
+
+    session.expect("Wallet successfully created and added to");
+    session.expect(Eof);
+
+    session.assert_file_snapshot_matches(
+        "wallets.toml",
+        "integration/snapshots/wallet/test_wallet_import_all_fields_interactive.wallets.toml.txt",
     );
 }
 
