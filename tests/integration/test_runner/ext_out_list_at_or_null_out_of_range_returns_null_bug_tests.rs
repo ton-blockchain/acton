@@ -107,7 +107,7 @@ get fun `test-ct-ext-out-list-atornull-out-of-range`() {
 
     val txs = net.sendExternal(
         createExternalMessage(externalAddress, CtTriggerExternal { queryId: 2 }),
-    );
+    )!;
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;
@@ -131,7 +131,7 @@ get fun `test-ct-ext-out-list-atornull-negative-index`() {
 
     val txs = net.sendExternal(
         createExternalMessage(externalAddress, CtTriggerExternal { queryId: 3 }),
-    );
+    )!;
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;
@@ -179,7 +179,7 @@ get fun `test-ct-ext-out-list-atornull-valid-index`() {
 
     val txs = net.sendExternal(
         createExternalMessage(externalAddress, CtTriggerExternal { queryId: 5 }),
-    );
+    )!;
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;
