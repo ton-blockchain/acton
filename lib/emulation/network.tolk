@@ -472,9 +472,10 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
 
 /// Sends an external incoming message to the specified destination address.
 /// Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
-fun net.sendExternal(msg: OutMessage): SendResultList {
+/// Returns `null` if external message was not accepted or destination account does not exist.
+fun net.sendExternal(msg: OutMessage): SendResultList? {
     // from and mode fields do not affect anything in case of an ExtIn message
-    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell())!;
+    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell());
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.

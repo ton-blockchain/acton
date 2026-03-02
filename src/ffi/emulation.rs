@@ -254,11 +254,14 @@ fn send_message_impl(
         emulator.send_message(world_state, msg, &libs, Some(src))?
     };
 
-    if let [SendMessageResult::Error(error), ..] = &emulations[..]
+    if let [SendMessageResult::Error(_), ..] = &emulations[..]
         && emulations.len() == 1
     {
-        ctx.asserts
-            .fail(format!("Cannot send message: {}", error.error));
+        // TODO return error with type when unions are supported in ffi
+        // ctx.asserts
+        //     .fail(format!("Cannot send message: {}", error.error));
+        stack.push(TupleItem::Null);
+        return Ok(());
     }
 
     let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
