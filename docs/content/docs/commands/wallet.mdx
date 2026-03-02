@@ -31,6 +31,7 @@ This command will start an interactive prompt to guide you through the wallet cr
 | `--local`             | Flag   | Save wallet to local `wallets.toml`                            |
 | `--global`            | Flag   | Save wallet to global `global.wallets.toml`                    |
 | `--secure`            | Bool   | Use secure native store (Keyring) (default: true if available) |
+| `--airdrop`           | Flag   | Request testnet TON from faucet after wallet creation (default: false) |
 | `--json`              | Flag   | Output result as JSON                                          |
 
 **Supported wallet versions:**
@@ -55,6 +56,7 @@ You will be prompted to:
 2. Choose where to save it (local or global)
 3. Select the wallet version from a list
 4. Choose whether to store the mnemonic in the system's secure keyring (recommended)
+5. Choose whether to request testnet TON from faucet automatically
 
 **Non-interactive Creation:**
 
@@ -64,6 +66,9 @@ acton wallet new --name deployer --version v5r1 --local
 
 # Create a global highload wallet
 acton wallet new --name shared-sender --version highloadv2r2 --global
+
+# Create wallet and request testnet TON from faucet immediately
+acton wallet new --name deployer --version v5r1 --local --airdrop
 ```
 
 **Wallet name normalization:**
@@ -80,6 +85,12 @@ Example: `My Wallet 123!` becomes `my-wallet-123`.
 - If secure native store is available and `--secure` is omitted, Acton prompts and defaults to secure storage.
 - If secure native store is unavailable and `--secure=true` is passed explicitly, the command fails.
 - If secure native store is unavailable and `--secure` is omitted (or `false`), mnemonic is stored in plain text config.
+
+**`--airdrop` behavior:**
+
+- Default is `false`.
+- In interactive mode, if `--airdrop` is not passed, Acton asks whether to request testnet TON automatically.
+- In non-interactive mode, `--airdrop` must be passed explicitly to trigger auto-request.
 
 #### Output
 
@@ -103,6 +114,10 @@ keys = { mnemonic-keyring = "my-project:deployer" }
 
 For local wallets, keyring id usually includes project prefix (`<project>:<wallet>`).
 For global wallets, keyring id is wallet name.
+
+In `--json` mode, output includes:
+- `airdrop_requested` (boolean)
+- optional `airdrop` object when auto-request was attempted (`--airdrop` or interactive confirmation)
 
 ---
 
@@ -246,12 +261,13 @@ acton wallet airdrop [NAME]
 ```
 
 This command requests a PoW challenge from faucet, solves it locally, and submits claim for selected wallet address.
+Acton retries transient faucet errors (network/5xx) automatically with short backoff.
 
 #### Options
 
 | Option                 | Type   | Description                          |
 |------------------------|--------|--------------------------------------|
-| `--faucet-url <URL>`   | String | Faucet URL (default: `http://localhost:3001`) |
+| `--faucet-url <URL>`   | String | Faucet URL (default: `https://acton.monster/faucet/`) |
 | `--json`               | Flag   | Output result as JSON                |
 
 #### Example
@@ -259,6 +275,26 @@ This command requests a PoW challenge from faucet, solves it locally, and submit
 ```bash
 acton wallet airdrop deployer --faucet-url https://your-faucet.example
 ```
+
+When `--json` is used:
+
+#### Success JSON
+
+| Field        | Type    | Description                                                  |
+|--------------|---------|--------------------------------------------------------------|
+| `success`    | Boolean | Always `true` for successful airdrop                         |
+| `message`    | String  | Faucet success message (or default `"Success"` if omitted)   |
+| `address`    | String  | Wallet address used for claim                                |
+| `difficulty` | Number  | PoW difficulty returned by faucet                            |
+| `nonce`      | Number  | Solved PoW nonce                                             |
+| `solve_ms`   | Number  | Time spent solving PoW challenge in milliseconds             |
+
+#### Error JSON
+
+| Field     | Type    | Description                                         |
+|-----------|---------|-----------------------------------------------------|
+| `success` | Boolean | Always `false` for failed airdrop                   |
+| `error`   | String  | Human-readable error message describing the failure |
 
 ---
 

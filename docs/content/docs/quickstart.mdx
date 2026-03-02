@@ -131,12 +131,19 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
 
         This will generate a new wallet and save it to `wallets.toml` in your project root.
         By default, Acton stores mnemonic in your system's secure keyring/keychain (when available).
+        In interactive mode, Acton will also ask if you want to request testnet TON from faucet right after wallet creation.
+
+        If you run non-interactively (for example in CI), use `--airdrop` to request faucet funds automatically:
+
+        ```bash
+        acton wallet new --name deployer --local --airdrop
+        ```
 
         <Callout type="warn">
             If secure keyring is unavailable, or you choose plain text storage (`--secure false`), `wallets.toml` will contain your private mnemonic. **Never commit it to git!** Acton automatically adds it to `.gitignore`.
         </Callout>
 
-        Since this is a testnet wallet, you'll need some testnet TONs. Get them from the **[Testnet Giver Bot](https://t.me/testgiver_ton_bot)** by sending your new wallet address.
+        If you skip faucet request (or it fails), you can still fund your wallet from the **[Testnet Giver Bot](https://t.me/testgiver_ton_bot)** by sending your wallet address.
     </Step>
 
     <Step title="Deploying contract">

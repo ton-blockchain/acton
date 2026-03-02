@@ -840,6 +840,8 @@ fn test_wallet_new_json() {
     assert!(json["address"].is_string());
     assert_eq!(json["kind"], "v5r1");
     assert_eq!(json["is_global"], false);
+    assert_eq!(json["airdrop_requested"], false);
+    assert!(json.get("airdrop").is_none());
 }
 
 #[test]

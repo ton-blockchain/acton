@@ -1,0 +1,7 @@
+Error: Failed to parse challenge response
+
+Caused by:
+  error decoding response body
+
+Caused by:
+  missing field `difficulty` at line 1 column 30

@@ -1256,6 +1256,15 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn wallet_airdrop(mut self) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wallet")
+            .arg("airdrop")
+            .current_dir(&self.project.path);
+        self
+    }
+
     pub(crate) fn with_duration(mut self, duration: &str) -> Self {
         self.cmd = self.cmd.arg("--duration").arg(duration);
         self

@@ -1,0 +1,1 @@
+Error: Faucet returned error 429 Too Many Requests: Too many requests from your IP. Only 2 requests per 24 hours are allowed. Please try again later.

@@ -1,0 +1,1 @@
+Error: Faucet URL scheme must be http or https

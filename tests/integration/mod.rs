@@ -29,5 +29,6 @@ mod stdlib_tests;
 mod test_runner;
 mod test_tests;
 mod verify_tests;
+mod wallet_airdrop_tests;
 mod wallet_tests;
 mod wrapper_tests;
