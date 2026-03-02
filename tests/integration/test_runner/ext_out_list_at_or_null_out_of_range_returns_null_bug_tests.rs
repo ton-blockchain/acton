@@ -155,7 +155,7 @@ get fun `test-ct-ext-out-list-atornull-opcode-mismatch`() {
 
     val txs = net.sendExternal(
         createExternalMessage(externalAddress, CtTriggerExternal { queryId: 4 }),
-    );
+    )!;
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;
