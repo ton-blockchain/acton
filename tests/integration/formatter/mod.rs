@@ -885,7 +885,7 @@ get fun `test-formatter-external-out-println-destinations`() {
         ),
     );
 
-    expect(txs).toHaveLength(1);
+    expect(txs!).toHaveLength(1);
     println(txs);
 }
 "#,
@@ -910,7 +910,7 @@ get fun `test-formatter-ext-in-exit-code-with-backtrace-full`() {
         ),
     );
 
-    expect(txs).toHaveLength(1);
+    expect(txs!).toHaveLength(1);
     println(txs);
 }
 "#,

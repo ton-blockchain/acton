@@ -146,7 +146,7 @@ get fun `test-send-external-collects-externals`() {
 
     val txs = net.sendExternal(
         createExternalMessage(harness.address, TriggerExternal { id: 1 }),
-    );
+    )!;
 
     expect(txs).toHaveLength(1);
     val tx = txs.at(0);
@@ -182,7 +182,7 @@ get fun `test-create-external-message-with-external-src`() {
             null,
             externalDest(),
         ),
-    );
+    )!;
 
     expect(txs).toHaveLength(1);
     expect(txs.at(0).externals).toHaveLength(2);
@@ -205,10 +205,10 @@ get fun `test-send-external-repeatable`() {
 
     val first = net.sendExternal(
         createExternalMessage(harness.address, TriggerExternal { id: 3 }),
-    );
+    )!;
     val second = net.sendExternal(
         createExternalMessage(harness.address, TriggerExternal { id: 4 }),
-    );
+    )!;
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);
@@ -257,7 +257,7 @@ get fun `test-find-external-out-message-bug`() {
         createExternalMessage(harness.address, TriggerExternal { id: 5 }),
     );
 
-    val found = txs.findExternalOutMessage<ExternalAlpha>({
+    val found = txs!.findExternalOutMessage<ExternalAlpha>({
         from: harness.address,
         to: createAddressNone(),
     });

@@ -187,6 +187,17 @@ fn send_message_impl(
         IntAddr::Var(_) => anyhow::bail!("Var addresses are not supported anymore"),
     };
 
+    // Internal messages are serialized as RelaxedMessage; ExtIn messages are not.
+    let is_external = match msg.parse::<RelaxedMessage<'_>>() {
+        Ok(parsed) => match parsed.info {
+            RelaxedMsgInfo::ExtOut(_) => {
+                anyhow::bail!("External out messages can't initiate transactions!");
+            }
+            RelaxedMsgInfo::Int(_) => false,
+        },
+        Err(_) => true,
+    };
+
     if let Some(wallet) = ctx.env.find_wallet_by_address(src_std) {
         send_wallet_message(
             &msg,
@@ -257,6 +268,11 @@ fn send_message_impl(
     if let [SendMessageResult::Error(error), ..] = &emulations[..]
         && emulations.len() == 1
     {
+        // TODO return error with type when unions are supported in ffi
+        if is_external {
+            stack.push(TupleItem::Null);
+            return Ok(());
+        }
         ctx.asserts
             .fail(format!("Cannot send message: {}", error.error));
     }
