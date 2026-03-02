@@ -1,7 +1,6 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use acton::wallets;
-use keyring::{Entry, Error as KeyringError};
 use serde_json::Value;
 use std::fs;
 use ton_api::Network;
@@ -11,6 +10,7 @@ use tonlib_core::wallet::mnemonic::Mnemonic;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tonlib_core::wallet::wallet_version::WalletVersion;
 
+#[allow(dead_code)]
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
 
@@ -732,8 +732,11 @@ fn test_wallet_remove_requires_confirmation_in_non_interactive_mode() {
     output.assert_contains("Re-run with -y/--yes in non-interactive mode");
 }
 
+#[cfg(feature = "only_ci")]
 #[test]
 fn test_wallet_remove_deletes_keyring_mnemonic() {
+    use keyring::{Entry, Error as KeyringError};
+
     if !wallets::is_keyring_supported() {
         return;
     }

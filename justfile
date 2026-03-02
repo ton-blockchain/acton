@@ -1,5 +1,6 @@
 CARGO_TEST := `if cargo nextest --version >/dev/null 2>&1; then echo "cargo nextest run"; else echo "cargo test"; fi`
 TEST_SERIAL_ARGS := `if cargo nextest --version >/dev/null 2>&1; then echo "--test-threads 1"; else echo "-- --test-threads 1"; fi`
+TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci" } else { "" }
 
 all: precommit
 
@@ -16,9 +17,9 @@ test-serial:
     {{ CARGO_TEST }} -p retrace {{ TEST_SERIAL_ARGS }}
 
 test-integration:
-    {{ CARGO_TEST }} --test integration_test
+    {{ CARGO_TEST }} --test integration_test {{ TEST_FEATURE_ARGS }}
     # we need test by test execution due to single debug port
-    # {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }}
+    # {{ CARGO_TEST }} --test debug_test {{ TEST_SERIAL_ARGS }} {{ TEST_FEATURE_ARGS }}
 
 test-tree-sitter:
     cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
