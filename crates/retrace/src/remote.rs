@@ -47,14 +47,18 @@ impl TonCenterClient {
         }
 
         let response = request.send().await?;
-        let status = response.status();
-        let text = response.text().await?;
-        if !status.is_success() {
-            anyhow::bail!("TonCenter V3 error {status}: {text}");
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter V3 returned status: {}", response.status());
         }
-        let response_data: TransactionData = serde_json::from_str(&text).map_err(|e| {
-            anyhow::anyhow!("Failed to decode TonCenter V3 response: {e}. Body: {text}")
-        })?;
+
+        let result: serde_json::Value = response.json().await?;
+
+        if let Some(error) = result.get("error") {
+            anyhow::bail!("TonCenter V3 error: {error}");
+        }
+
+        let response_data: TransactionData = serde_json::from_value(result)
+            .map_err(|e| anyhow::anyhow!("Failed to decode TonCenter V3 response: {e}"))?;
         Ok(response_data)
     }
 
@@ -79,14 +83,18 @@ impl TonCenterClient {
         }
 
         let response = request.send().await?;
-        let status = response.status();
-        let text = response.text().await?;
-        if !status.is_success() {
-            anyhow::bail!("TonCenter V3 error {status}: {text}");
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter V3 returned status: {}", response.status());
         }
-        let response_data: BlocksResponse = serde_json::from_str(&text).map_err(|e| {
-            anyhow::anyhow!("Failed to decode TonCenter V3 response: {e}. Body: {text}")
-        })?;
+
+        let result: serde_json::Value = response.json().await?;
+
+        if let Some(error) = result.get("error") {
+            anyhow::bail!("TonCenter V3 error: {error}");
+        }
+
+        let response_data: BlocksResponse = serde_json::from_value(result)
+            .map_err(|e| anyhow::anyhow!("Failed to decode TonCenter V3 response: {e}"))?;
         Ok(response_data)
     }
 
@@ -123,13 +131,18 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
-        let response: serde_json::Value = request.send().await?.json().await?;
+        let response = request.send().await?;
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+        }
 
-        if let Some(error) = response.get("error") {
+        let result: serde_json::Value = response.json().await?;
+
+        if let Some(error) = result.get("error") {
             anyhow::bail!("TonCenter V2 error: {error}");
         }
 
-        let result = response.get("result").and_then(|v| v.as_array()).cloned();
+        let result = result.get("result").and_then(|v| v.as_array()).cloned();
         Ok(result.unwrap_or_default())
     }
 
@@ -146,13 +159,18 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
-        let response: serde_json::Value = request.send().await?.json().await?;
+        let response = request.send().await?;
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+        }
 
-        if let Some(error) = response.get("error") {
+        let result: serde_json::Value = response.json().await?;
+
+        if let Some(error) = result.get("error") {
             anyhow::bail!("TonCenter V2 error: {error}");
         }
 
-        let result = response
+        let result = result
             .get("result")
             .and_then(|v| v.get("result"))
             .and_then(|v| v.as_array());
