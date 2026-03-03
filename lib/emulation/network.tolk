@@ -20,6 +20,7 @@
 
 import "@stdlib/gas-payments"
 import "@stdlib/reflection"
+import "../types/big_array"
 import "../ffi/ffi"
 import "../fmt"
 import "../testing/assert"
@@ -172,12 +173,11 @@ fun SendResult.allOutActions(self): OutActionList {
 /// This list represent all transactions produced by a [net.send] call.
 ///
 /// To get a single send result, use [SendResultList.at] method.
-type SendResultList = array<tuple>
+type SendResultList = BigArray<SendResult>
 
 /// Returns the send result at the given index.
 fun SendResultList.at(self, index: int): SendResult {
-    val tuple = self.get(index) as tuple;
-    return SendResult.fromTuple(tuple);
+    return self.get(index);
 }
 
 /// Wait for the transaction to be applied on the blockchain.
@@ -367,7 +367,7 @@ fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
     }
-    val tx = ffi.findTransactionByParams(self, params.toTuple());
+    val tx = ffi.findTransactionByParams(self.toTuple(), params.toTuple());
     if (tx == null) {
         return Maybe<Transaction>.none();
     }
@@ -403,7 +403,7 @@ fun net.send(from: address, message: OutMessage): SendResultList {
     if (rawRes == null) {
         Assert.fail("ffi.sendMessageFrom unexpectedly returned null")
     }
-    return rawRes;
+    return SendResultList.fromTuple(rawRes!);
 }
 
 /// Send a single message from a specified address.
@@ -475,7 +475,11 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
 /// Returns `null` if external message was not accepted or destination account does not exist.
 fun net.sendExternal(msg: OutMessage): SendResultList? {
     // from and mode fields do not affect anything in case of an ExtIn message
-    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell());
+    val rawRes = ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell());
+    if (rawRes == null) {
+        return null;
+    }
+    return SendResultList.fromTuple(rawRes!);
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
@@ -1225,7 +1229,7 @@ fun __treasuryCode(): cell asm """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
-fun ffi.sendMessageFrom(msg: cell, from: cell): SendResultList? asm "9 EXTCALL"
+fun ffi.sendMessageFrom(msg: cell, from: cell): tuple? asm "9 EXTCALL"
 fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
 fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: string, returnType: string, args: tuple): tuple? asm "8 EXTCALL"
 fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"

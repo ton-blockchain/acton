@@ -3,6 +3,7 @@
 //! This module is mostly used for defining FFI functions that are called from the TVM emulator.
 use crate::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 use thiserror::Error;
 use tycho_types::cell::Cell;
 use tycho_types::cell::HashBytes;
@@ -78,20 +79,110 @@ impl FromStack for Vec<u8> {
 /// Convert a `TupleItem` to a list of strings.
 impl FromStack for Vec<String> {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
-        let items = match item {
-            TupleItem::Tuple(tuple) => tuple.0,
-            TupleItem::TypedTuple { inner, .. } => inner.0,
-            _ => {
-                return Err(ArgError::TypeMismatch {
-                    expected: "Tuple(String[])",
-                });
-            }
-        };
-
-        items
+        Vec::<TupleItem>::from_item(item)?
             .into_iter()
             .map(String::from_item)
             .collect::<Result<Vec<_>, _>>()
+    }
+}
+
+fn decode_big_array_items(tuple: Tuple) -> Result<Vec<TupleItem>, ArgError> {
+    if tuple.len() != 3 {
+        return Err(ArgError::TypeMismatch {
+            expected: "Tuple(BigArray<T>)",
+        });
+    }
+
+    let mut fields = tuple.0.into_iter();
+    let is_init = fields.next().ok_or(ArgError::TypeMismatch {
+        expected: "Tuple(BigArray<T>)",
+    })?;
+    let top_level = fields.next().ok_or(ArgError::TypeMismatch {
+        expected: "Tuple(BigArray<T>)",
+    })?;
+    let size_item = fields.next().ok_or(ArgError::TypeMismatch {
+        expected: "Tuple(BigArray<T>)",
+    })?;
+
+    if !matches!(is_init, TupleItem::Int(_)) {
+        return Err(ArgError::TypeMismatch {
+            expected: "Tuple(BigArray<T>)",
+        });
+    }
+
+    let TupleItem::Tuple(top_level) = top_level else {
+        return Err(ArgError::TypeMismatch {
+            expected: "Tuple(BigArray<T>)",
+        });
+    };
+
+    let TupleItem::Int(size) = size_item else {
+        return Err(ArgError::TypeMismatch {
+            expected: "Tuple(BigArray<T>)",
+        });
+    };
+
+    let Some(size) = size.to_usize() else {
+        return Err(ArgError::TypeMismatch {
+            expected: "Tuple(BigArray<T>)",
+        });
+    };
+
+    let mut result = Vec::with_capacity(size);
+    for bin in top_level.0 {
+        let TupleItem::Tuple(bin_items) = bin else {
+            return Err(ArgError::TypeMismatch {
+                expected: "Tuple(BigArray<T>)",
+            });
+        };
+
+        for item in bin_items.0 {
+            if result.len() == size {
+                break;
+            }
+            result.push(item);
+        }
+
+        if result.len() == size {
+            break;
+        }
+    }
+
+    if result.len() != size {
+        return Err(ArgError::TypeMismatch {
+            expected: "Tuple(BigArray<T>)",
+        });
+    }
+
+    Ok(result)
+}
+
+fn decode_vec_like_items(item: TupleItem) -> Result<Vec<TupleItem>, ArgError> {
+    let tuple = match item {
+        TupleItem::Tuple(tuple) => tuple,
+        TupleItem::TypedTuple { inner, .. } => inner,
+        _ => {
+            return Err(ArgError::TypeMismatch {
+                expected: "Tuple(Array<T> | BigArray<T>)",
+            });
+        }
+    };
+
+    let looks_like_big_array = tuple.len() == 3
+        && matches!(tuple.first(), Some(TupleItem::Int(_)))
+        && matches!(tuple.get(1), Some(TupleItem::Tuple(top_level)) if top_level.len() == 255)
+        && matches!(tuple.get(2), Some(TupleItem::Int(_)));
+
+    if looks_like_big_array {
+        decode_big_array_items(tuple)
+    } else {
+        Ok(tuple.0)
+    }
+}
+
+impl FromStack for Vec<TupleItem> {
+    fn from_item(item: TupleItem) -> Result<Self, ArgError> {
+        decode_vec_like_items(item)
     }
 }
 
@@ -425,6 +516,38 @@ mod tests {
         words.push_string("three");
 
         let parsed = Vec::<String>::from_item(TupleItem::Tuple(words)).unwrap();
+        assert_eq!(parsed, vec!["one", "two", "three"]);
+    }
+
+    #[test]
+    fn test_vec_tuple_item_from_big_array() {
+        let values = vec![
+            TupleItem::Int(1.into()),
+            TupleItem::Int(2.into()),
+            TupleItem::Int(3.into()),
+        ];
+
+        let big_array = TupleItem::big_array_from_items(values.clone());
+        let parsed = Vec::<TupleItem>::from_item(big_array).unwrap();
+        assert_eq!(parsed, values);
+    }
+
+    #[test]
+    fn test_vec_string_from_big_array() {
+        let mut one = Tuple::empty();
+        one.push_string("one");
+        let mut two = Tuple::empty();
+        two.push_string("two");
+        let mut three = Tuple::empty();
+        three.push_string("three");
+
+        let big_array = TupleItem::big_array_from_items(vec![
+            one[0].clone(),
+            two[0].clone(),
+            three[0].clone(),
+        ]);
+
+        let parsed = Vec::<String>::from_item(big_array).unwrap();
         assert_eq!(parsed, vec!["one", "two", "three"]);
     }
 

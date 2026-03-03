@@ -212,6 +212,8 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
 
     /// Parse transaction items into `SendResult` structures
     fn parse_send_results(&self, tx_items: &[TupleItem]) -> Vec<SendResult> {
+        let tx_items = Self::flatten_big_array_items(tx_items).unwrap_or_else(|| tx_items.to_vec());
+
         tx_items
             .iter()
             .filter_map(|el| {
@@ -269,6 +271,48 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 })
             })
             .collect::<Vec<_>>()
+    }
+
+    fn flatten_big_array_items(items: &[TupleItem]) -> Option<Vec<TupleItem>> {
+        if items.len() != 3 {
+            return None;
+        }
+
+        let TupleItem::Int(_) = &items[0] else {
+            return None;
+        };
+        let TupleItem::Tuple(top_level) = &items[1] else {
+            return None;
+        };
+        let TupleItem::Int(size) = &items[2] else {
+            return None;
+        };
+
+        let size = size.to_usize()?;
+        let mut result = Vec::with_capacity(size);
+
+        for bin in top_level.iter() {
+            let TupleItem::Tuple(bin_items) = bin else {
+                return None;
+            };
+
+            for item in bin_items.iter() {
+                if result.len() == size {
+                    break;
+                }
+                result.push(item.clone());
+            }
+
+            if result.len() == size {
+                break;
+            }
+        }
+
+        if result.len() != size {
+            return None;
+        }
+
+        Some(result)
     }
 
     /// Collect all known contract addresses from send results

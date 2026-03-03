@@ -121,6 +121,45 @@ pub enum TupleItem {
 }
 
 impl TupleItem {
+    pub fn big_array_from_items(v: Vec<TupleItem>) -> Self {
+        const BIN_SIZE: usize = 255;
+        const BIN_COUNT: usize = 255;
+        const MAX_SIZE: usize = BIN_SIZE * BIN_COUNT;
+
+        let size = v.len();
+        assert!(
+            size <= MAX_SIZE,
+            "BigArray supports at most {MAX_SIZE} items, got {size}"
+        );
+
+        // BigArray layout in stack tuple:
+        // [isInit: bool, topLevel: array<array<T>>, size: int]
+        // where topLevel is always 255 bins after init().
+        let mut bins = vec![Vec::<TupleItem>::new(); BIN_COUNT];
+        for (index, value) in v.into_iter().enumerate() {
+            let bin_idx = index / BIN_SIZE;
+            bins[bin_idx].push(value);
+        }
+
+        let top_level = bins
+            .into_iter()
+            .map(|bin| Self::Tuple(Tuple(bin)))
+            .collect::<Vec<_>>();
+
+        Self::Tuple(Tuple(vec![
+            // true in TVM is represented as -1.
+            Self::Int(BigInt::from(-1)),
+            Self::Tuple(Tuple(top_level)),
+            Self::Int(BigInt::from(size)),
+        ]))
+    }
+
+    pub fn big_array_from_vec(v: Vec<BigInt>) -> Self {
+        Self::big_array_from_items(v.into_iter().map(Self::Int).collect())
+    }
+}
+
+impl TupleItem {
     fn equal_to(&self, other: &Self) -> bool {
         // Since strings can be build in different cells, we need to compare string values.
         if let TupleItem::Cell(left) | TupleItem::Slice(left) = self
