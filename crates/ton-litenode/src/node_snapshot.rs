@@ -238,6 +238,7 @@ impl Node {
             });
 
         self.rebuild_indexes();
+        self.rebuild_global_libraries_from_accounts()?;
         Ok(())
     }
 

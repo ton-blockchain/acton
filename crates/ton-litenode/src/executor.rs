@@ -54,6 +54,7 @@ pub trait TvmExecutor {
         in_msg: &BocBytes,
         ctx: &ExecContext,
         config: &BocBytes,
+        libs: Option<&BocBytes>,
     ) -> anyhow::Result<ExecResult>;
 }
 
@@ -75,6 +76,7 @@ impl TvmExecutor for TvmEmulatorAdapter {
         in_msg: &BocBytes,
         ctx: &ExecContext,
         config: &BocBytes,
+        libs: Option<&BocBytes>,
     ) -> anyhow::Result<ExecResult> {
         // 1. Prepare inputs
         let config_b64 = STANDARD.encode(config);
@@ -86,6 +88,7 @@ impl TvmExecutor for TvmEmulatorAdapter {
         let shard_account_b64 = STANDARD.encode(shard_account);
 
         let args = RunTransactionArgs {
+            libs: libs.map(|value| STANDARD.encode(value)),
             shard_account: shard_account_b64,
             now: ctx.gen_utime,
             lt: ctx.lt,

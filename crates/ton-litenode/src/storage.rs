@@ -2,7 +2,7 @@ use crate::litenode::{LiteNodeBlockId, LiteNodeTransactionId};
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 use tycho_types::models::{StdAddr, StdAddrFormat};
@@ -12,6 +12,15 @@ pub const EMPTY_CELL_BASE64: &str = "te6cckEBAQEAAgAAAEysuc0=";
 pub struct CellStore {
     pub conn: Option<Arc<Mutex<Connection>>>,
     pub boc_by_hash: HashMap<Hash256, BocBytes>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GlobalLibraryEntry {
+    pub hash: Hash256,
+    pub lib_boc: BocBytes,
+    pub publishers: BTreeSet<Addr>,
+    pub first_seen_lt: Lt,
+    pub last_seen_lt: Lt,
 }
 
 impl CellStore {

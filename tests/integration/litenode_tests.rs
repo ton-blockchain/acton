@@ -6,6 +6,7 @@ use std::fs;
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
+use tycho_types::boc::Boc;
 
 const CHILD_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -106,6 +107,11 @@ fun main() {
     println1("GETTER_CONTRACT={}", getterAddress);
 }
 "#;
+
+const LIBRARY_CONTRACT: &str = r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+";
 
 #[test]
 fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
@@ -323,6 +329,120 @@ fn litenode_supports_try_locate_transaction_endpoints() {
         try_locate_tx_rpc["result"]["hash"].as_str(),
         try_locate_tx["result"]["hash"].as_str()
     );
+
+    node.stop();
+}
+
+#[test]
+fn litenode_supports_library_publish_and_get_libraries_endpoint() {
+    let project = ProjectBuilder::new("litenode-library-support")
+        .contract("library_contract", LIBRARY_CONTRACT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .litenode()
+        .before_start(|cmd| cmd.build())
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    project
+        .acton()
+        .library()
+        .publish()
+        .arg("library_contract")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--net")
+        .arg("custom:localnet")
+        .arg("--duration")
+        .arg("1y")
+        .arg("--amount")
+        .arg("5")
+        .arg("--yes")
+        .arg("--local")
+        .arg("--api-key")
+        .arg("local-test-api-key")
+        .run()
+        .success();
+
+    let libraries_toml = fs::read_to_string(project.path().join("libraries.toml"))
+        .expect("Failed to read libraries.toml");
+    let libraries_doc: toml::Value = toml::from_str(&libraries_toml).expect("Invalid TOML");
+    let libraries = libraries_doc["libraries"]
+        .as_table()
+        .expect("`libraries` table is missing");
+    let (_, lib_entry) = libraries
+        .iter()
+        .next()
+        .expect("Expected at least one published library");
+    let library_hash = lib_entry["hash"]
+        .as_str()
+        .expect("Library hash is missing")
+        .to_string();
+    let library_code_b64 = lib_entry["code"]
+        .as_str()
+        .expect("Library code is missing")
+        .to_string();
+
+    let query = format!("/api/v2/getLibraries?libraries={library_hash}");
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let get_libraries_response = loop {
+        let response = node.get_json(&query);
+        let has_result = response
+            .pointer("/result/result")
+            .and_then(Value::as_array)
+            .is_some_and(|items| !items.is_empty());
+        if has_result || Instant::now() >= deadline {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+
+    let result_items = get_libraries_response
+        .pointer("/result/result")
+        .and_then(Value::as_array)
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected getLibraries result array, got:\n{}",
+                serde_json::to_string_pretty(&get_libraries_response).unwrap_or_default()
+            )
+        });
+    assert!(
+        !result_items.is_empty(),
+        "Expected non-empty getLibraries result, got:\n{}",
+        serde_json::to_string_pretty(&get_libraries_response).unwrap_or_default()
+    );
+    let first = &result_items[0];
+    assert_eq!(first["hash"].as_str(), Some(library_hash.as_str()));
+    assert_eq!(first["data"].as_str(), Some(library_code_b64.as_str()));
+    assert!(
+        first["publishers_count"].as_u64().unwrap_or_default() >= 1,
+        "Expected at least one publisher in getLibraries response: {}",
+        serde_json::to_string_pretty(first).unwrap_or_default()
+    );
+
+    project
+        .acton()
+        .library()
+        .fetch(&library_hash)
+        .arg("--net")
+        .arg("custom:localnet")
+        .arg("--api-key")
+        .arg("local-test-api-key")
+        .arg("--output")
+        .arg("fetched_library.boc")
+        .run()
+        .success();
+
+    let fetched_boc = fs::read(project.path().join("fetched_library.boc"))
+        .expect("Failed to read fetched library boc");
+    let fetched_cell = Boc::decode(&fetched_boc).expect("Fetched library BOC must be valid");
+    let fetched_hash = hex::encode(fetched_cell.repr_hash().as_array());
+    assert_eq!(fetched_hash, library_hash);
 
     node.stop();
 }

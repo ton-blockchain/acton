@@ -109,6 +109,20 @@ pub async fn get_extended_address_information(
     .await
 }
 
+pub async fn get_libraries(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetLibrariesRequest>,
+) -> Json<Value> {
+    handle_result(
+        async move {
+            let hashes = parse_libraries_query(&payload.libraries)?;
+            node.get_libraries(hashes).await
+        },
+        |res| v2::map_libraries(res),
+    )
+    .await
+}
+
 pub async fn get_transactions(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetTransactionsRequest>,
@@ -392,6 +406,21 @@ fn parse_config_param(payload: &GetConfigParamRequest) -> anyhow::Result<u32> {
         anyhow::bail!("Config param must be a non-negative integer");
     }
     Ok(raw as u32)
+}
+
+fn parse_libraries_query(raw: &str) -> anyhow::Result<Vec<Hash256>> {
+    let hashes = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(parse_hash_any)
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    if hashes.is_empty() {
+        anyhow::bail!("`libraries` query parameter is required");
+    }
+
+    Ok(hashes)
 }
 
 fn parse_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {

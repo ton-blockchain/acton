@@ -29,6 +29,7 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
         .route("/v2/getAddressInformation", get(get_address_information))
         .route("/v2/getAddressBalance", get(get_address_balance))
         .route("/v2/getAddressState", get(get_address_state))
+        .route("/v2/getLibraries", get(get_libraries))
         .route(
             "/v2/getExtendedAddressInformation",
             get(get_extended_address_information),

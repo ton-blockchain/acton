@@ -1,6 +1,6 @@
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::remote::{RemoteProvider, fetch_remote_shard_account};
-use crate::storage::{self, JettonMasterMeta};
+use crate::storage::{self, GlobalLibraryEntry, JettonMasterMeta};
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
     LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
@@ -12,7 +12,7 @@ use core::cmp;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tonlib_core::TonHash;
@@ -20,7 +20,8 @@ use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
 use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{CellBuilder, CellFamily, Store};
-use tycho_types::models::{AccountState, Message, MsgInfo, ShardAccount};
+use tycho_types::models::{AccountState, LibDescr, Message, MsgInfo, ShardAccount};
+use tycho_types::prelude::HashBytes;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StateSource {
@@ -38,6 +39,9 @@ pub struct Node {
     pub executor: Box<dyn TvmExecutor>,
     pub state_source: StateSource,
     pub conn: Option<Arc<std::sync::Mutex<rusqlite::Connection>>>,
+    pub global_libraries: HashMap<Hash256, GlobalLibraryEntry>,
+    pub vm_global_libs_boc: Option<BocBytes>,
+    pub vm_global_libs_dirty: bool,
 }
 
 pub const GIVER_ADDR: Addr = Addr {
@@ -214,7 +218,7 @@ impl Node {
         // Approximation of global LT
         globals.global_lt = history.blocks.last().map(|b| b.end_lt).unwrap_or(0);
 
-        Ok(Self {
+        let mut node = Self {
             cas,
             latest,
             history,
@@ -224,7 +228,12 @@ impl Node {
             executor,
             state_source,
             conn,
-        })
+            global_libraries: HashMap::new(),
+            vm_global_libs_boc: None,
+            vm_global_libs_dirty: true,
+        };
+        node.rebuild_global_libraries_from_accounts()?;
+        Ok(node)
     }
 
     pub fn send_boc(
@@ -302,10 +311,15 @@ impl Node {
             gen_utime,
             rand_seed: None,
         };
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
 
-        let exec_result = self
-            .executor
-            .execute(&shard_account_boc, &msg_boc, &ctx, &config_boc)?;
+        let exec_result = self.executor.execute(
+            &shard_account_boc,
+            &msg_boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
+        )?;
 
         // 6. Store outputs & 7. Derive hashes
         let tx_hash = compute_boc_hash(&exec_result.tx_boc)?;
@@ -445,6 +459,12 @@ impl Node {
         };
 
         self.apply_commit(pending)?;
+        self.update_public_libraries_from_account_diff(
+            &dst,
+            Some(&shard_account_boc),
+            exec_result.new_account_boc.as_ref(),
+            lt,
+        )?;
 
         self.detect_jetton_masters(&dst)?;
         self.detect_jetton_wallets(&dst)?;
@@ -648,6 +668,222 @@ impl Node {
             workchain: int_addr.workchain as i32,
             addr: int_addr.address.0,
         })
+    }
+
+    pub fn get_libraries(&self, hashes: &[Hash256]) -> Vec<GlobalLibraryEntry> {
+        hashes
+            .iter()
+            .filter_map(|hash| self.global_libraries.get(hash).cloned())
+            .collect()
+    }
+
+    pub(crate) fn rebuild_global_libraries_from_accounts(&mut self) -> anyhow::Result<()> {
+        self.global_libraries.clear();
+
+        let accounts = self.latest.accounts.clone();
+        for (address, meta) in accounts {
+            if meta.status != AccountStatus::Active {
+                continue;
+            }
+
+            let Some(shard_account_boc) = self.cas.get(&meta.account_hash) else {
+                continue;
+            };
+
+            let libs = Self::extract_public_libraries_from_shard_account(&shard_account_boc)?;
+            for (hash, lib_cell) in libs {
+                let lib_boc: BocBytes = Boc::encode(lib_cell).into();
+                let lt = meta.last_trans_lt.unwrap_or(0);
+                let entry =
+                    self.global_libraries
+                        .entry(hash)
+                        .or_insert_with(|| GlobalLibraryEntry {
+                            hash,
+                            lib_boc: lib_boc.clone(),
+                            publishers: std::collections::BTreeSet::new(),
+                            first_seen_lt: lt,
+                            last_seen_lt: lt,
+                        });
+                entry.publishers.insert(address);
+                entry.last_seen_lt = entry.last_seen_lt.max(lt);
+            }
+        }
+
+        self.vm_global_libs_dirty = true;
+        self.vm_global_libs_boc = None;
+        Ok(())
+    }
+
+    fn build_vm_global_libs_boc(&mut self) -> anyhow::Result<Option<BocBytes>> {
+        if !self.vm_global_libs_dirty {
+            return Ok(self.vm_global_libs_boc.clone());
+        }
+
+        let mut libs = tycho_types::dict::Dict::<HashBytes, LibDescr>::new();
+        for (hash, entry) in &self.global_libraries {
+            if entry.publishers.is_empty() {
+                continue;
+            }
+
+            let lib_cell = Boc::decode(&entry.lib_boc).with_context(|| {
+                format!("Failed to decode stored library BOC {}", hash.to_hex())
+            })?;
+            let actual_hash = Hash256(*lib_cell.repr_hash().as_array());
+            if actual_hash != *hash {
+                anyhow::bail!(
+                    "Stored global library hash mismatch for {}: got {}",
+                    hash.to_hex(),
+                    actual_hash.to_hex()
+                );
+            }
+
+            let mut publishers = tycho_types::dict::Dict::<HashBytes, ()>::new();
+            for publisher in &entry.publishers {
+                publishers
+                    .add(HashBytes(publisher.addr), ())
+                    .context("Failed to add publisher to global library record")?;
+            }
+
+            libs.add(
+                HashBytes(hash.0),
+                LibDescr {
+                    lib: lib_cell,
+                    publishers,
+                },
+            )
+            .context("Failed to add global library to VM dictionary")?;
+        }
+
+        self.vm_global_libs_boc = libs.into_root().map(|cell| Boc::encode(cell).into());
+        self.vm_global_libs_dirty = false;
+        Ok(self.vm_global_libs_boc.clone())
+    }
+
+    fn update_public_libraries_from_account_diff(
+        &mut self,
+        account: &Addr,
+        old_shard_account: Option<&BocBytes>,
+        new_shard_account: Option<&BocBytes>,
+        lt: Lt,
+    ) -> anyhow::Result<()> {
+        let old_public = if let Some(old) = old_shard_account {
+            Self::extract_public_libraries_from_shard_account(old)?
+        } else {
+            HashMap::new()
+        };
+        let new_public = if let Some(new_) = new_shard_account {
+            Self::extract_public_libraries_from_shard_account(new_)?
+        } else {
+            HashMap::new()
+        };
+
+        let mut all_hashes = old_public.keys().copied().collect::<HashSet<_>>();
+        all_hashes.extend(new_public.keys().copied());
+
+        for hash in all_hashes {
+            let old_present = old_public.get(&hash);
+            let new_present = new_public.get(&hash);
+
+            match (old_present, new_present) {
+                (Some(_), None) => {
+                    if let Some(entry) = self.global_libraries.get_mut(&hash)
+                        && entry.publishers.remove(account)
+                    {
+                        entry.last_seen_lt = lt;
+                        self.vm_global_libs_dirty = true;
+                    }
+                    if self
+                        .global_libraries
+                        .get(&hash)
+                        .is_some_and(|entry| entry.publishers.is_empty())
+                    {
+                        self.global_libraries.remove(&hash);
+                        self.vm_global_libs_dirty = true;
+                    }
+                }
+                (None, Some(new_lib)) => {
+                    let new_hash = Hash256(*new_lib.repr_hash().as_array());
+                    if new_hash != hash {
+                        anyhow::bail!(
+                            "Public library hash mismatch in account {}: dict key {} != library hash {}",
+                            account,
+                            hash.to_hex(),
+                            new_hash.to_hex()
+                        );
+                    }
+
+                    let lib_boc: BocBytes = Boc::encode(new_lib.clone()).into();
+                    let entry =
+                        self.global_libraries
+                            .entry(hash)
+                            .or_insert_with(|| GlobalLibraryEntry {
+                                hash,
+                                lib_boc: lib_boc.clone(),
+                                publishers: std::collections::BTreeSet::new(),
+                                first_seen_lt: lt,
+                                last_seen_lt: lt,
+                            });
+                    let stored_cell = Boc::decode(&entry.lib_boc)?;
+                    let stored_hash = Hash256(*stored_cell.repr_hash().as_array());
+                    if stored_hash != hash {
+                        anyhow::bail!(
+                            "Global library store is corrupted for {} (stored hash {})",
+                            hash.to_hex(),
+                            stored_hash.to_hex()
+                        );
+                    }
+
+                    if entry.publishers.insert(*account) {
+                        entry.last_seen_lt = lt;
+                        self.vm_global_libs_dirty = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn extract_public_libraries_from_shard_account(
+        shard_account_boc: &BocBytes,
+    ) -> anyhow::Result<HashMap<Hash256, tycho_types::cell::Cell>> {
+        let cell = Boc::decode(shard_account_boc).context("Failed to decode shard account BOC")?;
+        let shard_account = cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse shard account")?;
+        let opt_account = shard_account
+            .account
+            .load()
+            .context("Failed to load optional account from shard account")?;
+
+        let Some(account) = opt_account.0 else {
+            return Ok(HashMap::new());
+        };
+        let AccountState::Active(state_init) = account.state else {
+            return Ok(HashMap::new());
+        };
+
+        let mut result = HashMap::new();
+        for item in state_init.libraries.iter() {
+            let (key_hash, simple_lib) =
+                item.context("Failed to read account library dictionary")?;
+            let key_hash = Hash256(key_hash.0);
+            let root_hash = Hash256(*simple_lib.root.repr_hash().as_array());
+            if root_hash != key_hash {
+                anyhow::bail!(
+                    "Malformed account library entry: key {} != root hash {}",
+                    key_hash.to_hex(),
+                    root_hash.to_hex()
+                );
+            }
+
+            if simple_lib.public {
+                result.insert(key_hash, simple_lib.root);
+            }
+        }
+
+        Ok(result)
     }
 
     fn apply_commit(&mut self, pending: PendingCommit) -> anyhow::Result<()> {
@@ -1003,7 +1239,7 @@ impl Node {
         // Create empty shard account
         let sa = ShardAccount {
             account: tycho_types::cell::Lazy::new(&tycho_types::models::OptionalAccount(None))?,
-            last_trans_hash: tycho_types::prelude::HashBytes([0u8; 32]),
+            last_trans_hash: HashBytes([0u8; 32]),
             last_trans_lt: 0,
         };
         let mut builder = CellBuilder::new();
@@ -1157,7 +1393,7 @@ const fn convert_addr(addr: &tycho_types::models::IntAddr) -> Addr {
 fn create_dev_block_boc(seqno: Seqno, tx_hash: Hash256) -> anyhow::Result<BocBytes> {
     let mut builder = CellBuilder::new();
     builder.store_u32(seqno)?;
-    builder.store_u256(&tycho_types::prelude::HashBytes(tx_hash.0))?;
+    builder.store_u256(&HashBytes(tx_hash.0))?;
     let cell = builder.build()?;
     Ok(Boc::encode(cell).into())
 }
