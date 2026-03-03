@@ -191,6 +191,7 @@ impl Default for LintConfig {
 pub struct FmtSettings {
     pub width: Option<usize>,
     pub ignore: Option<Vec<String>>,
+    pub separate_import_groups: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -283,6 +284,7 @@ impl Default for ActonConfig {
             fmt: Some(FmtSettings {
                 width: Some(100),
                 ignore: Some(vec![]),
+                separate_import_groups: None,
             }),
             build: None,
             litenode: None,
