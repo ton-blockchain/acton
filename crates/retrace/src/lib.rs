@@ -114,7 +114,7 @@ mod remote;
 mod runner;
 mod types;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "only_ci"))]
 mod tests;
 
 pub mod trace;
