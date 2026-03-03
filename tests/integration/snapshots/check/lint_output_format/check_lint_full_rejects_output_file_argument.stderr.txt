@@ -1,0 +1,1 @@
+Error: output_file cannot be used with full output format

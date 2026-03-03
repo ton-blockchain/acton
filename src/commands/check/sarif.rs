@@ -2,7 +2,7 @@ use crate::commands::check::pos;
 use serde_json::json;
 use serde_sarif::sarif;
 use std::collections::{BTreeMap, HashMap};
-use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, DiagnosticTag, Severity};
 use tolk_resolver::{FileDb, Span};
@@ -11,23 +11,15 @@ const DOCS_BASE_URL: &str = "https://i582.github.io/acton/docs";
 const SOURCE_ROOT_URI_BASE_ID: &str = "SRCROOT";
 
 pub(super) fn write_report(
+    writer: &mut dyn Write,
     diagnostics: &[Diagnostic],
     file_db: &FileDb,
     project_root: &Path,
-    output_path: &Path,
 ) -> anyhow::Result<()> {
-    if let Some(parent) = output_path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        fs::create_dir_all(parent)?;
-    }
-
     let report = diagnostics_to_sarif(diagnostics, file_db, project_root)?;
-    fs::write(
-        output_path,
-        format!("{}\n", serde_json::to_string_pretty(&report)?),
-    )?;
+    let json = serde_json::to_string_pretty(&report)?;
 
+    writer.write_all(json.as_bytes())?;
     Ok(())
 }
 
