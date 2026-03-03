@@ -23,6 +23,7 @@ kind = "v4r2"
 workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
+const TEST_LIBRARY_ACCOUNT: &str = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT";
 
 // We don't usually want to store keys this way, but without keys it's almost
 // impossible to use API calls :(
@@ -1678,6 +1679,555 @@ fn test_library_fetch_flag_api_key_overrides_env() {
     assert_eq!(header, Some("flag-api-key"));
 }
 
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_topup_updates_global_metadata_when_local_missing() {
+    let project = ProjectBuilder::new("library-topup-global-fallback").build();
+    write_deployer_wallets(project.path());
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    let global_path = home_temp
+        .path()
+        .join(".config")
+        .join("acton")
+        .join("libraries")
+        .join("global.libraries.toml");
+    write_library_metadata_file(
+        &global_path,
+        "global-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let (_, before_topup) = read_first_library_entry(&global_path);
+    thread::sleep(Duration::from_secs(1));
+
+    project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .arg("topup")
+        .arg("global-lib")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .run()
+        .success()
+        .assert_contains("Top-up transaction sent successfully");
+
+    let (_, after_topup) = read_first_library_entry(&global_path);
+    assert_ne!(
+        before_topup.last_topup_timestamp, after_topup.last_topup_timestamp,
+        "topup should update timestamp in global.libraries.toml when local metadata is absent"
+    );
+    assert!(
+        !project.path().join("libraries.toml").exists(),
+        "local libraries.toml must stay absent in global fallback scenario"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(captured.len(), 2, "expected seqno + sendBoc requests");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[cfg(unix)]
+#[test]
+fn test_library_topup_happy_path_with_duration_and_prompted_amount() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-topup-duration-success").build();
+    write_deployer_wallets(project.path());
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let libraries_path = project.path().join("libraries.toml");
+    write_library_metadata_file(
+        &libraries_path,
+        "my-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let (_, before_topup) = read_first_library_entry(&libraries_path);
+    let mut session = project
+        .acton()
+        .library()
+        .arg("topup")
+        .arg("my-lib")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--duration")
+        .arg("1d")
+        .arg("--yes")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(30)));
+
+    session.expect("Enter amount in TON");
+    session.send_line("1", "failed to provide amount for duration-based topup");
+    session.expect("Top-up transaction sent successfully");
+    session.expect(Eof);
+
+    let (_, after_topup) = read_first_library_entry(&libraries_path);
+    assert_ne!(
+        before_topup.last_topup_timestamp, after_topup.last_topup_timestamp,
+        "duration-based topup should update last_topup_timestamp"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(captured.len(), 2, "expected seqno + sendBoc requests");
+}
+
+#[test]
+fn test_library_fetch_invalid_hash_json_reports_error_object() {
+    let project = ProjectBuilder::new("library-fetch-invalid-hash-json-error").build();
+
+    let output = project
+        .acton()
+        .library()
+        .fetch("not-a-valid-hash")
+        .with_net("testnet")
+        .with_json()
+        .run()
+        .success();
+
+    let payload: JsonValue = serde_json::from_str(&output.get_stdout())
+        .expect("fetch --json must output JSON envelope for validation errors");
+    assert_eq!(payload["success"].as_bool(), Some(false));
+    assert!(
+        payload["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Invalid library hash format"),
+        "unexpected error payload: {}",
+        output.get_stdout()
+    );
+}
+
+#[test]
+fn test_library_fetch_invalid_network_json_reports_error_object() {
+    let project = ProjectBuilder::new("library-fetch-invalid-network-json-error").build();
+
+    let output = project
+        .acton()
+        .library()
+        .fetch(LIB_HASH)
+        .with_net("invalid")
+        .with_json()
+        .run()
+        .success();
+
+    let payload: JsonValue = serde_json::from_str(&output.get_stdout())
+        .expect("fetch --json must output JSON envelope for network errors");
+    assert_eq!(payload["success"].as_bool(), Some(false));
+    assert!(
+        payload["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Unknown network"),
+        "unexpected error payload: {}",
+        output.get_stdout()
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_publish_uses_env_api_key_when_flag_missing() {
+    let project = ProjectBuilder::new("library-publish-env-api-key").build();
+    write_deployer_wallets(project.path());
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .publish()
+        .with_code("te6cckEBAQEAAgAAAEysuc0=")
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--local")
+        .env("TONCENTER_API_KEY", "env-api-key")
+        .run()
+        .success();
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert!(
+        !captured.is_empty(),
+        "publish should produce toncenter requests in happy path"
+    );
+    for req in captured.iter() {
+        let header = req
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
+            .map(|(_, value)| value.as_str());
+        assert_eq!(header, Some("env-api-key"));
+    }
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_publish_flag_api_key_overrides_env() {
+    let project = ProjectBuilder::new("library-publish-flag-api-key").build();
+    write_deployer_wallets(project.path());
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .publish()
+        .with_code("te6cckEBAQEAAgAAAEysuc0=")
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--local")
+        .arg("--api-key")
+        .arg("flag-api-key")
+        .env("TONCENTER_API_KEY", "env-api-key")
+        .run()
+        .success();
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert!(
+        !captured.is_empty(),
+        "publish should produce toncenter requests in happy path"
+    );
+    for req in captured.iter() {
+        let header = req
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
+            .map(|(_, value)| value.as_str());
+        assert_eq!(header, Some("flag-api-key"));
+    }
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_info_uses_env_api_key_when_flag_missing() {
+    let project = ProjectBuilder::new("library-info-env-api-key").build();
+    let libraries_path = project.path().join("libraries.toml");
+    write_library_metadata_file(
+        &libraries_path,
+        "my-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_balance_ok_response("1000000000")]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .arg("info")
+        .arg("my-lib")
+        .env("TONCENTER_API_KEY", "env-api-key")
+        .run()
+        .success();
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected one getAddressBalance request");
+    let header = captured[0]
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
+        .map(|(_, value)| value.as_str());
+    assert_eq!(header, Some("env-api-key"));
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_info_flag_api_key_overrides_env() {
+    let project = ProjectBuilder::new("library-info-flag-api-key").build();
+    let libraries_path = project.path().join("libraries.toml");
+    write_library_metadata_file(
+        &libraries_path,
+        "my-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_balance_ok_response("1000000000")]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .arg("info")
+        .arg("my-lib")
+        .arg("--api-key")
+        .arg("flag-api-key")
+        .env("TONCENTER_API_KEY", "env-api-key")
+        .run()
+        .success();
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected one getAddressBalance request");
+    let header = captured[0]
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
+        .map(|(_, value)| value.as_str());
+    assert_eq!(header, Some("flag-api-key"));
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_topup_uses_env_api_key_when_flag_missing() {
+    let project = ProjectBuilder::new("library-topup-env-api-key").build();
+    write_deployer_wallets(project.path());
+    let libraries_path = project.path().join("libraries.toml");
+    write_library_metadata_file(
+        &libraries_path,
+        "my-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .arg("topup")
+        .arg("my-lib")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .env("TONCENTER_API_KEY", "env-api-key")
+        .run()
+        .success();
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert!(
+        !captured.is_empty(),
+        "topup should produce toncenter requests in happy path"
+    );
+    for req in captured.iter() {
+        let header = req
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
+            .map(|(_, value)| value.as_str());
+        assert_eq!(header, Some("env-api-key"));
+    }
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_topup_flag_api_key_overrides_env() {
+    let project = ProjectBuilder::new("library-topup-flag-api-key").build();
+    write_deployer_wallets(project.path());
+    let libraries_path = project.path().join("libraries.toml");
+    write_library_metadata_file(
+        &libraries_path,
+        "my-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .arg("topup")
+        .arg("my-lib")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--api-key")
+        .arg("flag-api-key")
+        .env("TONCENTER_API_KEY", "env-api-key")
+        .run()
+        .success();
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert!(
+        !captured.is_empty(),
+        "topup should produce toncenter requests in happy path"
+    );
+    for req in captured.iter() {
+        let header = req
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("x-api-key"))
+            .map(|(_, value)| value.as_str());
+        assert_eq!(header, Some("flag-api-key"));
+    }
+}
+
+#[test]
+fn test_library_publish_local_and_global_flags_prefer_global_storage() {
+    let project = ProjectBuilder::new("library-publish-local-global-precedence").build();
+    write_deployer_wallets(project.path());
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+
+    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code("te6cckEBAQEAAgAAAEysuc0=")
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--local")
+        .arg("--global")
+        .run()
+        .success()
+        .assert_contains("Library info saved");
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    assert!(
+        !project.path().join("libraries.toml").exists(),
+        "local metadata file should not be created when both --local and --global are set"
+    );
+
+    let global_path = home_temp
+        .path()
+        .join(".config")
+        .join("acton")
+        .join("libraries")
+        .join("global.libraries.toml");
+    assert!(
+        global_path.exists(),
+        "global metadata should win when both --local and --global are set"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_library_publish_interactive_empty_amount_exits_without_metadata_changes() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-empty-amount-interactive").build();
+    write_deployer_wallets(project.path());
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code("te6cckEBAQEAAgAAAEysuc0=")
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:unused")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(30)));
+
+    session.expect("Enter amount in TON");
+    session.send_line(
+        "   ",
+        "failed to submit whitespace amount input that should trim to empty",
+    );
+    session.expect(Eof);
+
+    assert!(
+        !project.path().join("libraries.toml").exists(),
+        "libraries.toml should not be created when publish amount prompt is left empty"
+    );
+    let global_path = home_temp
+        .path()
+        .join(".config")
+        .join("acton")
+        .join("libraries")
+        .join("global.libraries.toml");
+    assert!(
+        !global_path.exists(),
+        "global metadata should not be created when publish exits on empty amount"
+    );
+}
+
 #[derive(Debug)]
 struct StoredLibraryEntry {
     hash: String,
@@ -1863,6 +2413,64 @@ fn status_text(status: u16) -> &'static str {
         500 => "Internal Server Error",
         _ => "Unknown",
     }
+}
+
+fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "stack": [["num", "0x0"]],
+                "exit_code": 0
+            }
+        })
+        .to_string(),
+    }
+}
+
+fn toncenter_v2_send_boc_ok_response() -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: "{}".to_string(),
+    }
+}
+
+fn toncenter_v2_balance_ok_response(balance: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": balance
+        })
+        .to_string(),
+    }
+}
+
+fn write_library_metadata_file(path: &Path, library_id: &str, network: &str, last_topup: &str) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("failed to create library metadata parent directory");
+    }
+
+    fs::write(
+        path,
+        format!(
+            r#"[libraries.{library_id}]
+name = "MyLib"
+hash = "{lib_hash}"
+code = "te6cckEBAQEAAgAAAEysuc0="
+account = "{account}"
+duration = 31536000
+network = "{network}"
+timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "{last_topup}"
+bits = 1024
+cells = 4
+"#,
+            lib_hash = LIB_HASH,
+            account = TEST_LIBRARY_ACCOUNT,
+        ),
+    )
+    .expect("failed to write library metadata");
 }
 
 fn append_custom_network(project_path: &Path, network_name: &str, v2_url: &str) {
