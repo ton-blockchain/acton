@@ -177,6 +177,9 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .insert("[DEPLOYED_AT]", regex!(r"Deployed at: .*"))
         .unwrap();
     redactions
+        .insert("[LAST_TOPUP_AT]", regex!(r"Last top-up: .*"))
+        .unwrap();
+    redactions
         .insert(
             "[GENERATED_ON]",
             regex!(r"Generated on: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"),

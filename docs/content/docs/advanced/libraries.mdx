@@ -59,7 +59,7 @@ Upon success, you will see the **Library Hash**. This hash is what you'll use to
 > Enter amount in TON (at least 0.1124 TON for 1 year):
 > Send 0.1124 TON to publish library? Note that any extra TON will be refunded. Yes
   ✓ Transaction sent successfully
-  → Library should be available soon at hash: b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27
+  → Library should be available soon at hash: b993c68...
 ```
 
 ### Advanced Options
@@ -84,8 +84,12 @@ acton library info math
 
 This command shows:
 - **Balance**: Current balance of the library account.
-- **Remaining**: Estimated time until the library account runs out of funds, based on current Masterchain storage prices.
+- **Last top-up**: Timestamp used as the reference point for storage runway calculations.
+- **Remaining**: Estimated storage runway based on current Masterchain storage prices and elapsed time since the last top-up.
 - **Hash and Account**: The library's unique hash and its on-chain address.
+
+If the estimated runway is exhausted, Acton prints an urgent warning to top up. This warning does not necessarily mean the account is already frozen, but it signals elevated freeze risk.
+For account state transitions (`active`/`frozen`/`nonexist`) and storage debt behavior, see TON docs: [Address states](https://docs.ton.org/v3/documentation/smart-contracts/addresses/address-states).
 
 ## Extending Library Lifetime
 
@@ -100,6 +104,7 @@ acton library topup math --amount 5.0
 ```
 
 The `topup` command uses the same cost estimation logic as `publish`, ensuring you send enough funds for the desired period.
+After a successful top-up, Acton updates the `last_topup_timestamp` field in library metadata.
 
 ## Fetching a Library
 

@@ -80,6 +80,7 @@ pub struct LibraryConfig {
     pub duration: u64,
     pub network: Network,
     pub timestamp: String,
+    pub last_topup_timestamp: String,
     pub bits: u64,
     pub cells: u64,
 }

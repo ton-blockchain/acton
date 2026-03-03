@@ -369,8 +369,10 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
     let network = Network::from_str(&lib.network.to_string())?;
     let api_client = TonApiClient::new(network, custom_networks, api_key)?;
 
+    let last_topup_timestamp = &lib.last_topup_timestamp;
     let mut balance_u128: Option<u128> = None;
     let mut remaining_seconds: Option<u128> = None;
+    let mut storage_runway_exhausted = false;
 
     if let Ok(balance) = api_client.get_address_balance(&lib.account) {
         balance_u128 = Some(balance.to_string().parse().unwrap_or(0));
@@ -386,7 +388,10 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
         if cost_per_second_x65536 > 0
             && let Some(balance_u128) = balance_u128
         {
-            remaining_seconds = Some((balance_u128 * 65536) / cost_per_second_x65536);
+            let funded_seconds = (balance_u128 * 65536) / cost_per_second_x65536;
+            let elapsed_seconds = elapsed_seconds_since(last_topup_timestamp).unwrap_or(0);
+            storage_runway_exhausted = elapsed_seconds >= funded_seconds;
+            remaining_seconds = Some(funded_seconds.saturating_sub(elapsed_seconds));
         }
     }
 
@@ -398,6 +403,13 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
         "Deployed at:".dimmed(),
         lib.timestamp,
         format_relative_time(&lib.timestamp),
+        w = w
+    );
+    println!(
+        "{:<w$} {} ({})",
+        "Last top-up:".dimmed(),
+        last_topup_timestamp,
+        format_relative_time(last_topup_timestamp),
         w = w
     );
     println!("{:<w$} {}", "Contract:".dimmed(), lib.name);
@@ -426,6 +438,13 @@ pub fn info_cmd(name: Option<String>, api_key: Option<String>) -> anyhow::Result
             format_duration(remaining_seconds as u64),
             remaining_seconds
         );
+
+        if storage_runway_exhausted {
+            println!(
+                "  {} Storage runway is exhausted. Library may still be active, but top up urgently to avoid freeze.",
+                "⚠".yellow().bold()
+            );
+        }
     }
 
     println!("{:<w$} {}", "Code:".dimmed(), lib.code.magenta());
@@ -578,6 +597,11 @@ pub fn topup_cmd(
         "  {} Top-up transaction sent successfully",
         "✓".green().bold()
     );
+
+    let last_topup_timestamp = Local::now().to_rfc3339();
+    update_library_last_topup_timestamp(&lib_name, &last_topup_timestamp)
+        .context("Top-up transaction was sent, but failed to update library metadata")?;
+
     Ok(())
 }
 
@@ -653,6 +677,18 @@ fn format_relative_time(timestamp_str: &str) -> String {
     }
     let years = duration.num_days() / 365;
     format!("{} year{} ago", years, if years > 1 { "s" } else { "" })
+}
+
+fn elapsed_seconds_since(timestamp_str: &str) -> Option<u128> {
+    let dt = DateTime::parse_from_rfc3339(timestamp_str).ok()?;
+    let now = Local::now();
+    let duration = now.signed_duration_since(dt);
+
+    if duration.num_seconds() <= 0 {
+        return Some(0);
+    }
+
+    Some(duration.num_seconds() as u128)
 }
 
 #[must_use]
@@ -762,13 +798,15 @@ fn save_library(
     }
 
     let mut lib_table = Table::new();
+    let now = Local::now().to_rfc3339();
     lib_table.insert("name", value(contract_name));
     lib_table.insert("hash", value(hash));
     lib_table.insert("code", value(code));
     lib_table.insert("account", value(account));
     lib_table.insert("duration", value(duration as i64));
     lib_table.insert("network", value(network));
-    lib_table.insert("timestamp", value(Local::now().to_rfc3339()));
+    lib_table.insert("timestamp", value(now.clone()));
+    lib_table.insert("last_topup_timestamp", value(now));
     lib_table.insert("bits", value(bits as i64));
     lib_table.insert("cells", value(cells as i64));
 
@@ -786,6 +824,55 @@ fn save_library(
     }
 
     Ok(())
+}
+
+fn update_library_last_topup_timestamp(lib_name: &str, timestamp: &str) -> anyhow::Result<()> {
+    let local_path = PathBuf::from("libraries.toml");
+    if update_library_last_topup_timestamp_in_file(&local_path, lib_name, timestamp)? {
+        return Ok(());
+    }
+
+    if let Some(global_path) = global_libraries_path()
+        && update_library_last_topup_timestamp_in_file(&global_path, lib_name, timestamp)?
+    {
+        return Ok(());
+    }
+
+    anyhow::bail!("Library '{lib_name}' metadata was not found in local/global libraries files")
+}
+
+fn update_library_last_topup_timestamp_in_file(
+    path: &Path,
+    lib_name: &str,
+    timestamp: &str,
+) -> anyhow::Result<bool> {
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let mut doc = content
+        .parse::<DocumentMut>()
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    let Some(libraries_item) = doc.get_mut("libraries") else {
+        return Ok(false);
+    };
+    let Some(libraries) = libraries_item.as_table_mut() else {
+        return Ok(false);
+    };
+    let Some(lib_item) = libraries.get_mut(lib_name) else {
+        return Ok(false);
+    };
+    let Some(lib_table) = lib_item.as_table_mut() else {
+        return Ok(false);
+    };
+
+    lib_table.insert("last_topup_timestamp", value(timestamp));
+    fs::write(path, doc.to_string())
+        .with_context(|| format!("Failed to write {}", path.display()))?;
+    Ok(true)
 }
 
 fn parse_duration(s: &str) -> anyhow::Result<u64> {

@@ -410,6 +410,7 @@ account = "EQD..."
 duration = 31536000
 network = "testnet"
 timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "2026-01-05T12:00:00Z"
 bits = 1024
 cells = 4
 "#;
@@ -439,6 +440,7 @@ account = "..."
 duration = 100
 network = "testnet"
 timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "2026-01-05T12:00:00Z"
 bits = 10
 cells = 1
 "#;
@@ -496,6 +498,7 @@ account = "..."
 duration = 100
 network = "mainnet"
 timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "2026-01-05T12:00:00Z"
 bits = 20
 cells = 2
 "#;

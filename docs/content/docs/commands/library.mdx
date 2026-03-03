@@ -149,6 +149,14 @@ If `LIBRARY_NAME` is not provided, it will show a selection list of available li
 acton library info math
 ```
 
+The output includes:
+
+- **Deployed at**: Initial publication timestamp.
+- **Last top-up**: Timestamp of the latest top-up operation. This value is used as the reference point for storage runway calculation.
+- **Remaining**: Estimated storage runway computed from current balance and elapsed time since `last_topup_timestamp`.
+
+If `Remaining` is exhausted, Acton prints a warning that top-up is needed urgently. This does not always mean the account is already frozen, but it indicates elevated freeze risk.
+
 ## Library Top-up
 
 The `topup` subcommand allows you to extend the storage life of a library by sending TON to its account.
@@ -183,3 +191,24 @@ acton library topup math --duration 1y
 ```bash
 acton library topup math --amount 5.5 --wallet my-wallet
 ```
+
+After a successful top-up transaction, Acton updates `last_topup_timestamp` in the corresponding `libraries.toml`/`global.libraries.toml` entry.
+
+## Libraries Metadata File
+
+When library metadata is saved to `libraries.toml` (or `global.libraries.toml`), each entry includes:
+
+| Field                  | Type   | Description                                                                |
+|------------------------|--------|----------------------------------------------------------------------------|
+| `name`                 | String | Contract/library name from config                                          |
+| `hash`                 | String | Library code hash (hex)                                                    |
+| `code`                 | String | Library code BoC (base64)                                                  |
+| `account`              | String | Library account address on-chain                                           |
+| `duration`             | Number | Initial funded duration in seconds (used for publish/top-up estimation)    |
+| `network`              | String | Network where the library is used (`testnet` / `mainnet` / custom network) |
+| `timestamp`            | String | Publication time (RFC3339)                                                 |
+| `last_topup_timestamp` | String | Last successful top-up time (RFC3339), used for `Remaining` calculation    |
+| `bits`                 | Number | Library code size in bits                                                  |
+| `cells`                | Number | Library code size in cells                                                 |
+
+`last_topup_timestamp` is required and is used by `acton library info` to estimate remaining storage runway.
