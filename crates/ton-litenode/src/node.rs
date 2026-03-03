@@ -1397,3 +1397,660 @@ fn create_dev_block_boc(seqno: Seqno, tx_hash: Hash256) -> anyhow::Result<BocByt
     let cell = builder.build()?;
     Ok(Boc::encode(cell).into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::executor::{ExecContext, ExecResult, TvmExecutor};
+    use crate::node::StateSource;
+    use base64::Engine;
+    use std::sync::{Arc, Mutex};
+    use ton_executor::DEFAULT_CONFIG;
+    use tycho_types::cell::{Cell, CellBuilder, Lazy, Store};
+    use tycho_types::dict::Dict;
+    use tycho_types::models::{
+        Account, CurrencyCollection, IntAddr, OptionalAccount, SimpleLib, StateInit, StdAddr,
+    };
+
+    struct NoopExecutor;
+
+    impl TvmExecutor for NoopExecutor {
+        fn execute(
+            &self,
+            _shard_account: &BocBytes,
+            _in_msg: &BocBytes,
+            _ctx: &ExecContext,
+            _config: &BocBytes,
+            _libs: Option<&BocBytes>,
+        ) -> anyhow::Result<ExecResult> {
+            anyhow::bail!("NoopExecutor should not be used in this test")
+        }
+    }
+
+    #[derive(Clone)]
+    struct RecordingExecutor {
+        recorded_libs: Arc<Mutex<Vec<Option<BocBytes>>>>,
+    }
+
+    impl TvmExecutor for RecordingExecutor {
+        fn execute(
+            &self,
+            _shard_account: &BocBytes,
+            _in_msg: &BocBytes,
+            _ctx: &ExecContext,
+            _config: &BocBytes,
+            libs: Option<&BocBytes>,
+        ) -> anyhow::Result<ExecResult> {
+            self.recorded_libs
+                .lock()
+                .expect("recorded libs mutex poisoned")
+                .push(libs.cloned());
+            anyhow::bail!("forced executor failure")
+        }
+    }
+
+    fn make_test_node(executor: Box<dyn TvmExecutor>) -> Node {
+        let config_bytes = base64::engine::general_purpose::STANDARD
+            .decode(DEFAULT_CONFIG)
+            .expect("must decode default config");
+        Node::new(executor, config_bytes.into(), StateSource::Local).expect("must create test node")
+    }
+
+    fn test_addr(byte: u8) -> Addr {
+        Addr {
+            workchain: 0,
+            addr: [byte; 32],
+        }
+    }
+
+    fn make_lib_root(seed: u32) -> Cell {
+        let mut builder = CellBuilder::new();
+        builder.store_u32(seed).expect("must store seed");
+        builder.build().expect("must build test lib root")
+    }
+
+    fn valid_simple_lib_entry(public: bool, seed: u32) -> (HashBytes, SimpleLib) {
+        let root = make_lib_root(seed);
+        let hash = HashBytes(*root.repr_hash().as_array());
+        (hash, SimpleLib { public, root })
+    }
+
+    fn make_active_shard_account_boc(
+        addr: Addr,
+        libraries: Dict<HashBytes, SimpleLib>,
+    ) -> BocBytes {
+        let state_init = StateInit {
+            split_depth: None,
+            special: None,
+            code: None,
+            data: None,
+            libraries,
+        };
+        let account = Account {
+            address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
+            storage_stat: Default::default(),
+            last_trans_lt: 0,
+            balance: CurrencyCollection::new(1_000_000_000),
+            state: AccountState::Active(state_init),
+        };
+        shard_account_boc(OptionalAccount(Some(account)))
+    }
+
+    fn make_uninit_shard_account_boc(addr: Addr) -> BocBytes {
+        let account = Account {
+            address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
+            storage_stat: Default::default(),
+            last_trans_lt: 0,
+            balance: CurrencyCollection::new(1_000_000_000),
+            state: AccountState::Uninit,
+        };
+        shard_account_boc(OptionalAccount(Some(account)))
+    }
+
+    fn make_frozen_shard_account_boc(addr: Addr) -> BocBytes {
+        let account = Account {
+            address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
+            storage_stat: Default::default(),
+            last_trans_lt: 0,
+            balance: CurrencyCollection::new(1_000_000_000),
+            state: AccountState::Frozen(HashBytes([0xAA; 32])),
+        };
+        shard_account_boc(OptionalAccount(Some(account)))
+    }
+
+    fn make_nonexist_shard_account_boc() -> BocBytes {
+        shard_account_boc(OptionalAccount(None))
+    }
+
+    fn shard_account_boc(optional_account: OptionalAccount) -> BocBytes {
+        let shard_account = ShardAccount {
+            account: Lazy::new(&optional_account).expect("must build lazy account"),
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        };
+        let mut builder = CellBuilder::new();
+        shard_account
+            .store_into(&mut builder, Cell::empty_context())
+            .expect("must serialize shard account");
+        let cell = builder.build().expect("must build shard account cell");
+        Boc::encode(cell).into()
+    }
+
+    #[test]
+    fn private_library_is_not_visible_in_global_index() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x11);
+        let old_boc = make_nonexist_shard_account_boc();
+
+        let mut libs = Dict::<HashBytes, SimpleLib>::new();
+        let (key, lib) = valid_simple_lib_entry(false, 1);
+        libs.set(key, lib).expect("must insert private lib");
+        let new_boc = make_active_shard_account_boc(account, libs);
+
+        node.update_public_libraries_from_account_diff(&account, Some(&old_boc), Some(&new_boc), 1)
+            .expect("must update library diff");
+
+        assert!(
+            node.global_libraries.is_empty(),
+            "private libraries must not be added to global index"
+        );
+    }
+
+    #[test]
+    fn add_public_library_by_account_a_is_visible_globally() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_a = test_addr(0x22);
+        let old_boc = make_nonexist_shard_account_boc();
+
+        let mut libs = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 2);
+        libs.set(hash, lib).expect("must insert public lib");
+        let new_boc = make_active_shard_account_boc(account_a, libs);
+
+        node.update_public_libraries_from_account_diff(
+            &account_a,
+            Some(&old_boc),
+            Some(&new_boc),
+            2,
+        )
+        .expect("must update library diff");
+
+        let entries = node.get_libraries(&[Hash256(hash.0)]);
+        assert_eq!(entries.len(), 1, "public library must appear globally");
+        assert!(
+            entries[0].publishers.contains(&account_a),
+            "publisher A must be tracked"
+        );
+    }
+
+    #[test]
+    fn same_public_library_by_two_accounts_has_one_entry_and_two_publishers() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_a = test_addr(0x33);
+        let account_b = test_addr(0x44);
+
+        let mut libs = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 3);
+        libs.set(hash, lib).expect("must insert public lib");
+
+        let active_a = make_active_shard_account_boc(account_a, libs.clone());
+        let active_b = make_active_shard_account_boc(account_b, libs);
+        let empty = make_nonexist_shard_account_boc();
+
+        node.update_public_libraries_from_account_diff(
+            &account_a,
+            Some(&empty),
+            Some(&active_a),
+            3,
+        )
+        .expect("must add publisher A");
+        node.update_public_libraries_from_account_diff(
+            &account_b,
+            Some(&empty),
+            Some(&active_b),
+            4,
+        )
+        .expect("must add publisher B");
+
+        let entries = node.get_libraries(&[Hash256(hash.0)]);
+        assert_eq!(entries.len(), 1, "library hash must have one global entry");
+        assert_eq!(entries[0].publishers.len(), 2, "must have 2 publishers");
+        assert!(entries[0].publishers.contains(&account_a));
+        assert!(entries[0].publishers.contains(&account_b));
+    }
+
+    #[test]
+    fn remove_by_account_a_keeps_entry_with_account_b() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_a = test_addr(0x55);
+        let account_b = test_addr(0x66);
+        let empty = make_nonexist_shard_account_boc();
+
+        let mut with_lib = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 4);
+        with_lib.set(hash, lib).expect("must insert public lib");
+        let active_a_with_lib = make_active_shard_account_boc(account_a, with_lib.clone());
+        let active_b_with_lib = make_active_shard_account_boc(account_b, with_lib);
+        let active_without_lib = make_active_shard_account_boc(account_a, Dict::new());
+
+        node.update_public_libraries_from_account_diff(
+            &account_a,
+            Some(&empty),
+            Some(&active_a_with_lib),
+            4,
+        )
+        .expect("must add publisher A");
+        node.update_public_libraries_from_account_diff(
+            &account_b,
+            Some(&empty),
+            Some(&active_b_with_lib),
+            5,
+        )
+        .expect("must add publisher B");
+        node.update_public_libraries_from_account_diff(
+            &account_a,
+            Some(&active_a_with_lib),
+            Some(&active_without_lib),
+            6,
+        )
+        .expect("must remove publisher A");
+
+        let entries = node.get_libraries(&[Hash256(hash.0)]);
+        assert_eq!(
+            entries.len(),
+            1,
+            "entry must remain while publisher B exists"
+        );
+        assert_eq!(entries[0].publishers.len(), 1);
+        assert!(entries[0].publishers.contains(&account_b));
+    }
+
+    #[test]
+    fn remove_by_last_publisher_deletes_entry() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_a = test_addr(0x77);
+        let account_b = test_addr(0x88);
+        let empty = make_nonexist_shard_account_boc();
+
+        let mut with_lib = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 5);
+        with_lib.set(hash, lib).expect("must insert public lib");
+        let active_with_lib_a = make_active_shard_account_boc(account_a, with_lib.clone());
+        let active_with_lib_b = make_active_shard_account_boc(account_b, with_lib);
+        let active_without_lib_a = make_active_shard_account_boc(account_a, Dict::new());
+        let active_without_lib_b = make_active_shard_account_boc(account_b, Dict::new());
+
+        node.update_public_libraries_from_account_diff(
+            &account_a,
+            Some(&empty),
+            Some(&active_with_lib_a),
+            5,
+        )
+        .expect("must add publisher A");
+        node.update_public_libraries_from_account_diff(
+            &account_b,
+            Some(&empty),
+            Some(&active_with_lib_b),
+            6,
+        )
+        .expect("must add publisher B");
+        node.update_public_libraries_from_account_diff(
+            &account_a,
+            Some(&active_with_lib_a),
+            Some(&active_without_lib_a),
+            7,
+        )
+        .expect("must remove publisher A");
+        node.update_public_libraries_from_account_diff(
+            &account_b,
+            Some(&active_with_lib_b),
+            Some(&active_without_lib_b),
+            8,
+        )
+        .expect("must remove publisher B");
+
+        assert!(
+            node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+            "entry must be deleted when last publisher is removed"
+        );
+    }
+
+    #[test]
+    fn account_state_transitions_clear_published_libraries() {
+        let scenarios = [
+            (
+                "uninit",
+                make_uninit_shard_account_boc as fn(Addr) -> BocBytes,
+            ),
+            (
+                "frozen",
+                make_frozen_shard_account_boc as fn(Addr) -> BocBytes,
+            ),
+        ];
+
+        for (name, next_state_builder) in scenarios {
+            let mut node = make_test_node(Box::new(NoopExecutor));
+            let account = test_addr(0x99);
+            let empty = make_nonexist_shard_account_boc();
+
+            let mut with_lib = Dict::<HashBytes, SimpleLib>::new();
+            let (hash, lib) = valid_simple_lib_entry(true, 6);
+            with_lib.set(hash, lib).expect("must insert public lib");
+            let active_with_lib = make_active_shard_account_boc(account, with_lib);
+            let next_state = next_state_builder(account);
+
+            node.update_public_libraries_from_account_diff(
+                &account,
+                Some(&empty),
+                Some(&active_with_lib),
+                9,
+            )
+            .expect("must add library");
+            node.update_public_libraries_from_account_diff(
+                &account,
+                Some(&active_with_lib),
+                Some(&next_state),
+                10,
+            )
+            .unwrap_or_else(|e| panic!("state transition {name} failed: {e}"));
+
+            assert!(
+                node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+                "state transition {name} must clear published library"
+            );
+        }
+
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x9A);
+        let empty = make_nonexist_shard_account_boc();
+        let mut with_lib = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 7);
+        with_lib.set(hash, lib).expect("must insert public lib");
+        let active_with_lib = make_active_shard_account_boc(account, with_lib);
+        let nonexist = make_nonexist_shard_account_boc();
+
+        node.update_public_libraries_from_account_diff(
+            &account,
+            Some(&empty),
+            Some(&active_with_lib),
+            11,
+        )
+        .expect("must add library");
+        node.update_public_libraries_from_account_diff(
+            &account,
+            Some(&active_with_lib),
+            Some(&nonexist),
+            12,
+        )
+        .expect("nonexist transition must be processed");
+
+        assert!(
+            node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+            "nonexist transition must clear published library"
+        );
+    }
+
+    #[test]
+    fn mixed_actions_non_fatal_failure_uses_final_state_diff_as_source_of_truth() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0xAB);
+        let old_boc = make_nonexist_shard_account_boc();
+
+        // Final state contains public library, so it must be indexed regardless of
+        // intermediate action-phase details.
+        let mut new_libs = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 8);
+        new_libs
+            .set(hash, lib)
+            .expect("must insert final public library");
+        let new_boc = make_active_shard_account_boc(account, new_libs);
+
+        node.update_public_libraries_from_account_diff(
+            &account,
+            Some(&old_boc),
+            Some(&new_boc),
+            13,
+        )
+        .expect("must index from final state");
+
+        assert_eq!(
+            node.get_libraries(&[Hash256(hash.0)]).len(),
+            1,
+            "final state with public library must be indexed"
+        );
+    }
+
+    #[test]
+    fn state_limit_rollback_like_case_does_not_persist_library() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0xBC);
+        let old_boc = make_nonexist_shard_account_boc();
+        let new_boc = make_nonexist_shard_account_boc();
+
+        // Final state unchanged => no library should be indexed.
+        node.update_public_libraries_from_account_diff(
+            &account,
+            Some(&old_boc),
+            Some(&new_boc),
+            14,
+        )
+        .expect("must process rollback-like transition");
+
+        assert!(
+            node.global_libraries.is_empty(),
+            "rolled back library changes must not persist"
+        );
+    }
+
+    #[test]
+    fn hash_mismatch_in_public_library_entry_is_rejected() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0xCD);
+        let old_boc = make_nonexist_shard_account_boc();
+
+        let mut libs = Dict::<HashBytes, SimpleLib>::new();
+        let root = make_lib_root(9);
+        let wrong_key = HashBytes([0xEE; 32]);
+        libs.set(wrong_key, SimpleLib { public: true, root })
+            .expect("must insert malformed library");
+
+        let malformed = make_active_shard_account_boc(account, libs);
+        let err = node
+            .update_public_libraries_from_account_diff(
+                &account,
+                Some(&old_boc),
+                Some(&malformed),
+                15,
+            )
+            .expect_err("hash mismatch must be rejected");
+        let err_text = err.to_string();
+        assert!(
+            err_text.contains("Malformed account library entry"),
+            "unexpected error: {err_text}"
+        );
+    }
+
+    #[allow(clippy::significant_drop_tightening)]
+    #[test]
+    fn next_transaction_receives_global_libs_via_set_libs_argument() {
+        let recorded_libs = Arc::new(Mutex::new(Vec::<Option<BocBytes>>::new()));
+        let executor = RecordingExecutor {
+            recorded_libs: Arc::clone(&recorded_libs),
+        };
+        let mut node = make_test_node(Box::new(executor));
+
+        let publisher = test_addr(0xDE);
+        let old_boc = make_nonexist_shard_account_boc();
+        let mut libs = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 10);
+        libs.set(hash, lib).expect("must insert public lib");
+        let new_boc = make_active_shard_account_boc(publisher, libs);
+        node.update_public_libraries_from_account_diff(
+            &publisher,
+            Some(&old_boc),
+            Some(&new_boc),
+            16,
+        )
+        .expect("must register global public library");
+
+        let destination = test_addr(0xEF);
+        let _ = node.faucet(&destination, 1);
+
+        let calls = recorded_libs.lock().expect("recorded libs mutex poisoned");
+        assert!(!calls.is_empty(), "executor must be invoked");
+        let libs_boc = calls[0]
+            .as_ref()
+            .expect("global libs must be passed to executor");
+        let libs_cell = Boc::decode(libs_boc).expect("libs boc must decode");
+        let mut slice = libs_cell.as_slice_allow_exotic();
+        let dict =
+            Dict::<HashBytes, LibDescr>::load_from_root_ext(&mut slice, Cell::empty_context())
+                .expect("libs dict must decode");
+        assert!(
+            dict.get(HashBytes(hash.0))
+                .expect("must query lib hash")
+                .is_some(),
+            "executor libs dict must include published library"
+        );
+    }
+
+    #[test]
+    fn public_library_added_after_private_transition_becomes_visible() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0xF0);
+        let empty = make_nonexist_shard_account_boc();
+
+        let mut private_libs = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, private_lib) = valid_simple_lib_entry(false, 11);
+        private_libs
+            .set(hash, private_lib)
+            .expect("must insert private lib");
+        let private_state = make_active_shard_account_boc(account, private_libs);
+
+        let mut public_libs = Dict::<HashBytes, SimpleLib>::new();
+        let (same_hash, public_lib) = valid_simple_lib_entry(true, 11);
+        assert_eq!(hash, same_hash, "same seed should produce same hash");
+        public_libs
+            .set(same_hash, public_lib)
+            .expect("must insert public lib");
+        let public_state = make_active_shard_account_boc(account, public_libs);
+
+        node.update_public_libraries_from_account_diff(
+            &account,
+            Some(&empty),
+            Some(&private_state),
+            17,
+        )
+        .expect("private transition must succeed");
+        assert!(
+            node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+            "private library must stay hidden"
+        );
+
+        node.update_public_libraries_from_account_diff(
+            &account,
+            Some(&private_state),
+            Some(&public_state),
+            18,
+        )
+        .expect("public transition must succeed");
+        assert_eq!(
+            node.get_libraries(&[Hash256(hash.0)]).len(),
+            1,
+            "public transition must expose library"
+        );
+    }
+
+    #[test]
+    fn rollback_like_noop_update_keeps_existing_unrelated_public_library() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_a = test_addr(0xA1);
+        let account_b = test_addr(0xB1);
+        let empty = make_nonexist_shard_account_boc();
+
+        let mut libs_a = Dict::<HashBytes, SimpleLib>::new();
+        let (hash_a, lib_a) = valid_simple_lib_entry(true, 12);
+        libs_a.set(hash_a, lib_a).expect("must insert A lib");
+        let active_a = make_active_shard_account_boc(account_a, libs_a);
+        node.update_public_libraries_from_account_diff(
+            &account_a,
+            Some(&empty),
+            Some(&active_a),
+            19,
+        )
+        .expect("must index A library");
+
+        let old_b = make_nonexist_shard_account_boc();
+        let new_b = make_nonexist_shard_account_boc();
+        node.update_public_libraries_from_account_diff(&account_b, Some(&old_b), Some(&new_b), 20)
+            .expect("rollback-like noop for B must succeed");
+
+        assert_eq!(
+            node.get_libraries(&[Hash256(hash_a.0)]).len(),
+            1,
+            "unrelated noop update must not affect existing global library"
+        );
+    }
+
+    #[test]
+    fn malformed_global_library_storage_is_rejected_when_building_vm_dict() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let hash = Hash256([0x42; 32]);
+        let wrong_root = make_lib_root(99);
+        let wrong_boc: BocBytes = Boc::encode(wrong_root).into();
+        node.global_libraries.insert(
+            hash,
+            GlobalLibraryEntry {
+                hash,
+                lib_boc: wrong_boc,
+                publishers: std::iter::once(test_addr(0x01)).collect(),
+                first_seen_lt: 1,
+                last_seen_lt: 1,
+            },
+        );
+        node.vm_global_libs_dirty = true;
+        node.vm_global_libs_boc = None;
+
+        let err = node
+            .build_vm_global_libs_boc()
+            .expect_err("corrupted storage must fail");
+        let err_text = err.to_string();
+        assert!(
+            err_text.contains("hash mismatch"),
+            "unexpected error: {err_text}"
+        );
+    }
+
+    #[test]
+    fn get_libraries_returns_only_requested_hashes() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x01);
+        let empty = make_nonexist_shard_account_boc();
+
+        let mut libs = Dict::<HashBytes, SimpleLib>::new();
+        let (hash_a, lib_a) = valid_simple_lib_entry(true, 13);
+        let (hash_b, lib_b) = valid_simple_lib_entry(true, 14);
+        libs.set(hash_a, lib_a).expect("must insert lib A");
+        libs.set(hash_b, lib_b).expect("must insert lib B");
+        let active = make_active_shard_account_boc(account, libs);
+
+        node.update_public_libraries_from_account_diff(&account, Some(&empty), Some(&active), 21)
+            .expect("must index libraries");
+
+        let entries = node.get_libraries(&[Hash256(hash_b.0)]);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].hash, Hash256(hash_b.0));
+    }
+
+    #[test]
+    fn set_libs_dict_is_empty_when_no_global_libraries() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let libs = node
+            .build_vm_global_libs_boc()
+            .expect("must build libs dict for empty state");
+        assert!(
+            libs.is_none(),
+            "VM libs should be absent when there are no global libraries"
+        );
+    }
+}
