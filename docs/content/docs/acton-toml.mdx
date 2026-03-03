@@ -207,26 +207,25 @@ For practical workflows and CI usage, see [Linting](/docs/linting).
 
 ### General Settings
 
-| Field          | Type       | Description                                                                                             |
-|:---------------|:-----------|:--------------------------------------------------------------------------------------------------------|
-| `exclude`      | `string[]` | Glob patterns for files to exclude from lint diagnostics. Excluded contract roots are skipped entirely. |
-| `max-warnings` | `integer`  | Maximum warning count allowed before `acton check` exits with non-zero code. Default: unlimited.        |
-| `output`       | `object`   | Report output settings. Use `[lint.output.sarif]` to write SARIF report to file.                        |
+| Field           | Type       | Description                                                                                             |
+|:----------------|:-----------|:--------------------------------------------------------------------------------------------------------|
+| `exclude`       | `string[]` | Glob patterns for files to exclude from lint diagnostics. Excluded contract roots are skipped entirely. |
+| `max-warnings`  | `integer`  | Maximum warning count allowed before `acton check` exits with non-zero code. Default: unlimited.        |
+| `output-format` | `string`   | Default report format for `acton check`: `plain`, `json`, `sarif`, or `github`.                         |
 
 Example:
 ```toml
 [lint]
 exclude = ["contracts/generated/*.tolk", "contracts/legacy.tolk"]
 max-warnings = 0 # fail on any warning
-
-[lint.output.sarif]
-path = ".acton/reports/lint.sarif"
+output-format = "sarif"
 ```
 
 Excluded dependency files are still parsed for imports/types, but lint diagnostics for them are hidden.
 When you pass an explicit target to `acton check` (contract id or file path), that target is checked even if it matches `exclude`.
 Compiler errors are never hidden by `exclude`.
-CLI flag `acton check --sarif <PATH>` overrides `lint.output.sarif.path` for the current run.
+CLI flag `acton check --output-format <FORMAT>` overrides `[lint].output-format` for the current run.
+Use `acton check --output-file <PATH>` to write non-plain output into a file.
 For one-off line-level suppressions in source code, use `// acton-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
 Suppressions use rule names (for example `unused-variable`) and do not affect compiler/parser diagnostics (`C001`).
 

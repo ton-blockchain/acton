@@ -1,0 +1,1 @@
+::warning file=contracts/main.tolk,line=4,title=[E010]%3A used-ignored-identifier::`_value` is marked as unused but used here

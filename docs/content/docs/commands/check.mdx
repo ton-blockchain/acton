@@ -18,8 +18,8 @@ acton check <path-to-file.tolk>
 | Option                     | Type   | Description                                                 |
 |:---------------------------|:-------|:------------------------------------------------------------|
 | `--fix`                    | Flag   | Automatically apply available fixes (plain output only).    |
-| `--output-format <FORMAT>` | String | Output format: `plain`, `json`, or `sarif`.                 |
-| `--output-file <PATH>`     | String | Write JSON/SARIF output to file (not allowed with `plain`). |
+| `--output-format <FORMAT>` | String | Output format: `plain`, `json`, `sarif`, or `github`.       |
+| `--output-file <PATH>`     | String | Write non-plain output to file (not allowed with `plain`).  |
 | `--explain <CODE>`         | String | Explain a rule.                                             |
 
 For setup and configuration, see [Linting](/docs/linting).
@@ -28,7 +28,8 @@ For the full rules catalog, see [Linter Rules](/docs/linting/rules).
 ## Behavior Notes
 
 - `--fix` applies edits only in `plain` output mode.
-- With `--output-format json` or `--output-format sarif`, diagnostics include fix suggestions, but files are not changed.
+- In non-plain output modes (`json`, `sarif`, `github`), diagnostics are reported without applying edits to source files.
+- `github` format emits GitHub Actions workflow annotations (`::warning ...` / `::error ...`), useful in CI logs.
 - Output format is resolved in this order: CLI `--output-format`, then `[lint].output-format` from `Acton.toml`, then default `plain`.
 - `--output-file` cannot be used with `plain` format.
 - `acton check <path-to-file.tolk>` runs the file in single-file mode with test-style lint settings. In this mode, `E014 (acton-import-in-contract)` is relaxed.
@@ -51,4 +52,7 @@ acton check --output-format json
 
 # Write SARIF report to file
 acton check --output-format sarif --output-file .acton/reports/lint.sarif
+
+# Emit GitHub annotations to stdout (for GitHub Actions)
+acton check --output-format github
 ```

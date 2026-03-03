@@ -303,7 +303,7 @@
         },
         "output-format": {
           "type": "string",
-          "enum": ["plain", "json", "sarif"],
+          "enum": ["plain", "json", "sarif", "github"],
           "description": "Output format for `acton check` diagnostics"
         },
         "rules": {

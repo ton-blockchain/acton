@@ -506,7 +506,7 @@ enum Commands {
             long = "output-format",
             value_enum,
             value_name = "FORMAT",
-            help = "Output format (plain, json, sarif)"
+            help = "Output format (plain, json, sarif, github)"
         )]
         output_format: Option<CheckOutputFormat>,
         #[arg(

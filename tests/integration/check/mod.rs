@@ -14,6 +14,7 @@ mod import_path_can_use_mappings_tests;
 mod incoming_messages_duplicate_opcode_tests;
 mod lint_exclude_tests;
 mod lint_exit_code_tests;
+mod lint_output_github_tests;
 mod lint_output_json_tests;
 mod lint_output_plain_tests;
 mod lint_output_sarif_tests;

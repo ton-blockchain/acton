@@ -1,6 +1,6 @@
 ---
 title: "Outputs and CI"
-description: "Use JSON, SARIF, and exit codes in automation"
+description: "Use JSON, SARIF, GitHub annotations, and exit codes in automation"
 ---
 
 ## Console Output
@@ -47,6 +47,18 @@ acton check --output-file reports/ci.sarif
 
 SARIF output never applies file edits. Even if you pass `--fix`, fixes are only reported and must be applied separately.
 
+## GitHub Annotations
+
+```bash
+acton check --output-format github
+```
+
+This format prints GitHub Actions workflow commands (`::warning ...`, `::error ...`) so diagnostics appear as annotations in Actions logs and checks.
+
+For GitHub Actions annotations, keep this output on `stdout` so the runner can parse workflow commands.
+
+Like other non-plain formats, this mode never applies file edits.
+
 ## Exit Code Rules
 
 `acton check` exits with non-zero code when:
@@ -63,4 +75,4 @@ Example CI policy:
 max-warnings = 0
 ```
 
-These exit rules are the same for all output formats.
+These exit rules are the same for all output formats (`plain`, `json`, `sarif`, `github`).

@@ -232,6 +232,9 @@ pub fn check_cmd(
         CheckOutputFormat::Sarif => {
             output::sarif::write_report(&mut writer, &all_diagnostics, &file_db, &cwd)?;
         }
+        CheckOutputFormat::Github => {
+            output::github::write_report(&mut writer, &all_diagnostics, &file_db, &cwd)?;
+        }
     }
 
     if output_format != CheckOutputFormat::Plain {

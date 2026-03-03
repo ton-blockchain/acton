@@ -25,6 +25,7 @@ pub enum CheckOutputFormat {
     Plain,
     Json,
     Sarif,
+    Github,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Default)]
