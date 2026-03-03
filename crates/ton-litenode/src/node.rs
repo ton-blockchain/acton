@@ -1,6 +1,6 @@
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::remote::{RemoteProvider, fetch_remote_shard_account};
-use crate::storage::{self, GlobalLibraryEntry, JettonMasterMeta};
+use crate::storage::{self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta};
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
     LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
@@ -670,17 +670,21 @@ impl Node {
         })
     }
 
-    pub fn get_libraries(&self, hashes: &[Hash256]) -> Vec<GlobalLibraryEntry> {
+    pub fn get_libraries(&self, hashes: &[Hash256]) -> Vec<GlobalLibraryLookup> {
         hashes
             .iter()
-            .filter_map(|hash| self.global_libraries.get(hash).cloned())
+            .map(|hash| GlobalLibraryLookup {
+                hash: *hash,
+                entry: self.global_libraries.get(hash).cloned(),
+            })
             .collect()
     }
 
     pub(crate) fn rebuild_global_libraries_from_accounts(&mut self) -> anyhow::Result<()> {
         self.global_libraries.clear();
 
-        let accounts = self.latest.accounts.clone();
+        let mut accounts: Vec<_> = self.latest.accounts.iter().collect();
+        accounts.sort_by_key(|(address, _)| **address);
         for (address, meta) in accounts {
             if meta.status != AccountStatus::Active {
                 continue;
@@ -704,7 +708,8 @@ impl Node {
                             first_seen_lt: lt,
                             last_seen_lt: lt,
                         });
-                entry.publishers.insert(address);
+                entry.publishers.insert(*address);
+                entry.first_seen_lt = entry.first_seen_lt.min(lt);
                 entry.last_seen_lt = entry.last_seen_lt.max(lt);
             }
         }
@@ -1536,6 +1541,16 @@ mod tests {
         Boc::encode(cell).into()
     }
 
+    fn single_library_lookup(node: &Node, hash: Hash256) -> GlobalLibraryLookup {
+        let mut entries = node.get_libraries(&[hash]);
+        assert_eq!(entries.len(), 1, "expected one lookup result");
+        entries.remove(0)
+    }
+
+    fn found_library_entry(node: &Node, hash: Hash256) -> Option<GlobalLibraryEntry> {
+        single_library_lookup(node, hash).entry
+    }
+
     #[test]
     fn private_library_is_not_visible_in_global_index() {
         let mut node = make_test_node(Box::new(NoopExecutor));
@@ -1575,10 +1590,10 @@ mod tests {
         )
         .expect("must update library diff");
 
-        let entries = node.get_libraries(&[Hash256(hash.0)]);
-        assert_eq!(entries.len(), 1, "public library must appear globally");
+        let entry = found_library_entry(&node, Hash256(hash.0))
+            .expect("public library must appear globally");
         assert!(
-            entries[0].publishers.contains(&account_a),
+            entry.publishers.contains(&account_a),
             "publisher A must be tracked"
         );
     }
@@ -1612,11 +1627,11 @@ mod tests {
         )
         .expect("must add publisher B");
 
-        let entries = node.get_libraries(&[Hash256(hash.0)]);
-        assert_eq!(entries.len(), 1, "library hash must have one global entry");
-        assert_eq!(entries[0].publishers.len(), 2, "must have 2 publishers");
-        assert!(entries[0].publishers.contains(&account_a));
-        assert!(entries[0].publishers.contains(&account_b));
+        let entry = found_library_entry(&node, Hash256(hash.0))
+            .expect("library hash must have one global entry");
+        assert_eq!(entry.publishers.len(), 2, "must have 2 publishers");
+        assert!(entry.publishers.contains(&account_a));
+        assert!(entry.publishers.contains(&account_b));
     }
 
     #[test]
@@ -1655,14 +1670,10 @@ mod tests {
         )
         .expect("must remove publisher A");
 
-        let entries = node.get_libraries(&[Hash256(hash.0)]);
-        assert_eq!(
-            entries.len(),
-            1,
-            "entry must remain while publisher B exists"
-        );
-        assert_eq!(entries[0].publishers.len(), 1);
-        assert!(entries[0].publishers.contains(&account_b));
+        let entry = found_library_entry(&node, Hash256(hash.0))
+            .expect("entry must remain while publisher B exists");
+        assert_eq!(entry.publishers.len(), 1);
+        assert!(entry.publishers.contains(&account_b));
     }
 
     #[test]
@@ -1710,7 +1721,7 @@ mod tests {
         .expect("must remove publisher B");
 
         assert!(
-            node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+            found_library_entry(&node, Hash256(hash.0)).is_none(),
             "entry must be deleted when last publisher is removed"
         );
     }
@@ -1755,7 +1766,7 @@ mod tests {
             .unwrap_or_else(|e| panic!("state transition {name} failed: {e}"));
 
             assert!(
-                node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+                found_library_entry(&node, Hash256(hash.0)).is_none(),
                 "state transition {name} must clear published library"
             );
         }
@@ -1785,7 +1796,7 @@ mod tests {
         .expect("nonexist transition must be processed");
 
         assert!(
-            node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+            found_library_entry(&node, Hash256(hash.0)).is_none(),
             "nonexist transition must clear published library"
         );
     }
@@ -1813,9 +1824,8 @@ mod tests {
         )
         .expect("must index from final state");
 
-        assert_eq!(
-            node.get_libraries(&[Hash256(hash.0)]).len(),
-            1,
+        assert!(
+            found_library_entry(&node, Hash256(hash.0)).is_some(),
             "final state with public library must be indexed"
         );
     }
@@ -1943,7 +1953,7 @@ mod tests {
         )
         .expect("private transition must succeed");
         assert!(
-            node.get_libraries(&[Hash256(hash.0)]).is_empty(),
+            found_library_entry(&node, Hash256(hash.0)).is_none(),
             "private library must stay hidden"
         );
 
@@ -1954,9 +1964,8 @@ mod tests {
             18,
         )
         .expect("public transition must succeed");
-        assert_eq!(
-            node.get_libraries(&[Hash256(hash.0)]).len(),
-            1,
+        assert!(
+            found_library_entry(&node, Hash256(hash.0)).is_some(),
             "public transition must expose library"
         );
     }
@@ -1985,9 +1994,8 @@ mod tests {
         node.update_public_libraries_from_account_diff(&account_b, Some(&old_b), Some(&new_b), 20)
             .expect("rollback-like noop for B must succeed");
 
-        assert_eq!(
-            node.get_libraries(&[Hash256(hash_a.0)]).len(),
-            1,
+        assert!(
+            found_library_entry(&node, Hash256(hash_a.0)).is_some(),
             "unrelated noop update must not affect existing global library"
         );
     }
@@ -2022,7 +2030,7 @@ mod tests {
     }
 
     #[test]
-    fn get_libraries_returns_only_requested_hashes() {
+    fn get_libraries_preserves_request_order_and_includes_not_found_entries() {
         let mut node = make_test_node(Box::new(NoopExecutor));
         let account = test_addr(0x01);
         let empty = make_nonexist_shard_account_boc();
@@ -2037,9 +2045,84 @@ mod tests {
         node.update_public_libraries_from_account_diff(&account, Some(&empty), Some(&active), 21)
             .expect("must index libraries");
 
-        let entries = node.get_libraries(&[Hash256(hash_b.0)]);
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].hash, Hash256(hash_b.0));
+        let missing = Hash256([0xEE; 32]);
+        let entries = node.get_libraries(&[missing, Hash256(hash_b.0), Hash256(hash_a.0)]);
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].hash, missing);
+        assert!(
+            entries[0].entry.is_none(),
+            "missing hash must be returned as not found"
+        );
+        assert_eq!(entries[1].hash, Hash256(hash_b.0));
+        assert!(entries[1].entry.is_some());
+        assert_eq!(entries[2].hash, Hash256(hash_a.0));
+        assert!(entries[2].entry.is_some());
+    }
+
+    #[test]
+    fn rebuild_global_libraries_uses_min_first_seen_lt_for_same_hash() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account_high_lt = test_addr(0x01);
+        let account_low_lt = test_addr(0xFE);
+
+        let (lib_hash, lib) = valid_simple_lib_entry(true, 15);
+        let mut high_libs = Dict::<HashBytes, SimpleLib>::new();
+        high_libs
+            .set(lib_hash, lib.clone())
+            .expect("must insert high-lt library");
+        let high_boc = make_active_shard_account_boc(account_high_lt, high_libs);
+        let high_account_hash =
+            compute_boc_hash(&high_boc).expect("must hash high-lt shard account");
+        node.cas.put(high_boc, high_account_hash);
+
+        let mut low_libs = Dict::<HashBytes, SimpleLib>::new();
+        low_libs
+            .set(lib_hash, lib)
+            .expect("must insert low-lt library");
+        let low_boc = make_active_shard_account_boc(account_low_lt, low_libs);
+        let low_account_hash = compute_boc_hash(&low_boc).expect("must hash low-lt shard account");
+        node.cas.put(low_boc, low_account_hash);
+
+        node.latest.accounts.insert(
+            account_high_lt,
+            AccountMeta {
+                account_hash: high_account_hash,
+                status: AccountStatus::Active,
+                cached_balance: Some(0),
+                last_trans_lt: Some(100),
+                last_trans_hash: None,
+                code_hash: None,
+                data_hash: None,
+                frozen_hash: None,
+            },
+        );
+        node.latest.accounts.insert(
+            account_low_lt,
+            AccountMeta {
+                account_hash: low_account_hash,
+                status: AccountStatus::Active,
+                cached_balance: Some(0),
+                last_trans_lt: Some(5),
+                last_trans_hash: None,
+                code_hash: None,
+                data_hash: None,
+                frozen_hash: None,
+            },
+        );
+
+        node.rebuild_global_libraries_from_accounts()
+            .expect("must rebuild global libraries from accounts");
+        let entry = found_library_entry(&node, Hash256(lib_hash.0))
+            .expect("shared public library must be present");
+        assert_eq!(
+            entry.first_seen_lt, 5,
+            "first_seen_lt must be min publisher lt"
+        );
+        assert_eq!(
+            entry.last_seen_lt, 100,
+            "last_seen_lt must be max publisher lt"
+        );
+        assert_eq!(entry.publishers.len(), 2, "both publishers must be present");
     }
 
     #[test]

@@ -430,3 +430,37 @@ fn parse_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {
         None => Ok(None),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_libraries_query_rejects_empty_input() {
+        let err = parse_libraries_query(" , , ").expect_err("empty list must be rejected");
+        assert!(
+            err.to_string()
+                .contains("`libraries` query parameter is required"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_libraries_query_rejects_invalid_hash() {
+        let err = parse_libraries_query("not-a-hash").expect_err("invalid hash must be rejected");
+        assert!(
+            err.to_string().contains("Invalid hash format"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_libraries_query_accepts_multiple_hashes_and_skips_blanks() {
+        let hash_a = "11".repeat(32);
+        let hash_b = "22".repeat(32);
+
+        let parsed = parse_libraries_query(&format!("{hash_a}, ,{hash_b},"))
+            .expect("valid list with blanks must parse");
+        assert_eq!(parsed, vec![Hash256([0x11; 32]), Hash256([0x22; 32])]);
+    }
+}

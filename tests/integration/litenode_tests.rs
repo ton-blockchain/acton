@@ -417,13 +417,76 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
         serde_json::to_string_pretty(&get_libraries_response).unwrap_or_default()
     );
     let first = &result_items[0];
+    assert_eq!(first["@type"].as_str(), Some("smc.libraryEntry"));
     assert_eq!(first["hash"].as_str(), Some(library_hash.as_str()));
     assert_eq!(first["data"].as_str(), Some(library_code_b64.as_str()));
-    assert!(
-        first["publishers_count"].as_u64().unwrap_or_default() >= 1,
-        "Expected at least one publisher in getLibraries response: {}",
-        serde_json::to_string_pretty(first).unwrap_or_default()
+
+    #[allow(clippy::manual_strip)]
+    let missing_hash = if library_hash.starts_with('0') {
+        format!("1{}", &library_hash[1..])
+    } else {
+        format!("0{}", &library_hash[1..])
+    };
+
+    let mixed_query = format!("/api/v2/getLibraries?libraries={missing_hash},,{library_hash}");
+    let mixed_response = node.get_json(&mixed_query);
+    assert_eq!(mixed_response["ok"].as_bool(), Some(true));
+    let mixed_items = mixed_response
+        .pointer("/result/result")
+        .and_then(Value::as_array)
+        .expect("Mixed getLibraries response must contain result array");
+    assert_eq!(
+        mixed_items.len(),
+        1,
+        "Expected only found libraries in response"
     );
+    assert_eq!(mixed_items[0]["@type"].as_str(), Some("smc.libraryEntry"));
+    assert_eq!(mixed_items[0]["hash"].as_str(), Some(library_hash.as_str()));
+    assert_eq!(
+        mixed_items[0]["data"].as_str(),
+        Some(library_code_b64.as_str())
+    );
+
+    let empty_libraries_response = node.get_json("/api/v2/getLibraries?libraries=,,");
+    assert_eq!(empty_libraries_response["ok"].as_bool(), Some(false));
+    assert!(
+        empty_libraries_response["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("`libraries` query parameter is required"),
+        "Unexpected error for empty libraries query: {}",
+        serde_json::to_string_pretty(&empty_libraries_response).unwrap_or_default()
+    );
+
+    let invalid_libraries_response = node.get_json("/api/v2/getLibraries?libraries=not-a-hash");
+    assert_eq!(invalid_libraries_response["ok"].as_bool(), Some(false));
+    assert!(
+        invalid_libraries_response["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Invalid hash format"),
+        "Unexpected error for invalid hash query: {}",
+        serde_json::to_string_pretty(&invalid_libraries_response).unwrap_or_default()
+    );
+
+    let rpc_libraries = node.post_json(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getLibraries",
+            "params": {
+                "libraries": format!("{missing_hash},{library_hash}")
+            }
+        }),
+    );
+    assert_eq!(rpc_libraries["ok"].as_bool(), Some(true));
+    let rpc_items = rpc_libraries["result"]["result"]
+        .as_array()
+        .expect("JSON-RPC getLibraries response must contain result array");
+    assert_eq!(rpc_items.len(), 1);
+    assert_eq!(rpc_items[0]["@type"].as_str(), Some("smc.libraryEntry"));
+    assert_eq!(rpc_items[0]["hash"].as_str(), Some(library_hash.as_str()));
 
     project
         .acton()

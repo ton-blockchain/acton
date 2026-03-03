@@ -152,7 +152,8 @@ pub struct LiteNodeBlockTransactions {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LiteNodeLibrary {
     pub hash: Hash256,
-    pub data: BocBytes,
+    pub found: bool,
+    pub data: Option<BocBytes>,
     pub publishers_count: usize,
     pub publishers: Vec<Addr>,
 }
@@ -1315,13 +1316,24 @@ fn handle_get_consensus_block(node: &Node) -> anyhow::Result<LiteNodeConsensusBl
 fn handle_get_libraries(node: &Node, hashes: &[Hash256]) -> anyhow::Result<Vec<LiteNodeLibrary>> {
     let entries = node.get_libraries(hashes);
     let mut result = Vec::with_capacity(entries.len());
-    for entry in entries {
-        result.push(LiteNodeLibrary {
-            hash: entry.hash,
-            data: entry.lib_boc,
-            publishers_count: entry.publishers.len(),
-            publishers: entry.publishers.into_iter().collect(),
-        });
+    for lookup in entries {
+        if let Some(entry) = lookup.entry {
+            result.push(LiteNodeLibrary {
+                hash: lookup.hash,
+                found: true,
+                data: Some(entry.lib_boc),
+                publishers_count: entry.publishers.len(),
+                publishers: entry.publishers.into_iter().collect(),
+            });
+        } else {
+            result.push(LiteNodeLibrary {
+                hash: lookup.hash,
+                found: false,
+                data: None,
+                publishers_count: 0,
+                publishers: Vec::new(),
+            });
+        }
     }
     Ok(result)
 }
