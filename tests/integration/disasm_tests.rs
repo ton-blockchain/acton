@@ -311,6 +311,7 @@ fn toncenter_api_key() -> &'static str {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_disasm_from_blockchain_mainnet_address() {
     thread::sleep(Duration::from_secs(1)); // rate limit
     let project = ProjectBuilder::new("disasm-blockchain-mainnet").build();
@@ -327,6 +328,7 @@ fn test_disasm_from_blockchain_mainnet_address() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_disasm_from_blockchain_testnet_address() {
     thread::sleep(Duration::from_secs(1)); // rate limit
     let project = ProjectBuilder::new("disasm-blockchain-testnet").build();
@@ -343,6 +345,7 @@ fn test_disasm_from_blockchain_testnet_address() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_disasm_from_blockchain_mainnet_address_with_exotic_cell_lib() {
     thread::sleep(Duration::from_secs(1)); // rate limit
     let project = ProjectBuilder::new("disasm-blockchain-testnet").build();
@@ -358,6 +361,7 @@ fn test_disasm_from_blockchain_mainnet_address_with_exotic_cell_lib() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_disasm_follow_libraries() {
     thread::sleep(Duration::from_secs(1)); // rate limit
     let project = ProjectBuilder::new("disasm-follow-libraries").build();
@@ -390,6 +394,7 @@ fn test_disasm_from_blockchain_invalid_address() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_disasm_from_blockchain_with_wrong_api_key() {
     thread::sleep(Duration::from_secs(1)); // rate limit
     let project = ProjectBuilder::new("disasm-blockchain-api-key").build();
