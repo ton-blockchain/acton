@@ -15,7 +15,7 @@ fn big_array_from_vec_small_values() {
     let TupleItem::Tuple(top_level) = &big_array_fields[1] else {
         panic!("topLevel must be encoded as array<array<T>> tuple");
     };
-    assert_eq!(top_level.len(), 255);
+    assert_eq!(top_level.len(), 1);
 
     let TupleItem::Tuple(first_bin) = &top_level[0] else {
         panic!("bin[0] must be an array tuple");
@@ -29,12 +29,10 @@ fn big_array_from_vec_small_values() {
         ])
     );
 
-    for bin in top_level.iter().skip(1) {
-        let TupleItem::Tuple(items) = bin else {
-            panic!("all bins must be tuples");
-        };
-        assert!(items.is_empty());
-    }
+    let TupleItem::Tuple(items) = &top_level[0] else {
+        panic!("all bins must be tuples");
+    };
+    assert_eq!(items.len(), 3);
 }
 
 #[test]
@@ -54,6 +52,7 @@ fn big_array_from_vec_splits_into_bins_by_255_items() {
     let TupleItem::Tuple(second_bin) = &top_level[1] else {
         panic!("bin[1] must be an array tuple");
     };
+    assert_eq!(top_level.len(), 2);
 
     assert_eq!(first_bin.len(), 255);
     assert_eq!(second_bin.len(), 5);

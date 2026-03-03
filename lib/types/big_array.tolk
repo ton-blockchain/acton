@@ -3,8 +3,9 @@
 /// `BigArray<T>` is a chunked array implementation for cases when regular `array<T>`
 /// capacity (`0..255`) is not enough.
 ///
-/// Internally it stores items in 255 bins, each bin is `array<T>` with up to 255 items,
-/// so total capacity is up to `255 * 255 = 65025` items.
+/// Internally it stores items in bins, where each bin is `array<T>` with up to 255 items.
+/// Bins are created lazily on demand.
+/// Total capacity is up to `255 * 255 = 65025` items.
 ///
 /// Example:
 /// ```tolk
@@ -23,15 +24,13 @@ struct BigArray<T> {
 
 /// Initializes internal storage of [BigArray].
 ///
-/// This method allocates 255 empty bins in [BigArray.topLevel] once.
+/// This method marks the structure as initialized once.
+/// Actual bins in [BigArray.topLevel] are allocated lazily when pushing elements.
 /// Subsequent calls are no-op.
 ///
 /// Most mutating methods (`push`, `pop`, `set`) call `init()` automatically.
 fun BigArray<T>.init(mutate self) {
     if (!self.isInit) {
-        repeat (255) {
-            self.topLevel.push([]);
-        }
         self.isInit = true;
     }
 }
@@ -64,7 +63,15 @@ fun BigArray<T>.last(self): T {
 fun BigArray<T>.push(mutate self, value: T) {
     self.init();
 
+    if (self.itemsCount >= 65025) {
+        throw 5;
+    }
+
     val binIdx = self.itemsCount / 255;
+    while (self.topLevel.size() <= binIdx) {
+        self.topLevel.push([]);
+    }
+
     var bin = self.topLevel.get(binIdx);
     bin.push(value);
     self.topLevel.set(bin, binIdx);
@@ -81,7 +88,11 @@ fun BigArray<T>.pop(mutate self) {
     val binIdx = (self.itemsCount - 1) / 255;
     var bin = self.topLevel.get(binIdx);
     bin.pop();
-    self.topLevel.set(bin, binIdx);
+    if (bin.size() == 0 && binIdx == self.topLevel.size() - 1) {
+        self.topLevel.pop();
+    } else {
+        self.topLevel.set(bin, binIdx);
+    }
     self.itemsCount -= 1;
 }
 

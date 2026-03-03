@@ -170,14 +170,16 @@ fn decode_vec_like_items(item: TupleItem) -> Result<Vec<TupleItem>, ArgError> {
 
     let looks_like_big_array = tuple.len() == 3
         && matches!(tuple.first(), Some(TupleItem::Int(_)))
-        && matches!(tuple.get(1), Some(TupleItem::Tuple(top_level)) if top_level.len() == 255)
+        && matches!(tuple.get(1), Some(TupleItem::Tuple(_)))
         && matches!(tuple.get(2), Some(TupleItem::Int(_)));
 
     if looks_like_big_array {
-        decode_big_array_items(tuple)
-    } else {
-        Ok(tuple.0)
+        if let Ok(items) = decode_big_array_items(tuple.clone()) {
+            return Ok(items);
+        }
     }
+
+    Ok(tuple.0)
 }
 
 impl FromStack for Vec<TupleItem> {

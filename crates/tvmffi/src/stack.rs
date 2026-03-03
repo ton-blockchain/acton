@@ -123,8 +123,7 @@ pub enum TupleItem {
 impl TupleItem {
     pub fn big_array_from_items(v: Vec<TupleItem>) -> Self {
         const BIN_SIZE: usize = 255;
-        const BIN_COUNT: usize = 255;
-        const MAX_SIZE: usize = BIN_SIZE * BIN_COUNT;
+        const MAX_SIZE: usize = BIN_SIZE * BIN_SIZE;
 
         let size = v.len();
         assert!(
@@ -134,8 +133,8 @@ impl TupleItem {
 
         // BigArray layout in stack tuple:
         // [isInit: bool, topLevel: array<array<T>>, size: int]
-        // where topLevel is always 255 bins after init().
-        let mut bins = vec![Vec::<TupleItem>::new(); BIN_COUNT];
+        // topLevel stores bins of up to 255 items and keeps only used bins.
+        let mut bins = vec![Vec::<TupleItem>::new(); size.div_ceil(BIN_SIZE)];
         for (index, value) in v.into_iter().enumerate() {
             let bin_idx = index / BIN_SIZE;
             bins[bin_idx].push(value);
