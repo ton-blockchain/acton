@@ -197,7 +197,7 @@ pub fn verify_cmd(
         sources: sources_meta,
         compiler: CompilerSettings::Tolk {
             compiler_settings: TolkCompilerSettings {
-                tolk_version: version,
+                tolk_version: version.clone(),
             },
         },
     };
@@ -216,8 +216,48 @@ pub fn verify_cmd(
     );
 
     let client = reqwest::blocking::Client::new();
-    let first_backend = remove_random(&mut backend_info.backends);
+    let backend_override = std::env::var("ACTON_VERIFY_BACKEND")
+        .ok()
+        .map(|s| s.trim().trim_end_matches('/').to_string())
+        .filter(|s| !s.is_empty());
+    let first_backend = backend_override
+        .clone()
+        .unwrap_or_else(|| remove_random(&mut backend_info.backends));
     let source_url = format!("{first_backend}/source");
+    println!(
+        "  {} Using backend: {}",
+        "→".blue().bold(),
+        source_url.dimmed()
+    );
+
+    let verify_debug = std::env::var_os("ACTON_VERIFY_DEBUG").is_some();
+    if verify_debug {
+        println!(
+            "  {} Debug mode enabled via {}",
+            "ℹ".blue().bold(),
+            "ACTON_VERIFY_DEBUG=1".dimmed()
+        );
+        println!(
+            "    {} Compiler version: {}",
+            "→".dimmed(),
+            version.dimmed()
+        );
+        println!(
+            "    {} Source file{}:",
+            "→".dimmed(),
+            if source_files.len() == 1 { "" } else { "s" }
+        );
+        for file in &source_files {
+            println!("      {}", file.dimmed());
+        }
+        if let Some(backend_override) = &backend_override {
+            println!(
+                "    {} Backend override: {}",
+                "→".dimmed(),
+                backend_override.dimmed()
+            );
+        }
+    }
 
     let response = client
         .post(&source_url)
@@ -226,10 +266,44 @@ pub fn verify_cmd(
         .context("Failed to send request to verification backend")?;
 
     if !response.status().is_success() {
+        let status = response.status();
+        let headers = response.headers().clone();
         let error_text = response
             .text()
             .unwrap_or_else(|_| "Unknown error".to_string());
-        anyhow::bail!("Backend compilation failed: {error_text}");
+
+        let mut header_parts = Vec::new();
+        if let Some(v) = headers.get("x-request-id").and_then(|v| v.to_str().ok()) {
+            header_parts.push(format!("x-request-id={v}"));
+        }
+        if let Some(v) = headers.get("cf-ray").and_then(|v| v.to_str().ok()) {
+            header_parts.push(format!("cf-ray={v}"));
+        }
+        if let Some(v) = headers.get("server").and_then(|v| v.to_str().ok()) {
+            header_parts.push(format!("server={v}"));
+        }
+
+        let header_suffix = if header_parts.is_empty() {
+            String::new()
+        } else {
+            format!("\nResponse headers: {}", header_parts.join(", "))
+        };
+
+        let retry_hint = if status.is_server_error() {
+            "\nHint: backend returned a server error (5xx). Retry later; if it persists, run with ACTON_VERIFY_DEBUG=1 and/or ACTON_VERIFY_BACKEND=https://... to test another endpoint."
+        } else {
+            "\nHint: run with ACTON_VERIFY_DEBUG=1 to print request details."
+        };
+
+        let body = truncate_for_display(&error_text, 4_000);
+        anyhow::bail!(
+            "Backend compilation failed: HTTP {} at {}{}{}\nResponse body:\n{}",
+            status,
+            source_url,
+            header_suffix,
+            retry_hint,
+            body
+        );
     }
 
     let source_result: SourceResponse = response
@@ -443,8 +517,20 @@ struct SourcesObject {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BackendsConfig {
+    #[serde(default)]
+    verifiers: Vec<VerifierBackends>,
+    #[serde(default)]
     backends: Vec<String>,
+    #[serde(default)]
     backends_testnet: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifierBackends {
+    id: String,
+    network: String,
+    backends: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -496,6 +582,7 @@ struct SignResponse {
     msg_cell: MsgCell,
 }
 
+#[derive(Debug)]
 struct BackendInfo {
     source_registry: String,
     backends: Vec<String>,
@@ -520,16 +607,46 @@ fn get_backends() -> anyhow::Result<BackendsConfig> {
 }
 
 fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Result<BackendInfo> {
+    let network_name = match network {
+        Network::Mainnet => "mainnet",
+        Network::Testnet => "testnet",
+        _ => {
+            anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet")
+        }
+    };
+
+    // New config style:
+    // {
+    //   "verifiers": [{ "id": "...", "network": "...", "backends": [...] }]
+    // }
+    // Prefer TON Verifier entries first, fallback to legacy root fields.
+    let mut resolved_backends: Vec<String> = config
+        .verifiers
+        .iter()
+        .filter(|entry| {
+            entry.id == "verifier.ton.org" && entry.network.eq_ignore_ascii_case(network_name)
+        })
+        .flat_map(|entry| entry.backends.clone())
+        .collect();
+
+    if resolved_backends.is_empty() {
+        resolved_backends = match network {
+            Network::Mainnet => config.backends.clone(),
+            Network::Testnet => config.backends_testnet.clone(),
+            _ => unreachable!("network variants are checked above"),
+        };
+    }
+
     match network {
         Network::Mainnet => Ok(BackendInfo {
-            source_registry: "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL".to_string(),
-            backends: config.backends.clone(),
-            id: "orbs.com".to_string(),
+            source_registry: "EQBU-i8MHvmedMJS6gvicPP7FHBEuBBEnbGWw46shTr1rSXI".to_string(),
+            backends: resolved_backends,
+            id: "verifier.ton.org".to_string(),
         }),
         Network::Testnet => Ok(BackendInfo {
-            source_registry: "EQCsdKYwUaXkgJkz2l0ol6qT_WxeRbE_wBCwnEybmR0u5TO8".to_string(),
-            backends: config.backends_testnet.clone(),
-            id: "orbs-testnet".to_string(),
+            source_registry: "EQDPvIEUktSCLk69IFjY6Nttv4Hz87P3l3H1XMNjs6kPpDR3".to_string(),
+            backends: resolved_backends,
+            id: "verifier.ton.org".to_string(),
         }),
         _ => anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet"),
     }
@@ -538,6 +655,22 @@ fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Resul
 fn remove_random<T>(els: &mut Vec<T>) -> T {
     let index = (rand::random::<usize>()) % els.len();
     els.remove(index)
+}
+
+fn truncate_for_display(text: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+
+    let total = text.chars().count();
+    if total <= max_chars {
+        return text.to_string();
+    }
+
+    let mut out = String::with_capacity(max_chars + 64);
+    out.extend(text.chars().take(max_chars));
+    out.push_str(&format!("\n... (truncated, total {total} chars)"));
+    out
 }
 
 fn wait_for_rate_limit(api_key: &Option<String>) {
