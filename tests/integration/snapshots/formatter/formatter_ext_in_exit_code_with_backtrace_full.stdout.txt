@@ -9,11 +9,5 @@
 
  > tests/formatter_external_throw.test.tolk (1 test)
   ✓ formatter-ext-in-exit-code-with-backtrace-full [TIME]
-    └─ Test output:
-       N/A -> external
-       └── ext-in FmExternalTrigger -> fm_external_throw A                             gas=388 exit_code=10 aborted
-           ├── Compute phase failed: Dictionary error
-           └── at contracts/fm_external_throw[LINE]
-                  __throw   at contracts/fm_external_throw[LINE]
 
  ✓ 1 passed in 1 file

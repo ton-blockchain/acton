@@ -274,18 +274,18 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     fn flatten_big_array_items(items: &[TupleItem]) -> Option<Vec<TupleItem>> {
-        if items.len() != 3 {
-            return None;
-        }
-
-        let TupleItem::Int(_) = &items[0] else {
-            return None;
-        };
-        let TupleItem::Tuple(top_level) = &items[1] else {
-            return None;
-        };
-        let TupleItem::Int(size) = &items[2] else {
-            return None;
+        let (top_level, size) = match items {
+            // Current layout:
+            // [topLevel: array<array<T>>, size: int]
+            [TupleItem::Tuple(top_level), TupleItem::Int(size)] => (top_level, size),
+            // Legacy layout:
+            // [isInit: bool, topLevel: array<array<T>>, size: int]
+            [
+                TupleItem::Int(_),
+                TupleItem::Tuple(top_level),
+                TupleItem::Int(size),
+            ] => (top_level, size),
+            _ => return None,
         };
 
         let size = size.to_usize()?;

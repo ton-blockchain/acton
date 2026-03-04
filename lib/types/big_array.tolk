@@ -4,35 +4,45 @@
 /// capacity (`0..255`) is not enough.
 ///
 /// Internally it stores items in bins, where each bin is `array<T>` with up to 255 items.
-/// Bins are created lazily on demand.
+/// New bins are created lazily on demand.
 /// Total capacity is up to `255 * 255 = 65025` items.
 ///
 /// Example:
 /// ```tolk
-/// var list = BigArray<int>.fromTuple([false, [] as array<array<int>>, 0]);
-/// list.init();
+/// var list = BigArray<int>.createEmpty();
 /// list.push(10);
 /// list.push(20);
 /// val first = list.first(); // 10
 /// val last = list.last();   // 20
 /// ```
 struct BigArray<T> {
-    private isInit: bool = false;
-    private topLevel: array<array<T>>;
+    private topLevel: array<array<T>> = [];
     private itemsCount: int = 0;
 }
 
-/// Initializes internal storage of [BigArray].
+/// Creates an empty [BigArray].
 ///
-/// This method marks the structure as initialized once.
-/// Actual bins in [BigArray.topLevel] are allocated lazily when pushing elements.
-/// Subsequent calls are no-op.
-///
-/// Most mutating methods (`push`, `pop`, `set`) call `init()` automatically.
-fun BigArray<T>.init(mutate self) {
-    if (!self.isInit) {
-        self.isInit = true;
+/// Use this constructor to initialize a new chunked array.
+fun BigArray<T>.createEmpty(): BigArray<T> {
+    return BigArray<T> {
+        topLevel: [],
+        itemsCount: 0,
     }
+}
+
+/// Creates [BigArray] and fills it with all elements from [items].
+///
+/// Elements preserve the original order from [items].
+/// All elements are copied into the first bin directly.
+fun BigArray<T>.createFromArray(items: array<T>): BigArray<T> {
+    if (items.size() == 0) {
+        return BigArray<T>.createEmpty();
+    }
+
+    return BigArray<T> {
+        topLevel: [items],
+        itemsCount: items.size(),
+    };
 }
 
 /// Returns the first element of a non-empty [BigArray].
@@ -58,11 +68,8 @@ fun BigArray<T>.last(self): T {
 
 /// Appends [value] to the end of [BigArray].
 ///
-/// Initializes storage lazily on first call.
 /// Fails if array capacity exceeds 65025 elements.
 fun BigArray<T>.push(mutate self, value: T) {
-    self.init();
-
     if (self.itemsCount >= 65025) {
         throw 5;
     }
@@ -80,11 +87,8 @@ fun BigArray<T>.push(mutate self, value: T) {
 
 /// Removes the last element from [BigArray].
 ///
-/// Initializes storage lazily on first call.
 /// Fails if the array is empty.
 fun BigArray<T>.pop(mutate self) {
-    self.init();
-
     val binIdx = (self.itemsCount - 1) / 255;
     var bin = self.topLevel.get(binIdx);
     bin.pop();
@@ -98,11 +102,8 @@ fun BigArray<T>.pop(mutate self) {
 
 /// Replaces element at [index] with [value].
 ///
-/// Initializes storage lazily on first call.
 /// Fails if [index] is out of bounds.
 fun BigArray<T>.set(mutate self, value: T, index: int) {
-    self.init();
-
     val binIdx = index / 255;
     var bin = self.topLevel.get(binIdx);
     val idxInBin = index % 255;

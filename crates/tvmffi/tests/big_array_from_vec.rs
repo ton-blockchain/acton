@@ -8,11 +8,10 @@ fn big_array_from_vec_small_values() {
         panic!("BigArray must be encoded as a tuple");
     };
 
-    assert_eq!(big_array_fields.len(), 3);
-    assert_eq!(big_array_fields[0], TupleItem::Int(BigInt::from(-1)));
-    assert_eq!(big_array_fields[2], TupleItem::Int(BigInt::from(3)));
+    assert_eq!(big_array_fields.len(), 2);
+    assert_eq!(big_array_fields[1], TupleItem::Int(BigInt::from(3)));
 
-    let TupleItem::Tuple(top_level) = &big_array_fields[1] else {
+    let TupleItem::Tuple(top_level) = &big_array_fields[0] else {
         panic!("topLevel must be encoded as array<array<T>> tuple");
     };
     assert_eq!(top_level.len(), 1);
@@ -43,7 +42,7 @@ fn big_array_from_vec_splits_into_bins_by_255_items() {
         panic!("BigArray must be encoded as a tuple");
     };
 
-    let TupleItem::Tuple(top_level) = &big_array_fields[1] else {
+    let TupleItem::Tuple(top_level) = &big_array_fields[0] else {
         panic!("topLevel must be encoded as array<array<T>> tuple");
     };
     let TupleItem::Tuple(first_bin) = &top_level[0] else {
@@ -58,7 +57,7 @@ fn big_array_from_vec_splits_into_bins_by_255_items() {
     assert_eq!(second_bin.len(), 5);
     assert_eq!(second_bin[0], TupleItem::Int(255.into()));
     assert_eq!(second_bin[4], TupleItem::Int(259.into()));
-    assert_eq!(big_array_fields[2], TupleItem::Int(BigInt::from(260)));
+    assert_eq!(big_array_fields[1], TupleItem::Int(BigInt::from(260)));
 }
 
 #[test]

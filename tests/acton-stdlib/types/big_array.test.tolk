@@ -2,8 +2,7 @@ import "@local-acton/types/big_array"
 import "@local-acton/testing/expect"
 
 fun createFilledBigArray(size: int): BigArray<int> {
-    var big = BigArray<int>.fromTuple([false, [] as array<array<int>>, 0]);
-    big.init();
+    var big = BigArray<int>.createEmpty();
 
     var i = 0;
     while (i < size) {
@@ -12,6 +11,18 @@ fun createFilledBigArray(size: int): BigArray<int> {
     }
 
     return big;
+}
+
+get fun `test-big-array-create-empty`() {
+    val big = BigArray<int>.createEmpty();
+    expect(big.size()).toEqual(0);
+}
+
+get fun `test-big-array-create-from-array`() {
+    val big = BigArray<int>.createFromArray([4, 7, 9]);
+    expect(big.size()).toEqual(3);
+    expect(big.first()).toEqual(4);
+    expect(big.last()).toEqual(9);
 }
 
 get fun `test-big-array-push-first-last-size`() {

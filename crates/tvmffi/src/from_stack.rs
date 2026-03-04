@@ -87,39 +87,22 @@ impl FromStack for Vec<String> {
 }
 
 fn decode_big_array_items(tuple: Tuple) -> Result<Vec<TupleItem>, ArgError> {
-    if tuple.len() != 3 {
-        return Err(ArgError::TypeMismatch {
-            expected: "Tuple(BigArray<T>)",
-        });
-    }
-
-    let mut fields = tuple.0.into_iter();
-    let is_init = fields.next().ok_or(ArgError::TypeMismatch {
-        expected: "Tuple(BigArray<T>)",
-    })?;
-    let top_level = fields.next().ok_or(ArgError::TypeMismatch {
-        expected: "Tuple(BigArray<T>)",
-    })?;
-    let size_item = fields.next().ok_or(ArgError::TypeMismatch {
-        expected: "Tuple(BigArray<T>)",
-    })?;
-
-    if !matches!(is_init, TupleItem::Int(_)) {
-        return Err(ArgError::TypeMismatch {
-            expected: "Tuple(BigArray<T>)",
-        });
-    }
-
-    let TupleItem::Tuple(top_level) = top_level else {
-        return Err(ArgError::TypeMismatch {
-            expected: "Tuple(BigArray<T>)",
-        });
-    };
-
-    let TupleItem::Int(size) = size_item else {
-        return Err(ArgError::TypeMismatch {
-            expected: "Tuple(BigArray<T>)",
-        });
+    let (top_level, size) = match tuple.0.as_slice() {
+        // Current layout:
+        // [topLevel: array<array<T>>, size: int]
+        [TupleItem::Tuple(top_level), TupleItem::Int(size)] => (top_level, size),
+        // Legacy layout (accepted for backward compatibility):
+        // [isInit: bool, topLevel: array<array<T>>, size: int]
+        [
+            TupleItem::Int(_),
+            TupleItem::Tuple(top_level),
+            TupleItem::Int(size),
+        ] => (top_level, size),
+        _ => {
+            return Err(ArgError::TypeMismatch {
+                expected: "Tuple(BigArray<T>)",
+            });
+        }
     };
 
     let Some(size) = size.to_usize() else {
@@ -129,18 +112,18 @@ fn decode_big_array_items(tuple: Tuple) -> Result<Vec<TupleItem>, ArgError> {
     };
 
     let mut result = Vec::with_capacity(size);
-    for bin in top_level.0 {
+    for bin in top_level.iter() {
         let TupleItem::Tuple(bin_items) = bin else {
             return Err(ArgError::TypeMismatch {
                 expected: "Tuple(BigArray<T>)",
             });
         };
 
-        for item in bin_items.0 {
+        for item in bin_items.iter() {
             if result.len() == size {
                 break;
             }
-            result.push(item);
+            result.push(item.clone());
         }
 
         if result.len() == size {
@@ -168,10 +151,13 @@ fn decode_vec_like_items(item: TupleItem) -> Result<Vec<TupleItem>, ArgError> {
         }
     };
 
-    let looks_like_big_array = tuple.len() == 3
-        && matches!(tuple.first(), Some(TupleItem::Int(_)))
-        && matches!(tuple.get(1), Some(TupleItem::Tuple(_)))
-        && matches!(tuple.get(2), Some(TupleItem::Int(_)));
+    let looks_like_big_array = (tuple.len() == 2
+        && matches!(tuple.first(), Some(TupleItem::Tuple(_)))
+        && matches!(tuple.get(1), Some(TupleItem::Int(_))))
+        || (tuple.len() == 3
+            && matches!(tuple.first(), Some(TupleItem::Int(_)))
+            && matches!(tuple.get(1), Some(TupleItem::Tuple(_)))
+            && matches!(tuple.get(2), Some(TupleItem::Int(_))));
 
     if looks_like_big_array {
         if let Ok(items) = decode_big_array_items(tuple.clone()) {
@@ -543,11 +529,8 @@ mod tests {
         let mut three = Tuple::empty();
         three.push_string("three");
 
-        let big_array = TupleItem::big_array_from_items(vec![
-            one[0].clone(),
-            two[0].clone(),
-            three[0].clone(),
-        ]);
+        let big_array =
+            TupleItem::big_array_from_items(vec![one[0].clone(), two[0].clone(), three[0].clone()]);
 
         let parsed = Vec::<String>::from_item(big_array).unwrap();
         assert_eq!(parsed, vec!["one", "two", "three"]);

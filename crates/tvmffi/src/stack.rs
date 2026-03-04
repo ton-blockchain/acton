@@ -132,7 +132,7 @@ impl TupleItem {
         );
 
         // BigArray layout in stack tuple:
-        // [isInit: bool, topLevel: array<array<T>>, size: int]
+        // [topLevel: array<array<T>>, size: int]
         // topLevel stores bins of up to 255 items and keeps only used bins.
         let mut bins = vec![Vec::<TupleItem>::new(); size.div_ceil(BIN_SIZE)];
         for (index, value) in v.into_iter().enumerate() {
@@ -146,8 +146,6 @@ impl TupleItem {
             .collect::<Vec<_>>();
 
         Self::Tuple(Tuple(vec![
-            // true in TVM is represented as -1.
-            Self::Int(BigInt::from(-1)),
             Self::Tuple(Tuple(top_level)),
             Self::Int(BigInt::from(size)),
         ]))
