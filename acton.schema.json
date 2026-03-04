@@ -301,21 +301,10 @@
           "minimum": 0,
           "description": "Maximum allowed warning count before `acton check` exits with a non-zero code"
         },
-        "output": {
-          "type": "object",
-          "description": "Output configuration for lint reports",
-          "properties": {
-            "sarif": {
-              "type": "object",
-              "description": "SARIF report output settings",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "description": "Path where SARIF JSON report will be written"
-                }
-              }
-            }
-          }
+        "output-format": {
+          "type": "string",
+          "enum": ["full", "json", "sarif"],
+          "description": "Output format for `acton check` diagnostics"
         },
         "rules": {
           "type": "object",
