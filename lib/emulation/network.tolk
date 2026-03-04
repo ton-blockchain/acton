@@ -403,7 +403,7 @@ fun net.send(from: address, message: OutMessage): SendResultList {
     if (rawRes == null) {
         Assert.fail("ffi.sendMessageFrom unexpectedly returned null")
     }
-    return rawRes!;
+    return rawRes;
 }
 
 /// Send a single message from a specified address.
@@ -475,11 +475,7 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
 /// Returns `null` if external message was not accepted or destination account does not exist.
 fun net.sendExternal(msg: OutMessage): SendResultList? {
     // from and mode fields do not affect anything in case of an ExtIn message
-    val rawRes = ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell());
-    if (rawRes == null) {
-        return null;
-    }
-    return rawRes!;
+    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell());
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
