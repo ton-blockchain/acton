@@ -20,6 +20,7 @@
 
 import "@stdlib/gas-payments"
 import "@stdlib/reflection"
+import "../types/big_array"
 import "../ffi/ffi"
 import "../fmt"
 import "../testing/assert"
@@ -172,12 +173,11 @@ fun SendResult.allOutActions(self): OutActionList {
 /// This list represent all transactions produced by a [net.send] call.
 ///
 /// To get a single send result, use [SendResultList.at] method.
-type SendResultList = array<tuple>
+type SendResultList = BigArray<SendResult>
 
 /// Returns the send result at the given index.
 fun SendResultList.at(self, index: int): SendResult {
-    val tuple = self.get(index) as tuple;
-    return SendResult.fromTuple(tuple);
+    return self.get(index);
 }
 
 /// Wait for the transaction to be applied on the blockchain.
@@ -240,7 +240,7 @@ struct SearchParams {
     value: coins? = null,
     /// Exit code of the transaction.
     exitCode: int32? = null
-    /// Whether the transaction is succesfull (both compute and action phase).
+    /// Whether the transaction is successful (both compute and action phase).
     success: bool? = null,
     /// Whether the compute phase of transaction was aborted and transaction was reverted.
     aborted: bool? = null,
@@ -470,11 +470,12 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
     };
 }
 
-/// Sends external incoming message to the spefied destination address.
-/// Read more about External incomming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
-fun net.sendExternal(msg: OutMessage): SendResultList {
+/// Sends an external incoming message to the specified destination address.
+/// Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
+/// Returns `null` if external message was not accepted or destination account does not exist.
+fun net.sendExternal(msg: OutMessage): SendResultList? {
     // from and mode fields do not affect anything in case of an ExtIn message
-    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell())!;
+    return ffi.sendMessageFrom(msg.messageCell, address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell());
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
@@ -1231,9 +1232,9 @@ fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
 fun ffi.registerAddress(address: cell, name: string): void asm "15 EXTCALL"
 fun ffi.registerCodeCell(cell: cell, name: string): void asm "16 EXTCALL"
-fun ffi.findTransactionByParams(txs: tuple, params: tuple): cell? asm "10 EXTCALL"
-fun ffi.failToFindTransactionByParams(location: string, message: string, txs: tuple, params: tuple): tuple? asm "103 EXTCALL"
-fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: tuple, params: tuple): tuple? asm "104 EXTCALL"
+fun ffi.findTransactionByParams(txs: SendResultList, params: tuple): cell? asm "10 EXTCALL"
+fun ffi.failToFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "103 EXTCALL"
+fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "104 EXTCALL"
 fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
 fun ffi.loadLibrary(hash: string): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
@@ -1247,4 +1248,4 @@ fun ffi.getConfig(): dict asm "31 EXTCALL"
 fun ffi.setConfig(config: dict): bool asm "32 EXTCALL"
 fun ffi.getShardAccount(addr: address): cell? asm "33 EXTCALL";
 fun ffi.setShardAccount(addr: address, account: cell?): void asm "34 EXTCALL";
-fun ffi.saveTraceName(txs: tuple, name: string): void asm "35 EXTCALL";
+fun ffi.saveTraceName(txs: SendResultList, name: string): void asm "35 EXTCALL";

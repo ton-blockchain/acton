@@ -1929,25 +1929,30 @@ impl<'db, 'a, 't> TypeInferenceWalker<'db, 'a> {
 
         // let receiver_ty = self.ctx.type_db.receiver_types.get(&fun_ref);
 
+        let receiver_ty = self.ctx.type_db.receiver_types.get(&fun_ref).copied();
+
         // for `obj.method()` obj is the first argument (passed to `self` parameter)
         if let Some(self_expr) = self_obj {
             let self_obj_ty = self.ctx.get_node_type(&self_expr);
 
             if let Some(self_obj_ty) = self_obj_ty
-                && let Some(&receiver_ty) = self.ctx.type_db.receiver_types.get(&fun_ref)
+                && let Some(receiver_ty) = receiver_ty
                 && self.intrn().has_generics(receiver_ty)
             {
                 deducing_ts.auto_deduce_from_argument(receiver_ty, self_obj_ty, self.intrn());
             }
 
-            let params = &f_callable.0;
-            if let Some(&param_ty) = params.first()
-                && let Some(self_obj_ty) = self_obj_ty
-            {
-                let mut param_ty = param_ty;
+            if let Some(self_obj_ty) = self_obj_ty {
+                let mut param_ty = receiver_ty
+                    .or_else(|| f_callable.0.first().copied())
+                    .unwrap_or_else(|| self.intrn().ty_undefined);
+
                 if self.intrn().has_generics(param_ty) {
+                    // Use currently deduced substitutions for `self` once.
+                    // Re-deducing here from already-instantiated callable params can cause
+                    // recursive growth like `T -> array<T>` on loop back-edges.
                     param_ty =
-                        deducing_ts.auto_deduce_from_argument(param_ty, self_obj_ty, self.intrn());
+                        deducing_ts.replace_ts_with_currently_deduced(param_ty, self.intrn());
                 }
 
                 if let SymbolKind::Method {

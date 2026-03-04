@@ -1,0 +1,13 @@
+warning[E027]: conditional branches are identical
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                 return id(flag ? value : value);
+  |                                  -----   ^^^^^ this branch duplicates the other ternary branch
+  |                                  |        
+  |                                  first branch is here
+  |
+  = simplify ternary or make branches semantically different
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E027

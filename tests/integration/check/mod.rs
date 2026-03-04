@@ -6,8 +6,12 @@ mod asm_safety_comment_tests;
 mod bless_safety_comment_tests;
 mod dangerous_send_mode_safety_comment_tests;
 mod deprecated_tests;
+mod divide_before_multiply_tests;
+mod duplicated_condition_tests;
 mod field_init_can_be_folded_tests;
+mod identical_conditional_branches_tests;
 mod import_path_can_use_mappings_tests;
+mod incoming_messages_duplicate_opcode_tests;
 mod lint_exclude_tests;
 mod lint_exit_code_tests;
 mod lint_rules_config_tests;
@@ -19,11 +23,13 @@ mod mutable_variable_can_be_immutable_tests;
 mod name_case_checker_tests;
 mod negated_is_type_can_use_not_is_tests;
 mod no_bounce_handler_tests;
+mod no_global_variables_tests;
 mod pure_function_call_unused_tests;
 mod random_requires_initialization_tests;
 mod reserve_mode_literal_tests;
 mod send_mode_literal_tests;
 mod several_not_null_assertions_tests;
+mod type_inference_regressions_tests;
 mod unauthorized_access_tests;
 mod unused_import_tests;
 mod unused_variable_tests;
@@ -41,9 +47,7 @@ pub(crate) fn run_simple_test_with_mappings(
     mappings: &[(&str, &str)],
     name: &str,
 ) {
-    let mut builder = ProjectBuilder::new(&format!("check-{name}"))
-        .contract("main", content)
-        .with_lint_level("unauthorized-access", "warn");
+    let mut builder = ProjectBuilder::new(&format!("check-{name}")).contract("main", content);
     for (path, file_content) in files {
         builder = builder.file(path, file_content);
     }

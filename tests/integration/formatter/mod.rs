@@ -67,6 +67,29 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
+const LINEAR_ROOT_OPCODE_MISMATCH_CONTRACT: &str = r#"
+import "fm_linear_messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy FmRoute.fromSlice(in.body);
+    createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: msg.mid,
+        body: FmDelivered {
+            queryId: msg.queryId,
+            hop: 1,
+        },
+    }).send(SEND_MODE_REGULAR);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 const LINEAR_SINK_CONTRACT: &str = r#"
 import "fm_linear_messages"
 
@@ -755,6 +778,16 @@ fn linear_formatter_project(project_name: &str, test_body: &str) -> ProjectBuild
         .test_file("formatter_linear", &source)
 }
 
+fn linear_mismatch_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
+    let source = format!("{LINEAR_IMPORTS}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .file("contracts/fm_linear_messages", LINEAR_MESSAGES)
+        .contract("fm_linear_root", LINEAR_ROOT_OPCODE_MISMATCH_CONTRACT)
+        .contract("fm_linear_mid", LINEAR_MID_CONTRACT)
+        .contract("fm_linear_sink", LINEAR_SINK_CONTRACT)
+        .test_file("formatter_linear", &source)
+}
+
 fn fanout_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
     let source = format!("{FANOUT_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
@@ -850,6 +883,86 @@ get fun `test-formatter-linear-chain-println`() {
 }
 
 #[test]
+fn formatter_linear_chain_println_renders_exit_code63_for_opcode_mismatch() {
+    run_success_case(
+        linear_mismatch_formatter_project(
+            "formatter-linear-chain-println-exit-code63-opcode-mismatch",
+            r#"
+get fun `test-formatter-linear-chain-println-exit-code63-opcode-mismatch`() {
+    val (sender, rootAddress, midAddress, sinkAddress) = deployFmLinearHarness();
+    val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 102);
+
+    expect(txs).toHaveLength(2);
+    println(txs);
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_linear_chain_println_exit_code63_opcode_mismatch.stdout.txt",
+    );
+}
+
+#[test]
+fn formatter_exit_code63_from_cell_mismatch_is_reported_in_test_body() {
+    linear_formatter_project(
+        "formatter-exit-code63-from-cell-mismatch-in-test-body",
+        r#"
+get fun `test-formatter-exit-code63-from-cell-mismatch-in-test-body`() {
+    val mid = net.randomAddress("fm_mismatch_mid");
+    val sink = net.randomAddress("fm_mismatch_sink");
+    val wrongCell = FmRoute {
+        queryId: 999,
+        mid,
+        sink,
+    }.toCell();
+
+    FmRelay.fromCell(wrongCell);
+}
+"#,
+    )
+    .build()
+    .acton()
+    .test()
+    .run()
+    .failure()
+    .assert_failed(1)
+    .assert_contains("exit_code=63")
+    .assert_snapshot_matches(
+        "integration/snapshots/formatter/formatter_exit_code63_from_cell_mismatch_in_test_body.stdout.txt",
+    );
+}
+
+#[test]
+fn formatter_exit_code63_from_cell_mismatch_in_test_body_with_backtrace_full() {
+    linear_formatter_project(
+        "formatter-exit-code63-from-cell-mismatch-in-test-body-with-backtrace-full",
+        r#"
+get fun `test-formatter-exit-code63-from-cell-mismatch-in-test-body-with-backtrace-full`() {
+    val mid = net.randomAddress("fm_mismatch_mid");
+    val sink = net.randomAddress("fm_mismatch_sink");
+    val wrongCell = FmRoute {
+        queryId: 1001,
+        mid,
+        sink,
+    }.toCell();
+
+    FmRelay.fromCell(wrongCell);
+}
+"#,
+    )
+    .build()
+    .acton()
+    .test()
+    .with_backtrace("full")
+    .run()
+    .failure()
+    .assert_failed(1)
+    .assert_contains("exit_code=63")
+    .assert_snapshot_matches(
+        "integration/snapshots/formatter/formatter_exit_code63_from_cell_mismatch_in_test_body_with_backtrace_full.stdout.txt",
+    );
+}
+
+#[test]
 fn formatter_fanout_chain_println_renders_sibling_branches() {
     run_success_case(
         fanout_formatter_project(
@@ -885,7 +998,7 @@ get fun `test-formatter-external-out-println-destinations`() {
         ),
     );
 
-    expect(txs).toHaveLength(1);
+    expect(txs!).toHaveLength(1);
     println(txs);
 }
 "#,
@@ -910,7 +1023,7 @@ get fun `test-formatter-ext-in-exit-code-with-backtrace-full`() {
         ),
     );
 
-    expect(txs).toHaveLength(1);
+    expect(txs!).toHaveLength(1);
     println(txs);
 }
 "#,
@@ -982,7 +1095,7 @@ get fun `test-formatter-multi-root-println-independent-internal-chains`() {
     val first = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 505);
     val second = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 506);
 
-    var merged: SendResultList = [];
+    var merged: SendResultList = SendResultList.createEmpty();
     var i = 0;
     while (i < first.size()) {
         merged.push(first.get(i));
@@ -1223,7 +1336,7 @@ get fun `test-formatter-orphan-chain-println-missing-parent`() {
     val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 909);
     expect(txs).toHaveLength(3);
 
-    var orphaned: SendResultList = [];
+    var orphaned: SendResultList = SendResultList.createEmpty();
     orphaned.push(txs.get(1));
     orphaned.push(txs.get(2));
     println(orphaned);
@@ -1326,7 +1439,7 @@ fn formatter_contract_letters_rollover_after_z_println_uses_a1_and_b1() {
         r#"
 get fun `test-formatter-contract-letters-rollover-a1-b1`() {{
     val sender = net.treasury("sender");
-    var merged: SendResultList = [];
+    var merged: SendResultList = SendResultList.createEmpty();
 {sends}
     expect(merged).toHaveLength(27);
     println(merged);

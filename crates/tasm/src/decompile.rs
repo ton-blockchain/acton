@@ -1,4 +1,4 @@
-use crate::spec::{Arg, SliceArg, SpecInstruction, Specification};
+use crate::spec::{Arg, SliceArg, SpecInstruction, load_tvm_specification};
 use crate::types::{
     ArgValue, Code, CodeDictionary, Control, ExoticCellInstruction, Instruction, Method,
     PlainInstruction, RefInstruction, StackRegister,
@@ -8,8 +8,6 @@ use num_bigint::{BigInt, BigUint};
 use num_traits::ToPrimitive;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSlice, DynCell, Store};
 use tycho_types::dict::RawDict;
-
-const SPEC: &str = include_str!("../spec/tvm-specification.json");
 
 #[derive(Debug)]
 pub struct Disassembler {
@@ -25,8 +23,8 @@ impl Default for Disassembler {
 impl Disassembler {
     #[must_use]
     pub fn new() -> Disassembler {
-        let spec: Specification =
-            serde_json::from_str(SPEC).expect("Failed to parse built-in TVM specification JSON");
+        let spec =
+            load_tvm_specification().expect("Failed to parse built-in TVM specification JSON");
         Self::from_instructions(&spec.instructions)
     }
 

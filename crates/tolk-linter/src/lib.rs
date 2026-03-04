@@ -3,8 +3,10 @@ extern crate core;
 use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{
     acton_import_in_contract, bless_call_missing_safety_comment,
-    dangerous_send_mode_missing_safety_comment, deprecated_symbol_use,
-    negated_is_type_can_use_not_is, no_bounce_handler, several_not_null_assertions,
+    dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, duplicated_condition,
+    identical_conditional_branches, incoming_messages_duplicate_opcode,
+    negated_is_type_can_use_not_is, no_bounce_handler, no_global_variables,
+    several_not_null_assertions,
 };
 use crate::rules::ast::{
     asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
@@ -24,8 +26,8 @@ use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, NameUse, Resolved};
 use tolk_syntax::{
-    Call, Expr, ExprStmt, Ident, InstanceArg, NotNull, SourceFile, TopLevel, TypeIdent, Unary,
-    Walker, walk_ast,
+    Call, Expr, ExprStmt, GlobalVar, HasName, Ident, If, IfAlt, InstanceArg, NotNull, SourceFile,
+    Ternary, TopLevel, TypeIdent, Unary, Walker, walk_ast,
 };
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
@@ -35,7 +37,7 @@ use tree_sitter::Node;
 mod profiling;
 mod rules;
 
-use crate::dfa::{random_requires_initialization, unauthorized_access};
+use crate::dfa::{divide_before_multiply, random_requires_initialization, unauthorized_access};
 #[cfg(feature = "profile_rules")]
 pub use profiling::Profiler;
 use tolk_analysis::{AnalysisDb, FileUseFacts};
@@ -227,6 +229,13 @@ impl<'a> Checker<'a> {
             .use_facts(self.type_db, self.body_types, file_id)
     }
 
+    pub fn cfg_for_symbol(
+        &mut self,
+        symbol_id: SymbolId,
+    ) -> Option<Arc<tolk_dataflow::ControlFlowGraph>> {
+        self.analysis_db.cfg_for_symbol(self.type_db, symbol_id)
+    }
+
     pub fn apply_suppressions(&mut self) {
         self.diagnostics.retain(|diag| {
             let Some(file_suppressions) = self.file_suppressions.get(&diag.file_id) else {
@@ -399,6 +408,11 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         );
         run_rule!(
             self.checker,
+            Rule::IncomingMessagesDuplicateOpcode,
+            incoming_messages_duplicate_opcode::check_file(self.checker, self.file_id)
+        );
+        run_rule!(
+            self.checker,
             Rule::UnauthorizedAccess,
             unauthorized_access::check_file(self.checker, self.file_id)
         );
@@ -406,6 +420,11 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
             self.checker,
             Rule::RandomRequiresInitialization,
             random_requires_initialization::check_file(self.checker, self.file_id)
+        );
+        run_rule!(
+            self.checker,
+            Rule::DivideBeforeMultiply,
+            divide_before_multiply::check_file(self.checker, self.file_id)
         );
         run_rule!(
             self.checker,
@@ -465,6 +484,57 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         if let Some(value) = node.value() {
             self.visit_expr(&value);
         }
+    }
+
+    fn walk_if(&mut self, node: &If<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::DuplicatedCondition,
+            duplicated_condition::check_if(self.checker, self.file_id, node)
+        );
+
+        run_rule!(
+            self.checker,
+            Rule::IdenticalConditionalBranches,
+            identical_conditional_branches::check_if(self.checker, self.file_id, node)
+        );
+
+        if let Some(condition) = node.condition() {
+            self.visit_expr(&condition);
+        }
+        if let Some(body) = node.body() {
+            self.walk_block(&body);
+        }
+        if let Some(alternative) = node.alternative() {
+            match alternative {
+                IfAlt::If(if_stmt) => {
+                    self.walk_if(&if_stmt);
+                }
+                IfAlt::Block(block) => {
+                    self.walk_block(&block);
+                }
+            }
+        }
+        self.default_result()
+    }
+
+    fn walk_ternary(&mut self, node: &Ternary<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::IdenticalConditionalBranches,
+            identical_conditional_branches::check_ternary(self.checker, self.file_id, node)
+        );
+
+        if let Some(condition) = node.condition() {
+            self.visit_expr(&condition);
+        }
+        if let Some(consequence) = node.consequence() {
+            self.visit_expr(&consequence);
+        }
+        if let Some(alternative) = node.alternative() {
+            self.visit_expr(&alternative);
+        }
+        self.default_result()
     }
 
     fn walk_call(&mut self, node: &Call<'file>) -> Self::Result {
@@ -586,6 +656,25 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
 
         if let Some(inner) = node.inner() {
             self.visit_expr(&inner);
+        }
+        self.default_result()
+    }
+
+    fn walk_global_var(&mut self, node: &GlobalVar<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::NoGlobalVariables,
+            no_global_variables::check_global_var(self.checker, self.file_id, node)
+        );
+
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        if let Some(typ) = node.typ() {
+            self.visit_type(&typ);
         }
         self.default_result()
     }

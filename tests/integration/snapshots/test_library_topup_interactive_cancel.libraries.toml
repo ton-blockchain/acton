@@ -1,0 +1,11 @@
+[libraries.my-lib]
+name = "MyLib"
+hash = "..."
+code = "..."
+account = "EQD..."
+duration = 100
+network = "testnet"
+timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "2026-01-05T12:00:00Z"
+bits = 10
+cells = 1

@@ -1,6 +1,7 @@
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tolk_dataflow::{ControlFlowGraph, build_cfg_for_top_level_with_source};
 use tolk_resolver::resolve_index::LocalDefId;
 use tolk_resolver::{AstNodeSpanExt, FileId, Resolved, Span, SymbolId, SymbolKind};
 use tolk_syntax::{Assign, Call, CallArgument, DotAccess, SetAssign, TryFromNode};
@@ -25,6 +26,7 @@ pub struct LocalUseFacts {
 
 pub struct AnalysisDb {
     use_facts: FxHashMap<FileId, Arc<FileUseFacts>>,
+    cfg_by_symbol: FxHashMap<SymbolId, Arc<ControlFlowGraph>>,
 }
 
 impl Default for AnalysisDb {
@@ -37,7 +39,33 @@ impl AnalysisDb {
     pub fn new() -> Self {
         Self {
             use_facts: FxHashMap::default(),
+            cfg_by_symbol: FxHashMap::default(),
         }
+    }
+
+    pub fn cfg_for_symbol(
+        &mut self,
+        type_db: &TypeDb,
+        symbol_id: SymbolId,
+    ) -> Option<Arc<ControlFlowGraph>> {
+        if let Some(cfg) = self.cfg_by_symbol.get(&symbol_id) {
+            return Some(cfg.clone());
+        }
+
+        let file = type_db.file_db.get_by_id(symbol_id.file_id)?;
+        let top_level = file.find_syntax_declaration(symbol_id)?;
+        let resolved_index = type_db
+            .project_index
+            .resolved_uses
+            .get(&symbol_id.file_id)
+            .cloned()?;
+        let source = file.source().source.as_ref();
+
+        let cfg =
+            build_cfg_for_top_level_with_source(&top_level, resolved_index.as_ref(), Some(source))?;
+        let cfg = Arc::new(cfg);
+        self.cfg_by_symbol.insert(symbol_id, cfg.clone());
+        Some(cfg)
     }
 
     pub fn use_facts(

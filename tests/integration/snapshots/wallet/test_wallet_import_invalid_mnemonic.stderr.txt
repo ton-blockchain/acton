@@ -1,1 +1,4 @@
 Error: Invalid mnemonic phrase
+
+Caused by:
+  Invalid mnemonic word count (count: 3)

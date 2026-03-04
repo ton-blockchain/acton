@@ -111,7 +111,8 @@ pub fn get_library_by_hash(
 
     #[derive(Deserialize)]
     struct TonCenterLibraryData {
-        data: String,
+        found: Option<bool>,
+        data: Option<String>,
     }
 
     let data: TonCenterLibrariesResponse = response
@@ -121,8 +122,16 @@ pub fn get_library_by_hash(
     if !data.ok || data.result.result.is_empty() {
         anyhow::bail!("Library with hash {hash_hex} not found");
     }
+    let first = &data.result.result[0];
+    if first.found == Some(false) {
+        anyhow::bail!("Library with hash {hash_hex} not found");
+    }
+    let boc_data = first
+        .data
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("Library with hash {hash_hex} not found"))?;
 
-    Boc::decode_base64(&data.result.result[0].data).context("Failed to decode library BOC data")
+    Boc::decode_base64(boc_data).context("Failed to decode library BOC data")
 }
 
 /// Decodes an optional Base64-encoded `BoC` string into a `Cell`.

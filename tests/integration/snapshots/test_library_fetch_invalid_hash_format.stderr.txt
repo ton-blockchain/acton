@@ -1,0 +1,4 @@
+Error: Invalid library hash format
+
+Caused by:
+  expected string of 44, 64 or 66 bytes

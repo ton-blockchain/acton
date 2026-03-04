@@ -1,0 +1,14 @@
+warning[E026]: duplicated condition in conditional chain
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 if (((a + 1) * (a - 2)) > 10) {
+  |                     ------------------------ first occurrence of this condition
+4 |                     return 1;
+5 |                 } else if (((a + 1) * (a - 2)) > 10) {
+  |                            ^^^^^^^^^^^^^^^^^^^^^^^^ duplicated condition
+  |
+  = remove duplicated condition or change it
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E026

@@ -1,0 +1,1 @@
+Error: Invalid TON format: multiple dots

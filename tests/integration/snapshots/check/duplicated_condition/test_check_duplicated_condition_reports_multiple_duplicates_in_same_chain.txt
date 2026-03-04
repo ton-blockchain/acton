@@ -1,0 +1,36 @@
+warning[E026]: duplicated condition in conditional chain
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 if (a > 7) {
+  |                     ----- first occurrence of this condition
+  .
+7 |                 } else if (a > 7) {
+  |                            ^^^^^ duplicated condition
+  |
+  = remove duplicated condition or change it
+
+warning[E026]: duplicated condition in conditional chain
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 if (a > 7) {
+  |                     ----- first occurrence of this condition
+  .
+9 |                 } else if (a > 7) {
+  |                            ^^^^^ duplicated condition
+  |
+  = remove duplicated condition or change it
+
+warning[E026]: duplicated condition in conditional chain
+  --> [ROOT]/contracts/main[LINE]
+  |
+7 |                 } else if (a > 7) {
+  |                            ----- first occurrence of this condition
+8 |                     return 3;
+9 |                 } else if (a > 7) {
+  |                            ^^^^^ duplicated condition
+  |
+  = remove duplicated condition or change it
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E026

@@ -1,7 +1,9 @@
 use crate::common::{acton_exe, assert_ui};
 use crate::support::assertions::TestOutput;
+use crate::support::tempdir::create_tmp_dir;
 use acton_config::color::ColorMode;
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -64,9 +66,236 @@ pub(crate) struct TestConfig {
 }
 
 #[allow(dead_code)]
+#[cfg(unix)]
+fn is_json_like_snapshot_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+pub(crate) struct ProcessCommandBuilder {
+    cmd: std::process::Command,
+    stdin: Option<snapbox::Data>,
+}
+
+#[allow(dead_code)]
+impl ProcessCommandBuilder {
+    pub(crate) fn new(program: impl AsRef<OsStr>) -> Self {
+        Self {
+            cmd: std::process::Command::new(program),
+            stdin: None,
+        }
+    }
+
+    fn arg(mut self, arg: impl AsRef<OsStr>) -> Self {
+        self.cmd.arg(arg);
+        self
+    }
+
+    fn env(mut self, key: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> Self {
+        self.cmd.env(key, value);
+        self
+    }
+
+    fn env_remove(mut self, key: impl AsRef<OsStr>) -> Self {
+        self.cmd.env_remove(key);
+        self
+    }
+
+    fn current_dir(mut self, dir: impl AsRef<Path>) -> Self {
+        self.cmd.current_dir(dir);
+        self
+    }
+
+    fn has_arg_exact_or_prefixed(&self, exact: &str, prefix: &str) -> bool {
+        self.cmd.get_args().any(|arg| {
+            let arg = arg.to_string_lossy();
+            arg == exact || arg.starts_with(prefix)
+        })
+    }
+
+    pub(crate) fn stdin(mut self, stream: impl snapbox::IntoData) -> Self {
+        self.stdin = Some(stream.into_data());
+        self
+    }
+
+    fn into_std(self) -> std::process::Command {
+        self.cmd
+    }
+
+    fn into_snapbox(self, config: snapbox::Assert) -> snapbox::cmd::Command {
+        let mut cmd = snapbox::cmd::Command::from_std(self.cmd).with_assert(config);
+        if let Some(stdin) = self.stdin {
+            cmd = cmd.stdin(stdin);
+        }
+        cmd
+    }
+}
+
+#[cfg(unix)]
+#[allow(dead_code)]
+pub(crate) struct PtySession {
+    inner: expectrl::Session,
+    project_path: PathBuf,
+}
+
+#[cfg(unix)]
+#[allow(dead_code)]
+pub(crate) trait NeedleLabel {
+    fn needle_label(&self) -> String;
+}
+
+#[cfg(unix)]
+impl<Re: AsRef<str>> NeedleLabel for expectrl::Regex<Re> {
+    fn needle_label(&self) -> String {
+        format!("regex `{}`", self.0.as_ref())
+    }
+}
+
+#[cfg(unix)]
+impl NeedleLabel for expectrl::Eof {
+    fn needle_label(&self) -> String {
+        "EOF".to_owned()
+    }
+}
+
+#[cfg(unix)]
+impl NeedleLabel for expectrl::NBytes {
+    fn needle_label(&self) -> String {
+        format!("{} bytes", self.0)
+    }
+}
+
+#[cfg(unix)]
+impl NeedleLabel for &str {
+    fn needle_label(&self) -> String {
+        format!("string `{self}`")
+    }
+}
+
+#[cfg(unix)]
+impl NeedleLabel for String {
+    fn needle_label(&self) -> String {
+        format!("string `{self}`")
+    }
+}
+
+#[cfg(unix)]
+impl NeedleLabel for &[u8] {
+    fn needle_label(&self) -> String {
+        format!("byte pattern ({} bytes)", self.len())
+    }
+}
+
+#[cfg(unix)]
+#[allow(dead_code)]
+impl PtySession {
+    fn new(inner: expectrl::Session, project_path: PathBuf) -> Self {
+        Self {
+            inner,
+            project_path,
+        }
+    }
+
+    /// Set expect timeout and return the session for chaining.
+    pub(crate) fn set_expect_timeout(
+        mut self,
+        expect_timeout: Option<std::time::Duration>,
+    ) -> Self {
+        self.inner.set_expect_timeout(expect_timeout);
+        self
+    }
+
+    /// Expect a pattern and panic with a generic message on failure.
+    pub(crate) fn expect<N>(&mut self, needle: N) -> &mut Self
+    where
+        N: expectrl::Needle + NeedleLabel,
+    {
+        let message = format!("Expected PTY output to match {}", needle.needle_label());
+        self.inner.expect(needle).expect(&message);
+        self
+    }
+
+    /// Expect a pattern and panic with a custom message on failure.
+    #[allow(dead_code)]
+    #[allow(non_snake_case)]
+    pub(crate) fn expect_or_err<N>(&mut self, needle: N, message: &str) -> &mut Self
+    where
+        N: expectrl::Needle,
+    {
+        self.inner.expect(needle).expect(message);
+        self
+    }
+
+    /// Send a line and panic with a custom message on failure.
+    pub(crate) fn send_line(&mut self, line: impl AsRef<str>, message: &str) -> &mut Self {
+        self.inner.send_line(line).expect(message);
+        self
+    }
+
+    pub(crate) fn assert_file_snapshot_matches(
+        &mut self,
+        file_path: &str,
+        snapshot_path: &str,
+    ) -> &mut Self {
+        let full_file_path = self.project_path.join(file_path);
+        assert!(
+            full_file_path.exists(),
+            "File '{}' doesn't exist",
+            full_file_path.display()
+        );
+
+        let file_content = fs::read_to_string(&full_file_path).unwrap_or_else(|e| {
+            panic!("Failed to read file '{}': {}", full_file_path.display(), e)
+        });
+
+        let normalized = if is_json_like_snapshot_file(&full_file_path) {
+            crate::support::snapshots::normalize_output_preserve_escapes(
+                &file_content,
+                &self.project_path,
+            )
+        } else {
+            crate::support::snapshots::normalize_output(&file_content, &self.project_path)
+        };
+
+        let assertion = if is_json_like_snapshot_file(&full_file_path) {
+            crate::common::assertion().normalize_paths(false)
+        } else {
+            crate::common::assertion()
+        };
+
+        let mut snapshot_full_path = std::env::current_dir().expect("Failed to get current dir");
+        snapshot_full_path.push("tests");
+        snapshot_full_path.push(snapshot_path);
+
+        let expected = snapbox::Data::read_from(&snapshot_full_path, None);
+        assertion.eq(normalized, expected);
+        self
+    }
+}
+
+#[cfg(unix)]
+impl std::ops::Deref for PtySession {
+    type Target = expectrl::Session;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+#[cfg(unix)]
+impl std::ops::DerefMut for PtySession {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+#[allow(dead_code)]
 impl ProjectBuilder {
     pub(crate) fn new(name: &str) -> Self {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let temp_dir = create_tmp_dir();
         Self {
             name: name.to_string(),
             temp_dir,
@@ -708,7 +937,7 @@ pub(crate) struct Project {
 impl Project {
     #[allow(dead_code)]
     pub(crate) fn acton(&self) -> ActonCommand {
-        let cmd = snapbox::cmd::Command::new(acton_exe()).with_assert(assert_ui());
+        let cmd = ProcessCommandBuilder::new(acton_exe());
         ActonCommand {
             cmd,
             project: Arc::new(ProjectRef {
@@ -746,6 +975,7 @@ impl Project {
             build_info: false,
             force_no_color_env: true,
             color_mode: None,
+            wallet_secure_default_false: false,
         }
     }
 
@@ -759,7 +989,7 @@ pub(crate) struct ProjectRef {
 }
 
 pub(crate) struct ActonCommand {
-    pub(crate) cmd: snapbox::cmd::Command,
+    pub(crate) cmd: ProcessCommandBuilder,
     pub(crate) project: Arc<ProjectRef>,
     pub(crate) test_path: Option<String>,
     pub(crate) filter: Option<String>,
@@ -793,6 +1023,7 @@ pub(crate) struct ActonCommand {
     pub(crate) build_info: bool,
     pub(crate) force_no_color_env: bool,
     pub(crate) color_mode: Option<ColorMode>,
+    pub(crate) wallet_secure_default_false: bool,
 }
 
 #[allow(dead_code)]
@@ -1202,9 +1433,8 @@ impl ActonCommand {
             .cmd
             .arg("wallet")
             .arg("new")
-            .arg("--secure")
-            .arg("false")
             .current_dir(&self.project.path);
+        self.wallet_secure_default_false = true;
         self
     }
 
@@ -1213,9 +1443,8 @@ impl ActonCommand {
             .cmd
             .arg("wallet")
             .arg("import")
-            .arg("--secure")
-            .arg("false")
             .current_dir(&self.project.path);
+        self.wallet_secure_default_false = true;
         self
     }
 
@@ -1228,11 +1457,20 @@ impl ActonCommand {
         self
     }
 
-    pub(crate) fn wallet_get(mut self) -> Self {
+    pub(crate) fn wallet_export_mnemonic(mut self) -> Self {
         self.cmd = self
             .cmd
             .arg("wallet")
-            .arg("get")
+            .arg("export-mnemonic")
+            .current_dir(&self.project.path);
+        self
+    }
+
+    pub(crate) fn wallet_sign(mut self) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wallet")
+            .arg("sign")
             .current_dir(&self.project.path);
         self
     }
@@ -1242,6 +1480,15 @@ impl ActonCommand {
             .cmd
             .arg("wallet")
             .arg("remove")
+            .current_dir(&self.project.path);
+        self
+    }
+
+    pub(crate) fn wallet_airdrop(mut self) -> Self {
+        self.cmd = self
+            .cmd
+            .arg("wallet")
+            .arg("airdrop")
             .current_dir(&self.project.path);
         self
     }
@@ -1315,8 +1562,7 @@ impl ActonCommand {
         self
     }
 
-    /// Run the command and return output
-    pub(crate) fn run(mut self) -> TestOutput {
+    fn into_prepared_command(mut self) -> ProcessCommandBuilder {
         if let Some(path) = self.test_path {
             self.cmd = self.cmd.arg(path);
         }
@@ -1448,13 +1694,40 @@ impl ActonCommand {
             self.cmd = self.cmd.arg("--color").arg(mode.to_string());
         }
 
+        // Keep tests deterministic by defaulting wallet new/import to plaintext mnemonic
+        // storage, but avoid duplicate --secure flags when tests set it explicitly.
+        if self.wallet_secure_default_false
+            && !self.cmd.has_arg_exact_or_prefixed("--secure", "--secure=")
+        {
+            self.cmd = self.cmd.arg("--secure").arg("false");
+        }
+
         if self.force_no_color_env {
             self.cmd = self.cmd.env("NO_COLOR", "1");
         }
-        let output = self.cmd.assert();
+
+        self.cmd
+    }
+
+    /// Run the command and return output
+    pub(crate) fn run(self) -> TestOutput {
+        let project_path = self.project.path.clone();
+        let output = self
+            .into_prepared_command()
+            .into_snapbox(assert_ui())
+            .assert();
         TestOutput {
             output,
-            project_path: self.project.path.clone(),
+            project_path,
         }
+    }
+
+    /// Spawn command in a pseudo-terminal for interactive tests.
+    #[cfg(unix)]
+    pub(crate) fn spawn_pty(self) -> PtySession {
+        let project_path = self.project.path.clone();
+        let session = expectrl::Session::spawn(self.into_prepared_command().into_std())
+            .expect("Failed to spawn command in PTY");
+        PtySession::new(session, project_path)
     }
 }

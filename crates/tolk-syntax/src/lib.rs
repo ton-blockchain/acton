@@ -30,6 +30,7 @@ pub use ast::node::*;
 pub use ast::statements::*;
 pub use ast::top_level::*;
 pub use ast::traits::*;
+pub use ast::traversal::*;
 pub use ast::types::*;
 pub use ast::walker::*;
 use tree_sitter::{Language, Parser, Tree};

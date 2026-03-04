@@ -1,0 +1,14 @@
+Instruction:   ADD
+Category:      arithmetic / add_mul
+Opcode:        A0 (tlb: #a0)
+Stack:         x:Int y:Int -> result:Int
+
+Summary:
+Adds two integers and pushes the result back onto the stack.
+
+Description:
+Pops two integers from the stack, adds them and pushes the result back onto the stack.
+
+Exit codes:
+- 2: Stack contains less than 2 elements.
+- 7: Top or second element is not an Int.

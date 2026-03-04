@@ -2,9 +2,7 @@ use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Diagnostic};
 use crate::rules::violation::Violation;
 use rustc_hash::FxHashMap;
-use tolk_dataflow::build_cfg_for_top_level_with_source;
 use tolk_macros::ViolationMetadata;
-use tolk_resolver::Symbol;
 use tolk_resolver::file_index::{FileId, SymbolId};
 
 pub mod analysis;
@@ -65,10 +63,11 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
             continue;
         }
 
-        let Some(cfg) = summaries.cfg_for_symbol(symbol) else {
+        let symbol_id = symbol.id;
+        let Some(cfg) = summaries.checker.cfg_for_symbol(symbol_id) else {
             continue;
         };
-        let report = analysis::run(&cfg, symbol.id.file_id, &mut summaries);
+        let report = analysis::run(cfg.as_ref(), symbol.id.file_id, &mut summaries);
         issues.extend(report.issues);
     }
 
@@ -119,35 +118,16 @@ enum CachedSummary {
 }
 
 struct RandomSummaryComputer<'a, 'b> {
-    checker: &'a Checker<'b>,
-    cfg_cache: FxHashMap<SymbolId, tolk_dataflow::ControlFlowGraph>,
+    checker: &'a mut Checker<'b>,
     summary_cache: FxHashMap<SymbolId, CachedSummary>,
 }
 
 impl<'a, 'b> RandomSummaryComputer<'a, 'b> {
-    fn new(checker: &'a Checker<'b>) -> Self {
+    fn new(checker: &'a mut Checker<'b>) -> Self {
         Self {
             checker,
-            cfg_cache: FxHashMap::default(),
             summary_cache: FxHashMap::default(),
         }
-    }
-
-    fn cfg_for_symbol(&mut self, symbol: &Symbol) -> Option<tolk_dataflow::ControlFlowGraph> {
-        let symbol_id = symbol.id;
-        if let Some(cfg) = self.cfg_cache.get(&symbol_id) {
-            return Some(cfg.clone());
-        }
-
-        let file = self.checker.file_db.get_by_id(symbol_id.file_id)?;
-        let top_level = file.find_syntax_declaration(symbol_id)?;
-        let resolve_index = self.checker.resolve_index_for(symbol_id.file_id)?;
-        let source = file.source().source.as_ref();
-        let cfg =
-            build_cfg_for_top_level_with_source(&top_level, resolve_index.as_ref(), Some(source))?;
-
-        self.cfg_cache.insert(symbol_id, cfg.clone());
-        Some(cfg)
     }
 
     fn summary_for_symbol(&mut self, symbol_id: SymbolId) -> analysis::InitializationSummary {
@@ -184,8 +164,9 @@ impl<'a, 'b> RandomSummaryComputer<'a, 'b> {
         self.summary_cache
             .insert(symbol_id, CachedSummary::InProgress);
 
-        let summary = if let Some(cfg) = self.cfg_for_symbol(symbol) {
-            analysis::function_summary(&cfg, symbol_id.file_id, self)
+        let symbol_id1 = symbol.id;
+        let summary = if let Some(cfg) = self.checker.cfg_for_symbol(symbol_id1) {
+            analysis::function_summary(cfg.as_ref(), symbol_id.file_id, self)
         } else {
             analysis::InitializationSummary {
                 is_guaranteed: false,

@@ -149,6 +149,15 @@ pub struct LiteNodeBlockTransactions {
     pub msg_hash: Option<Hash256>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LiteNodeLibrary {
+    pub hash: Hash256,
+    pub found: bool,
+    pub data: Option<BocBytes>,
+    pub publishers_count: usize,
+    pub publishers: Vec<Addr>,
+}
+
 #[derive(Debug)]
 pub(crate) enum Request {
     SendBoc {
@@ -206,6 +215,10 @@ pub(crate) enum Request {
     },
     GetConsensusBlock {
         resp: oneshot::Sender<anyhow::Result<LiteNodeConsensusBlock>>,
+    },
+    GetLibraries {
+        hashes: Vec<Hash256>,
+        resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeLibrary>>>,
     },
     GetConfigParam {
         param: u32,
@@ -504,6 +517,15 @@ impl LiteNode {
         rx.await?
     }
 
+    pub async fn get_libraries(
+        &self,
+        hashes: Vec<Hash256>,
+    ) -> anyhow::Result<Vec<LiteNodeLibrary>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetLibraries { hashes, resp }).await?;
+        rx.await?
+    }
+
     pub async fn get_config_param(
         &self,
         param: u32,
@@ -795,6 +817,10 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::GetConsensusBlock { resp } => {
             let res = handle_get_consensus_block(node);
+            let _ = resp.send(res);
+        }
+        Request::GetLibraries { hashes, resp } => {
+            let res = handle_get_libraries(node, &hashes);
             let _ = resp.send(res);
         }
         Request::GetConfigParam { param, seqno, resp } => {
@@ -1285,6 +1311,31 @@ fn handle_get_consensus_block(node: &Node) -> anyhow::Result<LiteNodeConsensusBl
         consensus_block,
         timestamp,
     })
+}
+
+fn handle_get_libraries(node: &Node, hashes: &[Hash256]) -> anyhow::Result<Vec<LiteNodeLibrary>> {
+    let entries = node.get_libraries(hashes);
+    let mut result = Vec::with_capacity(entries.len());
+    for lookup in entries {
+        if let Some(entry) = lookup.entry {
+            result.push(LiteNodeLibrary {
+                hash: lookup.hash,
+                found: true,
+                data: Some(entry.lib_boc),
+                publishers_count: entry.publishers.len(),
+                publishers: entry.publishers.into_iter().collect(),
+            });
+        } else {
+            result.push(LiteNodeLibrary {
+                hash: lookup.hash,
+                found: false,
+                data: None,
+                publishers_count: 0,
+                publishers: Vec::new(),
+            });
+        }
+    }
+    Ok(result)
 }
 
 fn handle_get_config_param(

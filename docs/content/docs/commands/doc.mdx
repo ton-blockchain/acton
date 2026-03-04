@@ -1,0 +1,85 @@
+---
+title: "Documentation from CLI"
+description: "Lookup various documentation from the CLI"
+---
+
+The `doc` command for now provides only reference lookup from the built-in TVM instruction specification via `tvm` subcommand.
+
+```bash
+acton doc tvm <INSTRUCTION_OR_QUERY>...
+```
+
+## Usage
+
+```bash
+acton doc tvm ADD
+acton doc tvm ADD SUB
+acton doc tvm SENDRAWMSG --json
+acton doc tvm SENRAWMSG --find
+acton doc tvm outcomng --find --description
+```
+
+## Options
+
+| Option                   | Type | Description                                                     |
+|--------------------------|------|-----------------------------------------------------------------|
+| `<INSTRUCTION_OR_QUERY>` | List | One or more instruction names (or search queries in find mode). |
+| `--json`                 | Flag | Output as JSON.                                                 |
+| `-f, --find`             | Flag | Fuzzy search instruction names.                                 |
+| `-d, --description`      | Flag | Extend fuzzy search to descriptions. Requires `--find`.         |
+
+## Behavior
+
+### Exact lookup mode (default)
+
+Without `--find`, each argument is treated as an instruction name.
+
+- Name matching is case-insensitive.
+- `-` and `#` are normalized (for convenience when typing names).
+- Text mode prints instruction blocks one after another.
+- JSON mode always returns an array of instruction objects (one or more items).
+
+### Fuzzy search mode (`--find`)
+
+With `--find`, each argument is treated as a search query.
+
+- By default, fuzzy matching is applied to instruction names.
+- With `--description`, fuzzy matching also uses instruction `short`/`long` description fields, tags, and operands.
+- Text mode prints a result block per query.
+- JSON mode always returns an array of objects in `{ "query": "...", "matches": [...] }` format (one or more items).
+
+## Examples
+
+### Exact lookup
+
+```bash
+acton doc tvm ADD
+```
+
+```bash
+acton doc tvm ADD SUB
+```
+
+```bash
+acton doc tvm SENDRAWMSG --json
+```
+
+### Fuzzy search by name
+
+```bash
+acton doc tvm SENRAWMSG --find
+```
+
+```bash
+acton doc tvm SENRAWMSG --find --json
+```
+
+### Fuzzy search in descriptions
+
+```bash
+acton doc tvm outcomng --find --description
+```
+
+```bash
+acton doc tvm SENRAWMSG outcomng --find --description --json
+```

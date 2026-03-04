@@ -15,13 +15,13 @@ This command verifies that the specified contract address contains bitcode that 
 
 ## Command Options
 
-| Option                         | Type    | Description                                                                        |
-|--------------------------------|---------|------------------------------------------------------------------------------------|
-| `--address <ADDR>`             | String  | Contract address to verify on the blockchain (prompted if not provided)            |
-| `--wallet <WALLET>`            | String  | Wallet name to use for signing verification transaction (prompted if not provided) |
-| `--compiler-version <VERSION>` | String  | Tolk compiler version to use on verifier side (defaults to 1.1.0)                  |
-| `--dry-run`                    | Boolean | Run verification without sending the final transaction                             |
-| `--api-key <KEY>`              | String  | TonCenter API key for blockchain queries (avoids rate limiting)                    |
+| Option                         | Type    | Description                                                                                     |
+|--------------------------------|---------|-------------------------------------------------------------------------------------------------|
+| `--address <ADDR>`             | String  | Contract address to verify on the blockchain (prompted if not provided)                         |
+| `--wallet <WALLET>`            | String  | Wallet name to use for signing verification transaction (prompted if not provided)              |
+| `--compiler-version <VERSION>` | String  | Tolk compiler version to use on verifier side (defaults to 1.1.0)                               |
+| `--dry-run`                    | Boolean | Run verification without sending the final transaction                                          |
+| `--api-key <KEY>`              | String  | TonCenter API key for blockchain queries (avoids rate limiting; also reads `TONCENTER_API_KEY`) |
 
 ### Network Options
 
@@ -128,7 +128,7 @@ By default, contracts are verified on testnet. To verify a contract on mainnet, 
 
 ### Rate Limiting
 
-Without providing an `--api-key`, the verification process will include 1-second delays between blockchain queries to respect TonCenter rate limits. Provide a TonCenter API key using the `--api-key` option to avoid these delays.
+Without providing an `--api-key`, the verification process will include 1-second delays between blockchain queries to respect TonCenter rate limits. Provide a TonCenter API key using `--api-key` or `TONCENTER_API_KEY` environment variable to avoid these delays.
 
 ### Compiler Version
 

@@ -284,13 +284,13 @@ pub fn empty_lines_between(ctx: &Context<'_>, top: &Node, bottom: &Node) -> usiz
     // [
     //
     // ] <- end   position of top
-    // ( <- start position of botton
+    // ( <- start position of bottom
     //
     // )
 
-    let botton_line = start_line(ctx, bottom);
+    let bottom_line = start_line(ctx, bottom);
     let top_line = top.end_position().row;
-    botton_line.saturating_sub(top_line)
+    bottom_line.saturating_sub(top_line)
 }
 
 #[allow(clippy::branches_sharing_code)] // for readability

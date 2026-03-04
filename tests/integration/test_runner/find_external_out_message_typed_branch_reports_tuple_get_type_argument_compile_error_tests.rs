@@ -36,7 +36,7 @@ fn find_external_out_message_typed_branch_reports_tuple_get_type_argument_compil
         "en-stdlib-find-external-out-message-typed-branch-bug",
         r#"
 get fun `test-en-find-external-out-message-typed-branch-bug`() {
-    val txs: SendResultList = [];
+    val txs: SendResultList = SendResultList.createEmpty();
 
     val found = txs.findExternalOutMessage<EnExternalNotice>({});
     expect(found).toBeNone();
@@ -52,7 +52,7 @@ fn find_external_out_message_default_branch_reports_tuple_get_type_argument_comp
         "en-stdlib-find-external-out-message-default-branch-bug",
         r#"
 get fun `test-en-find-external-out-message-default-branch-bug`() {
-    val txs: SendResultList = [];
+    val txs: SendResultList = SendResultList.createEmpty();
 
     val found = txs.findExternalOutMessage({});
     expect(found).toBeNone();

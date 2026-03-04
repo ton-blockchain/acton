@@ -1,0 +1,42 @@
+---
+title: "E025: divide-before-multiply"
+description: "Detects cases where division is evaluated before multiplication."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E025`
+- `Rule`: `divide-before-multiply`
+- `Status`: Preview since `v0.0.1`
+- `Quick fix`: sometimes available
+
+### What it does
+Detects cases where division is evaluated before multiplication.
+
+### Why is this bad?
+Division done too early may lose precision (especially for integer arithmetic)
+and can produce unintended results in subsequent multiplication.
+
+### Example
+```tolk
+fun main(a: int, b: int, c: int): int {
+  return a / b * c;
+}
+```
+
+Use instead:
+```tolk
+fun main(a: int, b: int, c: int): int {
+  return a * c / b;
+}
+```
+
+### Behavior notes
+The check uses CFG + dataflow:
+- reports direct patterns like `(x / y) * z` and `x * (y / z)`;
+- tracks locals tainted by division through assignments and warns when
+  such values are later used in multiplication.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/dfa/divide_before_multiply/mod.rs#L35" />

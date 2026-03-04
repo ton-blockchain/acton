@@ -17,6 +17,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
   ✗ maybe-unwrap-on-none-throws-exit-code-7 [TIME]
     └─ exit_code=7
       ├─ Re-run with --backtrace full to get more information
+      ├─ Type check error
       └─ Phase: Compute phase
 
  ✗ 1 failed in 1 file

@@ -14,7 +14,10 @@ permissions:
 
 jobs:
   build-linux:
-    runs-on: ubicloud-standard-4
+    strategy:
+      matrix:
+        os: [ ubicloud-standard-4-ubuntu-2204 ]
+    runs-on: ${{ matrix.os }}
     if: true
 
     outputs:
@@ -24,9 +27,55 @@ jobs:
       - name: Check out Acton repository
         uses: actions/checkout@v6
 
+      - name: Check versions match tag
+        if: github.event_name == 'release'
+        env:
+          RAW_TAG: ${{ github.event.release.tag_name }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          raw_tag="${RAW_TAG}"
+
+          if [[ "${raw_tag}" != v* ]]; then
+            echo "::error title=Invalid tag::Tag '${raw_tag}' must start with 'v'"
+            exit 1
+          fi
+
+          tag_version="${raw_tag:1}"
+
+          acton_version="$(yq -r '.package.version' Acton.toml)"
+          cargo_version="$(yq -r '.workspace.package.version' Cargo.toml)"
+          package_version="$(jq -r '.version' package.json)"
+
+          has_errors=0
+
+          if [[ "${acton_version}" != "${tag_version}" ]]; then
+            echo "::error title=Version mismatch::Acton.toml(version) '${acton_version}' does not match tag '${tag_version}'"
+            has_errors=1
+          fi
+
+          if [[ "${cargo_version}" != "${tag_version}" ]]; then
+            echo "::error title=Version mismatch::Cargo.toml(workspace.package.version) '${cargo_version}' does not match tag '${tag_version}'"
+            has_errors=1
+          fi
+
+          if [[ "${package_version}" != "${tag_version}" ]]; then
+            echo "::error title=Version mismatch::package.json(version) '${package_version}' does not match tag '${tag_version}'"
+            has_errors=1
+          fi
+
+          if [[ "${has_errors}" -ne 0 ]]; then
+            exit 1
+          fi
+
+          echo "All versions match ${tag_version}"
+          exit 0
+
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
+          key: ${{ matrix.os }}
           save-if: false
 
       - name: Install Rust
@@ -37,6 +86,13 @@ jobs:
         with:
           tool: nextest,just
 
+      - name: Install LLVM and Clang (don't cache)
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 16 clang
+          rm llvm.sh
+
       - name: Get TON commit hash
         id: ton-commit
         run: |
@@ -46,60 +102,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Cache TON artifacts
-        id: cache-ton-artifacts
         uses: actions/cache/restore@v5
         with:
           path: ton-repo/artifacts
-          key: ton-artifacts-${{ runner.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ runner.os }}-
-
-      - name: Check cache hit
-        run: echo '${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
-
-      - name: Install system dependencies (cache not exist)
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev graphviz
-          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+          key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-artifacts-${{ matrix.os }}-
+          fail-on-cache-miss: true
 
       - name: Install system dependencies (cache exist)
-        if: steps.cache-ton-artifacts.outputs.cache-hit == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y graphviz
-
-      - name: Maximize Build Space
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      - name: Clone TON repository
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: actions/checkout@v6
-        with:
-          repository: i582/ton
-          ref: pmakhnev/acton
-          fetch-depth: 1
-          submodules: true
-
-      - name: Build TON static libraries
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: |
-          export CC=clang-16
-          export CXX=clang++-16
-          export AR=llvm-ar-16
-          export RANLIB=llvm-ranlib-16
-          cd ton-repo
-          cp assembly/native/build-ubuntu-static.sh .
-          chmod +x build-ubuntu-static.sh
-          ./build-ubuntu-static.sh -a -c
-
-      - name: Show ccache stats
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: ccache -s
 
       - name: Copy TON artifacts to objs directory
         run: |
@@ -116,8 +129,8 @@ jobs:
 
       - name: Build acton binary
         env:
-          CC: gcc
-          CXX: g++
+          CC: clang-16
+          CXX: clang++-16
         run: |
           just build-ui
           cargo build --profile release-size --bin acton

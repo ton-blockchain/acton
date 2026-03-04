@@ -1,0 +1,9 @@
+[
+  {
+    "query": "SENRAWMSG",
+    "matches": [
+      "SENDRAWMSG",
+      "SENDMSG"
+    ]
+  }
+]

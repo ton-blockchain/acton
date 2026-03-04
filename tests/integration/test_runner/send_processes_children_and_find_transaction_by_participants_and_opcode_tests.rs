@@ -358,7 +358,7 @@ get fun `test-ag-send-external-runs-handler`() {
 
     val txs = net.sendExternal(
         createExternalMessage(externalAddress, TriggerExternal { queryId: 1 }),
-    );
+    )!;
 
     expect(txs).toHaveLength(1);
     expect(txs).toHaveSuccessfulTx();
@@ -383,10 +383,10 @@ get fun `test-ag-send-external-repeatable`() {
 
     val first = net.sendExternal(
         createExternalMessage(externalAddress, TriggerExternal { queryId: 2 }),
-    );
+    )!;
     val second = net.sendExternal(
         createExternalMessage(externalAddress, TriggerExternal { queryId: 3 }),
-    );
+    )!;
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);
@@ -524,7 +524,7 @@ get fun `test-ag-wait-in-emulation-mode`() {
     expect(txs.wait()).toEqual(true);
     expect(txs.wait(true, 1, 1)).toEqual(true);
 
-    val empty: SendResultList = [];
+    val empty: SendResultList = SendResultList.createEmpty();
     expect(empty.wait()).toEqual(true);
 }
 "#,
@@ -539,7 +539,7 @@ fn wait_returns_false_for_empty_list_in_broadcast_mode() {
         r#"
 get fun `test-ag-wait-empty-list-in-broadcast-mode`() {
     net.enableBroadcast();
-    val empty: SendResultList = [];
+    val empty: SendResultList = SendResultList.createEmpty();
     expect(empty.wait()).toEqual(false);
     net.disableBroadcast();
 }

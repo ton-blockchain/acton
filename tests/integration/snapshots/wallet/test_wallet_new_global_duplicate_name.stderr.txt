@@ -1,0 +1,1 @@
+Error: Wallet global-duplicate already exists in global config

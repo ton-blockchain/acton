@@ -40,6 +40,11 @@ pub struct DetectHashRequest {
 }
 
 #[derive(Deserialize)]
+pub struct GetLibrariesRequest {
+    pub libraries: String,
+}
+
+#[derive(Deserialize)]
 pub struct GetTransactionsRequest {
     pub address: String,
     #[serde(default = "default_limit")]

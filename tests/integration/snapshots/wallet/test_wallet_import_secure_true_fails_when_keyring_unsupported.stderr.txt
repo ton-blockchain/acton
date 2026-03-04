@@ -1,0 +1,1 @@
+Error: Secure native store is not supported or accessible in this environment, but --secure was explicitly requested.

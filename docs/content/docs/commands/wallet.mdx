@@ -3,7 +3,7 @@ title: "Managing Wallets"
 description: "Learn how to create and manage testnet wallets for your Acton projects"
 ---
 
-The `wallet` command allows you to generate, import, list, inspect, and remove wallets for testing purposes. It automatically creates wallet configurations and offers to store mnemonics securely in the system keyring or in configuration files.
+The `wallet` command allows you to generate, import, list, sign messages with, export mnemonics from, and remove wallets for testing purposes. It automatically creates wallet configurations and offers to store mnemonics securely in the system keyring or in configuration files.
 
 <Callout type="warn">
     Wallets created by this command are configured for **testnet** by default.
@@ -28,9 +28,10 @@ This command will start an interactive prompt to guide you through the wallet cr
 |-----------------------|--------|----------------------------------------------------------------|
 | `--name <NAME>`       | String | Name of the wallet (default: prompts user)                     |
 | `--version <VERSION>` | String | Version of the wallet (default: prompts user)                  |
-| `--local`             | Flag   | Save wallet to local `wallets.toml`                            |
-| `--global`            | Flag   | Save wallet to global `global.wallets.toml`                    |
+| `--local`             | Flag   | Save wallet to local `wallets.toml` (mutually exclusive with `--global`) |
+| `--global`            | Flag   | Save wallet to global `global.wallets.toml` (mutually exclusive with `--local`) |
 | `--secure`            | Bool   | Use secure native store (Keyring) (default: true if available) |
+| `--airdrop`           | Flag   | Request testnet TON from faucet after wallet creation (default: false) |
 | `--json`              | Flag   | Output result as JSON                                          |
 
 **Supported wallet versions:**
@@ -55,6 +56,7 @@ You will be prompted to:
 2. Choose where to save it (local or global)
 3. Select the wallet version from a list
 4. Choose whether to store the mnemonic in the system's secure keyring (recommended)
+5. Choose whether to request testnet TON from faucet automatically
 
 **Non-interactive Creation:**
 
@@ -64,6 +66,9 @@ acton wallet new --name deployer --version v5r1 --local
 
 # Create a global highload wallet
 acton wallet new --name shared-sender --version highloadv2r2 --global
+
+# Create wallet and request testnet TON from faucet immediately
+acton wallet new --name deployer --version v5r1 --local --airdrop
 ```
 
 **Wallet name normalization:**
@@ -81,6 +86,12 @@ Example: `My Wallet 123!` becomes `my-wallet-123`.
 - If secure native store is unavailable and `--secure=true` is passed explicitly, the command fails.
 - If secure native store is unavailable and `--secure` is omitted (or `false`), mnemonic is stored in plain text config.
 
+**`--airdrop` behavior:**
+
+- Default is `false`.
+- In interactive mode, if `--airdrop` is not passed, Acton asks whether to request testnet TON automatically.
+- In non-interactive mode, `--airdrop` must be passed explicitly to trigger auto-request.
+
 #### Output
 
 When you create a new wallet, the configuration is added to either `wallets.toml` (local) or `~/.config/acton/wallets/global.wallets.toml` (global).
@@ -91,6 +102,9 @@ When you create a new wallet, the configuration is added to either `wallets.toml
 kind = "v5r1"
 workchain = 0
 keys = { mnemonic = "word1 word2 ... word24" }
+
+[wallets.deployer.expected]
+address-testnet = "EQ..."
 ```
 
 **Example (Secure Keyring):**
@@ -99,10 +113,19 @@ keys = { mnemonic = "word1 word2 ... word24" }
 kind = "v5r1"
 workchain = 0
 keys = { mnemonic-keyring = "my-project:deployer" }
+
+[wallets.deployer.expected]
+address-testnet = "EQ..."
 ```
 
-For local wallets, keyring id usually includes project prefix (`<project>:<wallet>`).  
+For local wallets, keyring id usually includes project prefix (`<project>:<wallet>`).
 For global wallets, keyring id is wallet name.
+`wallet new` automatically writes only `expected.address-testnet`; add `address-mainnet` manually if needed.
+When a wallet is saved globally, Acton may also create a local `global.wallets.toml` symlink in the current project.
+
+In `--json` mode, output includes:
+- `airdrop_requested` (boolean)
+- optional `airdrop` object when auto-request was attempted (`--airdrop` or interactive confirmation)
 
 ---
 
@@ -122,8 +145,8 @@ This command allows you to import an existing wallet by providing its mnemonic p
 |-----------------------|--------|----------------------------------------------------------------|
 | `--name <NAME>`       | String | Name of the wallet (default: prompts user)                     |
 | `--version <VERSION>` | String | Version of the wallet (default: prompts user)                  |
-| `--local`             | Flag   | Save wallet to local `wallets.toml`                            |
-| `--global`            | Flag   | Save wallet to global `global.wallets.toml`                    |
+| `--local`             | Flag   | Save wallet to local `wallets.toml` (mutually exclusive with `--global`) |
+| `--global`            | Flag   | Save wallet to global `global.wallets.toml` (mutually exclusive with `--local`) |
 | `--secure`            | Bool   | Use secure native store (Keyring) (default: true if available) |
 | `--json`              | Flag   | Output result as JSON                                          |
 
@@ -150,6 +173,8 @@ acton wallet import --name deployer --version v4r2 --local "word1 word2 ... word
 Wallet names are normalized with the same rules as `wallet new` (lowercase, spaces to `-`, special chars removed).
 
 `--secure` behavior is the same as in `wallet new`.
+Saved config format is also the same as in `wallet new`, including `[wallets.<name>.expected].address-testnet`.
+For global imports, Acton may create local `global.wallets.toml` symlink in the current project.
 
 ---
 
@@ -182,20 +207,60 @@ If `--api-key` is omitted, Acton also checks the `TONCENTER_API_KEY` environment
 
 ---
 
-### `acton wallet get`
+### `acton wallet export-mnemonic`
 
-Prints the wallet mnemonic phrase.
+Exports wallet mnemonic phrase.
 
 ```bash
-acton wallet get [NAME]
+acton wallet export-mnemonic [NAME]
 ```
+
+For security reasons:
+- export is allowed only in interactive mode (`TTY`)
+- command asks you to type wallet name to confirm export
 
 Acton reads mnemonic from any configured source (`mnemonic`, `mnemonic-keyring`, `mnemonic-env`, `mnemonic-file`).
 
 #### Example
 
 ```bash
-acton wallet get deployer
+acton wallet export-mnemonic deployer
+```
+
+---
+
+### `acton wallet sign`
+
+Signs wallet `external_body` BoC with the selected wallet private key using wallet-version-specific format.
+
+```bash
+acton wallet sign [NAME]
+```
+
+Input format is auto-detected:
+- `hex` (preferred when a payload can be interpreted as both `hex` and `base64`)
+- `base64`
+
+Output is always signed `external_body` BoC in `hex`.
+
+#### Options
+
+| Option         | Type   | Description                                                    |
+|----------------|--------|----------------------------------------------------------------|
+| `--body <BOC>` | String | External body BoC to sign (auto-detected as `hex` or `base64`) |
+| `--message <BOC>` | String | Alias for `--body`                                             |
+| `--json`       | Flag   | Output result as JSON                                          |
+
+If `--body` / `--message` is omitted, Acton will ask for the external body interactively.
+
+#### Examples
+
+```bash
+# Sign external body provided as hex BoC
+acton wallet sign deployer --body "B5EE9C72..."
+
+# Sign external body provided as base64 BoC
+acton wallet sign deployer --body "te6ccgEBAQEA..."
 ```
 
 ---
@@ -209,19 +274,45 @@ acton wallet airdrop [NAME]
 ```
 
 This command requests a PoW challenge from faucet, solves it locally, and submits claim for selected wallet address.
+Acton retries transient faucet errors (network/5xx) automatically with short backoff.
+If `[NAME]` is omitted, Acton auto-selects a wallet (single wallet) or asks you to choose (multiple wallets).
 
 #### Options
 
 | Option                 | Type   | Description                          |
 |------------------------|--------|--------------------------------------|
-| `--faucet-url <URL>`   | String | Faucet URL (default: `http://localhost:3001`) |
+| `--faucet-url <URL>`   | String | Faucet URL (default: `https://acton.monster/faucet/`) |
 | `--json`               | Flag   | Output result as JSON                |
+
+`--faucet-url` validation rules:
+- only `http` / `https` schemes are allowed
+- query parameters and URL fragments are not allowed
 
 #### Example
 
 ```bash
 acton wallet airdrop deployer --faucet-url https://your-faucet.example
 ```
+
+When `--json` is used:
+
+#### Success JSON
+
+| Field        | Type    | Description                                                  |
+|--------------|---------|--------------------------------------------------------------|
+| `success`    | Boolean | Always `true` for successful airdrop                         |
+| `message`    | String  | Faucet success message (or default `"Success"` if omitted)   |
+| `address`    | String  | Wallet address used for claim                                |
+| `difficulty` | Number  | PoW difficulty returned by faucet                            |
+| `nonce`      | Number  | Solved PoW nonce                                             |
+| `solve_ms`   | Number  | Time spent solving PoW challenge in milliseconds             |
+
+#### Error JSON
+
+| Field     | Type    | Description                                         |
+|-----------|---------|-----------------------------------------------------|
+| `success` | Boolean | Always `false` for failed airdrop                   |
+| `error`   | String  | Human-readable error message describing the failure |
 
 ---
 

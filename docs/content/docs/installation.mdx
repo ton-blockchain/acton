@@ -162,8 +162,14 @@ acton up --canary
 
 ## Uninstall
 
-To completely uninstall Acton and remove all associated data (including downloaded compilers and global wallets), remove the `.acton` directory in your home folder:
+To uninstall Acton binaries/cache, remove the `.acton` directory in your home folder:
 
 ```bash
 rm -rf ~/.acton
+```
+
+If you also want to remove global wallets and libraries, remove the global config directory too:
+
+```bash
+rm -rf ~/.config/acton
 ```

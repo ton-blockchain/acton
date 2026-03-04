@@ -1,0 +1,79 @@
+[
+  {
+    "category": "arithmetic",
+    "description": {
+      "exit_codes": [
+        {
+          "condition": "Stack contains less than 2 elements.",
+          "errno": "2"
+        },
+        {
+          "condition": "Top or second element is not an Int.",
+          "errno": "7"
+        }
+      ],
+      "gas": [
+        {
+          "description": "Base gas consumption",
+          "value": 18
+        }
+      ],
+      "long": "Pops two integers from the stack, adds them and pushes the result back onto the stack.",
+      "operands": [],
+      "short": "Adds two integers and pushes the result back onto the stack."
+    },
+    "implementation": {
+      "commit_hash": "f58297f1b668c7b49e8b30b65062951ca7c18acc",
+      "file_path": "crypto/vm/arithops.cpp",
+      "function_name": "exec_add",
+      "line_number": 162
+    },
+    "layout": {
+      "args": [],
+      "checkLen": 8,
+      "exec": "(_1) => exec_add(_1, false)",
+      "kind": "simple",
+      "max": 10551296,
+      "min": 10485760,
+      "prefix": 160,
+      "prefix_str": "A0",
+      "skipLen": 8,
+      "tlb": "#a0"
+    },
+    "name": "ADD",
+    "signature": {
+      "inputs": {
+        "stack": [
+          {
+            "type": "simple",
+            "name": "x",
+            "value_types": [
+              "Int"
+            ]
+          },
+          {
+            "type": "simple",
+            "name": "y",
+            "value_types": [
+              "Int"
+            ]
+          }
+        ]
+      },
+      "outputs": {
+        "stack": [
+          {
+            "type": "simple",
+            "name": "result",
+            "presentation": "x + y",
+            "value_types": [
+              "Int"
+            ]
+          }
+        ]
+      },
+      "stack_string": "x:Int y:Int -> result:Int"
+    },
+    "sub_category": "add_mul"
+  }
+]

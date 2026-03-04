@@ -4,7 +4,7 @@ use crate::context::{
     AssertFailure, BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
     WalletNotFoundFailure, to_cell,
 };
-use crate::retrace::{ExecutedAction, InstalledActions};
+use crate::retrace::{ExecutedAction, InstalledAction, InstalledActions, InvalidAction};
 use crate::{context, exit_codes, retrace};
 use acton_config::color::OwoColorize;
 use acton_config::test::BacktraceMode;
@@ -212,6 +212,8 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
 
     /// Parse transaction items into `SendResult` structures
     fn parse_send_results(&self, tx_items: &[TupleItem]) -> Vec<SendResult> {
+        let tx_items = Self::flatten_big_array_items(tx_items).unwrap_or_else(|| tx_items.to_vec());
+
         tx_items
             .iter()
             .filter_map(|el| {
@@ -269,6 +271,40 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 })
             })
             .collect::<Vec<_>>()
+    }
+
+    fn flatten_big_array_items(items: &[TupleItem]) -> Option<Vec<TupleItem>> {
+        let (top_level, size) = match items {
+            // [topLevel: array<array<T>>, size: int]
+            [TupleItem::Tuple(top_level), TupleItem::Int(size)] => (top_level, size),
+            _ => return None,
+        };
+
+        let size = size.to_usize()?;
+        let mut result = Vec::with_capacity(size);
+
+        for bin in top_level.iter() {
+            let TupleItem::Tuple(bin_items) = bin else {
+                return None;
+            };
+
+            for item in bin_items.iter() {
+                if result.len() == size {
+                    break;
+                }
+                result.push(item.clone());
+            }
+
+            if result.len() == size {
+                break;
+            }
+        }
+
+        if result.len() != size {
+            return None;
+        }
+
+        Some(result)
     }
 
     /// Collect all known contract addresses from send results
@@ -718,7 +754,9 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                             logs,
                             contract_letters,
                         );
-                        extra_infos.push(actions);
+                        if !actions.is_empty() {
+                            extra_infos.push(actions);
+                        }
                     }
                 }
             }
@@ -891,15 +929,20 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         logs: &str,
         contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
-        let actions = retrace::ExecutedActions::from(logs).actions;
+        let executed = retrace::ExecutedActions::from(logs);
 
-        if actions.is_empty() {
-            return String::new();
+        if executed.actions.is_empty() {
+            return self.format_invalid_actions_retrace(
+                child_prefix,
+                tx,
+                &installed_actions,
+                &executed.invalid_actions,
+            );
         }
 
         let mut action_parts = Vec::new();
 
-        for action in &actions {
+        for action in &executed.actions {
             match action {
                 ExecutedAction::SendMessage {
                     hash,
@@ -908,23 +951,23 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 } => {
                     let message = installed_actions.find_message(hash);
 
-                    let (loc, formated) = if let Some(message) = message {
+                    let (loc, formatted) = if let Some(message) = message {
                         let msg = message.message();
 
-                        let formated = match msg {
+                        let formatted = match msg {
                             Some(msg) => self.format_single_message(&msg, contract_letters, false),
                             None => hash.to_string(),
                         };
 
                         (
                             self.find_source_loc(tx, &message.loc_hash, message.loc_offset),
-                            formated,
+                            formatted,
                         )
                     } else {
                         (None, "msg: ".to_owned() + hash)
                     };
 
-                    let message_part = formated;
+                    let message_part = formatted;
                     let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
                     let location_part = loc
                         .map(|l| format!("at {}", l.format()))
@@ -978,7 +1021,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         result.push_str("Executed actions:\n");
 
         for (idx, (message, balance, location)) in action_parts.iter().enumerate() {
-            if idx == actions.len() - 1 {
+            if idx == executed.actions.len() - 1 {
                 result.push_str(format!("{}    {} ", child_prefix, "└──".dimmed()).as_str());
             } else {
                 result.push_str(format!("{}    {} ", child_prefix, "├──".dimmed()).as_str());
@@ -1004,6 +1047,75 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
 
         result.trim_end().to_string()
+    }
+
+    fn format_invalid_actions_retrace(
+        &self,
+        child_prefix: &str,
+        tx: &Transaction,
+        installed_actions: &InstalledActions,
+        invalid_actions: &[InvalidAction],
+    ) -> String {
+        if invalid_actions.is_empty() {
+            return String::new();
+        }
+
+        let mut result = String::new();
+        result.push_str("Invalid actions:\n");
+
+        for (idx, action) in invalid_actions.iter().enumerate() {
+            if idx == invalid_actions.len() - 1 {
+                result.push_str(format!("{}    {} ", child_prefix, "└──".dimmed()).as_str());
+            } else {
+                result.push_str(format!("{}    {} ", child_prefix, "├──".dimmed()).as_str());
+            }
+
+            let reason = if action.during_preprocessing {
+                "during action list preprocessing"
+            } else {
+                "in action list"
+            };
+
+            result.push_str(
+                format!(
+                    "invalid action {}: error code {} ({reason})",
+                    action.action_index, action.error_code
+                )
+                .as_str(),
+            );
+
+            if let Some(loc) =
+                self.find_invalid_action_source_loc(tx, installed_actions, action.action_index)
+            {
+                result.push_str("  ");
+                result.push_str(
+                    format!("at {}", loc.format_normalized())
+                        .dimmed()
+                        .to_string()
+                        .as_str(),
+                );
+            }
+
+            result.push('\n');
+        }
+
+        result.trim_end().to_string()
+    }
+
+    fn find_invalid_action_source_loc(
+        &self,
+        tx: &Transaction,
+        installed_actions: &InstalledActions,
+        action_index: usize,
+    ) -> Option<SourceLocation> {
+        match installed_actions.find_by_index(action_index)? {
+            InstalledAction::Message(action) => {
+                self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
+            }
+            InstalledAction::Reserve(action) => {
+                self.find_source_loc(tx, &action.loc_hash, action.loc_offset)
+            }
+        }
     }
 
     fn find_source_loc(
@@ -2018,7 +2130,10 @@ impl<'a> FormatterContext<'a> {
         }
 
         if let Some(info) = exit_codes::find(exit_code) {
-            if exit_code_info.is_none() {
+            let should_show_fallback_description = exit_code_info
+                .as_ref()
+                .is_none_or(|exception| exception.description.is_empty());
+            if should_show_fallback_description {
                 writeln!(output, "Description: {}", info.description).ok();
             }
             writeln!(output, "Phase: {}", info.phase).ok();

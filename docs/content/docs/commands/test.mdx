@@ -56,6 +56,18 @@ This command will discover and run all test files in the current directory and s
 | `--coverage`            | Boolean   | Enable code coverage                                      |
 | `--format <FORMAT>`     | String    | Coverage output format ("lcov")                           |
 
+### Profiling Options
+
+| Option                          | Type   | Description                                       |
+|---------------------------------|--------|---------------------------------------------------|
+| `--snapshot <FILE>`             | String | Create JSON snapshot of gas usage statistics      |
+| `--baseline-snapshot <FILE>`    | String | Compare gas usage with baseline snapshot file     |
+
+<Callout type="info">
+If both `--snapshot` and `--baseline-snapshot` are provided, Acton runs in
+comparison mode and does not overwrite the snapshot file.
+</Callout>
+
 ### Mutation Testing Options
 
 | Option                    | Type    | Description                                       |
@@ -76,6 +88,14 @@ This command will discover and run all test files in the current directory and s
 | Option                  | Type      | Description                                               |
 |-------------------------|-----------|-----------------------------------------------------------|
 | `--clear-cache`         | Flag      | Clear test compilation cache                              |
+
+### Tracing and UI Options
+
+| Option                    | Type    | Description                                                           |
+|---------------------------|---------|-----------------------------------------------------------------------|
+| `--save-test-trace [DIR]` | String  | Save transaction traces to directory (`.acton/traces` if DIR omitted) |
+| `--ui`                    | Flag    | Open test results in browser                                          |
+| `--ui-port <PORT>`        | Integer | UI server port (default: `12344`)                                     |
 
 ## Examples
 
@@ -125,6 +145,16 @@ acton test --mutate --mutate-contract wallet
 acton test --mutate --mutate-contract wallet --disable-rule remove_assert
 ```
 
+### Gas profiling and snapshots
+
+```bash
+# Create baseline gas snapshot
+acton test --snapshot .acton/gas-baseline.json
+
+# Compare current run with baseline snapshot
+acton test --baseline-snapshot .acton/gas-baseline.json
+```
+
 ### Debug mode
 
 ```bash
@@ -170,5 +200,7 @@ For detailed guides on writing tests, see the "Test Runner" section:
 - [Generating contract wrappers](/docs/test-runner/generating-wrappers/)
 - [Test attributes and configuration](/docs/test-runner/test-attributes/)
 - [Test configuration options](/docs/test-runner/test-configuration/)
+- [Test UI](/docs/test-runner/test-ui/)
+- [Gas profiling with snapshots](/docs/test-runner/gas-profiling-with-snapshots/)
 - [Code coverage](/docs/test-runner/code-coverage/)
 - [Mutation testing](/docs/test-runner/mutation-testing/)

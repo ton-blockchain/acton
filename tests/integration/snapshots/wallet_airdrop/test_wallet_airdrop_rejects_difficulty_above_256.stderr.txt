@@ -1,0 +1,1 @@
+Error: Invalid PoW difficulty from faucet: 257 (max 256)

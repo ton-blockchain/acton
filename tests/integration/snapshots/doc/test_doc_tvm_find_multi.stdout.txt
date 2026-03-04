@@ -1,0 +1,7 @@
+Found 3 instruction(s) for query 'SENRAWMSG':
+- SENDRAWMSG
+- SENDMSG
+- SETNUMVARARGS
+
+Found 1 instruction(s) for query 'outcomng':
+- SENDMSG

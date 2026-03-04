@@ -1,0 +1,1 @@
+Error: Wallet name '!!!' is invalid

@@ -17,7 +17,7 @@ fun JettonWallet.getJettonBalance(self): coins {
     return result.jettonBalance
 }
 
-fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int, recepient: address, responseAddress: address, customPayload: cell?, forwardTonAmount: int, forwardPayload: cell?) {
+fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int, recipient: address, responseAddress: address, customPayload: cell?, forwardTonAmount: int, forwardPayload: cell?) {
     val msg = createMessage({
         bounce: true,
         value: value,
@@ -25,7 +25,7 @@ fun JettonWallet.sendTransfer(self, from: address, value: int, jettonAmount: int
         body: AskToTransfer {
             queryId: 0,
             jettonAmount: jettonAmount,
-            transferRecipient: recepient,
+            transferRecipient: recipient,
             sendExcessesTo: responseAddress,
             customPayload: customPayload,
             forwardTonAmount: forwardTonAmount,

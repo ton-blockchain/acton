@@ -1,0 +1,14 @@
+warning[E025]: division before multiplication may cause precision loss
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |                 return (a / b) * c;
+  |                         -----  ^ multiplication happened here
+  |                         |       
+  |                         division that feeds this multiplication happens here
+  |
+  = doing division first can change the result because precision is lost and rounding/truncation happens earlier
+    when arithmetic intent allows it, multiply first and divide afterward
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E025

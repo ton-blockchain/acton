@@ -10,6 +10,6 @@
  > tests/test.test.tolk (1 test)
   ✓ foo [TIME]
     └─ Test output:
-       kQAXTuKVC1YXpOkK4jJxtnmahvDniolFswBTRkDKZy1D67lA (sender)
+       [WALLET_ADDRESS_BASE] (sender)
 
  ✓ 1 passed in 1 file

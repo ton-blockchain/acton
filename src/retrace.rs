@@ -1,6 +1,8 @@
 use crate::vmtrace;
 use crate::vmtrace::SkipBlocksMode;
-pub use retrace::trace::{ExecutedAction, ExecutedActions, InstalledActions};
+pub use retrace::trace::{
+    ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
+};
 use ton_source_map::{DebugLocation, SourceLocation, SourceMap};
 use vmlogs::parser::VmLine;
 

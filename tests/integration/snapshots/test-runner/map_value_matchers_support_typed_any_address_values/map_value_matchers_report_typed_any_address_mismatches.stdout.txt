@@ -15,10 +15,10 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
 
  > tests/ed_map_value_matchers.test.tolk (2 tests)
   ✗ ed-stdlib-map-to-contain-value-reports-missing-typed-address [TIME]
-    └─ Error: expect(actual).toContainValue(expected): Value 'kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA3W4G' not found in the map
+    └─ Error: expect(actual).toContainValue(expected): Value '[WALLET_ADDRESS_BASE]' not found in the map
       └─ at tests/ed_map_value_matchers.test[LINE]
   ✗ ed-stdlib-map-to-not-contain-value-reports-present-typed-address [TIME]
-    └─ Error: expect(actual).toNotContainValue(expected): Value 'kQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqmB2' is found in the map
+    └─ Error: expect(actual).toNotContainValue(expected): Value '[WALLET_ADDRESS_BASE]' is found in the map
       └─ at tests/ed_map_value_matchers.test[LINE]
 
  ✗ 2 failed in 1 file

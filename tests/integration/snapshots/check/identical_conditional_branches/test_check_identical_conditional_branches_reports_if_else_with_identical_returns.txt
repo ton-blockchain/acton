@@ -1,0 +1,18 @@
+warning[E027]: conditional branches are identical
+  --> [ROOT]/contracts/main[LINE]
+  |    
+3 |                     if (flag) {
+  | /-----------------------------'
+4 | |                       return value + 1;
+5 | |                   } else {
+  | /-------------------' first branch is here
+  |   /------------------------^
+6 |   |                     return value + 1;
+7 |   |                 }
+  |   /-----------------^ this branch duplicates the `if` body
+  |    
+  = remove `else` or make branches semantically different
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E027

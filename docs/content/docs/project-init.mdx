@@ -86,8 +86,9 @@ After initialization, your project will have the following structure:
     <File name="contract.pkg" />
   </Folder>
   <File name="Acton.toml" />
-  <File name="wallets.toml" />
-  <File name="global.wallets.toml" />
+  <File name=".env" />
+  <File name="wallets.toml (created when you add local wallets)" />
+  <File name="global.wallets.toml (optional symlink to global wallets)" />
   <File name="LICENSE" />
   <File name=".gitignore" />
 </Files>
@@ -101,8 +102,9 @@ After initialization, your project will have the following structure:
 - **`tests/wrappers/`**: Contains contract wrappers that provide an interface for testing your contracts.
 - **`build/`**: (Generated) This folder is created when you run `acton build`. It contains the compiled bytecode (BOC files) and other build artifacts.
 - **`Acton.toml`**: The main configuration file for your project. It defines your package metadata, contracts, and dependencies.
-- **`wallets.toml`**: Project-specific wallet configurations (added to `.gitignore`).
-- **`global.wallets.toml`**: A symbolic link to your global wallets (shared across all projects).
+- **`.env`**: Local environment variables template (includes commented `TONCENTER_API_KEY` hint).
+- **`wallets.toml`**: Project-specific wallet configurations (added to `.gitignore`), created when you add local wallets.
+- **`global.wallets.toml`**: Optional symbolic link to global wallets, created when global wallets file exists.
 
 ## Configuration
 

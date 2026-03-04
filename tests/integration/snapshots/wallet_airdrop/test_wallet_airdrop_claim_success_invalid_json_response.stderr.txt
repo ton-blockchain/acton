@@ -1,0 +1,7 @@
+Error: Failed to parse faucet response
+
+Caused by:
+  error decoding response body
+
+Caused by:
+  expected ident at line 1 column 2

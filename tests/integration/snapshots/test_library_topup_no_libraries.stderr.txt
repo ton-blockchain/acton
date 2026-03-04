@@ -1,0 +1,2 @@
+Error: No libraries configured in libraries.toml or global.libraries.toml.
+To add a library use acton library publish or add a record to libraries.toml manually.

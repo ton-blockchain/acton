@@ -1,4 +1,4 @@
-use crate::cfg::{ControlFlowGraph, EdgeKind, FlowNodeKind, NodeId};
+use crate::cfg::{ControlFlowGraph, EdgeKind, FlowNodeKind, MultiplicationOperationFact, NodeId};
 use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
@@ -6,6 +6,7 @@ use tolk_resolver::file_index::AstNodeSpanExt;
 use tolk_resolver::file_index::SymbolId;
 use tolk_resolver::resolve_index::{FileResolveIndex, LocalDefId, LocalDefKind, Resolved};
 use tolk_syntax::ast::Node;
+use tolk_syntax::ast::NodeTraversalExt;
 use tolk_syntax::{
     Assert, Assign, AstNode, AstNodeBytesKind, Bin, Call, DotAccess, DotAccessField, Expr,
     FuncBody, FunctionLike, HasName, IfAlt, InstanceArg, Match, MatchArmBody, MatchPattern, Paren,
@@ -724,6 +725,50 @@ impl<'idx> CfgBuilder<'idx> {
             self.cfg.node_mut(node_id).taint.has_random_value_sink = true;
         }
 
+        let mut division_spans = Vec::new();
+        collector.collect_division_spans(expr, &mut division_spans);
+        if !division_spans.is_empty() {
+            let node = self.cfg.node_mut(node_id);
+            node.taint.has_division_operation = true;
+            node.taint.division_spans.extend(division_spans);
+            node.taint
+                .division_spans
+                .sort_by_key(|span| (span.start, span.end));
+            node.taint.division_spans.dedup();
+        }
+
+        let mut direct_assignment_division_spans = Vec::new();
+        collector
+            .collect_direct_assignment_division_spans(expr, &mut direct_assignment_division_spans);
+        if !direct_assignment_division_spans.is_empty() {
+            let node = self.cfg.node_mut(node_id);
+            node.taint
+                .direct_assignment_division_spans
+                .extend(direct_assignment_division_spans);
+            node.taint
+                .direct_assignment_division_spans
+                .sort_by_key(|span| (span.start, span.end));
+            node.taint.direct_assignment_division_spans.dedup();
+        }
+
+        let mut multiplication_operations = Vec::new();
+        collector.collect_multiplication_operations(expr, &mut multiplication_operations);
+        if !multiplication_operations.is_empty() {
+            let has_divide_before_multiply = multiplication_operations
+                .iter()
+                .any(|op| !op.division_operand_spans.is_empty());
+
+            let node = self.cfg.node_mut(node_id);
+            node.taint.has_multiplication_operation = true;
+            node.taint.has_divide_before_multiply = has_divide_before_multiply;
+            node.taint
+                .multiplication_operations
+                .extend(multiplication_operations);
+            node.taint
+                .multiplication_operations
+                .sort_by_key(|op| (op.operator_span.start, op.operator_span.end));
+        }
+
         let mut called_globals = FxHashSet::default();
         collector.collect_called_globals(expr, &mut called_globals);
         if !called_globals.is_empty() {
@@ -1006,6 +1051,125 @@ impl<'idx> UseDefCollector<'idx> {
 
     fn contains_random_value_sink(&self, expr: Expr<'_>) -> bool {
         self.contains_random_method_call(expr, &["uint256", "range"])
+    }
+
+    fn collect_multiplication_operations(
+        &self,
+        expr: Expr<'_>,
+        out: &mut Vec<MultiplicationOperationFact>,
+    ) {
+        let Some(source) = self.source else {
+            return;
+        };
+
+        for node in expr.syntax().traverse() {
+            if node.kind() != "binary_operator" {
+                continue;
+            }
+
+            let mul = Bin(node);
+            if mul.operator_name(source) != "*" {
+                continue;
+            }
+
+            let operator_span = mul.operator().map_or_else(
+                || tolk_resolver::Span::from_syntax(&node),
+                |op| tolk_resolver::Span::from_syntax(&op),
+            );
+
+            let mut read_locals = FxHashSet::default();
+            let mut writes = FxHashSet::default();
+            self.collect_expr(
+                Expr::Bin(mul),
+                AccessMode::Read,
+                &mut read_locals,
+                &mut writes,
+            );
+
+            let mut division_operand_spans = Vec::new();
+            if let Some(left) = mul.left() {
+                self.collect_division_spans(left, &mut division_operand_spans);
+            }
+            if let Some(right) = mul.right() {
+                self.collect_division_spans(right, &mut division_operand_spans);
+            }
+            division_operand_spans.sort_by_key(|span| (span.start, span.end));
+            division_operand_spans.dedup();
+
+            out.push(MultiplicationOperationFact {
+                operator_span,
+                read_locals,
+                division_operand_spans,
+            });
+        }
+    }
+
+    fn collect_division_spans(&self, expr: Expr<'_>, out: &mut Vec<tolk_resolver::Span>) {
+        let Some(source) = self.source else {
+            return;
+        };
+
+        for node in expr.syntax().traverse() {
+            if node.kind() != "binary_operator" {
+                continue;
+            }
+            let bin = Bin(node);
+            if bin.operator_name(source) != "/" {
+                continue;
+            }
+            out.push(tolk_resolver::Span::from_syntax(&node));
+        }
+    }
+
+    fn collect_direct_assignment_division_spans(
+        &self,
+        expr: Expr<'_>,
+        out: &mut Vec<tolk_resolver::Span>,
+    ) {
+        let Some(rhs) = (match expr {
+            Expr::Assign(assign) => assign.right(),
+            _ => None,
+        }) else {
+            return;
+        };
+
+        let rhs = self.strip_taint_wrappers(rhs);
+        let Expr::Bin(bin) = rhs else {
+            return;
+        };
+        if !self.is_arithmetic_binary_operator(bin) {
+            return;
+        }
+
+        self.collect_division_spans(rhs, out);
+    }
+
+    fn strip_taint_wrappers<'tree>(&self, mut expr: Expr<'tree>) -> Expr<'tree> {
+        loop {
+            expr = match expr {
+                Expr::Paren(paren) => match paren.inner() {
+                    Some(inner) => inner,
+                    None => return expr,
+                },
+                Expr::NotNull(not_null) => match not_null.inner() {
+                    Some(inner) => inner,
+                    None => return expr,
+                },
+                Expr::AsCast(as_cast) => match as_cast.expr() {
+                    Some(inner) => inner,
+                    None => return expr,
+                },
+                _ => return expr,
+            };
+        }
+    }
+
+    fn is_arithmetic_binary_operator(&self, bin: Bin<'_>) -> bool {
+        let Some(source) = self.source else {
+            return false;
+        };
+
+        matches!(bin.operator_name(source), "+" | "-" | "*" | "/" | "%")
     }
 
     fn collect_called_globals(&self, expr: Expr<'_>, out: &mut FxHashSet<SymbolId>) {

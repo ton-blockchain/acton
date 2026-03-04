@@ -1,0 +1,1 @@
+Error: Faucet URL cannot be empty

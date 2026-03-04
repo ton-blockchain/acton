@@ -3,6 +3,7 @@ use acton::commands::build::build_cmd;
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
 use acton::commands::disasm::disasm_cmd;
+use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
 use acton::commands::fmt::fmt_cmd;
 use acton::commands::init::init_cmd;
@@ -41,7 +42,7 @@ use ton_source_map::SourceMap;
 #[derive(Parser)]
 #[command(
     name = "acton",
-    version = concat!(env!("CARGO_PKG_VERSION"), " (", env!("GIT_HASH"), ")")
+    version = get_acton_version()
 )]
 #[command(about = "TON blockchain development tool")]
 #[command(color = ColorChoice::Auto)]
@@ -554,6 +555,14 @@ enum Commands {
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
     },
+    #[command(
+        about = "Lookup reference documentation",
+        after_help = example_doc_usage()
+    )]
+    Doc {
+        #[command(subcommand)]
+        command: DocCommand,
+    },
     #[command(about = "LSP server for the TON languages and technologies")]
     Ls {
         #[arg(long, help = "Port to listen on (TCP)")]
@@ -740,6 +749,41 @@ pub enum LibraryCommand {
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
     },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum DocCommand {
+    #[command(about = "Lookup an instruction in the TVM specification")]
+    Tvm {
+        #[arg(
+            help = "Instruction name(s) or search query (for example: ADD SENDRAWMSG)",
+            num_args = 1..
+        )]
+        instruction: Vec<String>,
+        #[arg(short = 'f', long, help = "Find instructions by fuzzy query")]
+        find: bool,
+        #[arg(
+            short = 'd',
+            long,
+            requires = "find",
+            help = "Include instruction descriptions in fuzzy search"
+        )]
+        description: bool,
+        #[arg(long, help = "Output instruction entry as JSON")]
+        json: bool,
+    },
+}
+
+#[inline]
+const fn get_acton_version() -> &'static str {
+    concat!(
+        env!("CARGO_PKG_VERSION"),
+        " (",
+        env!("GIT_HASH"),
+        " ",
+        env!("BUILD_DATE"),
+        ")"
+    )
 }
 
 fn example_litenode_usage() -> StyledStr {
@@ -1105,6 +1149,14 @@ fn example_wallet_usage() -> StyledStr {
                 "Request testnet TONs from faucet",
                 "acton wallet airdrop my-wallet",
             ),
+            (
+                "Sign external wallet body BoC",
+                "acton wallet sign my-wallet --body \"B5EE9C72...\"",
+            ),
+            (
+                "Export wallet mnemonic (interactive only)",
+                "acton wallet export-mnemonic my-wallet",
+            ),
         ],
         "https://i582.github.io/acton/docs/commands/wallet",
     )
@@ -1132,11 +1184,11 @@ fn example_script_usage() -> StyledStr {
             ),
             (
                 "Execute a deploy script and broadcast to testnet network",
-                "acton script scripts/deploy.tolk --net testnet",
+                "acton script scripts/deploy.tolk --broadcast",
             ),
             (
                 "Execute a deploy script and broadcast to mainnet network",
-                "acton script scripts/deploy.tolk --net mainnet",
+                "acton script scripts/deploy.tolk --broadcast --net mainnet",
             ),
         ],
         "https://i582.github.io/acton/docs/scripting",
@@ -1228,6 +1280,34 @@ fn example_fmt_usage() -> StyledStr {
     )
 }
 
+fn example_doc_usage() -> StyledStr {
+    format_examples(
+        &[
+            (
+                "Show text documentation for TVM instruction ADD",
+                "acton doc tvm ADD",
+            ),
+            (
+                "Show text documentation for several instructions",
+                "acton doc tvm ADD SUB",
+            ),
+            (
+                "Show raw JSON entry for TVM instruction SENDRAWMSG",
+                "acton doc tvm SENDRAWMSG --json",
+            ),
+            (
+                "Find TVM instructions by fuzzy query",
+                "acton doc tvm SENRAWMSG --find",
+            ),
+            (
+                "Find by fuzzy query in names and descriptions",
+                "acton doc tvm outcomng --find --description",
+            ),
+        ],
+        "",
+    )
+}
+
 fn example_completions_usage() -> StyledStr {
     format_examples(
         &[
@@ -1314,14 +1394,20 @@ fn main() {
     } = Cli::parse();
     init_color_mode(color);
 
-    if let Err(err) = configure_manifest_path(manifest_path) {
+    if !matches!(command, Commands::Init | Commands::New { .. })
+        && let Err(err) = configure_manifest_path(manifest_path)
+    {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1);
     }
 
-    if !matches!(command, Commands::Ls { .. }) {
-        // for language server we set up own logging
-        setup_logging().expect("Failed to set up logging");
+    if !matches!(command, Commands::Ls { .. })
+        && let Err(err) = setup_logging()
+    {
+        eprintln!(
+            "{} failed to initialize debug logging ({err}). Continuing without file logging.\nHint: set ACTON_LOG_DIR to a writable directory.",
+            "Warning:".yellow()
+        );
     }
 
     let result = match command {
@@ -1630,6 +1716,14 @@ fn main() {
             result
         }
         Commands::Fmt { paths, check } => fmt_cmd(paths, check),
+        Commands::Doc { command } => match command {
+            DocCommand::Tvm {
+                instruction,
+                find,
+                description,
+                json,
+            } => doc_tvm_cmd(&instruction, json, find, description),
+        },
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())
@@ -1644,7 +1738,7 @@ fn main() {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .expect("Failed to initialize tokio runtime for langauge server");
+                .expect("Failed to initialize tokio runtime for language server");
             rt.block_on(ls_cmd(port, stdio, log_file, no_log))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),
@@ -1697,8 +1791,19 @@ fn main() {
     };
 
     if let Err(err) = result {
-        eprintln!("{} {}", "Error:".red(), err);
+        print_error(&err);
         process::exit(1)
+    }
+}
+
+fn print_error(err: &anyhow::Error) {
+    eprintln!("{} {}", "Error:".red(), err);
+
+    for cause in err.chain().skip(1) {
+        eprintln!("\nCaused by:");
+        for line in cause.to_string().lines() {
+            eprintln!("  {}", line);
+        }
     }
 }
 
@@ -1768,12 +1873,57 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Sour
     Ok(source_map_data)
 }
 
+const ACTON_LOG_DIR_ENV: &str = "ACTON_LOG_DIR";
+
+fn env_path(var: &str) -> Option<PathBuf> {
+    let value = env::var_os(var)?;
+    if value.is_empty() {
+        return None;
+    }
+    Some(PathBuf::from(value))
+}
+
+fn resolve_acton_log_dir_with_env(
+    mut get_env_path: impl FnMut(&str) -> Option<PathBuf>,
+) -> PathBuf {
+    if let Some(path) = get_env_path(ACTON_LOG_DIR_ENV) {
+        return path;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(path) = get_env_path("USERPROFILE") {
+            return path.join(".acton").join("logs");
+        }
+        if let Some(path) = get_env_path("HOME") {
+            return path.join(".acton").join("logs");
+        }
+        return PathBuf::from(".acton").join("logs");
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(path) = get_env_path("HOME") {
+            return path.join(".acton").join("logs");
+        }
+        return PathBuf::from(".acton").join("logs");
+    }
+
+    #[allow(unreachable_code)]
+    PathBuf::from(".acton").join("logs")
+}
+
+fn resolve_acton_log_dir() -> PathBuf {
+    resolve_acton_log_dir_with_env(env_path)
+}
+
 fn setup_logging() -> anyhow::Result<()> {
-    fs::create_dir_all(".acton/")?;
+    let log_dir = resolve_acton_log_dir();
+    fs::create_dir_all(&log_dir)?;
     let log_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(".acton/debug.log")?;
+        .open(log_dir.join("debug.log"))?;
 
     fern::Dispatch::new()
         .format(|out, message, record| {

@@ -481,7 +481,7 @@ export function TransactionTree({
                 <p className={styles.edgeTextTitle}>{externalOutDestination}</p>
                 <p className={styles.edgeTextContent}>Lt: {createdLt}</p>
               </div>
-              <div className={styles.bottonText}>
+              <div className={styles.bottomText}>
                 <p className={styles.edgeTextContent}>Type: external-out</p>
               </div>
             </div>
@@ -580,7 +580,7 @@ export function TransactionTree({
                 <p className={styles.edgeTextContent}>{nodeDatum.attributes.value as string}</p>
               )}
             </div>
-            <div className={styles.bottonText}>
+            <div className={styles.bottomText}>
               <p className={styles.edgeTextContent}>{opcode}</p>
               {nodeDatum.attributes?.exitCode && nodeDatum.attributes.exitCode !== "0" && (
                 <p className={styles.edgeTextContent}>

@@ -14,6 +14,7 @@ license = { workspace = true }
 tolk-syntax = { workspace = true }
 tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }
+tolk-dataflow = { workspace = true }
 rustc-hash = { workspace = true }
 bitflags = { workspace = true }
 

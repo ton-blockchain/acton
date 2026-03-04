@@ -13,10 +13,10 @@ Acton supports two levels of wallet configuration:
 1.  **Local Wallets (`wallets.toml`)**: Project-specific wallets. Stored in the project root.
 2.  **Global Wallets (`~/.config/acton/wallets/global.wallets.toml`)**: Shared across all your Acton projects.
 
-When you create a project using `acton new` or `acton init`, Acton automatically creates a symbolic link `global.wallets.toml` pointing to your global wallets for easy access.
+When you create a project using `acton new` or `acton init`, Acton creates a symbolic link `global.wallets.toml` if global wallets already exist (`~/.config/acton/wallets/global.wallets.toml`).
 
 <Callout type="warn">
-    Both `wallets.toml` and `global.wallets.toml` may contain sensitive information (mnemonics). Acton automatically adds them to your `.gitignore`, but you should always be careful not to commit them.
+    `wallets.toml` and `global.wallets.toml` may contain sensitive information. With secure keyring storage, these files keep only keyring identifiers; with plaintext storage they contain mnemonics directly. Acton automatically adds these files to your `.gitignore`, but you should always be careful not to commit them.
 </Callout>
 
 ## Wallet Configuration
@@ -40,6 +40,12 @@ This configuration creates a wallet named `deployer` that:
 ## Providing Mnemonic Phrases
 
 Acton supports four methods for providing wallet mnemonics.
+
+If multiple mnemonic sources are present in one wallet entry, Acton uses this priority:
+1. `mnemonic-env`
+2. `mnemonic-file`
+3. `mnemonic-keyring`
+4. `mnemonic`
 
 ### 1. Secure Native Store (Keyring) - Recommended
 
@@ -133,12 +139,41 @@ You can also check their balances on the testnet:
 acton wallet list --balance
 ```
 
-### Retrieving a Wallet Mnemonic
+## Getting Testnet TON
 
-If you need to view the mnemonic phrase for a configured wallet (e.g., to import it into another app), use the `acton wallet get` command:
+Newly created wallets have zero balance. Before running `--broadcast` flows on testnet, fund the wallet with testnet TON.
+
+### Option 1: Request Airdrop During Wallet Creation
 
 ```bash
-acton wallet get deployer
+acton wallet new --name deployer --local --airdrop
+```
+
+Acton creates the wallet and then immediately requests testnet TON from faucet.
+
+### Option 2: Request Airdrop for Existing Wallet
+
+```bash
+acton wallet airdrop deployer
+```
+
+If wallet name is omitted, Acton auto-selects a single configured wallet or asks you to choose when multiple wallets exist.
+
+### Verify Balance
+
+```bash
+acton wallet list --balance
+```
+
+If faucet is temporarily unavailable or rate-limited, retry later or use official TON testnet funding instructions:
+https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
+
+### Retrieving a Wallet Mnemonic
+
+If you need to export the mnemonic phrase for a configured wallet (e.g., to import it into another app), use the `acton wallet export-mnemonic` command:
+
+```bash
+acton wallet export-mnemonic deployer
 ```
 
 This will display the mnemonic phrase, regardless of whether it's stored in a plain text file, environment variable, or secure system keyring.
@@ -181,7 +216,11 @@ address-testnet = "0QD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8ZLd"
 address-mainnet = "UQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8XSS"
 ```
 
-Before executing any operations, Acton verifies that the wallet derived from your mnemonic matches the expected address. This safety check helps catch configuration mistakes before spending real TON.
+`acton wallet new` and `acton wallet import` automatically populate only `expected.address-testnet`. Add `address-mainnet` manually for mainnet safety checks.
+
+Acton performs strict derived-vs-expected address verification when opening real wallets for blockchain operations (for example `acton script --broadcast`, `acton verify`, `acton library publish/topup`).
+
+Some wallet management commands (for example `wallet list`/`wallet airdrop`) may use configured `expected.address-testnet` directly to resolve the displayed/claim address.
 
 ## Multiple Wallets
 

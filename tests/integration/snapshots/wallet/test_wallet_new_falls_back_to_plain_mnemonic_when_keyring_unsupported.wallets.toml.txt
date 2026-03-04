@@ -1,0 +1,7 @@
+[wallets.secure-fallback-wallet]
+kind = "v5r1"
+workchain = 0
+keys = { [MNEMONIC] }
+
+[wallets.secure-fallback-wallet.expected]
+[WALLET_ADDRESS_TESTNET]

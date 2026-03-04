@@ -80,6 +80,7 @@ pub struct LibraryConfig {
     pub duration: u64,
     pub network: Network,
     pub timestamp: String,
+    pub last_topup_timestamp: String,
     pub bits: u64,
     pub cells: u64,
 }
@@ -190,6 +191,7 @@ impl Default for LintConfig {
 pub struct FmtSettings {
     pub width: Option<usize>,
     pub ignore: Option<Vec<String>>,
+    pub separate_import_groups: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -282,6 +284,7 @@ impl Default for ActonConfig {
             fmt: Some(FmtSettings {
                 width: Some(100),
                 ignore: Some(vec![]),
+                separate_import_groups: None,
             }),
             build: None,
             litenode: None,

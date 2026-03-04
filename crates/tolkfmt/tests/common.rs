@@ -1,6 +1,6 @@
 #![cfg(test)]
 use expect_test::Expect;
-use tolkfmt::format_source;
+use tolkfmt::{FormatOptions, format_source};
 
 #[allow(dead_code)]
 pub(crate) fn check(code: &str, expect: Expect) {
@@ -9,7 +9,7 @@ pub(crate) fn check(code: &str, expect: Expect) {
 
 #[allow(dead_code)]
 pub(crate) fn check_with_width(code: &str, expect: Expect, width: usize) {
-    check_code(code, expect, width, true)
+    check_code(code, expect, width, true, FormatOptions::default())
 }
 
 #[allow(dead_code)]
@@ -19,12 +19,58 @@ pub(crate) fn check_without_trees(code: &str, expect: Expect) {
 
 #[allow(dead_code)]
 pub(crate) fn check_with_width_without_trees(code: &str, expect: Expect, width: usize) {
-    check_code(code, expect, width, false)
+    check_code(code, expect, width, false, FormatOptions::default())
 }
 
-fn check_code(code: &str, expect: Expect, width: usize, check_trees: bool) {
+#[allow(dead_code)]
+pub(crate) fn check_without_trees_with_import_group_separators(
+    code: &str,
+    expect: Expect,
+    separate_import_groups: bool,
+) {
+    check_with_width_and_options(
+        code,
+        expect,
+        80,
+        false,
+        FormatOptions {
+            separate_import_groups,
+            ..FormatOptions::default()
+        },
+    );
+}
+
+#[allow(dead_code)]
+pub(crate) fn check_with_import_group_separators(
+    code: &str,
+    expect: Expect,
+    separate_import_groups: bool,
+) {
+    check_with_width_and_options(
+        code,
+        expect,
+        80,
+        true,
+        FormatOptions {
+            separate_import_groups,
+            ..FormatOptions::default()
+        },
+    );
+}
+
+fn check_with_width_and_options(
+    code: &str,
+    expect: Expect,
+    width: usize,
+    check_trees: bool,
+    options: FormatOptions,
+) {
+    check_code(code, expect, width, check_trees, options);
+}
+
+fn check_code(code: &str, expect: Expect, width: usize, check_trees: bool, options: FormatOptions) {
     // unsafe { std::env::set_var("UPDATE_EXPECT", "1") }
-    let res = format_source(code, width).unwrap();
+    let res = format_source(code, FormatOptions { width, ..options }).unwrap();
 
     equal_format_code(expect, &res);
     equal_trees(code, &res, check_trees);

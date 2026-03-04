@@ -9,6 +9,84 @@ use tolk_syntax::{
     TypeParameter, TypeParameters,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ImportGroup {
+    Stdlib,
+    Acton,
+    Other,
+    RelativeParent,
+    RelativeCurrent,
+}
+
+#[derive(Clone)]
+struct ImportBlockItem<'tree> {
+    import: Import<'tree>,
+    group: ImportGroup,
+    depth: usize,
+    normalized_path: String,
+    had_empty_line_after: bool,
+}
+
+fn strip_import_quotes(path: &str) -> &str {
+    if path.len() >= 2 && path.starts_with('"') && path.ends_with('"') {
+        &path[1..path.len() - 1]
+    } else {
+        path
+    }
+}
+
+fn import_group(path: &str) -> ImportGroup {
+    if path == "@stdlib" || path.strip_prefix("@stdlib/").is_some() {
+        ImportGroup::Stdlib
+    } else if path == "@acton" || path.strip_prefix("@acton/").is_some() {
+        ImportGroup::Acton
+    } else if path.starts_with('@') {
+        ImportGroup::Other
+    } else if path.starts_with("./") {
+        ImportGroup::RelativeCurrent
+    } else if path.starts_with("../") {
+        ImportGroup::RelativeParent
+    } else {
+        // Plain imports like `import "foo"` are resolved relative to current directory.
+        ImportGroup::RelativeCurrent
+    }
+}
+
+fn import_depth(path: &str) -> usize {
+    path.split('/')
+        .filter(|segment| !segment.is_empty())
+        .count()
+}
+
+fn build_import_items<'tree>(
+    ctx: &Context<'tree>,
+    imports: &[Import<'tree>],
+) -> Vec<ImportBlockItem<'tree>> {
+    imports
+        .iter()
+        .enumerate()
+        .map(|(i, import)| {
+            let path = import
+                .path()
+                .and_then(|p| p.0.utf8_text(ctx.code.as_ref().as_ref()).ok())
+                .map(strip_import_quotes)
+                .unwrap_or("");
+
+            let had_empty_line_after = imports.get(i + 1).is_some_and(|next_import| {
+                common::empty_lines_between(ctx, &import.0, &next_import.0) > 1
+            });
+
+            ImportBlockItem {
+                import: *import,
+                group: import_group(path),
+                depth: import_depth(path),
+                normalized_path: path.to_owned(),
+                had_empty_line_after,
+            }
+        })
+        .collect()
+}
+
 #[must_use]
 pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcDoc<'a>> {
     let mut sections = vec![];
@@ -52,14 +130,24 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
         })
         .collect::<Vec<_>>();
 
+    let mut imports = build_import_items(ctx, &imports);
+    imports.sort_by(|left, right| {
+        left.group
+            .cmp(&right.group)
+            .then(left.depth.cmp(&right.depth))
+            .then(left.normalized_path.cmp(&right.normalized_path))
+            .then(left.import.0.start_byte().cmp(&right.import.0.start_byte()))
+    });
+
     // After the optional Tolk version come imports.
-    // Imports are printed without empty lines like other declarations, but like statements
-    // they can be separated by one empty line if that's how it was in the original code
+    // Comments stay attached to their import during sorting.
+    // Existing empty-line separators are preserved (normalized to one),
+    // and optional group separators can be inserted by config.
     for (i, import) in imports.iter().enumerate() {
-        let comments = ctx.comments.get(&import.0);
+        let comments = ctx.comments.get(&import.import.0);
         comments::print_leading_comments(ctx, &mut docs, comments);
 
-        let Some(doc) = print_import(ctx, import) else {
+        let Some(doc) = print_import(ctx, &import.import) else {
             continue;
         };
         docs.push(doc);
@@ -68,9 +156,10 @@ pub fn print_source_file<'a>(ctx: &Context<'_>, file: &SourceFile) -> Option<RcD
         docs.push(RcDoc::hardline());
         comments::print_trailing_comments(ctx, &mut docs, comments);
 
-        if let Some(next_import) = imports.get(i + 1)
-            && common::empty_lines_between(ctx, &import.0, &next_import.0) > 1
-        {
+        let add_group_separator = imports.get(i + 1).is_some_and(|next_import| {
+            ctx.options.separate_import_groups && import.group != next_import.group
+        });
+        if import.had_empty_line_after || add_group_separator {
             docs.push(RcDoc::hardline());
         }
     }

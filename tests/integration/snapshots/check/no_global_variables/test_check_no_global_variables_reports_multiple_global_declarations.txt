@@ -1,0 +1,19 @@
+warning[E028]: global variable declarations are not allowed
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             global counter: int
+  |                    ^^^^^^^ global variable declaration is not allowed
+  |
+  = move the variable into a function scope or contract storage
+
+warning[E028]: global variable declarations are not allowed
+  --> [ROOT]/contracts/main[LINE]
+  |
+3 |             global owner: address
+  |                    ^^^^^ global variable declaration is not allowed
+  |
+  = move the variable into a function scope or contract storage
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E028

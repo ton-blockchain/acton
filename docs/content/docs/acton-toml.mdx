@@ -13,6 +13,7 @@ The top-level of `Acton.toml` contains the following sections:
 - `[package]` — Project metadata.
 - `[contracts]` — Definition of smart contracts in the project.
 - `[build]` — Build command output settings.
+- `[fmt]` — Tolk formatter settings for `acton fmt`.
 - `[litenode]` — Default settings for `acton litenode` commands.
 - `[test]` — Configuration for the test runner.
 - `[lint]` — General linter configuration.
@@ -101,6 +102,30 @@ output-fift = "build/fift"
 
 `acton build --output-fift <DIR>` overrides this value for a single run.
 Precompiled `.boc` contracts are skipped for Fift output.
+
+---
+
+## `[fmt]` Section
+
+Configures defaults for `acton fmt`.
+
+| Field                    | Type       | Default | Description                                        |
+|:-------------------------|:-----------|:--------|:---------------------------------------------------|
+| `width`                  | `integer`  | `100`   | Maximum line width for formatting.                 |
+| `ignore`                 | `string[]` | -       | Glob patterns of files to exclude from formatting. |
+| `separate-import-groups` | `boolean`  | `false` | Adds an empty line between import groups.          |
+
+Import groups are ordered as: `@stdlib`, `@acton`, `@<other>`, `../`, `./` (plain imports like `import "foo"` are treated as `./` group).
+
+Example:
+```toml
+[fmt]
+width = 100
+ignore = ["contracts/generated/*.tolk"]
+separate-import-groups = true
+```
+
+CLI flags still override config values for a single run (for example `acton fmt --check`).
 
 ---
 

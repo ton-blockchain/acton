@@ -14,9 +14,13 @@ use std::fs;
 use std::io::{IsTerminal, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Arc;
+use std::time::Duration;
 use toml_edit::{DocumentMut, Item, Table, value};
-use ton_api::{Network, TonApiClient};
+use ton_api::{CustomNetworkUrls, Network, TonApiClient};
 use tonlib_core::TonAddress;
+use tonlib_core::cell::Cell;
+use tonlib_core::tlb_types::tlb::TLB;
 use tonlib_core::wallet::mnemonic::Mnemonic;
 use tonlib_core::wallet::ton_wallet::TonWallet;
 use tonlib_core::wallet::wallet_version::WalletVersion;
@@ -39,6 +43,50 @@ pub enum WalletVersionArg {
     HighloadV2,
     HighloadV2R1,
     HighloadV2R2,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum SignMessageFormat {
+    Hex,
+    Base64,
+}
+
+#[derive(serde::Deserialize)]
+struct FaucetChallengeResponse {
+    challenge: String,
+    difficulty: u32,
+}
+
+#[derive(serde::Deserialize)]
+struct FaucetMessageResponse {
+    message: Option<String>,
+    error: Option<String>,
+}
+
+struct AirdropResult {
+    address: String,
+    difficulty: u32,
+    nonce: u64,
+    solve_duration: Duration,
+    message: Option<String>,
+}
+
+const HTTP_RETRY_ATTEMPTS: usize = 3;
+const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [200, 500, 1000];
+const POW_MAX_SOLVE_DURATION: Duration = Duration::from_secs(60);
+const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
+const DEFAULT_FAUCET_URL: &str = "https://acton.monster/faucet/";
+const NEW_WALLET_AIRDROP_FAUCET_URL_ENV: &str = "ACTON_FAUCET_URL"; // for testing purpose
+const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
+const TEST_TONCENTER_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_V3_URL"; // integration tests only
+
+impl SignMessageFormat {
+    const fn as_str(self) -> &'static str {
+        match self {
+            SignMessageFormat::Hex => "hex",
+            SignMessageFormat::Base64 => "base64",
+        }
+    }
 }
 
 impl From<WalletVersionArg> for WalletVersion {
@@ -82,6 +130,12 @@ pub enum WalletCommand {
             num_args = 0..=1
         )]
         secure: Option<bool>,
+        #[arg(
+            long,
+            help = "Request testnet TON from faucet after wallet creation",
+            default_value_t = false
+        )]
+        airdrop: bool,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
@@ -116,10 +170,23 @@ pub enum WalletCommand {
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
-    #[command(about = "Get wallet mnemonic")]
-    Get {
+    #[command(about = "Export wallet mnemonic (interactive confirmation required)")]
+    ExportMnemonic {
         #[arg(help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
+    },
+    #[command(about = "Sign a message with wallet private key")]
+    Sign {
+        #[arg(help = "Name of the wallet (prompts if not provided)")]
+        name: Option<String>,
+        #[arg(
+            long,
+            alias = "message",
+            help = "External body BoC to sign in hex or base64. If omitted, reads from stdin or prompts interactively"
+        )]
+        body: Option<String>,
+        #[arg(long, help = "Output result as JSON")]
+        json: bool,
     },
     #[command(about = "Remove wallet")]
     Remove {
@@ -134,7 +201,11 @@ pub enum WalletCommand {
     Airdrop {
         #[arg(help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
-        #[arg(long, help = "Faucet URL", default_value = "http://localhost:3001")]
+        #[arg(
+            long,
+            help = "Faucet URL",
+            default_value = "https://acton.monster/faucet/"
+        )]
         faucet_url: String,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
@@ -149,8 +220,9 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             global,
             local,
             secure,
+            airdrop,
             json,
-        } => new_wallet(name, version, global, local, secure, json),
+        } => new_wallet(name, version, global, local, secure, airdrop, json),
         WalletCommand::Import {
             name,
             mnemonics,
@@ -165,7 +237,8 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
             api_key,
             json,
         } => list_wallets(balance, api_key, json),
-        WalletCommand::Get { name } => get_mnemonic(name),
+        WalletCommand::ExportMnemonic { name } => export_mnemonic(name),
+        WalletCommand::Sign { name, body, json } => sign_wallet_external_body(name, body, json),
         WalletCommand::Remove { name, yes, json } => remove_wallet(name, yes, json),
         WalletCommand::Airdrop {
             name,
@@ -176,6 +249,48 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
 }
 
 fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyhow::Result<()> {
+    let run_result = perform_airdrop(name, faucet_url, json);
+
+    match run_result {
+        Ok(result) => {
+            let message = result.message.as_deref().unwrap_or("Success");
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::json!({
+                        "success": true,
+                        "message": message,
+                        "address": result.address,
+                        "difficulty": result.difficulty,
+                        "nonce": result.nonce,
+                        "solve_ms": result.solve_duration.as_millis(),
+                    }))?
+                );
+            } else {
+                println!("{} {}", "✓".green(), message);
+            }
+            Ok(())
+        }
+        Err(err) => {
+            if json {
+                println!(
+                    "{}",
+                    serde_json::to_string(&serde_json::json!({
+                        "success": false,
+                        "error": err.to_string()
+                    }))?
+                );
+            }
+            Err(err)
+        }
+    }
+}
+
+fn perform_airdrop(
+    name: Option<String>,
+    faucet_url: String,
+    json: bool,
+) -> anyhow::Result<AirdropResult> {
     let config = ActonConfig::load()?;
 
     let name = select_wallet(name, &config)?;
@@ -195,7 +310,25 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyho
         );
     }
 
-    let client = reqwest::blocking::Client::new();
+    let faucet_base = parse_faucet_base_url(&faucet_url)?;
+    let challenge_url = faucet_base.join("challenge").with_context(|| {
+        format!(
+            "Failed to build challenge URL from faucet base URL {}",
+            faucet_base
+        )
+    })?;
+    let claim_url = faucet_base.join("claim").with_context(|| {
+        format!(
+            "Failed to build claim URL from faucet base URL {}",
+            faucet_base
+        )
+    })?;
+
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(60))
+        .build()
+        .context("Failed to build HTTP client")?;
 
     // Faucet for testnet TON uses Proof-of-Work so we need to solve it to get coins
 
@@ -203,100 +336,199 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyho
     if !json {
         println!("{} Fetching PoW challenge...", "→".blue().bold());
     }
-    let challenge_res = client
-        .get(format!("{faucet_url}/challenge"))
-        .send()
-        .context("Failed to get challenge from faucet")?;
+    let challenge_res = send_with_retry(
+        || client.get(challenge_url.clone()).send(),
+        "challenge",
+        "Failed to get challenge from faucet",
+        json,
+    )?;
 
     if !challenge_res.status().is_success() {
-        anyhow::bail!("Failed to get challenge: status {}", challenge_res.status());
+        let status = challenge_res.status();
+        let body = challenge_res.text().unwrap_or_default();
+        if body.is_empty() {
+            anyhow::bail!("Failed to get challenge: status {status}");
+        }
+        anyhow::bail!("Failed to get challenge: status {status}: {body}");
     }
 
-    let challenge_data: serde_json::Value = challenge_res
+    let challenge_data: FaucetChallengeResponse = challenge_res
         .json()
         .context("Failed to parse challenge response")?;
-    let challenge = challenge_data["challenge"]
-        .as_str()
-        .context("No challenge in response")?;
-    let difficulty = challenge_data["difficulty"]
-        .as_u64()
-        .context("No difficulty in response")? as u32;
+    if challenge_data.difficulty > 256 {
+        anyhow::bail!(
+            "Invalid PoW difficulty from faucet: {} (max 256)",
+            challenge_data.difficulty
+        );
+    }
 
     // 2. Solve challenge
     if !json {
         println!(
             "{} Solving challenge (difficulty: {} bits)...",
             "→".blue().bold(),
-            difficulty
+            challenge_data.difficulty
         );
     }
     let start = std::time::Instant::now();
-    let nonce = solve_challenge(challenge, difficulty);
+    let nonce = solve_challenge(&challenge_data.challenge, challenge_data.difficulty)?;
     let duration = start.elapsed();
     if !json {
         println!("{} Challenge solved in {:?}", "✓".green(), duration);
     }
 
     // 3. Send claim
-    let response = client
-        .post(format!("{faucet_url}/claim"))
-        .json(&serde_json::json!({
-            "address": address,
-            "challenge": challenge,
-            "nonce": nonce
-        }))
-        .send()
-        .context("Failed to send request to faucet")?;
+    let claim_payload = serde_json::json!({
+        "address": address,
+        "challenge": challenge_data.challenge,
+        "nonce": nonce
+    });
+    let response = send_with_retry(
+        || client.post(claim_url.clone()).json(&claim_payload).send(),
+        "claim",
+        "Failed to send request to faucet",
+        json,
+    )?;
 
     if response.status().is_success() {
-        let res: serde_json::Value = response.json().context("Failed to parse faucet response")?;
-        if json {
-            println!(
-                "{}",
-                serde_json::to_string(&serde_json::json!({
-                    "success": true,
-                    "message": res.get("message").and_then(|m| m.as_str()).unwrap_or("Success")
-                }))?
-            );
-        } else if let Some(msg) = res.get("message").and_then(|m| m.as_str()) {
-            println!("{} {}", "✓".green(), msg);
-        } else {
-            println!("{} Success", "✓".green());
-        }
+        let res: FaucetMessageResponse =
+            response.json().context("Failed to parse faucet response")?;
+        Ok(AirdropResult {
+            address,
+            difficulty: challenge_data.difficulty,
+            nonce,
+            solve_duration: duration,
+            message: res.message,
+        })
     } else {
         let status = response.status();
         let error_msg = if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
             "Too many requests from your IP. Only 2 requests per 24 hours are allowed. Please try again later.".to_string()
         } else {
             let body_text = response.text().unwrap_or_default();
-            if let Ok(res) = serde_json::from_str::<serde_json::Value>(&body_text) {
-                res.get("error")
-                    .and_then(|e| e.as_str())
-                    .map_or_else(|| body_text.clone(), ToString::to_string)
+            if let Ok(res) = serde_json::from_str::<FaucetMessageResponse>(&body_text) {
+                res.error
+                    .or(res.message)
+                    .unwrap_or_else(|| body_text.clone())
             } else {
                 body_text
             }
         };
 
-        if json {
-            println!(
-                "{}",
-                serde_json::to_string(&serde_json::json!({
-                    "success": false,
-                    "error": format!("Faucet returned error {}: {}", status, error_msg)
-                }))?
-            );
-        } else {
-            anyhow::bail!("Faucet returned error {status}: {error_msg}");
-        }
+        anyhow::bail!("Faucet returned error {status}: {error_msg}");
     }
-
-    Ok(())
 }
 
-fn solve_challenge(challenge: &str, difficulty: u32) -> u64 {
+fn send_with_retry<F>(
+    mut send_request: F,
+    request_name: &str,
+    transport_error_context: &str,
+    json: bool,
+) -> anyhow::Result<reqwest::blocking::Response>
+where
+    F: FnMut() -> Result<reqwest::blocking::Response, reqwest::Error>,
+{
+    for attempt in 0..HTTP_RETRY_ATTEMPTS {
+        return match send_request() {
+            Ok(response) => {
+                if response.status().is_server_error() && attempt + 1 < HTTP_RETRY_ATTEMPTS {
+                    if !json {
+                        println!(
+                            "{} {} request returned {}. Retrying ({}/{})...",
+                            "↻".yellow().bold(),
+                            request_name,
+                            response.status(),
+                            attempt + 2,
+                            HTTP_RETRY_ATTEMPTS
+                        );
+                    }
+                    std::thread::sleep(http_retry_backoff(attempt));
+                    continue;
+                }
+                Ok(response)
+            }
+            Err(err) => {
+                if attempt + 1 < HTTP_RETRY_ATTEMPTS {
+                    if !json {
+                        println!(
+                            "{} {} request failed: {}. Retrying ({}/{})...",
+                            "↻".yellow().bold(),
+                            request_name,
+                            err,
+                            attempt + 2,
+                            HTTP_RETRY_ATTEMPTS
+                        );
+                    }
+                    std::thread::sleep(http_retry_backoff(attempt));
+                    continue;
+                }
+                Err(err).context(transport_error_context.to_owned())
+            }
+        };
+    }
+
+    unreachable!("retry loop must return on success or final failure")
+}
+
+fn http_retry_backoff(attempt: usize) -> Duration {
+    let index = attempt.min(HTTP_RETRY_BACKOFF_MS.len() - 1);
+    Duration::from_millis(HTTP_RETRY_BACKOFF_MS[index])
+}
+
+fn parse_faucet_base_url(faucet_url: &str) -> anyhow::Result<reqwest::Url> {
+    let faucet_url = faucet_url.trim();
+    if faucet_url.is_empty() {
+        anyhow::bail!("Faucet URL cannot be empty");
+    }
+
+    let mut normalized = faucet_url.to_owned();
+    if !normalized.ends_with('/') {
+        normalized.push('/');
+    }
+
+    let url = reqwest::Url::parse(&normalized)
+        .with_context(|| format!("Invalid faucet URL: {faucet_url}"))?;
+    if !matches!(url.scheme(), "http" | "https") {
+        anyhow::bail!("Faucet URL scheme must be http or https");
+    }
+    if url.query().is_some() || url.fragment().is_some() {
+        anyhow::bail!("Faucet URL must not contain query parameters or fragments");
+    }
+    Ok(url)
+}
+
+fn solve_challenge(challenge: &str, difficulty: u32) -> anyhow::Result<u64> {
+    solve_challenge_with_limits(
+        challenge,
+        difficulty,
+        POW_MAX_SOLVE_DURATION,
+        POW_MAX_NONCE_ATTEMPTS,
+    )
+}
+
+fn solve_challenge_with_limits(
+    challenge: &str,
+    difficulty: u32,
+    max_duration: Duration,
+    max_nonce_attempts: u64,
+) -> anyhow::Result<u64> {
+    if difficulty > 256 {
+        anyhow::bail!("PoW difficulty must be at most 256 bits");
+    }
+
+    let started_at = std::time::Instant::now();
     let mut nonce: u64 = 0;
     loop {
+        if started_at.elapsed() >= max_duration {
+            anyhow::bail!(
+                "PoW solve exceeded time limit of {}s",
+                max_duration.as_secs()
+            );
+        }
+        if nonce >= max_nonce_attempts {
+            anyhow::bail!("PoW solve exceeded nonce limit of {max_nonce_attempts}");
+        }
+
         let mut hasher = Sha256::new();
         hasher.update(challenge.as_bytes());
         hasher.update(nonce.to_be_bytes());
@@ -311,14 +543,49 @@ fn solve_challenge(challenge: &str, difficulty: u32) -> u64 {
             }
         }
         if zero_bits >= difficulty {
-            return nonce;
+            return Ok(nonce);
         }
 
-        nonce += 1;
+        nonce = nonce
+            .checked_add(1)
+            .context("PoW nonce overflow while solving challenge")?;
     }
 }
 
-fn get_mnemonic(name: Option<String>) -> anyhow::Result<()> {
+fn export_mnemonic(name: Option<String>) -> anyhow::Result<()> {
+    let config = ActonConfig::load()?;
+
+    let name = select_wallet(name, &config)?;
+
+    if !stdin().is_terminal() || !stdout().is_terminal() {
+        anyhow::bail!(
+            "Exporting mnemonic is only allowed in interactive mode for security reasons."
+        );
+    }
+
+    let confirmation = Text::new("Type wallet name to confirm mnemonic export:")
+        .prompt()
+        .context("Failed to read confirmation")?;
+    if confirmation.trim() != name {
+        anyhow::bail!("Confirmation failed: wallet name does not match");
+    }
+
+    let wallet = config
+        .get_wallet(&name)
+        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
+
+    let mnemonic = wallets::load_mnemonic(wallet)?;
+
+    println!("{mnemonic}");
+
+    Ok(())
+}
+
+fn sign_wallet_external_body(
+    name: Option<String>,
+    body: Option<String>,
+    json: bool,
+) -> anyhow::Result<()> {
     let config = ActonConfig::load()?;
 
     let name = select_wallet(name, &config)?;
@@ -327,12 +594,73 @@ fn get_mnemonic(name: Option<String>) -> anyhow::Result<()> {
         .get_wallet(&name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
 
-    let mnemonic = wallets::load_mnemonic(wallet)?;
+    let body = read_sign_body(body)?;
+    let (external_body, input) = decode_sign_input(&body)?;
 
-    println!("Mnemonic for wallet {}:", name.cyan().bold());
-    println!("{}", mnemonic.green());
+    let mnemonic_str = wallets::load_mnemonic(wallet)?;
+    let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
+    let key_pair = mnemonic.to_key_pair()?;
+    let version = parse_wallet_version(&wallet.kind)?;
+    let wallet_id = wallets::wallet_id(version, &Network::Testnet);
+    let ton_wallet =
+        TonWallet::new_with_params(version, key_pair, wallet.workchain.unwrap_or(0), wallet_id)?;
+
+    let signed_body = ton_wallet
+        .sign_external_body(&external_body)
+        .context("Failed to sign external body")?;
+    let signed_body_hex = signed_body
+        .to_boc_hex(false)
+        .context("Failed to encode signed body to hex BoC")?;
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&serde_json::json!({
+                "success": true,
+                "wallet": name,
+                "input": input.as_str(),
+                "output": "hex",
+                "signed_body": signed_body_hex,
+            }))?
+        );
+    } else {
+        println!("{signed_body_hex}");
+    }
 
     Ok(())
+}
+
+fn read_sign_body(body: Option<String>) -> anyhow::Result<String> {
+    if let Some(body) = body {
+        return Ok(body);
+    }
+
+    Text::new("External body BoC (hex/base64) to sign:")
+        .prompt()
+        .context("Failed to read body")
+}
+
+fn decode_sign_input(body: &str) -> anyhow::Result<(Cell, SignMessageFormat)> {
+    let body = body.trim();
+    if body.is_empty() {
+        anyhow::bail!("Body cannot be empty");
+    }
+
+    if is_hex_payload(body)
+        && let Ok(cell) = Cell::from_boc_hex(body)
+    {
+        return Ok((cell, SignMessageFormat::Hex));
+    }
+
+    if let Ok(cell) = Cell::from_boc_b64(body) {
+        return Ok((cell, SignMessageFormat::Base64));
+    }
+
+    anyhow::bail!("Body must be a valid BoC encoded as hex or base64")
+}
+
+fn is_hex_payload(value: &str) -> bool {
+    value.len().is_multiple_of(2) && value.as_bytes().iter().all(u8::is_ascii_hexdigit)
 }
 
 fn remove_wallet(name: Option<String>, yes: bool, json: bool) -> anyhow::Result<()> {
@@ -484,10 +812,33 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
         return Ok(());
     }
 
-    let config = ActonConfig::load().unwrap_or_default();
-    let custom_networks = config.custom_networks();
-    let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
-    let client = TonApiClient::new(Network::Testnet, custom_networks, api_key)?;
+    let client = if balance {
+        let config = ActonConfig::load().unwrap_or_default();
+        let mut custom_networks = config.custom_networks();
+        let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
+        let toncenter_v3_override = env::var(TEST_TONCENTER_V3_URL_ENV).ok();
+        Some(if let Some(url) = toncenter_v3_override {
+            // test only code
+            let network_name = "__wallet_list_testnet_override".to_string();
+            let normalized = Arc::<str>::from(url.trim_end_matches('/').to_owned());
+            custom_networks.insert(
+                network_name.clone(),
+                CustomNetworkUrls {
+                    v2_url: Arc::clone(&normalized),
+                    v3_url: Some(normalized),
+                },
+            );
+            TonApiClient::new(
+                Network::Custom(Arc::from(network_name)),
+                custom_networks,
+                api_key,
+            )?
+        } else {
+            TonApiClient::new(Network::Testnet, custom_networks, api_key)?
+        })
+    } else {
+        None
+    };
 
     if !json {
         println!("Available wallets:");
@@ -508,6 +859,9 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
             .iter()
             .map(|(_, _, addr)| addr.as_str())
             .collect();
+        let client = client
+            .as_ref()
+            .expect("TonApiClient must be initialized when --balance is set");
         match client.get_account_states(&addresses) {
             Ok(states) => {
                 for state in states {
@@ -676,6 +1030,14 @@ fn get_or_prompt_name(name: Option<String>) -> anyhow::Result<String> {
 }
 
 fn get_is_global(global_flag: bool, local_flag: bool) -> anyhow::Result<bool> {
+    if global_flag && local_flag {
+        anyhow::bail!(
+            "Cannot use both {} and {} flags",
+            "--global".yellow(),
+            "--local".yellow()
+        );
+    }
+
     if global_flag {
         Ok(true)
     } else if local_flag {
@@ -688,6 +1050,35 @@ fn get_is_global(global_flag: bool, local_flag: bool) -> anyhow::Result<bool> {
         let selection = Select::new("Save wallet to:", options).prompt()?;
         Ok(selection.starts_with("Global"))
     }
+}
+
+const fn should_prompt_auto_airdrop(
+    airdrop_flag: bool,
+    json: bool,
+    stdin_is_tty: bool,
+    stdout_is_tty: bool,
+) -> bool {
+    !airdrop_flag && !json && stdin_is_tty && stdout_is_tty
+}
+
+fn resolve_auto_airdrop(airdrop_flag: bool, json: bool) -> anyhow::Result<bool> {
+    if airdrop_flag {
+        return Ok(true);
+    }
+
+    if !should_prompt_auto_airdrop(
+        airdrop_flag,
+        json,
+        stdin().is_terminal(),
+        stdout().is_terminal(),
+    ) {
+        return Ok(false);
+    }
+
+    Confirm::new("Request testnet TON from faucet now?")
+        .with_default(false)
+        .prompt()
+        .context("Failed to read auto-airdrop confirmation")
 }
 
 fn get_config_path(name: &str, is_global: bool) -> anyhow::Result<PathBuf> {
@@ -845,6 +1236,7 @@ fn new_wallet(
     global_flag: bool,
     local_flag: bool,
     secure: Option<bool>,
+    airdrop: bool,
     json: bool,
 ) -> anyhow::Result<()> {
     let config = ActonConfig::load().ok();
@@ -884,18 +1276,42 @@ fn new_wallet(
         &wallet_address,
         is_global,
     )?;
+    let auto_airdrop = resolve_auto_airdrop(airdrop, json)?;
+    let airdrop_faucet_url = auto_airdrop.then(new_wallet_airdrop_faucet_url);
 
     if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&serde_json::json!({
-                "success": true,
-                "name": name,
-                "address": wallet_address,
-                "kind": wallet_version_to_string(&version),
-                "is_global": is_global,
-            }))?
-        );
+        let mut output = serde_json::json!({
+            "success": true,
+            "name": name,
+            "address": wallet_address,
+            "kind": wallet_version_to_string(&version),
+            "is_global": is_global,
+            "airdrop_requested": auto_airdrop,
+        });
+
+        if auto_airdrop {
+            let airdrop_output = match perform_airdrop(
+                Some(name),
+                airdrop_faucet_url.expect("auto_airdrop implies faucet URL exists"),
+                true,
+            ) {
+                Ok(result) => serde_json::json!({
+                    "success": true,
+                    "message": result.message.as_deref().unwrap_or("Success"),
+                    "address": result.address,
+                    "difficulty": result.difficulty,
+                    "nonce": result.nonce,
+                    "solve_ms": result.solve_duration.as_millis(),
+                }),
+                Err(err) => serde_json::json!({
+                    "success": false,
+                    "error": err.to_string(),
+                }),
+            };
+            output["airdrop"] = airdrop_output;
+        }
+
+        println!("{}", serde_json::to_string_pretty(&output)?);
     } else {
         println!(
             "{} Wallet successfully created and added to {}",
@@ -911,21 +1327,54 @@ fn new_wallet(
             );
         }
 
-        println!(
-            "\n{}",
-            "NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.".yellow()
-        );
-        println!(
-            "\nTo get testnet coins, check official documentation: {}",
-            "https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet"
-                .underline(),
-        );
+        if auto_airdrop {
+            match perform_airdrop(
+                Some(name),
+                airdrop_faucet_url.expect("auto_airdrop implies faucet URL exists"),
+                false,
+            ) {
+                Ok(result) => {
+                    println!(
+                        "{} {}",
+                        "✓".green(),
+                        result.message.as_deref().unwrap_or("Success")
+                    );
+                }
+                Err(err) => {
+                    println!(
+                        "{} Wallet was created, but automatic airdrop failed: {}",
+                        "Warning:".yellow().bold(),
+                        err
+                    );
+                }
+            }
+            println!(
+                "\n{}",
+                "NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.".yellow()
+            );
+        } else {
+            println!(
+                "\n{}",
+                "NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.".yellow()
+            );
+
+            println!(
+                "\nTo get testnet coins, check official documentation: {}",
+                "https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet"
+                    .underline(),
+            );
+        }
+
         if !use_secure_store {
             show_security_warning(config_path);
         }
     }
 
     Ok(())
+}
+
+fn new_wallet_airdrop_faucet_url() -> String {
+    env::var(NEW_WALLET_AIRDROP_FAUCET_URL_ENV).unwrap_or_else(|_| DEFAULT_FAUCET_URL.to_owned())
 }
 
 fn maybe_store_mnemonic_in_keystore(
@@ -1047,7 +1496,7 @@ fn show_security_warning(config_path: PathBuf) {
 }
 
 fn get_or_prompt_use_keystore(secure: Option<bool>) -> anyhow::Result<bool> {
-    let use_secure_store = if wallets::is_keyring_supported() {
+    let use_secure_store = if is_keyring_supported_for_wallet_cmd()? {
         if let Some(s) = secure {
             s
         } else {
@@ -1065,6 +1514,28 @@ fn get_or_prompt_use_keystore(secure: Option<bool>) -> anyhow::Result<bool> {
         false
     };
     Ok(use_secure_store)
+}
+
+fn is_keyring_supported_for_wallet_cmd() -> anyhow::Result<bool> {
+    match env::var(TEST_WALLET_KEYRING_SUPPORTED_ENV) {
+        Ok(raw) => {
+            let normalized = raw.trim().to_ascii_lowercase();
+            match normalized.as_str() {
+                "1" => Ok(true),
+                "0" => Ok(false),
+                _ => anyhow::bail!(
+                    "Invalid value for {}: {}. Expected one of: 1, 0",
+                    TEST_WALLET_KEYRING_SUPPORTED_ENV.yellow(),
+                    raw.yellow()
+                ),
+            }
+        }
+        Err(env::VarError::NotPresent) => Ok(wallets::is_keyring_supported()),
+        Err(err) => Err(anyhow!(
+            "Failed to read {}: {err}",
+            TEST_WALLET_KEYRING_SUPPORTED_ENV.yellow()
+        )),
+    }
 }
 
 fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
@@ -1116,5 +1587,193 @@ mod wallet_name_tests {
         );
         assert_eq!(normalize_wallet_name("v5r1"), "v5r1");
         assert_eq!(normalize_wallet_name("!!!"), "");
+    }
+
+    #[test]
+    fn test_decode_sign_input_hex() {
+        let cell = Cell::default();
+        let body_hex = cell.to_boc_hex(false).expect("must encode hex boc");
+        let (decoded, format) = decode_sign_input(&body_hex).expect("must decode hex");
+        assert_eq!(decoded, cell);
+        assert_eq!(format, SignMessageFormat::Hex);
+    }
+
+    #[test]
+    fn test_decode_sign_input_base64() {
+        let cell = Cell::default();
+        let body_b64 = cell.to_boc_b64(false).expect("must encode base64 boc");
+        let (decoded, format) = decode_sign_input(&body_b64).expect("must decode base64");
+        assert_eq!(decoded, cell);
+        assert_eq!(format, SignMessageFormat::Base64);
+    }
+
+    #[test]
+    fn test_decode_sign_input_empty() {
+        let err = decode_sign_input("").expect_err("must fail for empty payload");
+        assert!(
+            err.to_string().contains("Body cannot be empty"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_decode_sign_input_invalid() {
+        let err = decode_sign_input("!@#$%").expect_err("must fail for invalid payload");
+        assert!(
+            err.to_string()
+                .contains("Body must be a valid BoC encoded as hex or base64"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_get_wallet_address_uses_mnemonic_when_expected_testnet_missing() {
+        let mnemonic_str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+
+        let wallet = config::WalletConfig {
+            kind: "v5r1".to_string(),
+            workchain: Some(0),
+            keys: config::WalletKeys {
+                mnemonic_env: None,
+                mnemonic_file: None,
+                mnemonic: Some(mnemonic_str.to_string()),
+                mnemonic_keyring: None,
+            },
+            expected: Some(config::WalletExpectedAddresses {
+                // Should be ignored because address-testnet is missing.
+                address_mainnet: Some("invalid-mainnet-address".to_string()),
+                address_testnet: None,
+            }),
+        };
+
+        let actual =
+            get_wallet_address(&wallet).expect("must derive testnet address from mnemonic");
+
+        let mnemonic = Mnemonic::from_str(mnemonic_str, &None).expect("valid mnemonic");
+        let key_pair = mnemonic.to_key_pair().expect("keypair from mnemonic");
+        let version = WalletVersion::V5R1;
+        let wallet_id = wallets::wallet_id(version, &Network::Testnet);
+        let expected_wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)
+            .expect("wallet from mnemonic");
+        let expected = expected_wallet.address.to_base64_url_flags(false, true);
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_faucet_base_url_normalizes_trailing_slash() {
+        let base = parse_faucet_base_url("https://example.com/faucet").expect("must parse");
+        assert_eq!(base.as_str(), "https://example.com/faucet/");
+        assert_eq!(
+            base.join("challenge").expect("must join").as_str(),
+            "https://example.com/faucet/challenge"
+        );
+    }
+
+    #[test]
+    fn test_parse_faucet_base_url_rejects_invalid_scheme() {
+        let err = parse_faucet_base_url("ftp://example.com").expect_err("must reject ftp");
+        assert!(
+            err.to_string()
+                .contains("Faucet URL scheme must be http or https"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_faucet_base_url_rejects_query_and_fragment() {
+        let query_err =
+            parse_faucet_base_url("https://example.com/faucet?token=123").expect_err("must fail");
+        assert!(
+            query_err
+                .to_string()
+                .contains("must not contain query parameters or fragments"),
+            "unexpected error: {query_err}"
+        );
+
+        let fragment_err =
+            parse_faucet_base_url("https://example.com/faucet#frag").expect_err("must fail");
+        assert!(
+            fragment_err
+                .to_string()
+                .contains("must not contain query parameters or fragments"),
+            "unexpected error: {fragment_err}"
+        );
+    }
+
+    #[test]
+    fn test_solve_challenge_rejects_too_high_difficulty() {
+        let err = solve_challenge("abc", 257).expect_err("difficulty > 256 must fail");
+        assert!(
+            err.to_string()
+                .contains("PoW difficulty must be at most 256 bits"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_solve_challenge_respects_nonce_limit() {
+        let err = solve_challenge_with_limits("abc", 1, Duration::from_secs(10), 0)
+            .expect_err("must stop on nonce limit");
+        assert!(
+            err.to_string().contains("PoW solve exceeded nonce limit"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_solve_challenge_respects_time_limit() {
+        let err = solve_challenge_with_limits("abc", 1, Duration::ZERO, u64::MAX)
+            .expect_err("must stop on time limit");
+        assert!(
+            err.to_string().contains("PoW solve exceeded time limit"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_should_prompt_auto_airdrop_interactive_defaults_to_prompt() {
+        assert!(should_prompt_auto_airdrop(false, false, true, true));
+    }
+
+    #[test]
+    fn test_should_prompt_auto_airdrop_disabled_for_json_or_non_tty() {
+        assert!(!should_prompt_auto_airdrop(false, true, true, true));
+        assert!(!should_prompt_auto_airdrop(false, false, false, true));
+        assert!(!should_prompt_auto_airdrop(false, false, true, false));
+    }
+
+    #[test]
+    fn test_should_prompt_auto_airdrop_disabled_when_flag_is_set() {
+        assert!(!should_prompt_auto_airdrop(true, false, true, true));
+    }
+
+    #[test]
+    fn test_send_with_retry_retries_transport_errors() {
+        let client = reqwest::blocking::Client::builder()
+            .no_proxy()
+            .connect_timeout(Duration::from_millis(50))
+            .timeout(Duration::from_millis(100))
+            .build()
+            .expect("failed to create reqwest client");
+
+        let mut attempts = 0;
+        let err = send_with_retry(
+            || {
+                attempts += 1;
+                client.get("http://127.0.0.1:1/").send()
+            },
+            "challenge",
+            "Failed to get challenge from faucet",
+            true,
+        )
+        .expect_err("transport error path must fail");
+
+        assert_eq!(attempts, HTTP_RETRY_ATTEMPTS);
+        assert!(
+            err.to_string()
+                .contains("Failed to get challenge from faucet"),
+            "unexpected error: {err}"
+        );
     }
 }

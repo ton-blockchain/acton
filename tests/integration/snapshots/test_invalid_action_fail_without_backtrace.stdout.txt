@@ -1,0 +1,22 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ action-fail [TIME]
+    └─ Test output:
+       N/A -> deployer A
+       └── empty 0.2 TON -> simple B                                                   gas=823 aborted action_result_code=34
+           ├── account created
+           ├── Action phase failed
+           ├── Description: Action is invalid or not supported
+           ├── Re-run with --backtrace full to get actions location
+           └── Invalid actions:
+               └── invalid action 0: error code 34 (during action list preprocessing)
+
+ ✓ 1 passed in 1 file

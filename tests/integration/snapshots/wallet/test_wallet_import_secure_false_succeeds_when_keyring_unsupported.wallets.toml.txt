@@ -1,0 +1,7 @@
+[wallets.import-secure-false]
+kind = "v5r1"
+workchain = 0
+keys = { [MNEMONIC] }
+
+[wallets.import-secure-false.expected]
+[WALLET_ADDRESS_TESTNET]

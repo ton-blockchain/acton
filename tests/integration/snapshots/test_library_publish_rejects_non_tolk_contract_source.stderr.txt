@@ -1,0 +1,1 @@
+Error: Contract source must be a .tolk file

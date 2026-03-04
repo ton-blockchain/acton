@@ -1,3 +1,4 @@
+use chrono::Utc;
 use std::process::Command;
 
 fn main() {
@@ -10,4 +11,7 @@ fn main() {
     let git_hash = git_hash.trim();
 
     println!("cargo:rustc-env=GIT_HASH={git_hash}");
+
+    let build_date = Utc::now().format("%Y-%m-%d").to_string();
+    println!("cargo:rustc-env=BUILD_DATE={build_date}");
 }

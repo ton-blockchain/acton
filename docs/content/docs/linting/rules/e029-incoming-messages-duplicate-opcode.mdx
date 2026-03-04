@@ -1,0 +1,37 @@
+---
+title: "E029: incoming-messages-duplicate-opcode"
+description: "Checks `contract` header field `incomingMessages` for duplicate message opcodes."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `E029`
+- `Rule`: `incoming-messages-duplicate-opcode`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: not available
+
+### What it does
+Checks `contract` header field `incomingMessages` for duplicate message opcodes.
+
+### Why is this bad?
+If two incoming message variants share the same opcode, message decoding is ambiguous.
+
+### Example
+```tolk
+struct (0x1000) MsgA {}
+struct (0x1000) MsgB {}
+
+contract Wallet {
+    incomingMessages: MsgA | MsgB,
+}
+```
+
+Use instead:
+```tolk
+struct (0x1000) MsgA {}
+struct (0x1001) MsgB {}
+```
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/incoming_messages_duplicate_opcode.rs#L35" />

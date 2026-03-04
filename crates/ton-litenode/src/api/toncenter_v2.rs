@@ -1,6 +1,6 @@
 use crate::litenode::{
     LiteNodeAccountState, LiteNodeBlockHeader, LiteNodeBlockId, LiteNodeBlockTransactions,
-    LiteNodeConsensusBlock, LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult,
+    LiteNodeConsensusBlock, LiteNodeLibrary, LiteNodeMasterchainInfo, LiteNodeRunGetMethodResult,
     LiteNodeTransaction, LiteNodeTransactionId,
 };
 use crate::storage::AccountStatus;
@@ -231,6 +231,23 @@ pub fn map_consensus_block(cb: &LiteNodeConsensusBlock) -> Value {
         "@type": "ext.blocks.consensusBlock",
         "consensus_block": cb.consensus_block,
         "timestamp": cb.timestamp
+    })
+}
+
+pub fn map_libraries(libs: &[LiteNodeLibrary]) -> Value {
+    serde_json::json!({
+        "@type": "smc.libraryResult",
+        "result": libs
+            .iter()
+            .filter_map(|lib| lib.data.as_ref().map(|data| (lib, data)))
+            .map(|(lib, data)| {
+                serde_json::json!({
+                    "@type": "smc.libraryEntry",
+                    "hash": lib.hash.to_hex(),
+                    "data": base64::engine::general_purpose::STANDARD.encode(data),
+                })
+            })
+            .collect::<Vec<_>>()
     })
 }
 

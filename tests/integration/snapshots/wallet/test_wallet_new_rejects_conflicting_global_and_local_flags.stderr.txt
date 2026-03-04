@@ -1,0 +1,1 @@
+Error: Cannot use both --global and --local flags

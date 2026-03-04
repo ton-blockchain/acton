@@ -12,6 +12,7 @@ use sha2::Sha512;
 use std::collections::BTreeMap;
 use std::fs;
 use std::num::NonZeroU32;
+use std::path::PathBuf;
 use std::str::FromStr;
 use tonlib_core::TonAddress;
 use tonlib_core::wallet::mnemonic::WORDLIST_EN_SET;
@@ -22,8 +23,25 @@ use tonlib_core::wallet::versioned::{
 use tonlib_core::wallet::wallet_version::WalletVersion;
 
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
+const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR"; // integration tests only
+
+fn test_keyring_file_path(id: &str) -> Option<PathBuf> {
+    let dir = std::env::var(TEST_KEYRING_DIR_ENV).ok()?;
+    let encoded_id = id
+        .as_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>();
+    Some(PathBuf::from(dir).join(format!("{encoded_id}.mnemonic")))
+}
 
 pub fn load_mnemonic_from_keyring(id: &str) -> anyhow::Result<String> {
+    if let Some(path) = test_keyring_file_path(id) {
+        return fs::read_to_string(&path)
+            .with_context(|| format!("Failed to load mnemonic from test keyring for {id}"))
+            .map(|s| s.trim().to_owned());
+    }
+
     let entry = Entry::new(KEYRING_SERVICE, id)?;
     entry
         .get_password()
@@ -31,6 +49,20 @@ pub fn load_mnemonic_from_keyring(id: &str) -> anyhow::Result<String> {
 }
 
 pub fn store_mnemonic_in_keyring(id: &str, mnemonic: &str) -> anyhow::Result<()> {
+    if let Some(path) = test_keyring_file_path(id) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!(
+                    "Failed to create test keyring directory {}",
+                    parent.display()
+                )
+            })?;
+        }
+        fs::write(&path, mnemonic)
+            .with_context(|| format!("Failed to store mnemonic in test keyring for {id}"))?;
+        return Ok(());
+    }
+
     let entry = Entry::new(KEYRING_SERVICE, id)?;
     entry
         .set_password(mnemonic)
@@ -38,6 +70,15 @@ pub fn store_mnemonic_in_keyring(id: &str, mnemonic: &str) -> anyhow::Result<()>
 }
 
 pub fn delete_mnemonic_from_keyring(id: &str) -> anyhow::Result<()> {
+    if let Some(path) = test_keyring_file_path(id) {
+        return match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err)
+                .with_context(|| format!("Failed to delete mnemonic in test keyring for {id}")),
+        };
+    }
+
     let entry = Entry::new(KEYRING_SERVICE, id)?;
     match entry.delete_credential() {
         Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
@@ -49,6 +90,13 @@ pub fn delete_mnemonic_from_keyring(id: &str) -> anyhow::Result<()> {
 
 #[must_use]
 pub fn is_keyring_supported() -> bool {
+    if let Ok(dir) = std::env::var(TEST_KEYRING_DIR_ENV) {
+        if fs::create_dir_all(&dir).is_err() {
+            return false;
+        }
+        return true;
+    }
+
     // Try to perform a dummy operation to check if the keyring backend is functional.
     // Real native backends will succeed (or return NoEntry for get),
     // while the default no-op mock will fail on set_password.

@@ -1,0 +1,3 @@
+Error: Library nonexistent not found in libraries.toml and global.libraries.toml
+Available libraries:
+ my-lib

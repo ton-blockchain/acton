@@ -190,6 +190,17 @@ pub enum ExecutedAction {
     },
 }
 
+/// Details of an `invalid action` entry from executor logs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvalidAction {
+    /// Index of the failing action in action-list processing order.
+    pub action_index: usize,
+    /// Action-phase error code for this invalid action.
+    pub error_code: i32,
+    /// Whether this happened during action-list preprocessing.
+    pub during_preprocessing: bool,
+}
+
 impl ExecutedAction {
     fn set_failure_reason(&mut self, reason: ExecutedActionFailureReason) {
         match self {
@@ -506,12 +517,20 @@ impl InstalledActions {
             })
             .find(|reserve| reserve.mode == mode && reserve.amount == *amount)
     }
+
+    /// Finds an installed action by its action-list index.
+    #[must_use]
+    pub fn find_by_index(&self, index: usize) -> Option<&InstalledAction> {
+        self.actions.get(index)
+    }
 }
 
 /// A collection of actions that were actually executed by the sandbox.
 pub struct ExecutedActions {
     /// The list of executed actions.
     pub actions: Vec<ExecutedAction>,
+    /// Raw `invalid action ...` entries from executor logs.
+    pub invalid_actions: Vec<InvalidAction>,
 }
 
 impl ExecutedActions {
@@ -532,6 +551,7 @@ impl ExecutedActions {
     pub fn from(logs: &str) -> ExecutedActions {
         let parsed_lines = parse_executor_lines(logs);
         let mut actions = Vec::new();
+        let mut invalid_actions = Vec::new();
 
         for result in parsed_lines {
             match result {
@@ -644,17 +664,22 @@ impl ExecutedActions {
                 Ok(ExecutorLine::InvalidAction {
                     action_index,
                     error_code,
+                    during_preprocessing,
                 }) => {
                     let action_index = action_index.parse::<usize>().ok();
                     let error_code = error_code.parse::<i32>().ok();
-                    if let Some(code) = error_code {
-                        if let Some(idx) = action_index {
-                            if let Some(action) = actions.get_mut(idx) {
-                                action.set_failure_code(code);
-                            } else if let Some(action) = actions.last_mut() {
-                                action.set_failure_code(code);
-                            }
-                        } else if let Some(action) = actions.last_mut() {
+                    if let (Some(idx), Some(code)) = (action_index, error_code) {
+                        invalid_actions.push(InvalidAction {
+                            action_index: idx,
+                            error_code: code,
+                            during_preprocessing,
+                        });
+
+                        if let Some(action) = actions.get_mut(idx) {
+                            action.set_failure_code(code);
+                        } else if !during_preprocessing && let Some(action) = actions.last_mut() {
+                            // Keep historical fallback for logs where action index
+                            // does not map to reconstructed action vector.
                             action.set_failure_code(code);
                         }
                     }
@@ -663,11 +688,14 @@ impl ExecutedActions {
             }
         }
 
-        ExecutedActions { actions }
+        ExecutedActions {
+            actions,
+            invalid_actions,
+        }
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "only_ci"))]
 mod tests {
     use super::*;
 
@@ -788,6 +816,15 @@ execute FOO
 
         let executed = ExecutedActions::from(logs);
         assert_eq!(executed.actions.len(), 2);
+        assert_eq!(executed.invalid_actions.len(), 1);
+        assert_eq!(
+            executed.invalid_actions[0],
+            InvalidAction {
+                action_index: 1,
+                error_code: 37,
+                during_preprocessing: false,
+            }
+        );
 
         if let ExecutedAction::SendMessage {
             hash,
@@ -844,6 +881,15 @@ execute FOO
 
         let executed = ExecutedActions::from(logs);
         assert_eq!(executed.actions.len(), 2);
+        assert_eq!(executed.invalid_actions.len(), 1);
+        assert_eq!(
+            executed.invalid_actions[0],
+            InvalidAction {
+                action_index: 1,
+                error_code: 37,
+                during_preprocessing: false,
+            }
+        );
 
         if let ExecutedAction::ReserveCurrency {
             mode,
@@ -896,5 +942,21 @@ execute FOO
         } else {
             panic!("Expected second action to be ReserveCurrency");
         }
+    }
+
+    #[test]
+    fn test_executed_actions_preprocessing_invalid_action_is_preserved() {
+        let logs = r"[ 4][t 0][2026-03-03 13:38:24.650053][transaction.cpp:2160]	invalid action 0 found while preprocessing action list: error code 34";
+
+        let executed = ExecutedActions::from(logs);
+        assert!(executed.actions.is_empty());
+        assert_eq!(
+            executed.invalid_actions,
+            vec![InvalidAction {
+                action_index: 0,
+                error_code: 34,
+                during_preprocessing: true,
+            }]
+        );
     }
 }

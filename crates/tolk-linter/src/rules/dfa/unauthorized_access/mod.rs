@@ -1,11 +1,9 @@
 use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Diagnostic};
 use crate::rules::violation::Violation;
-use tolk_dataflow::build_cfg_for_top_level_with_source;
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::file_index::FileId;
 use tolk_resolver::resolve_index::{FileResolveIndex, LocalDefKind};
-use tolk_syntax::{HasName, TopLevel};
 
 pub mod analysis;
 
@@ -45,29 +43,24 @@ impl Violation for UnauthorizedAccess {
 
 pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
     let file = checker.file_db.get_by_id(file_id)?;
-    let source = file.source().source.as_ref();
     let resolve_index = checker.resolve_index_for(file_id)?;
 
     for top_level in file.source().top_levels() {
-        let TopLevel::Func(func) = top_level else {
+        let Some(symbol) = file.find_declaration(&top_level) else {
             continue;
         };
-        let Some(name) = func.name() else { continue };
-        let Some(name) = checker.file_db.text_of(file_id, &name) else {
+        if !symbol.is_func() {
             continue;
-        };
-
-        if name != "onInternalMessage" {
+        }
+        if symbol.name.as_ref() != "onInternalMessage" {
             continue;
         }
 
-        let Some(cfg) =
-            build_cfg_for_top_level_with_source(&top_level, resolve_index.as_ref(), Some(source))
-        else {
+        let Some(cfg) = checker.cfg_for_symbol(symbol.id) else {
             continue;
         };
 
-        let report = analysis::run(&cfg);
+        let report = analysis::run(cfg.as_ref());
         for issue in report.issues {
             emit_issue(checker, file_id, resolve_index.as_ref(), issue);
         }

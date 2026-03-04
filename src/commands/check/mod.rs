@@ -386,6 +386,8 @@ fn check_test_file(
     lint_settings.insert(Rule::ActonImportInContract, LintLevel::Allow);
     // random is not so important in tests
     lint_settings.insert(Rule::RandomRequiresInitialization, LintLevel::Allow);
+    // division is not so important in tests
+    lint_settings.insert(Rule::DivideBeforeMultiply, LintLevel::Allow);
 
     check_root_file(
         &root,

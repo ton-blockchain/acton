@@ -79,6 +79,16 @@ impl SourceLocation {
     }
 
     #[must_use]
+    pub fn format_normalized(&self) -> String {
+        format!(
+            "{}:{}:{}",
+            Self::normalize_path(&self.file),
+            self.line + 1,
+            self.column + 2,
+        )
+    }
+
+    #[must_use]
     pub fn format_full(&self) -> String {
         format!(
             "{}:{}:{}",

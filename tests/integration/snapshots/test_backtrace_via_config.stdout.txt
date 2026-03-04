@@ -12,6 +12,7 @@
     └─ exit_code=42
       ├─ at tests/test.test[LINE]
       │     __throw   at tests/test.test[LINE]
+      ├─ Library change action error
       └─ Phase: Action phase
 
  ✗ 1 failed in 1 file

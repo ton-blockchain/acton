@@ -165,6 +165,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "separate-import-groups": {
+          "type": "boolean",
+          "description": "Insert an empty line between import groups (@stdlib, @acton, @<other>, ../, ./)",
+          "default": false
         }
       }
     },

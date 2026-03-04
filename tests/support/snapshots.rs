@@ -138,6 +138,12 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .insert("[WALLET_ADDRESS]", regex!("Wallet address is .*"))
         .unwrap();
     redactions
+        .insert(
+            "[WALLET_ADDRESS_BASE]",
+            regex!(r"(?:EQ|UQ|kQ|0Q)[A-Za-z0-9_-]{46}"),
+        )
+        .unwrap();
+    redactions
         .insert("[GLOBAL_WALLET_ADDRESS]", regex!("global-wallet .*"))
         .unwrap();
     redactions
@@ -169,6 +175,9 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .unwrap();
     redactions
         .insert("[DEPLOYED_AT]", regex!(r"Deployed at: .*"))
+        .unwrap();
+    redactions
+        .insert("[LAST_TOPUP_AT]", regex!(r"Last top-up: .*"))
         .unwrap();
     redactions
         .insert(

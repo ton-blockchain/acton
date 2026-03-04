@@ -89,6 +89,13 @@ fn prev_non_comment_sibling(node: Node) -> Option<Node> {
     None
 }
 
+fn is_comment_after_binary_operator(comment: Node) -> bool {
+    comment
+        .parent()
+        .is_some_and(|parent| parent.kind() == "binary_operator")
+        && comment.prev_sibling().is_some_and(|prev| !prev.is_named())
+}
+
 #[must_use]
 pub fn collect_comments(root: Node) -> HashMap<Node, Vec<Comment>> {
     let mut comments_map: HashMap<Node, Vec<Comment>> = HashMap::new();
@@ -139,6 +146,7 @@ pub fn collect_comments(root: Node) -> HashMap<Node, Vec<Comment>> {
 
         if let Some(p) = prev
             && p.end_position().row == comment.start_position().row
+            && !is_comment_after_binary_operator(comment)
         {
             // If the comment is on the same line as the previous node,
             // we always consider this comment as inline relative to that node

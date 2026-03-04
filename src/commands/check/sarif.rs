@@ -253,7 +253,7 @@ fn diagnostic_to_rule_descriptor(
                 ),
                 (
                     "actonDefinitionFile".to_string(),
-                    json!(diagnostic.rule.file()),
+                    json!(path_to_sarif_uri(Path::new(diagnostic.rule.file()), false)),
                 ),
                 (
                     "actonDefinitionLine".to_string(),

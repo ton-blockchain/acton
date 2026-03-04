@@ -66,6 +66,7 @@ pub enum ExecutorLine<'a> {
     InvalidAction {
         action_index: &'a str,
         error_code: &'a str,
+        during_preprocessing: bool,
     },
     Unknown {
         text: &'a str,
@@ -241,14 +242,20 @@ fn executor_cannot_reserve<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>> {
 }
 
 // invalid action 1 in action list: error code 37
+// invalid action 0 found while preprocessing action list: error code 34
 fn executor_invalid_action<'a>(i: &mut I<'a>) -> PResult<ExecutorLine<'a>> {
     let _ = "invalid action ".parse_next(i)?;
     let action_index = number.parse_next(i)?;
-    let _ = " in action list: error code ".parse_next(i)?;
+    let during_preprocessing = alt((
+        " in action list: error code ".value(false),
+        " found while preprocessing action list: error code ".value(true),
+    ))
+    .parse_next(i)?;
     let error_code = number.parse_next(i)?;
     Ok(ExecutorLine::InvalidAction {
         action_index,
         error_code,
+        during_preprocessing,
     })
 }
 
@@ -567,10 +574,32 @@ mod tests {
         if let Ok(ExecutorLine::InvalidAction {
             action_index,
             error_code,
+            during_preprocessing,
         }) = result
         {
             assert_eq!(action_index, "1");
             assert_eq!(error_code, "37");
+            assert!(!during_preprocessing);
+        } else {
+            panic!("Expected InvalidAction variant");
+        }
+    }
+
+    #[test]
+    fn test_parse_invalid_action_preprocessing_line() {
+        let line = "[ 4][t 0][2026-03-03 13:38:24.650053][transaction.cpp:2160]\tinvalid action 0 found while preprocessing action list: error code 34";
+        let result = parse_executor_line(line);
+        assert!(result.is_ok());
+
+        if let Ok(ExecutorLine::InvalidAction {
+            action_index,
+            error_code,
+            during_preprocessing,
+        }) = result
+        {
+            assert_eq!(action_index, "0");
+            assert_eq!(error_code, "34");
+            assert!(during_preprocessing);
         } else {
             panic!("Expected InvalidAction variant");
         }

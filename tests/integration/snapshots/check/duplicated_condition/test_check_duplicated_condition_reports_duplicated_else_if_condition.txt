@@ -1,0 +1,14 @@
+warning[E026]: duplicated condition in conditional chain
+  --> [ROOT]/contracts/main[LINE]
+  |
+5 |                 } else if (a > 4) {
+  |                            ----- first occurrence of this condition
+6 |                     return 2;
+7 |                 } else if (a > 4) {
+  |                            ^^^^^ duplicated condition
+  |
+  = remove duplicated condition or change it
+
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain E026

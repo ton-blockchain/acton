@@ -109,6 +109,20 @@ pub async fn get_extended_address_information(
     .await
 }
 
+pub async fn get_libraries(
+    State(node): State<Arc<LiteNode>>,
+    Query(payload): Query<GetLibrariesRequest>,
+) -> Json<Value> {
+    handle_result(
+        async move {
+            let hashes = parse_libraries_query(&payload.libraries)?;
+            node.get_libraries(hashes).await
+        },
+        |res| v2::map_libraries(res),
+    )
+    .await
+}
+
 pub async fn get_transactions(
     State(node): State<Arc<LiteNode>>,
     Query(payload): Query<GetTransactionsRequest>,
@@ -394,10 +408,59 @@ fn parse_config_param(payload: &GetConfigParamRequest) -> anyhow::Result<u32> {
     Ok(raw as u32)
 }
 
+fn parse_libraries_query(raw: &str) -> anyhow::Result<Vec<Hash256>> {
+    let hashes = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(parse_hash_any)
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    if hashes.is_empty() {
+        anyhow::bail!("`libraries` query parameter is required");
+    }
+
+    Ok(hashes)
+}
+
 fn parse_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {
     match seqno {
         Some(value) if value < 0 => anyhow::bail!("`seqno` must be a non-negative integer"),
         Some(value) => Ok(Some(value as u32)),
         None => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_libraries_query_rejects_empty_input() {
+        let err = parse_libraries_query(" , , ").expect_err("empty list must be rejected");
+        assert!(
+            err.to_string()
+                .contains("`libraries` query parameter is required"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_libraries_query_rejects_invalid_hash() {
+        let err = parse_libraries_query("not-a-hash").expect_err("invalid hash must be rejected");
+        assert!(
+            err.to_string().contains("Invalid hash format"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_libraries_query_accepts_multiple_hashes_and_skips_blanks() {
+        let hash_a = "11".repeat(32);
+        let hash_b = "22".repeat(32);
+
+        let parsed = parse_libraries_query(&format!("{hash_a}, ,{hash_b},"))
+            .expect("valid list with blanks must parse");
+        assert_eq!(parsed, vec![Hash256([0x11; 32]), Hash256([0x22; 32])]);
     }
 }
