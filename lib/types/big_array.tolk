@@ -16,7 +16,7 @@
 /// val last = list.last();   // 20
 /// ```
 struct BigArray<T> {
-    private arr: [array<array<T>>, int] = [[], 0]
+    private arr: [array<array<T>>, int] = [array<array<T>> [], 0]
 }
 
 /// Creates an empty [BigArray].
@@ -24,7 +24,7 @@ struct BigArray<T> {
 /// Use this constructor to initialize a new chunked array.
 fun BigArray<T>.createEmpty(): BigArray<T> {
     return BigArray<T> {
-        arr: [[], 0],
+        arr: [array<array<T>> [], 0],
     }
 }
 
