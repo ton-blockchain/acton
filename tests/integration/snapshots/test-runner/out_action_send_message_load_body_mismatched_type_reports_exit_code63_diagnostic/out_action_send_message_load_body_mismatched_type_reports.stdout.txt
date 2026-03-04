@@ -17,6 +17,7 @@ See [ACTON_DOCS_URL]/build-system/configuration-reference/#contracts-section for
   ✗ cw-out-action-load-body-mismatch-diagnostic [TIME]
     └─ exit_code=63
       ├─ Re-run with --backtrace full to get more information
+      ├─ Unable to load data from cell because prefix does not match
       └─ Phase: Compute phase
 
  ✗ 1 failed in 1 file

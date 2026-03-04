@@ -1,14 +1,18 @@
   Installing standard library [ACTON_VERSION]
    Compiling contracts
-   Compiling Counter
+   Compiling fm_linear_mid
+    Finished in [TIME]
+   Compiling fm_linear_root
+    Finished in [TIME]
+   Compiling fm_linear_sink
     Finished in [TIME]
     Finished in [TIME]
      Running tests
 
  TEST  [ROOT]
 
- > tests/cw_out_action_load_body_mismatch.test.tolk (1 test)
-  ✗ cw-out-action-load-body-mismatch-diagnostic-fixture [TIME]
+ > tests/formatter_linear.test.tolk (1 test)
+  ✗ formatter-exit-code63-from-cell-mismatch-in-test-body [TIME]
     └─ exit_code=63
       ├─ Re-run with --backtrace full to get more information
       ├─ Unable to load data from cell because prefix does not match
