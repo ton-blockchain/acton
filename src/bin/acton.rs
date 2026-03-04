@@ -1401,9 +1401,13 @@ fn main() {
         process::exit(1);
     }
 
-    if !matches!(command, Commands::Ls { .. }) {
-        // for language server we set up own logging
-        setup_logging().expect("Failed to set up logging");
+    if !matches!(command, Commands::Ls { .. })
+        && let Err(err) = setup_logging()
+    {
+        eprintln!(
+            "{} failed to initialize debug logging ({err}). Continuing without file logging.\nHint: set ACTON_LOG_DIR to a writable directory.",
+            "Warning:".yellow()
+        );
     }
 
     let result = match command {
