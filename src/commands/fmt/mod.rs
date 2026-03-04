@@ -14,6 +14,9 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
 
     let width = fmt_settings.and_then(|s| s.width).unwrap_or(100);
     let ignore_patterns = fmt_settings.and_then(|s| s.ignore.as_ref());
+    let separate_import_groups = fmt_settings
+        .and_then(|s| s.separate_import_groups)
+        .unwrap_or(false);
 
     let mut ignore_builder = GlobSetBuilder::new();
     ignore_builder.add(Glob::from_str("**/.git/**")?);
@@ -79,7 +82,13 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         let content = fs::read_to_string(&file_path)
             .with_context(|| format!("Failed to read {}", file_path.display()))?;
 
-        match tolkfmt::format_source(&content, width) {
+        match tolkfmt::format_source(
+            &content,
+            tolkfmt::FormatOptions {
+                width,
+                separate_import_groups,
+            },
+        ) {
             Ok(formatted) => {
                 if content != formatted {
                     if check {

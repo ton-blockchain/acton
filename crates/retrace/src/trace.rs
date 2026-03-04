@@ -695,7 +695,7 @@ impl ExecutedActions {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "only_ci"))]
 mod tests {
     use super::*;
 

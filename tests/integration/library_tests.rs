@@ -1,6 +1,8 @@
+#[cfg(feature = "only_ci")]
 use crate::common::assertion;
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
+#[cfg(feature = "only_ci")]
 use crate::support::snapshots::normalize_output;
 use serde_json::Value as JsonValue;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
@@ -33,6 +35,7 @@ fn toncenter_api_key() -> &'static str {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_basic() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-basic").build();
@@ -49,6 +52,7 @@ fn test_library_fetch_basic() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_json() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-json").build();
@@ -66,6 +70,7 @@ fn test_library_fetch_json() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_fail_json() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-json").build();
@@ -85,6 +90,7 @@ fn test_library_fetch_fail_json() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_unknown() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-unknown").build();
@@ -103,6 +109,7 @@ fn test_library_fetch_unknown() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_unknown_json() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-unknown-json").build();
@@ -122,6 +129,7 @@ fn test_library_fetch_unknown_json() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_disasm() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-disasm").build();
@@ -140,6 +148,7 @@ fn test_library_fetch_disasm() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_output() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-output").build();
@@ -168,6 +177,7 @@ fn test_library_fetch_output() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_boc() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-boc").build();
@@ -192,6 +202,7 @@ fn test_library_fetch_boc() {
 }
 
 #[test]
+#[cfg(feature = "only_ci")]
 fn test_library_fetch_disasm_output() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-fetch-disasm-output").build();

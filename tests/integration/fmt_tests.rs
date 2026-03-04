@@ -15,6 +15,16 @@ const FORMATTED_TOLK: &str = r"fun onInternalMessage(in: InMessage) {
 }
 ";
 
+const IMPORTS_UNFORMATTED_TOLK: &str = r#"import "./b"
+import "@acton/io"
+import "@stdlib/reflection"
+import "../z"
+import "./a"
+import "../a"
+import "@contracts/types"
+fun main() {}
+"#;
+
 #[test]
 fn test_fmt_simple() {
     let project = ProjectBuilder::new("fmt-simple")
@@ -157,5 +167,57 @@ fn test_fmt_custom_width() {
     output.assert_file_snapshot_matches(
         project.path().join("contracts/wide.tolk").to_str().unwrap(),
         "integration/snapshots/test_fmt_custom_width.result.txt",
+    );
+}
+
+#[test]
+fn test_fmt_import_group_separators_from_config() {
+    let project = ProjectBuilder::new("fmt-import-groups")
+        .contract("imports", IMPORTS_UNFORMATTED_TOLK)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&acton_toml_path).unwrap();
+    toml_content.push_str("\n[fmt]\nseparate-import-groups = true\n");
+    fs::write(&acton_toml_path, toml_content).unwrap();
+
+    let output = project.acton().fmt().run().success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_fmt_import_group_separators_from_config.stdout.txt",
+    );
+    output.assert_file_snapshot_matches(
+        project
+            .path()
+            .join("contracts/imports.tolk")
+            .to_str()
+            .unwrap(),
+        "integration/snapshots/test_fmt_import_group_separators_from_config.result.txt",
+    );
+}
+
+#[test]
+fn test_fmt_import_group_separators_disabled_from_config() {
+    let project = ProjectBuilder::new("fmt-import-groups-disabled")
+        .contract("imports", IMPORTS_UNFORMATTED_TOLK)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&acton_toml_path).unwrap();
+    toml_content.push_str("\n[fmt]\nseparate-import-groups = false\n");
+    fs::write(&acton_toml_path, toml_content).unwrap();
+
+    let output = project.acton().fmt().run().success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_fmt_import_group_separators_disabled_from_config.stdout.txt",
+    );
+    output.assert_file_snapshot_matches(
+        project
+            .path()
+            .join("contracts/imports.tolk")
+            .to_str()
+            .unwrap(),
+        "integration/snapshots/test_fmt_import_group_separators_disabled_from_config.result.txt",
     );
 }

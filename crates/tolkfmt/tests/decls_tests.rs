@@ -1,6 +1,9 @@
 mod common;
 
-use crate::common::{check, check_with_width, check_without_trees};
+use crate::common::{
+    check, check_with_import_group_separators, check_with_width, check_without_trees,
+    check_without_trees_with_import_group_separators,
+};
 use expect_test::expect;
 
 #[test]
@@ -1055,6 +1058,187 @@ fn test_imports_with_newlines() {
                 import "c"
 
                 fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_imports_sorted_by_group_depth_and_name() {
+    check(
+        r#"
+                import "../z"
+                import "@other/b"
+                import "@acton/testing/expect"
+                import "./b"
+                import "@stdlib/reflection"
+                import "@other/a"
+                import "../a"
+                import "./a/c"
+                import "./a"
+                import "@acton/io"
+                import "local/mod"
+                import "@stdlib/gas-payments"
+                fun foo() {}"#,
+        expect![[r#"
+                import "@stdlib/gas-payments"
+                import "@stdlib/reflection"
+                import "@acton/io"
+                import "@acton/testing/expect"
+                import "@other/a"
+                import "@other/b"
+                import "../a"
+                import "../z"
+                import "./a"
+                import "./b"
+                import "local/mod"
+                import "./a/c"
+
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_import_sorting_preserves_attached_comments_and_group_separators() {
+    check_without_trees_with_import_group_separators(
+        r#"
+                // for other
+                import "@contracts/types" // inline other
+                import "./b"
+                // for stdlib
+                import "@stdlib/reflection" // inline stdlib
+                import "../z"
+                // for acton
+                import "@acton/testing/expect" // inline acton
+                import "./a" // inline relative
+                import "../a"
+                fun foo() {}"#,
+        expect![[r#"
+                // for stdlib
+                import "@stdlib/reflection" // inline stdlib
+
+                // for acton
+                import "@acton/testing/expect" // inline acton
+
+                // for other
+                import "@contracts/types" // inline other
+
+                import "../a"
+                import "../z"
+
+                import "./a" // inline relative
+                import "./b"
+
+                fun foo() {}"#]],
+        true,
+    );
+}
+
+#[test]
+fn test_imports_preserve_single_blank_lines_and_normalize_multiple() {
+    check_with_import_group_separators(
+        r#"
+                import "./a"
+
+
+                import "./b"
+
+                import "./c"
+                fun foo() {}"#,
+        expect![[r#"
+                import "./a"
+
+                import "./b"
+
+                import "./c"
+
+                fun foo() {}"#]],
+        false,
+    );
+}
+
+#[test]
+fn test_import_group_prefix_matching_is_exact() {
+    check(
+        r#"
+                import "@actonx/tools"
+                import "@stdlibx/reflection"
+                import "@stdlib/reflection"
+                import "@acton/io"
+                import "@zzz/a"
+                import "@stdlib"
+                import "@acton"
+                fun foo() {}"#,
+        expect![[r#"
+                import "@stdlib"
+                import "@stdlib/reflection"
+                import "@acton"
+                import "@acton/io"
+                import "@actonx/tools"
+                import "@stdlibx/reflection"
+                import "@zzz/a"
+
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_imports_relative_parent_sorted_by_depth_then_name() {
+    check(
+        r#"
+                import "../../z"
+                import "../a"
+                import "../../a"
+                import "../z"
+                import "../a/b"
+                fun foo() {}"#,
+        expect![[r#"
+                import "../a"
+                import "../z"
+                import "../../a"
+                import "../../z"
+                import "../a/b"
+
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_import_sorting_keeps_between_import_comment_with_next_import() {
+    check_without_trees(
+        r#"
+                import "./b"
+                // trailing for b
+                import "@stdlib/reflection"
+                // trailing for stdlib
+                fun foo() {}"#,
+        expect![[r#"
+                // trailing for b
+                import "@stdlib/reflection"
+                import "./b"
+
+                // trailing for stdlib
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_plain_import_path_is_relative_current_group() {
+    check_with_import_group_separators(
+        r#"
+                import "@contracts/types"
+                import "../z"
+                import "foo"
+                import "./bar"
+                fun foo() {}"#,
+        expect![[r#"
+                import "@contracts/types"
+
+                import "../z"
+
+                import "foo"
+                import "./bar"
+
+                fun foo() {}"#]],
+        true,
     );
 }
 

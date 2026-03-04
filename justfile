@@ -1,5 +1,6 @@
 CARGO_TEST := `if cargo nextest --version >/dev/null 2>&1; then echo "cargo nextest run"; else echo "cargo test"; fi`
 TEST_SERIAL_ARGS := `if cargo nextest --version >/dev/null 2>&1; then echo "--test-threads 1"; else echo "-- --test-threads 1"; fi`
+TEST_NO_TESTS_ARGS := `if cargo nextest --version >/dev/null 2>&1; then echo "--no-tests pass"; else echo ""; fi`
 TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci" } else { "" }
 
 all: precommit
@@ -14,7 +15,7 @@ test-unit:
 
 test-serial:
     # we need test by test execution due to Toncenter rate limit
-    {{ CARGO_TEST }} -p retrace {{ TEST_SERIAL_ARGS }}
+    {{ CARGO_TEST }} -p retrace {{ TEST_SERIAL_ARGS }} {{ TEST_FEATURE_ARGS }} {{ TEST_NO_TESTS_ARGS }}
 
 test-integration:
     {{ CARGO_TEST }} --test integration_test {{ TEST_FEATURE_ARGS }}

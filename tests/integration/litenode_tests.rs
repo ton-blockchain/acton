@@ -113,6 +113,144 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+const LIBRARY_WORKER_CONTRACT: &str = r"
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val refundMsg = createMessage({
+        bounce: false,
+        value: 0,
+        dest: in.senderAddress,
+    });
+    refundMsg.send(SEND_MODE_DESTROY | SEND_MODE_CARRY_ALL_BALANCE);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const LIBRARY_MANAGER_CONTRACT: &str = r#"
+import "../gen/worker_code.tolk"
+
+fun workerStateInit(): ContractState {
+    return ContractState {
+        code: workerCompiledCode(),
+        data: createEmptyCell(),
+    };
+}
+
+fun onInternalMessage(in: InMessage) {
+    val workerInit = workerStateInit();
+    val workerAddress = AutoDeployAddress {
+        stateInit: workerInit,
+    }.calculateAddress();
+
+    if (in.valueCoins >= ton("0.2")) {
+        val deployWorkerMsg = createMessage({
+            bounce: false,
+            value: ton("0.3"),
+            dest: {
+                stateInit: workerInit,
+            },
+        });
+        deployWorkerMsg.send(SEND_MODE_REGULAR);
+        return;
+    }
+
+    val destroyWorkerMsg = createMessage({
+        bounce: false,
+        value: ton("0.05"),
+        dest: workerAddress,
+        body: beginCell().storeUint(1, 1).endCell(),
+    });
+    destroyWorkerMsg.send(SEND_MODE_REGULAR);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const DEPLOY_MANAGER_AND_WORKER_SCRIPT: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../gen/worker_code.tolk"
+
+fun main() {
+    val wallet = net.wallet("deployer");
+
+    val managerInit = ContractState {
+        code: build("manager"),
+        data: createEmptyCell(),
+    };
+    val managerAddress = AutoDeployAddress {
+        stateInit: managerInit,
+    }.calculateAddress();
+
+    val workerAddress = AutoDeployAddress {
+        stateInit: {
+            code: workerCompiledCode(),
+            data: createEmptyCell(),
+        },
+    }.calculateAddress();
+
+    val deployManagerMsg = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: managerInit,
+        },
+    });
+    net.send(wallet.address, deployManagerMsg);
+
+    val deployWorkerViaManagerMsg = createMessage({
+        bounce: false,
+        value: ton("0.4"),
+        dest: managerAddress,
+    });
+    net.send(wallet.address, deployWorkerViaManagerMsg);
+
+    println1("MANAGER_CONTRACT={}", managerAddress);
+    println1("WORKER_CONTRACT={}", workerAddress);
+}
+"#;
+
+const DESTROY_WORKER_VIA_MANAGER_SCRIPT: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../gen/worker_code.tolk"
+
+fun main() {
+    val wallet = net.wallet("deployer");
+
+    val managerAddress = AutoDeployAddress {
+        stateInit: {
+            code: build("manager"),
+            data: createEmptyCell(),
+        },
+    }.calculateAddress();
+
+    val workerAddress = AutoDeployAddress {
+        stateInit: {
+            code: workerCompiledCode(),
+            data: createEmptyCell(),
+        },
+    }.calculateAddress();
+
+    val triggerDestroyMsg = createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: managerAddress,
+        body: beginCell().storeUint(1, 1).endCell(),
+    });
+    net.send(wallet.address, triggerDestroyMsg);
+
+    println1("MANAGER_CONTRACT={}", managerAddress);
+    println1("WORKER_CONTRACT={}", workerAddress);
+}
+"#;
+
 #[test]
 fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
     let project = ProjectBuilder::new("litenode-pre-start-commands")
@@ -511,6 +649,217 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
 }
 
 #[test]
+fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
+    let project = ProjectBuilder::new("litenode-library-ref-contract-flow")
+        .contract("worker", LIBRARY_WORKER_CONTRACT)
+        .contract_with_detailed_deps(
+            "manager",
+            LIBRARY_MANAGER_CONTRACT,
+            vec![("worker", Some("library_ref"), None, None)],
+        )
+        .script_file(
+            "deploy_manager_and_worker",
+            DEPLOY_MANAGER_AND_WORKER_SCRIPT,
+        )
+        .script_file(
+            "destroy_worker_via_manager",
+            DESTROY_WORKER_VIA_MANAGER_SCRIPT,
+        )
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .litenode()
+        .before_start(|cmd| cmd.build())
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    project
+        .acton()
+        .library()
+        .publish()
+        .arg("worker")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--net")
+        .arg("custom:localnet")
+        .arg("--duration")
+        .arg("1y")
+        .arg("--amount")
+        .arg("5")
+        .arg("--yes")
+        .arg("--local")
+        .arg("--api-key")
+        .arg("local-test-api-key")
+        .run()
+        .success();
+
+    let deploy_result = project
+        .acton()
+        .script("scripts/deploy_manager_and_worker.tolk")
+        .broadcast()
+        .verify_network("custom:localnet")
+        .run();
+    let deploy_stdout = String::from_utf8(deploy_result.output.get_output().stdout.clone())
+        .expect("Failed to decode deploy script stdout");
+    let deploy_stderr = String::from_utf8(deploy_result.output.get_output().stderr.clone())
+        .expect("Failed to decode deploy script stderr");
+    let deploy_status = deploy_result.output.get_output().status.code().unwrap_or(1);
+    assert_eq!(
+        deploy_status, 0,
+        "Deploy script failed with status {deploy_status}\nstdout:\n{deploy_stdout}\nstderr:\n{deploy_stderr}"
+    );
+
+    let manager_address = extract_marker_value(&deploy_stdout, "MANAGER_CONTRACT=");
+    let worker_address = extract_marker_value(&deploy_stdout, "WORKER_CONTRACT=");
+    let worker_raw_address = unpack_address(&node, &worker_address);
+
+    wait_until_address_state_active(&node, &manager_address, Duration::from_secs(12));
+    wait_until_address_state_active(&node, &worker_address, Duration::from_secs(12));
+
+    let manager_info_before = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={manager_address}"),
+        Duration::from_secs(12),
+    );
+    let worker_info_before = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={worker_address}"),
+        Duration::from_secs(12),
+    );
+
+    assert_eq!(
+        manager_info_before["result"]["state"].as_str(),
+        Some("active")
+    );
+    assert_eq!(
+        worker_info_before["result"]["state"].as_str(),
+        Some("active")
+    );
+    assert!(
+        !manager_info_before["result"]["code"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty(),
+        "Manager code is unexpectedly empty:\n{}",
+        serde_json::to_string_pretty(&manager_info_before).unwrap_or_default()
+    );
+    assert!(
+        !worker_info_before["result"]["code"]
+            .as_str()
+            .unwrap_or_default()
+            .is_empty(),
+        "Worker code is unexpectedly empty:\n{}",
+        serde_json::to_string_pretty(&worker_info_before).unwrap_or_default()
+    );
+
+    let manager_balance_before = parse_address_balance(&manager_info_before);
+    let worker_balance_before = parse_address_balance(&worker_info_before);
+    assert!(
+        worker_balance_before > 0,
+        "Worker balance should be positive after deploy, got:\n{}",
+        serde_json::to_string_pretty(&worker_info_before).unwrap_or_default()
+    );
+
+    let destroy_result = project
+        .acton()
+        .script("scripts/destroy_worker_via_manager.tolk")
+        .broadcast()
+        .verify_network("custom:localnet")
+        .run();
+    let destroy_stdout = String::from_utf8(destroy_result.output.get_output().stdout.clone())
+        .expect("Failed to decode destroy script stdout");
+    let destroy_stderr = String::from_utf8(destroy_result.output.get_output().stderr.clone())
+        .expect("Failed to decode destroy script stderr");
+    let destroy_status = destroy_result
+        .output
+        .get_output()
+        .status
+        .code()
+        .unwrap_or(1);
+    assert_eq!(
+        destroy_status, 0,
+        "Destroy script failed with status {destroy_status}\nstdout:\n{destroy_stdout}\nstderr:\n{destroy_stderr}"
+    );
+    assert_eq!(
+        extract_marker_value(&destroy_stdout, "MANAGER_CONTRACT="),
+        manager_address
+    );
+    assert_eq!(
+        extract_marker_value(&destroy_stdout, "WORKER_CONTRACT="),
+        worker_address
+    );
+
+    let worker_info_query = format!("/api/v2/getAddressInformation?address={worker_address}");
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let worker_info_after = loop {
+        let response = node.get_json(&worker_info_query);
+        if response["ok"].as_bool() == Some(true)
+            && response["result"]["state"]
+                .as_str()
+                .is_some_and(|state| state != "active")
+        {
+            break response;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for worker contract `{worker_address}` to be destroyed:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    };
+    assert_eq!(
+        worker_info_after["result"]["state"].as_str(),
+        Some("uninitialized")
+    );
+    assert_eq!(worker_info_after["result"]["code"].as_str(), Some(""));
+    assert_eq!(worker_info_after["result"]["data"].as_str(), Some(""));
+    assert_eq!(parse_address_balance(&worker_info_after), 0);
+
+    let manager_info_after = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={manager_address}"),
+        Duration::from_secs(12),
+    );
+    assert_eq!(
+        manager_info_after["result"]["state"].as_str(),
+        Some("active")
+    );
+    let manager_balance_after = parse_address_balance(&manager_info_after);
+    assert!(
+        manager_balance_after > manager_balance_before,
+        "Expected manager balance to increase after worker self-destruct. before={manager_balance_before}, after={manager_balance_after}\nmanager_before:\n{}\nmanager_after:\n{}",
+        serde_json::to_string_pretty(&manager_info_before).unwrap_or_default(),
+        serde_json::to_string_pretty(&manager_info_after).unwrap_or_default()
+    );
+
+    let manager_txs_query = format!("/api/v2/getTransactions?address={manager_address}&limit=20");
+    let tx_deadline = Instant::now() + Duration::from_secs(12);
+    let manager_txs = loop {
+        let response = node.get_json(&manager_txs_query);
+        if has_incoming_transaction_from_source(&response, &worker_raw_address) {
+            break response;
+        }
+        assert!(
+            Instant::now() < tx_deadline,
+            "Timed out waiting for incoming transaction from worker `{worker_address}` (`{worker_raw_address}`) to manager `{manager_address}`:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    };
+    assert!(
+        has_incoming_transaction_from_source(&manager_txs, &worker_raw_address),
+        "Expected manager transactions to include inbound transfer from worker `{worker_address}` (`{worker_raw_address}`):\n{}",
+        serde_json::to_string_pretty(&manager_txs).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
 fn litenode_supports_config_endpoints() {
     let project = ProjectBuilder::new("litenode-config-endpoints").build();
     let node = project.litenode().start();
@@ -811,6 +1160,51 @@ fn wait_until_address_state_active(
         );
         thread::sleep(Duration::from_millis(200));
     }
+}
+
+fn parse_address_balance(address_information: &Value) -> u128 {
+    address_information["result"]["balance"]
+        .as_str()
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected string balance field in getAddressInformation response:\n{}",
+                serde_json::to_string_pretty(address_information).unwrap_or_default()
+            )
+        })
+        .parse::<u128>()
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to parse balance from getAddressInformation response: {e}\n{}",
+                serde_json::to_string_pretty(address_information).unwrap_or_default()
+            )
+        })
+}
+
+fn unpack_address(node: &crate::support::litenode::LiteNodeHandle, address: &str) -> String {
+    let response = wait_for_ok_response(
+        node,
+        &format!("/api/v2/unpackAddress?address={address}"),
+        Duration::from_secs(12),
+    );
+    response["result"]
+        .as_str()
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected string result from unpackAddress for `{address}`:\n{}",
+                serde_json::to_string_pretty(&response).unwrap_or_default()
+            )
+        })
+}
+
+fn has_incoming_transaction_from_source(response: &Value, source: &str) -> bool {
+    response["result"].as_array().is_some_and(|txs| {
+        txs.iter().any(|tx| {
+            tx["in_msg"]["source"]
+                .as_str()
+                .is_some_and(|tx_source| tx_source == source)
+        })
+    })
 }
 
 fn extract_first_outgoing_message_locator(
