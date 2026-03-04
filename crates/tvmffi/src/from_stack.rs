@@ -147,10 +147,8 @@ fn decode_vec_like_items(item: TupleItem) -> Result<Vec<TupleItem>, ArgError> {
         && matches!(tuple.first(), Some(TupleItem::Tuple(_)))
         && matches!(tuple.get(1), Some(TupleItem::Int(_)));
 
-    if looks_like_big_array {
-        if let Ok(items) = decode_big_array_items(tuple.clone()) {
-            return Ok(items);
-        }
+    if looks_like_big_array && let Ok(items) = decode_big_array_items(tuple.clone()) {
+        return Ok(items);
     }
 
     Ok(tuple.0)
