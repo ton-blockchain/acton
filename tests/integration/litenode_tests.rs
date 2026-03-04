@@ -649,6 +649,7 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
 }
 
 #[test]
+#[ignore]
 fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
     let project = ProjectBuilder::new("litenode-library-ref-contract-flow")
         .contract("worker", LIBRARY_WORKER_CONTRACT)

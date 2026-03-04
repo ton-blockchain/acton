@@ -252,7 +252,7 @@ fn send_message_impl(
             TupleItem::Int(BigInt::ZERO),
             TupleItem::Tuple(Tuple::empty()),
         ]))];
-        stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
+        stack.push(TupleItem::big_array_from_items(transaction_cells));
         return Ok(());
     }
 
@@ -289,7 +289,7 @@ fn send_message_impl(
     ctx.chain
         .emulations
         .save_message(&ctx.env.running_id, emulations);
-    stack.push(TupleItem::Tuple(Tuple(transaction_cells)));
+    stack.push(TupleItem::big_array_from_items(transaction_cells));
     Ok(())
 }
 
@@ -608,7 +608,7 @@ fn send_single_message_impl(
     Ok(())
 }
 
-fn root_lt_from_send_results(txs: &Tuple) -> Option<u64> {
+fn root_lt_from_send_results(txs: &[TupleItem]) -> Option<u64> {
     let first = txs.first()?;
     let TupleItem::Tuple(send_result) = first else {
         return None;
@@ -620,12 +620,12 @@ fn root_lt_from_send_results(txs: &Tuple) -> Option<u64> {
     Some(tx.lt)
 }
 
-extension!(save_trace_name in (Context) with (trace_name: String, txs: Tuple) using save_trace_name_impl);
+extension!(save_trace_name in (Context) with (trace_name: String, txs: Vec<TupleItem>) using save_trace_name_impl);
 fn save_trace_name_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
     trace_name: String,
-    txs: Tuple,
+    txs: Vec<TupleItem>,
 ) -> anyhow::Result<()> {
     let Some(root_lt) = root_lt_from_send_results(&txs) else {
         return Ok(());
@@ -637,12 +637,12 @@ fn save_trace_name_impl(
     Ok(())
 }
 
-extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple) using find_transaction_by_params_impl);
+extension!(find_transaction_by_params in (Context) with (params: Tuple, txs: Vec<TupleItem>) using find_transaction_by_params_impl);
 fn find_transaction_by_params_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
     params: Tuple,
-    txs: Tuple,
+    txs: Vec<TupleItem>,
 ) -> anyhow::Result<()> {
     if txs.is_empty() {
         stack.push(TupleItem::Null);
