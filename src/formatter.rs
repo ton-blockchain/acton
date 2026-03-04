@@ -2126,7 +2126,10 @@ impl<'a> FormatterContext<'a> {
         }
 
         if let Some(info) = exit_codes::find(exit_code) {
-            if exit_code_info.is_none() {
+            let should_show_fallback_description = exit_code_info
+                .as_ref()
+                .is_none_or(|exception| exception.description.is_empty());
+            if should_show_fallback_description {
                 writeln!(output, "Description: {}", info.description).ok();
             }
             writeln!(output, "Phase: {}", info.phase).ok();

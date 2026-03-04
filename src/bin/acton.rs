@@ -1394,7 +1394,9 @@ fn main() {
     } = Cli::parse();
     init_color_mode(color);
 
-    if let Err(err) = configure_manifest_path(manifest_path) {
+    if !matches!(command, Commands::Init | Commands::New { .. })
+        && let Err(err) = configure_manifest_path(manifest_path)
+    {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1);
     }
@@ -1867,12 +1869,57 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Sour
     Ok(source_map_data)
 }
 
+const ACTON_LOG_DIR_ENV: &str = "ACTON_LOG_DIR";
+
+fn env_path(var: &str) -> Option<PathBuf> {
+    let value = env::var_os(var)?;
+    if value.is_empty() {
+        return None;
+    }
+    Some(PathBuf::from(value))
+}
+
+fn resolve_acton_log_dir_with_env(
+    mut get_env_path: impl FnMut(&str) -> Option<PathBuf>,
+) -> PathBuf {
+    if let Some(path) = get_env_path(ACTON_LOG_DIR_ENV) {
+        return path;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(path) = get_env_path("USERPROFILE") {
+            return path.join(".acton").join("logs");
+        }
+        if let Some(path) = get_env_path("HOME") {
+            return path.join(".acton").join("logs");
+        }
+        return PathBuf::from(".acton").join("logs");
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(path) = get_env_path("HOME") {
+            return path.join(".acton").join("logs");
+        }
+        return PathBuf::from(".acton").join("logs");
+    }
+
+    #[allow(unreachable_code)]
+    PathBuf::from(".acton").join("logs")
+}
+
+fn resolve_acton_log_dir() -> PathBuf {
+    resolve_acton_log_dir_with_env(env_path)
+}
+
 fn setup_logging() -> anyhow::Result<()> {
-    fs::create_dir_all(".acton/")?;
+    let log_dir = resolve_acton_log_dir();
+    fs::create_dir_all(&log_dir)?;
     let log_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(".acton/debug.log")?;
+        .open(log_dir.join("debug.log"))?;
 
     fern::Dispatch::new()
         .format(|out, message, record| {

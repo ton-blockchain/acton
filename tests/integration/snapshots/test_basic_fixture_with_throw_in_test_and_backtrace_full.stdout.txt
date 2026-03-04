@@ -13,6 +13,7 @@
     └─ exit_code=9
       ├─ at tests/counter.test[LINE]
       │     __throw   at tests/counter.test[LINE]
+      ├─ Cell underflow
       └─ Phase: Compute phase
 
  ✓ 1 passed, ✗ 1 failed in 1 file

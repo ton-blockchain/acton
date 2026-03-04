@@ -46,6 +46,85 @@ fn test_binary_operator() {
 }
 
 #[test]
+fn test_binary_operator_with_comments() {
+    check(
+        r#"
+fun foo() {
+    return 6 +
+        // comment 1
+        4 * 5 +
+        3 + // comment 2
+        2 +
+        1;
+}"#,
+        expect![[r#"
+            fun foo() {
+                return 6 +
+                // comment 1
+                4 * 5 +
+                3 +
+                // comment 2
+                2 +
+                1;
+            }"#]],
+    );
+}
+
+#[test]
+fn test_binary_operator_comment_immediately_after_operator() {
+    check(
+        r#"
+fun foo() {
+    return 1 + // comment
+        2;
+}"#,
+        expect![[r#"
+            fun foo() {
+                return 1 +
+                // comment
+                2;
+            }"#]],
+    );
+}
+
+#[test]
+fn test_binary_operator_multiple_comments_immediately_after_operator() {
+    check(
+        r#"
+fun foo() {
+    return 1 + // comment 1
+        2 * 3 + // comment 2
+        4;
+}"#,
+        expect![[r#"
+            fun foo() {
+                return 1 +
+                // comment 1
+                2 * 3 +
+                // comment 2
+                4;
+            }"#]],
+    );
+}
+
+#[test]
+fn test_binary_operator_chain_with_comment_on_middle_operand() {
+    check(
+        r#"
+fun foo() {
+    return 1 +
+        2 // comment
+        + 3;
+}"#,
+        expect![[r#"
+            fun foo() {
+                return 1 + 2 // comment
+                + 3;
+            }"#]],
+    );
+}
+
+#[test]
 fn test_null_coalescing_operator() {
     check(
         "fun test() { x = a ?? b; y = a ?? b ?? c; }",

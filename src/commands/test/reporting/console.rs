@@ -427,7 +427,10 @@ fn process_nonzero_exit_code(test: &TestReport, result: &GetMethodResultSuccess,
     }
 
     if let Some(info) = exit_codes::find(exit_code) {
-        if exit_code_info.is_none() {
+        let should_show_fallback_description = exit_code_info
+            .as_ref()
+            .is_none_or(|exception| exception.description.is_empty());
+        if should_show_fallback_description {
             // Don't show duplicate info
             println!("      {} {}", "├─".dimmed(), info.description.dimmed());
         }

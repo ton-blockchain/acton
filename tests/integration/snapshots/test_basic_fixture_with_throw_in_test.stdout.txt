@@ -12,6 +12,7 @@
   ✗ should-reset-counter [TIME]
     └─ exit_code=9
       ├─ Re-run with --backtrace full to get more information
+      ├─ Cell underflow
       └─ Phase: Compute phase
 
  ✓ 1 passed, ✗ 1 failed in 1 file
