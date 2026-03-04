@@ -15,5 +15,5 @@ struct tracing
 /// expect(txs).toHaveAllSuccessfulTxs();
 /// ```
 fun tracing.save(txs: SendResultList, name: string): void {
-    ffi.saveTraceName(txs.toTuple(), name);
+    ffi.saveTraceName(txs, name);
 }

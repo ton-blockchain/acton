@@ -16,8 +16,7 @@
 /// val last = list.last();   // 20
 /// ```
 struct BigArray<T> {
-    private topLevel: array<array<T>> = [];
-    private itemsCount: int = 0;
+    private arr: [array<array<T>>, int] = [[], 0]
 }
 
 /// Creates an empty [BigArray].
@@ -25,8 +24,7 @@ struct BigArray<T> {
 /// Use this constructor to initialize a new chunked array.
 fun BigArray<T>.createEmpty(): BigArray<T> {
     return BigArray<T> {
-        topLevel: [],
-        itemsCount: 0,
+        arr: [[], 0],
     }
 }
 
@@ -40,8 +38,7 @@ fun BigArray<T>.createFromArray(items: array<T>): BigArray<T> {
     }
 
     return BigArray<T> {
-        topLevel: [items],
-        itemsCount: items.size(),
+        arr: [[items], items.size()],
     };
 }
 
@@ -49,20 +46,23 @@ fun BigArray<T>.createFromArray(items: array<T>): BigArray<T> {
 ///
 /// Fails if the array is empty.
 fun BigArray<T>.first(self): T {
-    return self.topLevel.get(0).get(0);
+    val [topLevel, _] = self.arr;
+    return topLevel.get(0).get(0);
 }
 
 /// Returns current number of elements in [BigArray].
 fun BigArray<T>.size(self): int {
-    return self.itemsCount;
+    val [_, itemsCount] = self.arr;
+    return itemsCount;
 }
 
 /// Returns the last element of a non-empty [BigArray].
 ///
 /// Fails if the array is empty.
 fun BigArray<T>.last(self): T {
-    val binIdx = (self.itemsCount - 1) / 255;
-    val bin = self.topLevel.get(binIdx);
+    val [topLevel, itemsCount] = self.arr;
+    val binIdx = (itemsCount - 1) / 255;
+    val bin = topLevel.get(binIdx);
     return bin.last();
 }
 
@@ -70,53 +70,64 @@ fun BigArray<T>.last(self): T {
 ///
 /// Fails if array capacity exceeds 65025 elements.
 fun BigArray<T>.push(mutate self, value: T) {
-    if (self.itemsCount >= 65025) {
+    var [topLevel, itemsCount] = self.arr;
+
+    if (itemsCount >= 65025) {
         throw 5;
     }
 
-    val binIdx = self.itemsCount / 255;
-    while (self.topLevel.size() <= binIdx) {
-        self.topLevel.push([]);
+    val binIdx = itemsCount / 255;
+    while (topLevel.size() <= binIdx) {
+        topLevel.push([]);
     }
 
-    var bin = self.topLevel.get(binIdx);
+    var bin = topLevel.get(binIdx);
     bin.push(value);
-    self.topLevel.set(bin, binIdx);
-    self.itemsCount += 1;
+    topLevel.set(bin, binIdx);
+    itemsCount += 1;
+
+    self.arr = [topLevel, itemsCount];
 }
 
 /// Removes the last element from [BigArray].
 ///
 /// Fails if the array is empty.
 fun BigArray<T>.pop(mutate self) {
-    val binIdx = (self.itemsCount - 1) / 255;
-    var bin = self.topLevel.get(binIdx);
+    var [topLevel, itemsCount] = self.arr;
+    val binIdx = (itemsCount - 1) / 255;
+    var bin = topLevel.get(binIdx);
     bin.pop();
-    if (bin.size() == 0 && binIdx == self.topLevel.size() - 1) {
-        self.topLevel.pop();
+    if (bin.size() == 0 && binIdx == topLevel.size() - 1) {
+        topLevel.pop();
     } else {
-        self.topLevel.set(bin, binIdx);
+        topLevel.set(bin, binIdx);
     }
-    self.itemsCount -= 1;
+    itemsCount -= 1;
+
+    self.arr = [topLevel, itemsCount];
 }
 
 /// Replaces element at [index] with [value].
 ///
 /// Fails if [index] is out of bounds.
 fun BigArray<T>.set(mutate self, value: T, index: int) {
+    var [topLevel, itemsCount] = self.arr;
     val binIdx = index / 255;
-    var bin = self.topLevel.get(binIdx);
+    var bin = topLevel.get(binIdx);
     val idxInBin = index % 255;
     bin.set(value, idxInBin);
-    self.topLevel.set(bin, binIdx);
+    topLevel.set(bin, binIdx);
+
+    self.arr = [topLevel, itemsCount];
 }
 
 /// Returns element at [index].
 ///
 /// Fails if [index] is out of bounds.
 fun BigArray<T>.get(self, index: int): T {
+    val [topLevel, _] = self.arr;
     val binIdx = index / 255;
-    var bin = self.topLevel.get(binIdx);
+    val bin = topLevel.get(binIdx);
     val idxInBin = index % 255;
     return bin.get(idxInBin);
 }

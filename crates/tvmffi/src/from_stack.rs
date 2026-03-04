@@ -88,16 +88,8 @@ impl FromStack for Vec<String> {
 
 fn decode_big_array_items(tuple: Tuple) -> Result<Vec<TupleItem>, ArgError> {
     let (top_level, size) = match tuple.0.as_slice() {
-        // Current layout:
         // [topLevel: array<array<T>>, size: int]
         [TupleItem::Tuple(top_level), TupleItem::Int(size)] => (top_level, size),
-        // Legacy layout (accepted for backward compatibility):
-        // [isInit: bool, topLevel: array<array<T>>, size: int]
-        [
-            TupleItem::Int(_),
-            TupleItem::Tuple(top_level),
-            TupleItem::Int(size),
-        ] => (top_level, size),
         _ => {
             return Err(ArgError::TypeMismatch {
                 expected: "Tuple(BigArray<T>)",
@@ -151,13 +143,9 @@ fn decode_vec_like_items(item: TupleItem) -> Result<Vec<TupleItem>, ArgError> {
         }
     };
 
-    let looks_like_big_array = (tuple.len() == 2
+    let looks_like_big_array = tuple.len() == 2
         && matches!(tuple.first(), Some(TupleItem::Tuple(_)))
-        && matches!(tuple.get(1), Some(TupleItem::Int(_))))
-        || (tuple.len() == 3
-            && matches!(tuple.first(), Some(TupleItem::Int(_)))
-            && matches!(tuple.get(1), Some(TupleItem::Tuple(_)))
-            && matches!(tuple.get(2), Some(TupleItem::Int(_))));
+        && matches!(tuple.get(1), Some(TupleItem::Int(_)));
 
     if looks_like_big_array {
         if let Ok(items) = decode_big_array_items(tuple.clone()) {

@@ -367,7 +367,7 @@ fun SendResultList.findTransaction<Msg = unknown>(self, params: SearchParams = {
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
     }
-    val tx = ffi.findTransactionByParams(self.toTuple(), params.toTuple());
+    val tx = ffi.findTransactionByParams(self, params.toTuple());
     if (tx == null) {
         return Maybe<Transaction>.none();
     }
@@ -403,7 +403,7 @@ fun net.send(from: address, message: OutMessage): SendResultList {
     if (rawRes == null) {
         Assert.fail("ffi.sendMessageFrom unexpectedly returned null")
     }
-    return SendResultList.fromTuple(rawRes!);
+    return rawRes!;
 }
 
 /// Send a single message from a specified address.
@@ -479,7 +479,7 @@ fun net.sendExternal(msg: OutMessage): SendResultList? {
     if (rawRes == null) {
         return null;
     }
-    return SendResultList.fromTuple(rawRes!);
+    return rawRes!;
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
@@ -1229,16 +1229,16 @@ fun __treasuryCode(): cell asm """
     "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe" base64>B B>boc PUSHREF
 """
 
-fun ffi.sendMessageFrom(msg: cell, from: cell): tuple? asm "9 EXTCALL"
+fun ffi.sendMessageFrom(msg: cell, from: cell): SendResultList? asm "9 EXTCALL"
 fun ffi.sendSingleMessage(msg: cell, from: cell): tuple? asm "30 EXTCALL"
 fun ffi.runGetMethod(addr: cell, code: cell, id: int, name: string, returnType: string, args: tuple): tuple? asm "8 EXTCALL"
 fun ffi.isDeployed(addr: cell): bool asm "11 EXTCALL"
 fun ffi.getDeployedCode(addr: cell): cell? asm "12 EXTCALL"
 fun ffi.registerAddress(address: cell, name: string): void asm "15 EXTCALL"
 fun ffi.registerCodeCell(cell: cell, name: string): void asm "16 EXTCALL"
-fun ffi.findTransactionByParams(txs: tuple, params: tuple): cell? asm "10 EXTCALL"
-fun ffi.failToFindTransactionByParams(location: string, message: string, txs: tuple, params: tuple): tuple? asm "103 EXTCALL"
-fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: tuple, params: tuple): tuple? asm "104 EXTCALL"
+fun ffi.findTransactionByParams(txs: SendResultList, params: tuple): cell? asm "10 EXTCALL"
+fun ffi.failToFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "103 EXTCALL"
+fun ffi.failToNotFindTransactionByParams(location: string, message: string, txs: SendResultList, params: tuple): tuple? asm "104 EXTCALL"
 fun ffi.getAccountState(addr: cell): cell? asm "17 EXTCALL"
 fun ffi.loadLibrary(hash: string): cell? asm "21 EXTCALL"
 fun ffi.isBroadcasting(): bool asm "23 EXTCALL"
@@ -1252,4 +1252,4 @@ fun ffi.getConfig(): dict asm "31 EXTCALL"
 fun ffi.setConfig(config: dict): bool asm "32 EXTCALL"
 fun ffi.getShardAccount(addr: address): cell? asm "33 EXTCALL";
 fun ffi.setShardAccount(addr: address, account: cell?): void asm "34 EXTCALL";
-fun ffi.saveTraceName(txs: tuple, name: string): void asm "35 EXTCALL";
+fun ffi.saveTraceName(txs: SendResultList, name: string): void asm "35 EXTCALL";

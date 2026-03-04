@@ -9,7 +9,7 @@
 
  > tests/counter.test.tolk (2 tests)
   ✗ should-increase-counter [TIME]
-    └─ Gas limit exceeded: used 149011, limit 100
+    └─ Gas limit exceeded: used 148743, limit 100
   ✓ should-reset-counter [TIME]
 
  ✓ 1 passed, ✗ 1 failed in 1 file
