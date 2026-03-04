@@ -506,8 +506,8 @@ enum Commands {
             long = "output-format",
             value_enum,
             value_name = "FORMAT",
-            default_value_t = CheckOutputFormat::Full,
-            help = "Output format (full, json, sarif)"
+            default_value_t = CheckOutputFormat::Plain,
+            help = "Output format (plain, json, sarif)"
         )]
         output_format: CheckOutputFormat,
         #[arg(

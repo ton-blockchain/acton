@@ -10,7 +10,7 @@ use tolk_resolver::{FileDb, Span};
 const DOCS_BASE_URL: &str = "https://i582.github.io/acton/docs";
 const SOURCE_ROOT_URI_BASE_ID: &str = "SRCROOT";
 
-pub(super) fn write_report(
+pub(crate) fn write_report(
     writer: &mut dyn Write,
     diagnostics: &[Diagnostic],
     file_db: &FileDb,

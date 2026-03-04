@@ -3,7 +3,6 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, CheckOutputFormat, ContractConfig, LintLevel};
 use anyhow::anyhow;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use serde_json;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::io::{BufWriter, Write};
@@ -25,10 +24,9 @@ mod check_explain;
 mod check_list;
 mod compiler;
 mod fix;
-mod json;
+mod output;
 mod pos;
 mod render;
-mod sarif;
 
 pub(super) struct LintExcludes {
     project_root: PathBuf,
@@ -103,10 +101,10 @@ pub fn check_cmd(
     list_lint_rules: bool,
     target: Option<String>,
 ) -> anyhow::Result<()> {
-    let is_full_report = output_format == CheckOutputFormat::Full;
-    if is_full_report && output_file.is_some() {
+    let is_plain_report = output_format == CheckOutputFormat::Plain;
+    if is_plain_report && output_file.is_some() {
         return Err(anyhow!(
-            "output_file cannot be used with full output format"
+            "output_file cannot be used with plain output format"
         ));
     }
 
@@ -149,7 +147,7 @@ pub fn check_cmd(
                 Path::new(&target),
                 &file_db,
                 fix,
-                is_full_report,
+                is_plain_report,
                 &config,
                 &excludes,
             )?;
@@ -163,7 +161,7 @@ pub fn check_cmd(
                 contract,
                 &file_db,
                 fix,
-                is_full_report,
+                is_plain_report,
                 &config,
                 &excludes,
             )?;
@@ -180,7 +178,7 @@ pub fn check_cmd(
                 &contract,
                 &file_db,
                 fix,
-                is_full_report,
+                is_plain_report,
                 &config,
                 &excludes,
             )?;
@@ -193,7 +191,7 @@ pub fn check_cmd(
             };
             if name.to_string_lossy().ends_with(".test.tolk") && !excludes.is_match(&file) {
                 let contract_diagnostics =
-                    check_test_file(&file, &file_db, fix, is_full_report, &config, &excludes)?;
+                    check_test_file(&file, &file_db, fix, is_plain_report, &config, &excludes)?;
                 all_diagnostics.extend(contract_diagnostics);
             }
         }
@@ -219,18 +217,18 @@ pub fn check_cmd(
     };
 
     match output_format {
-        CheckOutputFormat::Full => {
-            show_full_report(fix, max_warnings, &all_diagnostics, &file_db)?;
+        CheckOutputFormat::Plain => {
+            show_plain_report(fix, max_warnings, &all_diagnostics, &file_db)?;
         }
         CheckOutputFormat::Json => {
-            show_json_report(&mut writer, &all_diagnostics, &file_db)?;
+            output::json::write_report(&mut writer, &all_diagnostics, &file_db)?;
         }
         CheckOutputFormat::Sarif => {
-            sarif::write_report(&mut writer, &all_diagnostics, &file_db, &cwd)?;
+            output::sarif::write_report(&mut writer, &all_diagnostics, &file_db, &cwd)?;
         }
     }
 
-    if output_format != CheckOutputFormat::Full {
+    if output_format != CheckOutputFormat::Plain {
         writer.flush()?;
 
         let (error_count, warning_count) = diagnostics_summary(&all_diagnostics);
@@ -245,22 +243,7 @@ pub fn check_cmd(
     Ok(())
 }
 
-fn show_json_report(
-    writer: &mut dyn Write,
-    all_diagnostics: &[Diagnostic],
-    file_db: &FileDb,
-) -> anyhow::Result<()> {
-    let json_output = serde_json::json!({
-        "success": true,
-        "diagnostics": all_diagnostics.iter().map(|d| json::diagnostic_to_json(d, file_db)).collect::<Vec<_>>()
-    });
-    let json = serde_json::to_string_pretty(&json_output)?;
-
-    writer.write_all(json.as_bytes())?;
-    Ok(())
-}
-
-fn show_full_report(
+fn show_plain_report(
     fix: bool,
     max_warnings: usize,
     all_diagnostics: &[Diagnostic],
@@ -373,7 +356,7 @@ fn check_contract(
     config: &ContractConfig,
     file_db: &FileDb,
     fix: bool,
-    is_full_report: bool,
+    is_plain_report: bool,
     acton_config: &ActonConfig,
     excludes: &LintExcludes,
 ) -> anyhow::Result<Vec<Diagnostic>> {
@@ -382,7 +365,7 @@ fn check_contract(
         return Ok(vec![]);
     }
 
-    if is_full_report {
+    if is_plain_report {
         println!("    {} {}", "Checking".green().bold(), config.name,);
     }
 
@@ -393,7 +376,7 @@ fn check_contract(
         &root,
         file_db,
         fix,
-        is_full_report,
+        is_plain_report,
         lint_settings,
         acton_config,
         excludes,
@@ -404,7 +387,7 @@ fn check_test_file(
     file: &Path,
     file_db: &FileDb,
     fix: bool,
-    is_full_report: bool,
+    is_plain_report: bool,
     acton_config: &ActonConfig,
     excludes: &LintExcludes,
 ) -> anyhow::Result<Vec<Diagnostic>> {
@@ -412,7 +395,7 @@ fn check_test_file(
     let current_dir = std::env::current_dir().unwrap_or_default();
     let relative_root = pathdiff::diff_paths(&root, &current_dir).unwrap_or_else(|| root.clone());
 
-    if is_full_report {
+    if is_plain_report {
         println!(
             "    {} {}",
             "Checking".green().bold(),
@@ -432,7 +415,7 @@ fn check_test_file(
         &root,
         file_db,
         fix,
-        is_full_report,
+        is_plain_report,
         lint_settings,
         acton_config,
         excludes,
@@ -443,7 +426,7 @@ fn check_root_file(
     root: &Path,
     file_db: &FileDb,
     fix: bool,
-    is_full_report: bool,
+    is_plain_report: bool,
     lint_settings: HashMap<Rule, LintLevel>,
     acton_config: &ActonConfig,
     excludes: &LintExcludes,
@@ -571,7 +554,7 @@ fn check_root_file(
             || !excludes.is_match_file_id(file_db, diagnostic.file_id)
     });
 
-    if is_full_report {
+    if is_plain_report {
         let diagnostics_to_show = if fix {
             fix::filter_fixed_diagnostics(&diagnostics)
         } else {

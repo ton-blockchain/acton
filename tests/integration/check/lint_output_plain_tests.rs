@@ -10,7 +10,7 @@ const UNUSED_VARIABLE_CONTRACT: &str = r#"
 
 #[test]
 #[named]
-fn check_lint_full_rejects_output_file_argument() {
+fn check_lint_plain_rejects_output_file_argument() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract("main", UNUSED_VARIABLE_CONTRACT)
         .with_lint_level("unused-variable", "warn")
@@ -26,7 +26,7 @@ fn check_lint_full_rejects_output_file_argument() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!(
-            "integration/snapshots/check/lint_output_format/{}.stderr.txt",
+            "integration/snapshots/check/lint_output_plain_format/{}.stderr.txt",
             function_name!()
         ));
 
@@ -35,6 +35,6 @@ fn check_lint_full_rejects_output_file_argument() {
             .path()
             .join(".acton/reports/should-not-exist.json")
             .exists(),
-        "report file should not be created when full output format rejects --output-file"
+        "report file should not be created when plain output format rejects --output-file"
     );
 }

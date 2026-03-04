@@ -1,8 +1,24 @@
 use crate::commands::check::pos;
+use std::io::Write;
 use tolk_linter::diagnostic::{Applicability, Diagnostic, Severity};
 use tolk_resolver::{FileDb, Span};
 
-pub(super) fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value {
+pub(crate) fn write_report(
+    writer: &mut dyn Write,
+    all_diagnostics: &[Diagnostic],
+    file_db: &FileDb,
+) -> anyhow::Result<()> {
+    let json_output = serde_json::json!({
+        "success": true,
+        "diagnostics": all_diagnostics.iter().map(|d| diagnostic_to_json(d, file_db)).collect::<Vec<_>>()
+    });
+    let json = serde_json::to_string_pretty(&json_output)?;
+
+    writer.write_all(json.as_bytes())?;
+    Ok(())
+}
+
+fn diagnostic_to_json(diag: &Diagnostic, file_db: &FileDb) -> serde_json::Value {
     let file_info = file_db
         .get_by_id(diag.file_id)
         .expect("File info should exist for diagnostic");

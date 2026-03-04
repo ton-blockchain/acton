@@ -22,7 +22,7 @@ pub enum Explorer {
 #[serde(rename_all = "kebab-case")]
 pub enum CheckOutputFormat {
     #[default]
-    Full,
+    Plain,
     Json,
     Sarif,
 }

@@ -1,5 +1,5 @@
-use crate::support::project::ProjectBuilder;
 use crate::support::TestOutputExt;
+use crate::support::project::ProjectBuilder;
 use function_name::named;
 
 const UNUSED_VARIABLE_CONTRACT: &str = r#"

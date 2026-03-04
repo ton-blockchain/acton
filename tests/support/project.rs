@@ -681,7 +681,7 @@ impl ProjectBuilder {
     }
 
     fn copy_lib_to(temp_path: &Path) {
-        use include_dir::{include_dir, Dir};
+        use include_dir::{Dir, include_dir};
         static LIB_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/lib");
 
         let lib_path = temp_path.join("lib");
