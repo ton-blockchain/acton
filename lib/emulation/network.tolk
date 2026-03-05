@@ -465,7 +465,7 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
                 importFee: ton("0.1"),
             },
             init,
-            body: Either<TBody, Cell<TBody>>.right(body.toCell())
+            body: Either<TBody, Cell<TBody>>.right(body.__asPayload())
         }.toCell()
     };
 }
@@ -1219,6 +1219,14 @@ fun T.getDeclaredPackPrefix2() {
 
 fun unknown.getDeclaredPackPrefix2() {
     return -1;
+}
+
+// This function is used in createExternalMessage to not wrap cells twice
+fun T.__asPayload(self) {
+    return self.toCell()
+}
+fun cell.__asPayload(self) {
+    return self;
 }
 
 fun __treasuryCode(): cell asm """
