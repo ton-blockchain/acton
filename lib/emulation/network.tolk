@@ -431,6 +431,10 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
     return SendResult.fromTuple(res)
 }
 
+struct __Any {
+    value : cell
+}
+
 /// Creates an External-in message.
 /// Body is always packed into the Either Right (in the reference).
 /// If `StateInit` is present it is also packed in the Either Right (in the reference).
@@ -442,7 +446,7 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
 ///   init:(Maybe (Either StateInit ^StateInit))
 ///   body:(Either X ^X) = Message X;
 ///```
-fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null) {
+fun createExternalMessage(dest: address, body: cell, stateInit: StateInit? = null, src: any_address? = null) {
     val init = stateInit != null
         ? Maybe<Either<StateInit, Cell<StateInit>>>.some(Either<StateInit, Cell<StateInit>>.right(stateInit.toCell()))
         : Maybe<Either<StateInit, Cell<StateInit>>>.none();
@@ -457,7 +461,7 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
     }
 
     return OutMessage {
-        messageCell: Message<TBody, ExternalInMessageInfo> {
+        messageCell: Message<cell, ExternalInMessageInfo> {
             info: ExternalInMessageInfo {
                 src,
                 dest,
@@ -465,7 +469,8 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
                 importFee: ton("0.1"),
             },
             init,
-            body: Either<TBody, Cell<TBody>>.right(body.toCell())
+            // A little hack to pass just cell to Either.right
+            body: Either<cell, Cell<__Any>>.right(__Any{ value: body })
         }.toCell()
     };
 }
