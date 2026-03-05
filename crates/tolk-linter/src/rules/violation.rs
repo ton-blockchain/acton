@@ -3,7 +3,7 @@ use crate::ast::dangerous_send_mode_missing_safety_comment::DangerousSendModeMis
 use crate::ast::enum_cast_missing_safety_comment::EnumCastMissingSafetyComment;
 use crate::ast::{
     acton_import_in_contract, asm_function_missing_safety_comment, compiler_error,
-    deprecated_symbol_use, duplicated_condition, field_init_can_be_folded,
+    deprecated_symbol_use, duplicated_condition, explicit_return_type, field_init_can_be_folded,
     identical_conditional_branches, import_path_can_use_mappings,
     incoming_messages_duplicate_opcode, message_entity_naming, method_can_be_static,
     mutable_parameter_can_be_immutable, mutable_variable_can_be_immutable, name_case_checker,
@@ -94,6 +94,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E030") => EnumCastMissingSafetyComment,
         (Tolk, "C001") => compiler_error::CompilerError,
         (Tolk, "S001") => name_case_checker::NameCaseChecker,
+        (Tolk, "S002") => explicit_return_type::ExplicitReturnType,
         _ => return None,
     })
 }

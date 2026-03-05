@@ -4,7 +4,7 @@ use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{
     acton_import_in_contract, bless_call_missing_safety_comment,
     dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, duplicated_condition,
-    enum_cast_missing_safety_comment, identical_conditional_branches,
+    enum_cast_missing_safety_comment, explicit_return_type, identical_conditional_branches,
     incoming_messages_duplicate_opcode, negated_is_type_can_use_not_is, no_bounce_handler,
     no_global_variables, several_not_null_assertions,
 };
@@ -26,8 +26,9 @@ use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, NameUse, Resolved};
 use tolk_syntax::{
-    AsCast, Call, Expr, ExprStmt, GlobalVar, HasName, Ident, If, IfAlt, InstanceArg, NotNull,
-    SourceFile, Ternary, TopLevel, TypeIdent, Unary, Walker, walk_ast,
+    AsCast, Call, Expr, ExprStmt, Func, FunctionLike, GetMethod, GlobalVar, HasAnnotations,
+    HasGenericParams, HasName, Ident, If, IfAlt, InstanceArg, Method, NotNull, SourceFile, Ternary,
+    TopLevel, TypeIdent, Unary, Walker, walk_ast,
 };
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
@@ -696,6 +697,105 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         }
         if let Some(typ) = node.typ() {
             self.visit_type(&typ);
+        }
+        self.default_result()
+    }
+
+    fn walk_func(&mut self, node: &Func<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::ExplicitReturnType,
+            explicit_return_type::check_return_type(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
+        );
+
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
+        if let Some(type_params) = node.type_parameters() {
+            self.walk_type_parameters(&type_params);
+        }
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        for param in node.parameters() {
+            self.walk_parameter(&param, false);
+        }
+        if let Some(return_type) = node.return_type() {
+            self.visit_type(&return_type);
+        }
+        if let Some(body) = node.body() {
+            self.walk_function_body(&body);
+        }
+        self.default_result()
+    }
+
+    fn walk_method(&mut self, node: &Method<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::ExplicitReturnType,
+            explicit_return_type::check_return_type(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
+        );
+
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
+        if let Some(receiver) = node.receiver() {
+            self.walk_method_receiver(&receiver);
+        }
+        if let Some(type_params) = node.type_parameters() {
+            self.walk_type_parameters(&type_params);
+        }
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        for param in node.parameters() {
+            self.walk_parameter(&param, false);
+        }
+        if let Some(return_type) = node.return_type() {
+            self.visit_type(&return_type);
+        }
+        if let Some(body) = node.body() {
+            self.walk_function_body(&body);
+        }
+        self.default_result()
+    }
+
+    fn walk_get_method(&mut self, node: &GetMethod<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::ExplicitReturnType,
+            explicit_return_type::check_return_type(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
+        );
+
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        for param in node.parameters() {
+            self.walk_parameter(&param, false);
+        }
+        if let Some(return_type) = node.return_type() {
+            self.visit_type(&return_type);
+        }
+        if let Some(body) = node.body() {
+            self.walk_function_body(&body);
         }
         self.default_result()
     }

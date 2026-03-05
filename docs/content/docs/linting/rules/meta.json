@@ -31,6 +31,7 @@
     "e028-no-global-variables",
     "e029-incoming-messages-duplicate-opcode",
     "e030-enum-cast-missing-safety-comment",
-    "s001-name-case-checker"
+    "s001-name-case-checker",
+    "s002-explicit-return-type"
   ]
 }
