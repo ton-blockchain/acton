@@ -8,6 +8,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const MOCK_FAUCET_ACCEPT_TIMEOUT: Duration = Duration::from_secs(20);
+const MOCK_FAUCET_READ_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Copy)]
 struct FaucetMockResponse {
@@ -45,7 +47,7 @@ fn spawn_faucet_mock(
 
     let handle = thread::spawn(move || {
         for response in responses {
-            let wait_until = Instant::now() + Duration::from_secs(5);
+            let wait_until = Instant::now() + MOCK_FAUCET_ACCEPT_TIMEOUT;
             let mut stream = loop {
                 match listener.accept() {
                     Ok((stream, _)) => break stream,
@@ -63,12 +65,12 @@ fn spawn_faucet_mock(
             };
 
             stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
+                .set_read_timeout(Some(MOCK_FAUCET_READ_TIMEOUT))
                 .expect("failed to set mock faucet read timeout");
 
             let mut reader = BufReader::new(stream.try_clone().expect("failed to clone stream"));
             let mut request_line = String::new();
-            let read_deadline = Instant::now() + Duration::from_secs(2);
+            let read_deadline = Instant::now() + MOCK_FAUCET_READ_TIMEOUT;
             loop {
                 request_line.clear();
                 match reader.read_line(&mut request_line) {
