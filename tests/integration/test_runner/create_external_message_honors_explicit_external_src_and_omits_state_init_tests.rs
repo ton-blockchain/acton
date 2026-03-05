@@ -47,7 +47,7 @@ get fun `test-dh-create-external-message-src-override-no-state-init`() {
 
     val msg = createExternalMessage(
         dest,
-        DhTriggerExternal { queryId: 41 }.toCell(),
+        DhTriggerExternal { queryId: 41 },
         null,
         src,
     );
@@ -76,7 +76,7 @@ get fun `test-dh-create-external-message-default-src-no-state-init`() {
 
     val msg = createExternalMessage(
         dest,
-        DhTriggerExternal { queryId: 99 }.toCell(),
+        DhTriggerExternal { queryId: 99 },
     );
 
     val parsed = (msg.messageCell as Cell<Message<DhTriggerExternal, ExternalInMessageInfo>>)

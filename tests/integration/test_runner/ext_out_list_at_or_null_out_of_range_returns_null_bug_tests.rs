@@ -106,7 +106,7 @@ get fun `test-ct-ext-out-list-atornull-out-of-range`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 2 }.toCell()),
+        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 2 }),
     )!;
     expect(txs).toHaveLength(1);
 
@@ -130,7 +130,7 @@ get fun `test-ct-ext-out-list-atornull-negative-index`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 3 }.toCell()),
+        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 3 }),
     )!;
     expect(txs).toHaveLength(1);
 
@@ -154,7 +154,7 @@ get fun `test-ct-ext-out-list-atornull-opcode-mismatch`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 4 }.toCell()),
+        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 4 }),
     )!;
     expect(txs).toHaveLength(1);
 
@@ -178,7 +178,7 @@ get fun `test-ct-ext-out-list-atornull-valid-index`() {
     val externalAddress = deployCtExternalHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 5 }.toCell()),
+        createExternalMessage(externalAddress, CtTriggerExternal { queryId: 5 }),
     )!;
     expect(txs).toHaveLength(1);
 

@@ -992,7 +992,7 @@ get fun `test-formatter-external-out-println-destinations`() {
     val txs = net.sendExternal(
         createExternalMessage(
             extAddress,
-            FmExternalTrigger { queryId: 303 }.toCell(),
+            FmExternalTrigger { queryId: 303 },
             null,
             fmExternalAddress(0x0A0B0C0D),
         ),
@@ -1017,7 +1017,7 @@ get fun `test-formatter-ext-in-exit-code-with-backtrace-full`() {
     val txs = net.sendExternal(
         createExternalMessage(
             extAddress,
-            FmExternalTrigger { queryId: 404 }.toCell(),
+            FmExternalTrigger { queryId: 404 },
             null,
             fmExternalAddress(0x0F0E0D0C),
         ),
