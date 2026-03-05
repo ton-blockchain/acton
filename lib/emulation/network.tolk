@@ -446,6 +446,7 @@ struct __Any {
 ///   init:(Maybe (Either StateInit ^StateInit))
 ///   body:(Either X ^X) = Message X;
 ///```
+fun __cast<F, T>(from: F): T asm "NOP";
 fun createExternalMessage(dest: address, body: cell, stateInit: StateInit? = null, src: any_address? = null) {
     val init = stateInit != null
         ? Maybe<Either<StateInit, Cell<StateInit>>>.some(Either<StateInit, Cell<StateInit>>.right(stateInit.toCell()))
@@ -470,7 +471,7 @@ fun createExternalMessage(dest: address, body: cell, stateInit: StateInit? = nul
             },
             init,
             // A little hack to pass just cell to Either.right
-            body: Either<cell, Cell<__Any>>.right(__Any{ value: body })
+            body: Either<cell, Cell<cell>>.right(__cast(body))
         }.toCell()
     };
 }
