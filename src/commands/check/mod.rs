@@ -213,7 +213,7 @@ pub fn check_cmd(
             let file = fs::File::create(path)?;
             Box::new(BufWriter::new(file))
         }
-        None => Box::new(BufWriter::new(io::stderr())),
+        None => Box::new(BufWriter::new(io::stdout())),
     };
 
     match output_format {
