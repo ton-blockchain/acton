@@ -9,15 +9,15 @@ fun x2(x: int): int {
 
 fun drop(): void asm "DROP";
 
-fun wrap(f: int -> int): int {
-    val combined = fun(fx: int -> int): int {
+fun combineConts(first: continuation, then: continuation): continuation asm "BOOLAND";
+
+fun wrap<T, U>(f: T -> U): (T -> U) {
+    val dropAsCont = fun(): int {
         drop();
-        fx(10);
     };
-    val res = ffi.testReverse(combined, f, net.randomAddress());
-    return res;
+    return combineConts(dropAsCont, f);
 }
 
 get fun `test basic`() {
-    expect(wrap(x2)).toEqual(20);
+    expect(ffi.executeInRust(wrap(x2), 10)).toEqual(20);
 }

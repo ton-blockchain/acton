@@ -6,7 +6,7 @@ use crate::ffi::assert::parse_search_params;
 use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
-use anyhow::Context as AnyhowContext;
+use anyhow::{anyhow, Context as AnyhowContext};
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
@@ -1405,25 +1405,24 @@ fn set_shard_account_impl(
     Ok(())
 }
 
-extension!(call_tolk_function in (Context) with (function: TupleItem, arg: BigInt, addr: StdAddr) using call_tolk_function_impl);
+extension!(call_tolk_function in (Context) with (function: TupleItem, arg: TupleItem, addr: StdAddr) using call_tolk_function_impl);
 fn call_tolk_function_impl(
     ctx: &mut Context,
-    _stack: &mut Tuple,
+    stack: &mut Tuple,
     function: TupleItem,
-    arg: BigInt,
+    args: TupleItem,
     addr: StdAddr,
 ) -> anyhow::Result<()> {
     let cont = match function {
-        TupleItem::Slice(cont) => cont,
-        _ => anyhow::bail!("Expected Slice, got {:?}", function),
+        TupleItem::Cont(cont) => cont,
+        _ => anyhow::bail!("Expected Cont, got {:?}", function),
     };
-    let args_stack = Tuple(vec![TupleItem::Int(arg)]);
-    let mut empty_stack = Tuple(vec![]);
-    let res = run_get_method_impl(ctx, &mut empty_stack, args_stack, "int".parse()?, "inner-get-method".parse()?, BigInt::from(0), cont, addr);
-    if let Err(err) = res {
-        anyhow::bail!("Failed to call tolk function: {}", err);
-    }
-    Ok(())
+    let args_stack = match args {
+        TupleItem::Tuple(args_stack) => args_stack,
+        _ => anyhow::bail!("Expected Tuple, got {:?}", args),
+    };
+
+    run_get_method_impl(ctx, stack, args_stack, "int".parse()?, "inner-get-method".parse()?, BigInt::from(0), cont, addr)
 }
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
