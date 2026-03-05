@@ -442,7 +442,7 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
 ///   init:(Maybe (Either StateInit ^StateInit))
 ///   body:(Either X ^X) = Message X;
 ///```
-fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null) {
+fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null): OutMessage {
     val init = stateInit != null
         ? Maybe<Either<StateInit, Cell<StateInit>>>.some(Either<StateInit, Cell<StateInit>>.right(stateInit.toCell()))
         : Maybe<Either<StateInit, Cell<StateInit>>>.none();
@@ -837,7 +837,7 @@ fun net.randomAddress(name: string? = null, wc: int = 0): address {
 /// ```tolk
 /// net.registerAddress(address, "my_address");
 /// ```
-fun net.registerAddress(addr: address, name: string) {
+fun net.registerAddress(addr: address, name: string): void {
     ffi.registerAddress(addr.toCell(), name);
 }
 
@@ -850,7 +850,7 @@ fun net.registerAddress(addr: address, name: string) {
 /// ```tolk
 /// net.registerCodeCell(code, "my_code");
 /// ```
-fun net.registerCodeCell(code: cell, name: string) {
+fun net.registerCodeCell(code: cell, name: string): void {
     ffi.registerCodeCell(code, name);
 }
 
@@ -889,7 +889,7 @@ fun net.getAccountState(addr: address): AccountInfo? {
 ///     println1("Daily storage fee: {:ton}", storage_fee);
 /// }
 /// ```
-fun net.getAccountStorageFee(addr: address, seconds: int) {
+fun net.getAccountStorageFee(addr: address, seconds: int): coins? {
     val state = net.getAccountState(addr);
     if (state == null) {
         return null;
@@ -926,7 +926,7 @@ fun net.fetchAndRegisterLibrary(hash: string): bool {
 /// val future_time = net.now() + 1000; // 1000 seconds from now
 /// net.setNow(future_time);
 /// ```
-fun net.setNow(now: uint32) {
+fun net.setNow(now: uint32): void {
     ffi.setNow(now);
 }
 
@@ -949,7 +949,7 @@ fun net.now(): uint32 {
 /// ```tolk
 /// net.topUp(address, ton("10"));
 /// ```
-fun net.topUp(to: address, amount: coins) {
+fun net.topUp(to: address, amount: coins): void {
     val treasury = net.treasury("treasury");
     val topupMsg = createMessage({
         bounce: BounceMode.NoBounce,
@@ -1004,7 +1004,7 @@ fun net.getAccount(addr: address): Account {
 /// val acc = net.getAccount(addr);
 /// net.setAccount(addr, acc);
 /// ```
-fun net.setAccount(addr: address, acc: Account) {
+fun net.setAccount(addr: address, acc: Account): void {
     val shardAcc = net.getShardAccount(addr);
     var lastTransHash = 0;
     var lastTransLt = 0;
@@ -1160,19 +1160,19 @@ fun tuple.fromTuple(data: tuple): tuple {
     return data;
 }
 
-fun T.externalOutPrefix() {
+fun T.externalOutPrefix(): int {
     return reflect.serializationPrefixOf<T>();
 }
 
-fun unknown.externalOutPrefix() {
+fun unknown.externalOutPrefix(): int {
     return -1;
 }
 
-fun T.externalOutPrefixLen() {
+fun T.externalOutPrefixLen(): int {
     return reflect.serializationPrefixLenOf<T>();
 }
 
-fun unknown.externalOutPrefixLen() {
+fun unknown.externalOutPrefixLen(): int {
     return 0;
 }
 
@@ -1213,22 +1213,22 @@ fun impl.runGetMethodById<Ret, Args = tuple>(addr: address, id: int, name: strin
     }
 }
 
-fun T.getDeclaredPackPrefix2() {
+fun T.getDeclaredPackPrefix2(): int {
     return reflect.serializationPrefixOf<T>();
 }
 
-fun unknown.getDeclaredPackPrefix2() {
+fun unknown.getDeclaredPackPrefix2(): int {
     return -1;
 }
 
 // This function is used in createExternalMessage to not wrap cells twice
-fun T.__asPayload(self) {
+fun T.__asPayload(self): Cell<T> {
     return self.toCell()
 }
 fun Cell<T>.__asPayload(self): never {
     Assert.fail("Can't pass Cell<T> to .createExternalMessage(). Pass untyped cell or T");
 }
-fun cell.__asPayload(self) {
+fun cell.__asPayload(self): Cell<cell> {
     return self as Cell<cell>;
 }
 

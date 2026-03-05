@@ -38,7 +38,7 @@ type Either<X, Y> = EitherLeft<X> | EitherRight<Y>
 
 ```tolk
 @inline
-fun Either<X, Y>.left(value: X)
+fun Either<X, Y>.left(value: X): EitherLeft<X>
 ```
 
 Left constructor.
@@ -50,7 +50,7 @@ Encodes with tag bit `0` followed by `value`.
 
 ```tolk
 @inline
-fun Either<X, Y>.right(value: Y)
+fun Either<X, Y>.right(value: Y): EitherRight<Y>
 ```
 
 Right constructor.

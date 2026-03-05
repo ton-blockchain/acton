@@ -42,7 +42,7 @@ expect(failResults).toHaveFailedTx({
 ## `Expectation<SendResultList>.toHaveSuccessfulDeploy`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {}): void
 ```
 
 Expect the transaction list to have a successful deploy transaction.
@@ -63,7 +63,7 @@ expect(txs).toHaveSuccessfulDeploy({
 ## `Expectation<SendResultList>.toHaveSuccessfulTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {}): void
 ```
 
 Expect the transaction list to have a successful transaction.
@@ -89,7 +89,7 @@ expect(txs).toHaveSuccessfulTx({
 ## `Expectation<SendResultList>.toHaveTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {}): void
 ```
 
 Expect the transaction list to have a transaction with specified parameters.
@@ -112,7 +112,7 @@ expect(txs).toHaveTx({
 ## `Expectation<SendResultList>.toNotHaveTx`
 
 ```tolk
-fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {}): void
 ```
 
 Expect the transaction list to NOT have a transaction with specified parameters.
@@ -130,7 +130,7 @@ expect(txs).toNotHaveTx({
 ## `Expectation<SendResultList>.toHaveBouncedTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {}): void
 ```
 
 Expect the transaction list to have a **bounced** transaction.
@@ -148,7 +148,7 @@ expect(txs).toHaveBouncedTx({
 ## `Expectation<SendResultList>.toHaveFailedTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {})
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {}): void
 ```
 
 Expect the transaction list to have a **failed** transaction.
@@ -174,7 +174,7 @@ expect(txs).toHaveFailedTx({
 ## `Expectation<SendResultList>.toHaveAllSuccessfulTxs`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self)
+fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void
 ```
 
 Expect all transactions in the list to be successful.
@@ -190,7 +190,7 @@ expect(results).toHaveAllSuccessfulTxs();
 ## `Expectation<SendResultList>.toEmitExternalMessage`
 
 ```tolk
-fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self)
+fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void
 ```
 
 Expect the transaction to emit an external message of given type.
@@ -205,7 +205,7 @@ expect(txs).toEmitExternalMessage<IncreaseCounter>();
 ## `Expectation<SendResult>.toConsumeLessThan`
 
 ```tolk
-fun Expectation<SendResult>.toConsumeLessThan(self, amount: int)
+fun Expectation<SendResult>.toConsumeLessThan(self, amount: int): void
 ```
 
 Expect the transaction to consume less than the expected amount of gas.
@@ -221,7 +221,7 @@ expect(result.at(0)).toConsumeLessThan(1000);
 ## `T.getDeclaredPackPrefix`
 
 ```tolk
-fun T.getDeclaredPackPrefix()
+fun T.getDeclaredPackPrefix(): int
 ```
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L317" />

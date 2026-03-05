@@ -97,7 +97,7 @@ Fails if the array is empty.
 ## `BigArray<T>.push`
 
 ```tolk
-fun BigArray<T>.push(mutate self, value: T)
+fun BigArray<T>.push(mutate self, value: T): void
 ```
 
 Appends [value](#bigarray\<t>push) to the end of [BigArray](#bigarray).
@@ -109,7 +109,7 @@ Fails if array capacity exceeds 65025 elements.
 ## `BigArray<T>.pop`
 
 ```tolk
-fun BigArray<T>.pop(mutate self)
+fun BigArray<T>.pop(mutate self): void
 ```
 
 Removes the last element from [BigArray](#bigarray).
@@ -121,7 +121,7 @@ Fails if the array is empty.
 ## `BigArray<T>.set`
 
 ```tolk
-fun BigArray<T>.set(mutate self, value: T, index: int)
+fun BigArray<T>.set(mutate self, value: T, index: int): void
 ```
 
 Replaces element at [index](#bigarray\<t>set) with [value](#bigarray\<t>push).

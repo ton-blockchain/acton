@@ -49,7 +49,7 @@ import "../ffi/ffi"
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -86,7 +86,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, para
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -122,7 +122,7 @@ fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: 
 ///     actionExitCode: 37,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -149,7 +149,7 @@ fun Expectation<SendResultList>.toHaveTx<Msg = unknown>(self, params: SearchPara
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -176,7 +176,7 @@ fun Expectation<SendResultList>.toNotHaveTx<Msg = unknown>(self, params: SearchP
 ///     to: counter.address,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -212,7 +212,7 @@ fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: Sea
 ///     exitCode: 123,
 /// });
 /// ```
-fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {}) {
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {}): void {
     val declaredPrefix = Msg.getDeclaredPackPrefix();
     if (declaredPrefix != -1) {
         params.opcode = declaredPrefix;
@@ -244,7 +244,7 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: Sear
 /// val results = net.send(wallet.address, msg);
 /// expect(results).toHaveAllSuccessfulTxs();
 /// ```
-fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
+fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void {
     val params = SearchParams {
         success: false,
     };
@@ -268,7 +268,7 @@ fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self) {
 /// ```tolk
 /// expect(txs).toEmitExternalMessage<IncreaseCounter>();
 /// ```
-fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
+fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
     var i = 0;
     while (i < self.value.size()) {
         val result = self.value.at(i);
@@ -304,7 +304,7 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self) {
 /// val result = net.send(deployer.address, message);
 /// expect(result.at(0)).toConsumeLessThan(1000);
 /// ```
-fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {
+fun Expectation<SendResult>.toConsumeLessThan(self, amount: int): void {
     ffi.assertComparison(
         self.value.gasUsed,
         amount,
@@ -314,14 +314,14 @@ fun Expectation<SendResult>.toConsumeLessThan(self, amount: int) {
     );
 }
 
-fun T.getDeclaredPackPrefix() {
+fun T.getDeclaredPackPrefix(): int {
     return reflect.serializationPrefixOf<T>();
 }
 
-fun unknown.getDeclaredPackPrefix() {
+fun unknown.getDeclaredPackPrefix(): int {
     return -1;
 }
 
-fun unknown.getDeclaredPackPrefixLen() {
+fun unknown.getDeclaredPackPrefixLen(): int {
     return -1;
 }

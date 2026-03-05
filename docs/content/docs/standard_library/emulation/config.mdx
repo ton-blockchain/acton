@@ -57,7 +57,7 @@ To apply updates to the emulator globally, call [net.setConfig](../network/#nets
 ## `Config.setParamRaw`
 
 ```tolk
-fun Config.setParamRaw(mutate self, index: uint32, data: cell)
+fun Config.setParamRaw(mutate self, index: uint32, data: cell): void
 ```
 
 Sets a raw configuration parameter at the given index.
@@ -81,7 +81,7 @@ config.setParamRaw(20, gasCell);
 ## `Config.getParamRaw`
 
 ```tolk
-fun Config.getParamRaw(self, index: uint32)
+fun Config.getParamRaw(self, index: uint32): cell
 ```
 
 Retrieves a raw configuration parameter at the given index.
@@ -136,7 +136,7 @@ that indicate which features are supported by the network.
 ## `Config.setGlobalVersion`
 
 ```tolk
-fun Config.setGlobalVersion(mutate self, version: GlobalVersion)
+fun Config.setGlobalVersion(mutate self, version: GlobalVersion): void
 ```
 
 Sets the global network version and capabilities (Param 8).
@@ -166,7 +166,7 @@ if (!net.setConfig(config)) {
 ## `Config.getGlobalVersion`
 
 ```tolk
-fun Config.getGlobalVersion(self)
+fun Config.getGlobalVersion(self): GlobalVersion
 ```
 
 Retrieves the global network version and capabilities (Param 8).
@@ -251,7 +251,7 @@ storage price configuration that applies from the beginning of time.
 ## `StoragePricesDict.getInitial`
 
 ```tolk
-fun StoragePricesDict.getInitial(self)
+fun StoragePricesDict.getInitial(self): StoragePrices
 ```
 
 Retrieves the initial storage price configuration from the dictionary.
@@ -273,7 +273,7 @@ println1("Initial bit price: {}", initialPrices.bitPrice);
 ## `StoragePricesDict.setInitial`
 
 ```tolk
-fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices)
+fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices): void
 ```
 
 Sets the initial storage price configuration in the dictionary.
@@ -306,7 +306,7 @@ if (!net.setConfig(config)) {
 ## `Config.setStoragePrices`
 
 ```tolk
-fun Config.setStoragePrices(mutate self, prices: StoragePricesDict)
+fun Config.setStoragePrices(mutate self, prices: StoragePricesDict): void
 ```
 
 Sets the storage price configuration (Param 18).
@@ -340,7 +340,7 @@ if (!net.setConfig(config)) {
 ## `Config.getStoragePrices`
 
 ```tolk
-fun Config.getStoragePrices(self)
+fun Config.getStoragePrices(self): StoragePricesDict
 ```
 
 Retrieves the storage price configuration (Param 18).
@@ -430,7 +430,7 @@ Configuration parameter index for basechain gas prices (Param 21).
 ## `Config.setGasPrices`
 
 ```tolk
-fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int)
+fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int): void
 ```
 
 Sets gas price configuration for the masterchain or basechain (Param 20/21).
@@ -450,7 +450,7 @@ This mutates only the local [Config](#config) value until you call [net.setConfi
 ## `Config.getGasPrices`
 
 ```tolk
-fun Config.getGasPrices(self, chainType: int)
+fun Config.getGasPrices(self, chainType: int): GasPrices
 ```
 
 Retrieves gas price configuration for the masterchain or basechain (Param 20/21).
@@ -519,7 +519,7 @@ Configuration parameter index for basechain message forwarding prices (Param 25)
 ## `Config.setMsgForwardPrices`
 
 ```tolk
-fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int)
+fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int): void
 ```
 
 Sets message forwarding price configuration for the masterchain or basechain (Param 24/25).
@@ -554,7 +554,7 @@ if (!net.setConfig(config)) {
 ## `Config.getMsgForwardPrices`
 
 ```tolk
-fun Config.getMsgForwardPrices(self, chainType: int)
+fun Config.getMsgForwardPrices(self, chainType: int): MsgForwardPrices
 ```
 
 Retrieves message forwarding price configuration for the masterchain or basechain (Param 24/25).
@@ -623,7 +623,7 @@ Precompiled contracts are optimized implementations of common operations provide
 ## `PrecompiledContractsConfig.addContractGas`
 
 ```tolk
-fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64)
+fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64): bool
 ```
 
 Adds a precompiled contract gas entry if `hash` is not already present.
@@ -636,7 +636,7 @@ Returns `false` for duplicate `hash` values, and keeps the original `gasUsage` u
 ## `Config.setPrecompiledContractsConfig`
 
 ```tolk
-fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: PrecompiledContractsConfig)
+fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: PrecompiledContractsConfig): void
 ```
 
 Sets the precompiled contracts configuration (Param 45).
@@ -667,7 +667,7 @@ if (!net.setConfig(config)) {
 ## `Config.getPrecompiledContractsConfig`
 
 ```tolk
-fun Config.getPrecompiledContractsConfig(self)
+fun Config.getPrecompiledContractsConfig(self): PrecompiledContractsConfig
 ```
 
 Retrieves the precompiled contracts configuration (Param 45).

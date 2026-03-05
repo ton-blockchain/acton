@@ -49,7 +49,7 @@ import "../types/out_actions"
 /// - if the action is not a send message, assertion fails with index information;
 /// - if typed load fails with opcode mismatch (exit code `63`), assertion includes expected type/prefix and actual opcode (plus known type name when available);
 /// - for other decode errors, assertion includes the decoder exit code.
-fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
+fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
     val action = self.value.at(index);
     if (action is OutActionSendMessage) {
         try {
@@ -91,7 +91,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int) {
 
 struct expectImpl
 
-fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string) {
+fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string): never {
     Assert.fail(
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",

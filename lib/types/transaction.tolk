@@ -83,7 +83,7 @@ struct (0b0111) Transaction {
 /// val body = tx.loadBody<IncreaseCounter>();
 /// println(body.increaseBy);
 /// ```
-fun Transaction.loadBody<Msg>(self) {
+fun Transaction.loadBody<Msg>(self): Msg {
     val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
     val inMsg = inMsgCell.load();
     return inMsg.loadBody()
@@ -96,7 +96,7 @@ fun Transaction.loadBody<Msg>(self) {
 ///
 /// After an inbound message exists, if message type does not match `Msg`, loading fails with
 /// exit code 63.
-fun Transaction.loadInMsg<Msg>(self) {
+fun Transaction.loadInMsg<Msg>(self): MessageRelaxed<Msg> {
     val inMsgCell = self.messages.load().inMsg.unwrap() as cell as Cell<MessageRelaxed<Msg>>;
     return inMsgCell.load()
 }
@@ -106,7 +106,7 @@ fun Transaction.loadInMsg<Msg>(self) {
 /// Fails with [Assert.fail]:
 /// - if `description` is not [TransOrd];
 /// - if `description.computePh` is [TrComputeSkipped].
-fun Transaction.getUsedGas(self) {
+fun Transaction.getUsedGas(self): int {
     val description = self.description.load();
     if (description is TransOrd) {
         if (description.computePh is TrComputeVm) {
@@ -147,7 +147,7 @@ fun Transaction.getActionFee(self): Maybe<coins> {
 }
 
 /// Return address of account of this transaction.
-fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN) {
+fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN): address {
     return address.fromValidBuilder(
         beginCell()
             .storeUint(0b100, 3)
@@ -404,7 +404,7 @@ fun varUintSize(value: int, maxBytes: int): int {
     return size;
 }
 
-fun VarUint7.packToBuilder(self, mutate b: builder) {
+fun VarUint7.packToBuilder(self, mutate b: builder): void {
     val size = varUintSize(self, 7);
     b.storeUint(size, 3);
     if (size > 0) {
@@ -419,7 +419,7 @@ fun VarUint7.unpackFromSlice(mutate s: slice): VarUint7 {
 
 type VarUint3 = int
 
-fun VarUint3.packToBuilder(self, mutate b: builder) {
+fun VarUint3.packToBuilder(self, mutate b: builder): void {
     val size = varUintSize(self, 3);
     b.storeUint(size, 2);
     if (size > 0) {

@@ -124,7 +124,7 @@ Represents a transaction in the TON blockchain.
 ## `Transaction.loadBody`
 
 ```tolk
-fun Transaction.loadBody<Msg>(self)
+fun Transaction.loadBody<Msg>(self): Msg
 ```
 
 Loads the in message body of the transaction with given type.
@@ -148,7 +148,7 @@ println(body.increaseBy);
 ## `Transaction.loadInMsg`
 
 ```tolk
-fun Transaction.loadInMsg<Msg>(self)
+fun Transaction.loadInMsg<Msg>(self): MessageRelaxed<Msg>
 ```
 
 Loads the in message of the transaction with given type.
@@ -164,7 +164,7 @@ exit code 63.
 ## `Transaction.getUsedGas`
 
 ```tolk
-fun Transaction.getUsedGas(self)
+fun Transaction.getUsedGas(self): int
 ```
 
 Returns consumed gas for ordinary transactions with VM compute phase.
@@ -193,7 +193,7 @@ Behavior by variant:
 ## `Transaction.getAccountAddress`
 
 ```tolk
-fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN)
+fun Transaction.getAccountAddress(self, workchain: int = BASECHAIN): address
 ```
 
 Return address of account of this transaction.
@@ -679,7 +679,7 @@ fun varUintSize(value: int, maxBytes: int): int
 ## `VarUint7.packToBuilder`
 
 ```tolk
-fun VarUint7.packToBuilder(self, mutate b: builder)
+fun VarUint7.packToBuilder(self, mutate b: builder): void
 ```
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L407" />
@@ -703,7 +703,7 @@ type VarUint3 = int
 ## `VarUint3.packToBuilder`
 
 ```tolk
-fun VarUint3.packToBuilder(self, mutate b: builder)
+fun VarUint3.packToBuilder(self, mutate b: builder): void
 ```
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/transaction.tolk#L422" />

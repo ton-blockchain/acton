@@ -55,7 +55,7 @@ type Config = map<uint32, cell>
 /// ```tolk
 /// config.setParamRaw(20, gasCell);
 /// ```
-fun Config.setParamRaw(mutate self, index: uint32, data: cell) {
+fun Config.setParamRaw(mutate self, index: uint32, data: cell): void {
     self.set(index, data);
 }
 
@@ -74,7 +74,7 @@ fun Config.setParamRaw(mutate self, index: uint32, data: cell) {
 /// ```tolk
 /// val paramCell = config.getParamRaw(20);
 /// ```
-fun Config.getParamRaw(self, index: uint32) {
+fun Config.getParamRaw(self, index: uint32): cell {
     return self.get(index).loadValue();
 }
 
@@ -116,7 +116,7 @@ struct (0xc4) GlobalVersion {
 ///     Assert.fail("Failed to apply config");
 /// }
 /// ```
-fun Config.setGlobalVersion(mutate self, version: GlobalVersion) {
+fun Config.setGlobalVersion(mutate self, version: GlobalVersion): void {
     self.set(GLOBAL_VERSION_INDEX, version.toCell());
 }
 
@@ -132,7 +132,7 @@ fun Config.setGlobalVersion(mutate self, version: GlobalVersion) {
 /// val version = config.getGlobalVersion();
 /// println(format2("Network version: {}, capabilities: {}", version.version, version.capabilities));
 /// ```
-fun Config.getGlobalVersion(self) {
+fun Config.getGlobalVersion(self): GlobalVersion {
     return GlobalVersion.fromCell(self.get(GLOBAL_VERSION_INDEX).loadValue());
 }
 
@@ -185,7 +185,7 @@ const INITIAL_UNIXTIME_STORAGE_INDEX = 0
 /// val initialPrices = storagePrices.getInitial();
 /// println1("Initial bit price: {}", initialPrices.bitPrice);
 /// ```
-fun StoragePricesDict.getInitial(self) {
+fun StoragePricesDict.getInitial(self): StoragePrices {
     val entry = self.get(INITIAL_UNIXTIME_STORAGE_INDEX);
     if (!entry.isFound) {
         Assert.fail("No value found for INITIAL_UNIXTIME_STORAGE_INDEX");
@@ -218,7 +218,7 @@ fun StoragePricesDict.getInitial(self) {
 ///     Assert.fail("Failed to apply config");
 /// }
 /// ```
-fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices) {
+fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices): void {
     self.set(INITIAL_UNIXTIME_STORAGE_INDEX, prices);
 }
 
@@ -247,7 +247,7 @@ fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices) {
 ///     Assert.fail("Failed to apply config");
 /// }
 /// ```
-fun Config.setStoragePrices(mutate self, prices: StoragePricesDict) {
+fun Config.setStoragePrices(mutate self, prices: StoragePricesDict): void {
     val pricesDict = prices.toCell();
     val pricesRef = pricesDict.beginParse().loadRef();
 
@@ -268,7 +268,7 @@ fun Config.setStoragePrices(mutate self, prices: StoragePricesDict) {
 /// println(format3("Bit price: {}, Cell price: {}, Masterchain bit price: {}",
 ///     prices.bitPrice, prices.cellPrice, prices.masterchainBitPrice));
 /// ```
-fun Config.getStoragePrices(self) {
+fun Config.getStoragePrices(self): StoragePricesDict {
     val rawDict = self.get(STORAGE_PRICES_INDEX).loadValue();
 
     return StoragePricesDict.fromCell(beginCell().storeBool(true).storeRef(rawDict).endCell());
@@ -324,7 +324,7 @@ const BASECHAIN_GAS_PRICES_INDEX = 21
 /// - `chainType`: Chain type constant - either `BASECHAIN` for basechain prices (Param 21) or `MASTERCHAIN` for masterchain prices (Param 20)
 ///
 /// This mutates only the local [Config] value until you call [net.setConfig].
-fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int) {
+fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int): void {
     val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
     self.set(index, prices.toCell());
 }
@@ -343,7 +343,7 @@ fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int) {
 /// val gasPrices = config.getGasPrices(BASECHAIN);
 /// println1("Gas limit basechain: {}", gasPrices);
 /// ```
-fun Config.getGasPrices(self, chainType: int) {
+fun Config.getGasPrices(self, chainType: int): GasPrices {
     val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
     return GasPrices.fromCell(self.get(index).loadValue());
 }
@@ -399,7 +399,7 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 ///     Assert.fail("Failed to apply config");
 /// }
 /// ```
-fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int) {
+fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int): void {
     val index = chainType == MASTERCHAIN
         ? MASTERCHAIN_MSG_FORWARD_PRICES_INDEX
         : BASECHAIN_MSG_FORWARD_PRICES_INDEX;
@@ -422,7 +422,7 @@ fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType:
 /// println(format3("Lump price: {}, Bit price: {}, Cell price: {}",
 ///     msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice));
 /// ```
-fun Config.getMsgForwardPrices(self, chainType: int) {
+fun Config.getMsgForwardPrices(self, chainType: int): MsgForwardPrices {
     val index = chainType == MASTERCHAIN
         ? MASTERCHAIN_MSG_FORWARD_PRICES_INDEX
         : BASECHAIN_MSG_FORWARD_PRICES_INDEX;
@@ -458,7 +458,7 @@ struct (0xc0) PrecompiledContractsConfig {
 ///
 /// Returns `true` when a new entry is inserted.
 /// Returns `false` for duplicate `hash` values, and keeps the original `gasUsage` unchanged.
-fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64) {
+fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64): bool {
     return self.list.addIfNotExists(hash, {
         gasUsage: gasForComputePhase,
     });
@@ -486,7 +486,7 @@ fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasFor
 ///     Assert.fail("Failed to apply config");
 /// }
 /// ```
-fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: PrecompiledContractsConfig) {
+fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: PrecompiledContractsConfig): void {
     self.set(PRECOMPILED_CONTRACTS_CONFIG_INDEX, precompiledConfig.toCell());
 }
 
@@ -505,7 +505,7 @@ fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: Precomp
 /// val precompiledConfig = config.getPrecompiledContractsConfig();
 /// val contractsList = precompiledConfig.list;
 /// ```
-fun Config.getPrecompiledContractsConfig(self) {
+fun Config.getPrecompiledContractsConfig(self): PrecompiledContractsConfig {
     return PrecompiledContractsConfig.fromCell(self.get(PRECOMPILED_CONTRACTS_CONFIG_INDEX)
         .loadValue());
 }

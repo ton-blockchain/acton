@@ -447,7 +447,7 @@ See [net.send](#netsend) if you need to send a message and process out messages.
 ## `createExternalMessage`
 
 ```tolk
-fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null)
+fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null): OutMessage
 ```
 
 Creates an External-in message.
@@ -837,7 +837,7 @@ val masterchain_address = net.randomAddress("random_user", -1);
 ## `net.registerAddress`
 
 ```tolk
-fun net.registerAddress(addr: address, name: string)
+fun net.registerAddress(addr: address, name: string): void
 ```
 
 Register an address with a name.
@@ -858,7 +858,7 @@ net.registerAddress(address, "my_address");
 ## `net.registerCodeCell`
 
 ```tolk
-fun net.registerCodeCell(code: cell, name: string)
+fun net.registerCodeCell(code: cell, name: string): void
 ```
 
 Register a code cell with a name.
@@ -900,7 +900,7 @@ if (state != null) {
 ## `net.getAccountStorageFee`
 
 ```tolk
-fun net.getAccountStorageFee(addr: address, seconds: int)
+fun net.getAccountStorageFee(addr: address, seconds: int): coins?
 ```
 
 Returns storage fee for address for specified amount of seconds.
@@ -944,7 +944,7 @@ Returns false if library is not found.
 ## `net.setNow`
 
 ```tolk
-fun net.setNow(now: uint32)
+fun net.setNow(now: uint32): void
 ```
 
 Set the current Unix timestamp for time forwarding emulation.
@@ -980,7 +980,7 @@ println1("Current emulation time: {}", current_time);
 ## `net.topUp`
 
 ```tolk
-fun net.topUp(to: address, amount: coins)
+fun net.topUp(to: address, amount: coins): void
 ```
 
 Topup an address with a specified amount of TON.
@@ -1034,7 +1034,7 @@ if (acc is AccountInfo) {
 ## `net.setAccount`
 
 ```tolk
-fun net.setAccount(addr: address, acc: Account)
+fun net.setAccount(addr: address, acc: Account): void
 ```
 
 Sets the account state for an address in emulation.
@@ -1189,7 +1189,7 @@ fun tuple.fromTuple(data: tuple): tuple
 ## `T.externalOutPrefix`
 
 ```tolk
-fun T.externalOutPrefix()
+fun T.externalOutPrefix(): int
 ```
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/network.tolk#L1163" />
@@ -1197,7 +1197,7 @@ fun T.externalOutPrefix()
 ## `T.externalOutPrefixLen`
 
 ```tolk
-fun T.externalOutPrefixLen()
+fun T.externalOutPrefixLen(): int
 ```
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/network.tolk#L1171" />
@@ -1213,7 +1213,7 @@ fun T.decodeExternalOutBody(body: RemainingBitsAndRefs): T
 ## `T.getDeclaredPackPrefix2`
 
 ```tolk
-fun T.getDeclaredPackPrefix2()
+fun T.getDeclaredPackPrefix2(): int
 ```
 
 <SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/network.tolk#L1216" />

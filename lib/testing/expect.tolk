@@ -53,7 +53,7 @@ struct Expectation<T> {
 /// ```tolk
 /// expect(10).toEqual(10);
 /// ```
-fun Expectation<T>.create(value: T, valueType: string, location: string = "") {
+fun Expectation<T>.create(value: T, valueType: string, location: string = ""): Expectation<T> {
     return Expectation<T> {
         value,
         valueType,
@@ -67,7 +67,7 @@ fun Expectation<T>.create(value: T, valueType: string, location: string = "") {
 /// ```tolk
 /// expect(10).toEqual(10);
 /// ```
-fun Expectation<T>.toEqual<U>(self, expected: U) {
+fun Expectation<T>.toEqual<U>(self, expected: U): void {
     Assert.equal(self.value, expected, "expect(<actual>).toEqual(<expected>)", self.location);
 }
 
@@ -81,7 +81,7 @@ fun Expectation<T>.toEqual<U>(self, expected: U) {
 /// ```tolk
 /// expect(ton("1.5")).toEqualDecimal(ton("1.5"), 9);
 /// ```
-fun Expectation<T>.toEqualDecimal(self, expected: T, decimals: int) {
+fun Expectation<T>.toEqualDecimal(self, expected: T, decimals: int): void {
     Assert.equalDecimal(self.value, expected, decimals, "", self.location);
 }
 
@@ -91,7 +91,7 @@ fun Expectation<T>.toEqualDecimal(self, expected: T, decimals: int) {
 /// ```tolk
 /// expect(10).toNotEqual(20);
 /// ```
-fun Expectation<T>.toNotEqual<U>(self, expected: U) {
+fun Expectation<T>.toNotEqual<U>(self, expected: U): void {
     Assert.notEqual(self.value, expected, "expect(<actual>).toNotEqual(<expected>)", self.location);
 }
 
@@ -101,7 +101,7 @@ fun Expectation<T>.toNotEqual<U>(self, expected: U) {
 /// ```tolk
 /// expect(5).toBeLess(10);
 /// ```
-fun Expectation<T>.toBeLess<U>(self, expected: U) {
+fun Expectation<T>.toBeLess<U>(self, expected: U): void {
     ffi.assertComparison(
         self.value,
         expected,
@@ -117,7 +117,7 @@ fun Expectation<T>.toBeLess<U>(self, expected: U) {
 /// ```tolk
 /// expect(10).toBeGreater(5);
 /// ```
-fun Expectation<T>.toBeGreater<U>(self, expected: U) {
+fun Expectation<T>.toBeGreater<U>(self, expected: U): void {
     ffi.assertComparison(
         self.value,
         expected,
@@ -134,7 +134,7 @@ fun Expectation<T>.toBeGreater<U>(self, expected: U) {
 /// expect(5).toBeLessOrEqual(10);
 /// expect(10).toBeLessOrEqual(10);
 /// ```
-fun Expectation<T>.toBeLessOrEqual<U>(self, expected: U) {
+fun Expectation<T>.toBeLessOrEqual<U>(self, expected: U): void {
     ffi.assertComparison(
         self.value,
         expected,
@@ -151,7 +151,7 @@ fun Expectation<T>.toBeLessOrEqual<U>(self, expected: U) {
 /// expect(10).toBeGreaterOrEqual(5);
 /// expect(10).toBeGreaterOrEqual(10);
 /// ```
-fun Expectation<T>.toBeGreaterOrEqual<U>(self, expected: U) {
+fun Expectation<T>.toBeGreaterOrEqual<U>(self, expected: U): void {
     ffi.assertComparison(
         self.value,
         expected,
@@ -168,7 +168,7 @@ fun Expectation<T>.toBeGreaterOrEqual<U>(self, expected: U) {
 /// expect(10).toBeApproxEqAbs(15, 10); // ok, difference is 5, which is less than maximum allowed difference of 10
 /// expect(10).toBeApproxEqAbs(20, 5); // error, difference is 10, which is greater than maximum allowed difference of 5
 /// ```
-fun Expectation<int>.toBeApproxEqAbs(self, expected: int, maxDelta: int) {
+fun Expectation<int>.toBeApproxEqAbs(self, expected: int, maxDelta: int): void {
     val realDelta = abs(self.value - expected);
     if (realDelta > maxDelta) {
         ffi.assertFail(
@@ -199,7 +199,7 @@ fun Expectation<int>.toBeApproxEqAbs(self, expected: int, maxDelta: int) {
 /// expect(1000).toBeApproxEqRel(1099, 9);
 /// expect(0).toBeApproxEqRel(0, 0);
 /// ```
-fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int) {
+fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int): void {
     val valueDelta = abs(self.value - expected);
     val denominator = abs(self.value);
     if (denominator == 0) {
@@ -240,7 +240,7 @@ fun Expectation<int>.toBeApproxEqRel(self, expected: int, maxDelta: int) {
 /// ```tolk
 /// expect(null).toBeNull();
 /// ```
-fun Expectation<T?>.toBeNull(self) {
+fun Expectation<T?>.toBeNull(self): void {
     if (self.value != null) {
         Assert.fail("expect(<actual>).toBeNull(): value is not null", self.location);
     }
@@ -253,7 +253,7 @@ fun Expectation<T?>.toBeNull(self) {
 /// val someValue: int? = cond ? 10 : null;
 /// expect(someValue).toBeNotNull();
 /// ```
-fun Expectation<T?>.toBeNotNull(self) {
+fun Expectation<T?>.toBeNotNull(self): void {
     if (self.value == null) {
         Assert.fail("expect(<actual>).toBeNotNull(): value is null", self.location);
     }
@@ -268,7 +268,7 @@ fun Expectation<T?>.toBeNotNull(self) {
 /// val someValue = Maybe<int>.some(10);
 /// expect(someValue).toBeDefined();
 /// ```
-fun Expectation<Maybe<T>>.toBeDefined(self) {
+fun Expectation<Maybe<T>>.toBeDefined(self): void {
     if (self.value is None) {
         Assert.fail("expect(<actual>).toBeDefined()", self.location);
     }
@@ -282,7 +282,7 @@ fun Expectation<Maybe<T>>.toBeDefined(self) {
 /// val noneValue = Maybe<int>.none();
 /// expect(noneValue).toBeNone();
 /// ```
-fun Expectation<Maybe<T>>.toBeNone(self) {
+fun Expectation<Maybe<T>>.toBeNone(self): void {
     if (self.value !is None) {
         Assert.fail("expect(<actual>).toBeNone()", self.location);
     }
@@ -294,7 +294,7 @@ fun Expectation<Maybe<T>>.toBeNone(self) {
 /// ```tolk
 /// expect("hello").toBeNonEmpty();
 /// ```
-fun Expectation<slice>.toBeNonEmpty(self) {
+fun Expectation<slice>.toBeNonEmpty(self): void {
     Assert.notEqual(self.value, "", "expect(<actual>).toBeNonEmpty()", self.location);
 }
 
@@ -304,7 +304,7 @@ fun Expectation<slice>.toBeNonEmpty(self) {
 /// ```tolk
 /// expect("").toBeEmpty();
 /// ```
-fun Expectation<slice>.toBeEmpty(self) {
+fun Expectation<slice>.toBeEmpty(self): void {
     Assert.equal(self.value, "", "expect(<actual>).toBeEmpty()", self.location);
 }
 
@@ -314,7 +314,7 @@ fun Expectation<slice>.toBeEmpty(self) {
 /// ```tolk
 /// expect(nan()).toBeNaN();
 /// ```
-fun Expectation<int>.toBeNaN(self) {
+fun Expectation<int>.toBeNaN(self): void {
     Assert.equal(self.value, ffi.nan(), "expect(<actual>).toBeNaN()", self.location);
 }
 
@@ -324,7 +324,7 @@ fun Expectation<int>.toBeNaN(self) {
 /// ```tolk
 /// expect(0).toBeNonNaN();
 /// ```
-fun Expectation<int>.toBeNonNaN(self) {
+fun Expectation<int>.toBeNonNaN(self): void {
     Assert.notEqual(self.value, ffi.nan(), "expect(<actual>).toBeNonNaN()", self.location);
 }
 
@@ -334,7 +334,7 @@ fun Expectation<int>.toBeNonNaN(self) {
 /// ```tolk
 /// expect(true).toBeTrue();
 /// ```
-fun Expectation<bool>.toBeTrue(self) {
+fun Expectation<bool>.toBeTrue(self): void {
     Assert.equal(self.value, true, "expect(<actual>).toBeTrue()", self.location);
 }
 
@@ -344,7 +344,7 @@ fun Expectation<bool>.toBeTrue(self) {
 /// ```tolk
 /// expect(false).toBeFalse();
 /// ```
-fun Expectation<bool>.toBeFalse(self) {
+fun Expectation<bool>.toBeFalse(self): void {
     Assert.equal(self.value, false, "expect(<actual>).toBeFalse()", self.location);
 }
 
@@ -354,7 +354,7 @@ fun Expectation<bool>.toBeFalse(self) {
 /// ```tolk
 /// expect(addr).toBeInternalAddress();
 /// ```
-fun Expectation<any_address>.toBeInternalAddress(self) {
+fun Expectation<any_address>.toBeInternalAddress(self): void {
     if (!self.value.isInternal()) {
         Assert.fail("expect(<actual>).toBeInternalAddress(): Expected address to be internal", self.location);
     }
@@ -366,7 +366,7 @@ fun Expectation<any_address>.toBeInternalAddress(self) {
 /// ```tolk
 /// expect(addr).toBeNoneAddress();
 /// ```
-fun Expectation<any_address>.toBeNoneAddress(self) {
+fun Expectation<any_address>.toBeNoneAddress(self): void {
     if (!self.value.isNone()) {
         Assert.fail("expect(<actual>).toBeNoneAddress(): Expected address to be none", self.location);
     }
@@ -378,7 +378,7 @@ fun Expectation<any_address>.toBeNoneAddress(self) {
 /// ```tolk
 /// expect(addr).toBeExternalAddress();
 /// ```
-fun Expectation<any_address>.toBeExternalAddress(self) {
+fun Expectation<any_address>.toBeExternalAddress(self): void {
     if (!self.value.isExternal()) {
         Assert.fail("expect(<actual>).toBeExternalAddress(): Expected address to be external", self.location);
     }
@@ -391,7 +391,7 @@ fun Expectation<any_address>.toBeExternalAddress(self) {
 /// val arr = [1, 2, 3];
 /// expect(arr).toContain(2);
 /// ```
-fun Expectation<array<E>>.toContain<U>(self, expected: U) {
+fun Expectation<array<E>>.toContain<U>(self, expected: U): void {
     var i = 0;
     while (i < self.value.size()) {
         val item = self.value.get(i) as U;
@@ -403,7 +403,7 @@ fun Expectation<array<E>>.toContain<U>(self, expected: U) {
     Assert.fail("Array doesn't contain the value", self.location);
 }
 
-fun Expectation<BigArray<E>>.toContain<U>(self, expected: U) {
+fun Expectation<BigArray<E>>.toContain<U>(self, expected: U): void {
     var i = 0;
     while (i < self.value.size()) {
         val item = self.value.get(i) as U;
@@ -422,7 +422,7 @@ fun Expectation<BigArray<E>>.toContain<U>(self, expected: U) {
 /// val arr = [1, 2, 3];
 /// expect(arr).toNotContain(4);
 /// ```
-fun Expectation<array<E>>.toNotContain<U>(self, expected: U) {
+fun Expectation<array<E>>.toNotContain<U>(self, expected: U): void {
     var i = 0;
     while (i < self.value.size()) {
         val item = self.value.get(i) as U;
@@ -433,7 +433,7 @@ fun Expectation<array<E>>.toNotContain<U>(self, expected: U) {
     }
 }
 
-fun Expectation<BigArray<E>>.toNotContain<U>(self, expected: U) {
+fun Expectation<BigArray<E>>.toNotContain<U>(self, expected: U): void {
     var i = 0;
     while (i < self.value.size()) {
         val item = self.value.get(i) as U;
@@ -450,13 +450,13 @@ fun Expectation<BigArray<E>>.toNotContain<U>(self, expected: U) {
 /// val arr = array<int> [];
 /// expect(arr).toBeEmpty();
 /// ```
-fun Expectation<array<E>>.toBeEmpty(self) {
+fun Expectation<array<E>>.toBeEmpty(self): void {
     if (self.value.size() != 0) {
         Assert.fail("expect(<actual>).toBeEmpty(<expected>): array is not empty", self.location);
     }
 }
 
-fun Expectation<BigArray<E>>.toBeEmpty(self) {
+fun Expectation<BigArray<E>>.toBeEmpty(self): void {
     if (self.value.size() != 0) {
         Assert.fail("expect(<actual>).toBeEmpty(<expected>): array is not empty", self.location);
     }
@@ -469,13 +469,13 @@ fun Expectation<BigArray<E>>.toBeEmpty(self) {
 /// val arr = [1, 2, 3];
 /// expect(arr).toBeNonEmpty();
 /// ```
-fun Expectation<array<E>>.toBeNonEmpty(self) {
+fun Expectation<array<E>>.toBeNonEmpty(self): void {
     if (self.value.size() == 0) {
         Assert.fail("expect(<actual>).toBeNonEmpty(<expected>): array is empty", self.location);
     }
 }
 
-fun Expectation<BigArray<E>>.toBeNonEmpty(self) {
+fun Expectation<BigArray<E>>.toBeNonEmpty(self): void {
     if (self.value.size() == 0) {
         Assert.fail("expect(<actual>).toBeNonEmpty(<expected>): array is empty", self.location);
     }
@@ -488,11 +488,11 @@ fun Expectation<BigArray<E>>.toBeNonEmpty(self) {
 /// val arr = [1, 2, 3];
 /// expect(arr).toHaveLength(3);
 /// ```
-fun Expectation<array<E>>.toHaveLength(self, length: int) {
+fun Expectation<array<E>>.toHaveLength(self, length: int): void {
     Assert.equal(self.value.size(), length, "expect(<actual>).toHaveLength(<expected>)", self.location);
 }
 
-fun Expectation<BigArray<E>>.toHaveLength(self, length: int) {
+fun Expectation<BigArray<E>>.toHaveLength(self, length: int): void {
     Assert.equal(self.value.size(), length, "expect(<actual>).toHaveLength(<expected>)", self.location);
 }
 
@@ -505,7 +505,7 @@ fun Expectation<BigArray<E>>.toHaveLength(self, length: int) {
 /// map.set(2, 3);
 /// expect(map).toContainKey(2);
 /// ```
-fun Expectation<map<K, V>>.toContainKey(self, key: K) {
+fun Expectation<map<K, V>>.toContainKey(self, key: K): void {
     val result = self.value.get(key);
     if (!result.isFound) {
         Assert.fail(format1("expect(<actual>).toContainKey(<expected>): Key '{}' not found in the map", key), self.location)
@@ -521,7 +521,7 @@ fun Expectation<map<K, V>>.toContainKey(self, key: K) {
 /// map.set(2, 3);
 /// expect(map).toNotContainKey(4);
 /// ```
-fun Expectation<map<K, V>>.toNotContainKey(self, key: K) {
+fun Expectation<map<K, V>>.toNotContainKey(self, key: K): void {
     val result = self.value.get(key);
     if (result.isFound) {
         Assert.fail(format1("expect(<actual>).toNotContainKey(<expected>): Key '{}' is found in the map", key), self.location)
@@ -537,7 +537,7 @@ fun Expectation<map<K, V>>.toNotContainKey(self, key: K) {
 /// map.set(2, 3);
 /// expect(map).toContainValue(2);
 /// ```
-fun Expectation<map<K, V>>.toContainValue(self, value: V) {
+fun Expectation<map<K, V>>.toContainValue(self, value: V): void {
     var r = self.value.findFirst();
     while (r.isFound) {
         val mapValue = r.loadValue();
@@ -559,7 +559,7 @@ fun Expectation<map<K, V>>.toContainValue(self, value: V) {
 /// map.set(2, 3);
 /// expect(map).toNotContainValue(4);
 /// ```
-fun Expectation<map<K, V>>.toNotContainValue(self, value: V) {
+fun Expectation<map<K, V>>.toNotContainValue(self, value: V): void {
     var r = self.value.findFirst();
     while (r.isFound) {
         val mapValue = r.loadValue();
@@ -577,7 +577,7 @@ fun Expectation<map<K, V>>.toNotContainValue(self, value: V) {
 /// var map = createEmptyMap<int32, int32>();
 /// expect(map).toBeEmpty();
 /// ```
-fun Expectation<map<K, V>>.toBeEmpty(self) {
+fun Expectation<map<K, V>>.toBeEmpty(self): void {
     if (!self.value.isEmpty()) {
         Assert.fail("expect(<actual>).toBeEmpty(): Map is not empty", self.location)
     }
@@ -592,7 +592,7 @@ fun Expectation<map<K, V>>.toBeEmpty(self) {
 /// map.set(2, 3);
 /// expect(map).toBeNonEmpty();
 /// ```
-fun Expectation<map<K, V>>.toBeNonEmpty(self) {
+fun Expectation<map<K, V>>.toBeNonEmpty(self): void {
     if (self.value.isEmpty()) {
         Assert.fail("expect(<actual>).toBeNonEmpty(): Map is empty", self.location)
     }
@@ -607,7 +607,7 @@ fun Expectation<map<K, V>>.toBeNonEmpty(self) {
 /// map.set(2, 3);
 /// expect(map).toHaveLength(2);
 /// ```
-fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
+fun Expectation<map<K, V>>.toHaveLength(self, length: int): void {
     var mapLength = 0;
     var r = self.value.findFirst();
     while (r.isFound) {
@@ -630,7 +630,7 @@ fun Expectation<map<K, V>>.toHaveLength(self, length: int) {
 /// Optional location can be provided to specify the location of the expectation to
 /// be printed in the error message. You likely don't want to set this manually,
 /// as the location will be automatically set by the test framework.
-fun expect<T>(value: T, loc: SourceLocation = reflect.sourceLocation()) {
+fun expect<T>(value: T, loc: SourceLocation = reflect.sourceLocation()): Expectation<T> {
     val locString = format3("{}:{}:{}", loc.fileName, loc.lineNo, loc.charNo);
     return Expectation<T>.create(value, reflect.typeNameOfObject(value), locString);
 }
@@ -669,7 +669,7 @@ fun ffi.nan(): int
 /// Internal helper function for comparison assertions.
 ///
 /// Don't use this function directly. Use comparison methods instead.
-fun ffi.assertComparison<V1, V2>(left: V1, right: V2, op: string, message: string, location: string) {
+fun ffi.assertComparison<V1, V2>(left: V1, right: V2, op: string, message: string, location: string): void {
     if (
         !ffi.assertBin(
             op,

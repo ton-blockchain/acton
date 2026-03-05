@@ -43,7 +43,7 @@ fun vm.getConfigParam<T>(index: int): T {
 }
 
 /// Generic helper to overwrite a single config parameter.
-fun vm.setConfigParam<T>(value: T, index: int) {
+fun vm.setConfigParam<T>(value: T, index: int): void {
     var c7 = vm.getC7();
     var params = c7.get(0) as tuple;
     params.set(value, index);
@@ -61,7 +61,7 @@ const CONFIG_ROOT_INDEX = 9
 ///
 /// Note that this does not recompute unpacked config in C7 slot 14.
 /// After [vm.setConfigRootDict], [vm.getConfigUnpacked] can still return stale values.
-fun vm.setConfigRootDict(root: dict) {
+fun vm.setConfigRootDict(root: dict): void {
     var c7 = vm.getC7();
     var params = c7.get(0) as tuple;
 
@@ -81,7 +81,7 @@ const CONFIG_UNPACKED_INDEX = 14
 /// Use [vm.getConfigUnpacked] as a template for expected tuple layout.
 /// If this tuple is malformed (for example, too short), later operations that assume
 /// specific indices can fail with runtime errors such as `tuple index out of range`.
-fun vm.setConfigUnpacked(values: tuple) {
+fun vm.setConfigUnpacked(values: tuple): void {
     var c7 = vm.getC7();
     var params = c7.get(0) as tuple;
 
@@ -100,7 +100,7 @@ fun vm.setConfigUnpacked(values: tuple) {
 /// ```tolk
 /// val unpacked = vm.getConfigUnpacked();
 /// ```
-fun vm.getConfigUnpacked() {
+fun vm.getConfigUnpacked(): tuple {
     val c7 = vm.getC7();
     val params = c7.get(0) as tuple;
 
@@ -110,7 +110,7 @@ fun vm.getConfigUnpacked() {
 /// Override `blockchain.now()` for deterministic testing.
 ///
 /// Writes C7 parameter tuple slot 3 and affects `blockchain.now()` reads.
-fun vm.setTime(now: int) {
+fun vm.setTime(now: int): void {
     vm.setConfigParam(now, 3);
 }
 
@@ -118,7 +118,7 @@ fun vm.setTime(now: int) {
 ///
 /// Writes C7 parameter tuple slot 4.
 /// Does not change slots 3 (`now`) or 5 (`logical time`).
-fun vm.setBlockLogicalTime(blockLogicalTime: int) {
+fun vm.setBlockLogicalTime(blockLogicalTime: int): void {
     vm.setConfigParam(blockLogicalTime, 4);
 }
 
@@ -126,21 +126,21 @@ fun vm.setBlockLogicalTime(blockLogicalTime: int) {
 ///
 /// Writes C7 parameter tuple slot 5.
 /// Does not change slots 3 (`now`) or 4 (`block logical time`).
-fun vm.setLogicalTime(logicalTime: int) {
+fun vm.setLogicalTime(logicalTime: int): void {
     vm.setConfigParam(logicalTime, 5);
 }
 
 /// Override the original balance of the contract.
 ///
 /// Writes C7 parameter tuple slot 7 as `[balance, extraCurrencies]`.
-fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null) {
+fun vm.setOriginalBalance(balance: coins, extraCurrencies: dict = null): void {
     vm.setConfigParam(tuple [balance, extraCurrencies], 7);
 }
 
 /// Register a new library for current test.
 ///
 /// Re-registering the same library cell is idempotent and does not change C5/C7.
-fun vm.registerLibrary(cell: cell) {
+fun vm.registerLibrary(cell: cell): void {
     ffi.registerLibrary(cell);
 }
 

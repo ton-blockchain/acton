@@ -63,7 +63,7 @@ expect(10).toEqual(10);
 ## `Assert.equal`
 
 ```tolk
-fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: string = "")
+fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: string = ""): void
 ```
 
 Asserts that two values are equal. If not, throws `ASSERTION_FAILED`.
@@ -80,7 +80,7 @@ with automatic location tracking.
 ## `Assert.notEqual`
 
 ```tolk
-fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: string = "", location: string = "")
+fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: string = "", location: string = ""): void
 ```
 
 Asserts that two values are NOT equal. If they are, throws `ASSERTION_FAILED`.
@@ -111,7 +111,7 @@ be printed in the error message.
 ## `Assert.consumesLessThan`
 
 ```tolk
-fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int)
+fun Assert.consumesLessThan<Ret>(fn: () -> Ret, expected: int): Ret
 ```
 
 Asserts that the function without arguments consumes less than or equal to the expected amount of gas.
@@ -140,7 +140,7 @@ but accept arguments.
 ## `Assert.consumesLessThan1`
 
 ```tolk
-fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int)
+fun Assert.consumesLessThan1<Ret, Arg1>(fn: (Arg1) -> Ret, arg1: Arg1, expected: int): Ret
 ```
 
 Asserts that the function with a single argument consumes less than or equal to the expected amount of gas.
@@ -172,7 +172,7 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
     arg1: Arg1,
     arg2: Arg2,
     expected: int
-)
+): Ret
 ```
 
 Asserts that the function with two arguments consumes less than or equal to the expected amount of gas.
@@ -206,7 +206,7 @@ fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
     arg2: Arg2,
     arg3: Arg3,
     expected: int
-)
+): Ret
 ```
 
 Asserts that the function with three arguments consumes less than or equal to the expected amount of gas.
@@ -250,7 +250,7 @@ NOT FOR PUBLIC USE.
 ## `Assert.equalDecimal`
 
 ```tolk
-fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "", location: string = "")
+fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "", location: string = ""): void
 ```
 
 Asserts that two values are equal as decimals with given precision.
