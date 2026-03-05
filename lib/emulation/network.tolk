@@ -435,6 +435,15 @@ struct __Any {
     value : cell
 }
 
+// This function is used in createExternalMessage to not wrap cells twice
+fun T.asPayload(self) {
+    return self.toCell()
+}
+fun cell.asPayload(self) {
+    return self;
+}
+
+
 /// Creates an External-in message.
 /// Body is always packed into the Either Right (in the reference).
 /// If `StateInit` is present it is also packed in the Either Right (in the reference).
@@ -446,7 +455,7 @@ struct __Any {
 ///   init:(Maybe (Either StateInit ^StateInit))
 ///   body:(Either X ^X) = Message X;
 ///```
-fun createExternalMessage(dest: address, body: cell, stateInit: StateInit? = null, src: any_address? = null) {
+fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateInit? = null, src: any_address? = null) {
     val init = stateInit != null
         ? Maybe<Either<StateInit, Cell<StateInit>>>.some(Either<StateInit, Cell<StateInit>>.right(stateInit.toCell()))
         : Maybe<Either<StateInit, Cell<StateInit>>>.none();
@@ -461,7 +470,7 @@ fun createExternalMessage(dest: address, body: cell, stateInit: StateInit? = nul
     }
 
     return OutMessage {
-        messageCell: Message<cell, ExternalInMessageInfo> {
+        messageCell: Message<TBody, ExternalInMessageInfo> {
             info: ExternalInMessageInfo {
                 src,
                 dest,
@@ -470,7 +479,7 @@ fun createExternalMessage(dest: address, body: cell, stateInit: StateInit? = nul
             },
             init,
             // A little hack to pass just cell to Either.right
-            body: Either<cell, Cell<cell>>.right(body as Cell<cell>)
+            body: Either<TBody, Cell<TBody>>.right(body.asPayload())
         }.toCell()
     };
 }
