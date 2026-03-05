@@ -108,6 +108,8 @@ fun main() {
 }
 "#;
 
+const V3_MESSAGE_TEST_BOC: &str = "te6ccgEBCAEA3gACq0gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ALmmY2giNrr7xsgbsuxgdjCwn44jNXXhSczUiwyp4TxsQ7msoAAAAAAAAAAAAANL430UZAgEAEAAAAAAAAAAAART/APSkE/S88sgLAwIBYgcEAgFYBgUAF7itDtRNDTHzHXCx+AAFu+F4AJzQ+JGRMOAg1ywj9DsnfI4YMe1E0AHXCx8B1h/XCx9YoAHIzssfye1U4NcsIdOpeDQxjhIw7UTQ1h8wyM7PkAAAAALJ7VTggQ/2AccA8vQ=";
+
 const LIBRARY_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
@@ -955,6 +957,59 @@ fn litenode_supports_config_endpoints() {
     assert_eq!(
         rpc_get_config_param["result"]["config"]["bytes"].as_str(),
         Some(param_bytes.as_str())
+    );
+
+    node.stop();
+}
+
+#[test]
+fn litenode_supports_v3_message_endpoint() {
+    let project = ProjectBuilder::new("litenode-v3-message-endpoint").build();
+    let node = project.litenode().start();
+
+    let response = node.post_json(
+        "/api/v3/message",
+        &json!({
+            "boc": V3_MESSAGE_TEST_BOC
+        }),
+    );
+
+    assert_eq!(
+        response["ok"].as_bool(),
+        Some(true),
+        "v3 message failed: {}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    let message_hash = response["result"]["message_hash"]
+        .as_str()
+        .expect("v3 message result.message_hash must be a string");
+    let message_hash_norm = response["result"]["message_hash_norm"]
+        .as_str()
+        .expect("v3 message result.message_hash_norm must be a string");
+
+    assert!(
+        !message_hash.is_empty(),
+        "Expected non-empty message_hash in v3 message response:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert_eq!(message_hash_norm, message_hash);
+
+    let invalid = node.post_json(
+        "/api/v3/message",
+        &json!({
+            "boc": "not-base64"
+        }),
+    );
+
+    assert_eq!(invalid["ok"].as_bool(), Some(false));
+    assert!(
+        invalid["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Invalid BOC base64"),
+        "Unexpected error for invalid v3 message payload:\n{}",
+        serde_json::to_string_pretty(&invalid).unwrap_or_default()
     );
 
     node.stop();

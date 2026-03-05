@@ -3,7 +3,7 @@ use crate::api::toncenter_v3;
 use crate::litenode::LiteNode;
 use crate::server::models::{
     GetAddressInformationV3Request, GetJettonMastersRequest, GetJettonWalletsRequest,
-    GetTracesQuery, RunGetMethodRequest,
+    GetTracesQuery, RunGetMethodRequest, SendBocRequest,
 };
 use axum::{
     Json,
@@ -66,6 +66,13 @@ pub async fn get_jetton_wallets(
         v3::map_jetton_wallets,
     )
     .await
+}
+
+pub async fn send_message_v3(
+    State(node): State<Arc<LiteNode>>,
+    Json(payload): Json<SendBocRequest>,
+) -> Json<Value> {
+    handle_result(node.send_boc(payload.boc), toncenter_v3::map_send_message).await
 }
 
 pub async fn run_get_method_v3(

@@ -1,4 +1,6 @@
-use crate::litenode::{LiteNodeAccountState, LiteNodeRunGetMethodResult};
+use crate::litenode::{
+    LiteNodeAccountState, LiteNodeBlockTransactions, LiteNodeRunGetMethodResult,
+};
 use crate::storage::{
     AccountStatus, JettonMasterMeta, JettonWalletMeta, MsgMeta, TraceNode, TransactionInfo,
 };
@@ -50,6 +52,18 @@ pub fn map_address_information(state: &LiteNodeAccountState) -> Value {
         "last_transaction_hash": state.last_transaction_id.hash.to_hex(),
         "last_transaction_lt": state.last_transaction_id.lt.to_string(),
         "status": map_account_status(&state.state),
+    })
+}
+
+pub fn map_send_message(bt: &LiteNodeBlockTransactions) -> Value {
+    let message_hash = bt
+        .msg_hash
+        .as_ref()
+        .map(|h| h.to_base64())
+        .unwrap_or_default();
+    serde_json::json!({
+        "message_hash": message_hash,
+        "message_hash_norm": message_hash,
     })
 }
 

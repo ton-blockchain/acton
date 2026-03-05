@@ -57,6 +57,7 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
     let api_v3_router = Router::new()
         .route("/v3/traces", get(get_traces))
         .route("/v3/addressInformation", get(get_address_information_v3))
+        .route("/v3/message", post(send_message_v3))
         .route("/v3/runGetMethod", post(run_get_method_v3))
         .route("/v3/jetton/masters", get(get_jetton_masters))
         .route("/v3/jetton/wallets", get(get_jetton_wallets));

@@ -40,12 +40,13 @@ This page tracks TonCenter v2 and v3 API coverage in Acton local development nod
 
 ## TonCenter v3 Coverage Matrix
 
-Acton local development node currently supports 5 TonCenter v3 endpoints:
+Acton local development node currently supports 6 TonCenter v3 endpoints:
 
 | Method | Endpoint                     | Available in local node | Purpose                                                              |
 |--------|------------------------------|-------------------------|----------------------------------------------------------------------|
 | `GET`  | `/api/v3/traces`             | ✅                       | Returns transaction trace tree for a transaction hash.               |
 | `GET`  | `/api/v3/addressInformation` | ✅                       | Returns account state in `V2AddressInformation` shape.               |
+| `POST` | `/api/v3/message`            | ✅                       | Sends an external message in BOC and returns message hash fields.    |
 | `POST` | `/api/v3/runGetMethod`       | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
 | `GET`  | `/api/v3/jetton/masters`     | ✅                       | Returns jetton master metadata with optional filters and pagination. |
 | `GET`  | `/api/v3/jetton/wallets`     | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
