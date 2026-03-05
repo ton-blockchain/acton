@@ -431,15 +431,11 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
     return SendResult.fromTuple(res)
 }
 
-struct __Any {
-    value : cell
-}
-
 // This function is used in createExternalMessage to not wrap cells twice
-fun T.asPayload(self) {
+fun T.__asPayload(self) {
     return self.toCell()
 }
-fun cell.asPayload(self) {
+fun cell.__asPayload(self) {
     return self;
 }
 
@@ -479,7 +475,7 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
             },
             init,
             // A little hack to pass just cell to Either.right
-            body: Either<TBody, Cell<TBody>>.right(body.asPayload())
+            body: Either<TBody, Cell<TBody>>.right(body.__asPayload())
         }.toCell()
     };
 }
