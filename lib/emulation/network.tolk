@@ -431,15 +431,6 @@ fun net.sendSingle(from: address, message: OutMessage): SendResult {
     return SendResult.fromTuple(res)
 }
 
-// This function is used in createExternalMessage to not wrap cells twice
-fun T.__asPayload(self) {
-    return self.toCell()
-}
-fun cell.__asPayload(self) {
-    return self;
-}
-
-
 /// Creates an External-in message.
 /// Body is always packed into the Either Right (in the reference).
 /// If `StateInit` is present it is also packed in the Either Right (in the reference).
@@ -474,7 +465,6 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
                 importFee: ton("0.1"),
             },
             init,
-            // A little hack to pass just cell to Either.right
             body: Either<TBody, Cell<TBody>>.right(body.__asPayload())
         }.toCell()
     };
@@ -1229,6 +1219,14 @@ fun T.getDeclaredPackPrefix2() {
 
 fun unknown.getDeclaredPackPrefix2() {
     return -1;
+}
+
+// This function is used in createExternalMessage to not wrap cells twice
+fun T.__asPayload(self) {
+    return self.toCell()
+}
+fun cell.__asPayload(self) {
+    return self;
 }
 
 fun __treasuryCode(): cell asm """
