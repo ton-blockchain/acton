@@ -357,7 +357,7 @@ get fun `test-ag-send-external-runs-handler`() {
     val (_, externalAddress) = deployExternalHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(externalAddress, TriggerExternal { queryId: 1 }),
+        createExternalMessage(externalAddress, TriggerExternal { queryId: 1 }.toCell()),
     )!;
 
     expect(txs).toHaveLength(1);
@@ -382,10 +382,10 @@ get fun `test-ag-send-external-repeatable`() {
     val (_, externalAddress) = deployExternalHarness();
 
     val first = net.sendExternal(
-        createExternalMessage(externalAddress, TriggerExternal { queryId: 2 }),
+        createExternalMessage(externalAddress, TriggerExternal { queryId: 2 }.toCell()),
     )!;
     val second = net.sendExternal(
-        createExternalMessage(externalAddress, TriggerExternal { queryId: 3 }),
+        createExternalMessage(externalAddress, TriggerExternal { queryId: 3 }.toCell()),
     )!;
 
     expect(first).toHaveLength(1);

@@ -146,7 +146,7 @@ get fun `test-send-external-collects-externals`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 1 }),
+        createExternalMessage(harness.address, TriggerExternal { id: 1 }.toCell()),
     )!;
 
     expect(txs).toHaveLength(1);
@@ -179,7 +179,7 @@ get fun `test-create-external-message-with-external-src`() {
     val txs = net.sendExternal(
         createExternalMessage(
             harness.address,
-            TriggerExternal { id: 2 },
+            TriggerExternal { id: 2 }.toCell(),
             null,
             externalDest(),
         ),
@@ -205,10 +205,10 @@ get fun `test-send-external-repeatable`() {
     val (harness, _) = deployHarness();
 
     val first = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 3 }),
+        createExternalMessage(harness.address, TriggerExternal { id: 3 }.toCell()),
     )!;
     val second = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 4 }),
+        createExternalMessage(harness.address, TriggerExternal { id: 4 }.toCell()),
     )!;
 
     expect(first).toHaveLength(1);
@@ -259,7 +259,7 @@ get fun `test-send-external-low-balance-rejected`() {
     expect(net.balance(harness.address)).toEqual(1);
 
     val txs = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 6 }),
+        createExternalMessage(harness.address, TriggerExternal { id: 6 }.toCell()),
     );
     expect(txs == null).toBeTrue();
 }
@@ -278,7 +278,7 @@ get fun `test-create-external-message-rejects-internal-src`() {
 
     createExternalMessage(
         harness.address,
-        TriggerExternal { id: 5 },
+        TriggerExternal { id: 5 }.toCell(),
         null,
         deployer.address,
     );
@@ -297,7 +297,7 @@ get fun `test-find-external-out-message-bug`() {
     val (harness, _) = deployHarness();
 
     val txs = net.sendExternal(
-        createExternalMessage(harness.address, TriggerExternal { id: 5 }),
+        createExternalMessage(harness.address, TriggerExternal { id: 5 }.toCell()),
     );
 
     val found = txs!.findExternalOutMessage<ExternalAlpha>({
