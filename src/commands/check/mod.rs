@@ -95,19 +95,12 @@ fn diagnostics_summary(diagnostics: &[Diagnostic]) -> (usize, usize) {
 
 pub fn check_cmd(
     fix: bool,
-    output_format: CheckOutputFormat,
+    cli_output_format: Option<CheckOutputFormat>,
     output_file: Option<PathBuf>,
     explain: Option<String>,
     list_lint_rules: bool,
     target: Option<String>,
 ) -> anyhow::Result<()> {
-    let is_plain_report = output_format == CheckOutputFormat::Plain;
-    if is_plain_report && output_file.is_some() {
-        return Err(anyhow!(
-            "output_file cannot be used with plain output format"
-        ));
-    }
-
     if list_lint_rules {
         return check_list::check_list_cmd();
     }
@@ -116,6 +109,19 @@ pub fn check_cmd(
     }
 
     let config = ActonConfig::load()?;
+    let output_format = cli_output_format
+        .or_else(|| {
+            config
+                .lint
+                .as_ref()
+                .and_then(|lint| lint.output_format.clone())
+        })
+        .unwrap_or(CheckOutputFormat::Plain);
+    let is_plain_report = output_format == CheckOutputFormat::Plain;
+    if is_plain_report && output_file.is_some() {
+        anyhow::bail!("output_file cannot be used with plain output format")
+    }
+
     let max_warnings = config
         .lint
         .as_ref()
@@ -560,7 +566,6 @@ fn check_root_file(
         } else {
             diagnostics.clone()
         };
-        // WTF ?! это как тут взялось
         let _ = render::emit_diagnostics(file_db, &diagnostics_to_show);
     }
 

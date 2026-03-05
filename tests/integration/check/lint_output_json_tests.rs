@@ -77,6 +77,27 @@ fn check_lint_json_stderr_output_works() {
 
 #[test]
 #[named]
+fn check_lint_json_uses_output_format_from_config() {
+    let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
+        .contract("main", UNUSED_VARIABLE_CONTRACT)
+        .with_lint_level("unused-variable", "warn")
+        .with_lint_output_format("json")
+        .build();
+
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .check()
+        .run()
+        .success()
+        .assert_contains("\"diagnostics\"")
+        .assert_contains("\"success\": true")
+        .assert_not_contains("Checking");
+}
+
+#[test]
+#[named]
 fn check_lint_json_writes_report_to_output_file() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract("main", UNUSED_VARIABLE_CONTRACT)
@@ -170,4 +191,29 @@ fn check_lint_json_writes_report_to_output_file_even_when_exit_code_is_non_zero(
                 function_name!()
             ),
         );
+}
+
+#[test]
+#[named]
+fn check_lint_json_fix_does_not_apply_with_non_plain_output() {
+    let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
+        .contract("main", UNUSED_VARIABLE_CONTRACT)
+        .with_lint_level("unused-variable", "warn")
+        .build();
+
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .check()
+        .arg("--output-format")
+        .arg("json")
+        .arg("--fix")
+        .arg("--output-file")
+        .arg(".acton/reports/fixed.json")
+        .run()
+        .success()
+        .assert_file_contains(".acton/reports/fixed.json", "\"name\": \"unused-variable\"")
+        .assert_file_contains(".acton/reports/fixed.json", "\"applicability\": \"auto\"")
+        .assert_file_contains("contracts/main.tolk", "val x = 1;");
 }

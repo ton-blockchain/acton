@@ -500,16 +500,15 @@ enum Commands {
     Check {
         #[arg(help = "Contract ID to check or path to a .tolk file")]
         target: Option<String>,
-        #[arg(long, help = "Automatically apply available fixes")]
+        #[arg(long, help = "Automatically apply available fixes (plain output only)")]
         fix: bool,
         #[arg(
             long = "output-format",
             value_enum,
             value_name = "FORMAT",
-            default_value_t = CheckOutputFormat::Plain,
             help = "Output format (plain, json, sarif)"
         )]
-        output_format: CheckOutputFormat,
+        output_format: Option<CheckOutputFormat>,
         #[arg(
             long,
             value_name = "PATH",

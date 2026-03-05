@@ -7,11 +7,11 @@ Use the `[lint]` section for global linter behavior, and `[lint.rules]` for rule
 
 ## `[lint]` Settings
 
-| Field          | Type       | Default   | Description                                                                                         |
-|:---------------|:-----------|:----------|:----------------------------------------------------------------------------------------------------|
-| `exclude`      | `string[]` | `[]`      | Glob patterns used to hide lint diagnostics for matching files.                                     |
-| `max-warnings` | `integer`  | unlimited | Warning threshold. If warnings are greater than this value, `acton check` exits with non-zero code. |
-| `output`       | `object`   | not set   | Report outputs. Currently supports `[lint.output.sarif]`.                                           |
+| Field           | Type       | Default   | Description                                                                                         |
+|:----------------|:-----------|:----------|:----------------------------------------------------------------------------------------------------|
+| `exclude`       | `string[]` | `[]`      | Glob patterns used to hide lint diagnostics for matching files.                                     |
+| `max-warnings`  | `integer`  | unlimited | Warning threshold. If warnings are greater than this value, `acton check` exits with non-zero code. |
+| `output-format` | `string`   | `plain`   | Default output format for `acton check`: `plain`, `json`, or `sarif`.                               |
 
 Example:
 
@@ -19,9 +19,7 @@ Example:
 [lint]
 exclude = ["contracts/generated/*.tolk", "contracts/legacy.tolk"]
 max-warnings = 0
-
-[lint.output.sarif]
-path = ".acton/reports/lint.sarif"
+output-format = "sarif"
 ```
 
 Behavior notes:

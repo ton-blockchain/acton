@@ -15,19 +15,22 @@ acton check <path-to-file.tolk>
 
 ## Options
 
-| Option             | Type   | Description                                              |
-|:-------------------|:-------|:---------------------------------------------------------|
-| `--fix`            | Flag   | Automatically apply available fixes (console mode only). |
-| `--json`           | Flag   | Output results as JSON.                                  |
-| `--sarif <PATH>`   | String | Write SARIF report to file.                              |
-| `--explain <CODE>` | String | Explain a rule.                                          |
+| Option                     | Type   | Description                                                 |
+|:---------------------------|:-------|:------------------------------------------------------------|
+| `--fix`                    | Flag   | Automatically apply available fixes (plain output only).    |
+| `--output-format <FORMAT>` | String | Output format: `plain`, `json`, or `sarif`.                 |
+| `--output-file <PATH>`     | String | Write JSON/SARIF output to file (not allowed with `plain`). |
+| `--explain <CODE>`         | String | Explain a rule.                                             |
 
 For setup and configuration, see [Linting](/docs/linting).
 For the full rules catalog, see [Linter Rules](/docs/linting/rules).
 
 ## Behavior Notes
 
-- `--fix` applies edits only in non-JSON mode. With `--json`, diagnostics still include fix suggestions, but files are not changed.
+- `--fix` applies edits only in `plain` output mode.
+- With `--output-format json` or `--output-format sarif`, diagnostics include fix suggestions, but files are not changed.
+- Output format is resolved in this order: CLI `--output-format`, then `[lint].output-format` from `Acton.toml`, then default `plain`.
+- `--output-file` cannot be used with `plain` format.
 - `acton check <path-to-file.tolk>` runs the file in single-file mode with test-style lint settings. In this mode, `E014 (acton-import-in-contract)` is relaxed.
 - `acton check <contract-id>` keeps normal contract lint settings from `Acton.toml` (including `E014`).
 
@@ -43,9 +46,9 @@ acton check counter
 # Check a single file
 acton check counter.tolk
 
-# Write SARIF report
-acton check --sarif .acton/reports/lint.sarif
+# Print JSON to stdout
+acton check --output-format json
 
-# Print JSON to stdout and write SARIF file in the same run
-acton check --json --sarif .acton/reports/lint.sarif
+# Write SARIF report to file
+acton check --output-format sarif --output-file .acton/reports/lint.sarif
 ```
