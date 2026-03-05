@@ -268,6 +268,10 @@ fn send_message_impl(
     if let [SendMessageResult::Error(error), ..] = &emulations[..]
         && emulations.len() == 1
     {
+        ctx.chain
+            .emulations
+            .save_message(&ctx.env.running_id, emulations.clone());
+
         // TODO return error with type when unions are supported in ffi
         if is_external {
             stack.push(TupleItem::Null);

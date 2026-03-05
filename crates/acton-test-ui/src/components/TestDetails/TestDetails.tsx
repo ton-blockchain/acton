@@ -12,6 +12,7 @@ import {
   TestStatus,
   type Trace,
   ContractData,
+  type FailedMessage,
   type TransactionInfo,
 } from "@acton/shared-ui"
 import {
@@ -64,6 +65,16 @@ const formatTraceName = (name: string | undefined, index: number): string => {
     return trimmed
   }
   return `Trace #${index + 1}`
+}
+
+const isExternalMessageNotAcceptedError = (error: string): boolean => {
+  const normalized = error.toLowerCase()
+  const mentionsExternal = normalized.includes("external")
+  const mentionsRejectedExternal =
+    normalized.includes("not accepted") ||
+    normalized.includes("cannot apply external") ||
+    normalized.includes("did not accept")
+  return mentionsExternal && mentionsRejectedExternal
 }
 
 export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoot}) => {
@@ -440,6 +451,52 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     }
   }
 
+  const renderFailedMessages = (failedMessages: readonly FailedMessage[]) => {
+    const isSingleFailedMessage = failedMessages.length === 1
+
+    return failedMessages.map((failedMessage, index) => {
+      const hasVmLog = (failedMessage.vm_log_diff ?? "").trim().length > 0
+      const hasExecutorLog = (failedMessage.executor_logs ?? "").trim().length > 0
+      const showExternalNotAcceptedTitle =
+        isSingleFailedMessage && isExternalMessageNotAcceptedError(failedMessage.error)
+
+      return (
+        <div key={`failed-message-${index}`} className={styles.txLogs}>
+          {showExternalNotAcceptedTitle && (
+            <div className={styles.errorTitle}>External message was not accepted</div>
+          )}
+          {!isSingleFailedMessage && (
+            <div className={styles.txHeader}>
+              <span>Failed Message #{index + 1}</span>
+            </div>
+          )}
+          <div className={styles.logSection}>
+            <div className={styles.logSectionTitle}>Error</div>
+            <DataBlock data={failedMessage.error} />
+          </div>
+          {failedMessage.vm_exit_code !== undefined && (
+            <div className={styles.logSection}>
+              <div className={styles.logSectionTitle}>VM Exit Code</div>
+              <DataBlock data={failedMessage.vm_exit_code.toString()} />
+            </div>
+          )}
+          {hasExecutorLog && (
+            <div className={styles.logSection}>
+              <div className={styles.logSectionTitle}>Executor Log</div>
+              <DataBlock data={failedMessage.executor_logs ?? ""} />
+            </div>
+          )}
+          {hasVmLog && (
+            <div className={styles.logSection}>
+              <div className={styles.logSectionTitle}>VM Log</div>
+              <DataBlock data={failedMessage.vm_log_diff ?? ""} />
+            </div>
+          )}
+        </div>
+      )
+    })
+  }
+
   const renderTabContent = () => {
     if (activeTab === "info") {
       return (
@@ -653,21 +710,28 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     if (!currentTraceList) return <div className={styles.empty}>Trace not found</div>
 
     if (activeTab === "transactions") {
+      const failedMessages = currentTraceList.failed_messages ?? []
       if (parsedTransactions.length === 0) {
-        return <div className={styles.empty}>No transaction data available for this trace</div>
+        if (failedMessages.length === 0) {
+          return <div className={styles.empty}>No transaction data available for this trace</div>
+        }
+        return <div>{renderFailedMessages(failedMessages)}</div>
       }
       return (
-        <div className={styles.treeWrapper}>
-          <TransactionTree
-            transactions={parsedTransactions}
-            contracts={contracts}
-            allContracts={allContracts}
-          />
-        </div>
+        <>
+          <div className={styles.treeWrapper}>
+            <TransactionTree
+              transactions={parsedTransactions}
+              contracts={contracts}
+              allContracts={allContracts}
+            />
+          </div>
+          {failedMessages.length > 0 && <div>{renderFailedMessages(failedMessages)}</div>}
+        </>
       )
     }
 
-    const logs = currentTraceList.transactions
+    const transactionLogs = currentTraceList.transactions
       .map((tx, idx) => {
         const hasVmLog = tx.vm_log_diff && tx.vm_log_diff.trim().length > 0
         const hasExecutorLog = tx.executor_logs && tx.executor_logs.trim().length > 0
@@ -695,6 +759,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
         )
       })
       .filter(Boolean)
+    const failedMessageLogs = renderFailedMessages(currentTraceList.failed_messages ?? [])
+    const logs = [...transactionLogs, ...failedMessageLogs]
 
     if (logs.length === 0) {
       return <div className={styles.empty}>No logs for this trace</div>

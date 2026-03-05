@@ -41,6 +41,13 @@ export interface BackendTransaction {
   readonly dest_contract_info?: string
 }
 
+export interface FailedMessage {
+  readonly error: string
+  readonly vm_log_diff?: string
+  readonly vm_exit_code?: number
+  readonly executor_logs?: string
+}
+
 export type BackendExecutorActionFailureReason =
   | {
       readonly type: "not_enough_toncoin_to_send"
@@ -76,6 +83,7 @@ export type BackendExecutorAction =
 export interface TransactionList {
   readonly name?: string
   readonly transactions: BackendTransaction[]
+  readonly failed_messages?: FailedMessage[]
 }
 
 export interface Trace {

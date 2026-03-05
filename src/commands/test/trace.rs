@@ -1,5 +1,5 @@
 use crate::commands::test::{Pos, TestDescriptor};
-use crate::context::{BuildCache, Emulations, KnownAddresses, to_cell};
+use crate::context::{BuildCache, Emulations, FailedSendMessageResult, KnownAddresses, to_cell};
 use retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -23,6 +23,8 @@ pub(super) struct TestTrace {
 pub(super) struct TransactionList {
     pub name: String,
     pub transactions: Vec<TransactionInfo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failed_messages: Vec<FailedMessageInfo>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -47,6 +49,17 @@ pub struct TransactionInfo {
     pub executor_actions: Vec<ExecutorActionInfo>,
     pub actions: Option<Arc<str>>,
     pub dest_contract_info: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FailedMessageInfo {
+    pub error: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vm_log_diff: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vm_exit_code: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executor_logs: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -191,12 +204,25 @@ pub(super) fn dump_test_transactions(
                     }
                 })
                 .collect::<Vec<_>>();
+            let failed_messages = txs.failed_messages.get(trace_index).map_or_else(
+                Vec::new,
+                |trace_failed_messages| {
+                    trace_failed_messages
+                        .iter()
+                        .map(failed_message_info)
+                        .collect::<Vec<_>>()
+                },
+            );
 
             let name = txs
                 .trace_name(trace_transactions)
                 .map_or_else(|| format!("Trace {}", trace_index + 1), ToString::to_string);
 
-            TransactionList { name, transactions }
+            TransactionList {
+                name,
+                transactions,
+                failed_messages,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -252,6 +278,16 @@ pub(super) fn dump_test_transactions(
     fs::write(file_path, str)?;
 
     Ok(())
+}
+
+#[must_use]
+fn failed_message_info(message: &FailedSendMessageResult) -> FailedMessageInfo {
+    FailedMessageInfo {
+        error: message.error.clone(),
+        vm_log_diff: message.vm_log.as_deref().map(vmlogs::convert_to_diff_logs),
+        vm_exit_code: message.vm_exit_code,
+        executor_logs: message.executor_logs.clone(),
+    }
 }
 
 #[cfg(test)]
