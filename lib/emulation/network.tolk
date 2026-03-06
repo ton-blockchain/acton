@@ -465,7 +465,7 @@ fun createExternalMessage<TBody>(dest: address, body: TBody, stateInit: StateIni
                 importFee: ton("0.1"),
             },
             init,
-            body: Either<TBody, Cell<TBody>>.right(body.__asPayload())
+            body: Either<TBody, cell>.right(body.__asPayload())
         }.toCell()
     };
 }
@@ -1225,8 +1225,11 @@ fun unknown.getDeclaredPackPrefix2() {
 fun T.__asPayload(self) {
     return self.toCell()
 }
+fun Cell<T>.__asPayload(self) {
+    return self;
+}
 fun cell.__asPayload(self) {
-    return self as Cell<cell>;
+    return self;
 }
 
 fun __treasuryCode(): cell asm """

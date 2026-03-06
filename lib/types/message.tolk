@@ -248,7 +248,7 @@ type CommonMessageInfo =
 struct Message<TBody = RemainingBitsAndRefs, TInfo = CommonMessageInfo> {
     info: TInfo
     init: Maybe<Either<StateInit, Cell<StateInit>>>
-    body: Either<TBody, Cell<TBody>>
+    body: Either<TBody, cell>
 }
 
 /// Loads `Message.body`.
