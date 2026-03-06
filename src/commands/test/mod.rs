@@ -606,6 +606,8 @@ pub fn find_test_files_recursively(
         "**/.git/**",
         "**/target/**",
         "**/.acton/**",
+        "**/.codex/**",
+        "**/.claude/**",
     ] {
         exclude_builder.add(Glob::new(p)?);
     }

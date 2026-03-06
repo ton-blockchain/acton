@@ -5,7 +5,6 @@ use globset::{Glob, GlobSetBuilder};
 use similar::{ChangeTag, TextDiff};
 use std::fs;
 use std::path::PathBuf;
-use std::str::FromStr;
 use walkdir::WalkDir;
 
 pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
@@ -19,9 +18,16 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         .unwrap_or(false);
 
     let mut ignore_builder = GlobSetBuilder::new();
-    ignore_builder.add(Glob::from_str("**/.git/**")?);
-    ignore_builder.add(Glob::from_str("**/node_modules/**")?);
-    ignore_builder.add(Glob::from_str("**/target/**")?);
+    for p in [
+        "**/node_modules/**",
+        "**/.git/**",
+        "**/target/**",
+        "**/.acton/**",
+        "**/.codex/**",
+        "**/.claude/**",
+    ] {
+        ignore_builder.add(Glob::new(p)?);
+    }
     if let Some(ignores) = ignore_patterns {
         for pattern in ignores {
             ignore_builder.add(Glob::new(pattern)?);

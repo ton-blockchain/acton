@@ -584,6 +584,8 @@ fn find_files(root: &Path) -> anyhow::Result<Vec<PathBuf>> {
         "node_modules",
         "target",
         "tolk-stdlib",
+        ".codex",
+        ".claude",
     ];
 
     let mut exclude_builder = GlobSetBuilder::new();
