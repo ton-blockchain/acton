@@ -159,7 +159,9 @@ pub fn verify_cmd(
         anyhow::bail!("No source files found");
     }
 
-    let mut form = reqwest::blocking::multipart::Form::new();
+    let project_root = acton_config::config::project_root();
+    let mut upload_parts: Vec<UploadPart> = Vec::new();
+    let mut normalized_source_paths: Vec<String> = Vec::new();
 
     for path in &source_files {
         let path = PathBuf::from(path);
@@ -167,26 +169,25 @@ pub fn verify_cmd(
         let Some(filename) = path.file_name().and_then(|it| it.to_str()) else {
             anyhow::bail!("Failed to get filename from path: {}", path.display());
         };
+        let source_path = normalize_source_path_for_verifier(&path, project_root);
+        normalized_source_paths.push(source_path.clone());
 
-        form = form.part(
-            path.to_string_lossy().to_string(),
-            reqwest::blocking::multipart::Part::bytes(file_content).file_name(filename.to_string()),
-        );
+        upload_parts.push(UploadPart {
+            field_name: source_path,
+            file_name: filename.to_string(),
+            bytes: file_content,
+        });
     }
 
-    let sources_meta: Vec<SourceObject> = source_files
+    let sources_meta: Vec<SourceObject> = normalized_source_paths
         .iter()
         .enumerate()
         .map(|(idx, path)| SourceObject {
             include_in_command: true,
-            is_entrypoint: idx == source_files.len() - 1,
+            is_entrypoint: idx == normalized_source_paths.len() - 1,
             is_stdlib: false,
             has_include_directives: true,
-            folder: PathBuf::from(path)
-                .parent()
-                .and_then(|p| p.to_str())
-                .unwrap_or("")
-                .to_string(),
+            folder: source_folder_for_verifier(path),
         })
         .collect();
 
@@ -211,19 +212,13 @@ pub fn verify_cmd(
     };
 
     let json_str = serde_json::to_string(&sources_object)?;
-    form = form.part(
-        "json",
-        reqwest::blocking::multipart::Part::text(json_str)
-            .file_name("blob")
-            .mime_str("application/json")?,
-    );
-
     println!(
         "  {} Sending sources to backend for verification",
         "→".blue().bold()
     );
 
-    let client = reqwest::blocking::Client::new();
+    let sign_client =
+        build_verify_http_client().context("Failed to create HTTP client for verifier backend")?;
     let backend_override = std::env::var("ACTON_VERIFY_BACKEND")
         .ok()
         .map(|s| s.trim().trim_end_matches('/').to_string())
@@ -267,14 +262,70 @@ pub fn verify_cmd(
         }
     }
 
-    let response = client
-        .post(&source_url)
-        .multipart(form)
-        .send()
-        .context("Failed to send request to verification backend")?;
+    let source_max_attempts = parse_max_attempts_from_env("ACTON_VERIFY_SOURCE_MAX_ATTEMPTS", 8);
+    let mut response = None;
+    let mut last_send_error = None;
+    for attempt in 1..=source_max_attempts {
+        let form = build_verify_form(&upload_parts, &json_str)?;
+        let source_client = build_verify_http_client()
+            .context("Failed to create HTTP client for verifier backend")?;
+        match source_client
+            .post(&source_url)
+            .header(reqwest::header::CONNECTION, "close")
+            .multipart(form)
+            .send()
+        {
+            Ok(res) => {
+                let status = res.status();
+                let http_version = format!("{:?}", res.version());
+                let cf_ray = res
+                    .headers()
+                    .get("cf-ray")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("-");
+                let should_retry = status.is_server_error() && attempt < source_max_attempts;
+                if should_retry {
+                    println!(
+                        "  {} Backend returned {} ({}, cf-ray={}) on attempt {attempt}/{source_max_attempts}, retrying...",
+                        "↻".yellow().bold(),
+                        status,
+                        http_version,
+                        cf_ray
+                    );
+                    std::thread::sleep(source_retry_delay(attempt));
+                    continue;
+                }
+                response = Some(res);
+                break;
+            }
+            Err(err) => {
+                let should_retry = attempt < source_max_attempts;
+                if should_retry {
+                    println!(
+                        "  {} Network error on attempt {attempt}/{source_max_attempts}, retrying...\n    {}",
+                        "↻".yellow().bold(),
+                        err.to_string().dimmed()
+                    );
+                    last_send_error = Some(err);
+                    std::thread::sleep(source_retry_delay(attempt));
+                    continue;
+                }
+                return Err(err).context("Failed to send request to verification backend");
+            }
+        }
+    }
+
+    let response = response.ok_or_else(|| {
+        if let Some(err) = last_send_error {
+            anyhow!("Failed to send request to verification backend: {err}")
+        } else {
+            anyhow!("Failed to get response from verification backend")
+        }
+    })?;
 
     if !response.status().is_success() {
         let status = response.status();
+        let http_version = format!("{:?}", response.version());
         let headers = response.headers().clone();
         let error_text = response
             .text()
@@ -305,8 +356,9 @@ pub fn verify_cmd(
 
         let body = truncate_for_display(&error_text, 4_000);
         anyhow::bail!(
-            "Backend compilation failed: HTTP {} at {}{}{}\nResponse body:\n{}",
+            "Backend compilation failed: HTTP {} ({}) at {}{}{}\nResponse body:\n{}",
             status,
+            http_version,
             source_url,
             header_suffix,
             retry_hint,
@@ -379,7 +431,7 @@ pub fn verify_cmd(
             "messageCell": msg_cell,
         });
 
-        let response = client
+        let response = sign_client
             .post(&sign_url)
             .json(&sign_request)
             .send()
@@ -605,6 +657,13 @@ struct BackendInfo {
     id: String,
 }
 
+#[derive(Debug, Clone)]
+struct UploadPart {
+    field_name: String,
+    file_name: String,
+    bytes: Vec<u8>,
+}
+
 fn get_backends() -> anyhow::Result<BackendsConfig> {
     let url =
         "https://raw.githubusercontent.com/ton-community/contract-verifier-config/main/config.json";
@@ -670,6 +729,70 @@ fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Resul
 fn remove_random<T>(els: &mut Vec<T>) -> T {
     let index = (rand::random::<usize>()) % els.len();
     els.remove(index)
+}
+
+fn build_verify_http_client() -> anyhow::Result<reqwest::blocking::Client> {
+    reqwest::blocking::Client::builder()
+        .pool_max_idle_per_host(0)
+        .build()
+        .context("Failed to build verifier HTTP client")
+}
+
+fn build_verify_form(
+    parts: &[UploadPart],
+    json_str: &str,
+) -> anyhow::Result<reqwest::blocking::multipart::Form> {
+    let mut form = reqwest::blocking::multipart::Form::new();
+
+    for part in parts {
+        form = form.part(
+            part.field_name.clone(),
+            reqwest::blocking::multipart::Part::bytes(part.bytes.clone())
+                .file_name(part.file_name.clone()),
+        );
+    }
+
+    form = form.part(
+        "json",
+        reqwest::blocking::multipart::Part::text(json_str.to_owned())
+            .file_name("blob")
+            .mime_str("application/json")?,
+    );
+
+    Ok(form)
+}
+
+fn parse_max_attempts_from_env(env_key: &str, default_value: usize) -> usize {
+    let parsed = std::env::var(env_key)
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|v| *v > 0)
+        .unwrap_or(default_value);
+    parsed.min(64)
+}
+
+fn source_retry_delay(attempt: usize) -> std::time::Duration {
+    let secs = (attempt as u64).min(10);
+    std::time::Duration::from_secs(secs)
+}
+
+fn normalize_source_path_for_verifier(path: &Path, project_root: &Path) -> String {
+    let relative = path.strip_prefix(project_root).unwrap_or(path);
+    relative.to_string_lossy().replace('\\', "/")
+}
+
+fn source_folder_for_verifier(path: &str) -> String {
+    let folder = Path::new(path)
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    if folder.is_empty() {
+        ".".to_string()
+    } else {
+        folder
+    }
 }
 
 fn truncate_for_display(text: &str, max_chars: usize) -> String {
@@ -833,6 +956,19 @@ fn parse_string_ref(parser: &mut tonlib_core::cell::CellParser) -> anyhow::Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normalize_source_path_for_verifier_strips_project_root() {
+        let path = Path::new("/tmp/project/contracts/counter.tolk");
+        let root = Path::new("/tmp/project");
+        let normalized = normalize_source_path_for_verifier(path, root);
+        assert_eq!(normalized, "contracts/counter.tolk");
+    }
+
+    #[test]
+    fn source_folder_for_verifier_returns_dot_for_root_file() {
+        assert_eq!(source_folder_for_verifier("counter.tolk"), ".");
+    }
 
     #[test]
     fn get_backend_info_prefers_verifier_entries() {
