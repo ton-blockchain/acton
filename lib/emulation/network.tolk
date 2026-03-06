@@ -1226,7 +1226,7 @@ fun T.__asPayload(self) {
     return self.toCell()
 }
 fun cell.__asPayload(self) {
-    return self;
+    return self as Cell<cell>;
 }
 
 fun __treasuryCode(): cell asm """
