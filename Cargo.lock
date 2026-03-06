@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "acton"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "acton-config"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -748,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "dap-client"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -2393,7 +2393,7 @@ dependencies = [
 
 [[package]]
 name = "retrace"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "base64",
@@ -2995,7 +2995,7 @@ dependencies = [
 
 [[package]]
 name = "tasm"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -3191,7 +3191,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-analysis"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "bitflags 2.9.4",
  "rustc-hash",
@@ -3203,7 +3203,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-dataflow"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "rustc-hash",
  "tolk-resolver",
@@ -3212,7 +3212,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-linter"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "acton-config",
  "dunce",
@@ -3233,7 +3233,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-macros"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "heck",
  "itertools",
@@ -3244,7 +3244,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-resolver"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "dashmap 7.0.0-rc2",
@@ -3260,7 +3260,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-syntax"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "memchr",
@@ -3270,7 +3270,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-ty"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "dunce",
  "log",
@@ -3283,7 +3283,7 @@ dependencies = [
 
 [[package]]
 name = "tolkc"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "dunce",
@@ -3296,7 +3296,7 @@ dependencies = [
 
 [[package]]
 name = "tolkfmt"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "expect-test",
@@ -3359,7 +3359,7 @@ checksum = "ab16f14aed21ee8bfd8ec22513f7287cd4a91aa92e44edfe2c17ddd004e92607"
 
 [[package]]
 name = "ton-abi"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "crc",
@@ -3375,7 +3375,7 @@ dependencies = [
 
 [[package]]
 name = "ton-api"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -3389,7 +3389,7 @@ dependencies = [
 
 [[package]]
 name = "ton-emulator"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -3406,7 +3406,7 @@ dependencies = [
 
 [[package]]
 name = "ton-executor"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "hex",
@@ -3418,7 +3418,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "base64",
@@ -3433,7 +3433,7 @@ dependencies = [
 
 [[package]]
 name = "ton-litenode"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -3458,7 +3458,7 @@ dependencies = [
 
 [[package]]
 name = "ton-ls"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -3483,7 +3483,7 @@ dependencies = [
 
 [[package]]
 name = "ton-networks"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "serde",
@@ -3491,7 +3491,7 @@ dependencies = [
 
 [[package]]
 name = "ton-source-map"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "pathdiff",
@@ -3695,7 +3695,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tvmffi"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -3911,7 +3911,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vmlogs"
-version = "0.0.6"
+version = "0.0.8"
 dependencies = [
  "thiserror 2.0.18",
  "winnow",

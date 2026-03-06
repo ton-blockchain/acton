@@ -29,6 +29,8 @@ pub struct RunTransactionResultError {
     pub vm_log: Option<String>,
     /// VM exit code (if available).
     pub vm_exit_code: Option<i64>,
+    /// Set by executor.
+    pub executor_logs: Option<Arc<str>>,
 }
 
 /// Information about previous blocks.

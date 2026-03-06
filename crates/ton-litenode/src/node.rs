@@ -310,6 +310,7 @@ impl Node {
             lt,
             gen_utime,
             rand_seed: None,
+            ignore_chksig: false,
         };
         let vm_global_libs = self.build_vm_global_libs_boc()?;
 
@@ -1242,6 +1243,171 @@ impl Node {
         }
 
         // Create empty shard account
+        Self::empty_shard_account_boc()
+    }
+
+    pub fn emulate_trace_by_external_message(
+        &mut self,
+        boc: BocBytes,
+        ignore_chksig: bool,
+        mc_block_seqno: Option<Seqno>,
+    ) -> anyhow::Result<storage::EmulateTraceResult> {
+        let msg_hash = compute_boc_hash(&boc)?;
+        let msg_meta = parse_msg_meta(&boc, msg_hash)?;
+        let dst = msg_meta
+            .dst
+            .ok_or_else(|| anyhow::anyhow!("Msg has no dst"))?;
+
+        let shard_account_boc = self.get_shard_account_for_emulation(&dst, mc_block_seqno)?;
+        let (lt, gen_utime, block_seqno) = self.emulation_context(mc_block_seqno)?;
+        let mut code_cells = HashMap::new();
+        let mut data_cells = HashMap::new();
+        collect_code_data_cells(Some(&shard_account_boc), &mut code_cells, &mut data_cells);
+
+        let config_boc = self
+            .cas
+            .get(&self.globals.config_boc_hash)
+            .context("Config missing")?;
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let ctx = ExecContext {
+            lt,
+            gen_utime,
+            rand_seed: None,
+            ignore_chksig,
+        };
+
+        let exec_result = self.executor.execute(
+            &shard_account_boc,
+            &boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
+        )?;
+
+        let tx_hash = compute_boc_hash(&exec_result.tx_boc)?;
+        let mut out_msg_hashes = Vec::new();
+        let mut out_msgs = Vec::new();
+        for out_boc in &exec_result.out_msgs_boc {
+            let out_hash = compute_boc_hash(out_boc)?;
+            out_msg_hashes.push(out_hash);
+            let out_meta = parse_msg_meta(out_boc, out_hash)?;
+            out_msgs.push(MessageInfo {
+                meta: out_meta,
+                boc: out_boc.clone(),
+            });
+        }
+
+        let compute_exit_code = exec_result.compute_exit_code();
+        let action_result_code = exec_result.action_result_code();
+        let info = exec_result.tx.info.load().ok();
+        let (storage_fees, other_fees) =
+            if let Some(tycho_types::models::TxInfo::Ordinary(ord)) = info {
+                let storage: u128 = ord
+                    .storage_phase
+                    .map(|p| p.storage_fees_collected.into())
+                    .unwrap_or(0);
+                let total: u128 = exec_result.tx.total_fees.tokens.into();
+                (storage, total.saturating_sub(storage))
+            } else {
+                (0, exec_result.tx.total_fees.tokens.into())
+            };
+        let total_fees = exec_result.tx.total_fees.tokens.into();
+
+        let tx_meta = TxMeta {
+            tx_hash,
+            account: dst,
+            lt,
+            now: gen_utime,
+            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            compute_exit_code,
+            action_result_code,
+            total_fees: Some(total_fees),
+            storage_fees: Some(storage_fees),
+            other_fees: Some(other_fees),
+            in_msg_hash: Some(msg_hash),
+            out_msg_hashes,
+            block_seqno,
+        };
+
+        collect_code_data_cells(
+            exec_result.new_account_boc.as_ref(),
+            &mut code_cells,
+            &mut data_cells,
+        );
+
+        Ok(storage::EmulateTraceResult {
+            trace: TraceNode {
+                transaction: TransactionInfo {
+                    meta: tx_meta,
+                    in_msg: Some(MessageInfo {
+                        meta: msg_meta,
+                        boc,
+                    }),
+                    out_msgs,
+                    tx_boc: exec_result.tx_boc,
+                },
+                children: Vec::new(),
+                external_hash: Some(msg_hash),
+            },
+            code_cells,
+            data_cells,
+        })
+    }
+
+    fn get_shard_account_for_emulation(
+        &mut self,
+        addr: &Addr,
+        mc_block_seqno: Option<Seqno>,
+    ) -> anyhow::Result<BocBytes> {
+        let Some(seqno) = mc_block_seqno else {
+            return self.get_shard_account(addr);
+        };
+
+        if seqno == 0 {
+            return self.get_shard_account(addr);
+        }
+
+        if seqno >= self.globals.head_seqno {
+            return self.get_shard_account(addr);
+        }
+
+        if let Some(meta) = self.get_address_information_at_block(addr, seqno)
+            && let Some(boc) = self.cas.get(&meta.account_hash)
+        {
+            return Ok(boc);
+        }
+
+        Self::empty_shard_account_boc()
+    }
+
+    fn emulation_context(&self, mc_block_seqno: Option<Seqno>) -> anyhow::Result<(Lt, u32, Seqno)> {
+        if let Some(seqno) = mc_block_seqno {
+            if seqno == 0 {
+                return Ok((
+                    self.globals.global_lt.saturating_add(self.globals.lt_step),
+                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32,
+                    self.globals.head_seqno,
+                ));
+            }
+
+            let block = self
+                .get_block_header(seqno)
+                .ok_or_else(|| anyhow::anyhow!("Block {seqno} not found"))?;
+            return Ok((
+                block.end_lt.saturating_add(self.globals.lt_step),
+                block.gen_utime,
+                seqno,
+            ));
+        }
+
+        Ok((
+            self.globals.global_lt.saturating_add(self.globals.lt_step),
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32,
+            self.globals.head_seqno,
+        ))
+    }
+
+    fn empty_shard_account_boc() -> anyhow::Result<BocBytes> {
         let sa = ShardAccount {
             account: tycho_types::cell::Lazy::new(&tycho_types::models::OptionalAccount(None))?,
             last_trans_hash: HashBytes([0u8; 32]),
@@ -1341,6 +1507,46 @@ fn compute_boc_hash(boc: &[u8]) -> anyhow::Result<Hash256> {
     let cell = Boc::decode(boc)?;
     let hash = cell.repr_hash();
     Ok(Hash256(*hash.as_array()))
+}
+
+fn collect_code_data_cells(
+    shard_account_boc: Option<&BocBytes>,
+    code_cells: &mut HashMap<Hash256, BocBytes>,
+    data_cells: &mut HashMap<Hash256, BocBytes>,
+) {
+    let Some(shard_account_boc) = shard_account_boc else {
+        return;
+    };
+
+    let Ok(cell) = Boc::decode(shard_account_boc) else {
+        return;
+    };
+    let Ok(shard_account) = cell.parse::<ShardAccount>() else {
+        return;
+    };
+    let Ok(optional_account) = shard_account.account.load() else {
+        return;
+    };
+    let Some(account) = optional_account.0 else {
+        return;
+    };
+    let AccountState::Active(state) = account.state else {
+        return;
+    };
+
+    if let Some(code) = state.code {
+        let hash = Hash256(*code.repr_hash().as_array());
+        code_cells
+            .entry(hash)
+            .or_insert_with(|| Boc::encode(code).into());
+    }
+
+    if let Some(data) = state.data {
+        let hash = Hash256(*data.repr_hash().as_array());
+        data_cells
+            .entry(hash)
+            .or_insert_with(|| Boc::encode(data).into());
+    }
 }
 
 fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {

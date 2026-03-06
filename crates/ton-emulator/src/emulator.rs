@@ -147,7 +147,14 @@ impl Emulator {
 
         let result = match result {
             EmulationResult::Success(result) => result,
-            EmulationResult::Error(err) => return Ok(SendMessageResult::Error(err)),
+            EmulationResult::Error(err) => {
+                return Ok(SendMessageResult::Error(RunTransactionResultError {
+                    error: err.error,
+                    vm_log: err.vm_log,
+                    vm_exit_code: err.vm_exit_code,
+                    executor_logs: Some(executor_logs),
+                }));
+            }
         };
 
         let shard_account_after = Boc::decode_base64(result.shard_account.as_ref())?

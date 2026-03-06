@@ -18,8 +18,8 @@ pub fn map_block_id(id: &LiteNodeBlockId) -> Value {
         "workchain": id.workchain,
         "shard": id.shard.to_string(),
         "seqno": id.seqno,
-        "root_hash": id.root_hash.to_hex(),
-        "file_hash": id.file_hash.to_hex()
+        "root_hash": id.root_hash.to_base64(),
+        "file_hash": id.file_hash.to_base64()
     })
 }
 
@@ -53,7 +53,7 @@ pub fn map_transactions_std(txs: &[LiteNodeTransaction], limit: usize) -> Value 
 pub fn map_transaction(tx: &LiteNodeTransaction) -> Value {
     serde_json::json!({
         "@type": "ext.transaction",
-        "hash": tx.hash.to_hex(),
+        "hash": tx.hash.to_base64(),
         "address": { "@type": "accountAddress", "account_address": tx.address.to_string() },
         "account": tx.address.to_string(),
         "utime": tx.utime,
@@ -90,7 +90,7 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
     }
     serde_json::json!({
         "@type": "raw.message",
-        "hash": msg.hash.to_hex(),
+        "hash": msg.hash.to_base64(),
         "opcode": msg.opcode.map(|op| format!("0x{:08x}", op)),
         "source": msg.source.as_ref().map(|a| a.to_string()).unwrap_or_default(),
         "destination": msg.destination.as_ref().map(|a| a.to_string()).unwrap_or_default(),
@@ -98,7 +98,7 @@ pub fn map_message(msg: &crate::litenode::LiteNodeMessage) -> Value {
         "fwd_fee": msg.fwd_fee.to_string(),
         "ihr_fee": msg.ihr_fee.to_string(),
         "created_lt": msg.created_lt.to_string(),
-        "body_hash": msg.body_hash.to_hex(),
+        "body_hash": msg.body_hash.to_base64(),
         "msg_data": {
             "@type": "msg.dataRaw",
             "body": base64::engine::general_purpose::STANDARD.encode(&msg.body),
@@ -114,14 +114,14 @@ pub fn map_message_std(msg: &crate::litenode::LiteNodeMessage) -> Value {
     }
     serde_json::json!({
         "@type": "raw.message",
-        "hash": msg.hash.to_hex(),
+        "hash": msg.hash.to_base64(),
         "source": map_optional_account_address(msg.source.as_ref()),
         "destination": map_optional_account_address(msg.destination.as_ref()),
         "value": msg.value.to_string(),
         "fwd_fee": msg.fwd_fee.to_string(),
         "ihr_fee": msg.ihr_fee.to_string(),
         "created_lt": msg.created_lt.to_string(),
-        "body_hash": msg.body_hash.to_hex(),
+        "body_hash": msg.body_hash.to_base64(),
         "msg_data": {
             "@type": "msg.dataRaw",
             "body": base64::engine::general_purpose::STANDARD.encode(&msg.body),
@@ -140,7 +140,7 @@ pub fn map_account_state(s: &LiteNodeAccountState) -> Value {
         "block_id": map_block_id(&s.block_id),
         "code": encode_optional_boc(s.code.as_ref()),
         "data": encode_optional_boc(s.data.as_ref()),
-        "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_hex()).unwrap_or_default(),
+        "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_base64()).unwrap_or_default(),
         "sync_utime": s.sync_utime,
         "state": match s.state {
             AccountStatus::Active => "active",
@@ -169,7 +169,7 @@ pub fn map_extended_account_state(s: &LiteNodeAccountState) -> Value {
                 "@type": "raw.accountState",
                 "code": encode_optional_boc(s.code.as_ref()),
                 "data": encode_optional_boc(s.data.as_ref()),
-                "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_hex()).unwrap_or_default()
+                "frozen_hash": s.frozen_hash.as_ref().map(|h| h.to_base64()).unwrap_or_default()
             }),
         },
         "revision": 0
@@ -221,7 +221,7 @@ pub fn map_masterchain_info(mi: &LiteNodeMasterchainInfo) -> Value {
     serde_json::json!({
         "@type": "blocks.masterchainInfo",
         "last": map_block_id(&mi.last),
-        "state_root_hash": mi.state_root_hash.to_hex(),
+        "state_root_hash": mi.state_root_hash.to_base64(),
         "init": map_block_id(&mi.init)
     })
 }
@@ -243,7 +243,7 @@ pub fn map_libraries(libs: &[LiteNodeLibrary]) -> Value {
             .map(|(lib, data)| {
                 serde_json::json!({
                     "@type": "smc.libraryEntry",
-                    "hash": lib.hash.to_hex(),
+                    "hash": lib.hash.to_base64(),
                     "data": base64::engine::general_purpose::STANDARD.encode(data),
                 })
             })
@@ -400,7 +400,7 @@ fn map_internal_transaction_id(id: &LiteNodeTransactionId) -> Value {
     serde_json::json!({
         "@type": "internal.transactionId",
         "lt": id.lt.to_string(),
-        "hash": id.hash.to_hex()
+        "hash": id.hash.to_base64()
     })
 }
 

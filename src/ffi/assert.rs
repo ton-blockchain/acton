@@ -167,12 +167,12 @@ fn expect_to_end_with_exit_code_impl(
     Ok(())
 }
 
-extension!(fail_to_find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple, message: String, location: String) using fail_to_find_transaction_by_params_impl);
+extension!(fail_to_find_transaction_by_params in (Context) with (params: Tuple, txs: Vec<TupleItem>, message: String, location: String) using fail_to_find_transaction_by_params_impl);
 fn fail_to_find_transaction_by_params_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
     params: Tuple,
-    txs: Tuple,
+    txs: Vec<TupleItem>,
     message: String,
     location: String,
 ) -> anyhow::Result<()> {
@@ -195,7 +195,7 @@ fn fail_to_find_transaction_by_params_impl(
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionNotFound(
         TransactionGenericAssertFailure {
-            txs: txs.to_typed("SendResultList"),
+            txs: TupleItem::big_array_from_items(txs).to_typed("SendResultList"),
             parsed_txs,
             params,
             message: Some(message),
@@ -205,12 +205,12 @@ fn fail_to_find_transaction_by_params_impl(
     Ok(())
 }
 
-extension!(fail_to_not_find_transaction_by_params in (Context) with (params: Tuple, txs: Tuple, message: String, location: String) using fail_to_not_find_transaction_by_params_impl);
+extension!(fail_to_not_find_transaction_by_params in (Context) with (params: Tuple, txs: Vec<TupleItem>, message: String, location: String) using fail_to_not_find_transaction_by_params_impl);
 fn fail_to_not_find_transaction_by_params_impl(
     ctx: &mut Context,
     _stack: &mut Tuple,
     params: Tuple,
-    txs: Tuple,
+    txs: Vec<TupleItem>,
     message: String,
     location: String,
 ) -> anyhow::Result<()> {
@@ -233,7 +233,7 @@ fn fail_to_not_find_transaction_by_params_impl(
 
     *ctx.asserts.assert_failure = Some(AssertFailure::TransactionIsFound(
         TransactionGenericAssertFailure {
-            txs: txs.to_typed("SendResultList"),
+            txs: TupleItem::big_array_from_items(txs).to_typed("SendResultList"),
             parsed_txs,
             params,
             message: if message.is_empty() {
@@ -263,13 +263,12 @@ fn fail_wallet_not_found_impl(
 
 #[must_use]
 pub fn process_txs_and_search_params(
-    txs: &Tuple,
+    txs: &[TupleItem],
     params: &Tuple,
 ) -> Option<(TransactionNotFoundParams, Vec<Transaction>)> {
     let params = parse_search_params(params)?;
 
     let parsed_txs = txs
-        .0
         .iter()
         .filter_map(|el| match el {
             TupleItem::Tuple(tuple) => match tuple.first() {

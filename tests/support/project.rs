@@ -21,7 +21,7 @@ pub(crate) struct ProjectBuilder {
     lint_levels: BTreeMap<String, String>,
     lint_excludes: Vec<String>,
     lint_max_warnings: Option<usize>,
-    lint_sarif_path: Option<String>,
+    lint_output_format: Option<String>,
     test_config: Option<TestConfig>,
     license: Option<String>,
     create_acton_toml: bool,
@@ -308,7 +308,7 @@ impl ProjectBuilder {
             lint_levels: BTreeMap::new(),
             lint_excludes: Vec::new(),
             lint_max_warnings: None,
-            lint_sarif_path: None,
+            lint_output_format: None,
             test_config: None,
             license: Some("MIT".to_string()),
             create_acton_toml: true,
@@ -373,9 +373,9 @@ impl ProjectBuilder {
         self
     }
 
-    /// Configure path for SARIF report output from `acton check`.
-    pub(crate) fn with_lint_sarif_path(mut self, path: &str) -> Self {
-        self.lint_sarif_path = Some(path.to_string());
+    /// Configure format report output from `acton check`.
+    pub(crate) fn with_lint_output_format(mut self, format: &str) -> Self {
+        self.lint_output_format = Some(format.to_string());
         self
     }
 
@@ -668,7 +668,7 @@ impl ProjectBuilder {
                 &self.lint_levels,
                 &self.lint_excludes,
                 self.lint_max_warnings,
-                self.lint_sarif_path.clone(),
+                self.lint_output_format,
                 &self.test_config,
                 &self.license,
             );
@@ -705,7 +705,7 @@ impl ProjectBuilder {
         lint_levels: &BTreeMap<String, String>,
         lint_excludes: &[String],
         lint_max_warnings: Option<usize>,
-        lint_sarif_path: Option<String>,
+        lint_output_format: Option<String>,
         test_config: &Option<TestConfig>,
         license: &Option<String>,
     ) {
@@ -812,7 +812,8 @@ version = "0.1.0"
             toml_content.push('\n');
         }
 
-        if !lint_excludes.is_empty() || lint_max_warnings.is_some() || lint_sarif_path.is_some() {
+        if !lint_excludes.is_empty() || lint_max_warnings.is_some() || lint_output_format.is_some()
+        {
             toml_content.push_str("[lint]\n");
             if !lint_excludes.is_empty() {
                 toml_content.push_str("exclude = [");
@@ -828,12 +829,12 @@ version = "0.1.0"
             if let Some(max_warnings) = lint_max_warnings {
                 toml_content.push_str(&format!("max-warnings = {max_warnings}\n"));
             }
-            toml_content.push('\n');
-        }
 
-        if let Some(path) = lint_sarif_path {
-            toml_content.push_str("[lint.output.sarif]\n");
-            toml_content.push_str(&format!("path = \"{path}\"\n\n"));
+            if let Some(output_format) = lint_output_format {
+                toml_content.push_str(&format!("output-format = \"{output_format}\"\n"));
+            }
+
+            toml_content.push('\n');
         }
 
         if !lint_levels.is_empty() {

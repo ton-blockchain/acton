@@ -1,6 +1,6 @@
 ---
 title: "Outputs and CI"
-description: "Use JSON, SARIF, and exit codes in automation"
+description: "Use JSON, SARIF, GitHub annotations, and exit codes in automation"
 ---
 
 ## Console Output
@@ -12,7 +12,7 @@ If autofixes are available and `--fix` is not used, Acton prints a reminder to r
 ## JSON Output
 
 ```bash
-acton check --json
+acton check --output-format json
 ```
 
 This prints a JSON object to stdout with:
@@ -22,28 +22,42 @@ This prints a JSON object to stdout with:
 
 Use this mode for editor integrations and custom tooling.
 
-`--json` never applies file edits. Even if you pass `--fix`, fixes are only reported in JSON output and must be applied separately.
+JSON output never applies file edits. Even if you pass `--fix`, fixes are only reported and must be applied separately.
 
 ## SARIF Report
 
 Write SARIF to a file:
 
 ```bash
-acton check --sarif .acton/reports/lint.sarif
+acton check --output-format sarif --output-file .acton/reports/lint.sarif
 ```
 
-Or configure it in `Acton.toml`:
+Or configure format in `Acton.toml`:
 
 ```toml
-[lint.output.sarif]
-path = ".acton/reports/lint.sarif"
+[lint]
+output-format = "sarif"
 ```
 
-When both are set, CLI wins for that run:
+Then choose destination for that run:
 
 ```bash
-acton check --sarif reports/ci.sarif
+acton check --output-file reports/ci.sarif
 ```
+
+SARIF output never applies file edits. Even if you pass `--fix`, fixes are only reported and must be applied separately.
+
+## GitHub Annotations
+
+```bash
+acton check --output-format github
+```
+
+This format prints GitHub Actions workflow commands (`::warning ...`, `::error ...`) so diagnostics appear as annotations in Actions logs and checks.
+
+For GitHub Actions annotations, keep this output on `stdout` so the runner can parse workflow commands.
+
+Like other non-plain formats, this mode never applies file edits.
 
 ## Exit Code Rules
 
@@ -61,4 +75,4 @@ Example CI policy:
 max-warnings = 0
 ```
 
-These exit rules are the same for console and JSON modes.
+These exit rules are the same for all output formats (`plain`, `json`, `sarif`, `github`).

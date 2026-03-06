@@ -18,6 +18,16 @@ pub enum Explorer {
     Tonviewer,
 }
 
+#[derive(clap::ValueEnum, Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum CheckOutputFormat {
+    #[default]
+    Plain,
+    Json,
+    Sarif,
+    Github,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Default)]
 pub enum DependencyKind {
     #[serde(rename = "embed_code")]
@@ -146,18 +156,6 @@ pub struct LintRules {
     pub entries: BTreeMap<String, LintEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "kebab-case")]
-pub struct LintOutputSarifConfig {
-    pub path: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "kebab-case")]
-pub struct LintOutputConfig {
-    pub sarif: Option<LintOutputSarifConfig>,
-}
-
 const fn default_max_warnings() -> usize {
     usize::MAX
 }
@@ -168,7 +166,7 @@ pub struct LintConfig {
     pub exclude: Option<Vec<String>>,
     #[serde(default = "default_max_warnings")]
     pub max_warnings: usize,
-    pub output: Option<LintOutputConfig>,
+    pub output_format: Option<CheckOutputFormat>,
     pub rules: Option<LintRules>,
     #[serde(flatten)]
     pub metadata: BTreeMap<String, toml::Value>,
@@ -179,7 +177,7 @@ impl Default for LintConfig {
         Self {
             exclude: None,
             max_warnings: default_max_warnings(),
-            output: None,
+            output_format: None,
             rules: None,
             metadata: BTreeMap::new(),
         }
@@ -738,9 +736,7 @@ version = "0.1.0"
 [lint]
 exclude = ["contracts/skip.tolk"]
 max-warnings = 3
-
-[lint.output.sarif]
-path = ".acton/reports/lint.sarif"
+output-format = "sarif"
 
 [lint.rules]
 unused-variable = "deny"
@@ -757,15 +753,7 @@ unused-variable = "allow"
             &vec!["contracts/skip.tolk".to_string()]
         );
         assert_eq!(lint_settings.max_warnings, 3);
-        assert_eq!(
-            lint_settings
-                .output
-                .as_ref()
-                .and_then(|output| output.sarif.as_ref())
-                .and_then(|sarif| sarif.path.as_ref())
-                .map(String::as_str),
-            Some(".acton/reports/lint.sarif")
-        );
+        assert_eq!(lint_settings.output_format, Some(CheckOutputFormat::Sarif));
 
         let lint = lint_settings.rules.as_ref().unwrap();
 

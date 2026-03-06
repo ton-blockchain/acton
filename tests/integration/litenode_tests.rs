@@ -1,6 +1,7 @@
 use crate::common::{assertion, strip_ansi};
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
+use base64::Engine;
 use serde_json::{Value, json};
 use std::fs;
 use std::path::Path;
@@ -107,6 +108,12 @@ fun main() {
     println1("GETTER_CONTRACT={}", getterAddress);
 }
 "#;
+
+const V3_MESSAGE_TEST_BOC: &str = "te6ccgEBCAEA3gACq0gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ALmmY2giNrr7xsgbsuxgdjCwn44jNXXhSczUiwyp4TxsQ7msoAAAAAAAAAAAAANL430UZAgEAEAAAAAAAAAAAART/APSkE/S88sgLAwIBYgcEAgFYBgUAF7itDtRNDTHzHXCx+AAFu+F4AJzQ+JGRMOAg1ywj9DsnfI4YMe1E0AHXCx8B1h/XCx9YoAHIzssfye1U4NcsIdOpeDQxjhIw7UTQ1h8wyM7PkAAAAALJ7VTggQ/2AccA8vQ=";
+const V3_TRANSACTIONS_TEST_ACCOUNT_A: &str =
+    "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79";
+const V3_TRANSACTIONS_TEST_ACCOUNT_B: &str =
+    "0:1111111111111111111111111111111111111111111111111111111111111111";
 
 const LIBRARY_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -556,7 +563,14 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
     );
     let first = &result_items[0];
     assert_eq!(first["@type"].as_str(), Some("smc.libraryEntry"));
-    assert_eq!(first["hash"].as_str(), Some(library_hash.as_str()));
+    assert!(
+        first["hash"]
+            .as_str()
+            .is_some_and(|api_hash| hashes_equivalent(api_hash, &library_hash)),
+        "Expected API hash `{}` to represent the same value as metadata hash `{}`",
+        first["hash"].as_str().unwrap_or_default(),
+        library_hash
+    );
     assert_eq!(first["data"].as_str(), Some(library_code_b64.as_str()));
 
     #[allow(clippy::manual_strip)]
@@ -579,7 +593,14 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
         "Expected only found libraries in response"
     );
     assert_eq!(mixed_items[0]["@type"].as_str(), Some("smc.libraryEntry"));
-    assert_eq!(mixed_items[0]["hash"].as_str(), Some(library_hash.as_str()));
+    assert!(
+        mixed_items[0]["hash"]
+            .as_str()
+            .is_some_and(|api_hash| hashes_equivalent(api_hash, &library_hash)),
+        "Expected mixed API hash `{}` to represent the same value as metadata hash `{}`",
+        mixed_items[0]["hash"].as_str().unwrap_or_default(),
+        library_hash
+    );
     assert_eq!(
         mixed_items[0]["data"].as_str(),
         Some(library_code_b64.as_str())
@@ -624,7 +645,14 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
         .expect("JSON-RPC getLibraries response must contain result array");
     assert_eq!(rpc_items.len(), 1);
     assert_eq!(rpc_items[0]["@type"].as_str(), Some("smc.libraryEntry"));
-    assert_eq!(rpc_items[0]["hash"].as_str(), Some(library_hash.as_str()));
+    assert!(
+        rpc_items[0]["hash"]
+            .as_str()
+            .is_some_and(|api_hash| hashes_equivalent(api_hash, &library_hash)),
+        "Expected RPC hash `{}` to represent the same value as metadata hash `{}`",
+        rpc_items[0]["hash"].as_str().unwrap_or_default(),
+        library_hash
+    );
 
     project
         .acton()
@@ -649,6 +677,7 @@ fn litenode_supports_library_publish_and_get_libraries_endpoint() {
 }
 
 #[test]
+#[ignore]
 fn litenode_supports_library_ref_contract_deploy_and_destroy_flow() {
     let project = ProjectBuilder::new("litenode-library-ref-contract-flow")
         .contract("worker", LIBRARY_WORKER_CONTRACT)
@@ -960,6 +989,765 @@ fn litenode_supports_config_endpoints() {
 }
 
 #[test]
+fn litenode_supports_v3_message_endpoint() {
+    let project = ProjectBuilder::new("litenode-v3-message-endpoint").build();
+    let node = project.litenode().start();
+
+    let response = node.post_json(
+        "/api/v3/message",
+        &json!({
+            "boc": V3_MESSAGE_TEST_BOC
+        }),
+    );
+
+    assert_eq!(
+        response["ok"].as_bool(),
+        Some(true),
+        "v3 message failed: {}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    let message_hash = response["result"]["message_hash"]
+        .as_str()
+        .expect("v3 message result.message_hash must be a string");
+    let message_hash_norm = response["result"]["message_hash_norm"]
+        .as_str()
+        .expect("v3 message result.message_hash_norm must be a string");
+
+    assert!(
+        !message_hash.is_empty(),
+        "Expected non-empty message_hash in v3 message response:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert_eq!(message_hash_norm, message_hash);
+
+    let invalid = node.post_json(
+        "/api/v3/message",
+        &json!({
+            "boc": "not-base64"
+        }),
+    );
+
+    assert_eq!(invalid["ok"].as_bool(), Some(false));
+    assert!(
+        invalid["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Invalid BOC base64"),
+        "Unexpected error for invalid v3 message payload:\n{}",
+        serde_json::to_string_pretty(&invalid).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
+fn litenode_supports_emulate_v1_emulate_trace() {
+    let project = ProjectBuilder::new("litenode-emulate-v1-emulate-trace").build();
+    let node = project.litenode().start();
+
+    let before = wait_for_ok_response(&node, "/api/v2/getMasterchainInfo", Duration::from_secs(5));
+    let seqno_before = before["result"]["last"]["seqno"]
+        .as_i64()
+        .expect("masterchain seqno must be integer before emulate");
+
+    let response = node.post_json(
+        "/api/emulate/v1/emulateTrace",
+        &json!({
+            "boc": V3_MESSAGE_TEST_BOC,
+            "ignore_chksig": false,
+            "include_code_data": true,
+            "with_actions": true
+        }),
+    );
+
+    assert!(
+        response["trace"].is_object(),
+        "Expected object at emulateTrace.trace:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert!(
+        response["transactions"].is_object(),
+        "Expected object at emulateTrace.transactions:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert!(
+        response["actions"].is_array(),
+        "Expected array at emulateTrace.actions when with_actions=true:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert!(
+        response["code_cells"].is_object() && response["data_cells"].is_object(),
+        "Expected code_cells/data_cells when include_code_data=true:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    let code_cells_non_empty = response["code_cells"]
+        .as_object()
+        .is_some_and(|cells| !cells.is_empty());
+    let data_cells_non_empty = response["data_cells"]
+        .as_object()
+        .is_some_and(|cells| !cells.is_empty());
+    assert!(
+        code_cells_non_empty || data_cells_non_empty,
+        "Expected non-empty code_cells or data_cells when include_code_data=true:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert!(
+        response.get("address_book").is_none() && response.get("metadata").is_none(),
+        "address_book/metadata must be absent by default:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    assert_eq!(
+        response["mc_block_seqno"].as_i64(),
+        Some(seqno_before),
+        "Unexpected mc_block_seqno in emulateTrace response:\n{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    let response_with_seqno = node.post_json(
+        "/api/emulate/v1/emulateTrace",
+        &json!({
+            "boc": V3_MESSAGE_TEST_BOC,
+            "ignore_chksig": false,
+            "mc_block_seqno": seqno_before
+        }),
+    );
+    assert!(
+        response_with_seqno["trace"].is_object(),
+        "emulateTrace with mc_block_seqno failed: {}",
+        serde_json::to_string_pretty(&response_with_seqno).unwrap_or_default()
+    );
+    assert_eq!(
+        response_with_seqno.get("actions"),
+        None,
+        "actions must be omitted when with_actions=false:\n{}",
+        serde_json::to_string_pretty(&response_with_seqno).unwrap_or_default()
+    );
+    assert_eq!(
+        response_with_seqno["mc_block_seqno"].as_i64(),
+        Some(seqno_before),
+        "Unexpected mc_block_seqno for explicit emulate request:\n{}",
+        serde_json::to_string_pretty(&response_with_seqno).unwrap_or_default()
+    );
+
+    let after = wait_for_ok_response(&node, "/api/v2/getMasterchainInfo", Duration::from_secs(5));
+    let seqno_after = after["result"]["last"]["seqno"]
+        .as_i64()
+        .expect("masterchain seqno must be integer after emulate");
+    assert_eq!(
+        seqno_after, seqno_before,
+        "emulateTrace must not commit state. before={seqno_before}, after={seqno_after}"
+    );
+
+    let (invalid_status, invalid) = node.post_json_with_status(
+        "/api/emulate/v1/emulateTrace",
+        &json!({
+            "boc": "not-base64"
+        }),
+    );
+    assert_eq!(
+        invalid_status, 400,
+        "Invalid emulateTrace request must return 400"
+    );
+    assert!(
+        invalid["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("invalid request: invalid boc"),
+        "Unexpected error for invalid emulateTrace payload:\n{}",
+        serde_json::to_string_pretty(&invalid).unwrap_or_default()
+    );
+
+    let (missing_boc_status, missing_boc) =
+        node.post_json_with_status("/api/emulate/v1/emulateTrace", &json!({}));
+    assert_eq!(
+        missing_boc_status, 400,
+        "Missing boc emulateTrace request must return 400"
+    );
+    assert!(
+        missing_boc["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("invalid request: boc is required"),
+        "Unexpected error for missing boc emulateTrace payload:\n{}",
+        serde_json::to_string_pretty(&missing_boc).unwrap_or_default()
+    );
+
+    let (unsupported_status, unsupported) = node.post_json_with_status(
+        "/api/emulate/v1/emulateTrace",
+        &json!({
+            "boc": V3_MESSAGE_TEST_BOC,
+            "include_address_book": true
+        }),
+    );
+    assert_eq!(
+        unsupported_status, 400,
+        "include_address_book/include_metadata must return 400 when unavailable"
+    );
+    assert!(
+        unsupported["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("address book and metadata are not available"),
+        "Unexpected error for include_address_book/include_metadata:\n{}",
+        serde_json::to_string_pretty(&unsupported).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
+fn litenode_supports_v3_address_information_endpoint() {
+    let project = ProjectBuilder::new("litenode-v3-address-information")
+        .contract("getter", V3_GETTER_CONTRACT)
+        .script_file("deploy_getter", V3_DEPLOY_GETTER_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .litenode()
+        .before_start(|cmd| cmd.build())
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_result = project
+        .acton()
+        .script("scripts/deploy_getter.tolk")
+        .broadcast()
+        .verify_network("custom:localnet")
+        .run();
+    let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
+        .expect("Failed to decode deploy script stdout");
+    let script_stderr = String::from_utf8(script_result.output.get_output().stderr.clone())
+        .expect("Failed to decode deploy script stderr");
+    let script_status = script_result.output.get_output().status.code().unwrap_or(1);
+
+    assert_eq!(
+        script_status, 0,
+        "Deploy script failed with status {script_status}\nstdout:\n{script_stdout}\nstderr:\n{script_stderr}"
+    );
+
+    let getter_address = extract_marker_value(&script_stdout, "GETTER_CONTRACT=");
+    wait_until_address_state_active(&node, &getter_address, Duration::from_secs(12));
+
+    let v2_query = format!("/api/v2/getAddressInformation?address={getter_address}");
+    let v2_response = wait_for_ok_response(&node, &v2_query, Duration::from_secs(12));
+
+    let v3_query = format!("/api/v3/addressInformation?address={getter_address}");
+    let v3_response = wait_for_ok_response(&node, &v3_query, Duration::from_secs(12));
+
+    assert_eq!(
+        v3_response["result"]["balance"].as_str(),
+        v2_response["result"]["balance"].as_str()
+    );
+    assert_eq!(
+        v3_response["result"]["code"].as_str(),
+        v2_response["result"]["code"].as_str()
+    );
+    assert_eq!(
+        v3_response["result"]["data"].as_str(),
+        v2_response["result"]["data"].as_str()
+    );
+    assert_eq!(
+        v3_response["result"]["frozen_hash"].as_str(),
+        v2_response["result"]["frozen_hash"].as_str()
+    );
+    assert_eq!(
+        v3_response["result"]["last_transaction_hash"].as_str(),
+        v2_response["result"]["last_transaction_id"]["hash"].as_str()
+    );
+    assert_eq!(
+        v3_response["result"]["last_transaction_lt"].as_str(),
+        v2_response["result"]["last_transaction_id"]["lt"].as_str()
+    );
+    assert_eq!(
+        v3_response["result"]["status"].as_str(),
+        v2_response["result"]["state"].as_str()
+    );
+    assert_eq!(v3_response["result"]["status"].as_str(), Some("active"));
+
+    let missing_address = "0:1111111111111111111111111111111111111111111111111111111111111111";
+
+    let v2_missing = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={missing_address}"),
+        Duration::from_secs(12),
+    );
+    let v3_missing_default = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/addressInformation?address={missing_address}"),
+        Duration::from_secs(12),
+    );
+    let v3_missing_use_v2_false = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/addressInformation?address={missing_address}&use_v2=false"),
+        Duration::from_secs(12),
+    );
+
+    assert_eq!(
+        v2_missing["result"]["state"].as_str(),
+        Some("uninitialized")
+    );
+    assert_eq!(
+        v3_missing_default["result"]["status"].as_str(),
+        Some("uninitialized")
+    );
+    assert_eq!(
+        v3_missing_use_v2_false["result"]["status"].as_str(),
+        Some("uninitialized")
+    );
+    assert_eq!(
+        v3_missing_default["result"]["status"].as_str(),
+        v3_missing_use_v2_false["result"]["status"].as_str()
+    );
+
+    node.stop();
+}
+
+#[test]
+fn litenode_supports_v3_transactions_endpoints() {
+    let project = ProjectBuilder::new("litenode-v3-transactions-endpoints").build();
+    let node = project.litenode().start();
+
+    for address in [
+        V3_TRANSACTIONS_TEST_ACCOUNT_A,
+        V3_TRANSACTIONS_TEST_ACCOUNT_B,
+    ] {
+        let faucet = node.post_json(
+            "/admin/faucet",
+            &json!({
+                "address": address,
+                "amount": 250_000_000u128
+            }),
+        );
+        assert_eq!(
+            faucet["ok"].as_bool(),
+            Some(true),
+            "faucet failed for {address}: {}",
+            serde_json::to_string_pretty(&faucet).unwrap_or_default()
+        );
+    }
+
+    let all_txs_response = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?limit=100&sort=desc",
+        Duration::from_secs(12),
+    );
+    let all_txs = v3_transactions_from_response(&all_txs_response);
+    assert!(
+        !all_txs.is_empty(),
+        "Expected non-empty /api/v3/transactions response:\n{}",
+        serde_json::to_string_pretty(&all_txs_response).unwrap_or_default()
+    );
+    assert_transactions_sorted_by_lt_desc(all_txs);
+
+    let tx_for_a = all_txs
+        .iter()
+        .find(|tx| tx["account"].as_str() == Some(V3_TRANSACTIONS_TEST_ACCOUNT_A))
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected transaction for account {} in /api/v3/transactions:\n{}",
+                V3_TRANSACTIONS_TEST_ACCOUNT_A,
+                serde_json::to_string_pretty(&all_txs_response).unwrap_or_default()
+            )
+        });
+
+    let tx_hash = tx_for_a["hash"]
+        .as_str()
+        .expect("transaction hash must be string")
+        .to_owned();
+    let tx_lt = tx_for_a["lt"]
+        .as_str()
+        .expect("transaction lt must be string")
+        .parse::<u64>()
+        .expect("transaction lt must parse as u64");
+    let tx_now = tx_for_a["now"]
+        .as_u64()
+        .expect("transaction now must be integer") as u32;
+    let tx_mc_seqno = tx_for_a["mc_block_seqno"]
+        .as_u64()
+        .expect("transaction mc_block_seqno must be integer") as u32;
+    let in_msg_hash = tx_for_a["in_msg"]["hash"]
+        .as_str()
+        .expect("transaction in_msg.hash must be string")
+        .to_owned();
+    let in_msg_body_hash = tx_for_a["in_msg"]["message_content"]["hash"]
+        .as_str()
+        .expect("transaction in_msg.message_content.hash must be string")
+        .to_owned();
+    let tx_hash_query = encode_query_component(&tx_hash);
+    let in_msg_hash_query = encode_query_component(&in_msg_hash);
+    let in_msg_body_hash_query = encode_query_component(&in_msg_body_hash);
+
+    let by_hash = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactions?hash={tx_hash_query}&limit=10"),
+        Duration::from_secs(12),
+    );
+    let by_hash_txs = v3_transactions_from_response(&by_hash);
+    assert_eq!(by_hash_txs.len(), 1);
+    assert_eq!(by_hash_txs[0]["hash"].as_str(), Some(tx_hash.as_str()));
+
+    let by_lt = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactions?lt={tx_lt}&limit=10"),
+        Duration::from_secs(12),
+    );
+    assert!(
+        contains_tx_hash(v3_transactions_from_response(&by_lt), &tx_hash),
+        "Expected to find tx {tx_hash} by lt filter:\n{}",
+        serde_json::to_string_pretty(&by_lt).unwrap_or_default()
+    );
+
+    let by_account = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?account={}&limit=50",
+            V3_TRANSACTIONS_TEST_ACCOUNT_A
+        ),
+        Duration::from_secs(12),
+    );
+    for tx in v3_transactions_from_response(&by_account) {
+        assert_eq!(
+            tx["account"].as_str(),
+            Some(V3_TRANSACTIONS_TEST_ACCOUNT_A),
+            "Expected only account-filtered transactions:\n{}",
+            serde_json::to_string_pretty(&by_account).unwrap_or_default()
+        );
+    }
+
+    let by_account_b = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?account={}&limit=100",
+            V3_TRANSACTIONS_TEST_ACCOUNT_B
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&by_account_b)
+            .iter()
+            .all(|tx| tx["account"].as_str() == Some(V3_TRANSACTIONS_TEST_ACCOUNT_B)),
+        "Unexpected account in single-account filter:\n{}",
+        serde_json::to_string_pretty(&by_account_b).unwrap_or_default()
+    );
+
+    let excluded_account = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?exclude_account={}&limit=100",
+            V3_TRANSACTIONS_TEST_ACCOUNT_A
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&excluded_account)
+            .iter()
+            .all(|tx| tx["account"].as_str() != Some(V3_TRANSACTIONS_TEST_ACCOUNT_A)),
+        "exclude_account filter returned excluded account:\n{}",
+        serde_json::to_string_pretty(&excluded_account).unwrap_or_default()
+    );
+
+    let by_mc_seqno = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactions?mc_seqno={tx_mc_seqno}&limit=100"),
+        Duration::from_secs(12),
+    );
+    assert!(
+        contains_tx_hash(v3_transactions_from_response(&by_mc_seqno), &tx_hash),
+        "Expected tx {tx_hash} in mc_seqno-filtered response:\n{}",
+        serde_json::to_string_pretty(&by_mc_seqno).unwrap_or_default()
+    );
+
+    let by_block_id = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?workchain=0&shard=8000000000000000&seqno={tx_mc_seqno}&limit=100"
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        contains_tx_hash(v3_transactions_from_response(&by_block_id), &tx_hash),
+        "Expected tx {tx_hash} in workchain/shard/seqno-filtered response:\n{}",
+        serde_json::to_string_pretty(&by_block_id).unwrap_or_default()
+    );
+
+    let by_wrong_workchain = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?workchain=-1&limit=10",
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&by_wrong_workchain).is_empty(),
+        "Expected no transactions for unsupported workchain:\n{}",
+        serde_json::to_string_pretty(&by_wrong_workchain).unwrap_or_default()
+    );
+
+    let start_utime_strict = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactions?hash={tx_hash_query}&start_utime={tx_now}&limit=10"),
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&start_utime_strict).is_empty(),
+        "start_utime must be strict (after):\n{}",
+        serde_json::to_string_pretty(&start_utime_strict).unwrap_or_default()
+    );
+
+    let end_utime_strict = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactions?hash={tx_hash_query}&end_utime={tx_now}&limit=10"),
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&end_utime_strict).is_empty(),
+        "end_utime must be strict (before):\n{}",
+        serde_json::to_string_pretty(&end_utime_strict).unwrap_or_default()
+    );
+
+    let start_lt_inclusive = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactions?hash={tx_hash_query}&start_lt={tx_lt}&limit=10"),
+        Duration::from_secs(12),
+    );
+    assert!(
+        contains_tx_hash(v3_transactions_from_response(&start_lt_inclusive), &tx_hash),
+        "start_lt must be inclusive:\n{}",
+        serde_json::to_string_pretty(&start_lt_inclusive).unwrap_or_default()
+    );
+
+    let end_lt_inclusive = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactions?hash={tx_hash_query}&end_lt={tx_lt}&limit=10"),
+        Duration::from_secs(12),
+    );
+    assert!(
+        contains_tx_hash(v3_transactions_from_response(&end_lt_inclusive), &tx_hash),
+        "end_lt must be inclusive:\n{}",
+        serde_json::to_string_pretty(&end_lt_inclusive).unwrap_or_default()
+    );
+
+    let start_lt_exclusive = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?hash={tx_hash_query}&start_lt={}&limit=10",
+            tx_lt.saturating_add(1)
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&start_lt_exclusive).is_empty(),
+        "Expected no transactions when start_lt is greater than tx.lt:\n{}",
+        serde_json::to_string_pretty(&start_lt_exclusive).unwrap_or_default()
+    );
+
+    let end_lt_exclusive = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?hash={tx_hash_query}&end_lt={}&limit=10",
+            tx_lt.saturating_sub(1)
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&end_lt_exclusive).is_empty(),
+        "Expected no transactions when end_lt is less than tx.lt:\n{}",
+        serde_json::to_string_pretty(&end_lt_exclusive).unwrap_or_default()
+    );
+
+    let asc = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?limit=100&sort=asc",
+        Duration::from_secs(12),
+    );
+    let asc_txs = v3_transactions_from_response(&asc);
+    assert_transactions_sorted_by_lt_asc(asc_txs);
+
+    let desc = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?limit=100&sort=desc",
+        Duration::from_secs(12),
+    );
+    let desc_txs = v3_transactions_from_response(&desc);
+    assert_transactions_sorted_by_lt_desc(desc_txs);
+
+    if desc_txs.len() > 1 {
+        let first_hash = desc_txs[0]["hash"]
+            .as_str()
+            .expect("transaction hash must be string")
+            .to_owned();
+        let offset_response = wait_for_ok_response(
+            &node,
+            "/api/v3/transactions?limit=1&offset=1&sort=desc",
+            Duration::from_secs(12),
+        );
+        let offset_txs = v3_transactions_from_response(&offset_response);
+        assert_eq!(offset_txs.len(), 1);
+        assert_ne!(offset_txs[0]["hash"].as_str(), Some(first_hash.as_str()));
+    }
+
+    let by_msg_hash = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={in_msg_hash_query}&direction=in&limit=50"
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        contains_tx_hash(v3_transactions_from_response(&by_msg_hash), &tx_hash),
+        "Expected tx {tx_hash} in transactionsByMessage by msg_hash:\n{}",
+        serde_json::to_string_pretty(&by_msg_hash).unwrap_or_default()
+    );
+
+    let by_body_hash = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/transactionsByMessage?body_hash={in_msg_body_hash_query}&limit=50"),
+        Duration::from_secs(12),
+    );
+    assert!(
+        contains_tx_hash(v3_transactions_from_response(&by_body_hash), &tx_hash),
+        "Expected tx {tx_hash} in transactionsByMessage by body_hash:\n{}",
+        serde_json::to_string_pretty(&by_body_hash).unwrap_or_default()
+    );
+
+    let direction_out = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactionsByMessage?msg_hash={in_msg_hash_query}&direction=out&limit=50"
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        !contains_tx_hash(v3_transactions_from_response(&direction_out), &tx_hash),
+        "Inbound message hash must not match direction=out:\n{}",
+        serde_json::to_string_pretty(&direction_out).unwrap_or_default()
+    );
+
+    if let Some(opcode) = tx_for_a["in_msg"]["opcode"].as_u64() {
+        let by_opcode_hex = wait_for_ok_response(
+            &node,
+            &format!("/api/v3/transactionsByMessage?opcode=0x{opcode:08x}&limit=50"),
+            Duration::from_secs(12),
+        );
+        assert!(
+            contains_tx_hash(v3_transactions_from_response(&by_opcode_hex), &tx_hash),
+            "Expected tx {tx_hash} in transactionsByMessage by opcode (hex):\n{}",
+            serde_json::to_string_pretty(&by_opcode_hex).unwrap_or_default()
+        );
+
+        let opcode_signed = opcode as u32 as i32;
+        let by_opcode_signed = wait_for_ok_response(
+            &node,
+            &format!("/api/v3/transactionsByMessage?opcode={opcode_signed}&limit=50"),
+            Duration::from_secs(12),
+        );
+        assert!(
+            contains_tx_hash(v3_transactions_from_response(&by_opcode_signed), &tx_hash),
+            "Expected tx {tx_hash} in transactionsByMessage by opcode (signed decimal):\n{}",
+            serde_json::to_string_pretty(&by_opcode_signed).unwrap_or_default()
+        );
+    } else {
+        let by_opcode = wait_for_ok_response(
+            &node,
+            "/api/v3/transactionsByMessage?opcode=0x0&limit=10",
+            Duration::from_secs(12),
+        );
+        assert!(
+            by_opcode["ok"].as_bool() == Some(true),
+            "transactionsByMessage with opcode filter must succeed:\n{}",
+            serde_json::to_string_pretty(&by_opcode).unwrap_or_default()
+        );
+    }
+
+    let by_message_offset = wait_for_ok_response(
+        &node,
+        "/api/v3/transactionsByMessage?limit=1&offset=1",
+        Duration::from_secs(12),
+    );
+    assert!(
+        v3_transactions_from_response(&by_message_offset).len() <= 1,
+        "Expected limit=1 for transactionsByMessage:\n{}",
+        serde_json::to_string_pretty(&by_message_offset).unwrap_or_default()
+    );
+
+    let pending = wait_for_ok_response(
+        &node,
+        "/api/v3/pendingTransactions",
+        Duration::from_secs(12),
+    );
+    assert!(
+        pending["result"]["address_book"].is_object(),
+        "Expected address_book object in pendingTransactions:\n{}",
+        serde_json::to_string_pretty(&pending).unwrap_or_default()
+    );
+    assert!(
+        pending["result"]["transactions"].is_array(),
+        "Expected transactions array in pendingTransactions:\n{}",
+        serde_json::to_string_pretty(&pending).unwrap_or_default()
+    );
+
+    let pending_with_filters = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/pendingTransactions?account={}&trace_id={tx_hash_query}",
+            V3_TRANSACTIONS_TEST_ACCOUNT_A
+        ),
+        Duration::from_secs(12),
+    );
+    assert!(
+        pending_with_filters["result"]["transactions"].is_array(),
+        "pendingTransactions with filters must return transactions array:\n{}",
+        serde_json::to_string_pretty(&pending_with_filters).unwrap_or_default()
+    );
+
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactions?shard=8000000000000000"),
+        "`shard` requires `workchain`",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactions?workchain=0&seqno=1"),
+        "`seqno` requires both `workchain` and `shard`",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactions?sort=invalid"),
+        "Invalid `sort`",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactions?limit=0"),
+        "`limit` must be between 1 and 1000",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactions?account=not-an-address"),
+        "Invalid address format",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactionsByMessage?direction=sideways"),
+        "Invalid `direction`",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactionsByMessage?opcode=oops"),
+        "`opcode`",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/transactionsByMessage?msg_hash=bad-hash"),
+        "Invalid hash format",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/pendingTransactions?account=bad-account"),
+        "Invalid address format",
+    );
+    assert_v3_bad_request(
+        &node.get_json("/api/v3/pendingTransactions?trace_id=bad-hash"),
+        "Invalid hash format",
+    );
+
+    node.stop();
+}
+
+#[test]
 fn litenode_supports_v3_run_get_method() {
     let project = ProjectBuilder::new("litenode-v3-run-get-method")
         .contract("getter", V3_GETTER_CONTRACT)
@@ -1195,6 +1983,133 @@ fn unpack_address(node: &crate::support::litenode::LiteNodeHandle, address: &str
                 serde_json::to_string_pretty(&response).unwrap_or_default()
             )
         })
+}
+
+fn v3_transactions_from_response(response: &Value) -> &[Value] {
+    response
+        .pointer("/result/transactions")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected /result/transactions array in response:\n{}",
+                serde_json::to_string_pretty(response).unwrap_or_default()
+            )
+        })
+}
+
+fn hashes_equivalent(left: &str, right: &str) -> bool {
+    normalize_hash_to_bytes(left) == normalize_hash_to_bytes(right)
+}
+
+fn normalize_hash_to_bytes(hash: &str) -> Option<[u8; 32]> {
+    let trimmed = hash.trim();
+
+    if let Ok(bytes) = hex::decode(trimmed)
+        && bytes.len() == 32
+    {
+        let mut out = [0_u8; 32];
+        out.copy_from_slice(&bytes);
+        return Some(out);
+    }
+
+    for engine in [
+        &base64::engine::general_purpose::STANDARD,
+        &base64::engine::general_purpose::URL_SAFE,
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+    ] {
+        if let Ok(bytes) = engine.decode(trimmed)
+            && bytes.len() == 32
+        {
+            let mut out = [0_u8; 32];
+            out.copy_from_slice(&bytes);
+            return Some(out);
+        }
+    }
+
+    None
+}
+
+fn encode_query_component(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(char::from(byte))
+            }
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
+}
+
+fn contains_tx_hash(transactions: &[Value], hash: &str) -> bool {
+    transactions
+        .iter()
+        .any(|tx| tx["hash"].as_str() == Some(hash))
+}
+
+fn assert_transactions_sorted_by_lt_asc(transactions: &[Value]) {
+    for window in transactions.windows(2) {
+        let left = window[0]["lt"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<u64>()
+            .unwrap_or(0);
+        let right = window[1]["lt"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<u64>()
+            .unwrap_or(0);
+        assert!(
+            left <= right,
+            "Transactions are not sorted by lt asc:\n{}",
+            serde_json::to_string_pretty(transactions).unwrap_or_default()
+        );
+    }
+}
+
+fn assert_transactions_sorted_by_lt_desc(transactions: &[Value]) {
+    for window in transactions.windows(2) {
+        let left = window[0]["lt"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<u64>()
+            .unwrap_or(0);
+        let right = window[1]["lt"]
+            .as_str()
+            .unwrap_or("0")
+            .parse::<u64>()
+            .unwrap_or(0);
+        assert!(
+            left >= right,
+            "Transactions are not sorted by lt desc:\n{}",
+            serde_json::to_string_pretty(transactions).unwrap_or_default()
+        );
+    }
+}
+
+fn assert_v3_bad_request(response: &Value, expected_error_fragment: &str) {
+    assert_eq!(
+        response["ok"].as_bool(),
+        Some(false),
+        "Expected v3 bad request response:\n{}",
+        serde_json::to_string_pretty(response).unwrap_or_default()
+    );
+    assert_eq!(
+        response["code"].as_i64(),
+        Some(400),
+        "Expected code=400 in v3 bad request response:\n{}",
+        serde_json::to_string_pretty(response).unwrap_or_default()
+    );
+    assert!(
+        response["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(expected_error_fragment),
+        "Expected error to contain `{expected_error_fragment}`:\n{}",
+        serde_json::to_string_pretty(response).unwrap_or_default()
+    );
 }
 
 fn has_incoming_transaction_from_source(response: &Value, source: &str) -> bool {

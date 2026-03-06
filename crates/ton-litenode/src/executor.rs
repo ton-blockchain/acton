@@ -13,6 +13,7 @@ pub struct ExecContext {
     pub lt: Lt,
     pub gen_utime: u32,
     pub rand_seed: Option<[u8; 32]>,
+    pub ignore_chksig: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -93,6 +94,7 @@ impl TvmExecutor for TvmEmulatorAdapter {
             now: ctx.gen_utime,
             lt: ctx.lt,
             random_seed: ctx.rand_seed,
+            ignore_chksig: ctx.ignore_chksig,
             debug_enabled: false,
             ..Default::default()
         };

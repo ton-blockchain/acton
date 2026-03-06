@@ -4,6 +4,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 #[cfg(feature = "only_ci")]
 use crate::support::snapshots::normalize_output;
+use base64::Engine;
 use serde_json::Value as JsonValue;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
@@ -2560,6 +2561,7 @@ fn write_deployer_wallets(project_path: &Path) {
     .expect("failed to write wallets.toml");
 }
 
+#[cfg(unix)]
 fn write_two_wallets(project_path: &Path) {
     fs::write(
         project_path.join("wallets.toml"),
@@ -2942,9 +2944,11 @@ fn wait_for_library_in_api(
             .pointer("/result/result")
             .and_then(JsonValue::as_array)
             .is_some_and(|items| {
-                items
-                    .iter()
-                    .any(|item| item.get("hash").and_then(JsonValue::as_str) == Some(hash))
+                items.iter().any(|item| {
+                    item.get("hash")
+                        .and_then(JsonValue::as_str)
+                        .is_some_and(|api_hash| hashes_equivalent(api_hash, hash))
+                })
             });
 
         if found {
@@ -2958,6 +2962,38 @@ fn wait_for_library_in_api(
         );
         thread::sleep(Duration::from_millis(200));
     }
+}
+
+fn hashes_equivalent(left: &str, right: &str) -> bool {
+    normalize_hash_to_bytes(left) == normalize_hash_to_bytes(right)
+}
+
+fn normalize_hash_to_bytes(hash: &str) -> Option<[u8; 32]> {
+    let trimmed = hash.trim();
+
+    if let Ok(bytes) = hex::decode(trimmed)
+        && bytes.len() == 32
+    {
+        let mut out = [0_u8; 32];
+        out.copy_from_slice(&bytes);
+        return Some(out);
+    }
+
+    for engine in [
+        &base64::engine::general_purpose::STANDARD,
+        &base64::engine::general_purpose::URL_SAFE,
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+    ] {
+        if let Ok(bytes) = engine.decode(trimmed)
+            && bytes.len() == 32
+        {
+            let mut out = [0_u8; 32];
+            out.copy_from_slice(&bytes);
+            return Some(out);
+        }
+    }
+
+    None
 }
 
 fn wait_until_address_state_active(

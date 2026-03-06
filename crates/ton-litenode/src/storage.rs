@@ -235,6 +235,13 @@ pub struct TraceNode {
     pub external_hash: Option<Hash256>,
 }
 
+#[derive(Clone, Debug)]
+pub struct EmulateTraceResult {
+    pub trace: TraceNode,
+    pub code_cells: HashMap<Hash256, BocBytes>,
+    pub data_cells: HashMap<Hash256, BocBytes>,
+}
+
 impl TraceNode {
     pub fn max_lt(&self) -> u64 {
         let mut max = self.transaction.meta.lt;

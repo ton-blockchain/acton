@@ -202,8 +202,17 @@ impl KnownAddresses {
 pub struct Emulations {
     pub name: String,
     pub messages: Vec<Vec<SendMessageResultSuccess>>,
+    pub failed_messages: Vec<Vec<FailedSendMessageResult>>,
     pub trace_names: FxHashMap<u64, String>,
     pub get_methods: Vec<GetMethodResultSuccess>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FailedSendMessageResult {
+    pub error: String,
+    pub vm_log: Option<String>,
+    pub vm_exit_code: Option<i64>,
+    pub executor_logs: Option<Arc<str>>,
 }
 
 impl Emulations {
@@ -258,6 +267,18 @@ impl EmulationsState {
             })
             .cloned()
             .collect::<Vec<_>>();
+        let failed_messages = message
+            .iter()
+            .filter_map(|m| match m {
+                SendMessageResult::Success(_) => None,
+                SendMessageResult::Error(error) => Some(FailedSendMessageResult {
+                    error: error.error.clone(),
+                    vm_log: error.vm_log.clone(),
+                    vm_exit_code: error.vm_exit_code,
+                    executor_logs: error.executor_logs.clone(),
+                }),
+            })
+            .collect::<Vec<_>>();
 
         let emulations = self
             .results
@@ -265,11 +286,13 @@ impl EmulationsState {
             .or_insert_with(|| Emulations {
                 name: env_name.to_owned(),
                 messages: vec![],
+                failed_messages: vec![],
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             });
 
         emulations.messages.push(successful_messages);
+        emulations.failed_messages.push(failed_messages);
     }
 
     pub fn save_get_method(&mut self, env_name: &str, get_method: GetMethodResultSuccess) {
@@ -278,6 +301,7 @@ impl EmulationsState {
             .or_insert_with(|| Emulations {
                 name: env_name.to_owned(),
                 messages: vec![],
+                failed_messages: vec![],
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             })

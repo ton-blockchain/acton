@@ -30,7 +30,7 @@ import {AddressLabel} from "./AddressLabel"
 import {ContractCode} from "./ContractCode"
 import {Tokens} from "./Tokens"
 import styles from "./AccountDetails.module.css"
-import {formatNano, formatTimeAgo, isSameAddress, parseAddress} from "./utils"
+import {formatNano, formatTimeAgo, hashToHex, isSameAddress, parseAddress} from "./utils"
 
 type Tabs = "history" | "contract" | "tokens" | "holders"
 
@@ -186,7 +186,9 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                     key={tx.hash}
                     className={`${styles.row} ${styles.clickableRow}`}
                     onClick={() => {
-                      void navigate(`/explorer/tx/${tx.hash}`)
+                      const txHash = hashToHex(tx.hash)
+                      if (!txHash) return
+                      void navigate(`/explorer/tx/${txHash}`)
                     }}
                   >
                     <TableCell className={styles.time}>{formatTimeAgo(tx.utime)}</TableCell>

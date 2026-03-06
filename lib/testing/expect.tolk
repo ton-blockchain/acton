@@ -25,6 +25,7 @@ import "assert"
 import "../fmt"
 import "../ffi/ffi"
 import "../tlb/maybe"
+import "../types/big_array"
 
 /// Internal struct to represent an expectation for a value.
 ///
@@ -402,6 +403,18 @@ fun Expectation<array<E>>.toContain<U>(self, expected: U) {
     Assert.fail("Array doesn't contain the value", self.location);
 }
 
+fun Expectation<BigArray<E>>.toContain<U>(self, expected: U) {
+    var i = 0;
+    while (i < self.value.size()) {
+        val item = self.value.get(i) as U;
+        if (item == expected) {
+            return;
+        }
+        i += 1;
+    }
+    Assert.fail("Array doesn't contain the value", self.location);
+}
+
 /// Asserts that actual value represeneted as an array does not contain the expected value.
 ///
 /// Example:
@@ -420,6 +433,16 @@ fun Expectation<array<E>>.toNotContain<U>(self, expected: U) {
     }
 }
 
+fun Expectation<BigArray<E>>.toNotContain<U>(self, expected: U) {
+    var i = 0;
+    while (i < self.value.size()) {
+        val item = self.value.get(i) as U;
+        if (item == expected) {
+            Assert.fail("Array contains the value, but it should not", self.location);
+        }
+        i += 1;
+    }
+}
 /// Asserts that actual value represeneted as an array is empty.
 ///
 /// Example:
@@ -428,6 +451,12 @@ fun Expectation<array<E>>.toNotContain<U>(self, expected: U) {
 /// expect(arr).toBeEmpty();
 /// ```
 fun Expectation<array<E>>.toBeEmpty(self) {
+    if (self.value.size() != 0) {
+        Assert.fail("expect(<actual>).toBeEmpty(<expected>): array is not empty", self.location);
+    }
+}
+
+fun Expectation<BigArray<E>>.toBeEmpty(self) {
     if (self.value.size() != 0) {
         Assert.fail("expect(<actual>).toBeEmpty(<expected>): array is not empty", self.location);
     }
@@ -446,6 +475,12 @@ fun Expectation<array<E>>.toBeNonEmpty(self) {
     }
 }
 
+fun Expectation<BigArray<E>>.toBeNonEmpty(self) {
+    if (self.value.size() == 0) {
+        Assert.fail("expect(<actual>).toBeNonEmpty(<expected>): array is empty", self.location);
+    }
+}
+
 /// Asserts that actual value represeneted as an array has the expected length.
 ///
 /// Example:
@@ -454,6 +489,10 @@ fun Expectation<array<E>>.toBeNonEmpty(self) {
 /// expect(arr).toHaveLength(3);
 /// ```
 fun Expectation<array<E>>.toHaveLength(self, length: int) {
+    Assert.equal(self.value.size(), length, "expect(<actual>).toHaveLength(<expected>)", self.location);
+}
+
+fun Expectation<BigArray<E>>.toHaveLength(self, length: int) {
     Assert.equal(self.value.size(), length, "expect(<actual>).toHaveLength(<expected>)", self.location);
 }
 

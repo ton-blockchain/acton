@@ -21,7 +21,9 @@ use acton::commands::wallet::{WalletCommand, wallet_cmd};
 use acton::commands::wrapper::wrapper_cmd;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
-use acton_config::config::{ActonConfig, Explorer, LitenodeSettings, Network, init_manifest_path};
+use acton_config::config::{
+    ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, init_manifest_path,
+};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use clap::builder::styling::Style;
 use clap::builder::{StyledStr, Styles};
@@ -498,12 +500,21 @@ enum Commands {
     Check {
         #[arg(help = "Contract ID to check or path to a .tolk file")]
         target: Option<String>,
-        #[arg(long, help = "Automatically apply available fixes")]
+        #[arg(long, help = "Automatically apply available fixes (plain output only)")]
         fix: bool,
-        #[arg(long, help = "Output results as JSON")]
-        json: bool,
-        #[arg(long, value_name = "PATH", help = "Write SARIF report to file")]
-        sarif: Option<String>,
+        #[arg(
+            long = "output-format",
+            value_enum,
+            value_name = "FORMAT",
+            help = "Output format (plain, json, sarif, github)"
+        )]
+        output_format: Option<CheckOutputFormat>,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Write output result to file (default: stdout)"
+        )]
+        output_file: Option<PathBuf>,
         #[arg(long, help = "Explain a rule")]
         explain: Option<String>,
         #[arg(long, hide = true)]
@@ -1693,13 +1704,20 @@ fn main() {
             ),
         },
         Commands::Check {
-            target,
             fix,
-            json,
-            sarif,
+            output_format,
+            output_file,
             explain,
             list_lint_rules,
-        } => check_cmd(fix, json, explain, list_lint_rules, target, sarif),
+            target,
+        } => check_cmd(
+            fix,
+            output_format,
+            output_file,
+            explain,
+            list_lint_rules,
+            target,
+        ),
         Commands::Up {
             version,
             canary,

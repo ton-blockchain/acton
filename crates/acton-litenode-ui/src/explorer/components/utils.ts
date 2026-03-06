@@ -1,4 +1,41 @@
+import {Buffer} from "node:buffer"
+
 import {Address} from "@ton/core"
+
+const HEX_HASH_RE = /^[a-fA-F0-9]{64}$/
+const BASE64_STD_RE = /^[A-Za-z0-9+/]+={0,2}$/
+const BASE64_URL_RE = /^[A-Za-z0-9_-]+$/
+
+export function hashToHex(hash: string): string | undefined {
+  const value = hash.trim()
+  if (!value) return undefined
+
+  if (HEX_HASH_RE.test(value)) {
+    return value.toLowerCase()
+  }
+
+  let normalized = value
+  if (BASE64_URL_RE.test(normalized)) {
+    normalized = normalized.replaceAll("-", "+").replaceAll("_", "/")
+  } else if (!BASE64_STD_RE.test(normalized)) {
+    return undefined
+  }
+
+  const mod = normalized.length % 4
+  if (mod === 1) return undefined
+  if (mod !== 0) {
+    normalized = normalized.padEnd(normalized.length + (4 - mod), "=")
+  }
+
+  try {
+    const bytes = Buffer.from(normalized, "base64")
+    if (bytes.length !== 32) return undefined
+    return bytes.toString("hex")
+  } catch {
+    return undefined
+  }
+}
+
 export function parseAddress(address: string): Address | undefined {
   if (!address) return undefined
   try {

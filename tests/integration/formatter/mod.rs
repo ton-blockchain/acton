@@ -1095,7 +1095,7 @@ get fun `test-formatter-multi-root-println-independent-internal-chains`() {
     val first = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 505);
     val second = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 506);
 
-    var merged: SendResultList = [];
+    var merged: SendResultList = SendResultList.createEmpty();
     var i = 0;
     while (i < first.size()) {
         merged.push(first.get(i));
@@ -1336,7 +1336,7 @@ get fun `test-formatter-orphan-chain-println-missing-parent`() {
     val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 909);
     expect(txs).toHaveLength(3);
 
-    var orphaned: SendResultList = [];
+    var orphaned: SendResultList = SendResultList.createEmpty();
     orphaned.push(txs.get(1));
     orphaned.push(txs.get(2));
     println(orphaned);
@@ -1439,7 +1439,7 @@ fn formatter_contract_letters_rollover_after_z_println_uses_a1_and_b1() {
         r#"
 get fun `test-formatter-contract-letters-rollover-a1-b1`() {{
     val sender = net.treasury("sender");
-    var merged: SendResultList = [];
+    var merged: SendResultList = SendResultList.createEmpty();
 {sends}
     expect(merged).toHaveLength(27);
     println(merged);

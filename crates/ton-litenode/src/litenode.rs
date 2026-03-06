@@ -8,6 +8,7 @@ use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
@@ -83,6 +84,7 @@ pub struct LiteNodeTransactionId {
 pub struct LiteNodeTransaction {
     pub hash: Hash256,
     pub address: Addr,
+    pub mc_block_seqno: u32,
     pub utime: u32,
     pub data: BocBytes,
     pub success: bool,
@@ -177,6 +179,12 @@ pub(crate) enum Request {
         to_lt: Option<u64>,
         resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
     },
+    GetAllTransactions {
+        resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
+    },
+    GetPendingTransactions {
+        resp: oneshot::Sender<anyhow::Result<Vec<LiteNodeTransaction>>>,
+    },
     TryLocateTx {
         source: Addr,
         destination: Addr,
@@ -251,6 +259,12 @@ pub(crate) enum Request {
     GetTraces {
         tx_hash: Hash256,
         resp: oneshot::Sender<anyhow::Result<storage::TraceNode>>,
+    },
+    EmulateTrace {
+        boc: BocBytes,
+        ignore_chksig: bool,
+        mc_block_seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<storage::EmulateTraceResult>>,
     },
     GetJettonMasters {
         address: Option<Addr>,
@@ -369,6 +383,20 @@ impl LiteNode {
                 to_lt,
                 resp,
             })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_all_transactions(&self) -> anyhow::Result<Vec<LiteNodeTransaction>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetAllTransactions { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn get_pending_transactions(&self) -> anyhow::Result<Vec<LiteNodeTransaction>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetPendingTransactions { resp })
             .await?;
         rx.await?
     }
@@ -593,6 +621,28 @@ impl LiteNode {
         rx.await?
     }
 
+    pub async fn emulate_trace(
+        &self,
+        boc_str: String,
+        ignore_chksig: Option<bool>,
+        mc_block_seqno: Option<u32>,
+    ) -> anyhow::Result<storage::EmulateTraceResult> {
+        let boc = base64::engine::general_purpose::STANDARD
+            .decode(&boc_str)
+            .context("Invalid BOC base64")?
+            .into();
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::EmulateTrace {
+                boc,
+                ignore_chksig: ignore_chksig.unwrap_or(false),
+                mc_block_seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_jetton_masters(
         &self,
         address: Option<String>,
@@ -766,6 +816,14 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_get_transactions(node, address, limit, lt, hash, to_lt);
             let _ = resp.send(res);
         }
+        Request::GetAllTransactions { resp } => {
+            let res = handle_get_all_transactions(node);
+            let _ = resp.send(res);
+        }
+        Request::GetPendingTransactions { resp } => {
+            let res = handle_get_pending_transactions(node);
+            let _ = resp.send(res);
+        }
         Request::TryLocateTx {
             source,
             destination,
@@ -856,6 +914,15 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::GetTraces { tx_hash, resp } => {
             let res = node.get_traces(&tx_hash);
+            let _ = resp.send(res);
+        }
+        Request::EmulateTrace {
+            boc,
+            ignore_chksig,
+            mc_block_seqno,
+            resp,
+        } => {
+            let res = node.emulate_trace_by_external_message(boc, ignore_chksig, mc_block_seqno);
             let _ = resp.send(res);
         }
         Request::GetJettonMasters {
@@ -996,6 +1063,50 @@ fn handle_get_transactions(
         })
         .collect();
     Ok(full_txs)
+}
+
+fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LiteNodeTransaction>> {
+    let mut metas = node
+        .history
+        .tx_by_hash
+        .values()
+        .cloned()
+        .collect::<Vec<_>>();
+    metas.sort_by(|a, b| b.lt.cmp(&a.lt).then_with(|| b.tx_hash.cmp(&a.tx_hash)));
+
+    let mut result = Vec::with_capacity(metas.len());
+    for meta in metas {
+        if let Some(tx) = node.get_transaction_by_hash(&meta.tx_hash) {
+            result.push(convert_to_tx_struct(&tx, tx.tx_boc.clone())?);
+        }
+    }
+    Ok(result)
+}
+
+fn handle_get_pending_transactions(node: &Node) -> anyhow::Result<Vec<LiteNodeTransaction>> {
+    let mut pending_tx_hashes = Vec::new();
+    let mut seen = HashSet::new();
+    for msg_hash in node.pool.external.iter().chain(node.pool.internal.iter()) {
+        if let Some(tx_hash) = node.history.msg_to_tx.get(msg_hash)
+            && seen.insert(*tx_hash)
+        {
+            pending_tx_hashes.push(*tx_hash);
+        }
+    }
+
+    let mut result = Vec::with_capacity(pending_tx_hashes.len());
+    for tx_hash in pending_tx_hashes {
+        if let Some(tx) = node.get_transaction_by_hash(&tx_hash) {
+            result.push(convert_to_tx_struct(&tx, tx.tx_boc.clone())?);
+        }
+    }
+    result.sort_by(|a, b| {
+        b.transaction_id
+            .lt
+            .cmp(&a.transaction_id.lt)
+            .then_with(|| b.hash.cmp(&a.hash))
+    });
+    Ok(result)
 }
 
 fn handle_try_locate_tx(
@@ -1177,6 +1288,7 @@ pub(crate) fn convert_to_tx_struct(
     Ok(LiteNodeTransaction {
         hash: tx.meta.tx_hash,
         address: tx.meta.account,
+        mc_block_seqno: tx.meta.block_seqno,
         utime: tx.meta.now,
         data: tx_boc,
         success: tx.meta.success,
