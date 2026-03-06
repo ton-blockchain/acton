@@ -93,3 +93,29 @@ get fun `test-fail-to-load-transaction-body-after-find-transaction`() {
     val body = tx.loadBody<ResetCounter>();
     expect(body).toEqual(ResetCounter {});
 }
+
+get fun `test-load-transaction-in-message`() {
+    val (counter, deployer) = setupTest();
+
+    val res = counter.sendIncrease(deployer.address, 100);
+    expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+
+    val tx = res.at(0).tx.load();
+    val inMsg = tx.loadInMsg<IncreaseCounter>();
+    expect(inMsg.loadBody()).toEqual(IncreaseCounter { increaseBy: 100 });
+}
+
+get fun `test-transaction-helpers`() {
+    val (counter, deployer) = setupTest();
+
+    val res = counter.sendIncrease(deployer.address, 100);
+    expect(res).toHaveSuccessfulTx({ from: deployer.address, to: counter.address });
+
+    val first = res.at(0);
+    val tx = first.tx.load();
+
+    expect(tx.getUsedGas()).toEqual(first.gasUsed);
+    expect(tx.getActionFee()).toBeDefined();
+    expect(tx.getActionFee().unwrap()).toBeGreater(0);
+    expect(tx.getAccountAddress()).toEqual(counter.address);
+}

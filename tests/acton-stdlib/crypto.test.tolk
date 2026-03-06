@@ -71,3 +71,14 @@ get fun `test-seed-to-key-pair-signs-correctly`() {
     val valid = isSignatureValid(data.hash(), signature, kp.publicKey);
     expect(valid).toBeTrue();
 }
+
+get fun `test-raw-sign-matches-sign`() {
+    val kp = crypto.generateKeyPair();
+    val data = beginCell().storeUint(0xBEEF, 16).endCell();
+
+    val rawSignature = crypto.rawSign(kp.privateKey, data.hash());
+    val signature = crypto.sign(kp.privateKey, data);
+
+    expect(rawSignature).toEqual(signature);
+    expect(isSignatureValid(data.hash(), rawSignature, kp.publicKey)).toBeTrue();
+}
