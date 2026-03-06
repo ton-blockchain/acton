@@ -4,7 +4,7 @@ use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -213,6 +213,7 @@ pub struct FailedSendMessageResult {
     pub vm_log: Option<String>,
     pub vm_exit_code: Option<i64>,
     pub executor_logs: Option<Arc<str>>,
+    pub missing_libraries: FxHashSet<String>,
 }
 
 impl Emulations {
@@ -276,6 +277,7 @@ impl EmulationsState {
                     vm_log: error.vm_log.clone(),
                     vm_exit_code: error.vm_exit_code,
                     executor_logs: error.executor_logs.clone(),
+                    missing_libraries: error.missing_libraries.clone(),
                 }),
             })
             .collect::<Vec<_>>();
@@ -344,6 +346,11 @@ impl EmulationsState {
     #[must_use]
     pub fn find_tx_executor_logs(&self, lt: u64) -> Option<&str> {
         self.find_tx_by_lt(lt).map(|res| res.executor_logs.as_ref())
+    }
+
+    #[must_use]
+    pub fn find_tx_missing_libraries(&self, lt: u64) -> Option<&FxHashSet<String>> {
+        self.find_tx_by_lt(lt).map(|res| &res.missing_libraries)
     }
 }
 

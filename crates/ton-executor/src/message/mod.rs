@@ -69,7 +69,7 @@ pub use types::*;
 
 use crate::common::ExecutorVerbosity;
 use crate::config::DEFAULT_CONFIG;
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback};
 use anyhow::Context;
 use std::ffi::{CStr, CString, c_void};
 use std::marker::PhantomData;
@@ -253,6 +253,27 @@ impl Executor {
 
         Ok(result)
     }
+
+    /// Registers callback that is called when TVM fails to resolve a library by hash.
+    pub fn register_missing_library_callback<Ctx>(
+        &self,
+        ctx: &mut Ctx,
+        callback: MissingLibraryCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        // SAFETY: `transaction_emulator_register_missing_library_callback` is a safe C API function.
+        unsafe {
+            transaction_emulator_register_missing_library_callback(
+                self.inner.as_ptr(),
+                std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                std::mem::transmute::<
+                    unsafe extern "C" fn(*mut Ctx, *const c_char),
+                    unsafe extern "C" fn(*mut c_void, *const c_char),
+                >(callback),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 impl Drop for Executor {
@@ -298,6 +319,12 @@ unsafe extern "C" {
         ctx: *mut c_void,
         stack_items_count: c_int,
         callback: ExtMethodCallback<c_void>,
+    ) -> *const c_char;
+
+    pub(crate) fn transaction_emulator_register_missing_library_callback(
+        transaction_emulator: *mut c_void,
+        ctx: *mut c_void,
+        callback: MissingLibraryCallback<c_void>,
     ) -> *const c_char;
 
     pub(crate) fn transaction_emulator_set_config(

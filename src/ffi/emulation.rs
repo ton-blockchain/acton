@@ -12,6 +12,7 @@ use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use rustc_hash::FxHashSet;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -531,6 +532,7 @@ fn send_message_debug(
         actions: result.actions,
         code,
         externals: vec![],
+        missing_libraries: FxHashSet::default(),
     };
 
     let mut externals: Vec<Cell> = vec![];

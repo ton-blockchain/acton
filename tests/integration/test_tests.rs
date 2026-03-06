@@ -1,5 +1,9 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use std::fs;
+use toml_edit::DocumentMut;
+use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -836,6 +840,139 @@ fn test_auto_register_refs_if_any() {
 
     output
         .assert_snapshot_matches("integration/snapshots/test_auto_register_refs_if_any.stdout.txt");
+}
+
+fn replace_library_ref_boc(generated: &str, new_boc_b64: &str) -> String {
+    let marker = "\" base64>B B>boc hashu";
+    let marker_idx = generated
+        .find(marker)
+        .expect("generated dependency file must contain library_ref asm marker");
+    let open_quote_idx = generated[..marker_idx]
+        .rfind('"')
+        .expect("generated dependency file must contain opening quote before boc");
+    let value_start = open_quote_idx + 1;
+
+    format!(
+        "{}{}{}",
+        &generated[..value_start],
+        new_boc_b64,
+        &generated[marker_idx..]
+    )
+}
+
+#[test]
+fn test_missing_library_ref_is_reported_in_transaction_tree() {
+    let project = ProjectBuilder::new("dep-lib-missing-library-ref")
+        .contract("lib", SIMPLE_CONTRACT)
+        .contract_with_detailed_deps(
+            "main",
+            r#"
+            import "../gen/lib_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                if (in.body.isEmpty()) {
+                    return;
+                }
+
+                val childInit = ContractState {
+                    code: libCompiledCode(),
+                    data: createEmptyCell(),
+                };
+
+                val outMsg = createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: {
+                        stateInit: childInit,
+                    },
+                });
+
+                outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec![("lib", Some("library_ref"), None, None)],
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/build/build"
+            import "../../lib/io"
+            import "../../lib/emulation/network"
+
+            get fun `test-missing-library-ref-is-reported`() {
+                val deployer = net.treasury("deployer");
+                val mainStateInit = ContractState {
+                    code: build("main"),
+                    data: createEmptyCell(),
+                };
+                val mainAddress = AutoDeployAddress { stateInit: mainStateInit }.calculateAddress();
+
+                val deployMain = net.send(
+                    deployer.address,
+                    createMessage({
+                        bounce: false,
+                        value: ton("1"),
+                        dest: {
+                            stateInit: mainStateInit,
+                        },
+                    }),
+                );
+                expect(deployMain).toHaveLength(1);
+
+                val triggerRes = net.send(
+                    deployer.address,
+                    createMessage({
+                        bounce: false,
+                        value: ton("1"),
+                        dest: mainAddress,
+                        body: beginCell().storeUint(1, 32).endCell(),
+                    }),
+                );
+
+                println(triggerRes);
+            }
+        "#,
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    let generated_dep_path = project.path().join("gen/lib_code.tolk");
+    let generated_dep = fs::read_to_string(&generated_dep_path)
+        .expect("must read generated dependency function for lib");
+    let empty_cell_boc = Boc::encode_base64(Cell::default());
+    let tampered_dep = replace_library_ref_boc(&generated_dep, &empty_cell_boc);
+
+    let main_contract_path = project.path().join("contracts/main.tolk");
+    let main_contract =
+        fs::read_to_string(&main_contract_path).expect("must read main contract source");
+    let main_contract_without_import =
+        main_contract.replace("import \"../gen/lib_code.tolk\"\n", "");
+    fs::write(
+        &main_contract_path,
+        format!("{main_contract_without_import}\n{tampered_dep}\n"),
+    )
+    .expect("must rewrite main contract with tampered library_ref function");
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml: DocumentMut = fs::read_to_string(&acton_toml_path)
+        .expect("must read Acton.toml")
+        .parse()
+        .expect("Acton.toml must parse");
+    acton_toml["contracts"]["main"]["depends"] =
+        toml_edit::Item::Value(toml_edit::Value::Array(toml_edit::Array::default()));
+    fs::write(&acton_toml_path, acton_toml.to_string()).expect("must update Acton.toml");
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_missing_library_ref_is_reported_in_transaction_tree.stdout.txt",
+        );
 }
 
 #[test]

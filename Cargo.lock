@@ -3411,6 +3411,7 @@ dependencies = [
  "anyhow",
  "hex",
  "pkg-config",
+ "rustc-hash",
  "serde",
  "serde_json",
  "tycho-types",

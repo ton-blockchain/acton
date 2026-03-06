@@ -48,6 +48,8 @@
 
 use crate::world_state::WorldState;
 use anyhow::Context;
+use rustc_hash::FxHashSet;
+use std::ffi::{CStr, c_char};
 use std::sync::Arc;
 use std::time::SystemTime;
 use ton_executor::ExecutorVerbosity;
@@ -64,6 +66,39 @@ use tycho_types::models::{
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
+
+#[derive(Default)]
+struct MissingLibrariesContext {
+    hashes: FxHashSet<String>,
+}
+
+impl MissingLibrariesContext {
+    fn into_set(self) -> FxHashSet<String> {
+        self.hashes
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe extern "C" fn missing_library_callback(
+    ctx: *mut MissingLibrariesContext,
+    hash: *const c_char,
+) {
+    if ctx.is_null() || hash.is_null() {
+        return;
+    }
+
+    // SAFETY: `hash` is provided by the emulator callback contract and points to a valid C string
+    // for the duration of this callback.
+    let hash = unsafe { CStr::from_ptr(hash) }
+        .to_string_lossy()
+        .into_owned();
+
+    // SAFETY: `ctx` points to `MissingLibrariesContext` provided by `send_transaction`
+    // and lives until `run_transaction` returns.
+    if let Some(state) = unsafe { ctx.as_mut() } {
+        state.hashes.insert(hash);
+    }
+}
 
 /// A high-level emulator for TON transactions.
 ///
@@ -109,6 +144,12 @@ impl Emulator {
         libs: &Dict<HashBytes, LibDescr>,
         from: Option<IntAddr>,
     ) -> anyhow::Result<SendMessageResult> {
+        let mut missing_libraries_ctx = MissingLibrariesContext::default();
+        self.executor.register_missing_library_callback(
+            &mut missing_libraries_ctx,
+            missing_library_callback,
+        )?;
+
         let msg_cell = Self::patch_message(state.get_config(), message, from)?;
         let msg_b64 = Boc::encode_base64(&msg_cell);
         let msg = msg_cell
@@ -144,15 +185,21 @@ impl Emulator {
         };
 
         let (result, executor_logs) = self.executor.run_transaction(&msg_b64, &args)?;
+        let mut missing_libraries = Some(missing_libraries_ctx.into_set());
 
         let result = match result {
-            EmulationResult::Success(result) => result,
-            EmulationResult::Error(err) => {
+            EmulationResult::Success(mut result) => {
+                result.missing_libraries = missing_libraries.take().unwrap_or_default();
+                result
+            }
+            EmulationResult::Error(mut err) => {
+                err.missing_libraries = missing_libraries.take().unwrap_or_default();
                 return Ok(SendMessageResult::Error(RunTransactionResultError {
                     error: err.error,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
                     executor_logs: Some(executor_logs),
+                    missing_libraries: err.missing_libraries,
                 }));
             }
         };
@@ -187,6 +234,7 @@ impl Emulator {
             actions: result.actions,
             code,
             externals: vec![],
+            missing_libraries: result.missing_libraries,
         }))
     }
 
@@ -437,6 +485,8 @@ pub struct SendMessageResultSuccess {
     pub code: Option<Cell>,
     /// External outgoing messages produced by this transaction.
     pub externals: Vec<Cell>,
+    /// Hashes of missing libraries observed during this transaction emulation.
+    pub missing_libraries: FxHashSet<String>,
 }
 
 impl SendMessageResultSuccess {

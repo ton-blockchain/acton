@@ -60,6 +60,8 @@ pub struct FailedMessageInfo {
     pub vm_exit_code: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executor_logs: Option<Arc<str>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_libraries: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -282,11 +284,19 @@ pub(super) fn dump_test_transactions(
 
 #[must_use]
 fn failed_message_info(message: &FailedSendMessageResult) -> FailedMessageInfo {
+    let mut missing_libraries = message
+        .missing_libraries
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    missing_libraries.sort_unstable();
+
     FailedMessageInfo {
         error: message.error.clone(),
         vm_log_diff: message.vm_log.as_deref().map(vmlogs::convert_to_diff_logs),
         vm_exit_code: message.vm_exit_code,
         executor_logs: message.executor_logs.clone(),
+        missing_libraries,
     }
 }
 

@@ -816,6 +816,35 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             ));
         }
 
+        if let Some(missing_libraries) = self.emulations.find_tx_missing_libraries(tx.lt)
+            && !missing_libraries.is_empty()
+        {
+            let mut missing_libraries = missing_libraries.iter().cloned().collect::<Vec<_>>();
+            missing_libraries.sort_unstable();
+
+            if missing_libraries.len() == 1 {
+                extra_infos.push(format!(
+                    "Library {} is missing, which is what causes this error",
+                    missing_libraries.join(", ").yellow()
+                ));
+            } else {
+                extra_infos.push(format!(
+                    "Missing libraries: {}",
+                    missing_libraries.join(", ").yellow()
+                ));
+            }
+            extra_infos.push(
+                "This most likely happened because the library is not registered in tests"
+                    .to_owned(),
+            );
+            extra_infos.push(format!(
+                "To manually register library use {} somewhere in {}-like function",
+                "vm.registerLibrary(hash, code)".yellow(),
+                "setupTests()".yellow(),
+            ));
+            extra_infos.push("Learn more about libraries in documentation: https://i582.github.io/acton/docs/advanced/libraries/".to_owned());
+        }
+
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);
 
         result

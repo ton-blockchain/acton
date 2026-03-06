@@ -50,7 +50,7 @@ pub mod types;
 use core::ffi::{c_char, c_int, c_void};
 pub use types::*;
 
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback};
 use anyhow::Context;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString};
@@ -210,6 +210,27 @@ impl GetExecutor {
 
         Ok(())
     }
+
+    /// Registers callback that is called when TVM fails to resolve a library by hash.
+    pub fn register_missing_library_callback<Ctx>(
+        &mut self,
+        ctx: &mut Ctx,
+        callback: MissingLibraryCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        // SAFETY: `tvm_emulator_register_missing_library_callback` is a safe C API function.
+        unsafe {
+            tvm_emulator_register_missing_library_callback(
+                self.inner.as_ptr(),
+                std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                std::mem::transmute::<
+                    unsafe extern "C" fn(*mut Ctx, *const c_char),
+                    unsafe extern "C" fn(*mut c_void, *const c_char),
+                >(callback),
+            );
+        }
+
+        Ok(())
+    }
 }
 
 impl BaseExecutor for GetExecutor {
@@ -240,6 +261,12 @@ unsafe extern "C" {
         ctx: *mut c_void,
         stack_items_count: c_int,
         callback: ExtMethodCallback<c_void>,
+    ) -> *const c_char;
+
+    pub(crate) fn tvm_emulator_register_missing_library_callback(
+        tvm_emulator: *mut c_void,
+        ctx: *mut c_void,
+        callback: MissingLibraryCallback<c_void>,
     ) -> *const c_char;
 
     pub(crate) fn tvm_emulator_set_gas_limit(tvm_emulator: *mut c_void, gas_limit: i64) -> bool;

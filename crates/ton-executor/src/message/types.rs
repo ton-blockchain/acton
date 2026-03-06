@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -19,6 +20,9 @@ pub struct RunTransactionResultSuccess {
     pub vm_log: Arc<str>,
     /// Base64 encoded actions `BoC` (if any).
     pub actions: Option<Arc<str>>,
+    /// Hashes of missing libraries observed during this emulator run.
+    #[serde(default)]
+    pub missing_libraries: FxHashSet<String>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -31,6 +35,9 @@ pub struct RunTransactionResultError {
     pub vm_exit_code: Option<i64>,
     /// Set by executor.
     pub executor_logs: Option<Arc<str>>,
+    /// Hashes of missing libraries observed during this emulator run.
+    #[serde(default)]
+    pub missing_libraries: FxHashSet<String>,
 }
 
 /// Information about previous blocks.
