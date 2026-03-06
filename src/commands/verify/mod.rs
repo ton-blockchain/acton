@@ -9,13 +9,21 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use ton_api::{Network, StackItem, TonApiClient};
+use ton_api::{GetMethodResult, Network, TonApiClient};
 use tonlib_core::TonAddress;
 use tonlib_core::cell::ArcCell;
+use tonlib_core::cell::dict::predefined_readers::{
+    key_reader_uint, val_reader_cell, val_reader_uint,
+};
 use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
 use tonlib_core::tlb_types::primitives::either::EitherRef;
 use tonlib_core::tlb_types::tlb::TLB;
+use tvmffi::stack::TupleItem;
 use tycho_types::boc::Boc;
+
+const DEFAULT_VERIFIER_ID: &str = "verifier.ton.org";
+const MAINNET_SOURCE_REGISTRY: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
+const TESTNET_SOURCE_REGISTRY: &str = "EQCsdKYwUaXkgJkz2l0ol6qT_WxeRbE_wBCwnEybmR0u5TO8";
 
 #[allow(clippy::too_many_arguments)]
 pub fn verify_cmd(
@@ -330,13 +338,26 @@ pub fn verify_cmd(
 
     println!("  {} Backend verification successful", "✓".green().bold());
 
+    let config = ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+    let is_testnet = network == Network::Testnet;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+
+    wait_for_rate_limit(&api_key);
+    let registry_address = get_verifier_address(&backend_info, &api_client)?;
+
+    wait_for_rate_limit(&api_key);
+    let quorum = usize::from(get_verifier_quorum(
+        &api_client,
+        &registry_address,
+        &backend_info.id,
+        is_testnet,
+    )?);
+
     let mut msg_cell = source_result
         .msg_cell
         .ok_or_else(|| anyhow!("No message cell in response"))?;
-    let mut acquired_sigs = 1;
-
-    // TODO: fetch quorum from 'get_verifiers' get method
-    let quorum = 1;
+    let mut acquired_sigs = 1usize;
 
     println!(
         "  {} Collecting signatures (need {} of {})",
@@ -413,15 +434,9 @@ pub fn verify_cmd(
 
     println!("  {} Sending verification transaction", "→".blue().bold());
 
-    let config = ActonConfig::load().unwrap_or_default();
-    let custom_networks = config.custom_networks();
-
     let cell_data = &msg_cell.data;
     let cell = Boc::decode(cell_data)?;
     let cell_boc64 = Boc::encode_base64(&cell);
-
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
-    let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
     wait_for_rate_limit(&api_key);
 
@@ -624,7 +639,7 @@ fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Resul
         .verifiers
         .iter()
         .filter(|entry| {
-            entry.id == "verifier.ton.org" && entry.network.eq_ignore_ascii_case(network_name)
+            entry.id == DEFAULT_VERIFIER_ID && entry.network.eq_ignore_ascii_case(network_name)
         })
         .flat_map(|entry| entry.backends.clone())
         .collect();
@@ -639,14 +654,14 @@ fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Resul
 
     match network {
         Network::Mainnet => Ok(BackendInfo {
-            source_registry: "EQBU-i8MHvmedMJS6gvicPP7FHBEuBBEnbGWw46shTr1rSXI".to_string(),
+            source_registry: MAINNET_SOURCE_REGISTRY.to_string(),
             backends: resolved_backends,
-            id: "verifier.ton.org".to_string(),
+            id: DEFAULT_VERIFIER_ID.to_string(),
         }),
         Network::Testnet => Ok(BackendInfo {
-            source_registry: "EQDPvIEUktSCLk69IFjY6Nttv4Hz87P3l3H1XMNjs6kPpDR3".to_string(),
+            source_registry: TESTNET_SOURCE_REGISTRY.to_string(),
             backends: resolved_backends,
-            id: "verifier.ton.org".to_string(),
+            id: DEFAULT_VERIFIER_ID.to_string(),
         }),
         _ => anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet"),
     }
@@ -704,30 +719,217 @@ fn get_verifier_address(
         &[],
     )?;
 
-    let Some(address_stack) = result.stack.first() else {
-        anyhow::bail!("Stack from 'get_verifier_registry_address' is empty")
-    };
+    parse_verifier_registry_address(&result).with_context(|| {
+        format!(
+            "Failed to parse verifier registry address from source registry {}",
+            backend_info.source_registry
+        )
+    })
+}
 
-    let registry_address = if address_stack.len() >= 2 {
-        match &address_stack[1] {
-            StackItem::Obj(obj) => {
-                if let Some(bytes) = obj.get("bytes").and_then(|v| v.as_str()) {
-                    let cell = ArcCell::from_boc_b64(bytes)?;
-                    let mut slice = cell.parser();
-                    slice
-                        .load_address()
-                        .context("Failed to parse registry address from object")?
-                } else {
-                    anyhow::bail!("No bytes field in registry address response");
-                }
+fn get_verifier_quorum(
+    api_client: &TonApiClient,
+    registry_address: &TonAddress,
+    verifier_id: &str,
+    is_testnet: bool,
+) -> anyhow::Result<u8> {
+    let registry_address = registry_address.to_base64_url_flags(true, is_testnet);
+    let result = api_client.run_get_method(&registry_address, "get_verifiers", &[])?;
+    parse_verifier_quorum_from_get_method(&result, verifier_id)
+}
+
+fn parse_verifier_registry_address(result: &GetMethodResult) -> anyhow::Result<TonAddress> {
+    let cell = parse_stack_cell(result, "get_verifier_registry_address")?;
+    let mut slice = cell.parser();
+    slice
+        .load_address()
+        .context("Failed to parse registry address from object")
+}
+
+fn parse_verifier_quorum_from_get_method(
+    result: &GetMethodResult,
+    verifier_id: &str,
+) -> anyhow::Result<u8> {
+    let cell = parse_stack_cell(result, "get_verifiers")?;
+    let mut parser = cell.parser();
+    let verifiers = parser
+        .load_dict(256, key_reader_uint, val_reader_cell)
+        .context("Failed to parse verifier dictionary")?;
+
+    let mut available_verifiers = Vec::new();
+    for (_, verifier_cell) in verifiers {
+        let mut verifier = verifier_cell.parser();
+        let _admin = verifier
+            .load_address()
+            .context("Failed to parse verifier admin address")?;
+        let quorum = verifier
+            .load_u8(8)
+            .context("Failed to parse verifier quorum")?;
+        let _pub_key_endpoints = verifier
+            .load_dict(256, key_reader_uint, val_reader_uint)
+            .context("Failed to parse verifier endpoints")?;
+        let name = parse_string_ref(&mut verifier).context("Failed to parse verifier name")?;
+        let _url = parse_string_ref(&mut verifier).context("Failed to parse verifier URL")?;
+
+        available_verifiers.push(name.clone());
+        if name == verifier_id {
+            if quorum == 0 {
+                anyhow::bail!("Verifier '{verifier_id}' returned zero quorum");
             }
-            _ => {
-                anyhow::bail!("Unexpected response in registry address stack");
-            }
+            return Ok(quorum);
         }
-    } else {
-        anyhow::bail!("Invalid registry address stack format");
+    }
+
+    available_verifiers.sort();
+    available_verifiers.dedup();
+    anyhow::bail!(
+        "Verifier '{verifier_id}' is not registered in verifier registry. Available verifiers: {}",
+        if available_verifiers.is_empty() {
+            "none".to_string()
+        } else {
+            available_verifiers.join(", ")
+        }
+    );
+}
+
+fn parse_stack_cell(result: &GetMethodResult, method_name: &str) -> anyhow::Result<ArcCell> {
+    if result.exit_code != 0 {
+        anyhow::bail!(
+            "{method_name} returned non-zero exit code: {}",
+            result.exit_code
+        );
+    }
+
+    let tuple = result.parse_stack_tuple().with_context(|| {
+        format!("Failed to parse stack from '{method_name}' with tvmffi JSON stack parser")
+    })?;
+    let Some(item) = tuple.first() else {
+        anyhow::bail!("Stack from '{method_name}' is empty");
     };
 
-    Ok(registry_address)
+    let cell = match item {
+        TupleItem::Cell(cell) | TupleItem::Slice(cell) => cell,
+        _ => {
+            anyhow::bail!("Unexpected stack item type for '{method_name}'");
+        }
+    };
+
+    let cell_b64 = Boc::encode_base64(cell);
+    ArcCell::from_boc_b64(&cell_b64)
+        .with_context(|| format!("Failed to decode stack cell from '{method_name}'"))
+}
+
+fn parse_string_ref(parser: &mut tonlib_core::cell::CellParser) -> anyhow::Result<String> {
+    let string_cell = parser
+        .next_reference()
+        .context("Expected string reference")?;
+    let mut string_parser = string_cell.parser();
+    let bytes = string_parser
+        .load_snake_format_aligned(false)
+        .context("Failed to read string reference bytes")?;
+    String::from_utf8(bytes).context("String reference is not valid UTF-8")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_backend_info_prefers_verifier_entries() {
+        let json = serde_json::json!({
+            "verifiers": [
+                {
+                    "id": "verifier.ton.org",
+                    "network": "mainnet",
+                    "backends": ["https://verifier-mainnet.ton.org"]
+                },
+                {
+                    "id": "verifier.ton.org",
+                    "network": "testnet",
+                    "backends": ["https://verifier-testnet.ton.org"]
+                }
+            ],
+            "backends": ["https://legacy-mainnet.invalid"],
+            "backendsTestnet": ["https://legacy-testnet.invalid"]
+        });
+
+        let config: BackendsConfig = serde_json::from_value(json).expect("config must parse");
+
+        let mainnet = get_backend_info(&Network::Mainnet, &config).expect("mainnet backend");
+        assert_eq!(mainnet.source_registry, MAINNET_SOURCE_REGISTRY);
+        assert_eq!(mainnet.backends, vec!["https://verifier-mainnet.ton.org"]);
+
+        let testnet = get_backend_info(&Network::Testnet, &config).expect("testnet backend");
+        assert_eq!(testnet.source_registry, TESTNET_SOURCE_REGISTRY);
+        assert_eq!(testnet.backends, vec!["https://verifier-testnet.ton.org"]);
+    }
+
+    #[test]
+    fn get_backend_info_falls_back_to_legacy_fields() {
+        let json = serde_json::json!({
+            "backends": ["https://legacy-mainnet.ton.org"],
+            "backendsTestnet": ["https://legacy-testnet.ton.org"]
+        });
+        let config: BackendsConfig = serde_json::from_value(json).expect("config must parse");
+
+        let mainnet = get_backend_info(&Network::Mainnet, &config).expect("mainnet backend");
+        assert_eq!(mainnet.backends, vec!["https://legacy-mainnet.ton.org"]);
+
+        let testnet = get_backend_info(&Network::Testnet, &config).expect("testnet backend");
+        assert_eq!(testnet.backends, vec!["https://legacy-testnet.ton.org"]);
+    }
+
+    #[test]
+    fn parse_verifier_registry_address_accepts_valid_cell_stack() {
+        let result: GetMethodResult = serde_json::from_value(serde_json::json!({
+            "stack": [[
+                "cell",
+                {
+                    "bytes": "te6cckEBAQEAJAAAQ4Ac+koT5Lah8IfSSfxeEPjcf3uLjm3H434WqAEnVwID7TCzXKo6"
+                }
+            ]],
+            "exit_code": 0
+        }))
+        .expect("result must parse");
+
+        let address = parse_verifier_registry_address(&result).expect("address must parse");
+        assert_eq!(
+            address.to_base64_url_flags(true, false),
+            "UQDn0lCfJbUPhD6ST-Lwh8bj-9xcc24_G_C1QAk6uBAfab7I"
+        );
+    }
+
+    #[test]
+    fn parse_verifier_registry_address_rejects_non_zero_exit_code() {
+        let result: GetMethodResult = serde_json::from_value(serde_json::json!({
+            "stack": [["num", "0x1101c"]],
+            "exit_code": 11
+        }))
+        .expect("result must parse");
+
+        let err = parse_verifier_registry_address(&result).expect_err("must fail");
+        assert!(
+            err.to_string()
+                .contains("get_verifier_registry_address returned non-zero exit code"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_verifier_quorum_from_get_method_extracts_quorum() {
+        let result: GetMethodResult = serde_json::from_value(serde_json::json!({
+            "stack": [[
+                "cell",
+                {
+                    "bytes": "te6cckECDQEAAXIAAQHAAQICcwIDA4e/KryD+1Yul5ttpKQnnjlxcZSXijRz6i9ItwhZym0hBs4AQNaLrWCpePXWWx3dTB9VYszvsagQbaPja8YXE2qWU2EBYAQFBgOHvxJS0wKypgg4CpQJKkAmoQyG9N5RnyL4JydJaJvGNC4eACp9F4YPfM86YSl1BfE4ef2KOCJcCCJO2Mthx1ZCnXrWgOALDAwCASAHCAAQb3Jicy5jb20AIGh0dHBzOi8vb3Jicy5jb20AS7/860ZkeluWiK7t4oq73Uf0wVqx+StWtx9Cn9k6Yd4miwGBgYHAAgN6oAkKAEm+n48lFRPPHyWtiIFqTY48+jvUwvH7RaEsG/gyNR7xTPAwMDBIAEm+n1nGRqMDiNIEx2ckz4U19rN4gZzEnarDaiWAljY9AOAwMDBYAEugA5XnvxuA+Epxoj/w/s2cyr78RgMR4c9113hQI2ocsy7gAAAAEAAgdmVyaWZpZXIudG9uLm9yZ0jWZm8="
+                }
+            ]],
+            "exit_code": 0
+        }))
+        .expect("result must parse");
+
+        let quorum = parse_verifier_quorum_from_get_method(&result, "verifier.ton.org")
+            .expect("quorum must parse");
+        assert_eq!(quorum, 1);
+    }
 }

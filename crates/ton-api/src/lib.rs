@@ -4,6 +4,8 @@ use reqwest::blocking::Response;
 use serde::Deserialize;
 use std::collections::HashMap;
 pub use ton_networks::{CustomNetworkUrls, Network};
+use tvmffi::json_stack::{json_to_legacy_stack, json_to_stack};
+use tvmffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 
@@ -201,12 +203,15 @@ impl TonApiClient {
             return Ok((0, true));
         }
 
-        if let Some(first) = result.stack.first()
-            && first.len() == 2
-            && let (StackItem::Str(type_str), StackItem::Str(value_str)) = (&first[0], &first[1])
-            && type_str == "num"
-        {
-            let seqno = u32::from_str_radix(value_str.trim_start_matches("0x"), 16)?;
+        let stack = result
+            .parse_stack_tuple()
+            .context("Failed to parse runGetMethod stack for seqno")?;
+
+        if let Some(TupleItem::Int(value)) = stack.first() {
+            let seqno: u32 = value
+                .to_str_radix(10)
+                .parse()
+                .context("Failed to parse wallet seqno from stack integer")?;
             if seqno == 85143 {
                 return Ok((0, true));
             }
@@ -474,16 +479,22 @@ pub struct AccountState {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(untagged)]
-pub enum StackItem {
-    Str(String),
-    Obj(serde_json::Value),
+pub struct GetMethodResult {
+    pub stack: Vec<serde_json::Value>,
+    pub exit_code: i32,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct GetMethodResult {
-    pub stack: Vec<Vec<StackItem>>,
-    pub exit_code: i32,
+impl GetMethodResult {
+    pub fn parse_stack_tuple(&self) -> anyhow::Result<tvmffi::stack::Tuple> {
+        match json_to_legacy_stack(self.stack.clone()) {
+            Ok(tuple) => Ok(tuple),
+            Err(legacy_err) => json_to_stack(self.stack.clone()).with_context(|| {
+                format!(
+                    "Failed to parse stack as legacy and std formats. Legacy error: {legacy_err}"
+                )
+            }),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]

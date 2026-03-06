@@ -3383,6 +3383,7 @@ dependencies = [
  "serde",
  "serde_json",
  "ton-networks",
+ "tvmffi",
  "tycho-types",
  "urlencoding",
 ]
