@@ -853,15 +853,37 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
 
         for (idx, info) in extra_infos.iter().enumerate() {
-            result += child_prefix;
-
-            if has_children || idx < extra_infos.len() - 1 {
-                result += "├── ".dimmed().to_string().as_str();
+            let has_next_sibling = has_children || idx < extra_infos.len() - 1;
+            let branch = if has_next_sibling {
+                "├── ".dimmed().to_string()
             } else {
-                result += "└── ".dimmed().to_string().as_str();
+                "└── ".dimmed().to_string()
+            };
+
+            result += child_prefix;
+            result += &branch;
+
+            let mut lines = info.lines();
+            if let Some(first_line) = lines.next() {
+                result += first_line;
             }
 
-            result += info.as_str();
+            for line in lines {
+                result += "\n";
+                result += child_prefix;
+
+                let line_without_prefix = line.strip_prefix(child_prefix).unwrap_or(line);
+                if has_next_sibling {
+                    result += "│   ".dimmed().to_string().as_str();
+                    if let Some(rest) = line_without_prefix.strip_prefix("    ") {
+                        result += rest;
+                    } else {
+                        result += line_without_prefix;
+                    }
+                } else {
+                    result += line_without_prefix;
+                }
+            }
 
             if idx < extra_infos.len() - 1 {
                 result += "\n";

@@ -1326,6 +1326,54 @@ get fun `test-formatter-exit-code-with-backtrace-full`() {
 }
 
 #[test]
+fn formatter_exit_code_println_with_backtrace_full_and_account_created_event() {
+    let source = format!(
+        "{}\n{}\n",
+        FLAGS_IMPORTS,
+        r#"
+get fun `test-formatter-exit-code-with-backtrace-full-and-account-created-event`() {
+    val sender = net.treasury("sender");
+
+    val init = ContractState {
+        code: build("fm_flags"),
+        data: createEmptyCell(),
+    };
+
+    val throwRes = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.2"),
+            dest: {
+                stateInit: init,
+            },
+            body: FmFlagsThrow { queryId: 88 },
+        }),
+    );
+
+    expect(throwRes).toHaveLength(1);
+    println(throwRes);
+}
+"#
+    );
+
+    ProjectBuilder::new("formatter-exit-code-with-backtrace-full-and-account-created-event")
+        .file("contracts/fm_flags_messages", FLAGS_MESSAGES)
+        .contract("fm_flags", FLAGS_CONTRACT)
+        .test_file("formatter_flags", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_exit_code_with_backtrace_full_and_account_created_event.stdout.txt",
+        );
+}
+
+#[test]
 fn formatter_orphan_chain_println_treats_missing_parent_as_root() {
     run_success_case(
         linear_formatter_project(
