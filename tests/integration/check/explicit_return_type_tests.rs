@@ -27,6 +27,24 @@ fn test_check_explicit_return_type_with_explicit_type() {
 
 #[test]
 #[named]
+fn test_check_explicit_return_type_skips_contract_entrypoints() {
+    run_simple_test(
+        "explicit_return_type",
+        r#"
+            fun main() {}
+            fun onInternalMessage() {}
+            fun onExternalMessage() {}
+            fun onRunTickTock() {}
+            fun onSplitPrepare() {}
+            fun onSplitInstall() {}
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+        function_name!(),
+    );
+}
+
+#[test]
+#[named]
 fn test_fix_explicit_return_type() {
     run_fix_test(
         r#"

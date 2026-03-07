@@ -4,7 +4,7 @@ use crate::{Checker, FixAvailability};
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_index::{FileId, Span};
-use tolk_syntax::FunctionLike;
+use tolk_syntax::{FunctionLike, Ident};
 use tolk_ty::{InferenceResult, TyData, TyId, TypeInterner};
 
 /// ### What it does
@@ -30,6 +30,16 @@ use tolk_ty::{InferenceResult, TyData, TyId, TypeInterner};
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct ExplicitReturnType;
 
+const EXEMPT_ENTRYPOINTS: [&str; 7] = [
+    "main",
+    "onInternalMessage",
+    "onExternalMessage",
+    "onRunTickTock",
+    "onSplitPrepare",
+    "onSplitInstall",
+    "onBouncedMessage",
+];
+
 impl Violation for ExplicitReturnType {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
@@ -51,13 +61,24 @@ where
         return None;
     }
 
-    let name_span = node
-        .name()
-        .map(|name| name.span())
-        .unwrap_or_else(|| node.span());
+    let name = node.name();
+    if let Some(name) = name.as_ref()
+        && is_exempt_entrypoint(checker, file_id, name)
+    {
+        return None;
+    }
+
+    let name_span = name.map(|name| name.span()).unwrap_or_else(|| node.span());
     let insert_offset = node.syntax().child_by_field_name("parameters")?.end_byte() as u32;
 
     fire_diagnostic(checker, file_id, name_span, insert_offset, inference)
+}
+
+fn is_exempt_entrypoint(checker: &Checker, file_id: FileId, name: &Ident) -> bool {
+    let file_db = checker.file_db;
+    EXEMPT_ENTRYPOINTS
+        .iter()
+        .any(|entrypoint| file_db.text_matches(file_id, name, entrypoint))
 }
 
 fn fire_diagnostic(
