@@ -90,7 +90,7 @@ fn net_is_deployed_transitions_false_to_true_in_fixture_project() {
             init: ContractState
         }
 
-        fun Counter.fromStorage(storage: Storage) {
+        fun Counter.fromStorage(storage: Storage): Counter {
             val init = ContractState {
                 code: build("counter"),
                 data: storage.toCell(),

@@ -9,7 +9,7 @@ struct JettonMinter {
     init: ContractState
 }
 
-fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, includeOwnerAddress: bool, value: coins = ton("0.1")) {
+fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, includeOwnerAddress: bool, value: coins = ton("0.1")): SendResultList {
     val discoveryMsg = createMessage({
         bounce: false,
         value,
@@ -23,7 +23,7 @@ fun JettonMinter.sendDiscovery(self, from: address, ownerAddress: address, inclu
     return net.send(from, discoveryMsg)
 }
 
-fun JettonMinter.sendChangeContent(self, from: address, newContent: cell) {
+fun JettonMinter.sendChangeContent(self, from: address, newContent: cell): SendResultList {
     val changeMsg = createMessage({
         bounce: false,
         value: ton("0.1"),
@@ -36,7 +36,7 @@ fun JettonMinter.sendChangeContent(self, from: address, newContent: cell) {
     return net.send(from, changeMsg)
 }
 
-fun JettonMinter.fromStorage(storage: MinterStorage) {
+fun JettonMinter.fromStorage(storage: MinterStorage): JettonMinter {
     val init = ContractState {
         code: build("jetton_minter"),
         data: storage.toCell(),
@@ -47,7 +47,7 @@ fun JettonMinter.fromStorage(storage: MinterStorage) {
     }
 }
 
-fun JettonMinter.sendDeploy(self, from: address, params: SendParams) {
+fun JettonMinter.sendDeploy(self, from: address, params: SendParams): SendResultList {
     val deployMsg = createMessage({
         bounce: false,
         value: params.value,
@@ -59,7 +59,7 @@ fun JettonMinter.sendDeploy(self, from: address, params: SendParams) {
     return net.send(from, deployMsg)
 }
 
-fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount: int, forwardTonAmount: int, totalTonAmount: int) {
+fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount: int, forwardTonAmount: int, totalTonAmount: int): SendResultList {
     val mintMsg = createMessage({
         bounce: false,
         value: totalTonAmount + ton("0.015"),
@@ -81,7 +81,7 @@ fun JettonMinter.sendMint(self, from: address, recipient: address, jettonAmount:
     return net.send(from, mintMsg)
 }
 
-fun JettonMinter.sendChangeAdmin(self, from: address, newOwner: address) {
+fun JettonMinter.sendChangeAdmin(self, from: address, newOwner: address): SendResultList {
     val changeMsg = createMessage({
         bounce: false,
         value: ton("0.05"),

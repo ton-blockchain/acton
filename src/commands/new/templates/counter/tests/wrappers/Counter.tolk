@@ -8,7 +8,7 @@ struct Counter {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun Counter.fromStorage(storage: Storage) {
+fun Counter.fromStorage(storage: Storage): Counter {
     val init = ContractState {
         code: build("counter"),
         data: storage.toCell(),

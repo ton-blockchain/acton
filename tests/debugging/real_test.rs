@@ -83,7 +83,7 @@ struct Storage {
     counter: uint32
 }
 
-fun Storage.load() {
+fun Storage.load(): Storage {
     return Storage.fromCell(contract.getData());
 }
 
@@ -121,7 +121,7 @@ struct Counter {
     init: ContractState
 }
 
-fun Counter.fromStorage(storage: Storage) {
+fun Counter.fromStorage(storage: Storage): Counter {
     val init = ContractState {
         code: build("counter"),
         data: storage.toCell(),
@@ -130,7 +130,7 @@ fun Counter.fromStorage(storage: Storage) {
     return Counter { address, init }
 }
 
-fun Counter.sendIncrease(self, from: address, increaseBy: int) {
+fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: ton("0.1"),
@@ -140,7 +140,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int) {
     return net.send(from, msg);
 }
 
-fun Counter.sendReset(self, from: address) {
+fun Counter.sendReset(self, from: address): SendResultList {
     val msg = createMessage({
         bounce: false,
         value: ton("0.1"),
@@ -154,7 +154,7 @@ fun Counter.getCounter(self): int {
     return net.runGetMethod(self.address, "currentCounter")
 }
 
-fun setupTest() {
+fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({ id: 0, counter: 0 });
 
     val deployer = net.treasury("deployer");

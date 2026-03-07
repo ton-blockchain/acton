@@ -92,7 +92,7 @@ fn test_wrapper_generation_with_types_and_storage_in_the_same_file() {
                     counter: uint32
                 }
 
-                fun Storage.load() {
+                fun Storage.load(): Storage {
                     return Storage.fromCell(contract.getData());
                 }
 
@@ -291,7 +291,7 @@ fn test_wrapper_generation_with_typed_cell_field_in_storage() {
                     counter: Cell<uint32>
                 }
 
-                fun Storage.load() {
+                fun Storage.load(): Storage {
                     return Storage.fromCell(contract.getData());
                 }
 
@@ -370,7 +370,7 @@ fn test_wrapper_generation_with_typed_cell_field() {
                     counter: uint32
                 }
 
-                fun Storage.load() {
+                fun Storage.load(): Storage {
                     return Storage.fromCell(contract.getData());
                 }
 
@@ -443,7 +443,7 @@ fn test_wrapper_generation_with_typed_cell_param() {
                     counter: uint32
                 }
 
-                fun Storage.load() {
+                fun Storage.load(): Storage {
                     return Storage.fromCell(contract.getData());
                 }
 
@@ -580,7 +580,7 @@ fn test_with_several_files_contract() {
                     counter: uint32
                 }
 
-                fun Storage.load() {
+                fun Storage.load(): Storage {
                     return Storage.fromCell(contract.getData());
                 }
 
