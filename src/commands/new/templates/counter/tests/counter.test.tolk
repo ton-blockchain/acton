@@ -42,7 +42,7 @@ get fun `test unknown message`() {
 
 /// Initializes the test environment, creating a fresh instance of the contract.
 /// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).
-fun setupTest() {
+fun setupTest(): (undefined, Treasury, Treasury) {
     // Create a treasury account for deployment (typically the owner)
     val deployer = net.treasury("deployer");
     // Create another treasury account for testing interactions from other users

@@ -10,7 +10,7 @@ struct Counter {
     init: ContractState
 }
 
-fun Counter.fromStorage(storage: Storage) {
+fun Counter.fromStorage(storage: Storage): Counter {
     val init = ContractState {
         code: build("counter"),
         data: storage.toCell(),
@@ -19,7 +19,7 @@ fun Counter.fromStorage(storage: Storage) {
     return Counter { address, init }
 }
 
-fun setupTest() {
+fun setupTest(): (Counter, Treasury) {
     val counter = Counter.fromStorage({});
 
     val deployer = net.treasury("deployer");
