@@ -1,10 +1,15 @@
-use acton_config::color::OwoColorize;
+use acton_config::color::{ColorMode, OwoColorize, color_mode};
 use acton_config::config::ActonConfig;
 use anyhow::{Context, Result};
+use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
+use codespan_reporting::files::SimpleFiles;
+use codespan_reporting::term;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use globset::{Glob, GlobSetBuilder};
 use similar::{ChangeTag, TextDiff};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use tree_sitter::Point;
 use walkdir::WalkDir;
 
 pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
@@ -131,6 +136,10 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
                 }
             }
             Err(err) => {
+                if emit_parse_errors_if_any(&file_path, &content)? {
+                    error_count += 1;
+                    continue;
+                }
                 eprintln!("{} {}: {}", "Error".red(), file_path.display(), err);
                 error_count += 1;
             }
@@ -141,6 +150,9 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         if !unformatted_files.is_empty() {
             anyhow::bail!("Files are not formatted");
         } else if error_count > 0 {
+            if error_count == 1 {
+                anyhow::bail!("Formatting check failed due to syntax error in 1 file");
+            }
             anyhow::bail!("Formatting check failed due to syntax errors in {error_count} files");
         }
         println!("{}", "All files are properly formatted".green());
@@ -152,9 +164,69 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool) -> Result<()> {
         }
 
         if error_count > 0 {
+            if error_count == 1 {
+                anyhow::bail!("Failed to format 1 file due to syntax error");
+            }
             anyhow::bail!("Failed to format {error_count} files due to syntax errors");
         }
     }
 
     Ok(())
+}
+
+fn emit_parse_errors_if_any(file_path: &Path, source: &str) -> Result<bool> {
+    let source_file = tolk_syntax::parse(source)
+        .with_context(|| format!("Failed to parse {}", file_path.display()))?;
+    if !source_file.has_errors() {
+        // another kind of error
+        return Ok(false);
+    }
+
+    let mut files = SimpleFiles::new();
+    let file_id = files.add(file_path.display().to_string(), source.to_owned());
+
+    let writer = StandardStream::stderr(match color_mode() {
+        ColorMode::Auto => ColorChoice::Auto,
+        ColorMode::Always => ColorChoice::Always,
+        ColorMode::Never => ColorChoice::Never,
+    });
+
+    let mut config = term::Config::default();
+    let mut styles = term::Styles::default();
+    styles.header_error.set_intense(false);
+    config.styles = styles;
+    config.chars = term::Chars::ascii();
+
+    for parse_error in source_file.errors() {
+        let start = byte_offset_from_point(&parse_error.span.start, source).min(source.len());
+        let mut end = byte_offset_from_point(&parse_error.span.end, source).min(source.len());
+        if end < start {
+            end = start;
+        }
+
+        let diagnostic = Diagnostic::new(Severity::Error)
+            .with_code("C001")
+            .with_message(parse_error.message)
+            .with_labels(vec![Label::primary(file_id, start..end)]);
+        term::emit(&mut writer.lock(), &config, &files, &diagnostic)?;
+    }
+
+    Ok(true)
+}
+
+fn byte_offset_from_point(point: &Point, source: &str) -> usize {
+    let lines = source.lines().collect::<Vec<_>>();
+    let mut offset = 0;
+
+    for i in 0..point.row {
+        if i < lines.len() {
+            offset += lines[i].len() + 1; // +1 for newline
+        }
+    }
+
+    if point.row < lines.len() {
+        offset += point.column;
+    }
+
+    offset
 }
