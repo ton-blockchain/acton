@@ -1,4 +1,5 @@
 use crate::common::{assertion, strip_ansi};
+use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
 use base64::Engine;
@@ -62,6 +63,31 @@ fun main() {
     net.send(wallet.address, deployDeployer);
 
     println1("DEPLOYER_CONTRACT={}", deployerAddress);
+}
+"#;
+
+const PRINT_SEND_RESULT_SCRIPT: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {
+    val wallet = net.wallet("deployer");
+
+    val childInit = ContractState {
+        code: build("child"),
+        data: createEmptyCell(),
+    };
+
+    val deployChild = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: {
+            stateInit: childInit,
+        },
+    });
+
+    println(net.send(wallet.address, deployChild));
 }
 "#;
 
@@ -358,6 +384,41 @@ fn litenode_supports_pre_start_commands_and_get_out_msg_queue_size() {
         normalize_output_preserve_escapes(&tx_std_response_json, project.path()),
         snapbox::file!("snapshots/test_litenode_get_transactions_std.response.json"),
     );
+
+    node.stop();
+}
+
+#[test]
+fn litenode_script_println_net_send_in_broadcast_shows_synthetic_hint() {
+    let project = ProjectBuilder::new("litenode-broadcast-println-net-send")
+        .contract("child", CHILD_CONTRACT)
+        .script_file("deploy", PRINT_SEND_RESULT_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .litenode()
+        .before_start(|cmd| cmd.build())
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .broadcast()
+        .verify_network("custom:localnet")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Broadcast send (synthetic result)")
+        .assert_not_contains("compute phase skipped")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_litenode_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
+        );
 
     node.stop();
 }

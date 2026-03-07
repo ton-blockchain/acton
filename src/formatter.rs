@@ -22,9 +22,9 @@ use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes, Load};
 use tycho_types::models::{
-    AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, DisplayBase64StdAddr,
-    ExecutedComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo, ReserveCurrencyFlags,
-    SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
+    AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
+    DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
+    ReserveCurrencyFlags, SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
 };
 use tycho_types::num::Tokens;
 
@@ -206,8 +206,82 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         let known_contracts = self.collect_known_contracts(&send_results);
         let contract_letters = self.create_contract_letters(&known_contracts);
 
+        if let [send_result] = &send_results[..]
+            && self.is_broadcast_synthetic_send_result(send_result)
+        {
+            return self.format_broadcast_synthetic_send_result(send_result, &contract_letters);
+        }
+
         let tree = self.build_transaction_tree(send_results);
         self.format_transaction_tree(&tree, &contract_letters, 0, "")
+    }
+
+    fn is_broadcast_synthetic_send_result(&self, send_result: &SendResult) -> bool {
+        let tx = &send_result.tx;
+
+        if tx.lt != 0 || tx.prev_trans_lt != 0 {
+            return false;
+        }
+        if tx.orig_status != AccountStatus::Uninit || tx.end_status != AccountStatus::Uninit {
+            return false;
+        }
+        if tx.out_msg_count != 0 {
+            return false;
+        }
+        if send_result.parent_lt.is_some() || !send_result.children_ids.is_empty() {
+            return false;
+        }
+
+        let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
+            return false;
+        };
+
+        if info.action_phase.is_some()
+            || info.storage_phase.is_some()
+            || info.credit_phase.is_some()
+            || info.aborted
+            || info.destroyed
+        {
+            return false;
+        }
+
+        matches!(
+            info.compute_phase,
+            ComputePhase::Skipped(skipped)
+                if skipped.reason == ComputePhaseSkipReason::NoState
+        )
+    }
+
+    fn format_broadcast_synthetic_send_result(
+        &self,
+        send_result: &SendResult,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
+        let mut lines = vec!["Broadcast send (synthetic result)".to_owned()];
+        let mut message = self.format_message_part(&send_result.tx, contract_letters, true);
+
+        if let Some(in_msg_cell) = &send_result.tx.in_msg
+            && let Ok(in_msg) = in_msg_cell.parse::<RelaxedMessage>()
+            && let RelaxedMsgInfo::Int(info) = &in_msg.info
+            && info.src.is_none()
+        {
+            message = format!("{}{}", "N/A".dimmed(), message);
+        }
+
+        if message.is_empty() {
+            lines.push(format!(
+                "└── submitted to network; call {} to confirm inclusion",
+                "res.wait()".yellow()
+            ));
+            return lines.join("\n");
+        }
+
+        lines.push(format!("└── {message}"));
+        lines.push(format!(
+            "    └── submitted to network; call {} to confirm inclusion",
+            "res.wait()".yellow()
+        ));
+        lines.join("\n")
     }
 
     /// Parse transaction items into `SendResult` structures
