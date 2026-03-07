@@ -8,6 +8,7 @@ mod dangerous_send_mode_safety_comment_tests;
 mod deprecated_tests;
 mod divide_before_multiply_tests;
 mod duplicated_condition_tests;
+mod enable_only_tests;
 mod enum_cast_safety_comment_tests;
 mod field_init_can_be_folded_tests;
 mod identical_conditional_branches_tests;

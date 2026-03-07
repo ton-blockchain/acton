@@ -15,12 +15,13 @@ acton check <path-to-file.tolk>
 
 ## Options
 
-| Option                     | Type   | Description                                                 |
-|:---------------------------|:-------|:------------------------------------------------------------|
-| `--fix`                    | Flag   | Automatically apply available fixes (plain output only).    |
-| `--output-format <FORMAT>` | String | Output format: `plain`, `json`, `sarif`, or `github`.       |
-| `--output-file <PATH>`     | String | Write non-plain output to file (not allowed with `plain`).  |
-| `--explain <CODE>`         | String | Explain a rule.                                             |
+| Option                           | Type   | Description                                                |
+|:---------------------------------|:-------|:-----------------------------------------------------------|
+| `--fix`                          | Flag   | Automatically apply available fixes (plain output only).   |
+| `--output-format <FORMAT>`       | String | Output format: `plain`, `json`, `sarif`, or `github`.      |
+| `--output-file <PATH>`           | String | Write non-plain output to file (not allowed with `plain`). |
+| `--enable-only <CODE[,CODE...]>` | String | Run only selected rule codes (for example `E001,S001`).    |
+| `--explain <CODE>`               | String | Explain a rule.                                            |
 
 For setup and configuration, see [Linting](/docs/linting).
 For the full rules catalog, see [Linter Rules](/docs/linting/rules).
@@ -32,6 +33,7 @@ For the full rules catalog, see [Linter Rules](/docs/linting/rules).
 - `github` format emits GitHub Actions workflow annotations (`::warning ...` / `::error ...`), useful in CI logs.
 - Output format is resolved in this order: CLI `--output-format`, then `[lint].output-format` from `Acton.toml`, then default `plain`.
 - `--output-file` cannot be used with `plain` format.
+- `--enable-only` limits checks to the selected linter rules. You can pass a comma-separated list.
 - `acton check <path-to-file.tolk>` runs the file in single-file mode with test-style lint settings. In this mode, `E014 (acton-import-in-contract)` is relaxed.
 - `acton check <contract-id>` keeps normal contract lint settings from `Acton.toml` (including `E014`).
 
@@ -49,6 +51,9 @@ acton check counter.tolk
 
 # Print JSON to stdout
 acton check --output-format json
+
+# Run only specific rules
+acton check --enable-only E001,S001
 
 # Write SARIF report to file
 acton check --output-format sarif --output-file .acton/reports/lint.sarif

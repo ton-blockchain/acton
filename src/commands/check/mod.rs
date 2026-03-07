@@ -7,10 +7,11 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::Instant;
 use std::{fs, io};
 use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, Severity};
-use tolk_linter::{Checker, Rule};
+use tolk_linter::{Checker, Linter, Rule, Tolk};
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, Span};
 use tolk_resolver::project_index::ProjectIndex;
@@ -32,6 +33,14 @@ pub(super) struct LintExcludes {
     project_root: PathBuf,
     patterns: Vec<String>,
     excludes: GlobSet,
+}
+
+struct CheckRunOptions<'a> {
+    fix: bool,
+    is_plain_report: bool,
+    acton_config: &'a ActonConfig,
+    excludes: &'a LintExcludes,
+    only_rules: Option<&'a HashSet<Rule>>,
 }
 
 impl LintExcludes {
@@ -97,6 +106,7 @@ pub fn check_cmd(
     fix: bool,
     cli_output_format: Option<CheckOutputFormat>,
     output_file: Option<PathBuf>,
+    enable_only: Option<Vec<String>>,
     explain: Option<String>,
     list_lint_rules: bool,
     target: Option<String>,
@@ -129,6 +139,14 @@ pub fn check_cmd(
 
     let cwd = std::env::current_dir()?;
     let excludes = LintExcludes::from_config(&cwd, &config)?;
+    let only_rules = parse_rules_filter(enable_only)?;
+    let run_options = CheckRunOptions {
+        fix,
+        is_plain_report,
+        acton_config: &config,
+        excludes: &excludes,
+        only_rules: only_rules.as_ref(),
+    };
 
     let now = Instant::now();
     let files = find_files(&cwd)?;
@@ -149,28 +167,13 @@ pub fn check_cmd(
 
     if let Some(target) = target {
         if target.ends_with(".tolk") {
-            let contract_diagnostics = check_test_file(
-                Path::new(&target),
-                &file_db,
-                fix,
-                is_plain_report,
-                &config,
-                &excludes,
-            )?;
+            let contract_diagnostics = check_test_file(Path::new(&target), &file_db, &run_options)?;
             all_diagnostics.extend(contract_diagnostics);
         } else {
             let contract = config
                 .get_contract(&target)
                 .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &target)))?;
-            let contract_diagnostics = check_contract(
-                &target,
-                contract,
-                &file_db,
-                fix,
-                is_plain_report,
-                &config,
-                &excludes,
-            )?;
+            let contract_diagnostics = check_contract(&target, contract, &file_db, &run_options)?;
             all_diagnostics.extend(contract_diagnostics);
         }
     } else {
@@ -179,15 +182,8 @@ pub fn check_cmd(
             if excludes.is_match(Path::new(&contract.src)) {
                 continue;
             }
-            let contract_diagnostics = check_contract(
-                &contract_id,
-                &contract,
-                &file_db,
-                fix,
-                is_plain_report,
-                &config,
-                &excludes,
-            )?;
+            let contract_diagnostics =
+                check_contract(&contract_id, &contract, &file_db, &run_options)?;
             all_diagnostics.extend(contract_diagnostics);
         }
 
@@ -196,8 +192,7 @@ pub fn check_cmd(
                 continue;
             };
             if name.to_string_lossy().ends_with(".test.tolk") && !excludes.is_match(&file) {
-                let contract_diagnostics =
-                    check_test_file(&file, &file_db, fix, is_plain_report, &config, &excludes)?;
+                let contract_diagnostics = check_test_file(&file, &file_db, &run_options)?;
                 all_diagnostics.extend(contract_diagnostics);
             }
         }
@@ -250,6 +245,68 @@ pub fn check_cmd(
     }
 
     Ok(())
+}
+
+fn parse_rules_filter(rule_codes: Option<Vec<String>>) -> anyhow::Result<Option<HashSet<Rule>>> {
+    let Some(rule_codes) = rule_codes else {
+        return Ok(None);
+    };
+
+    let mut rules = HashSet::new();
+    for rule_code in rule_codes {
+        let rule = parse_rule_selector(&rule_code)?;
+        rules.insert(rule);
+    }
+
+    if rules.is_empty() {
+        anyhow::bail!("--enable-only requires at least one rule code");
+    }
+
+    Ok(Some(rules))
+}
+
+fn parse_rule_selector(rule_code: &str) -> anyhow::Result<Rule> {
+    let code = rule_code.trim();
+    if code.is_empty() {
+        anyhow::bail!("rule code cannot be empty");
+    }
+
+    if let Some(rule) = parse_exact_rule_code(code) {
+        return Ok(rule);
+    }
+
+    anyhow::bail!("Unknown rule code: {rule_code}");
+}
+
+fn parse_exact_rule_code(code: &str) -> Option<Rule> {
+    let selector = Tolk::from_str(code).ok()?;
+    let mut rules = selector.rules();
+    let rule = rules.next()?;
+    if rules.next().is_some() {
+        return None;
+    }
+    Some(rule)
+}
+
+fn apply_rules_filter(
+    mut lint_settings: HashMap<Rule, LintLevel>,
+    selected_rules: Option<&HashSet<Rule>>,
+) -> HashMap<Rule, LintLevel> {
+    let Some(selected_rules) = selected_rules else {
+        return lint_settings;
+    };
+
+    for rule in Linter::Tolk.all_rules() {
+        if selected_rules.contains(&rule) {
+            if matches!(lint_settings.get(&rule), Some(LintLevel::Allow)) {
+                lint_settings.remove(&rule);
+            }
+        } else {
+            lint_settings.insert(rule, LintLevel::Allow);
+        }
+    }
+
+    lint_settings
 }
 
 fn show_plain_report(
@@ -364,47 +421,42 @@ fn check_contract(
     contract_id: &str,
     config: &ContractConfig,
     file_db: &FileDb,
-    fix: bool,
-    is_plain_report: bool,
-    acton_config: &ActonConfig,
-    excludes: &LintExcludes,
+    options: &CheckRunOptions<'_>,
 ) -> anyhow::Result<Vec<Diagnostic>> {
     if !config.src.ends_with(".tolk") {
         // skip contracts with .boc sources
         return Ok(vec![]);
     }
 
-    if is_plain_report {
+    if options.is_plain_report {
         println!("    {} {}", "Checking".green().bold(), config.name,);
     }
 
     let root = dunce::canonicalize(PathBuf::from(&config.src))?;
-    let lint_settings = Checker::build_settings(acton_config, Some(contract_id));
+    let lint_settings = Checker::build_settings(options.acton_config, Some(contract_id));
+    let lint_settings = apply_rules_filter(lint_settings, options.only_rules);
 
     check_root_file(
         &root,
         file_db,
-        fix,
-        is_plain_report,
+        options.fix,
+        options.is_plain_report,
         lint_settings,
-        acton_config,
-        excludes,
+        options.acton_config,
+        options.excludes,
     )
 }
 
 fn check_test_file(
     file: &Path,
     file_db: &FileDb,
-    fix: bool,
-    is_plain_report: bool,
-    acton_config: &ActonConfig,
-    excludes: &LintExcludes,
+    options: &CheckRunOptions<'_>,
 ) -> anyhow::Result<Vec<Diagnostic>> {
     let root = dunce::canonicalize(file)?;
     let current_dir = std::env::current_dir().unwrap_or_default();
     let relative_root = pathdiff::diff_paths(&root, &current_dir).unwrap_or_else(|| root.clone());
 
-    if is_plain_report {
+    if options.is_plain_report {
         println!(
             "    {} {}",
             "Checking".green().bold(),
@@ -412,22 +464,23 @@ fn check_test_file(
         );
     }
 
-    let mut lint_settings = Checker::build_settings(acton_config, None);
+    let mut lint_settings = Checker::build_settings(options.acton_config, None);
     // we can import any files in tests
     lint_settings.insert(Rule::ActonImportInContract, LintLevel::Allow);
     // random is not so important in tests
     lint_settings.insert(Rule::RandomRequiresInitialization, LintLevel::Allow);
     // division is not so important in tests
     lint_settings.insert(Rule::DivideBeforeMultiply, LintLevel::Allow);
+    let lint_settings = apply_rules_filter(lint_settings, options.only_rules);
 
     check_root_file(
         &root,
         file_db,
-        fix,
-        is_plain_report,
+        options.fix,
+        options.is_plain_report,
         lint_settings,
-        acton_config,
-        excludes,
+        options.acton_config,
+        options.excludes,
     )
 }
 
@@ -496,7 +549,7 @@ fn check_root_file(
     resolve(file_db, &mut index);
     log::debug!("Resolve project took {:?}", now.elapsed());
 
-    // Infer types of all top level declarations
+    // Infer types of all top-level declarations
     let now = Instant::now();
     let mut interner = TypeInterner::new();
     let mut type_db = TypeDb::new(&mut interner, file_db, &index);

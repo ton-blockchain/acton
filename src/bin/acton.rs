@@ -512,6 +512,13 @@ enum Commands {
             help = "Write output result to file (default: stdout)"
         )]
         output_file: Option<PathBuf>,
+        #[arg(
+            long = "enable-only",
+            value_delimiter = ',',
+            value_name = "CODE[,CODE...]",
+            help = "Enable only selected lint rules by code (e.g. E001,S001)"
+        )]
+        enable_only: Option<Vec<String>>,
         #[arg(long, help = "Explain a rule")]
         explain: Option<String>,
         #[arg(long, hide = true)]
@@ -1920,6 +1927,7 @@ fn main() {
             fix,
             output_format,
             output_file,
+            enable_only,
             explain,
             list_lint_rules,
             target,
@@ -1927,6 +1935,7 @@ fn main() {
             fix,
             output_format,
             output_file,
+            enable_only,
             explain,
             list_lint_rules,
             target,
