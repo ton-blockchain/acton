@@ -131,6 +131,6 @@ const fn inferred_return_type(inference: Option<&InferenceResult>) -> Option<TyI
 fn impossible_to_add_type(type_interner: &TypeInterner, ty: TyId) -> bool {
     matches!(
         type_interner.data(ty),
-        TyData::Auto | TyData::Unknown | TyData::Undefined
+        TyData::Auto | TyData::Unknown | TyData::Undefined | TyData::Void
     )
 }

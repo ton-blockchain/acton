@@ -160,7 +160,7 @@ fn test_fix_explicit_return_type_for_void() {
             }
         "#,
         r#"
-            fun doNothing(): void {
+            fun doNothing() {
             }
         "#,
         function_name!(),
