@@ -34,6 +34,7 @@ fn test_check_does_not_hang_on_recursive_self_receiver_deduction() {
             }
         "#,
         )
+        .with_lint_level("explicit-return-type", "allow")
         .build();
 
     project.acton().init().run().success();

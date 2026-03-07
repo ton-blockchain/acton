@@ -27,6 +27,7 @@ fn check_lint_exclude_skips_excluded_contract_root() {
         .contract("alpha", UNUSED_VARIABLE_CONTRACT)
         .contract("beta", UNUSED_VARIABLE_CONTRACT)
         .with_lint_level("unused-variable", "warn")
+        .with_lint_level("explicit-return-type", "allow")
         .with_lint_exclude("contracts/beta.tolk")
         .build();
 
@@ -59,6 +60,7 @@ fn check_lint_exclude_hides_dependency_diagnostics_but_keeps_graph_valid() {
         )
         .file("contracts/helper", HELPER_WITH_UNUSED_VARIABLE)
         .with_lint_level("unused-variable", "warn")
+        .with_lint_level("explicit-return-type", "allow")
         .with_lint_exclude("contracts/helper.tolk")
         .build();
 
@@ -81,6 +83,7 @@ fn check_lint_exclude_is_ignored_for_explicit_target() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract("alpha", UNUSED_VARIABLE_CONTRACT)
         .contract("beta", UNUSED_VARIABLE_CONTRACT)
+        .with_lint_level("explicit-return-type", "allow")
         .with_lint_level("unused-variable", "warn")
         .with_lint_exclude("contracts/beta.tolk")
         .build();
@@ -105,6 +108,7 @@ fn check_lint_exclude_is_ignored_for_explicit_target_path() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract("alpha", UNUSED_VARIABLE_CONTRACT)
         .contract("beta", UNUSED_VARIABLE_CONTRACT)
+        .with_lint_level("explicit-return-type", "allow")
         .with_lint_level("unused-variable", "warn")
         .with_lint_exclude("contracts/beta.tolk")
         .build();
@@ -138,6 +142,7 @@ fn check_lint_exclude_does_not_hide_compiler_errors_from_excluded_files() {
             "#,
         )
         .file("contracts/broken_helper", BROKEN_HELPER)
+        .with_lint_level("explicit-return-type", "allow")
         .with_lint_exclude("contracts/broken_helper.tolk")
         .build();
 

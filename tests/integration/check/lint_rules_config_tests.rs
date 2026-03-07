@@ -16,6 +16,7 @@ fn check_lint_rules_warn_enables_rule_diagnostics() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract("main", UNAUTHORIZED_ACCESS_SAMPLE)
         .with_lint_level("unauthorized-access", "warn")
+        .with_lint_level("explicit-return-type", "allow")
         .build();
 
     project.acton().init().run().success();
@@ -37,6 +38,7 @@ fn check_lint_rules_allow_disables_rule_diagnostics() {
     let project = ProjectBuilder::new(&format!("check-{}", function_name!()))
         .contract("main", UNAUTHORIZED_ACCESS_SAMPLE)
         .with_lint_level("unauthorized-access", "allow")
+        .with_lint_level("explicit-return-type", "allow")
         .build();
 
     project.acton().init().run().success();
@@ -59,6 +61,7 @@ fn check_lint_rules_contract_override_applies_to_single_contract() {
         .contract("alpha", UNAUTHORIZED_ACCESS_SAMPLE)
         .contract("beta", UNAUTHORIZED_ACCESS_SAMPLE)
         .with_lint_level("unauthorized-access", "warn")
+        .with_lint_level("explicit-return-type", "allow")
         .build();
 
     let acton_toml_path = project.path().join("Acton.toml");
