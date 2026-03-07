@@ -259,3 +259,25 @@ fun main() {
             (type_identifier)
             (number_literal)
             (number_literal)))))))
+
+========================================================================
+Nested empty tuple
+========================================================================
+
+fun main() {
+    val data = [[]];
+}
+------------------------------------------------------------------------
+
+(source_file
+  (function_declaration
+    (identifier)
+    (parameter_list)
+    (block_statement
+      (expression_statement
+        (assignment
+          (var_declaration_lhs
+            (var_declaration
+              (identifier)))
+          (typed_tuple
+            (typed_tuple)))))))
