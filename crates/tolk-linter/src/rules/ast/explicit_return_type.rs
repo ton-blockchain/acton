@@ -26,6 +26,10 @@ use tolk_ty::{InferenceResult, TyData, TyId, TypeInterner};
 ///     return beginCell().toSlice();
 /// }
 /// ```
+///
+/// ### Behavior notes
+/// - Contract entrypoints `main`, `onInternalMessage`, `onExternalMessage`, `onRunTickTock`, `onSplitPrepare`, `onSplitInstall`, and `onBouncedMessage` are ignored by this rule.
+/// - When the inferred return type is `void`, the rule still reports the missing explicit type, but no quick fix is suggested.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct ExplicitReturnType;

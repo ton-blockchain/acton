@@ -32,4 +32,8 @@ fun buildSlice(): slice {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/explicit_return_type.rs#L29" />
+### Behavior notes
+- Contract entrypoints `main`, `onInternalMessage`, `onExternalMessage`, `onRunTickTock`, `onSplitPrepare`, `onSplitInstall`, and `onBouncedMessage` are ignored by this rule.
+- When the inferred return type is `void`, the rule still reports the missing explicit type, but no quick fix is suggested.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/explicit_return_type.rs#L33" />
