@@ -1,7 +1,16 @@
-use crate::integration::check::run_fix_test;
-use crate::integration::check::run_simple_test;
+use crate::integration::check::{run_rule_fix_test, run_rule_test};
 use crate::support::project::ProjectBuilder;
 use function_name::named;
+
+const RULE_CODE: &str = "S001";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
+
+fn run_fix_test(before: &str, after: &str, name: &str) {
+    run_rule_fix_test(RULE_CODE, before, after, name);
+}
 
 #[test]
 #[named]
@@ -284,7 +293,14 @@ fn test_fix_name_case_checker_updates_usages_in_another_file() {
         .build();
 
     project.acton().init().run().success();
-    project.acton().check().arg("--fix").run().success();
+    project
+        .acton()
+        .check()
+        .arg("--enable-only")
+        .arg(RULE_CODE)
+        .arg("--fix")
+        .run()
+        .success();
 
     let main_path = project.path().join("contracts/main.tolk");
     let api_path = project.path().join("contracts/api.tolk");

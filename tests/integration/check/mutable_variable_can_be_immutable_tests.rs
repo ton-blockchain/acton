@@ -1,7 +1,13 @@
-use crate::integration::check::run_simple_test;
+use crate::integration::check::run_rule_test;
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
+
+const RULE_CODE: &str = "E003";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
 
 #[test]
 #[named]
@@ -240,6 +246,8 @@ fn test_check_mutable_variable_can_be_immutable_with_call_of_unresolved_method()
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg(RULE_CODE)
         .run()
         .failure()
         .assert_stderr_snapshot_matches(&format!(

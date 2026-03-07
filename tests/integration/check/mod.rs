@@ -41,12 +41,13 @@ mod unused_variable_tests;
 mod used_ignored_identifier_tests;
 mod write_only_variable_tests;
 
-pub(crate) fn run_simple_test(group: &str, content: &str, name: &str) {
-    run_simple_test_with_mappings(group, content, &[], &[], name);
+pub(crate) fn run_rule_test(group: &str, rule_code: &str, content: &str, name: &str) {
+    run_rule_test_with_mappings(group, rule_code, content, &[], &[], name);
 }
 
-pub(crate) fn run_simple_test_with_mappings(
+pub(crate) fn run_rule_test_with_mappings(
     group: &str,
+    rule_code: &str,
     content: &str,
     files: &[(&str, &str)],
     mappings: &[(&str, &str)],
@@ -67,25 +68,29 @@ pub(crate) fn run_simple_test_with_mappings(
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg(rule_code)
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!("integration/snapshots/check/{group}/{name}.txt"));
 }
 
-pub(crate) fn run_fix_test(before: &str, after: &str, name: &str) {
-    run_fix_test_with_mappings(before, after, &[], &[], name);
+pub(crate) fn run_rule_fix_test(rule_code: &str, before: &str, after: &str, name: &str) {
+    run_rule_fix_test_with_mappings(rule_code, before, after, &[], &[], name);
 }
 
-pub(crate) fn run_fix_test_with_files(
+pub(crate) fn run_rule_fix_test_with_files(
+    rule_code: &str,
     before: &str,
     after: &str,
     files: &[(&str, &str)],
     name: &str,
 ) {
-    run_fix_test_with_mappings(before, after, files, &[], name);
+    run_rule_fix_test_with_mappings(rule_code, before, after, files, &[], name);
 }
 
-pub(crate) fn run_fix_test_with_mappings(
+pub(crate) fn run_rule_fix_test_with_mappings(
+    rule_code: &str,
     before: &str,
     after: &str,
     files: &[(&str, &str)],
@@ -103,7 +108,14 @@ pub(crate) fn run_fix_test_with_mappings(
     let project = builder.build();
 
     project.acton().init().run().success();
-    project.acton().check().arg("--fix").run().success();
+    project
+        .acton()
+        .check()
+        .arg("--enable-only")
+        .arg(rule_code)
+        .arg("--fix")
+        .run()
+        .success();
 
     let file_path = project.path().join("contracts/main.tolk");
     let actual = std::fs::read_to_string(&file_path)
@@ -117,17 +129,19 @@ pub(crate) fn run_fix_test_with_mappings(
     );
 }
 
-pub(crate) fn run_check_test_with_files(
+pub(crate) fn run_rule_check_test_with_files(
     group: &str,
+    rule_code: &str,
     main_content: &str,
     files: &[(&str, &str)],
     name: &str,
 ) {
-    run_check_test_with_files_and_mappings(group, main_content, files, &[], name);
+    run_rule_check_test_with_files_and_mappings(group, rule_code, main_content, files, &[], name);
 }
 
-pub(crate) fn run_check_test_with_files_and_mappings(
+pub(crate) fn run_rule_check_test_with_files_and_mappings(
     group: &str,
+    rule_code: &str,
     main_content: &str,
     files: &[(&str, &str)],
     mappings: &[(&str, &str)],
@@ -147,6 +161,8 @@ pub(crate) fn run_check_test_with_files_and_mappings(
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg(rule_code)
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!("integration/snapshots/check/{group}/{name}.txt"));

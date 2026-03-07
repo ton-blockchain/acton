@@ -6,7 +6,6 @@ fn run_random_requires_initialization_test(content: &str, name: &str) {
     let project = ProjectBuilder::new(&format!("check-{name}"))
         .contract("main", content)
         .with_lint_level("random-requires-initialization", "warn")
-        .with_lint_level("unauthorized-access", "allow")
         .build();
 
     project.acton().init().run().success();
@@ -14,6 +13,8 @@ fn run_random_requires_initialization_test(content: &str, name: &str) {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E024")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -28,8 +29,7 @@ fn run_random_requires_initialization_test_with_files(
 ) {
     let mut builder = ProjectBuilder::new(&format!("check-{name}"))
         .contract("main", main_content)
-        .with_lint_level("random-requires-initialization", "warn")
-        .with_lint_level("unauthorized-access", "allow");
+        .with_lint_level("random-requires-initialization", "warn");
 
     for (path, content) in files {
         builder = builder.file(path, content);
@@ -42,6 +42,8 @@ fn run_random_requires_initialization_test_with_files(
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E024")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(

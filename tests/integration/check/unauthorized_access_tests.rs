@@ -13,6 +13,8 @@ fn run_unauthorized_access_test(content: &str, name: &str) {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E017")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(

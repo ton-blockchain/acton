@@ -1,5 +1,15 @@
-use crate::integration::check::{run_check_test_with_files, run_simple_test};
+use crate::integration::check::{run_rule_check_test_with_files, run_rule_test};
 use function_name::named;
+
+const RULE_CODE: &str = "E023";
+
+fn run_simple_test(group: &str, content: &str, name: &str) {
+    run_rule_test(group, RULE_CODE, content, name);
+}
+
+fn run_check_test_with_files(group: &str, main_content: &str, files: &[(&str, &str)], name: &str) {
+    run_rule_check_test_with_files(group, RULE_CODE, main_content, files, name);
+}
 
 #[test]
 #[named]

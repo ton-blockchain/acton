@@ -6,7 +6,6 @@ fn run_divide_before_multiply_test(content: &str, name: &str) {
     let project = ProjectBuilder::new(&format!("check-{name}"))
         .contract("main", content)
         .with_lint_level("divide-before-multiply", "warn")
-        .with_lint_level("unauthorized-access", "allow")
         .build();
 
     project.acton().init().run().success();
@@ -14,6 +13,8 @@ fn run_divide_before_multiply_test(content: &str, name: &str) {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg("E025")
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
