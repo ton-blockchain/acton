@@ -3,9 +3,15 @@ use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::time::Duration;
 pub use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
+
+const HTTP_RETRY_ATTEMPTS: usize = 3;
+const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
+const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
+const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
 
 pub struct TonApiClient {
     client: reqwest::blocking::Client,
@@ -20,7 +26,9 @@ impl TonApiClient {
         custom_networks: HashMap<String, CustomNetworkUrls>,
         api_key: Option<String>,
     ) -> anyhow::Result<TonApiClient> {
-        let mut client_builder = reqwest::blocking::ClientBuilder::new();
+        let mut client_builder = reqwest::blocking::ClientBuilder::new()
+            .connect_timeout(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECS))
+            .timeout(Duration::from_secs(HTTP_REQUEST_TIMEOUT_SECS));
         if should_disable_system_proxy() {
             client_builder = client_builder.no_proxy();
         }
@@ -67,6 +75,54 @@ impl TonApiClient {
         request
     }
 
+    fn send_with_retry<F>(
+        &self,
+        mut build_request: F,
+        transport_error_context: &str,
+    ) -> anyhow::Result<Response>
+    where
+        F: FnMut() -> reqwest::blocking::RequestBuilder,
+    {
+        for attempt in 0..HTTP_RETRY_ATTEMPTS {
+            return match build_request().send() {
+                Ok(response) => {
+                    if Self::should_retry_status(response.status())
+                        && attempt + 1 < HTTP_RETRY_ATTEMPTS
+                    {
+                        std::thread::sleep(Self::http_retry_backoff(attempt));
+                        continue;
+                    }
+                    Ok(response)
+                }
+                Err(err) => {
+                    if Self::should_retry_transport_error(&err) && attempt + 1 < HTTP_RETRY_ATTEMPTS
+                    {
+                        std::thread::sleep(Self::http_retry_backoff(attempt));
+                        continue;
+                    }
+                    Err(err).context(transport_error_context.to_owned())
+                }
+            };
+        }
+
+        unreachable!("retry loop must return on success or final failure");
+    }
+
+    fn should_retry_status(status: reqwest::StatusCode) -> bool {
+        status.is_server_error()
+            || status == reqwest::StatusCode::TOO_MANY_REQUESTS
+            || status == reqwest::StatusCode::REQUEST_TIMEOUT
+    }
+
+    fn should_retry_transport_error(err: &reqwest::Error) -> bool {
+        err.is_timeout() || err.is_connect() || err.is_request()
+    }
+
+    fn http_retry_backoff(attempt: usize) -> Duration {
+        let index = attempt.min(HTTP_RETRY_BACKOFF_MS.len() - 1);
+        Duration::from_millis(HTTP_RETRY_BACKOFF_MS[index])
+    }
+
     #[must_use]
     pub fn network(&self) -> Network {
         self.network.clone()
@@ -99,10 +155,10 @@ impl TonApiClient {
             url.push_str(&urlencoding::encode(address));
         }
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send request to TonCenter")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send request to TonCenter",
+        )?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -159,11 +215,10 @@ impl TonApiClient {
             }
         });
 
-        let response = self
-            .build_post_request(&url)
-            .json(&json)
-            .send()
-            .context("Failed to send runGetMethod request")?;
+        let response = self.send_with_retry(
+            || self.build_post_request(&url).json(&json),
+            "Failed to send runGetMethod request",
+        )?;
 
         if !response.status().is_success() {
             let error_text = response
@@ -225,11 +280,10 @@ impl TonApiClient {
 
         let json = serde_json::json!({ "boc": boc });
 
-        let response = self
-            .build_post_request(&url)
-            .json(&json)
-            .send()
-            .context("Failed to send BOC")?;
+        let response = self.send_with_retry(
+            || self.build_post_request(&url).json(&json),
+            "Failed to send BOC",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -244,10 +298,10 @@ impl TonApiClient {
             self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send request to TonCenter")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send request to TonCenter",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -289,10 +343,10 @@ impl TonApiClient {
                 .unwrap_or_default(),
         );
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send request to TonCenter")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send request to TonCenter",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -317,11 +371,13 @@ impl TonApiClient {
         );
         let hash_hex = hash.to_string();
 
-        let response = self
-            .build_request(&url)
-            .query(&[("libraries", hash_hex.as_str())])
-            .send()
-            .context("Failed to send request to TonCenter for library")?;
+        let response = self.send_with_retry(
+            || {
+                self.build_request(&url)
+                    .query(&[("libraries", hash_hex.as_str())])
+            },
+            "Failed to send request to TonCenter for library",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));
@@ -393,11 +449,10 @@ impl TonApiClient {
             params.push(("hash", hash));
         }
 
-        let response = self
-            .build_request(&url)
-            .query(&params)
-            .send()
-            .context("Failed to send getTransactions request")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url).query(&params),
+            "Failed to send getTransactions request",
+        )?;
 
         if !response.status().is_success() {
             return Err(anyhow!(
@@ -425,10 +480,10 @@ impl TonApiClient {
             urlencoding::encode(address)
         );
 
-        let response = self
-            .build_request(&url)
-            .send()
-            .context("Failed to send getAddressBalance request")?;
+        let response = self.send_with_retry(
+            || self.build_request(&url),
+            "Failed to send getAddressBalance request",
+        )?;
 
         if !response.status().is_success() {
             return Err(Self::handle_fail(response));

@@ -52,7 +52,6 @@
 
 pub mod emulator;
 pub mod extensions;
-pub mod remote;
 pub mod world_state;
 
 mod tests;

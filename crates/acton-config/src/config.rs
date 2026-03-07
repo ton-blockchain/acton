@@ -2,7 +2,7 @@ use crate::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::{Result, anyhow};
 use path_absolutize::Absolutize;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -473,8 +473,8 @@ impl ActonConfig {
     }
 
     #[must_use]
-    pub fn custom_networks(&self) -> std::collections::HashMap<String, CustomNetworkUrls> {
-        let mut result = std::collections::HashMap::new();
+    pub fn custom_networks(&self) -> HashMap<String, CustomNetworkUrls> {
+        let mut result = HashMap::new();
         if let Some(networks) = &self.networks {
             for (name, config) in networks {
                 result.insert(

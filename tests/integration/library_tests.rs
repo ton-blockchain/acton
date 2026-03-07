@@ -2249,6 +2249,8 @@ fn test_library_publish_reports_send_boc_failure_and_skips_metadata_save() {
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_error_response("mock publish failure"),
+        toncenter_v2_send_boc_error_response("mock publish failure"),
+        toncenter_v2_send_boc_error_response("mock publish failure"),
     ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
 
@@ -2280,7 +2282,62 @@ fn test_library_publish_reports_send_boc_failure_and_skips_metadata_save() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected seqno + failing sendBoc");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 3 failing sendBoc retries"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_publish_retries_send_boc_and_succeeds_on_third_attempt() {
+    let project = ProjectBuilder::new("library-publish-send-boc-retry-success").build();
+    write_deployer_wallets(project.path());
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_error_response("transient publish failure"),
+        toncenter_v2_send_boc_error_response("transient publish failure"),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .publish()
+        .with_code("te6cckEBAQEAAgAAAEysuc0=")
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--local")
+        .run()
+        .success()
+        .assert_contains("Library info saved");
+
+    assert!(
+        project.path().join("libraries.toml").exists(),
+        "publish should save metadata after successful retry"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 2 failing sendBoc retries + final success"
+    );
+    assert_eq!(captured[0].path, "/jsonRPC");
+    for request in &captured[1..] {
+        assert_eq!(request.path, "/sendBoc");
+    }
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -2299,6 +2356,8 @@ fn test_library_topup_reports_send_boc_failure_and_keeps_timestamp_unchanged() {
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_error_response("mock topup failure"),
+        toncenter_v2_send_boc_error_response("mock topup failure"),
         toncenter_v2_send_boc_error_response("mock topup failure"),
     ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
@@ -2330,17 +2389,79 @@ fn test_library_topup_reports_send_boc_failure_and_keeps_timestamp_unchanged() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected seqno + failing sendBoc");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 3 failing sendBoc retries"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_topup_retries_send_boc_and_succeeds_on_third_attempt() {
+    let project = ProjectBuilder::new("library-topup-send-boc-retry-success").build();
+    write_deployer_wallets(project.path());
+    let libraries_path = project.path().join("libraries.toml");
+    write_library_metadata_file(
+        &libraries_path,
+        "my-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+    let (_, before_topup) = read_first_library_entry(&libraries_path);
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_error_response("transient topup failure"),
+        toncenter_v2_send_boc_error_response("transient topup failure"),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .arg("topup")
+        .arg("my-lib")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .run()
+        .success()
+        .assert_contains("Top-up transaction sent successfully");
+
+    let (_, after_topup) = read_first_library_entry(&libraries_path);
+    assert_ne!(
+        before_topup.last_topup_timestamp, after_topup.last_topup_timestamp,
+        "metadata timestamp must be updated after successful retry"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 2 failing sendBoc retries + final success"
+    );
+    assert_eq!(captured[0].path, "/jsonRPC");
+    for request in &captured[1..] {
+        assert_eq!(request.path, "/sendBoc");
+    }
 }
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_library_fetch_transport_error_reports_failure_in_plain_mode() {
     let project = ProjectBuilder::new("library-fetch-transport-error-plain").build();
-    let (mock_url, mock_handle, captured) =
-        spawn_toncenter_v2_mock(vec![toncenter_v2_get_libraries_error_response(
-            "mock fetch failure",
-        )]);
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+    ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
@@ -2357,17 +2478,66 @@ fn test_library_fetch_transport_error_reports_failure_in_plain_mode() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected one getLibraries request");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected 3 getLibraries attempts with retry on server error"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_fetch_retries_get_libraries_and_succeeds_on_third_attempt() {
+    let project = ProjectBuilder::new("library-fetch-retry-success").build();
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_error_response("transient fetch failure"),
+        toncenter_v2_get_libraries_error_response("transient fetch failure"),
+        toncenter_v2_get_libraries_ok_response("te6cckEBAQEAAgAAAEysuc0="),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let output = project
+        .acton()
+        .library()
+        .fetch(LIB_HASH)
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--json")
+        .run()
+        .success();
+
+    let payload: JsonValue =
+        serde_json::from_str(&output.get_stdout()).expect("fetch --json must output JSON");
+    assert_eq!(payload["success"].as_bool(), Some(true));
+    assert!(
+        payload["code_boc64"].as_str().is_some(),
+        "expected code_boc64 field in fetch --json output after successful retry, got: {}",
+        output.get_stdout()
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected 2 failing getLibraries retries + final success"
+    );
+    for request in captured.iter() {
+        assert!(request.path.starts_with("/getLibraries?libraries="));
+    }
 }
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_library_fetch_transport_error_reports_json_envelope_in_json_mode() {
     let project = ProjectBuilder::new("library-fetch-transport-error-json").build();
-    let (mock_url, mock_handle, captured) =
-        spawn_toncenter_v2_mock(vec![toncenter_v2_get_libraries_error_response(
-            "mock fetch failure",
-        )]);
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+    ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
 
     let output = project
@@ -2396,7 +2566,11 @@ fn test_library_fetch_transport_error_reports_json_envelope_in_json_mode() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected one getLibraries request");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected 3 getLibraries attempts with retry on server error"
+    );
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -2770,6 +2944,22 @@ fn toncenter_v2_get_libraries_error_response(error: &str) -> ToncenterV2MockResp
         body: serde_json::json!({
             "ok": false,
             "error": error
+        })
+        .to_string(),
+    }
+}
+
+fn toncenter_v2_get_libraries_ok_response(data: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": {
+                "result": [{
+                    "found": true,
+                    "data": data
+                }]
+            }
         })
         .to_string(),
     }
