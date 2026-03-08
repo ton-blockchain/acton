@@ -10,6 +10,28 @@ pub use ton_networks::{CustomNetworkUrls, Network};
 
 static MANIFEST_PATH: OnceLock<PathBuf> = OnceLock::new();
 static PROJECT_ROOT: OnceLock<PathBuf> = OnceLock::new();
+static MANIFEST_PATH_SOURCE: OnceLock<ResolutionSource> = OnceLock::new();
+static PROJECT_ROOT_SOURCE: OnceLock<ResolutionSource> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ResolutionSource {
+    ProjectRootFlag,
+    ManifestPathFlag,
+    AutoDetected,
+    FallbackCwd,
+}
+
+impl ResolutionSource {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ProjectRootFlag => "--project-root",
+            Self::ManifestPathFlag => "--manifest-path",
+            Self::AutoDetected => "auto-detected",
+            Self::FallbackCwd => "fallback-cwd",
+        }
+    }
+}
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone)]
 pub enum Explorer {
@@ -507,6 +529,8 @@ pub fn manifest_path() -> &'static Path {
         .get_or_init(|| {
             let (root, manifest) = default_project_root_and_manifest_path();
             let _ = PROJECT_ROOT.set(root);
+            let _ = PROJECT_ROOT_SOURCE.set(ResolutionSource::FallbackCwd);
+            let _ = MANIFEST_PATH_SOURCE.set(ResolutionSource::FallbackCwd);
             manifest
         })
         .as_path()
@@ -518,12 +542,21 @@ pub fn project_root() -> &'static Path {
         .get_or_init(|| {
             let (root, manifest) = default_project_root_and_manifest_path();
             let _ = MANIFEST_PATH.set(manifest);
+            let _ = MANIFEST_PATH_SOURCE.set(ResolutionSource::FallbackCwd);
+            let _ = PROJECT_ROOT_SOURCE.set(ResolutionSource::FallbackCwd);
             root
         })
         .as_path()
 }
 
 pub fn init_manifest_path(path: impl AsRef<Path>) -> Result<()> {
+    init_manifest_path_with_source(path, ResolutionSource::FallbackCwd)
+}
+
+pub fn init_manifest_path_with_source(
+    path: impl AsRef<Path>,
+    source: ResolutionSource,
+) -> Result<()> {
     let path = path.as_ref();
     let mut resolved = if path.is_absolute() {
         path.to_path_buf()
@@ -542,10 +575,26 @@ pub fn init_manifest_path(path: impl AsRef<Path>) -> Result<()> {
             "Manifest path already initialized to {}",
             existing.display()
         )),
+    }?;
+
+    match MANIFEST_PATH_SOURCE.set(source) {
+        Ok(()) => Ok(()),
+        Err(existing) if existing == source => Ok(()),
+        Err(existing) => Err(anyhow!(
+            "Manifest path source already initialized to {}",
+            existing.as_str()
+        )),
     }
 }
 
 pub fn init_project_root(path: impl AsRef<Path>) -> Result<()> {
+    init_project_root_with_source(path, ResolutionSource::FallbackCwd)
+}
+
+pub fn init_project_root_with_source(
+    path: impl AsRef<Path>,
+    source: ResolutionSource,
+) -> Result<()> {
     let path = path.as_ref();
     let resolved = if path.is_absolute() {
         path.to_path_buf()
@@ -560,7 +609,26 @@ pub fn init_project_root(path: impl AsRef<Path>) -> Result<()> {
             "Project root already initialized to {}",
             existing.display()
         )),
+    }?;
+
+    match PROJECT_ROOT_SOURCE.set(source) {
+        Ok(()) => Ok(()),
+        Err(existing) if existing == source => Ok(()),
+        Err(existing) => Err(anyhow!(
+            "Project root source already initialized to {}",
+            existing.as_str()
+        )),
     }
+}
+
+#[must_use]
+pub fn manifest_path_resolution_source() -> ResolutionSource {
+    *MANIFEST_PATH_SOURCE.get_or_init(|| ResolutionSource::FallbackCwd)
+}
+
+#[must_use]
+pub fn project_root_resolution_source() -> ResolutionSource {
+    *PROJECT_ROOT_SOURCE.get_or_init(|| ResolutionSource::FallbackCwd)
 }
 
 fn default_project_root_and_manifest_path() -> (PathBuf, PathBuf) {

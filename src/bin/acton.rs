@@ -5,6 +5,7 @@ use acton::commands::compile::compile_cmd;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
+use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
@@ -22,8 +23,9 @@ use acton::commands::wrapper::wrapper_cmd;
 use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
-    ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, init_manifest_path,
-    init_project_root, project_root as configured_project_root,
+    ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, ResolutionSource,
+    init_manifest_path_with_source, init_project_root_with_source,
+    project_root as configured_project_root,
 };
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -60,12 +62,7 @@ struct Cli {
     )]
     color: ColorMode,
 
-    #[arg(
-        long,
-        global = true,
-        value_name = "PATH",
-        help = "Path to Acton.toml"
-    )]
+    #[arg(long, global = true, value_name = "PATH", help = "Path to Acton.toml")]
     manifest_path: Option<PathBuf>,
     #[arg(
         long = "project-root",
@@ -626,6 +623,14 @@ enum Commands {
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
         check: bool,
+    },
+    #[command(
+        about = "Inspect resolved project environment",
+        after_help = example_doctor_usage()
+    )]
+    Doctor {
+        #[arg(long, help = "Output doctor report as JSON")]
+        json: bool,
     },
     #[command(
         about = "Generate shell completions for selected shell",
@@ -1312,6 +1317,16 @@ fn example_up_usage() -> StyledStr {
     )
 }
 
+fn example_doctor_usage() -> StyledStr {
+    format_examples(
+        &[
+            ("Show environment diagnostics", "acton doctor"),
+            ("Show diagnostics as JSON", "acton doctor --json"),
+        ],
+        "",
+    )
+}
+
 fn example_fmt_usage() -> StyledStr {
     format_examples(
         &[
@@ -1416,6 +1431,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let support_commands = vec![
         ("ls", ""),
         ("up", ""),
+        ("doctor", ""),
         ("help", "[COMMAND]"),
         ("completions", "<SHELL>"),
     ];
@@ -1598,10 +1614,20 @@ fn find_manifest_in_ancestors(start_dir: &Path) -> Option<PathBuf> {
         })
 }
 
+struct ResolvedProjectRoot {
+    path: PathBuf,
+    source: ResolutionSource,
+}
+
+struct ResolvedManifestPath {
+    path: PathBuf,
+    source: ResolutionSource,
+}
+
 fn resolve_manifest_path(
     manifest_path: Option<PathBuf>,
-    resolved_project_root: &Path,
-) -> anyhow::Result<PathBuf> {
+    resolved_project_root: &ResolvedProjectRoot,
+) -> anyhow::Result<ResolvedManifestPath> {
     let cwd = env::current_dir()?;
 
     if let Some(manifest_path) = manifest_path {
@@ -1615,13 +1641,26 @@ fn resolve_manifest_path(
             resolved = resolved.join("Acton.toml");
         }
 
-        return Ok(resolved);
+        return Ok(ResolvedManifestPath {
+            path: resolved,
+            source: ResolutionSource::ManifestPathFlag,
+        });
     }
 
-    Ok(resolved_project_root.join("Acton.toml"))
+    let source = match resolved_project_root.source {
+        ResolutionSource::ProjectRootFlag => ResolutionSource::ProjectRootFlag,
+        ResolutionSource::AutoDetected => ResolutionSource::AutoDetected,
+        ResolutionSource::FallbackCwd => ResolutionSource::FallbackCwd,
+        ResolutionSource::ManifestPathFlag => ResolutionSource::FallbackCwd,
+    };
+
+    Ok(ResolvedManifestPath {
+        path: resolved_project_root.path.join("Acton.toml"),
+        source,
+    })
 }
 
-fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<PathBuf> {
+fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<ResolvedProjectRoot> {
     let cwd = env::current_dir()?;
 
     if let Some(project_root) = project_root {
@@ -1638,16 +1677,25 @@ fn resolve_project_root(project_root: Option<PathBuf>) -> anyhow::Result<PathBuf
             );
         }
 
-        return Ok(resolved_project_root);
+        return Ok(ResolvedProjectRoot {
+            path: resolved_project_root,
+            source: ResolutionSource::ProjectRootFlag,
+        });
     }
 
     if let Some(found_manifest_path) = find_manifest_in_ancestors(&cwd)
         && let Some(parent) = found_manifest_path.parent()
     {
-        return Ok(parent.to_path_buf());
+        return Ok(ResolvedProjectRoot {
+            path: parent.to_path_buf(),
+            source: ResolutionSource::AutoDetected,
+        });
     }
 
-    Ok(cwd)
+    Ok(ResolvedProjectRoot {
+        path: cwd,
+        source: ResolutionSource::FallbackCwd,
+    })
 }
 
 fn configure_project_roots(
@@ -1657,8 +1705,8 @@ fn configure_project_roots(
     let resolved_project_root = resolve_project_root(project_root)?;
     let resolved_manifest_path = resolve_manifest_path(manifest_path, &resolved_project_root)?;
 
-    init_project_root(&resolved_project_root)?;
-    init_manifest_path(&resolved_manifest_path)?;
+    init_project_root_with_source(&resolved_project_root.path, resolved_project_root.source)?;
+    init_manifest_path_with_source(&resolved_manifest_path.path, resolved_manifest_path.source)?;
 
     Ok(())
 }
@@ -2022,6 +2070,7 @@ fn main() {
             }
             result
         }
+        Commands::Doctor { json } => doctor_cmd(json),
         Commands::Fmt { paths, check } => fmt_cmd(paths, check),
         Commands::Doc { command } => match command {
             DocCommand::Tvm {
