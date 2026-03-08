@@ -1001,6 +1001,15 @@ fn run_file_tests(
 
             if let Some(failure) = &assert_failure {
                 test_report.message = failure.message();
+                if test_report.message.is_none()
+                    && let AssertFailure::GetMethod(get_method_failure) = failure
+                {
+                    test_report.message = Some(FormatterContext::strip_ansi_text(
+                        &FormatterContext::format_get_method_assert_failure_title(
+                            get_method_failure,
+                        ),
+                    ));
+                }
                 test_report.details = failure.location().map(|l| l.format_full());
                 test_report.location = failure.location();
                 let detailed = formatter.format_detailed_assert_failure(failure, abi.clone());

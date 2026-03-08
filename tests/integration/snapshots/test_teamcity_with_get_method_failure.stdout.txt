@@ -1,0 +1,27 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+##teamcity[testingStarted]
+ > tests/test.test.tolk (1 test)
+##teamcity[testSuiteStarted name='test.test.tolk' nodeId='suite_test.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/test.test.tolk']
+##teamcity[testStarted name='test_get_method_failure' nodeId='test_test_get_method_failure' parentNodeId='suite_test.test.tolk' locationHint='tolk_qn://[ROOT]/tests/test.test.tolk:test_get_method_failure']
+  ✗ get_method_failure [TIME]
+    └─ Cannot execute get method currentCounterFail (83805)
+      ├─ exit_code=10
+      ├─ Re-run with --backtrace full to get more information
+      ├─ Description: Dictionary error
+      └─ Phase: Compute phase
+##teamcity[testFailed name='test_get_method_failure' nodeId='test_test_get_method_failure' [DURATION] message='Cannot execute get method currentCounterFail (83805)' details='']
+##teamcity[testFinished name='test_get_method_failure' nodeId='test_test_get_method_failure' [DURATION] parentNodeId='suite_test.test.tolk']
+##teamcity[testSuiteFinished name='test.test.tolk' nodeId='suite_test.test.tolk']
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.
+##teamcity[testingFinished]

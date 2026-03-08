@@ -1,5 +1,5 @@
 use crate::support::TestOutputExt;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{ProjectBuilder, TestConfig};
 use std::fs;
 use toml_edit::DocumentMut;
 use tycho_types::boc::Boc;
@@ -78,6 +78,35 @@ fn test_unknown_get_method_call() {
         .run()
         .failure()
         .assert_snapshot_matches("integration/snapshots/test_unknown_get_method_call.stdout.txt");
+}
+
+#[test]
+fn test_unknown_get_method_call_with_backtrace_full() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_unknown_get_method_call_with_backtrace_full.stdout.txt",
+        );
 }
 
 #[test]
@@ -162,6 +191,35 @@ fn test_no_arg_get_method_call_2() {
 }
 
 #[test]
+fn test_no_arg_get_method_call_2_with_backtrace_full() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_no_arg_get_method_call_2_with_backtrace_full.stdout.txt",
+        );
+}
+
+#[test]
 fn test_get_method_call_shows_exit_code_variant() {
     ProjectBuilder::new("simple")
         .contract("simple", SIMPLE_CONTRACT)
@@ -186,6 +244,67 @@ fn test_get_method_call_shows_exit_code_variant() {
         .failure()
         .assert_snapshot_matches(
             "integration/snapshots/test_get_method_call_shows_exit_code_variant.stdout.txt",
+        );
+}
+
+#[test]
+fn test_get_method_call_shows_backtrace_with_full_mode() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+                .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_get_method_call_shows_backtrace_with_full_mode.stdout.txt",
+        );
+}
+
+#[test]
+fn test_get_method_call_shows_backtrace_with_full_mode_from_config() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .with_test_config(TestConfig {
+            backtrace: Some("full".to_string()),
+            ..TestConfig::default()
+        })
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+                .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_get_method_call_shows_backtrace_with_full_mode_from_config.stdout.txt",
         );
 }
 

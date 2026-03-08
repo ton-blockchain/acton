@@ -1,9 +1,11 @@
 use crate::commands::common::error_fmt;
-use crate::context::{Context, KnownAddress, Wallet, to_cell};
+use crate::context::{
+    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, Wallet, to_cell,
+};
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
 use crate::ffi::assert::parse_search_params;
-use crate::formatter::FormatterContext;
+use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
 use anyhow::Context as AnyhowContext;
@@ -887,6 +889,12 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
+    let source_map = ctx
+        .build
+        .build_cache
+        .result_for_code(&Some(code))
+        .map(|res| res.1.source_map);
+
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
         .map(|t| Boc::encode_base64(&t))
@@ -896,18 +904,12 @@ fn run_get_method_impl(
         let step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
             .context("Cannot create get executor")?;
 
-        let source_map = ctx
-            .build
-            .build_cache
-            .result_for_code(&Some(code))
-            .map(|res| res.1.source_map);
-
         let dbg_ctx = ctx.debug.ctx();
         dbg_ctx
             .begin_thread(
                 2,
                 AnyExecutor::Get(step_executor.clone()),
-                source_map,
+                source_map.clone(),
                 "Send internal message".to_string(),
                 dbg_ctx.need_to_stop_child_thread_on_start(),
             )
@@ -960,13 +962,19 @@ fn run_get_method_impl(
 
             if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
                 let get_method = ctx.env.abi.find_get_method_by_id(&id);
+
+                let id_presentation = format!("({id})");
+                let id_presentation = id_presentation.dimmed();
+
                 let get_method_presentation = if let Some(get_method) = get_method {
-                    format!("'{}' ({id})", get_method.name)
+                    format!("{} {id_presentation}", get_method.name.yellow())
+                } else if name.is_empty() {
+                    format!("'' {id_presentation}")
                 } else {
-                    format!("'{name}' ({id})")
+                    format!("{} {id_presentation}", name.yellow())
                 };
 
-                if result.vm_exit_code == 11 {
+                let suggested_name = if result.vm_exit_code == 11 {
                     // TODO: right now get methods may not include all get methods
                     let get_methods: Vec<&str> = ctx
                         .env
@@ -975,23 +983,27 @@ fn run_get_method_impl(
                         .iter()
                         .map(|m| m.name.as_str())
                         .collect();
-                    let suggested_name = suggest_name(&name, &get_methods);
+                    suggest_name(&name, &get_methods).map(ToOwned::to_owned)
+                } else {
+                    None
+                };
 
-                    if let Some(suggested_name) = suggested_name {
-                        anyhow::bail!(
-                            "Cannot execute unknown get method {get_method_presentation}, did you mean '{suggested_name}'",
-                        );
-                    }
-                    anyhow::bail!("Cannot execute unknown get method {get_method_presentation}",);
-                } else if result.vm_exit_code == 2 {
-                    anyhow::bail!(
-                        "Get method {get_method_presentation} failed due to stack underflow. Make sure you passed all parameters to the get method.",
-                    );
-                }
-                anyhow::bail!(
-                    "Cannot execute get method {get_method_presentation}: exit code {}",
-                    FormatterContext::format_exit_code_with_number(result.vm_exit_code)
-                );
+                let location = source_map.as_ref().and_then(|map| {
+                    retrace::find_exception_info(&result.vm_log, map).and_then(|info| info.loc)
+                });
+
+                *ctx.asserts.assert_failure =
+                    Some(AssertFailure::GetMethod(GetMethodAssertFailure {
+                        get_method_presentation,
+                        vm_exit_code: result.vm_exit_code,
+                        suggested_name,
+                        vm_log: result.vm_log,
+                        source_map,
+                        location,
+                    }));
+
+                stack.push(TupleItem::Null);
+                return Ok(());
             }
 
             stack.push(TupleItem::TypedTuple {

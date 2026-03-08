@@ -1,8 +1,8 @@
 use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
 use crate::commands::test::trace::TransactionInfo;
 use crate::context::{
-    AssertFailure, BuildCache, EmulationsState, KnownAddresses, TransactionGenericAssertFailure,
-    WalletNotFoundFailure, to_cell,
+    AssertFailure, BuildCache, EmulationsState, GetMethodAssertFailure, KnownAddresses,
+    TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
 use crate::retrace::{ExecutedAction, InstalledAction, InstalledActions, InvalidAction};
 use crate::{context, exit_codes, retrace};
@@ -2035,6 +2035,107 @@ impl<'a> FormatterContext<'a> {
     }
 
     #[must_use]
+    pub fn format_get_method_assert_failure_title(failure: &GetMethodAssertFailure) -> String {
+        if failure.vm_exit_code == 11 {
+            if let Some(suggested_name) = &failure.suggested_name {
+                return format!(
+                    "Cannot execute unknown get method {}, did you mean '{suggested_name}'",
+                    failure.get_method_presentation
+                );
+            }
+            return format!(
+                "Cannot execute unknown get method {}",
+                failure.get_method_presentation
+            );
+        }
+
+        if failure.vm_exit_code == 2 {
+            return format!(
+                "Get method {} failed due to stack underflow. Make sure you passed all parameters to the get method.",
+                failure.get_method_presentation
+            );
+        }
+
+        format!(
+            "Cannot execute get method {}",
+            failure.get_method_presentation
+        )
+    }
+
+    #[must_use]
+    pub fn format_get_method_assert_failure(&self, failure: &GetMethodAssertFailure) -> String {
+        let mut output = Self::format_get_method_assert_failure_title(failure);
+
+        if failure.vm_exit_code == 11 || failure.vm_exit_code == 2 {
+            return output;
+        }
+
+        let mut details = String::new();
+        writeln!(
+            details,
+            "exit_code={}",
+            failure.vm_exit_code.to_string().yellow()
+        )
+        .ok();
+
+        let exception_info = failure
+            .source_map
+            .as_ref()
+            .and_then(|source_map| retrace::find_exception_info(&failure.vm_log, source_map));
+
+        if let Some(info) = &exception_info {
+            if let Some(loc) = &info.loc {
+                writeln!(details, "at {}", loc.format_normalized()).ok();
+
+                let backtrace_lines = Self::format_backtrace(&info.backtrace);
+                if !backtrace_lines.is_empty() {
+                    writeln!(details, "Backtrace:").ok();
+                    for line in backtrace_lines {
+                        writeln!(details, "  {line}").ok();
+                    }
+                }
+            } else if self.backtrace.is_none() {
+                writeln!(
+                    details,
+                    "Re-run with {} to get more information",
+                    "--backtrace full".yellow()
+                )
+                .ok();
+            }
+
+            if !info.description.is_empty() {
+                writeln!(details, "Description: {}", info.description).ok();
+            }
+        } else if self.backtrace.is_none() {
+            writeln!(
+                details,
+                "Re-run with {} to get more information",
+                "--backtrace full".yellow()
+            )
+            .ok();
+        }
+
+        if let Some(info) = exit_codes::find(failure.vm_exit_code) {
+            let should_show_fallback_description = exception_info
+                .as_ref()
+                .is_none_or(|exception| exception.description.is_empty());
+            if should_show_fallback_description {
+                writeln!(details, "Description: {}", info.description).ok();
+            }
+            writeln!(details, "Phase: {}", info.phase).ok();
+        }
+
+        let details = details.trim();
+        if details.is_empty() {
+            return output;
+        }
+
+        output.push('\n');
+        output.push_str(details);
+        output
+    }
+
+    #[must_use]
     pub fn account_code(
         accounts: &FxHashMap<StdAddr, ShardAccount>,
         addr: &StdAddr,
@@ -2135,6 +2236,7 @@ impl<'a> FormatterContext<'a> {
         abi: Arc<ContractAbi>,
     ) -> String {
         let mut result = String::new();
+        let append_location = !matches!(failure, AssertFailure::GetMethod(_));
 
         if let Some(message) = &failure.message()
             && !message.is_empty()
@@ -2207,10 +2309,14 @@ impl<'a> FormatterContext<'a> {
                 let highlighted_message = Self::highlight_actual_expected(&message);
                 writeln!(result, "Error: {highlighted_message}").ok();
             }
+            AssertFailure::GetMethod(failure) => {
+                let message = self.format_get_method_assert_failure(failure);
+                writeln!(result, "{message}").ok();
+            }
             _ => {}
         }
 
-        if let Some(location) = &failure.location() {
+        if append_location && let Some(location) = &failure.location() {
             writeln!(result, "at {}", location.format()).ok();
         }
 

@@ -49,6 +49,16 @@ pub struct FailAssertFailure {
 }
 
 #[derive(Debug, Clone)]
+pub struct GetMethodAssertFailure {
+    pub get_method_presentation: String,
+    pub vm_exit_code: i32,
+    pub suggested_name: Option<String>,
+    pub vm_log: Arc<str>,
+    pub source_map: Option<Arc<SourceMap>>,
+    pub location: Option<SourceLocation>,
+}
+
+#[derive(Debug, Clone)]
 pub struct TransactionNotFoundParams {
     pub to: Option<IntAddr>,
     pub from: Option<IntAddr>,
@@ -84,6 +94,7 @@ pub struct WalletNotFoundFailure {
 pub enum AssertFailure {
     Bin(AssertBinFailure),
     Fail(FailAssertFailure),
+    GetMethod(GetMethodAssertFailure),
     TransactionNotFound(TransactionGenericAssertFailure),
     TransactionIsFound(TransactionGenericAssertFailure),
     WalletNotFound(WalletNotFoundFailure),
@@ -95,6 +106,7 @@ impl AssertFailure {
         match self {
             AssertFailure::Bin(arg) => arg.message.clone(),
             AssertFailure::Fail(arg) => arg.message.clone(),
+            AssertFailure::GetMethod(_) => None, // Formatted in FormatterContext
             AssertFailure::TransactionNotFound(arg) => arg.message.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.message.clone(),
             AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
@@ -106,6 +118,7 @@ impl AssertFailure {
         match self {
             AssertFailure::Bin(arg) => arg.location.clone(),
             AssertFailure::Fail(arg) => arg.location.clone(),
+            AssertFailure::GetMethod(arg) => arg.location.clone(),
             AssertFailure::TransactionNotFound(arg) => arg.location.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.location.clone(),
             AssertFailure::WalletNotFound(arg) => arg.location.clone(),

@@ -7,6 +7,48 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+const GET_METHOD_FAILURE_CONTRACT: &str = r"
+fun onInternalMessage(in: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun currentCounterFail(): int { throw 10 }
+";
+
+const GET_METHOD_FAILURE_TEST_PREPARE: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+
+struct Counter {
+    address: address
+    init: ContractState
+}
+
+fun Counter.fromStorage() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    return Counter { address, init }
+}
+
+fun setupTest() {
+    val counter = Counter.fromStorage();
+
+    val deployer = net.treasury("deployer");
+    val msg = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: counter.init,
+        },
+    });
+
+    net.send(deployer.address, msg);
+    return counter
+}
+"#;
+
 #[test]
 fn test_teamcity_reporter_basic_passing() {
     FixtureProject::load("basic")
@@ -39,6 +81,36 @@ fn test_teamcity_reporter_with_failing_test() {
         .assert_contains("exit_code=10")
         .assert_snapshot_matches(
             "integration/snapshots/test_teamcity_with_failing_test.stdout.txt",
+        );
+}
+
+#[test]
+fn test_teamcity_reporter_with_get_method_failure() {
+    ProjectBuilder::new("teamcity_get_method_failure")
+        .contract("simple", GET_METHOD_FAILURE_CONTRACT)
+        .test_file(
+            "test",
+            (GET_METHOD_FAILURE_TEST_PREPARE.to_string()
+                + r#"
+            get fun test_get_method_failure() {
+                val counter = setupTest();
+                val _res: int = net.runGetMethod(counter.address, "currentCounterFail");
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_reporter("console")
+        .with_reporter("teamcity")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_contains("##teamcity[testFailed")
+        .assert_contains("Cannot execute get method")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_teamcity_with_get_method_failure.stdout.txt",
         );
 }
 

@@ -66,6 +66,15 @@ impl TeamCityReporter {
                 AssertFailure::Fail(_) => {
                     message = "Test assertion failed".to_string();
                 }
+                AssertFailure::GetMethod(failure) => {
+                    message = if self.formatter.is_some() {
+                        FormatterContext::strip_ansi_text(
+                            &FormatterContext::format_get_method_assert_failure_title(failure),
+                        )
+                    } else {
+                        "Get method execution failed".to_string()
+                    };
+                }
                 AssertFailure::TransactionNotFound(_) => {
                     message = "Transaction not found".to_string();
                 }

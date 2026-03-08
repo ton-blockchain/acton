@@ -11,7 +11,9 @@
   ✗ foo [TIME]
     └─ Cannot execute get method currentCounterFail (83805)
       ├─ exit_code=10
-      ├─ Re-run with --backtrace full to get more information
+      ├─ at contracts/simple[LINE]
+      ├─ Backtrace:
+      │     __throw   at contracts/simple[LINE]
       ├─ Description: Dictionary error
       └─ Phase: Compute phase
 
