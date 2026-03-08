@@ -582,7 +582,9 @@ fn check_root_file(
 
     // And finally run all inspections provided by checker
     let now = Instant::now();
-    let mut checker = Checker::new(file_db, &mut type_db, &body_types).with_settings(lint_settings);
+    let mut checker = Checker::new(file_db, &mut type_db, &body_types)
+        .with_settings(lint_settings)
+        .with_project_root(configured_project_root().to_path_buf());
 
     // locals by file -> file_db -> project_index -> by usage
     // globals one time

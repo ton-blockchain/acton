@@ -24,7 +24,9 @@ use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, ContractDependency, DependencyKind};
+use acton_config::config::{
+    ActonConfig, ContractDependency, DependencyKind, project_root as configured_project_root,
+};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::anyhow;
 use dunce;
@@ -568,9 +570,8 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     {
         let reports = reports.lock().expect("cannot lock mutex").clone();
         let trace_dir = config.save_test_trace.clone();
-        let project_root = std::env::current_dir().unwrap_or_default();
-        let project_root = dunce::canonicalize(project_root)
-            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default())
+        let project_root = dunce::canonicalize(configured_project_root())
+            .unwrap_or_else(|_| configured_project_root().to_path_buf())
             .to_string_lossy()
             .to_string();
         let project_root = if project_root.ends_with(std::path::MAIN_SEPARATOR) {

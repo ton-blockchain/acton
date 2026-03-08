@@ -3463,7 +3463,6 @@ dependencies = [
 name = "ton-ls"
 version = "0.0.8"
 dependencies = [
- "acton-config",
  "anyhow",
  "dashmap 7.0.0-rc2",
  "log",

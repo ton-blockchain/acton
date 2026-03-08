@@ -1,5 +1,7 @@
 use dashmap::DashMap;
 use lsp_types::*;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::FileId;
@@ -18,6 +20,8 @@ pub use profiling::ProfilingContext;
 pub struct Backend {
     pub client: Client,
     pub file_db: Arc<FileDb>,
+    pub project_root: PathBuf,
+    pub mappings: Option<BTreeMap<String, String>>,
     pub documents: DashMap<Url, String>,
     pub analysis: DashMap<Url, Arc<AnalysisResult>>,
     pub file_urls: DashMap<FileId, Url>,

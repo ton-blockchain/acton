@@ -2,10 +2,11 @@ use crate::commands::common::error_fmt;
 use crate::commands::test::TestConfig;
 use crate::commands::test::mutation::rules::{MutationEdit, MutationMatcher, MutationRule, rules};
 use acton_config::color::OwoColorize;
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::anyhow;
+use path_absolutize::Absolutize;
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fs, process};
 use tempfile::TempDir;
 use tree_sitter::{Node, Query, QueryCursor, StreamingIterator};
@@ -241,25 +242,31 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
     })?;
 
     let all_disable_rules = &config.disable_rules;
-    let project_root = std::env::current_dir()?;
+    let project_root = dunce::canonicalize(configured_project_root())
+        .unwrap_or_else(|_| configured_project_root().to_path_buf());
 
     let mut sources = Vec::new();
 
-    let main_content = match fs::read_to_string(&contract.src) {
+    let main_path = Path::new(&contract.src)
+        .absolutize_from(&project_root)
+        .unwrap_or_else(|_| Path::new(&contract.src).into())
+        .to_path_buf();
+    let main_path = dunce::canonicalize(&main_path).unwrap_or(main_path);
+
+    let main_content = match fs::read_to_string(&main_path) {
         Ok(content) => content,
         Err(err) => {
-            anyhow::bail!("Error reading file '{}': {err}", contract.src)
+            anyhow::bail!("Error reading file '{}': {err}", main_path.display())
         }
     };
     let main_tree = tolk_syntax::parse(&main_content)?;
-    let main_path = PathBuf::from(&contract.src);
-    let main_path = dunce::canonicalize(&main_path).unwrap_or(main_path);
 
     let main_relative_path = if main_path.starts_with(&project_root) {
-        main_path.strip_prefix(&project_root)?.to_path_buf()
+        pathdiff::diff_paths(&main_path, &project_root).unwrap_or_else(|| main_path.clone())
     } else {
         main_path.clone()
     };
+    let main_path_str = main_path.to_string_lossy().to_string();
 
     sources.push(MutationSource {
         path: main_path,
@@ -268,9 +275,13 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         tree: main_tree.tree,
     });
 
-    let dependencies = ton_abi::get_file_dependencies(&contract.src, true, &acton_config.mappings)?;
+    let dependencies =
+        ton_abi::get_file_dependencies(&main_path_str, true, &acton_config.mappings)?;
     for dep_path_str in &dependencies {
-        let dep_path = PathBuf::from(dep_path_str);
+        let dep_path = Path::new(dep_path_str)
+            .absolutize_from(&project_root)
+            .unwrap_or_else(|_| Path::new(dep_path_str).into())
+            .to_path_buf();
         let dep_path = dunce::canonicalize(&dep_path).unwrap_or(dep_path);
 
         if !dep_path.starts_with(&project_root) {
@@ -281,7 +292,8 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             continue;
         }
 
-        let relative_path = dep_path.strip_prefix(&project_root)?.to_path_buf();
+        let relative_path =
+            pathdiff::diff_paths(&dep_path, &project_root).unwrap_or_else(|| dep_path.clone());
         let content = fs::read_to_string(&dep_path)
             .map_err(|e| anyhow!("Error reading dependency {}: {}", dep_path.display(), e))?;
         let file = tolk_syntax::parse(&content)?;

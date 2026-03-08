@@ -1,7 +1,6 @@
 use crate::AnalysisResult;
 use crate::backend::Backend;
 use crate::backend::utils::FileInfoExt;
-use acton_config::config::ActonConfig;
 use lsp_types::MessageType;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -85,11 +84,9 @@ impl Backend {
         let stdlib_path = self.file_db.stdlib_path();
         let root_path = self.file_db.canonicalize(root_path)?;
 
-        let acton_config = ActonConfig::load()?;
-
         let mut index = ProjectIndexBuilder::new(&self.file_db, root_path.clone())
             .with_stdlib(stdlib_path.to_owned())
-            .with_mappings(&acton_config.mappings)
+            .with_mappings(&self.mappings)
             .build()?;
         resolve(&self.file_db, &mut index);
 
@@ -131,7 +128,8 @@ impl Backend {
         );
 
         let now = Instant::now();
-        let mut checker = Checker::new(&self.file_db, &mut type_db, &all_body_types);
+        let mut checker = Checker::new(&self.file_db, &mut type_db, &all_body_types)
+            .with_project_root(self.project_root.clone());
 
         for file_id in &reachable {
             let file_info = self.file_db.get_by_id(*file_id).expect("file not found");

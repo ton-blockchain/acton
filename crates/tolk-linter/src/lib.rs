@@ -20,6 +20,7 @@ use rules::diagnostic::{Diagnostic, Severity};
 pub use rules::*;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
@@ -70,6 +71,7 @@ pub struct Checker<'a> {
     pub analysis_db: AnalysisDb,
     pub diagnostics: Vec<Diagnostic>,
     pub settings: HashMap<Rule, LintLevel>,
+    project_root: Option<PathBuf>,
 
     /// Map from file ID to a map of line number to list of suppressed rule names/codes
     pub file_suppressions: FxHashMap<FileId, FxHashMap<usize, Vec<String>>>,
@@ -95,6 +97,7 @@ impl<'a> Checker<'a> {
             analysis_db: AnalysisDb::new(),
             diagnostics: Vec::new(),
             settings: HashMap::new(),
+            project_root: None,
             file_suppressions: FxHashMap::default(),
             line_starts: FxHashMap::default(),
             #[cfg(feature = "profile_rules")]
@@ -146,6 +149,15 @@ impl<'a> Checker<'a> {
     pub fn with_settings(mut self, settings: HashMap<Rule, LintLevel>) -> Self {
         self.settings = settings;
         self
+    }
+
+    pub fn with_project_root(mut self, project_root: impl Into<PathBuf>) -> Self {
+        self.project_root = Some(project_root.into());
+        self
+    }
+
+    pub fn project_root(&self) -> Option<&Path> {
+        self.project_root.as_deref()
     }
 
     pub fn should_run(&self, rule: Rule) -> bool {

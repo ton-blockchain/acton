@@ -19,7 +19,6 @@ tolk-ty = { workspace = true }
 tolk-syntax = { workspace = true }
 tolk-linter = { workspace = true }
 tolk-analysis = { workspace = true }
-acton-config = { workspace = true }
 rustc-hash = { workspace = true }
 tower-lsp = { workspace = true }
 lsp-types = { workspace = true }
