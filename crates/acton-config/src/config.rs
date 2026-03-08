@@ -9,6 +9,7 @@ use std::sync::{Arc, OnceLock};
 pub use ton_networks::{CustomNetworkUrls, Network};
 
 static MANIFEST_PATH: OnceLock<PathBuf> = OnceLock::new();
+static PROJECT_ROOT: OnceLock<PathBuf> = OnceLock::new();
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone)]
 pub enum Explorer {
@@ -499,16 +500,22 @@ impl ActonConfig {
 pub fn manifest_path() -> &'static Path {
     MANIFEST_PATH
         .get_or_init(|| {
-            std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .join("Acton.toml")
+            let (root, manifest) = default_project_root_and_manifest_path();
+            let _ = PROJECT_ROOT.set(root);
+            manifest
         })
         .as_path()
 }
 
 #[must_use]
 pub fn project_root() -> &'static Path {
-    manifest_path().parent().unwrap_or_else(|| Path::new("."))
+    PROJECT_ROOT
+        .get_or_init(|| {
+            let (root, manifest) = default_project_root_and_manifest_path();
+            let _ = MANIFEST_PATH.set(manifest);
+            root
+        })
+        .as_path()
 }
 
 pub fn init_manifest_path(path: impl AsRef<Path>) -> Result<()> {
@@ -523,6 +530,11 @@ pub fn init_manifest_path(path: impl AsRef<Path>) -> Result<()> {
         resolved = resolved.join("Acton.toml");
     }
 
+    let resolved_root = resolved
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| PathBuf::from("."));
+
     match MANIFEST_PATH.set(resolved.clone()) {
         Ok(()) => Ok(()),
         Err(existing) if existing == resolved => Ok(()),
@@ -530,7 +542,22 @@ pub fn init_manifest_path(path: impl AsRef<Path>) -> Result<()> {
             "Manifest path already initialized to {}",
             existing.display()
         )),
+    }?;
+
+    match PROJECT_ROOT.set(resolved_root.clone()) {
+        Ok(()) => Ok(()),
+        Err(existing) if existing == resolved_root => Ok(()),
+        Err(existing) => Err(anyhow!(
+            "Project root already initialized to {}",
+            existing.display()
+        )),
     }
+}
+
+fn default_project_root_and_manifest_path() -> (PathBuf, PathBuf) {
+    let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let manifest_path = project_root.join("Acton.toml");
+    (project_root, manifest_path)
 }
 
 #[must_use]

@@ -1,6 +1,6 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root};
 use anyhow::anyhow;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
@@ -28,13 +28,8 @@ fn build_model(
     test_output: Option<String>,
     storage_struct_name: Option<String>,
 ) -> anyhow::Result<WrapperModel> {
-    let project_root = find_project_root_from_current_dir().ok_or_else(|| {
-        anyhow!(
-            "Could not find Acton.toml in project root. Make sure you're in a project directory."
-        )
-    })?;
-
     let config = ActonConfig::load().map_err(|e| anyhow!("Failed to load Acton.toml: {e}"))?;
+    let project_root = project_root().to_path_buf();
 
     let contract_config = config
         .get_contract(contract_id)
@@ -269,22 +264,6 @@ fn print_types_warning(contract_path: &Path, types_file_path: &Path, abi: &Contr
         "═══════════════════════════════════════════════════════════".yellow()
     );
     println!();
-}
-
-fn find_project_root_from_current_dir() -> Option<PathBuf> {
-    let mut current = std::env::current_dir().ok()?;
-
-    loop {
-        let acton_toml = current.join("Acton.toml");
-        if acton_toml.exists() {
-            return Some(current);
-        }
-
-        match current.parent() {
-            Some(parent) => current = parent.to_path_buf(),
-            None => return None,
-        }
-    }
 }
 
 fn to_pascal_case(s: &str) -> String {

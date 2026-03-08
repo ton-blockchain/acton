@@ -1,6 +1,9 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, CheckOutputFormat, ContractConfig, LintLevel};
+use acton_config::config::{
+    ActonConfig, CheckOutputFormat, ContractConfig, LintLevel,
+    project_root as configured_project_root,
+};
 use anyhow::anyhow;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::collections::{HashMap, HashSet};
@@ -137,8 +140,8 @@ pub fn check_cmd(
         .as_ref()
         .map_or(usize::MAX, |lint| lint.max_warnings);
 
-    let cwd = std::env::current_dir()?;
-    let excludes = LintExcludes::from_config(&cwd, &config)?;
+    let project_root = configured_project_root().to_path_buf();
+    let excludes = LintExcludes::from_config(&project_root, &config)?;
     let only_rules = parse_rules_filter(enable_only)?;
     let run_options = CheckRunOptions {
         fix,
@@ -149,7 +152,7 @@ pub fn check_cmd(
     };
 
     let now = Instant::now();
-    let files = find_files(&cwd)?;
+    let files = find_files(&project_root)?;
     log::info!("found {} files in {:?}", files.len(), now.elapsed());
 
     let stdlib = find_stdlib()?;
@@ -225,10 +228,10 @@ pub fn check_cmd(
             output::json::write_report(&mut writer, &all_diagnostics, &file_db)?;
         }
         CheckOutputFormat::Sarif => {
-            output::sarif::write_report(&mut writer, &all_diagnostics, &file_db, &cwd)?;
+            output::sarif::write_report(&mut writer, &all_diagnostics, &file_db, &project_root)?;
         }
         CheckOutputFormat::Github => {
-            output::github::write_report(&mut writer, &all_diagnostics, &file_db, &cwd)?;
+            output::github::write_report(&mut writer, &all_diagnostics, &file_db, &project_root)?;
         }
     }
 
