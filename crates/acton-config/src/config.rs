@@ -195,6 +195,8 @@ pub struct FmtSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct BuildSettings {
+    pub out_dir: Option<String>,
+    pub gen_dir: Option<String>,
     pub output_fift: Option<String>,
 }
 
@@ -928,11 +930,15 @@ description = "Test project"
 version = "0.1.0"
 
 [build]
+out-dir = "artifacts/build"
+gen-dir = "artifacts/gen"
 output-fift = "build/fift"
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
         let build = config.build.as_ref().unwrap();
+        assert_eq!(build.out_dir.as_deref(), Some("artifacts/build"));
+        assert_eq!(build.gen_dir.as_deref(), Some("artifacts/gen"));
         assert_eq!(build.output_fift.as_deref(), Some("build/fift"));
     }
 

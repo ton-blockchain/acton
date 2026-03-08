@@ -950,6 +950,7 @@ impl Project {
             build_clear_cache: false,
             build_graph: None,
             build_out_dir: None,
+            build_gen_dir: None,
             build_output_fift: None,
             disasm_string: None,
             disasm_output: None,
@@ -998,6 +999,7 @@ pub(crate) struct ActonCommand {
     pub(crate) build_clear_cache: bool,
     pub(crate) build_graph: Option<Option<String>>,
     pub(crate) build_out_dir: Option<String>,
+    pub(crate) build_gen_dir: Option<String>,
     pub(crate) build_output_fift: Option<String>,
     pub(crate) disasm_string: Option<String>,
     pub(crate) disasm_output: Option<String>,
@@ -1540,6 +1542,12 @@ impl ActonCommand {
         self
     }
 
+    /// Set output directory for generated dependency files (only for build command)
+    pub(crate) fn with_gen_dir(mut self, path: &str) -> Self {
+        self.build_gen_dir = Some(path.to_string());
+        self
+    }
+
     /// Set output directory for compiled Fift files (only for build command)
     pub(crate) fn with_output_fift(mut self, path: &str) -> Self {
         self.build_output_fift = Some(path.to_string());
@@ -1637,6 +1645,10 @@ impl ActonCommand {
 
         if let Some(out_dir) = self.build_out_dir {
             self.cmd = self.cmd.arg("--out-dir").arg(out_dir);
+        }
+
+        if let Some(gen_dir) = self.build_gen_dir {
+            self.cmd = self.cmd.arg("--gen-dir").arg(gen_dir);
         }
 
         if let Some(output_fift_dir) = self.build_output_fift {

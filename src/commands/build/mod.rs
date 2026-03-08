@@ -22,6 +22,7 @@ pub fn build_cmd(
     clear_cache: bool,
     graph_output: Option<String>,
     out_dir: Option<String>,
+    gen_dir: Option<String>,
     output_fift: Option<String>,
     show_info: bool,
 ) -> anyhow::Result<()> {
@@ -30,12 +31,6 @@ pub fn build_cmd(
     // Due to global variables, we need to enable debug mode for emulator as early as possible
     // since first compilation WITHOUT debug mode will set debug=false forever
     enable_emulator_debug_mode()?;
-
-    let out_dir = out_dir.unwrap_or_else(|| "build".to_string());
-
-    if !Path::new(&out_dir).exists() {
-        fs::create_dir_all(&out_dir)?;
-    }
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -46,14 +41,32 @@ pub fn build_cmd(
     println!("   {} contracts", "Compiling".green().bold());
 
     let config = ActonConfig::load()?;
-    let output_fift_dir = output_fift
+    let out_dir = non_empty_path(out_dir)
         .or_else(|| {
             config
                 .build
                 .as_ref()
-                .and_then(|build| build.output_fift.clone())
+                .and_then(|build| non_empty_path(build.out_dir.clone()))
         })
-        .filter(|path| !path.is_empty());
+        .unwrap_or_else(|| "build".to_string());
+    let gen_dir = non_empty_path(gen_dir)
+        .or_else(|| {
+            config
+                .build
+                .as_ref()
+                .and_then(|build| non_empty_path(build.gen_dir.clone()))
+        })
+        .unwrap_or_else(|| "gen".to_string());
+    let output_fift_dir = non_empty_path(output_fift).or_else(|| {
+        config
+            .build
+            .as_ref()
+            .and_then(|build| non_empty_path(build.output_fift.clone()))
+    });
+
+    if !Path::new(&out_dir).exists() {
+        fs::create_dir_all(&out_dir)?;
+    }
 
     let contracts = match config.contracts() {
         Some(contracts) => contracts,
@@ -129,6 +142,7 @@ See https://i582.github.io/acton/docs/build-system/configuration-reference/#cont
             &compiled_contracts,
             &compile_errors,
             &config,
+            Path::new(&gen_dir),
         )?;
 
         let (code_boc64, code_hash, fift_code) =
@@ -347,6 +361,7 @@ pub(crate) fn generate_dependency_files(
     compiled_contracts: &HashMap<String, String>, // contract_key -> boc_base64
     failed_contracts: &BTreeMap<String, anyhow::Error>,
     acton_config: &ActonConfig,
+    gen_dir: &Path,
 ) -> anyhow::Result<()> {
     let Some(depends) = &config.depends else {
         return Ok(());
@@ -362,18 +377,18 @@ pub(crate) fn generate_dependency_files(
             compiled_contracts,
             failed_contracts,
             acton_config,
+            gen_dir,
         )?;
     }
 
     Ok(())
 }
 
-fn create_gen_dir<'a>() -> anyhow::Result<&'a Path> {
-    let gen_dir = Path::new("gen");
+fn create_gen_dir(gen_dir: &Path) -> anyhow::Result<()> {
     if !gen_dir.exists() {
         fs::create_dir_all(gen_dir)?;
     }
-    Ok(gen_dir)
+    Ok(())
 }
 
 fn generate_single_dependency_file(
@@ -382,8 +397,9 @@ fn generate_single_dependency_file(
     compiled_contracts: &HashMap<String, String>,
     failed_contracts: &BTreeMap<String, anyhow::Error>,
     acton_config: &ActonConfig,
+    gen_dir: &Path,
 ) -> anyhow::Result<()> {
-    let gen_dir = create_gen_dir()?;
+    create_gen_dir(gen_dir)?;
     let dependency_contract = dependency.name();
 
     if failed_contracts.get(dependency_contract).is_some() {
@@ -432,6 +448,10 @@ fn generate_single_dependency_file(
     fs::write(&output_filename, content)?;
 
     Ok(())
+}
+
+fn non_empty_path(path: Option<String>) -> Option<String> {
+    path.filter(|value| !value.is_empty())
 }
 
 fn format_valid_function_name(dependency_key: &str) -> String {

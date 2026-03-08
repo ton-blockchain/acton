@@ -416,7 +416,7 @@ impl<'a> TestRunner<'a> {
 
 pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()> {
     // First we need to build all contracts and generate all dependency files with code
-    build_cmd(None, config.clear_cache, None, None, None, false)?;
+    build_cmd(None, config.clear_cache, None, None, None, None, false)?;
     println!("     {} tests", "Running".green().bold());
 
     // If path is omitted, default to current directory

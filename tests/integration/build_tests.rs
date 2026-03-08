@@ -1480,6 +1480,72 @@ fn test_build_with_custom_out_dir() {
 }
 
 #[test]
+fn test_build_with_out_dir_from_config() {
+    let project = ProjectBuilder::new("build-out-dir-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\nout-dir = \"config-artifacts\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project.acton().build().run().success();
+
+    let config_json = project.path().join("config-artifacts/simple.json");
+    assert!(
+        config_json.exists(),
+        "config-artifacts/simple.json should be created"
+    );
+    assert!(
+        !project.path().join("build/simple.json").exists(),
+        "build/simple.json should not be created when [build].out-dir is set"
+    );
+}
+
+#[test]
+fn test_build_with_out_dir_cli_overrides_config() {
+    let project = ProjectBuilder::new("build-out-dir-cli-overrides-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\nout-dir = \"config-artifacts\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .with_out_dir("cli-artifacts")
+        .run()
+        .success();
+
+    assert!(
+        project.path().join("cli-artifacts/simple.json").exists(),
+        "cli-artifacts/simple.json should be created"
+    );
+    assert!(
+        !project.path().join("config-artifacts/simple.json").exists(),
+        "config-artifacts/simple.json should not be created when CLI override is used"
+    );
+}
+
+#[test]
+fn test_build_without_output_fift_does_not_emit_fift_by_default() {
+    let project = ProjectBuilder::new("build-output-fift-default-off")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project.acton().build().run().success();
+
+    assert!(
+        !project.path().join("build/fift/simple.fif").exists(),
+        "build/fift/simple.fif should not be created when output-fift is not configured"
+    );
+}
+
+#[test]
 fn test_build_with_output_fift_cli() {
     let project = ProjectBuilder::new("build-output-fift-cli")
         .contract("simple", SIMPLE_CONTRACT)
@@ -1606,6 +1672,116 @@ fn test_build_with_output_fift_skips_boc_sources() {
     assert!(
         !boc_fift_file.exists(),
         "build/fift/from_boc.fif should not be created for precompiled .boc sources"
+    );
+}
+
+#[test]
+fn test_build_with_gen_dir_from_config() {
+    let project = ProjectBuilder::new("build-gen-dir-config")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_deps(
+            "parent",
+            r#"
+            import "../custom-gen/child_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                val code = childCompiledCode();
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec!["child"],
+        )
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\ngen-dir = \"custom-gen\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project.acton().build().run().success();
+
+    assert!(
+        project.path().join("custom-gen/child_code.tolk").exists(),
+        "custom-gen/child_code.tolk should be created"
+    );
+    assert!(
+        !project.path().join("gen/child_code.tolk").exists(),
+        "default gen/child_code.tolk should not be created when [build].gen-dir is set"
+    );
+}
+
+#[test]
+fn test_build_with_gen_dir_cli_overrides_config() {
+    let project = ProjectBuilder::new("build-gen-dir-cli-overrides-config")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_deps(
+            "parent",
+            r#"
+            import "../cli-gen/child_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                val code = childCompiledCode();
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec!["child"],
+        )
+        .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\ngen-dir = \"config-gen\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .with_gen_dir("cli-gen")
+        .run()
+        .success();
+
+    assert!(
+        project.path().join("cli-gen/child_code.tolk").exists(),
+        "cli-gen/child_code.tolk should be created"
+    );
+    assert!(
+        !project.path().join("config-gen/child_code.tolk").exists(),
+        "config-gen/child_code.tolk should not be created when CLI override is used"
+    );
+}
+
+#[test]
+fn test_build_with_gen_dir_cli() {
+    let project = ProjectBuilder::new("build-gen-dir-cli")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_deps(
+            "parent",
+            r#"
+            import "../cli-gen/child_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                val code = childCompiledCode();
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec!["child"],
+        )
+        .build();
+
+    project
+        .acton()
+        .build()
+        .with_gen_dir("cli-gen")
+        .run()
+        .success();
+
+    assert!(
+        project.path().join("cli-gen/child_code.tolk").exists(),
+        "cli-gen/child_code.tolk should be created"
+    );
+    assert!(
+        !project.path().join("gen/child_code.tolk").exists(),
+        "default gen/child_code.tolk should not be created when CLI --gen-dir is set"
     );
 }
 

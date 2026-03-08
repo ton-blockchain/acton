@@ -389,10 +389,16 @@ enum Commands {
         graph: Option<String>,
         #[arg(
             long,
-            default_value = "build",
-            help = "Output directory for build artifacts"
+            value_name = "DIR",
+            help = "Output directory for build artifacts (default: build/)"
         )]
         out_dir: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Output directory for generated dependency files (default: gen/)"
+        )]
+        gen_dir: Option<String>,
         #[arg(
             long,
             value_name = "DIR",
@@ -1006,6 +1012,8 @@ fn example_build_usage() -> StyledStr {
 
     let build_config_example = [
         format!("{}build{}", dim("["), dim("]")),
+        format!("     out-dir{}{}", dim(" = "), green("\"build\"")),
+        format!("     gen-dir{}{}", dim(" = "), green("\"gen\"")),
         format!("     output-fift{}{}", dim(" = "), green("\"build/fift\"")),
     ]
     .join("\n");
@@ -1020,6 +1028,10 @@ fn example_build_usage() -> StyledStr {
         (
             "Generate dependency graph as DOT file",
             "acton build --graph deps.dot",
+        ),
+        (
+            "Save generated dependency files to a custom directory",
+            "acton build --gen-dir build/gen",
         ),
         (
             "Save compiled Fift files to a custom directory",
@@ -1775,9 +1787,18 @@ fn main() {
             clear_cache,
             graph,
             out_dir,
+            gen_dir,
             output_fift,
             info,
-        } => build_cmd(contract_id, clear_cache, graph, out_dir, output_fift, info),
+        } => build_cmd(
+            contract_id,
+            clear_cache,
+            graph,
+            out_dir,
+            gen_dir,
+            output_fift,
+            info,
+        ),
         Commands::Compile {
             path,
             json,

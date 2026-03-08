@@ -10,7 +10,8 @@ Options:
       --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
       --graph <GRAPH>         Generate dependency graph as DOT file
       --manifest-path <PATH>  Path to Acton.toml
-      --out-dir <OUT_DIR>     Output directory for build artifacts [default: build]
+      --out-dir <DIR>         Output directory for build artifacts (default: build/)
+      --gen-dir <DIR>         Output directory for generated dependency files (default: gen/)
       --output-fift <DIR>     Directory to save compiled Fift files
       --info                  Show compiled contract info
   -h, --help                  Print help
@@ -29,6 +30,8 @@ Configuration:
 
      # Optional build output settings
      [build]
+     out-dir = "build"
+     gen-dir = "gen"
      output-fift = "build/fift"
 
 Examples:
@@ -43,6 +46,9 @@ Examples:
 
      # Generate dependency graph as DOT file
      acton build --graph deps.dot
+
+     # Save generated dependency files to a custom directory
+     acton build --gen-dir build/gen
 
      # Save compiled Fift files to a custom directory
      acton build --output-fift build/fift

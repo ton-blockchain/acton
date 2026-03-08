@@ -113,6 +113,7 @@ impl FixtureProject {
             build_contract: None,
             build_graph: None,
             build_out_dir: None,
+            build_gen_dir: None,
             build_output_fift: None,
             disasm_string: None,
             disasm_output: None,

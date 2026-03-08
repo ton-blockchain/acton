@@ -177,6 +177,14 @@
       "type": "object",
       "description": "Default settings for the build command",
       "properties": {
+        "out-dir": {
+          "type": "string",
+          "description": "Directory where JSON build artifacts are saved"
+        },
+        "gen-dir": {
+          "type": "string",
+          "description": "Directory where generated dependency files are saved"
+        },
         "output-fift": {
           "type": "string",
           "description": "Directory where per-contract compiled Fift files are saved"

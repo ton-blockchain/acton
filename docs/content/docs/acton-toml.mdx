@@ -90,17 +90,21 @@ depends = [
 
 Configures defaults for `acton build`.
 
-| Field         | Type     | Required | Description                                                                       |
-|:--------------|:---------|:---------|:----------------------------------------------------------------------------------|
+| Field         | Type     | Required | Description                                                                              |
+|:--------------|:---------|:---------|:-----------------------------------------------------------------------------------------|
+| `out-dir`     | `string` | No       | Directory where build JSON artifacts are written (default: `build`).                     |
+| `gen-dir`     | `string` | No       | Directory where generated dependency files are written (default: `gen`).                 |
 | `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
 
 Example:
 ```toml
 [build]
+out-dir = "build"
+gen-dir = "gen"
 output-fift = "build/fift"
 ```
 
-`acton build --output-fift <DIR>` overrides this value for a single run.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run.
 Precompiled `.boc` contracts are skipped for Fift output.
 
 ---
