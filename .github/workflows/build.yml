@@ -227,7 +227,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
         with:
-          tool: just
+          tool: just,cargo-shear
 
       - name: Restore TON objects
         uses: actions/cache/restore@v5

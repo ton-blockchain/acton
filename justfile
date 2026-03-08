@@ -45,16 +45,15 @@ fmt-check:
 clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
-check-udeps:
-    cargo +nightly udeps --workspace --all-targets --all-features --locked
-    cargo deny check
+check-deps:
+    cargo shear
 
 check-docgen:
     cargo run -- docgen --check # always use latest acton
 
-check-ci: fmt-check check-docgen clippy
+check-ci: fmt-check check-docgen check-deps clippy
 
-check: fmt-check check-docgen clippy check-udeps test
+check: check-ci test
 
 coverage-setup:
     cargo install cargo-llvm-cov

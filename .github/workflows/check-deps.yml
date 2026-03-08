@@ -1,11 +1,11 @@
-name: Cargo Deny
+name: Check Dependencies
 
 on:
   pull_request:
     branches:
       - master
     paths:
-      - ".github/workflows/deny.yml"
+      - ".github/workflows/check-deps.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "**/Cargo.toml"
@@ -23,11 +23,11 @@ concurrency:
 permissions: { }
 
 jobs:
-  cargo-deny:
-    name: Deny Checks
+  check-dependencies:
+    name: Check Dependencies
     strategy:
       matrix:
-        os: [ ubicloud-standard-4-ubuntu-2204 ]
+        os: [ ubicloud-standard-2-ubuntu-2204 ]
     runs-on: ${{ matrix.os }}
 
     permissions:
