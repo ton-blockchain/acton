@@ -80,3 +80,21 @@
           - "crates/ton-networks/**"
           - "src/commands/wallet/**"
           - "src/wallets.rs"
+
+"documentation":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+
+"stdlib":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "lib/**"
+
+"Cargo.toml":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "Cargo.toml"
+          - "Cargo.lock"
+          - "**/Cargo.toml"
+          - "**/Cargo.lock"
