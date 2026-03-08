@@ -1109,8 +1109,7 @@ impl Node {
         self.history
             .blocks
             .iter()
-            .filter(|b| b.gen_utime <= utime)
-            .next_back()
+            .rfind(|b| b.gen_utime <= utime)
             .cloned()
     }
 
