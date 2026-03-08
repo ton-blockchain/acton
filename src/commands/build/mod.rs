@@ -278,7 +278,8 @@ fn process_contract(
             let compile_start = Instant::now();
             println!("   {} {}", "Compiling".green().bold(), contract_config.name);
 
-            let compiler = tolkc::Compiler::new(2).with_mappings(&acton_config.mappings);
+            let mappings = acton_config.mappings();
+            let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
             let compilation_result = compiler.compile(contract_path, false);
             let compile_time = compile_start.elapsed();
 

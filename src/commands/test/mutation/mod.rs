@@ -275,8 +275,8 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         tree: main_tree.tree,
     });
 
-    let dependencies =
-        ton_abi::get_file_dependencies(&main_path_str, true, &acton_config.mappings)?;
+    let mappings = acton_config.mappings();
+    let dependencies = ton_abi::get_file_dependencies(&main_path_str, true, &mappings)?;
     for dep_path_str in &dependencies {
         let dep_path = Path::new(dep_path_str)
             .absolutize_from(&project_root)

@@ -6,6 +6,7 @@ use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use globset::{Glob, GlobSetBuilder};
+use path_absolutize::Absolutize;
 use similar::{ChangeTag, TextDiff};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -250,5 +251,15 @@ fn relative_to_project_root(path: &Path, project_root: &Path) -> PathBuf {
 }
 
 fn path_for_display(path: &Path, current_dir: &Path) -> PathBuf {
-    pathdiff::diff_paths(path, current_dir).unwrap_or_else(|| path.to_path_buf())
+    let normalized_current_dir = current_dir
+        .absolutize()
+        .map(|p| p.into_owned())
+        .unwrap_or_else(|_| current_dir.to_path_buf());
+
+    let normalized_path = path
+        .absolutize_from(&normalized_current_dir)
+        .map(|p| p.into_owned())
+        .unwrap_or_else(|_| path.to_path_buf());
+
+    pathdiff::diff_paths(&normalized_path, &normalized_current_dir).unwrap_or(normalized_path)
 }

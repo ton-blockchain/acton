@@ -53,7 +53,11 @@ pub fn script_cmd(
     net: Option<String>,
     explorer: Option<Explorer>,
 ) -> anyhow::Result<()> {
-    stdlib::ensure_latest(configured_project_root())?;
+    let project_root = configured_project_root().to_path_buf();
+    stdlib::ensure_latest(&project_root)?;
+    let mappings = ActonConfig::load()
+        .ok()
+        .and_then(|config| config.mappings());
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -86,6 +90,7 @@ pub fn script_cmd(
     run_script_file(
         path,
         &content,
+        &mappings,
         stack,
         debug,
         debug_port,
@@ -107,6 +112,7 @@ pub fn script_cmd(
 fn run_script_file(
     file_path: &str,
     content: &str,
+    mappings: &Option<BTreeMap<String, String>>,
     stack: Tuple,
     debug: bool,
     debug_port: u16,
@@ -117,18 +123,9 @@ fn run_script_file(
     net: Option<String>,
     explorer: Option<Explorer>,
 ) -> anyhow::Result<()> {
-    let acton_config = ActonConfig::load();
-    let mappings = if let Ok(config) = &acton_config {
-        &config.mappings
-    } else {
-        &None
-    };
     let abi = contract_abi(content.into(), file_path, mappings);
 
-    let mut compiler = tolkc::Compiler::new(2);
-    if let Ok(config) = &acton_config {
-        compiler = compiler.with_mappings(&config.mappings);
-    }
+    let compiler = tolkc::Compiler::new(2).with_mappings(mappings);
 
     match compiler.compile(Path::new(file_path), debug) {
         tolkc::CompilerResult::Success(result) => {
@@ -231,6 +228,7 @@ fn execute_script(
     let mut ctx = Context {
         env: Env {
             config: &config,
+            project_root: configured_project_root().to_path_buf(),
             abi,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),

@@ -51,9 +51,9 @@ fn build_model(
         .into();
 
     let contract_path_str = contract_path.to_str().unwrap_or_default();
-    let mut abi = ton_abi::contract_abi(content.clone(), contract_path_str, &config.mappings);
-    let handled_messages =
-        ton_abi::extract_handled_messages(content, contract_path_str, &config.mappings);
+    let mappings = config.mappings();
+    let mut abi = ton_abi::contract_abi(content.clone(), contract_path_str, &mappings);
+    let handled_messages = ton_abi::extract_handled_messages(content, contract_path_str, &mappings);
 
     let file_stem = contract_path
         .file_stem()
@@ -127,7 +127,7 @@ fn build_model(
         message_paths,
         wrapper_path,
         test_path,
-        mappings: config.mappings.clone(),
+        mappings,
     })
 }
 

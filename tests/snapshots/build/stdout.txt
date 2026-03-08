@@ -11,6 +11,7 @@ Options:
       --graph <GRAPH>         Generate dependency graph as DOT file
       --manifest-path <PATH>  Path to Acton.toml
       --out-dir <DIR>         Output directory for build artifacts (default: build/)
+      --project-root <PATH>   Path to project root
       --gen-dir <DIR>         Output directory for generated dependency files (default: gen/)
       --output-fift <DIR>     Directory to save compiled Fift files
       --info                  Show compiled contract info

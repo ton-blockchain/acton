@@ -274,6 +274,7 @@ impl<'a> TestRunner<'a> {
         let mut ctx = Context {
             env: Env {
                 config: &self.acton_config,
+                project_root: self.project_root.clone(),
                 abi,
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
@@ -765,7 +766,8 @@ fn compile_test_file(
         ));
     }
 
-    let compiler = tolkc::Compiler::new(0).with_mappings(&acton_config.mappings);
+    let mappings = acton_config.mappings();
+    let compiler = tolkc::Compiler::new(0).with_mappings(&mappings);
     let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
         tolkc::CompilerResult::Success(result) => {
@@ -797,12 +799,13 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
 
     let executable_code = prepare_test_file(&file, &content);
     let tmp_test_filename = filepath.to_owned() + ".test.tolk";
+    let mappings = runner.acton_config.mappings();
 
     let abi = contract_abi_with_file(
         content.into(),
         filepath,
         &file,
-        &runner.acton_config.mappings,
+        &mappings,
         Some(&mut runner.abi_parse_cache),
     );
 
@@ -881,6 +884,7 @@ fn run_file_tests(
     let mut failed = 0;
     let mut skipped = 0;
     let mut todo = 0;
+    let mappings = runner.acton_config.mappings();
 
     for test in &filtered_tests {
         let suite_name = extract_suite_name(&file_path);
@@ -1086,12 +1090,8 @@ fn run_file_tests(
                     *code.repr_hash(),
                     source_map.clone(),
                     Some(
-                        contract_abi(
-                            content,
-                            file_path.to_string_lossy().as_ref(),
-                            &runner.acton_config.mappings,
-                        )
-                        .into(),
+                        contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
+                            .into(),
                     ),
                 );
             }

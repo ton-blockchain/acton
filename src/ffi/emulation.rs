@@ -77,6 +77,15 @@ fn build_impl(
         }
     }
 
+    if !path.starts_with('@') && !Path::new(&path).is_absolute() {
+        path = ctx
+            .env
+            .project_root
+            .join(Path::new(&path))
+            .to_string_lossy()
+            .to_string();
+    }
+
     if let Some(override_code) = ctx.env.build_override.get(id.as_str()) {
         debug!("Overriding code for {name}");
         stk.push(TupleItem::Cell(override_code.clone()));
@@ -109,6 +118,7 @@ fn build_impl(
             .file_build_cache
             .get(&path, ctx.build.need_debug_info, 2, "1.3")
     {
+        let mappings = ctx.env.config.mappings();
         let elapsed = start_time.elapsed();
         info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
 
@@ -119,7 +129,7 @@ fn build_impl(
             &cached_entry.code_boc64,
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             cached_entry.source_map.clone().unwrap_or_default().into(),
-            Some(contract_abi(content, &path, &ctx.env.config.mappings).into()),
+            Some(contract_abi(content, &path, &mappings).into()),
         );
 
         let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
@@ -129,7 +139,8 @@ fn build_impl(
     }
 
     let compile_start = Instant::now();
-    let compiler = tolkc::Compiler::new(2).with_mappings(&ctx.env.config.mappings);
+    let mappings = ctx.env.config.mappings();
+    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
     let result = compiler.compile(Path::new(&path), ctx.build.need_debug_info);
     let compile_time = compile_start.elapsed();
 
@@ -155,7 +166,7 @@ fn build_impl(
                 &success.code_boc64,
                 HashBytes::from_str(&success.code_hash_hex)?,
                 success.source_map.unwrap_or_default().into(),
-                Some(contract_abi(content, &path, &ctx.env.config.mappings).into()),
+                Some(contract_abi(content, &path, &mappings).into()),
             );
             let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")

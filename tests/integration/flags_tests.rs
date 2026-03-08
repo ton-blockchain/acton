@@ -54,6 +54,17 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
+import "../../lib/build/build"
+import "../../lib/testing/expect"
+
+get fun `test-build-path-from-project-root`() {
+    val byName = build("counter");
+    val byPath = build("counter", "tests/acton-stdlib/contracts/counter.tolk");
+    expect(byPath).toEqual(byName);
+}
+"#;
+
 #[test]
 fn test_run_specific_test_file() {
     let project = ProjectBuilder::new("multi-file")
@@ -438,6 +449,188 @@ fn test_manifest_path_build_works_from_nested_directory() {
             "build/simple.json",
             "integration/snapshots/flags/test_manifest_path_build_works_from_nested_directory.build_simple_json.txt",
         );
+
+    assert!(
+        project.path().join(".acton/cache").exists(),
+        "build cache should be created under project root"
+    );
+    assert!(
+        !nested_dir.join(".acton/cache").exists(),
+        "build cache must not be created under nested working directory"
+    );
+}
+
+#[test]
+fn test_project_root_build_works_from_nested_directory() {
+    let project = ProjectBuilder::new("project-root-build-from-nested")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    project
+        .acton()
+        .arg("--project-root")
+        .arg("..")
+        .build()
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    assert!(
+        project.path().join("build/simple.json").exists(),
+        "build output should be created under project root"
+    );
+}
+
+#[test]
+fn test_project_root_test_build_extension_resolves_relative_contract_path_from_project_root() {
+    let project = ProjectBuilder::new("project-root-build-extension-test")
+        .contract("counter", SIMPLE_CONTRACT)
+        .raw_file("tests/acton-stdlib/contracts/counter.tolk", SIMPLE_CONTRACT)
+        .test_file(
+            "build_from_project_root",
+            BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST,
+        )
+        .build();
+
+    let runner_dir = project.path().join("runner");
+    fs::create_dir_all(&runner_dir).expect("Failed to create sibling runner directory");
+
+    project
+        .acton()
+        .arg("--project-root")
+        .arg("..")
+        .test()
+        .current_dir(&runner_dir)
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_project_root_test_build_extension_resolves_relative_contract_path_from_project_root.stdout.txt",
+        );
+}
+
+#[test]
+fn test_project_root_full_flow_from_sibling_directory_on_new_project() {
+    let workspace = ProjectBuilder::new("project-root-full-flow")
+        .without_acton_toml()
+        .build();
+
+    let project_dir = workspace.path().join("generated-project");
+    let runner_dir = workspace.path().join("runner");
+    fs::create_dir_all(&runner_dir).expect("Failed to create sibling runner directory");
+
+    let new_output = workspace
+        .acton()
+        .arg("new")
+        .arg("generated-project")
+        .arg("--name")
+        .arg("generated-project")
+        .arg("--description")
+        .arg("Project for --project-root integration flow")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .current_dir(workspace.path())
+        .run()
+        .success();
+    new_output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_project_root_full_flow_from_sibling_directory_on_new_project.new.stdout.txt",
+    );
+
+    assert!(project_dir.join("Acton.toml").exists());
+
+    let build_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg("../generated-project")
+        .build()
+        .current_dir(&runner_dir)
+        .run()
+        .success();
+    build_output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_project_root_full_flow_from_sibling_directory_on_new_project.build.stdout.txt",
+    );
+
+    assert!(
+        project_dir.join("build/empty.json").exists(),
+        "build output should be created under project root when using --project-root"
+    );
+
+    let test_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg("../generated-project")
+        .test()
+        .current_dir(&runner_dir)
+        .run()
+        .success();
+    test_output
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_project_root_full_flow_from_sibling_directory_on_new_project.test.stdout.txt",
+        );
+
+    let script_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg("../generated-project")
+        .script("../generated-project/scripts/deploy.tolk")
+        .current_dir(&runner_dir)
+        .run()
+        .success();
+    script_output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_project_root_full_flow_from_sibling_directory_on_new_project.script.stdout.txt",
+    );
+
+    let run_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg("../generated-project")
+        .run_script_cmd("deploy-emulation")
+        .current_dir(&runner_dir)
+        .run()
+        .success();
+    run_output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_project_root_full_flow_from_sibling_directory_on_new_project.run.stdout.txt",
+    );
+
+    let check_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg("../generated-project")
+        .check()
+        .current_dir(&runner_dir)
+        .run()
+        .success();
+    check_output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_project_root_full_flow_from_sibling_directory_on_new_project.check.stdout.txt",
+    );
+
+    let fmt_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg("../generated-project")
+        .fmt()
+        .current_dir(&runner_dir)
+        .run()
+        .success();
+    fmt_output.assert_snapshot_matches(
+        "integration/snapshots/flags/test_project_root_full_flow_from_sibling_directory_on_new_project.fmt.stdout.txt",
+    );
+
+    assert!(
+        project_dir.join(".acton/cache").exists(),
+        "cache should be created under project root"
+    );
+    assert!(
+        !runner_dir.join("build").exists(),
+        "sibling runner directory must not receive build artifacts"
+    );
 }
 
 #[test]

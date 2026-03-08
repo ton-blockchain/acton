@@ -1,0 +1,10 @@
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]/runner
+
+ > ../generated-project/tests/contract.test.tolk (1 test)
+  ✓ something important [TIME]
+
+ ✓ 1 passed in 1 file

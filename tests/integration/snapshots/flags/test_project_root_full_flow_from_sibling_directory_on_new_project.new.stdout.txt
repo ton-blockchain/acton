@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+> Initialized empty Git repository in [ROOT]/generated-project/.git/
+✓ Created new Acton project
+  Project name: generated-project
+  Description: Project for --project-root integration flow
+  Template: empty
+  License: MIT
+
+Created Acton.toml with project configuration
+
+Next steps:
+
+  # Navigate to project
+  cd generated-project
+  # Build your contract
+  acton build
+  # Run tests
+  acton test

@@ -7,7 +7,7 @@ use acton::debugger::debug_context::DebugContext;
 use acton::file_build_cache::FileBuildCache;
 use acton::formatter::FormatterContext;
 use acton::{debugger, ffi};
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use dap::events::Event;
 use dap::responses::ContinueResponse;
 use dap::types::StackFrame;
@@ -156,7 +156,8 @@ pub(crate) fn run_script_file(
 
     let mut compiler = tolkc::Compiler::new(2);
     if let Ok(config) = &config {
-        compiler = compiler.with_mappings(&config.mappings)
+        let mappings = config.mappings();
+        compiler = compiler.with_mappings(&mappings)
     }
 
     match compiler.compile(Path::new(file_path), true) {
@@ -250,6 +251,7 @@ fn execute_script<'a>(
     let mut ctx = Context {
         env: Env {
             config: &config,
+            project_root: configured_project_root().to_path_buf(),
             abi: abi.clone(),
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),

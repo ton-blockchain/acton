@@ -16,7 +16,8 @@ pub(super) fn check_with_compiler(
 ) -> anyhow::Result<bool> {
     let now = Instant::now();
 
-    let compiler = Compiler::new(2).with_mappings(&acton_config.mappings);
+    let mappings = acton_config.mappings();
+    let compiler = Compiler::new(2).with_mappings(&mappings);
     let compiler_errors = compiler.check(root)?;
     log::debug!(
         "Run compiler check took {:?}, found {} errors in {}",

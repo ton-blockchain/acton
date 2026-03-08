@@ -41,6 +41,7 @@ pub(super) struct LintExcludes {
 struct CheckRunOptions<'a> {
     fix: bool,
     is_plain_report: bool,
+    project_root: &'a Path,
     acton_config: &'a ActonConfig,
     excludes: &'a LintExcludes,
     only_rules: Option<&'a HashSet<Rule>>,
@@ -146,6 +147,7 @@ pub fn check_cmd(
     let run_options = CheckRunOptions {
         fix,
         is_plain_report,
+        project_root: &project_root,
         acton_config: &config,
         excludes: &excludes,
         only_rules: only_rules.as_ref(),
@@ -435,7 +437,13 @@ fn check_contract(
         println!("    {} {}", "Checking".green().bold(), config.name,);
     }
 
-    let root = dunce::canonicalize(PathBuf::from(&config.src))?;
+    let source_path = Path::new(&config.src);
+    let source_path = if source_path.is_absolute() {
+        source_path.to_path_buf()
+    } else {
+        options.project_root.join(source_path)
+    };
+    let root = dunce::canonicalize(source_path)?;
     let lint_settings = Checker::build_settings(options.acton_config, Some(contract_id));
     let lint_settings = apply_rules_filter(lint_settings, options.only_rules);
 
@@ -540,9 +548,10 @@ fn check_root_file(
     // - parse
     // - resolve imports
     let now = Instant::now();
+    let mappings = acton_config.mappings();
     let mut index = ProjectIndex::builder(file_db, root.to_owned())
         .with_stdlib(file_db.stdlib_path().to_owned())
-        .with_mappings(&acton_config.mappings)
+        .with_mappings(&mappings)
         .build()?;
     log::debug!("Build project index took {:?}", now.elapsed());
     log::debug!("Index: {:?}", index.files().len());

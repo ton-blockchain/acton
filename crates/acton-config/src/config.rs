@@ -494,6 +494,11 @@ impl ActonConfig {
         }
         result
     }
+
+    #[must_use]
+    pub fn mappings(&self) -> Option<BTreeMap<String, String>> {
+        normalize_mappings(&self.mappings, project_root())
+    }
 }
 
 #[must_use]
@@ -558,6 +563,44 @@ fn default_project_root_and_manifest_path() -> (PathBuf, PathBuf) {
     let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let manifest_path = project_root.join("Acton.toml");
     (project_root, manifest_path)
+}
+
+#[must_use]
+pub fn normalize_mappings(
+    mappings: &Option<BTreeMap<String, String>>,
+    base_dir: &Path,
+) -> Option<BTreeMap<String, String>> {
+    let mappings = mappings.as_ref()?;
+
+    Some(
+        mappings
+            .iter()
+            .map(|(key, value)| {
+                let normalized_key = if key.starts_with('@') {
+                    key.clone()
+                } else {
+                    format!("@{key}")
+                };
+                let value_path = Path::new(value);
+                let normalized_path = if value_path.is_absolute() {
+                    value_path
+                        .absolutize()
+                        .map(|path| path.to_path_buf())
+                        .unwrap_or_else(|_| value_path.to_path_buf())
+                } else {
+                    value_path
+                        .absolutize_from(base_dir)
+                        .map(|path| path.to_path_buf())
+                        .unwrap_or_else(|_| base_dir.join(value_path))
+                };
+
+                (
+                    normalized_key,
+                    normalized_path.to_string_lossy().to_string(),
+                )
+            })
+            .collect(),
+    )
 }
 
 #[must_use]
@@ -946,6 +989,37 @@ utils = "/usr/local/lib/tolk/utils"
         let mappings = config.mappings.as_ref().unwrap();
         assert_eq!(mappings.get("core").unwrap(), "./core");
         assert_eq!(mappings.get("utils").unwrap(), "/usr/local/lib/tolk/utils");
+    }
+
+    #[test]
+    fn test_normalize_mappings_adds_prefix_and_resolves_paths_from_base_dir() {
+        let base_dir = std::env::temp_dir().join("acton-config-mappings-base");
+        let _ = fs::create_dir_all(&base_dir);
+        let shared_dir = base_dir
+            .parent()
+            .expect("base path must have parent")
+            .join("shared");
+
+        let mappings = Some(BTreeMap::from([
+            ("contracts".to_string(), "./contracts".to_string()),
+            ("@tests".to_string(), "tests".to_string()),
+            ("shared".to_string(), "../shared".to_string()),
+        ]));
+
+        let normalized = normalize_mappings(&mappings, &base_dir).expect("must normalize");
+
+        assert_eq!(
+            normalized.get("@contracts"),
+            Some(&base_dir.join("contracts").to_string_lossy().to_string())
+        );
+        assert_eq!(
+            normalized.get("@tests"),
+            Some(&base_dir.join("tests").to_string_lossy().to_string())
+        );
+        assert_eq!(
+            normalized.get("@shared"),
+            Some(&shared_dir.to_string_lossy().to_string())
+        );
     }
 
     #[test]

@@ -65,7 +65,8 @@ pub struct FileBuildCache {
 
 impl FileBuildCache {
     pub fn new(cache_dir: Option<PathBuf>) -> Result<Self> {
-        let cache_dir = cache_dir.unwrap_or_else(|| PathBuf::from(".acton/cache"));
+        let project_root = configured_project_root().to_path_buf();
+        let cache_dir = cache_dir.unwrap_or_else(|| project_root.join(".acton").join("cache"));
 
         if !cache_dir.exists() {
             fs::create_dir_all(&cache_dir)?;
@@ -95,7 +96,6 @@ impl FileBuildCache {
 
         let config = ActonConfig::load().unwrap_or_default();
 
-        let project_root = configured_project_root().to_path_buf();
         let contract_src_index = Self::build_contract_src_index(&config, &project_root);
 
         Ok(Self {
@@ -274,7 +274,8 @@ impl FileBuildCache {
             return Ok(cached.dependencies.clone());
         }
 
-        let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
+        let mappings = self.config.mappings();
+        let file_deps = ton_abi::get_file_dependencies(file_path, true, &mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
         let Some(contract_name) = self.contract_src_index.get(&normalized_path).cloned() else {

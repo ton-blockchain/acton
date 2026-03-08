@@ -62,6 +62,14 @@ struct Cli {
 
     #[arg(long, global = true, value_name = "PATH", help = "Path to Acton.toml")]
     manifest_path: Option<PathBuf>,
+    #[arg(
+        long = "project-root",
+        global = true,
+        value_name = "PATH",
+        help = "Path to project root",
+        conflicts_with = "manifest_path"
+    )]
+    project_root: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -1583,7 +1591,10 @@ fn find_manifest_in_ancestors(start_dir: &Path) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
-fn resolve_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<(PathBuf, bool)> {
+fn resolve_manifest_path(
+    manifest_path: Option<PathBuf>,
+    project_root: Option<PathBuf>,
+) -> anyhow::Result<PathBuf> {
     let cwd = env::current_dir()?;
 
     if let Some(manifest_path) = manifest_path {
@@ -1597,29 +1608,40 @@ fn resolve_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<(Path
             resolved = resolved.join("Acton.toml");
         }
 
-        return Ok((resolved, true));
+        return Ok(resolved);
+    }
+
+    if let Some(project_root) = project_root {
+        let resolved_project_root = if project_root.is_absolute() {
+            project_root
+        } else {
+            cwd.join(project_root)
+        };
+
+        if !resolved_project_root.is_dir() {
+            anyhow::bail!(
+                "Project root {} is not a directory",
+                resolved_project_root.display()
+            );
+        }
+
+        return Ok(resolved_project_root.join("Acton.toml"));
     }
 
     if let Some(found_manifest_path) = find_manifest_in_ancestors(&cwd) {
-        return Ok((found_manifest_path, true));
+        return Ok(found_manifest_path);
     }
 
-    Ok((cwd.join("Acton.toml"), false))
+    Ok(cwd.join("Acton.toml"))
 }
 
-fn configure_manifest_path(manifest_path: Option<PathBuf>) -> anyhow::Result<()> {
-    let (resolved_manifest_path, should_switch_to_project_root) =
-        resolve_manifest_path(manifest_path)?;
+fn configure_manifest_path(
+    manifest_path: Option<PathBuf>,
+    project_root: Option<PathBuf>,
+) -> anyhow::Result<()> {
+    let resolved_manifest_path = resolve_manifest_path(manifest_path, project_root)?;
 
     init_manifest_path(&resolved_manifest_path)?;
-
-    // Keep relative paths in commands stable by working from the project directory.
-    if should_switch_to_project_root
-        && let Some(project_dir) = resolved_manifest_path.parent()
-        && project_dir.exists()
-    {
-        env::set_current_dir(project_dir)?;
-    }
 
     Ok(())
 }
@@ -1636,6 +1658,7 @@ fn main() {
     let Cli {
         color,
         manifest_path,
+        project_root,
         command,
     } = {
         let matches = cli_command(root_help_has_explicit_help_flag()).get_matches();
@@ -1644,7 +1667,7 @@ fn main() {
     init_color_mode(color);
 
     if !matches!(command, Commands::Init | Commands::New { .. })
-        && let Err(err) = configure_manifest_path(manifest_path)
+        && let Err(err) = configure_manifest_path(manifest_path, project_root)
     {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1);
