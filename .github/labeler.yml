@@ -1,0 +1,82 @@
+"Acton.toml":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/acton-config/**"
+
+"CI":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/labeler.yml"
+
+"test-runner":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/acton-test-ui/**"
+          - "src/commands/test/**"
+
+"IDE Support":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/dap-client/**"
+          - "crates/ton-ls/**"
+          - "crates/tree-sitter-tolk/**"
+          - "src/commands/ls/**"
+
+"libraries":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/commands/library/**"
+
+"ton-emulator":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/ton-emulator/**"
+          - "crates/ton-executor/**"
+
+"TASM":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/tasm/**"
+          - "src/commands/disasm/**"
+
+"inspections":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/tolk-analysis/**"
+          - "crates/tolk-dataflow/**"
+          - "crates/tolk-linter/**"
+          - "crates/tolk-macros/**"
+          - "src/commands/check/**"
+
+"tolk-engine":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/tolk-resolver/**"
+          - "crates/tolk-syntax/**"
+          - "crates/tolk-ty/**"
+
+"tolkfmt":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/tolkfmt/**"
+
+"printing/formatting":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/formatter.rs"
+
+"litenode":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/acton-litenode-ui/**"
+          - "crates/ton-indexer/**"
+          - "crates/ton-litenode/**"
+          - "src/commands/litenode/**"
+
+"wallets":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "crates/ton-networks/**"
+          - "src/commands/wallet/**"
+          - "src/wallets.rs"
