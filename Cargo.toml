@@ -1,16 +1,22 @@
 [package]
 name = "acton"
-version.workspace = true
-edition.workspace = true
-rust-version.workspace = true
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
 
 [workspace]
 members = ["crates/*"]
 
 exclude = [
-    "crates/acton-test-ui",
-    "crates/acton-shared-ui",
-    "crates/acton-litenode-ui",
+  "crates/acton-test-ui",
+  "crates/acton-shared-ui",
+  "crates/acton-litenode-ui",
 ]
 
 [workspace.package]
