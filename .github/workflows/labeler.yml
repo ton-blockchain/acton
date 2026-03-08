@@ -8,9 +8,6 @@ on:
       - reopened
       - ready_for_review
 
-permissions:
-  contents: read
-
 jobs:
   label:
     runs-on: ubuntu-latest
