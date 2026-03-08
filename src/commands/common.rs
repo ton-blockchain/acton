@@ -1,4 +1,7 @@
-use acton_config::config::{ActonConfig, global_libraries_path, global_wallets_path};
+use acton_config::config::{
+    ActonConfig, global_libraries_path, global_wallets_path,
+    project_root as configured_project_root,
+};
 use anyhow::{Context, anyhow};
 use inquire::Select;
 use std::path::Path;
@@ -270,9 +273,9 @@ pub fn symlink_global_wallets() -> anyhow::Result<()> {
     if let Some(global_path) = global_wallets_path()
         && global_path.exists()
     {
-        let symlink_path = Path::new("global.wallets.toml");
+        let symlink_path = configured_project_root().join("global.wallets.toml");
         if !symlink_path.exists() {
-            create_symlink(&global_path, symlink_path)?;
+            create_symlink(&global_path, &symlink_path)?;
         }
     }
     Ok(())
@@ -282,9 +285,9 @@ pub fn symlink_global_libraries() -> anyhow::Result<()> {
     if let Some(global_path) = global_libraries_path()
         && global_path.exists()
     {
-        let symlink_path = Path::new("global.libraries.toml");
+        let symlink_path = configured_project_root().join("global.libraries.toml");
         if !symlink_path.exists() {
-            create_symlink(&global_path, symlink_path)?;
+            create_symlink(&global_path, &symlink_path)?;
         }
     }
     Ok(())

@@ -23,6 +23,7 @@ use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
     ActonConfig, CheckOutputFormat, Explorer, LitenodeSettings, Network, init_manifest_path,
+    project_root as configured_project_root,
 };
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -2164,7 +2165,7 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return PathBuf::from(".acton").join("logs");
+        return configured_project_root().join(".acton").join("logs");
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -2172,11 +2173,11 @@ fn resolve_acton_log_dir_with_env(
         if let Some(path) = get_env_path("HOME") {
             return path.join(".acton").join("logs");
         }
-        return PathBuf::from(".acton").join("logs");
+        return configured_project_root().join(".acton").join("logs");
     }
 
     #[allow(unreachable_code)]
-    PathBuf::from(".acton").join("logs")
+    configured_project_root().join(".acton").join("logs")
 }
 
 fn resolve_acton_log_dir() -> PathBuf {

@@ -2,7 +2,9 @@ use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, global_libraries_path};
+use acton_config::config::{
+    ActonConfig, global_libraries_path, project_root as configured_project_root,
+};
 use anyhow::{Context, anyhow};
 use chrono::{DateTime, Local};
 use inquire::{Select, Text};
@@ -253,6 +255,7 @@ pub fn publish_cmd(
         cells,
         local,
         global,
+        configured_project_root(),
     )?;
 
     println!("  {} Library info saved", "✓".green().bold());
@@ -603,8 +606,12 @@ pub fn topup_cmd(
     );
 
     let last_topup_timestamp = Local::now().to_rfc3339();
-    update_library_last_topup_timestamp(&lib_name, &last_topup_timestamp)
-        .context("Top-up transaction was sent, but failed to update library metadata")?;
+    update_library_last_topup_timestamp(
+        configured_project_root(),
+        &lib_name,
+        &last_topup_timestamp,
+    )
+    .context("Top-up transaction was sent, but failed to update library metadata")?;
 
     Ok(())
 }
@@ -750,6 +757,7 @@ fn save_library(
     cells: u64,
     local: bool,
     global: bool,
+    project_root: &Path,
 ) -> anyhow::Result<()> {
     let is_global = if global {
         true
@@ -774,7 +782,7 @@ fn save_library(
         fs::create_dir_all(&global_dir)?;
         global_dir.join("global.libraries.toml")
     } else {
-        PathBuf::from("libraries.toml")
+        project_root.join("libraries.toml")
     };
 
     let mut doc = if config_path.exists() {
@@ -830,8 +838,12 @@ fn save_library(
     Ok(())
 }
 
-fn update_library_last_topup_timestamp(lib_name: &str, timestamp: &str) -> anyhow::Result<()> {
-    let local_path = PathBuf::from("libraries.toml");
+fn update_library_last_topup_timestamp(
+    project_root: &Path,
+    lib_name: &str,
+    timestamp: &str,
+) -> anyhow::Result<()> {
+    let local_path = project_root.join("libraries.toml");
     if update_library_last_topup_timestamp_in_file(&local_path, lib_name, timestamp)? {
         return Ok(());
     }
@@ -1089,6 +1101,7 @@ mod tests {
             5,
             true,
             false,
+            dir.path(),
         )
         .expect("must save library metadata");
 
@@ -1149,6 +1162,7 @@ mod tests {
             1,
             true,
             false,
+            dir.path(),
         )
         .expect("must save first library entry");
 
@@ -1163,6 +1177,7 @@ mod tests {
             2,
             true,
             false,
+            dir.path(),
         )
         .expect("must save second library entry with suffix");
 

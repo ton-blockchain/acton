@@ -15,6 +15,12 @@ get fun `test-manifest-path-works`() {
 }
 "#;
 
+const UNFORMATTED_FMT_TOLK: &str = r#"
+fun onInternalMessage(in:InMessage){
+val x=1;
+}
+"#;
+
 const PROFILED_TEST: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/build/build"
@@ -613,6 +619,192 @@ fn test_manifest_path_test_profiling_snapshots_use_project_root() {
         !stderr.contains("Warning: Failed to load baseline gas snapshot"),
         "baseline snapshot must be loaded from project root, stderr:\n{}",
         stderr
+    );
+}
+
+#[test]
+fn test_manifest_path_fmt_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-path-fmt-from-nested")
+        .contract("simple", UNFORMATTED_FMT_TOLK)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let contract_path = project.path().join("contracts/simple.tolk");
+    let before = fs::read_to_string(&contract_path).expect("failed to read contract before fmt");
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg("../Acton.toml")
+        .fmt()
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    let after = fs::read_to_string(&contract_path).expect("failed to read contract after fmt");
+    assert_ne!(before, after, "fmt should update file in project root");
+    assert!(
+        after.contains("in: InMessage"),
+        "formatted file should contain normalized spacing in function args"
+    );
+    assert!(
+        after.contains("val x = 1;"),
+        "formatted file should contain normalized spacing in assignment"
+    );
+}
+
+#[test]
+fn test_manifest_auto_detect_fmt_works_from_nested_directory() {
+    let project = ProjectBuilder::new("manifest-auto-fmt-from-nested")
+        .contract("simple", UNFORMATTED_FMT_TOLK)
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let contract_path = project.path().join("contracts/simple.tolk");
+    let before = fs::read_to_string(&contract_path).expect("failed to read contract before fmt");
+
+    project
+        .acton()
+        .fmt()
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    let after = fs::read_to_string(&contract_path).expect("failed to read contract after fmt");
+    assert_ne!(before, after, "fmt should update file in project root");
+    assert!(
+        after.contains("in: InMessage"),
+        "formatted file should contain normalized spacing in function args"
+    );
+    assert!(
+        after.contains("val x = 1;"),
+        "formatted file should contain normalized spacing in assignment"
+    );
+}
+
+#[test]
+#[cfg_attr(not(unix), ignore)]
+fn test_manifest_path_run_works_from_nested_directory_and_uses_project_root() {
+    let project = ProjectBuilder::new("manifest-path-run-from-nested")
+        .script_config("emit-file", "echo nested > run-root.txt")
+        .build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let root_output = project.path().join("run-root.txt");
+    let nested_output = nested_dir.join("run-root.txt");
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg("../Acton.toml")
+        .run_script_cmd("emit-file")
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    assert!(
+        root_output.exists(),
+        "run output must be written in project root: {}",
+        root_output.display()
+    );
+    assert!(
+        !nested_output.exists(),
+        "run output must not be written in nested cwd: {}",
+        nested_output.display()
+    );
+}
+
+#[test]
+fn test_manifest_path_wallet_new_local_writes_to_project_root() {
+    let project = ProjectBuilder::new("manifest-path-wallet-local-root").build();
+    project.acton().init().run().success();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let root_wallets = project.path().join("wallets.toml");
+    let nested_wallets = nested_dir.join("wallets.toml");
+    assert!(
+        !root_wallets.exists(),
+        "wallets.toml must not exist before wallet command"
+    );
+
+    project
+        .acton()
+        .arg("--manifest-path")
+        .arg("../Acton.toml")
+        .wallet_new()
+        .arg("--name")
+        .arg("manifest-path-local-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    assert!(
+        root_wallets.exists(),
+        "wallets.toml must be written in project root: {}",
+        root_wallets.display()
+    );
+    assert!(
+        !nested_wallets.exists(),
+        "wallets.toml must not be written in nested cwd: {}",
+        nested_wallets.display()
+    );
+}
+
+#[test]
+fn test_manifest_path_wallet_new_global_creates_symlink_in_project_root() {
+    let project = ProjectBuilder::new("manifest-path-wallet-global-symlink-root").build();
+    project.acton().init().run().success();
+
+    let home = tempfile::TempDir::new().expect("failed to create temp HOME");
+    let home_str = home
+        .path()
+        .to_str()
+        .expect("temp HOME path must be valid UTF-8");
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let root_symlink = project.path().join("global.wallets.toml");
+    let nested_symlink = nested_dir.join("global.wallets.toml");
+
+    project
+        .acton()
+        .env("HOME", home_str)
+        .arg("--manifest-path")
+        .arg("../Acton.toml")
+        .wallet_new()
+        .arg("--name")
+        .arg("manifest-path-global-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--global")
+        .current_dir(&nested_dir)
+        .run()
+        .success();
+
+    assert!(
+        root_symlink.exists(),
+        "global.wallets.toml symlink must be created in project root: {}",
+        root_symlink.display()
+    );
+    assert!(
+        !nested_symlink.exists(),
+        "global.wallets.toml symlink must not be created in nested cwd: {}",
+        nested_symlink.display()
     );
 }
 

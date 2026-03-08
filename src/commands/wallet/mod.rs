@@ -2,7 +2,9 @@ use crate::commands::common::{create_symlink, error_fmt, select_wallet};
 use crate::wallets;
 use acton_config::color::OwoColorize;
 use acton_config::config;
-use acton_config::config::{ActonConfig, WalletsFile, global_wallets_path};
+use acton_config::config::{
+    ActonConfig, WalletsFile, global_wallets_path, project_root as configured_project_root,
+};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
@@ -760,7 +762,7 @@ fn confirm_wallet_removal(name: &str, yes: bool, json: bool) -> anyhow::Result<b
 fn remove_wallet_with_merged_precedence(name: &str, config: &ActonConfig) -> anyhow::Result<bool> {
     // global first, then local override.
     // So removal should target local first (effective winner), then global.
-    let local_path = PathBuf::from("wallets.toml");
+    let local_path = configured_project_root().join("wallets.toml");
     if remove_wallet_from_config_file(&local_path, name)? {
         return Ok(false);
     }
@@ -1105,7 +1107,7 @@ fn get_config_path(name: &str, is_global: bool) -> anyhow::Result<PathBuf> {
 
         Ok(config_path)
     } else {
-        let config_path = PathBuf::from("wallets.toml");
+        let config_path = configured_project_root().join("wallets.toml");
         if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
             let wallets: WalletsFile = toml::from_str(&content)?;
@@ -1208,9 +1210,9 @@ fn save_wallet_to_config(
         .with_context(|| format!("Failed to write to {}", config_path.display()))?;
 
     if is_global {
-        let symlink_path = Path::new("global.wallets.toml");
+        let symlink_path = configured_project_root().join("global.wallets.toml");
         if !symlink_path.exists() {
-            if let Err(e) = create_symlink(config_path, symlink_path) {
+            if let Err(e) = create_symlink(config_path, &symlink_path) {
                 println!(
                     "  {} Failed to create symlink: {}",
                     "Warning:".yellow().bold(),
@@ -1218,9 +1220,8 @@ fn save_wallet_to_config(
                 );
             } else {
                 println!(
-                    "{} Created symlink {} -> {}",
+                    "{} Created symlink global.wallets.toml -> {}",
                     "✓".green(),
-                    symlink_path.display(),
                     config_path.display()
                 );
             }
@@ -1313,10 +1314,15 @@ fn new_wallet(
 
         println!("{}", serde_json::to_string_pretty(&output)?);
     } else {
+        let config_label = if is_global {
+            "global.wallets.toml"
+        } else {
+            "wallets.toml"
+        };
         println!(
             "{} Wallet successfully created and added to {}",
             "✓".green(),
-            config_path.display().cyan(),
+            config_label.cyan(),
         );
         println!("{} Wallet address is {}", "✓".green(), wallet_address);
 
@@ -1465,10 +1471,15 @@ fn import_wallet(
             }))?
         );
     } else {
+        let config_label = if is_global {
+            "global.wallets.toml"
+        } else {
+            "wallets.toml"
+        };
         println!(
             "\n{} Wallet successfully created and added to {}",
             "✓".green(),
-            config_path.display().cyan(),
+            config_label.cyan(),
         );
         println!("{} Wallet address is {}", "✓".green(), wallet_address);
         if use_secure_store {
