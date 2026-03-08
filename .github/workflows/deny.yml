@@ -6,9 +6,10 @@ on:
       - master
     paths:
       - "Cargo.toml"
-      - "**/Cargo.toml"
       - "Cargo.lock"
+      - "**/Cargo.toml"
       - "**/Cargo.lock"
+      - "deny.toml"
   push:
     branches:
       - master
@@ -28,7 +29,6 @@ jobs:
       matrix:
         os: [ ubicloud-standard-4-ubuntu-2204 ]
     runs-on: ${{ matrix.os }}
-    if: true
 
     steps:
       - name: Check out Acton repository

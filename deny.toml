@@ -26,6 +26,12 @@ highlight = "all"
 workspace-default-features = "allow"
 external-default-features = "allow"
 
+[bans.workspace-dependencies]
+duplicates = "deny"
+include-path-dependencies = true
+unused = "deny"
+
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+unused-allowed-source = "deny"
