@@ -1,5 +1,5 @@
+use crate::pretty::RcDoc;
 use crate::{Context, comments, common, stmts, types};
-use pretty::RcDoc;
 use tolk_syntax::*;
 use tree_sitter::Node;
 

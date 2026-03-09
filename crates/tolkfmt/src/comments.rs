@@ -1,5 +1,5 @@
+use crate::pretty::RcDoc;
 use crate::{Context, common};
-use pretty::RcDoc;
 use std::collections::HashMap;
 use tree_sitter::Node;
 

@@ -11,13 +11,17 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-pretty = { workspace = true }
 tolk-syntax = { workspace = true }
 tree-sitter = { workspace = true }
 anyhow = { workspace = true }
+arrayvec = "0.7.6"
+typed-arena = "2.0.2"
+unicode-width = "0.2.0"
+termcolor = "1.4.1"
 
 [dev-dependencies]
 expect-test = { workspace = true }
+difference = "2.0.0"
 
 [lints]
 workspace = true

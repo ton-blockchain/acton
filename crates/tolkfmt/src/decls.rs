@@ -1,5 +1,5 @@
+use crate::pretty::RcDoc;
 use crate::{Context, comments, common, exprs, stmts, types};
-use pretty::RcDoc;
 use tolk_syntax::{
     Annotation, AnnotationArgs, AnnotationList, AsmBody, AstNode, Constant, Contract, ContractBody,
     ContractField, ContractFieldValue, Enum, EnumBody, EnumMember, Expr, Func, FuncBody,

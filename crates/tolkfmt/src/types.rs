@@ -1,5 +1,5 @@
+use crate::pretty::RcDoc;
 use crate::{Context, comments, common};
-use pretty::RcDoc;
 use tolk_syntax::{
     FunCallableType, NullableType, ParenthesizedType, TensorType, TupleType, Type,
     TypeInstantiatedTs, UnionType,
