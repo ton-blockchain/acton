@@ -524,12 +524,11 @@ pub fn print_function<'a>(ctx: &Context<'_>, func: &Func) -> Option<RcDoc<'a>> {
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FuncBody::Block(_));
-    if is_special {
-        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
-    } else {
+    if should_print_inline_function_body(ctx, &body) {
         parts.push(RcDoc::space());
         parts.push(print_function_body(ctx, &body)?);
+    } else {
+        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     }
 
     Some(RcDoc::concat(parts))
@@ -567,12 +566,11 @@ pub fn print_method_declaration<'a>(ctx: &Context<'_>, m: &Method) -> Option<RcD
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FuncBody::Block(_));
-    if is_special {
-        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
-    } else {
+    if should_print_inline_function_body(ctx, &body) {
         parts.push(RcDoc::space());
         parts.push(print_function_body(ctx, &body)?);
+    } else {
+        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     }
 
     Some(RcDoc::concat(parts))
@@ -599,12 +597,11 @@ pub fn print_get_method_declaration<'a>(ctx: &Context, g: &GetMethod) -> Option<
         parts.push(types::print_type(ctx, &ret)?);
     }
 
-    let is_special = !matches!(body, FuncBody::Block(_));
-    if is_special {
-        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
-    } else {
+    if should_print_inline_function_body(ctx, &body) {
         parts.push(RcDoc::space());
         parts.push(print_function_body(ctx, &body)?);
+    } else {
+        parts.push(RcDoc::concat([RcDoc::hardline(), print_function_body(ctx, &body)?]).nest(4));
     }
 
     Some(RcDoc::concat(parts))
@@ -615,6 +612,33 @@ pub fn print_method_receiver<'a>(ctx: &Context<'_>, r: &MethodReceiver) -> Optio
     let typ = r.typ()?;
     let typ_doc = types::print_type(ctx, &typ)?;
     Some(RcDoc::concat([typ_doc, RcDoc::text(".")]))
+}
+
+fn should_print_inline_function_body(ctx: &Context<'_>, body: &FuncBody<'_>) -> bool {
+    match body {
+        FuncBody::Block(_) => true,
+        FuncBody::AsmBody(asm) => is_single_triple_quoted_asm_body(ctx, asm),
+        _ => false,
+    }
+}
+
+fn is_single_triple_quoted_asm_body(ctx: &Context<'_>, asm: &AsmBody<'_>) -> bool {
+    let mut instructions = asm.instructions();
+    let Some(first) = instructions.next() else {
+        return false;
+    };
+    if instructions.next().is_some() {
+        return false;
+    }
+
+    first
+        .0
+        .utf8_text(ctx.code.as_ref().as_ref())
+        .ok()
+        .is_some_and(|text| {
+            let trimmed = text.trim();
+            trimmed.starts_with("\"\"\"") && trimmed.ends_with("\"\"\"")
+        })
 }
 
 pub trait ParameterTrait {
@@ -846,13 +870,26 @@ pub fn print_asm_body<'a>(ctx: &Context<'_>, asm: &AsmBody) -> Option<RcDoc<'a>>
 
     let instructions: Vec<_> = asm.instructions().collect();
     let mut inst_docs = vec![];
+    let keep_first_instruction_inline = instructions.len() == 1
+        && instructions[0]
+            .0
+            .utf8_text(ctx.code.as_ref().as_ref())
+            .ok()
+            .is_some_and(|text| {
+                let trimmed = text.trim();
+                trimmed.starts_with("\"\"\"") && trimmed.ends_with("\"\"\"")
+            });
 
     for (i, inst) in instructions.iter().enumerate() {
         let node = &inst.0;
         let comments = ctx.comments.get(node);
 
         if i == 0 {
-            inst_docs.push(RcDoc::line());
+            if keep_first_instruction_inline {
+                inst_docs.push(RcDoc::space());
+            } else {
+                inst_docs.push(RcDoc::line());
+            }
         }
 
         comments::print_leading_comments(ctx, &mut inst_docs, comments);

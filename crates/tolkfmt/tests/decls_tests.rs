@@ -888,6 +888,36 @@ fn test_asm_body() {
 }
 
 #[test]
+fn test_multiline_string_asm_stays_after_keyword_when_single_literal() {
+    check(
+        "fun codeCell(): cell asm \"\"\"\n    \"te6ccgEBAQEAAgAAAA==\" base64>B B>boc PUSHREF\n\"\"\"",
+        expect![[r#"
+            fun codeCell(): cell asm """
+                "te6ccgEBAQEAAgAAAA==" base64>B B>boc PUSHREF
+            """"#]],
+    );
+}
+
+#[test]
+fn test_single_line_triple_quoted_asm_stays_after_keyword() {
+    check(
+        "fun codeCell(): cell asm \"\"\"PUSHNULL\"\"\"",
+        expect![[r#"
+            fun codeCell(): cell asm """PUSHNULL""""#]],
+    );
+}
+
+#[test]
+fn test_multiple_string_literals_after_asm_break_after_keyword() {
+    check(
+        "fun codeCell(): cell asm \"\"\"PUSHNULL\"\"\" \"DROP\"",
+        expect![[r#"
+            fun codeCell(): cell
+                asm """PUSHNULL""" "DROP""#]],
+    );
+}
+
+#[test]
 fn test_builtin_function() {
     check(
         "fun hash(): int builtin",
