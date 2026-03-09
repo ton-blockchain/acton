@@ -3297,7 +3297,6 @@ dependencies = [
  "arrayvec",
  "difference",
  "expect-test",
- "termcolor",
  "tolk-syntax",
  "tree-sitter",
  "typed-arena",

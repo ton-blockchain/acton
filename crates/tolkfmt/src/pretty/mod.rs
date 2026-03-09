@@ -1,15 +1,17 @@
-pub extern crate termcolor;
+//! Simplified vendored variant of pretty.rs:
+//! https://github.com/Marwes/pretty.rs
+//!
+//! Adapted for tolkfmt and extended with `break parent` support via
+//! `Doc::BreakParent`.
 use std::{
     borrow::Cow,
     fmt, io,
     ops::{Add, AddAssign, Deref},
     rc::Rc,
 };
-use termcolor::{ColorSpec, WriteColor};
 
 mod render;
 
-pub use self::render::TermColored;
 pub use self::render::{FmtWrite, IoWrite, Render, RenderAnnotated};
 
 /// The concrete document type. This type is not meant to be used directly. Instead use the static
@@ -577,19 +579,6 @@ where
     #[inline]
     pub const fn pretty<'d>(&'d self, width: usize) -> PrettyFmt<'a, 'd, T, A> {
         PrettyFmt { doc: self, width }
-    }
-}
-
-impl<'a, T> Doc<'a, T, ColorSpec>
-where
-    T: DocPtr<'a, ColorSpec> + 'a,
-{
-    #[inline]
-    pub fn render_colored<W>(&self, width: usize, out: W) -> io::Result<()>
-    where
-        W: WriteColor,
-    {
-        render::best(self, width, &mut TermColored::new(out))
     }
 }
 

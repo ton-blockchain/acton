@@ -1,8 +1,5 @@
-use std::{cmp, fmt, io};
-
-use termcolor::{ColorSpec, WriteColor};
-
 use crate::pretty::{Doc, DocPtr};
+use std::{cmp, fmt, io};
 
 /// Trait representing the operations necessary to render a document
 pub trait Render {
@@ -110,57 +107,6 @@ where
 
     fn pop_annotation(&mut self) -> Result<(), Self::Error> {
         Ok(())
-    }
-}
-
-pub struct TermColored<W> {
-    color_stack: Vec<ColorSpec>,
-    upstream: W,
-}
-
-impl<W> TermColored<W> {
-    pub const fn new(upstream: W) -> TermColored<W> {
-        TermColored {
-            color_stack: Vec::new(),
-            upstream,
-        }
-    }
-}
-
-impl<W> Render for TermColored<W>
-where
-    W: io::Write,
-{
-    type Error = io::Error;
-
-    fn write_str(&mut self, s: &str) -> io::Result<usize> {
-        self.upstream.write(s.as_bytes())
-    }
-
-    fn write_str_all(&mut self, s: &str) -> io::Result<()> {
-        self.upstream.write_all(s.as_bytes())
-    }
-
-    fn fail_doc(&self) -> Self::Error {
-        io::Error::other("Document failed to render")
-    }
-}
-
-impl<W> RenderAnnotated<'_, ColorSpec> for TermColored<W>
-where
-    W: WriteColor,
-{
-    fn push_annotation(&mut self, color: &ColorSpec) -> Result<(), Self::Error> {
-        self.color_stack.push(color.clone());
-        self.upstream.set_color(color)
-    }
-
-    fn pop_annotation(&mut self) -> Result<(), Self::Error> {
-        self.color_stack.pop();
-        match self.color_stack.last() {
-            Some(previous) => self.upstream.set_color(previous),
-            None => self.upstream.reset(),
-        }
     }
 }
 
