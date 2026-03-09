@@ -1,6 +1,6 @@
 use crate::comments::CommentKind;
+use crate::pretty::RcDoc;
 use crate::{Context, comments};
-use pretty::RcDoc;
 use tree_sitter::Node;
 
 pub struct ListOptions<'a> {
@@ -345,7 +345,7 @@ pub fn doc_width(doc: &RcDoc) -> usize {
         last_line_len: usize,
     }
 
-    impl pretty::Render for MeasureWriter {
+    impl crate::pretty::Render for MeasureWriter {
         type Error = std::fmt::Error;
 
         fn write_str(&mut self, s: &str) -> Result<usize, Self::Error> {
@@ -364,7 +364,7 @@ pub fn doc_width(doc: &RcDoc) -> usize {
         }
     }
 
-    impl<'a, A> pretty::RenderAnnotated<'a, A> for MeasureWriter {
+    impl<'a, A> crate::pretty::RenderAnnotated<'a, A> for MeasureWriter {
         fn push_annotation(&mut self, _: &'a A) -> Result<(), Self::Error> {
             Ok(())
         }

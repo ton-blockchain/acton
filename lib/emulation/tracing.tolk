@@ -1,5 +1,5 @@
-import "network"
 import "../ffi/ffi"
+import "network"
 
 /// Utilities for naming and organizing traces produced in tests.
 struct tracing

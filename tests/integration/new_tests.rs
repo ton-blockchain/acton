@@ -296,6 +296,18 @@ fn test_new_empty_project_full_flow() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_new_empty_project_full_flow_check.stderr.txt",
         );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_empty_project_full_flow_fmt.stdout.txt",
+        );
 }
 
 #[test]
@@ -370,6 +382,18 @@ fn test_new_counter_project_full_flow() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_new_counter_project_full_flow_check.stderr.txt",
         );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_counter_project_full_flow_fmt.stdout.txt",
+        );
 }
 
 #[test]
@@ -443,6 +467,18 @@ fn test_new_jetton_project_full_flow() {
         .success()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_new_jetton_project_full_flow_check.stderr.txt",
+        );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_jetton_project_full_flow_fmt.stdout.txt",
         );
 }
 

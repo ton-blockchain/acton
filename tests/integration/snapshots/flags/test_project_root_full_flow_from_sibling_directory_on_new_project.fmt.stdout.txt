@@ -1,4 +1,1 @@
-Formatted ../generated-project/tests/contract.test.tolk
-Formatted ../generated-project/scripts/deploy.tolk
-
-Done: 2 files formatted
+All files are already formatted

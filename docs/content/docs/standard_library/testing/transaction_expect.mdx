@@ -42,7 +42,10 @@ expect(failResults).toHaveFailedTx({
 ## `Expectation<SendResultList>.toHaveSuccessfulDeploy`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(self, params: SearchParams = {}): void
+fun Expectation<SendResultList>.toHaveSuccessfulDeploy<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
 ```
 
 Expect the transaction list to have a successful deploy transaction.
@@ -63,7 +66,10 @@ expect(txs).toHaveSuccessfulDeploy({
 ## `Expectation<SendResultList>.toHaveSuccessfulTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(self, params: SearchParams = {}): void
+fun Expectation<SendResultList>.toHaveSuccessfulTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
 ```
 
 Expect the transaction list to have a successful transaction.
@@ -84,7 +90,7 @@ expect(txs).toHaveSuccessfulTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L89" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L92" />
 
 ## `Expectation<SendResultList>.toHaveTx`
 
@@ -107,7 +113,7 @@ expect(txs).toHaveTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L125" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L131" />
 
 ## `Expectation<SendResultList>.toNotHaveTx`
 
@@ -125,12 +131,15 @@ expect(txs).toNotHaveTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L152" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L158" />
 
 ## `Expectation<SendResultList>.toHaveBouncedTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(self, params: SearchParams = {}): void
+fun Expectation<SendResultList>.toHaveBouncedTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
 ```
 
 Expect the transaction list to have a **bounced** transaction.
@@ -143,12 +152,15 @@ expect(txs).toHaveBouncedTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L179" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L185" />
 
 ## `Expectation<SendResultList>.toHaveFailedTx`
 
 ```tolk
-fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(self, params: SearchParams = {}): void
+fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
+    self,
+    params: SearchParams = {},
+): void
 ```
 
 Expect the transaction list to have a **failed** transaction.
@@ -169,7 +181,7 @@ expect(txs).toHaveFailedTx({
 });
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L215" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L224" />
 
 ## `Expectation<SendResultList>.toHaveAllSuccessfulTxs`
 
@@ -185,7 +197,7 @@ val results = net.send(wallet.address, msg);
 expect(results).toHaveAllSuccessfulTxs();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L247" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L263" />
 
 ## `Expectation<SendResultList>.toEmitExternalMessage`
 
@@ -200,7 +212,7 @@ Example:
 expect(txs).toEmitExternalMessage<IncreaseCounter>();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L271" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L285" />
 
 ## `Expectation<SendResult>.toConsumeLessThan`
 
@@ -216,7 +228,7 @@ val result = net.send(deployer.address, message);
 expect(result.at(0)).toConsumeLessThan(1000);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L307" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L321" />
 
 ## `T.getDeclaredPackPrefix`
 
@@ -224,5 +236,5 @@ expect(result.at(0)).toConsumeLessThan(1000);
 fun T.getDeclaredPackPrefix(): int
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L317" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/transaction_expect.tolk#L331" />
 

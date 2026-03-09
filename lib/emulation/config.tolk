@@ -325,7 +325,9 @@ const BASECHAIN_GAS_PRICES_INDEX = 21
 ///
 /// This mutates only the local [Config] value until you call [net.setConfig].
 fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int): void {
-    val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
+    val index = chainType == MASTERCHAIN
+        ? MASTERCHAIN_GAS_PRICES_INDEX
+        : BASECHAIN_GAS_PRICES_INDEX;
     self.set(index, prices.toCell());
 }
 
@@ -344,7 +346,9 @@ fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int): void {
 /// println1("Gas limit basechain: {}", gasPrices);
 /// ```
 fun Config.getGasPrices(self, chainType: int): GasPrices {
-    val index = chainType == MASTERCHAIN ? MASTERCHAIN_GAS_PRICES_INDEX : BASECHAIN_GAS_PRICES_INDEX;
+    val index = chainType == MASTERCHAIN
+        ? MASTERCHAIN_GAS_PRICES_INDEX
+        : BASECHAIN_GAS_PRICES_INDEX;
     return GasPrices.fromCell(self.get(index).loadValue());
 }
 
@@ -458,10 +462,12 @@ struct (0xc0) PrecompiledContractsConfig {
 ///
 /// Returns `true` when a new entry is inserted.
 /// Returns `false` for duplicate `hash` values, and keeps the original `gasUsage` unchanged.
-fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64): bool {
-    return self.list.addIfNotExists(hash, {
-        gasUsage: gasForComputePhase,
-    });
+fun PrecompiledContractsConfig.addContractGas(
+    mutate self,
+    hash: uint256,
+    gasForComputePhase: uint64,
+): bool {
+    return self.list.addIfNotExists(hash, { gasUsage: gasForComputePhase });
 }
 
 /// Sets the precompiled contracts configuration (Param 45).
@@ -486,7 +492,10 @@ fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasFor
 ///     Assert.fail("Failed to apply config");
 /// }
 /// ```
-fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: PrecompiledContractsConfig): void {
+fun Config.setPrecompiledContractsConfig(
+    mutate self,
+    precompiledConfig: PrecompiledContractsConfig,
+): void {
     self.set(PRECOMPILED_CONTRACTS_CONFIG_INDEX, precompiledConfig.toCell());
 }
 
@@ -506,6 +515,7 @@ fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: Precomp
 /// val contractsList = precompiledConfig.list;
 /// ```
 fun Config.getPrecompiledContractsConfig(self): PrecompiledContractsConfig {
-    return PrecompiledContractsConfig.fromCell(self.get(PRECOMPILED_CONTRACTS_CONFIG_INDEX)
-        .loadValue());
+    return PrecompiledContractsConfig.fromCell(
+        self.get(PRECOMPILED_CONTRACTS_CONFIG_INDEX).loadValue(),
+    );
 }

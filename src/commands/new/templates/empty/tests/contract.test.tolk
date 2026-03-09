@@ -4,6 +4,5 @@
 
 get fun `test something important`() {
     // val (contract, deployer, _) = setupTest();
-
     // write your tests here
 }

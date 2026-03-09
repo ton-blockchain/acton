@@ -53,15 +53,15 @@ struct Assert
 /// with automatic location tracking.
 fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: string = ""): void {
     if (
-    !ffi.assertBin(
-        "==",
-        reflect.typeNameOfObject(left),
-        left.toTuple(),
-        reflect.typeNameOfObject(right),
-        right.toTuple(),
-        message,
-        location
-    )
+        !ffi.assertBin(
+            "==",
+            reflect.typeNameOfObject(left),
+            left.toTuple(),
+            reflect.typeNameOfObject(right),
+            right.toTuple(),
+            message,
+            location,
+        )
     ) {
         throw ASSERTION_FAILED;
     }
@@ -75,17 +75,22 @@ fun Assert.equal<V1, V2>(left: V1, right: V2, message: string = "", location: st
 ///
 /// This is a low-level function. Expectation API provides a higher-level interface
 /// with automatic location tracking.
-fun Assert.notEqual<V1, V2>(left: V1, right: V2, message: string = "", location: string = ""): void {
+fun Assert.notEqual<V1, V2>(
+    left: V1,
+    right: V2,
+    message: string = "",
+    location: string = "",
+): void {
     if (
-    !ffi.assertBin(
-        "!=",
-        reflect.typeNameOfObject(left),
-        left.toTuple(),
-        reflect.typeNameOfObject(right),
-        right.toTuple(),
-        message,
-        location
-    )
+        !ffi.assertBin(
+            "!=",
+            reflect.typeNameOfObject(left),
+            left.toTuple(),
+            reflect.typeNameOfObject(right),
+            right.toTuple(),
+            message,
+            location,
+        )
     ) {
         throw ASSERTION_FAILED;
     }
@@ -178,7 +183,7 @@ fun Assert.consumesLessThan2<Ret, Arg1, Arg2>(
     fn: (Arg1, Arg2) -> Ret,
     arg1: Arg1,
     arg2: Arg2,
-    expected: int
+    expected: int,
 ): Ret {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2);
@@ -212,7 +217,7 @@ fun Assert.consumesLessThan3<Ret, Arg1, Arg2, Arg3>(
     arg1: Arg1,
     arg2: Arg2,
     arg3: Arg3,
-    expected: int
+    expected: int,
 ): Ret {
     val start = getGasConsumedAtTheMoment();
     val result = fn(arg1, arg2, arg3);
@@ -240,16 +245,14 @@ fun Assert.failWalletNotFound(walletName: string, location: string = ""): never 
 ///
 /// This is a low-level function. Expectation API provides a higher-level interface
 /// with automatic location tracking.
-fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "", location: string = ""): void {
-    if (
-        !ffi.assertDecimal(
-            location,
-            message,
-            decimals,
-            right,
-            left
-        )
-    ) {
+fun Assert.equalDecimal<T>(
+    left: T,
+    right: T,
+    decimals: int,
+    message: string = "",
+    location: string = "",
+): void {
+    if (!ffi.assertDecimal(location, message, decimals, right, left)) {
         throw ASSERTION_FAILED;
     }
 }
@@ -261,7 +264,13 @@ fun Assert.equalDecimal<T>(left: T, right: T, decimals: int, message: string = "
 fun ffi.assertConsumedLess(start: int, end: int, expected: int): void {
     val consumed = end - start - 26; // 26 gas cost of GASCONSUMED
     if (consumed > expected) {
-        Assert.fail(format2("Gas consumption was expected to be less than or equal to {}, but {} was consumed", expected, consumed))
+        Assert.fail(
+            format2(
+                "Gas consumption was expected to be less than or equal to {}, but {} was consumed",
+                expected,
+                consumed,
+            ),
+        );
     }
 }
 
