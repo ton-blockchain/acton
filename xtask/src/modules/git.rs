@@ -19,7 +19,9 @@ impl Git {
     }
 
     pub(crate) fn has_uncommitted_changes(&self) -> Result<bool> {
-        Ok(!self.output(&["status", "--porcelain"])?.is_empty())
+        Ok(!self
+            .output(&["status", "--porcelain", "--untracked-files=no"])?
+            .is_empty())
     }
 
     pub(crate) fn commit_count_between(&self, from: &str, to: &str) -> Result<usize> {
