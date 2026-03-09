@@ -20,7 +20,6 @@ unicode-width = "0.2.0"
 
 [dev-dependencies]
 expect-test = { workspace = true }
-difference = "2.0.0"
 
 [lints]
 workspace = true

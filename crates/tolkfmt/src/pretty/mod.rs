@@ -1493,7 +1493,7 @@ mod tests {
         ($size:expr, $actual:expr, $expected:expr) => {
             let mut s = String::new();
             $actual.render_fmt($size, &mut s).unwrap();
-            difference::assert_diff!(&s, $expected, "\n", 0);
+            assert_eq!(s, $expected);
         };
         ($actual:expr, $expected:expr) => {
             test!(70, $actual, $expected)
@@ -1883,7 +1883,7 @@ mod tests {
         actual
             .render_raw(70, &mut TestWriter::new(FmtWrite::new(&mut s)))
             .unwrap();
-        difference::assert_diff!(&s, "[[abc]]", "\n", 0);
+        assert_eq!(s, "[[abc]]");
     }
 
     #[test]
