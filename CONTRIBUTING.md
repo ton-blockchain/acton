@@ -303,13 +303,36 @@ just precommit
 
 `just precommit` additionally runs UI formatting/lint and full build steps.
 
-For release PRs (or release branch prep), make sure versions are synchronized:
+## Release workflow (maintainers)
 
-- `Acton.toml` (`package.version`)
-- `Cargo.toml` (`workspace.package.version`)
-- `package.json` (`version`)
+Use the release `xtask` instead of manual version bump/tag/release steps:
 
-Release tags must use `v<version>` format and match those files.
+```bash
+cargo xtask release --version <major.minor.patch>
+```
+
+Example:
+
+```bash
+cargo xtask release --version 0.22.0
+```
+
+Prerequisites:
+
+- `gh` CLI installed and authenticated (`gh auth status`)
+- `yq` v4 installed (the `xtask` uses it to update `package.json`)
+- local `master` branch with no uncommitted changes
+
+What `cargo xtask release` does:
+
+- validates version format (`X.Y.Z`) and that `vX.Y.Z` does not exist on `origin`
+- fetches `origin/master` and checks local `master` is up to date
+- verifies GitHub Actions runs for current `master` `HEAD` are all successful
+- bumps versions in `Acton.toml`, `Cargo.toml`, and `package.json`
+- runs `cargo update --workspace` to refresh `Cargo.lock`
+- creates commit `chore(acton): bump to version \`X.Y.Z\`` and tag `vX.Y.Z`
+- asks for explicit confirmation (`yes`) before pushing `master` and the tag
+- pushes to `origin` and creates GitHub Release with generated notes
 
 ## Commit message style
 
