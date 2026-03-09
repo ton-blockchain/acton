@@ -1,0 +1,1 @@
+Error: git core.hooksPath is set to custom-hooks, expected .githooks

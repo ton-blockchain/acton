@@ -13,6 +13,7 @@ Commands:
   fmt              [PATHS...]          Format Tolk source files
 
   wallet           <COMMAND>           Manage wallets
+  hooks            <COMMAND>           Manage git hooks for the current project
   verify           [CONTRACT_ID]       Verify contract source code on verifier.ton.org
   library          <COMMAND>           Manage TON libraries
   litenode         <COMMAND>           Manage lightweight TON node

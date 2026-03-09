@@ -1,0 +1,3 @@
+#!/bin/sh
+acton check
+acton fmt --check

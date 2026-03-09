@@ -102,3 +102,8 @@
           - "Cargo.lock"
           - "**/Cargo.toml"
           - "**/Cargo.lock"
+
+"hooks":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/commands/hooks/**"

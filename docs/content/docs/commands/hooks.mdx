@@ -1,0 +1,133 @@
+---
+title: "Managing Git Hooks"
+description: "Learn how to scaffold and manage project-local Git hooks with Acton"
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+
+The `hooks` command helps you manage project-local Git hooks through Git's
+`core.hooksPath` setting. Acton expects hooks to live in `.githooks/` in the
+current project.
+
+## Commands
+
+### `acton hooks new`
+
+Creates a `.githooks/` scaffold in the current project.
+
+```bash
+acton hooks new
+```
+
+If `--template` is omitted, Acton opens an interactive selector with two
+options:
+
+- `empty` creates an empty `.githooks/pre-commit`
+- `ready` creates `.githooks/pre-commit` with a starter hook:
+
+```sh
+#!/bin/sh
+acton check
+acton fmt --check
+```
+
+#### Options
+
+| Option                      | Type   | Description                      |
+|-----------------------------|--------|----------------------------------|
+| `--template <empty\|ready>` | String | Hook scaffold template to create |
+
+#### Examples
+
+```bash
+# Choose template interactively
+acton hooks new
+
+# Create an empty pre-commit hook
+acton hooks new --template empty
+
+# Create a ready-made pre-commit hook
+acton hooks new --template ready
+```
+
+<Callout type="warn">
+If `.githooks/` already exists, `acton hooks new` fails instead of overwriting
+existing hooks.
+</Callout>
+
+---
+
+### `acton hooks install`
+
+Configures the current Git repository to use `.githooks/`:
+
+```bash
+acton hooks install
+```
+
+Internally this runs:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+On success, Acton prints:
+
+```text
+Git hooks installed successfully from .githooks
+```
+
+---
+
+### `acton hooks status`
+
+Checks whether the current Git repository already points `core.hooksPath` to
+`.githooks`:
+
+```bash
+acton hooks status
+```
+
+Possible outcomes:
+
+- success if `git config --get core.hooksPath` returns `.githooks`
+- error if `core.hooksPath` is unset
+- error if `core.hooksPath` points to a different directory
+
+Example success output:
+
+```text
+git core.hooksPath is set to .githooks
+```
+
+---
+
+### `acton hooks uninstall`
+
+Removes the `core.hooksPath` override from the current Git repository:
+
+```bash
+acton hooks uninstall
+```
+
+Internally this runs:
+
+```bash
+git config --unset core.hooksPath
+```
+
+On success, Acton prints:
+
+```text
+Git hooks uninstalled successfully
+```
+
+## Recommended Workflow
+
+```bash
+acton hooks new --template ready
+acton hooks install
+acton hooks status
+```
+
+After that, Git runs hooks from `.githooks/` for the current repository.

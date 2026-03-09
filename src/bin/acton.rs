@@ -8,6 +8,7 @@ use acton::commands::docgen::docgen_cmd;
 use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
 use acton::commands::func2tolk::{default_func2tolk_version, func2tolk_cmd};
+use acton::commands::hooks::{HooksCommand, hooks_cmd};
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
@@ -115,6 +116,14 @@ enum Commands {
     Wallet {
         #[command(subcommand)]
         command: WalletCommand,
+    },
+    #[command(
+        about = "Manage git hooks for the current project",
+        after_help = example_hooks_usage()
+    )]
+    Hooks {
+        #[command(subcommand)]
+        command: HooksCommand,
     },
     #[command(
         about = "Execute tests in file or directory",
@@ -1313,6 +1322,18 @@ fn example_wallet_usage() -> StyledStr {
     )
 }
 
+fn example_hooks_usage() -> StyledStr {
+    format_examples(
+        &[
+            ("Create hook scaffold interactively", "acton hooks new"),
+            ("Set git core.hooksPath to .githooks", "acton hooks install"),
+            ("Check git core.hooksPath", "acton hooks status"),
+            ("Unset git core.hooksPath", "acton hooks uninstall"),
+        ],
+        "",
+    )
+}
+
 fn example_wrapper_usage() -> StyledStr {
     format_examples(
         &[
@@ -1543,6 +1564,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
     ];
     let blockchain_commands = vec![
         ("wallet", "<COMMAND>"),
+        ("hooks", "<COMMAND>"),
         ("verify", "[CONTRACT_ID]"),
         ("library", "<COMMAND>"),
         ("litenode", "<COMMAND>"),
@@ -1870,6 +1892,7 @@ fn main() {
     let result = match command {
         Commands::Init => init_cmd(),
         Commands::Wallet { command } => wallet_cmd(command),
+        Commands::Hooks { command } => hooks_cmd(command),
         Commands::New {
             path,
             name,

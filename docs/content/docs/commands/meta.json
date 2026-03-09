@@ -1,6 +1,7 @@
 {
   "pages": [
     "new",
+    "hooks",
     "compile",
     "wrapper",
     "disasm",
