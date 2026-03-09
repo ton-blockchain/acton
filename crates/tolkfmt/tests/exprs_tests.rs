@@ -1891,6 +1891,26 @@ fn test_complex_expression_combination_with_breaking() {
     check_with_width(
         r#"
         fun main() {
+            val actionsCell = beginCell()
+                .storeUint(0, 1)   // no c5 actions
+                .storeUint(1, 1)   // has extra actions
+                .storeSlice(setDataAction.beginParse())
+                .endCell();
+        }
+        "#,
+        expect![[r#"
+            fun main() {
+                val actionsCell = beginCell()
+                    .storeUint(0, 1) // no c5 actions
+                    .storeUint(1, 1) // has extra actions
+                    .storeSlice(setDataAction.beginParse())
+                    .endCell();
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun main() {
             val minWithForward = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
             MIN_EDGE_DELTA;
         }

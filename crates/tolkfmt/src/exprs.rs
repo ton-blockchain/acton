@@ -46,6 +46,7 @@ struct MethodChainDoc<'a> {
 struct MethodChainLink<'a> {
     doc: RcDoc<'a>,
     has_leading_comments: bool,
+    has_inline_line_comments: bool,
 }
 
 fn wrap_doc_with_node_comments<'a>(
@@ -81,13 +82,27 @@ fn has_leading_comments_on_node(ctx: &Context<'_>, node: Node<'_>) -> bool {
     })
 }
 
+fn has_inline_line_comments_on_node(ctx: &Context<'_>, node: Node<'_>) -> bool {
+    ctx.comments.get(&node).is_some_and(|comments| {
+        comments.iter().any(|comment| {
+            comment.kind == comments::CommentKind::Inline
+                && comment.nodes.iter().any(|comment_node| {
+                    comment_node
+                        .utf8_text(ctx.code.as_ref().as_ref())
+                        .ok()
+                        .is_some_and(|text| text.trim_start().starts_with("//"))
+                })
+        })
+    })
+}
+
 fn print_node_with_detached_leading_comments<'a>(
     ctx: &Context<'_>,
     node: Node<'_>,
-) -> Option<(RcDoc<'a>, RcDoc<'a>, bool)> {
+) -> Option<(RcDoc<'a>, RcDoc<'a>, bool, bool)> {
     let comments = ctx.comments.get(&node);
     if comments.is_none() {
-        return Some((RcDoc::nil(), common::print_node_text(ctx, &node)?, false));
+        return Some((RcDoc::nil(), common::print_node_text(ctx, &node)?, false, false));
     }
 
     let mut leading_docs = vec![];
@@ -97,10 +112,12 @@ fn print_node_with_detached_leading_comments<'a>(
     comments::print_inline_comments(ctx, &mut body_docs, comments);
 
     let has_leading_comments = !leading_docs.is_empty();
+    let has_inline_line_comments = has_inline_line_comments_on_node(ctx, node);
     Some((
         RcDoc::concat(leading_docs),
         RcDoc::concat(body_docs),
         has_leading_comments,
+        has_inline_line_comments,
     ))
 }
 
@@ -114,19 +131,25 @@ fn collect_method_chain_doc<'a>(
             let obj = dot.obj()?;
             let mut chain = collect_method_chain_doc(ctx, &obj, true)?;
 
-            let (field_leading_comments_doc, field_doc, field_has_leading_comments) =
-                match dot.field()? {
-                    DotAccessField::Ident(i) => {
-                        print_node_with_detached_leading_comments(ctx, i.0)?
-                    }
-                    DotAccessField::NumericIndex(n) => {
-                        print_node_with_detached_leading_comments(ctx, n.0)?
-                    }
-                };
+            let (
+                field_leading_comments_doc,
+                field_doc,
+                field_has_leading_comments,
+                field_has_inline_line_comments,
+            ) = match dot.field()? {
+                DotAccessField::Ident(i) => print_node_with_detached_leading_comments(ctx, i.0)?,
+                DotAccessField::NumericIndex(n) => {
+                    print_node_with_detached_leading_comments(ctx, n.0)?
+                }
+            };
 
             let dot_has_leading_comments =
                 include_expr_comments && has_leading_comments_on_node(ctx, dot.syntax());
+            let dot_has_inline_line_comments =
+                include_expr_comments && has_inline_line_comments_on_node(ctx, dot.syntax());
             let has_leading_comments = field_has_leading_comments || dot_has_leading_comments;
+            let has_inline_line_comments =
+                field_has_inline_line_comments || dot_has_inline_line_comments;
 
             let link_doc = if field_has_leading_comments {
                 RcDoc::concat([field_leading_comments_doc, RcDoc::text("."), field_doc])
@@ -144,6 +167,7 @@ fn collect_method_chain_doc<'a>(
             chain.links.push(MethodChainLink {
                 doc: dot_doc,
                 has_leading_comments,
+                has_inline_line_comments,
             });
             chain.has_dot_link = true;
             Some(chain)
@@ -165,6 +189,9 @@ fn collect_method_chain_doc<'a>(
                     let call_has_leading_comments =
                         include_expr_comments && has_leading_comments_on_node(ctx, call.syntax());
                     last.has_leading_comments |= call_has_leading_comments;
+                    let call_has_inline_line_comments =
+                        include_expr_comments && has_inline_line_comments_on_node(ctx, call.syntax());
+                    last.has_inline_line_comments |= call_has_inline_line_comments;
                 } else {
                     chain.base = chain.base.append(args_doc);
                 }
@@ -204,9 +231,10 @@ fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<R
     let keep_single_link_attached = chain.links.len() == 1;
 
     let mut tail = Vec::with_capacity(chain.links.len() * 3);
+    let mut previous_has_inline_line_comments = false;
     for (index, link) in chain.links.into_iter().enumerate() {
-        let separator = if link.has_leading_comments {
-            RcDoc::line_()
+        let separator = if previous_has_inline_line_comments || link.has_leading_comments {
+            RcDoc::hardline()
         } else if index == 0 && (chain.base_is_object_lit || keep_single_link_attached) {
             RcDoc::nil()
         } else {
@@ -215,6 +243,7 @@ fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<R
         tail.push(separator);
         // If a part of the chain breaks, force parent groups to break too.
         tail.push(RcDoc::break_parent().flat_alt(RcDoc::nil()));
+        previous_has_inline_line_comments = link.has_inline_line_comments;
         tail.push(link.doc);
     }
 
