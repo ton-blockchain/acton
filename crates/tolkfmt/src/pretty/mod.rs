@@ -1,157 +1,14 @@
-//! This crate defines a
-//! [Wadler-style](http://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf)
-//! pretty-printing API.
-//!
-//! Start with the static functions of [Doc](enum.Doc.html).
-//!
-//! ## Quick start
-//!
-//! Let's pretty-print simple sexps!  We want to pretty print sexps like
-//!
-//! ```lisp
-//! (1 2 3)
-//! ```
-//! or, if the line would be too long, like
-//!
-//! ```lisp
-//! ((1)
-//!  (2 3)
-//!  (4 5 6))
-//! ```
-//!
-//! A _simple symbolic expression_ consists of a numeric _atom_ or a nested ordered _list_ of
-//! symbolic expression children.
-//!
-//! ```rust
-//! # use crate::pretty::*;
-//! enum SExp {
-//!     Atom(u32),
-//!     List(Vec<SExp>),
-//! }
-//! use SExp::*;
-//! # fn main() { }
-//! ```
-//!
-//! We define a simple conversion to a [Doc](enum.Doc.html).  Atoms are rendered as strings; lists
-//! are recursively rendered, with spaces between children where appropriate.  Children are
-//! [nested]() and [grouped](), allowing them to be laid out in a single line as appropriate.
-//!
-//! ```rust
-//! # use crate::pretty::*;
-//! # enum SExp {
-//! #     Atom(u32),
-//! #     List(Vec<SExp>),
-//! # }
-//! # use SExp::*;
-//! impl SExp {
-//!     /// Return a pretty printed format of self.
-//!     pub fn to_doc(&self) -> RcDoc<()> {
-//!         match *self {
-//!             Atom(ref x) => RcDoc::as_string(x),
-//!             List(ref xs) =>
-//!                 RcDoc::text("(")
-//!                     .append(RcDoc::intersperse(xs.into_iter().map(|x| x.to_doc()), Doc::line()).nest(1).group())
-//!                     .append(RcDoc::text(")"))
-//!         }
-//!     }
-//! }
-//! # fn main() { }
-//! ```
-//!
-//! Next, we convert the [Doc](enum.Doc.html) to a plain old string.
-//!
-//! ```rust
-//! # use crate::pretty::*;
-//! # enum SExp {
-//! #     Atom(u32),
-//! #     List(Vec<SExp>),
-//! # }
-//! # use SExp::*;
-//! # impl SExp {
-//! #     /// Return a pretty printed format of self.
-//! #     pub fn to_doc(&self) -> RcDoc<()> {
-//! #         match *self {
-//! #             Atom(ref x) => RcDoc::as_string(x),
-//! #             List(ref xs) =>
-//! #                 RcDoc::text("(")
-//! #                     .append(RcDoc::intersperse(xs.into_iter().map(|x| x.to_doc()), Doc::line()).nest(1).group())
-//! #                     .append(RcDoc::text(")"))
-//! #         }
-//! #     }
-//! # }
-//! impl SExp {
-//!     pub fn to_pretty(&self, width: usize) -> String {
-//!         let mut w = Vec::new();
-//!         self.to_doc().render(width, &mut w).unwrap();
-//!         String::from_utf8(w).unwrap()
-//!     }
-//! }
-//! # fn main() { }
-//! ```
-//!
-//! And finally we can test that the nesting and grouping behaves as we expected.
-//!
-//! ```rust
-//! # use crate::pretty::*;
-//! # enum SExp {
-//! #     Atom(u32),
-//! #     List(Vec<SExp>),
-//! # }
-//! # use SExp::*;
-//! # impl SExp {
-//! #     /// Return a pretty printed format of self.
-//! #     pub fn to_doc(&self) -> RcDoc<()> {
-//! #         match *self {
-//! #             Atom(ref x) => RcDoc::as_string(x),
-//! #             List(ref xs) =>
-//! #                 RcDoc::text("(")
-//! #                     .append(RcDoc::intersperse(xs.into_iter().map(|x| x.to_doc()), Doc::line()).nest(1).group())
-//! #                     .append(RcDoc::text(")"))
-//! #         }
-//! #     }
-//! # }
-//! # impl SExp {
-//! #     pub fn to_pretty(&self, width: usize) -> String {
-//! #         let mut w = Vec::new();
-//! #         self.to_doc().render(width, &mut w).unwrap();
-//! #         String::from_utf8(w).unwrap()
-//! #     }
-//! # }
-//! # fn main() {
-//! let atom = SExp::Atom(5);
-//! assert_eq!("5", atom.to_pretty(10));
-//! let list = SExp::List(vec![SExp::Atom(1), SExp::Atom(2), SExp::Atom(3)]);
-//! assert_eq!("(1 2 3)", list.to_pretty(10));
-//! assert_eq!("\
-//! (1
-//!  2
-//!  3)", list.to_pretty(5));
-//! # }
-//! ```
-//!
-//! ## Advanced usage
-//!
-//! There's a more efficient pattern that uses the [DocAllocator](trait.DocAllocator.html) trait, as
-//! implemented by [RcAllocator](struct.RcAllocator.html), to allocate
-//! [DocBuilder](struct.DocBuilder.html) instances.  See
-//! [examples/trees.rs](https://github.com/freebroccolo/pretty.rs/blob/master/examples/trees.rs#L39)
-//! for this approach.
-
 pub extern crate termcolor;
-
 use std::{
     borrow::Cow,
     fmt, io,
     ops::{Add, AddAssign, Deref},
     rc::Rc,
 };
-
 use termcolor::{ColorSpec, WriteColor};
 
-pub mod block;
 mod render;
 
-pub use self::block::{Affixes, BlockDoc};
 pub use self::render::TermColored;
 pub use self::render::{FmtWrite, IoWrite, Render, RenderAnnotated};
 
@@ -711,7 +568,7 @@ where
     /// Returns a value which implements `std::fmt::Display`
     ///
     /// ```
-    /// use crate::pretty::{Doc, RcDoc};
+    /// use tolkfmt::pretty::{Doc, RcDoc};
     /// let doc = RcDoc::<()>::group(
     ///     RcDoc::text("hello").append(Doc::line()).append(Doc::text("world"))
     /// );
@@ -990,7 +847,7 @@ where
     /// Acts like `line` but behaves like `nil` if grouped on a single line
     ///
     /// ```
-    /// use crate::pretty::{Doc, RcDoc};
+    /// use tolkfmt::pretty::{Doc, RcDoc};
     ///
     /// let doc = RcDoc::<()>::group(
     ///     RcDoc::text("(")
@@ -1098,10 +955,10 @@ where
     /// Allocate a document that acts differently based on the position and page layout
     ///
     /// ```rust
-    /// use crate::pretty::DocAllocator;
+    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
-    /// let alloc = &pretty::RcAllocator;
-    /// let doc = alloc.text("prefix ")
+    /// let alloc = &RcAllocator;
+    /// let doc: DocBuilder<'_, RcAllocator, ()> = alloc.text("prefix ")
     ///     .append(alloc.column(|l| {
     ///         alloc.text("| <- column ").append(alloc.as_string(l)).into_doc()
     ///     }));
@@ -1115,10 +972,10 @@ where
     /// Allocate a document that acts differently based on the current nesting level
     ///
     /// ```rust
-    /// use crate::pretty::DocAllocator;
+    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
-    /// let alloc = &pretty::RcAllocator;
-    /// let doc = alloc.text("prefix ")
+    /// let alloc = &RcAllocator;
+    /// let doc: DocBuilder<'_, RcAllocator, ()> = alloc.text("prefix ")
     ///     .append(alloc.nesting(|l| {
     ///         alloc.text("[Nested: ").append(alloc.as_string(l)).append("]").into_doc()
     ///     }).nest(4));
@@ -1242,9 +1099,10 @@ where
 /// `Pretty` trait, like `&str`)
 ///
 /// ```
-/// use crate::pretty::{docs, DocAllocator, RcAllocator};
+/// use tolkfmt::docs;
+/// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
 /// let alloc = &RcAllocator;
-/// let doc = docs![
+/// let doc: DocBuilder<'_, RcAllocator, ()> = docs![
 ///     alloc,
 ///     "let",
 ///     alloc.softline(),
@@ -1321,10 +1179,10 @@ where
     /// Acts as `self` when laid out on multiple lines and acts as `that` when laid out on a single line.
     ///
     /// ```
-    /// use crate::pretty::{DocAllocator, RcAllocator};
+    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
     /// let alloc = &RcAllocator;
-    /// let body = alloc.line().append("x");
+    /// let body: DocBuilder<'_, RcAllocator, ()> = alloc.line().append("x");
     /// let doc = alloc.text("let")
     ///     .append(alloc.line())
     ///     .append("x")
@@ -1418,10 +1276,11 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use crate::pretty::{docs, DocAllocator};
+    /// use tolkfmt::docs;
+    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
-    /// let arena = &pretty::RcAllocator;
-    /// let doc = docs![
+    /// let arena = &RcAllocator;
+    /// let doc: DocBuilder<'_, RcAllocator, ()> = docs![
     ///     arena,
     ///     "lorem",
     ///     " ",
@@ -1451,10 +1310,10 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use crate::pretty::DocAllocator;
+    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
-    /// let arena = &pretty::RcAllocator;
-    /// let doc = arena.text("prefix").append(arena.text(" "))
+    /// let arena = &RcAllocator;
+    /// let doc: DocBuilder<'_, RcAllocator, ()> = arena.text("prefix").append(arena.text(" "))
     ///     .append(arena.reflow("Indenting these words with nest").hang(4));
     /// assert_eq!(
     ///     doc.1.pretty(24).to_string(),
@@ -1475,10 +1334,10 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use crate::pretty::DocAllocator;
+    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
-    /// let arena = &pretty::RcAllocator;
-    /// let doc = arena.text("prefix").append(arena.text(" "))
+    /// let arena = &RcAllocator;
+    /// let doc: DocBuilder<'_, RcAllocator, ()> = arena.text("prefix").append(arena.text(" "))
     ///     .append(arena.reflow("The indent function indents these words!").indent(4));
     /// assert_eq!(
     ///     doc.1.pretty(24).to_string(),
@@ -1516,10 +1375,10 @@ where
     /// like `RcDoc`
     ///
     /// ```rust
-    /// use crate::pretty::DocAllocator;
+    /// use tolkfmt::pretty::{DocAllocator, DocBuilder, RcAllocator};
     ///
-    /// let arena = &pretty::RcAllocator;
-    /// let doc = arena.text("prefix ")
+    /// let arena = &RcAllocator;
+    /// let doc: DocBuilder<'_, RcAllocator, ()> = arena.text("prefix ")
     ///     .append(arena.column(|l| {
     ///         arena.text("| <- column ").append(arena.as_string(l)).into_doc()
     ///     }));
