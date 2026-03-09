@@ -1776,6 +1776,160 @@ fn test_complex_expression_combination_with_breaking() {
             }"#]],
         100,
     );
+    check_with_width(
+        r#"
+        fun badExternalOutWithBadSource(): cell {
+            val invalidDestAsInternal = beginCell()
+                .storeUint(2, 2) // addr_std$10
+                .storeUint(0, 1) // anycast nothing
+                .storeInt(0, 8)
+                .storeUint(1, 10)
+                .endCell();
+
+            return beginCell()
+                .storeUint(3, 2) // ext_out_msg_info$11
+                .storeBool(false) // invalid src for MsgAddressInt
+                .storeSlice(invalidDestAsInternal.beginParse())
+                .endCell();
+        }
+        "#,
+        expect![[r#"
+            fun badExternalOutWithBadSource(): cell {
+                val invalidDestAsInternal = beginCell()
+                    .storeUint(2, 2) // addr_std$10
+                    .storeUint(0, 1) // anycast nothing
+                    .storeInt(0, 8)
+                    .storeUint(1, 10)
+                    .endCell();
+
+                return beginCell()
+                    .storeUint(3, 2) // ext_out_msg_info$11
+                    .storeBool(false) // invalid src for MsgAddressInt
+                    .storeSlice(invalidDestAsInternal.beginParse())
+                    .endCell();
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+            val body = beginCell()
+                .storeUint(0x5fcc3d14, 32)  // op::transfer
+                .storeUint(42, 64)          // queryId
+                .storeAddress(nftReceiverAddress)  // new_owner
+                .storeAddress(responseAddress)     // response_destination
+                .storeMaybeRef(null)        // custom_payload
+                .storeCoins(999)            // forward_amount
+                // missing forward_payload!
+                .endCell();
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                val body = beginCell()
+                    .storeUint(0x5fcc3d14, 32) // op::transfer
+                    .storeUint(42, 64) // queryId
+                    .storeAddress(nftReceiverAddress) // new_owner
+                    .storeAddress(responseAddress) // response_destination
+                    .storeMaybeRef(null) // custom_payload
+                    .storeCoins(999) // forward_amount
+                    // missing forward_payload!
+                    .endCell();
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun badExternalOutWithBadSource(): cell {
+            val result = nftItem.sendAskToChangeOwnership(
+                notOwner.address,  // NOT the owner!
+                0,  // queryId
+                nftReceiverAddress,
+                null,  // sendExcessesTo
+                createEmptyDict(),  // customPayload
+                0,  // forwardTonAmount
+                createEmptySlice(),  // forwardPayload
+                {
+                    value: ton("0.05"),
+                    bounce: true,
+                }
+            );
+        }
+        "#,
+        expect![[r#"
+            fun badExternalOutWithBadSource(): cell {
+                val result = nftItem.sendAskToChangeOwnership(
+                    notOwner.address,   // NOT the owner!
+                    0,                  // queryId
+                    nftReceiverAddress,
+                    null,               // sendExcessesTo
+                    createEmptyDict(),  // customPayload
+                    0,                  // forwardTonAmount
+                    createEmptySlice(), // forwardPayload
+                    { value: ton("0.05"), bounce: true },
+                );
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun main() {
+            val bouncedBody = beginCell().storeUint(0xffffffff, 32).storeSlice(
+                outBody.toCell().beginParse(),
+            ).endCell();
+        }
+        "#,
+        expect![[r#"
+            fun main() {
+                val bouncedBody = beginCell()
+                    .storeUint(0xffffffff, 32)
+                    .storeSlice(outBody.toCell().beginParse())
+                    .endCell();
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun main() {
+            val minWithForward = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
+            MIN_EDGE_DELTA;
+        }
+        "#,
+        expect![[r#"
+            fun main() {
+                val minWithForward = calcMinimalTransferAmount(DEFAULT_FORWARD_TON_AMOUNT, fwdFee) +
+                MIN_EDGE_DELTA;
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun main() {
+            if (
+                payloadBody.remainingBitsCount() == 1 && payloadBody.preloadUint(1) == 1 &&
+                payloadBody.remainingRefsCount() == 1
+            ) {
+                payloadBody.loadUint(1);
+                expect(payloadBody.loadRef().hash()).toEqual(forwardPayload.hash());
+            } else {
+                expect(payloadRef.hash()).toEqual(forwardPayload.hash());
+            }
+        }
+        "#,
+        expect![[r#"
+            fun main() {
+                if (
+                    payloadBody.remainingBitsCount() == 1 && payloadBody.preloadUint(1) == 1 &&
+                    payloadBody.remainingRefsCount() == 1
+                ) {
+                    payloadBody.loadUint(1);
+                    expect(payloadBody.loadRef().hash()).toEqual(forwardPayload.hash());
+                } else {
+                    expect(payloadRef.hash()).toEqual(forwardPayload.hash());
+                }
+            }"#]],
+        100,
+    );
 }
 
 #[test]
