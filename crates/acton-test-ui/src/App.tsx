@@ -45,7 +45,14 @@ export const App: React.FC = () => {
     localStorage.setItem("selectedTest", `${test.suite_name}::${test.name}`)
     if (test.trace_path) {
       void fetch(`/api/trace/${test.trace_path}`)
-        .then(async res => (await res.json()) as Trace)
+        .then(async res => {
+          if (!res.ok) {
+            const responseText = await res.text()
+            const text = responseText.trim()
+            throw new Error(text || `HTTP ${res.status}`)
+          }
+          return (await res.json()) as Trace
+        })
         .then(data => {
           setCurrentTrace(data)
         })

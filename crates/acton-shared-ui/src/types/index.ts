@@ -11,6 +11,56 @@ export interface FailedTransactionContext {
   readonly params: [string, string][]
 }
 
+export type SliceStepStatus = "ok" | "failed" | "unknown"
+
+export interface SliceParseState {
+  readonly preview_hex: string
+  readonly hex_len: number
+  readonly bits_remaining?: number
+  readonly refs_remaining?: number
+  readonly stack_index: number
+  readonly source: "vm_range" | "boc" | "hex_heuristic" | "unknown"
+}
+
+export interface SliceParseRequirement {
+  readonly bits?: number
+  readonly refs?: number
+  readonly note?: string
+}
+
+export interface SliceSourceLocation {
+  readonly file_path: string
+  readonly display_path: string
+  readonly line: number
+  readonly column: number
+  readonly end_line: number
+  readonly end_column: number
+}
+
+export interface SliceParseStep {
+  readonly index: number
+  readonly instruction: string
+  readonly opcode: string
+  readonly code_hash?: string
+  readonly code_offset?: number
+  readonly status: SliceStepStatus
+  readonly before?: SliceParseState
+  readonly after?: SliceParseState
+  readonly requirement: SliceParseRequirement
+  readonly consumed_bits?: number
+  readonly consumed_refs?: number
+  readonly source_location?: SliceSourceLocation
+  readonly error?: string
+  readonly note?: string
+}
+
+export interface SliceParseTraceReport {
+  readonly failed_due_to_slice_parsing: boolean
+  readonly failure_step?: number
+  readonly failure_reason?: string
+  readonly steps: readonly SliceParseStep[]
+}
+
 export interface TestReport {
   readonly name: string
   readonly suite_name: string
@@ -21,6 +71,7 @@ export interface TestReport {
   readonly status: TestStatus
   readonly message?: string
   readonly detailed_message?: string
+  readonly slice_parse_trace?: SliceParseTraceReport
   readonly failed_transactions?: BackendTransaction[]
   readonly failed_transaction_context?: FailedTransactionContext
   readonly details?: string

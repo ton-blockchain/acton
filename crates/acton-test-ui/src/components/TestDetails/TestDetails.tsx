@@ -13,6 +13,8 @@ import {
   type Trace,
   ContractData,
   type FailedMessage,
+  type SliceParseStep,
+  type SliceStepStatus,
   type TransactionInfo,
 } from "@acton/shared-ui"
 import {
@@ -77,6 +79,54 @@ const isExternalMessageNotAcceptedError = (error: string): boolean => {
   return mentionsExternal && mentionsRejectedExternal
 }
 
+const SLICE_PARSE_TRACE_HEADER = "Slice parse trace:"
+
+const stripSliceParseTraceText = (details: string | undefined): string | undefined => {
+  if (!details) return details
+
+  const markerIndex = details.indexOf(SLICE_PARSE_TRACE_HEADER)
+  if (markerIndex === -1) {
+    return details
+  }
+
+  const stripped = details.slice(0, markerIndex).trimEnd()
+  return stripped.length > 0 ? stripped : undefined
+}
+
+const formatSliceMetricValue = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return "?"
+  return value.toString()
+}
+
+const formatSliceMetricPair = (
+  bits: number | null | undefined,
+  refs: number | null | undefined,
+): string => {
+  const bitsText = formatSliceMetricValue(bits)
+  const refsText = formatSliceMetricValue(refs)
+  return `bits ${bitsText} · refs ${refsText}`
+}
+
+const formatSliceRequirement = (step: SliceParseStep): string => {
+  if (step.requirement.bits === undefined && step.requirement.refs === undefined) {
+    return "n/a"
+  }
+  return formatSliceMetricPair(step.requirement.bits, step.requirement.refs)
+}
+
+const formatSliceConsumption = (step: SliceParseStep): string => {
+  if (step.consumed_bits === undefined && step.consumed_refs === undefined) {
+    return "n/a"
+  }
+  return formatSliceMetricPair(step.consumed_bits, step.consumed_refs)
+}
+
+const formatSliceStatusLabel = (status: SliceStepStatus): string => {
+  if (status === "ok") return "OK"
+  if (status === "failed") return "FAILED"
+  return "UNKNOWN"
+}
+
 export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoot}) => {
   const [activeTab, setActiveTab] = useState<"info" | "logs" | "transactions">(() => {
     const saved = localStorage.getItem("activeTab")
@@ -92,6 +142,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
   })
   const [isHeaderIDESelectorOpen, setIsHeaderIDESelectorOpen] = useState(false)
   const [isGridIDESelectorOpen, setIsGridIDESelectorOpen] = useState(false)
+  const [selectedSliceStepIndex, setSelectedSliceStepIndex] = useState(0)
   const headerDropdownRef = useRef<HTMLDivElement | null>(null)
   const gridDropdownRef = useRef<HTMLDivElement | null>(null)
 
@@ -348,6 +399,40 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
     }
   }, [test.failed_transactions])
 
+  const sliceParseTrace = test.slice_parse_trace
+  const sliceSteps = sliceParseTrace?.steps ?? []
+  const sliceStepCount = sliceSteps.length
+  const safeSliceStepIndex =
+    sliceStepCount === 0 ? 0 : Math.min(selectedSliceStepIndex, sliceStepCount - 1)
+  const selectedSliceStep = sliceStepCount === 0 ? undefined : sliceSteps[safeSliceStepIndex]
+
+  const detailedMessageWithoutSliceTrace = useMemo(() => {
+    if (!sliceParseTrace) return test.detailed_message
+    return stripSliceParseTraceText(test.detailed_message)
+  }, [sliceParseTrace, test.detailed_message])
+
+  const errorMessage = useMemo(() => {
+    if (test.failed_transaction_context) {
+      return test.message ?? "expect(actual).toHaveTx(expected)"
+    }
+
+    return (
+      detailedMessageWithoutSliceTrace ??
+      test.message ??
+      sliceParseTrace?.failure_reason ??
+      "No error message available"
+    )
+  }, [
+    detailedMessageWithoutSliceTrace,
+    sliceParseTrace,
+    test.failed_transaction_context,
+    test.message,
+  ])
+
+  useEffect(() => {
+    setSelectedSliceStepIndex(0)
+  }, [test.name, test.suite_name, sliceStepCount])
+
   const contracts = useMemo(() => {
     const map = new Map<string, ContractData>()
 
@@ -533,13 +618,254 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
             <div className={styles.errorSection}>
               <div className={styles.errorTitle}>Error Message</div>
               <DataBlock
-                data={
-                  test.failed_transaction_context
-                    ? (test.message ?? "expect(actual).toHaveTx(expected)")
-                    : (test.detailed_message ?? test.message ?? "No error message available")
-                }
+                data={errorMessage}
                 className={styles.errorMessageBlock}
               />
+
+              {sliceParseTrace && sliceStepCount > 0 && selectedSliceStep && (
+                <div className={styles.sliceTraceSection}>
+                  <div className={styles.sliceTraceHeader}>
+                    <div className={styles.sliceTraceTitle}>Slice Parse Trace</div>
+                    <div className={styles.sliceTraceSummary}>
+                      <span
+                        className={`${styles.sliceTraceSummaryBadge} ${
+                          sliceParseTrace.failed_due_to_slice_parsing
+                            ? styles.sliceTraceSummaryFailed
+                            : styles.sliceTraceSummaryOk
+                        }`}
+                      >
+                        {sliceParseTrace.failure_step === undefined ||
+                        sliceParseTrace.failure_step === null
+                          ? "Trace collected"
+                          : `Failed at step #${sliceParseTrace.failure_step}`}
+                      </span>
+                      {sliceParseTrace.failure_reason && (
+                        <span className={styles.sliceTraceSummaryReason}>
+                          {sliceParseTrace.failure_reason}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={styles.sliceTraceControls}>
+                    <button
+                      type="button"
+                      className={styles.sliceTraceNavButton}
+                      onClick={() => setSelectedSliceStepIndex(prev => Math.max(0, prev - 1))}
+                      disabled={safeSliceStepIndex === 0}
+                    >
+                      Prev
+                    </button>
+
+                    <input
+                      type="range"
+                      min={1}
+                      max={sliceStepCount}
+                      value={safeSliceStepIndex + 1}
+                      onChange={event => {
+                        const next = Number.parseInt(event.target.value, 10)
+                        if (Number.isNaN(next)) return
+                        setSelectedSliceStepIndex(Math.max(0, Math.min(sliceStepCount - 1, next - 1)))
+                      }}
+                      className={styles.sliceTraceSlider}
+                    />
+
+                    <button
+                      type="button"
+                      className={styles.sliceTraceNavButton}
+                      onClick={() =>
+                        setSelectedSliceStepIndex(prev => Math.min(sliceStepCount - 1, prev + 1))
+                      }
+                      disabled={safeSliceStepIndex === sliceStepCount - 1}
+                    >
+                      Next
+                    </button>
+                    <span className={styles.sliceTraceStepCounter}>
+                      Step {safeSliceStepIndex + 1} / {sliceStepCount}
+                    </span>
+                  </div>
+
+                  <div className={styles.sliceTraceRail}>
+                    {sliceSteps.map((step, index) => {
+                      const railStatusClass =
+                        step.status === "ok"
+                          ? styles.sliceRailStepOk
+                          : step.status === "failed"
+                            ? styles.sliceRailStepFailed
+                            : styles.sliceRailStepUnknown
+                      return (
+                        <button
+                          key={`slice-step-rail-${step.index}`}
+                          type="button"
+                          className={`${styles.sliceRailStep} ${railStatusClass} ${
+                            safeSliceStepIndex === index ? styles.sliceRailStepActive : ""
+                          }`}
+                          onClick={() => setSelectedSliceStepIndex(index)}
+                          title={`Step #${step.index} • ${step.instruction}`}
+                        >
+                          {step.index}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <div className={styles.sliceTraceSteps}>
+                    {(() => {
+                      const step = selectedSliceStep
+                      const cardStatusClass =
+                        step.status === "ok"
+                          ? styles.sliceStepOk
+                          : step.status === "failed"
+                            ? styles.sliceStepFailed
+                            : styles.sliceStepUnknown
+
+                      const badgeStatusClass =
+                        step.status === "ok"
+                          ? styles.sliceStepStatusOk
+                          : step.status === "failed"
+                            ? styles.sliceStepStatusFailed
+                            : styles.sliceStepStatusUnknown
+
+                      const location =
+                        step.code_hash &&
+                        step.code_offset !== undefined &&
+                        step.code_offset !== null
+                          ? `${step.code_hash.slice(0, 12)}:${step.code_offset}`
+                          : undefined
+
+                      const sourceLocationLabel = step.source_location
+                        ? `${step.source_location.display_path}:${step.source_location.line}:${step.source_location.column}`
+                        : undefined
+
+                      const snippetLine =
+                        step.source_location &&
+                        step.source_location.line > 0
+                          ? step.source_location.line
+                          : undefined
+
+                      return (
+                        <article
+                          key={`slice-step-${step.index}-${step.opcode}`}
+                          className={`${styles.sliceStepCard} ${cardStatusClass}`}
+                        >
+                          <div className={styles.sliceStepHeader}>
+                            <div className={styles.sliceStepHeaderMain}>
+                              <span className={styles.sliceStepIndex}>#{step.index}</span>
+                              <span className={styles.sliceStepInstruction}>
+                                {step.instruction}
+                              </span>
+                              <span className={styles.sliceStepOpcode}>{step.opcode}</span>
+                            </div>
+                            <span
+                              className={`${styles.sliceStepStatusBadge} ${badgeStatusClass}`}
+                            >
+                              {formatSliceStatusLabel(step.status)}
+                            </span>
+                          </div>
+
+                          <div className={styles.sliceStepMeta}>
+                            <span
+                              className={styles.sliceStepMetaItem}
+                              title={step.code_hash ?? "VM location is unavailable"}
+                            >
+                              {location ?? "unknown vm location"}
+                            </span>
+                            <span className={styles.sliceStepMetaItem}>
+                              stack #{step.before?.stack_index ?? "?"}
+                            </span>
+                            <span className={styles.sliceStepMetaItem}>
+                              source {step.before?.source ?? "unknown"}
+                            </span>
+                            {sourceLocationLabel && (
+                              <span
+                                className={styles.sliceStepMetaItem}
+                                title={step.source_location?.file_path}
+                              >
+                                {sourceLocationLabel}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className={styles.sliceStepMetrics}>
+                            <div className={styles.sliceMetricItem}>
+                              <span className={styles.sliceMetricLabel}>before</span>
+                              <span className={styles.sliceMetricValue}>
+                                {formatSliceMetricPair(
+                                  step.before?.bits_remaining,
+                                  step.before?.refs_remaining,
+                                )}
+                              </span>
+                            </div>
+                            <div className={styles.sliceMetricItem}>
+                              <span className={styles.sliceMetricLabel}>need</span>
+                              <span className={styles.sliceMetricValue}>
+                                {formatSliceRequirement(step)}
+                              </span>
+                            </div>
+                            <div className={styles.sliceMetricItem}>
+                              <span className={styles.sliceMetricLabel}>after</span>
+                              <span className={styles.sliceMetricValue}>
+                                {formatSliceMetricPair(
+                                  step.after?.bits_remaining,
+                                  step.after?.refs_remaining,
+                                )}
+                              </span>
+                            </div>
+                            <div className={styles.sliceMetricItem}>
+                              <span className={styles.sliceMetricLabel}>used</span>
+                              <span className={styles.sliceMetricValue}>
+                                {formatSliceConsumption(step)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {step.requirement.note && (
+                            <div className={styles.sliceStepHint}>{step.requirement.note}</div>
+                          )}
+                          {step.error && <div className={styles.sliceStepError}>{step.error}</div>}
+                          {step.note && <div className={styles.sliceStepNote}>{step.note}</div>}
+
+                          <div className={styles.sliceStepPreviews}>
+                            {step.before && (
+                              <div className={styles.slicePreviewItem}>
+                                <span className={styles.slicePreviewLabel}>before</span>
+                                <span className={styles.slicePreviewMeta}>
+                                  {step.before.hex_len} hex
+                                </span>
+                                <code className={styles.slicePreviewValue}>
+                                  {step.before.preview_hex}
+                                </code>
+                              </div>
+                            )}
+                            {step.after && (
+                              <div className={styles.slicePreviewItem}>
+                                <span className={styles.slicePreviewLabel}>after</span>
+                                <span className={styles.slicePreviewMeta}>
+                                  {step.after.hex_len} hex
+                                </span>
+                                <code className={styles.slicePreviewValue}>
+                                  {step.after.preview_hex}
+                                </code>
+                              </div>
+                            )}
+                          </div>
+
+                          {step.source_location && snippetLine !== undefined && (
+                            <div className={styles.sliceSourceSnippet}>
+                              <CodeSnippet
+                                filePath={step.source_location.file_path}
+                                line={snippetLine}
+                                contextLines={2}
+                                projectRoot={projectRoot}
+                              />
+                            </div>
+                          )}
+                        </article>
+                      )
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {failedTransactions.length > 0 && (
                 <div className={styles.failedTransactionsSection}>

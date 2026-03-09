@@ -23,6 +23,7 @@ use crate::debugger::debug_context::DebugContext;
 use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
+use crate::ldu_analyzer;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, ContractDependency, DependencyKind, project_root as configured_project_root,
@@ -899,6 +900,7 @@ fn run_file_tests(
             status: TestStatus::Passed,
             message: None,
             detailed_message: None,
+            slice_parse_trace: None,
             failed_transactions: None,
             failed_transaction_context: None,
             details: None,
@@ -988,6 +990,21 @@ fn run_file_tests(
             test_passed = false;
         }
 
+        let slice_parse_trace = if test_passed {
+            None
+        } else {
+            match &get_result {
+                GetMethodResult::Success(result) => {
+                    ldu_analyzer::analyze_slice_parse_trace(
+                        &result.vm_log,
+                        Some(source_map.as_ref()),
+                    )
+                        .filter(|report| report.failed_due_to_slice_parsing)
+                }
+                GetMethodResult::Error(_) => None,
+            }
+        };
+
         test_report.duration = duration;
         let failure_execution = if test_passed {
             None
@@ -1015,6 +1032,7 @@ fn run_file_tests(
             passed += 1;
         } else {
             test_report.status = TestStatus::Failed;
+            test_report.slice_parse_trace = slice_parse_trace;
 
             let formatter = FormatterContext {
                 contract_abi: abi.clone(),
@@ -1068,6 +1086,20 @@ fn run_file_tests(
                 if let GetMethodResult::Success(result) = &get_result {
                     test_report.detailed_message =
                         Some(formatter.format_detailed_exit_code(&test_report, result, exit_code));
+                }
+            }
+
+            if let Some(slice_parse_trace) = &test_report.slice_parse_trace {
+                let trace_text = slice_parse_trace.pretty_text();
+                if !trace_text.is_empty() {
+                    if let Some(details) = &mut test_report.detailed_message
+                        && !details.is_empty()
+                    {
+                        details.push_str("\n\n");
+                        details.push_str(&trace_text);
+                    } else {
+                        test_report.detailed_message = Some(trace_text);
+                    }
                 }
             }
 

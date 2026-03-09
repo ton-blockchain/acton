@@ -224,6 +224,9 @@ impl TestReporter for ConsoleReporter {
             match &failure_context.get_result {
                 GetMethodResult::Success(result) => {
                     process_test_fail(test, exec, formatter, result);
+                    if let Some(slice_trace) = &test.slice_parse_trace {
+                        print_slice_parse_trace(slice_trace);
+                    }
                 }
                 GetMethodResult::Error(error) => {
                     println!("    {} {}", "└─".dimmed(), error.error.yellow());
@@ -490,5 +493,20 @@ fn process_nonzero_exit_code(test: &TestReport, result: &GetMethodResultSuccess,
             "      {} Cannot run method of contract without code",
             "└─".dimmed()
         );
+    }
+}
+
+fn print_slice_parse_trace(trace: &crate::ldu_analyzer::SliceParseTraceReport) {
+    let text = trace.pretty_text();
+    if text.is_empty() {
+        return;
+    }
+
+    for (idx, line) in text.lines().enumerate() {
+        if idx == 0 {
+            println!("    {} {}", "└─".dimmed(), line.dimmed());
+        } else {
+            println!("       {}", line.dimmed());
+        }
     }
 }

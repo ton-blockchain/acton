@@ -1,6 +1,7 @@
 use crate::commands::test::TestDescriptor;
 use crate::commands::test::trace::TransactionInfo;
 use crate::context::{AssertFailure, BuildCache, EmulationsState, KnownAddresses};
+use crate::ldu_analyzer::SliceParseTraceReport;
 use acton_config::test::BacktraceMode;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
@@ -59,6 +60,7 @@ pub struct TestReport {
     pub status: TestStatus,
     pub message: Option<String>,
     pub detailed_message: Option<String>,
+    pub slice_parse_trace: Option<SliceParseTraceReport>,
     pub failed_transactions: Option<Vec<TransactionInfo>>,
     pub failed_transaction_context: Option<FailedTransactionContext>,
     pub details: Option<String>,

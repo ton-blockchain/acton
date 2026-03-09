@@ -490,6 +490,375 @@
   color: var(--text-primary);
 }
 
+.sliceTraceSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.sliceTraceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.sliceTraceTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.sliceTraceSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.sliceTraceSummaryBadge {
+  padding: 3px var(--spacing-sm);
+  border-radius: 999px;
+  font-size: var(--font-size-xss);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+}
+
+.sliceTraceSummaryFailed {
+  border-color: var(--color-failed);
+  color: var(--color-failed);
+  background-color: var(--bg-color);
+}
+
+.sliceTraceSummaryOk {
+  border-color: var(--color-passed);
+  color: var(--color-passed);
+  background-color: var(--bg-color);
+}
+
+.sliceTraceSummaryReason {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.sliceTraceControls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.sliceTraceNavButton {
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-secondary);
+  border-radius: var(--border-radius-sm);
+  padding: 4px var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+}
+
+.sliceTraceNavButton:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.sliceTraceNavButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sliceTraceSlider {
+  flex: 1;
+  min-width: 180px;
+  accent-color: var(--text-secondary);
+}
+
+.sliceTraceStepCounter {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.sliceTraceRail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sliceRailStep {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xss);
+  line-height: 1;
+  padding: 5px 7px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    border-color 0.2s,
+    color 0.2s;
+}
+
+.sliceRailStep:hover {
+  transform: translateY(-1px);
+  border-color: var(--text-muted);
+}
+
+.sliceRailStepActive {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--bg-color), 0 0 0 2px var(--text-primary);
+}
+
+.sliceRailStepOk {
+  border-left: 2px solid var(--color-passed);
+}
+
+.sliceRailStepFailed {
+  border-left: 2px solid var(--color-failed);
+}
+
+.sliceRailStepUnknown {
+  border-left: 2px solid var(--text-muted);
+}
+
+.sliceTraceSteps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.sliceStepCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-md);
+  background:
+    radial-gradient(circle at right top, rgba(120, 120, 120, 0.08), transparent 45%),
+    var(--bg-secondary-color);
+}
+
+.sliceStepOk {
+  border-left-color: var(--color-passed);
+}
+
+.sliceStepFailed {
+  border-left-color: var(--color-failed);
+}
+
+.sliceStepUnknown {
+  border-left-color: var(--text-muted);
+}
+
+.sliceStepHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.sliceStepHeaderMain {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.sliceStepIndex {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.sliceStepInstruction {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-semibold);
+  word-break: break-word;
+}
+
+.sliceStepOpcode {
+  font-size: var(--font-size-xss);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 2px var(--spacing-sm);
+  font-family: var(--font-mono);
+}
+
+.sliceStepStatusBadge {
+  padding: 2px var(--spacing-sm);
+  border-radius: 999px;
+  font-size: var(--font-size-xss);
+  font-weight: var(--font-weight-semibold);
+  border: 1px solid var(--border-color);
+  letter-spacing: 0.04em;
+}
+
+.sliceStepStatusOk {
+  border-color: var(--color-passed);
+  color: var(--color-passed);
+}
+
+.sliceStepStatusFailed {
+  border-color: var(--color-failed);
+  color: var(--color-failed);
+}
+
+.sliceStepStatusUnknown {
+  color: var(--text-muted);
+}
+
+.sliceStepMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.sliceStepMetaItem {
+  font-size: var(--font-size-xss);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  padding: 2px var(--spacing-sm);
+  font-family: var(--font-mono);
+  background-color: var(--bg-color);
+}
+
+.sliceStepMetrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.sliceMetricItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+}
+
+.sliceMetricLabel {
+  font-size: var(--font-size-xss);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sliceMetricValue {
+  font-size: var(--font-size-xs);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.sliceStepHint,
+.sliceStepError,
+.sliceStepNote {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+.sliceStepHint {
+  color: var(--text-secondary);
+  background-color: var(--bg-color);
+  border: 1px dashed var(--border-color);
+}
+
+.sliceStepError {
+  color: var(--color-failed);
+  background-color: var(--bg-color);
+  border: 1px solid var(--color-failed);
+}
+
+.sliceStepNote {
+  color: var(--text-secondary);
+  background-color: var(--bg-color);
+  border: 1px solid var(--border-color);
+}
+
+.sliceStepPreviews {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.slicePreviewItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.slicePreviewLabel {
+  font-size: var(--font-size-xss);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.slicePreviewMeta {
+  font-size: var(--font-size-xss);
+  color: var(--text-muted);
+}
+
+.slicePreviewValue {
+  font-size: var(--font-size-xs);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.sliceSourceSnippet {
+  margin-top: var(--spacing-xs);
+}
+
+@media (max-width: 900px) {
+  .sliceTraceSummary {
+    width: 100%;
+  }
+
+  .sliceTraceControls {
+    width: 100%;
+  }
+
+  .sliceTraceSlider {
+    width: 100%;
+    min-width: 0;
+    order: 3;
+  }
+
+  .sliceStepMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .sliceStepPreviews {
+    grid-template-columns: 1fr;
+  }
+}
+
 .failedTransactionsSection {
   display: flex;
   flex-direction: column;

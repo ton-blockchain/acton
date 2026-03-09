@@ -5,6 +5,7 @@ pub mod exit_codes;
 pub mod ffi;
 pub mod file_build_cache;
 pub mod formatter;
+pub mod ldu_analyzer;
 pub mod retrace;
 pub mod stdlib;
 pub mod vmtrace;
