@@ -415,6 +415,11 @@ where
                         doc = self.temp_arena.alloc(f(ind));
                         continue;
                     }
+                    Doc::BreakParent => {
+                        if mode == Mode::Flat {
+                            return false;
+                        }
+                    }
                     Doc::Nest(_, ref next)
                     | Doc::Group(ref next)
                     | Doc::Annotated(_, ref next)
@@ -553,6 +558,7 @@ where
                         cmd.2 = self.temp_arena.alloc(f(ind));
                         continue;
                     }
+                    Doc::BreakParent => {}
                     Doc::Fail => return Err(out.fail_doc()),
                 }
 

@@ -205,10 +205,9 @@ fn test_dot_access_breaking() {
     check_with_width(
         "fun test() { x = very_long_object_name.very_long_field_name; }",
         expect![[r#"
-                fun test() {
-                    x = very_long_object_name
-                        .very_long_field_name;
-                }"#]],
+            fun test() {
+                x = very_long_object_name.very_long_field_name;
+            }"#]],
         30,
     );
 }
@@ -1357,12 +1356,425 @@ fn test_complex_expression_combination_with_breaking() {
                     x = func(
                         a + b,
                         c * d,
-                    ).field.0
+                    )
+                        .field
+                        .0
                         .method(
-                        e ? f : g,
-                    );
+                            e
+                                ? f
+                                : g,
+                        );
                 }"#]],
         20,
+    );
+
+    check_with_width(
+        "fun test() { x = func(a + b, c * d).field.0.method(e ? f : g); }",
+        expect![[r#"
+            fun test() {
+                x = func(a + b, c * d)
+                    .field
+                    .0
+                    .method(e ? f : g);
+            }"#]],
+        40,
+    );
+
+    check_with_width(
+        r#"
+        fun test() {
+            expect(equalAddressArrays(
+                mapToAddressArray(after.signersMap()),
+                mapToAddressArray(before.signersMap())
+            ))
+                .toEqual(true);
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                expect(
+                    equalAddressArrays(
+                        mapToAddressArray(after.signersMap()),
+                        mapToAddressArray(before.signersMap()),
+                    ),
+                ).toEqual(true);
+            }"#]],
+        100,
+    );
+
+    check_with_width(
+        r#"
+        fun test() {
+            expect(vote).toHaveSuccessfulTx<ApproveAccepted>({
+                from: fixture.order.address,
+                to: signerAddress,
+            });
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                expect(vote).toHaveSuccessfulTx<ApproveAccepted>({
+                    from: fixture.order.address,
+                    to: signerAddress,
+                });
+            }"#]],
+        100,
+    );
+
+    check_with_width(
+        r#"
+        fun test() {
+            expect(equalAddressArrays(mapToAddressArray(after1.signersMap()), mapToAddressArray(before1.signersMap()))).toEqual(true);
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                expect(
+                    equalAddressArrays(
+                        mapToAddressArray(after1.signersMap()),
+                        mapToAddressArray(before1.signersMap()),
+                    ),
+                ).toEqual(true);
+            }"#]],
+        100,
+    );
+
+    check_with_width(
+        r#"
+        fun test() {
+            val execBody = ExecuteOrderRequest {
+                queryId: 0,
+                orderSeqno: legitData.nextOrderSeqno as uint256,
+                expirationDate: 0xffffffffffff,
+                approvalsNum: 255,
+                signersHash: legitSignersHash,
+                order: evilPayload,
+            }.toCell();
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                val execBody = ExecuteOrderRequest {
+                    queryId: 0,
+                    orderSeqno: legitData.nextOrderSeqno as uint256,
+                    expirationDate: 0xffffffffffff,
+                    approvalsNum: 255,
+                    signersHash: legitSignersHash,
+                    order: evilPayload,
+                }.toCell();
+            }"#]],
+        100,
+    );
+
+    check_with_width(
+        r#"
+        fun test() {
+            var i = 0;
+            while (i < 253) {
+                rootOrder.set(
+                    i as uint8,
+                    makeTransferAction(
+                        ctx.deployer.address,
+                        ton("0.01"),
+                        i,
+                        SEND_MODE_PAY_FEES_SEPARATELY,
+                        true,
+                    ).toCell(),
+                );
+                i += 1;
+            }
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                var i = 0;
+                while (i < 253) {
+                    rootOrder.set(
+                        i as uint8,
+                        makeTransferAction(
+                            ctx.deployer.address,
+                            ton("0.01"),
+                            i,
+                            SEND_MODE_PAY_FEES_SEPARATELY,
+                            true,
+                        ).toCell(),
+                    );
+                    i += 1;
+                }
+            }"#]],
+        100,
+    );
+
+    check_with_width(
+        r#"
+        fun test() {
+             val chained = beginCell().storeSlice("a".beginParse()).storeRef(beginCell().storeSlice("p"
+                .beginParse())
+                .storeRef(beginCell().storeSlice("prove".beginParse()).endCell())
+                .endCell())
+                .endCell();
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                val chained = beginCell()
+                    .storeSlice("a".beginParse())
+                    .storeRef(
+                        beginCell()
+                            .storeSlice("p".beginParse())
+                            .storeRef(beginCell().storeSlice("prove".beginParse()).endCell())
+                            .endCell(),
+                    )
+                    .endCell();
+            }"#]],
+        100,
+    );
+
+    check_with_width(
+        r#"
+        fun test() {
+             expect(containsMessageWithOpcode(secondActions, ApproveAccepted.getDeclaredPackPrefix2()))
+                .toEqual(true);
+             expect(containsMessageWithOpcode(secondActions, ExecuteOrderRequest.getDeclaredPackPrefix2()))
+                .toEqual(true);
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                expect(
+                    containsMessageWithOpcode(secondActions, ApproveAccepted.getDeclaredPackPrefix2()),
+                ).toEqual(true);
+                expect(
+                    containsMessageWithOpcode(secondActions, ExecuteOrderRequest.getDeclaredPackPrefix2()),
+                ).toEqual(true);
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+              val changedOrder = singleActionOrder(makeTransferAction(
+                  net.randomAddress("changed_order"),
+                  DEFAULT_TRANSFER_VALUE,
+                  777777
+              ) as GenericOrderAction);
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                val changedOrder = singleActionOrder(
+                    makeTransferAction(
+                        net.randomAddress("changed_order"),
+                        DEFAULT_TRANSFER_VALUE,
+                        777777,
+                    ) as GenericOrderAction,
+                );
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+              val chain = beginCell().storeSlice("a".beginParse()).storeRef(beginCell().storeSlice("p"
+                .beginParse())
+                .storeRef(beginCell().storeSlice("p".beginParse()).storeRef(beginCell().storeSlice("r"
+                .beginParse())
+                .storeRef(beginCell().storeSlice("o".beginParse()).storeRef(beginCell().storeSlice("v"
+                .beginParse())
+                .storeRef(beginCell().storeSlice("e".beginParse()).endCell())
+                .endCell())
+                .endCell())
+                .endCell())
+                .endCell())
+                .endCell())
+                .endCell();
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                val chain = beginCell()
+                    .storeSlice("a".beginParse())
+                    .storeRef(
+                        beginCell()
+                            .storeSlice("p".beginParse())
+                            .storeRef(
+                                beginCell()
+                                    .storeSlice("p".beginParse())
+                                    .storeRef(
+                                        beginCell()
+                                            .storeSlice("r".beginParse())
+                                            .storeRef(
+                                                beginCell()
+                                                    .storeSlice("o".beginParse())
+                                                    .storeRef(
+                                                        beginCell()
+                                                            .storeSlice("v".beginParse())
+                                                            .storeRef(
+                                                                beginCell()
+                                                                    .storeSlice("e".beginParse())
+                                                                    .endCell(),
+                                                            )
+                                                            .endCell(),
+                                                    )
+                                                    .endCell(),
+                                            )
+                                            .endCell(),
+                                    )
+                                    .endCell(),
+                            )
+                            .endCell(),
+                    )
+                    .endCell();
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+              {
+                   assert (
+                       msg.signersHash == storage.signers.hashCell() &&
+                       msg.approvalsNum >= storage.threshold
+                   ) throw ERROR_SIGNERS_OUTDATED;
+              }
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                {
+                    assert (
+                        msg.signersHash == storage.signers.hashCell() &&
+                        msg.approvalsNum >= storage.threshold
+                    ) throw ERROR_SIGNERS_OUTDATED;
+                }
+            }"#]],
+        80,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+              {
+                   {
+                       val (signerIndex, foundSigner) = storage.remaining.signers.findSignerByAddress(in
+                       .senderAddress);
+                   }
+              }
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                {
+                    {
+                        val (signerIndex, foundSigner) = storage
+                            .remaining
+                            .signers
+                            .findSignerByAddress(in.senderAddress);
+                    }
+                }
+            }"#]],
+        80,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+              val forwardFees = calculateForwardFee(
+                  BASECHAIN,
+                  INIT_ORDER_BIT_OVERHEAD + orderBits + signersBits,
+                  INIT_ORDER_CELL_OVERHEAD + orderCells + signersCells
+              ) +
+              calculateForwardFee(
+                  BASECHAIN,
+                  EXECUTE_ORDER_BIT_OVERHEAD + orderBits,
+                  EXECUTE_ORDER_CELL_OVERHEAD + orderCells
+              );
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                val forwardFees = calculateForwardFee(
+                    BASECHAIN,
+                    INIT_ORDER_BIT_OVERHEAD + orderBits + signersBits,
+                    INIT_ORDER_CELL_OVERHEAD + orderCells + signersCells,
+                ) +
+                calculateForwardFee(
+                    BASECHAIN,
+                    EXECUTE_ORDER_BIT_OVERHEAD + orderBits,
+                    EXECUTE_ORDER_CELL_OVERHEAD + orderCells,
+                );
+            }"#]],
+        80,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+              if (count > HIGHLOAD_MAX_INLINE_ACTIONS) {
+                  val chained = self.packActionsRange(
+                      messages,
+                      start + HIGHLOAD_CHAIN_CUT,
+                      count - HIGHLOAD_CHAIN_CUT,
+                      value,
+                      queryId
+                  );
+                  val chainMode = value > 0 ? SEND_MODE_PAY_FEES_SEPARATELY : SEND_MODE_CARRY_ALL_BALANCE;
+
+                  var head = packSendActionsToCell(messages, start, HIGHLOAD_CHAIN_CUT) as Cell<OutList>;
+                  head = OutList {
+                      prev: head,
+                      action: OutActionSendMessage { mode: chainMode as uint8, outMsg: chained.messageCell } as OutAction,
+                  }.toCell();
+
+                  return self.createInternalTransferMessageFromActionsCell(queryId, head, value);
+              }
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                if (count > HIGHLOAD_MAX_INLINE_ACTIONS) {
+                    val chained = self.packActionsRange(
+                        messages,
+                        start + HIGHLOAD_CHAIN_CUT,
+                        count - HIGHLOAD_CHAIN_CUT,
+                        value,
+                        queryId,
+                    );
+                    val chainMode = value > 0 ? SEND_MODE_PAY_FEES_SEPARATELY : SEND_MODE_CARRY_ALL_BALANCE;
+
+                    var head = packSendActionsToCell(messages, start, HIGHLOAD_CHAIN_CUT) as Cell<OutList>;
+                    head = OutList {
+                        prev: head,
+                        action: OutActionSendMessage {
+                            mode: chainMode as uint8,
+                            outMsg: chained.messageCell,
+                        } as OutAction,
+                    }.toCell();
+
+                    return self.createInternalTransferMessageFromActionsCell(queryId, head, value);
+                }
+            }"#]],
+        100,
+    );
+    check_with_width(
+        r#"
+        fun test() {
+              val outMsg = createMessage({
+                  bounce: false,
+                  value: ton("123"),
+                  dest: testAddr,
+                  body: testBody,
+              })
+                  .messageCell;
+        }
+        "#,
+        expect![[r#"
+            fun test() {
+                val outMsg = createMessage({
+                    bounce: false,
+                    value: ton("123"),
+                    dest: testAddr,
+                    body: testBody,
+                }).messageCell;
+            }"#]],
+        100,
     );
 }
 

@@ -180,6 +180,7 @@ where
     Union(T, T),
     Column(T::ColumnFn),
     Nesting(T::ColumnFn),
+    BreakParent,
     Fail,
 }
 
@@ -251,6 +252,7 @@ where
             Doc::Union(l, r) => f.debug_tuple("Union").field(l).field(r).finish(),
             Doc::Column(_) => f.debug_tuple("Column(..)").finish(),
             Doc::Nesting(_) => f.debug_tuple("Nesting(..)").finish(),
+            Doc::BreakParent => f.debug_tuple("BreakParent").finish(),
             Doc::Fail => f.debug_tuple("Fail").finish(),
         }
     }
@@ -348,6 +350,11 @@ where
     #[inline]
     pub fn fail() -> Self {
         Doc::Fail.into()
+    }
+
+    #[inline]
+    pub fn break_parent() -> Self {
+        Doc::BreakParent.into()
     }
 
     #[inline]
@@ -513,6 +520,11 @@ where
     pub const fn fail() -> Self {
         Doc::Fail
     }
+
+    #[inline]
+    pub const fn break_parent() -> Self {
+        Doc::BreakParent
+    }
 }
 
 impl<'a, D, A> Doc<'a, D, A>
@@ -552,6 +564,11 @@ where
     #[inline]
     pub const fn fail() -> Self {
         BuildDoc::Doc(Doc::Fail)
+    }
+
+    #[inline]
+    pub const fn break_parent() -> Self {
+        BuildDoc::Doc(Doc::BreakParent)
     }
 }
 
@@ -945,6 +962,12 @@ where
     #[inline]
     fn fail(&'a self) -> DocBuilder<'a, Self, A> {
         DocBuilder(self, Doc::Fail.into())
+    }
+
+    /// Break all parent groups.
+    #[inline]
+    fn break_parent(&'a self) -> DocBuilder<'a, Self, A> {
+        DocBuilder(self, Doc::BreakParent.into())
     }
 
     /// Allocate a single hardline.
@@ -1949,6 +1972,18 @@ mod tests {
 
         test!(5, doc, "12345");
         test!(4, doc, "abc");
+    }
+
+    #[test]
+    fn break_parent_forces_group_break() {
+        let doc: RcDoc<()> = RcDoc::group(
+            RcDoc::text("a")
+                .append(RcDoc::line())
+                .append(RcDoc::break_parent())
+                .append(RcDoc::text("b")),
+        );
+
+        test!(doc, "a\nb");
     }
 
     struct TestWriter<W> {

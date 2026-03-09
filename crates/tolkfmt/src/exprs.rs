@@ -36,6 +36,97 @@ pub fn print_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>>
     Some(RcDoc::concat(docs))
 }
 
+struct MethodChainDoc<'a> {
+    base: RcDoc<'a>,
+    links: Vec<MethodChainLink<'a>>,
+    has_dot_link: bool,
+    base_is_object_lit: bool,
+}
+
+struct MethodChainLink<'a> {
+    doc: RcDoc<'a>,
+}
+
+fn collect_method_chain_doc<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<MethodChainDoc<'a>> {
+    match expr {
+        Expr::DotAccess(dot) => {
+            let obj = dot.obj()?;
+            let mut chain = collect_method_chain_doc(ctx, &obj)?;
+
+            let field_doc = match dot.field()? {
+                DotAccessField::Ident(i) => print_simple_node(ctx, &i.0)?,
+                DotAccessField::NumericIndex(n) => print_simple_node(ctx, &n.0)?,
+            };
+
+            chain.links.push(MethodChainLink {
+                doc: RcDoc::concat([RcDoc::text("."), field_doc]),
+            });
+            chain.has_dot_link = true;
+            Some(chain)
+        }
+        Expr::Call(call) => {
+            let callee = call.callee()?;
+            let mut chain = collect_method_chain_doc(ctx, &callee)?;
+            let args: Vec<_> = call.arguments().collect();
+            let args_doc = print_argument_list(ctx, &args)?;
+
+            if chain.has_dot_link {
+                if let Some(last) = chain.links.last_mut() {
+                    last.doc = last.doc.clone().append(args_doc);
+                } else {
+                    chain.base = chain.base.append(args_doc);
+                }
+                Some(chain)
+            } else {
+                let callee_doc = print_expression(ctx, &callee)?;
+                Some(MethodChainDoc {
+                    base: RcDoc::concat([callee_doc, args_doc]),
+                    links: vec![],
+                    has_dot_link: false,
+                    base_is_object_lit: false,
+                })
+            }
+        }
+        _ => Some(MethodChainDoc {
+            base: print_expression(ctx, expr)?,
+            links: vec![],
+            has_dot_link: false,
+            base_is_object_lit: matches!(expr, Expr::ObjectLit(_)),
+        }),
+    }
+}
+
+fn print_method_chain_expression<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>> {
+    let chain = collect_method_chain_doc(ctx, expr)?;
+    if !chain.has_dot_link {
+        return Some(chain.base);
+    }
+
+    let keep_single_link_attached = chain.links.len() == 1;
+
+    let mut tail = Vec::with_capacity(chain.links.len() * 3);
+    for (index, link) in chain.links.into_iter().enumerate() {
+        let separator = if index == 0 && (chain.base_is_object_lit || keep_single_link_attached)
+        {
+            RcDoc::nil()
+        } else {
+            RcDoc::line_()
+        };
+        tail.push(separator);
+        // If a part of the chain breaks, force parent groups to break too.
+        tail.push(RcDoc::break_parent().flat_alt(RcDoc::nil()));
+        tail.push(link.doc);
+    }
+
+    let tail_doc = if keep_single_link_attached {
+        RcDoc::concat(tail)
+    } else {
+        RcDoc::concat(tail).nest(4)
+    };
+
+    Some(RcDoc::group(RcDoc::concat([chain.base, tail_doc])))
+}
+
 fn print_expression_naked<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a>> {
     match expr {
         Expr::VarDeclLhs(node) => print_var_declaration_lhs(ctx, node),
@@ -48,8 +139,7 @@ fn print_expression_naked<'a>(ctx: &Context<'_>, expr: &Expr) -> Option<RcDoc<'a
         Expr::AsCast(cast) => print_cast_as_operator(ctx, cast),
         Expr::IsType(is_type) => print_is_type_operator(ctx, is_type),
         Expr::NotNull(not_null) => print_not_null_operator(ctx, not_null),
-        Expr::DotAccess(dot) => print_dot_access(ctx, dot),
-        Expr::Call(call) => print_function_call(ctx, call),
+        Expr::DotAccess(_) | Expr::Call(_) => print_method_chain_expression(ctx, expr),
         Expr::Instantiation(r#gen) => print_generic_instantiation(ctx, r#gen),
         Expr::Paren(paren) => print_parenthesized_expression(ctx, paren),
         Expr::Match(match_expr) => print_match_expression(ctx, match_expr),
