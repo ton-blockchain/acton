@@ -1,5 +1,5 @@
 use crate::pretty::RcDoc;
-use crate::{Context, common};
+use crate::{Context, common, comments};
 use std::collections::HashMap;
 use tree_sitter::Node;
 
@@ -319,5 +319,24 @@ pub fn has_fmt_ignore(ctx: &Context<'_>, comments: Option<&Vec<Comment>>) -> boo
                 let text = n.utf8_text(ctx.code.as_ref().as_bytes()).unwrap_or("");
                 text.trim() == "// fmt-ignore"
             })
+    })
+}
+
+pub fn has_inline_line_comment_in_subtree(ctx: &Context<'_>, root: Node<'_>) -> bool {
+    let root_start = root.start_byte();
+    let root_end = root.end_byte();
+
+    ctx.comments.iter().any(|(owner, comments)| {
+        owner.start_byte() >= root_start
+            && owner.end_byte() <= root_end
+            && comments.iter().any(|comment| {
+            comment.kind == comments::CommentKind::Inline
+                && comment.nodes.iter().any(|comment_node| {
+                comment_node
+                    .utf8_text(ctx.code.as_ref().as_ref())
+                    .ok()
+                    .is_some_and(|text| text.trim_start().starts_with("//"))
+            })
+        })
     })
 }

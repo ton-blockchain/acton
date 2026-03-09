@@ -1,3 +1,4 @@
+use crate::comments::has_inline_line_comment_in_subtree;
 use crate::pretty::RcDoc;
 use crate::{Context, comments, common, stmts, types};
 use tolk_syntax::*;
@@ -190,6 +191,16 @@ pub fn print_binary_operator<'a>(ctx: &Context<'_>, binary: &Bin) -> Option<RcDo
     let op = binary.operator_name(ctx.code.as_ref().as_ref()).to_string();
     let left_doc = print_expression(ctx, &left)?;
     let right_doc = print_expression(ctx, &right)?;
+
+    if has_inline_line_comment_in_subtree(ctx, left.syntax()) {
+        return Some(RcDoc::group(RcDoc::concat([
+            left_doc,
+            RcDoc::hardline(),
+            RcDoc::text(op),
+            RcDoc::space(),
+            RcDoc::group(right_doc),
+        ])));
+    }
 
     Some(RcDoc::group(RcDoc::concat([
         left_doc,
