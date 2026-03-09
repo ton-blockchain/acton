@@ -1,6 +1,6 @@
-import "@acton/io"
-import "@acton/fmt"
 import "@acton/env"
+import "@acton/fmt"
+import "@acton/io"
 import "@acton/build/build"
 import "@acton/emulation/network"
 
@@ -10,14 +10,14 @@ const ONCHAIN_CONTENT_PREFIX = 0x00
 const SNAKE_PREFIX = 0x00
 
 struct JettonInfo {
-    name: string,
-    description: string,
-    symbol: string,
-    image: string,
+    name: string
+    description: string
+    symbol: string
+    image: string
 }
 
 fun string.toSnakeString(self): cell {
-    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self.beginParse()).endCell()
+    return beginCell().storeUint(SNAKE_PREFIX, 8).storeSlice(self.beginParse()).endCell();
 }
 
 fun buildOnchainMetadata(info: JettonInfo): cell {
@@ -30,7 +30,10 @@ fun buildOnchainMetadata(info: JettonInfo): cell {
     dict.set("symbol".sha256(), info.symbol.toSnakeString());
     dict.set("image".sha256(), info.image.toSnakeString());
 
-    return beginCell().storeUint(ONCHAIN_CONTENT_PREFIX, 8).storeDict(dict.toLowLevelDict()).endCell()
+    return beginCell()
+        .storeUint(ONCHAIN_CONTENT_PREFIX, 8)
+        .storeDict(dict.toLowLevelDict())
+        .endCell();
 }
 
 fun main() {
@@ -47,7 +50,7 @@ fun main() {
     val minter = JettonMinter.fromStorage({
         totalSupply: supply,
         adminAddress: deployer.address,
-        content: content,
+        content,
         jettonWalletCode: build("jetton_wallet"),
     });
 
@@ -56,10 +59,18 @@ fun main() {
     deployRes.wait();
 
     println1("Minting tokens: {}", supply);
-    val mintRes = minter.sendMint(deployer.address, deployer.address, supply, ton("0.01"), ton("0.02"));
+    val mintRes = minter.sendMint(
+        deployer.address,
+        deployer.address,
+        supply,
+        ton("0.01"),
+        ton("0.02"),
+    );
     if (!mintRes.wait()) {
         return;
     }
 
-    println(format2("Successfully minted and transferred {} tokens to {}", supply, deployer.address));
+    println(
+        format2("Successfully minted and transferred {} tokens to {}", supply, deployer.address),
+    );
 }

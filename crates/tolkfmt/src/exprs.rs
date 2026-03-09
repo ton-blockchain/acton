@@ -102,7 +102,12 @@ fn print_node_with_detached_leading_comments<'a>(
 ) -> Option<(RcDoc<'a>, RcDoc<'a>, bool, bool)> {
     let comments = ctx.comments.get(&node);
     if comments.is_none() {
-        return Some((RcDoc::nil(), common::print_node_text(ctx, &node)?, false, false));
+        return Some((
+            RcDoc::nil(),
+            common::print_node_text(ctx, &node)?,
+            false,
+            false,
+        ));
     }
 
     let mut leading_docs = vec![];
@@ -157,12 +162,8 @@ fn collect_method_chain_doc<'a>(
                 RcDoc::concat([RcDoc::text("."), field_doc])
             };
 
-            let dot_doc = wrap_doc_with_node_comments(
-                ctx,
-                dot.syntax(),
-                link_doc,
-                include_expr_comments,
-            );
+            let dot_doc =
+                wrap_doc_with_node_comments(ctx, dot.syntax(), link_doc, include_expr_comments);
 
             chain.links.push(MethodChainLink {
                 doc: dot_doc,
@@ -189,8 +190,8 @@ fn collect_method_chain_doc<'a>(
                     let call_has_leading_comments =
                         include_expr_comments && has_leading_comments_on_node(ctx, call.syntax());
                     last.has_leading_comments |= call_has_leading_comments;
-                    let call_has_inline_line_comments =
-                        include_expr_comments && has_inline_line_comments_on_node(ctx, call.syntax());
+                    let call_has_inline_line_comments = include_expr_comments
+                        && has_inline_line_comments_on_node(ctx, call.syntax());
                     last.has_inline_line_comments |= call_has_inline_line_comments;
                 } else {
                     chain.base = chain.base.append(args_doc);
