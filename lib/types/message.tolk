@@ -235,10 +235,7 @@ struct (0b11) ExternalOutMessageInfo {
 /// - `0b0`: [InternalMessage]
 /// - `0b10`: [ExternalInMessageInfo]
 /// - `0b11`: [ExternalOutMessageInfo]
-type CommonMessageInfo =
-    | InternalMessage
-    | ExternalInMessageInfo
-    | ExternalOutMessageInfo
+type CommonMessageInfo = InternalMessage | ExternalInMessageInfo | ExternalOutMessageInfo
 
 /// Generic message structure with configurable body and info types.
 ///

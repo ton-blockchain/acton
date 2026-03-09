@@ -25,9 +25,7 @@ struct BigArray<T> {
 ///
 /// Use this constructor to initialize a new chunked array.
 fun BigArray<T>.createEmpty(): BigArray<T> {
-    return BigArray<T> {
-        arr: [array<array<T>> [], 0],
-    }
+    return BigArray<T> { arr: [array<array<T>> [], 0] };
 }
 
 /// Creates [BigArray] and fills it with all elements from [items].
@@ -39,9 +37,7 @@ fun BigArray<T>.createFromArray(items: array<T>): BigArray<T> {
         return BigArray<T>.createEmpty();
     }
 
-    return BigArray<T> {
-        arr: [[items], items.size()],
-    };
+    return BigArray<T> { arr: [[items], items.size()] };
 }
 
 /// Returns the first element of a non-empty [BigArray].

@@ -22,12 +22,12 @@
 /// ```
 
 import "@stdlib/reflection"
-import "assert"
-import "expect"
 import "../fmt"
 import "../ffi/ffi"
 import "../types/message"
 import "../types/out_actions"
+import "assert"
+import "expect"
 
 /// Expect the out action at the given index to be a send message that can be loaded as `MessageRelaxed<Msg>`.
 ///
@@ -74,7 +74,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
                         opcode,
                         opcodeTypeName == null ? "" : format1(" ({})", opcodeTypeName),
                     ),
-                    self.location
+                    self.location,
                 );
                 return;
             }
@@ -83,10 +83,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
         return;
     }
 
-    Assert.fail(
-        format1("Out action at index {} is not a send message", index),
-        self.location
-    );
+    Assert.fail(format1("Out action at index {} is not a send message", index), self.location);
 }
 
 struct expectImpl
@@ -96,8 +93,8 @@ fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string): never {
         format2(
             "Out action is a send message, but it cannot be load as a `{}` due to exit code {}",
             reflect.typeNameOf<Msg>(),
-            exitCode
+            exitCode,
         ),
-        location
+        location,
     );
 }

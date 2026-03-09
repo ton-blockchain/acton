@@ -70,7 +70,13 @@ fun format1<T1>(fmt: string, arg1: T1): string {
 /// println(msg);  // prints "name: John"
 /// ```
 fun format2<T1, T2>(fmt: string, arg1: T1, arg2: T2): string {
-    return ffi.format2(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple());
+    return ffi.format2(
+        fmt,
+        reflect.typeNameOfObject(arg1),
+        arg1.toTuple(),
+        reflect.typeNameOfObject(arg2),
+        arg2.toTuple(),
+    );
 }
 
 /// Formats a string with 3 arguments.
@@ -83,7 +89,15 @@ fun format2<T1, T2>(fmt: string, arg1: T1, arg2: T2): string {
 /// println(msg);  // prints "2 + 3 = 5"
 /// ```
 fun format3<T1, T2, T3>(fmt: string, arg1: T1, arg2: T2, arg3: T3): string {
-    return ffi.format3(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple(), reflect.typeNameOfObject(arg3), arg3.toTuple());
+    return ffi.format3(
+        fmt,
+        reflect.typeNameOfObject(arg1),
+        arg1.toTuple(),
+        reflect.typeNameOfObject(arg2),
+        arg2.toTuple(),
+        reflect.typeNameOfObject(arg3),
+        arg3.toTuple(),
+    );
 }
 
 /// Formats a string with 4 arguments.
@@ -96,7 +110,17 @@ fun format3<T1, T2, T3>(fmt: string, arg1: T1, arg2: T2, arg3: T3): string {
 /// println(msg);  // prints "a b c d"
 /// ```
 fun format4<T1, T2, T3, T4>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4): string {
-    return ffi.format4(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple(), reflect.typeNameOfObject(arg3), arg3.toTuple(), reflect.typeNameOfObject(arg4), arg4.toTuple());
+    return ffi.format4(
+        fmt,
+        reflect.typeNameOfObject(arg1),
+        arg1.toTuple(),
+        reflect.typeNameOfObject(arg2),
+        arg2.toTuple(),
+        reflect.typeNameOfObject(arg3),
+        arg3.toTuple(),
+        reflect.typeNameOfObject(arg4),
+        arg4.toTuple(),
+    );
 }
 
 /// Formats a string with 5 arguments.
@@ -108,8 +132,27 @@ fun format4<T1, T2, T3, T4>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4)
 /// val msg = format5("{} {} {} {} {}", 1, 2, 3, 4, 5);
 /// println(msg);  // prints "1 2 3 4 5"
 /// ```
-fun format5<T1, T2, T3, T4, T5>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): string {
-    return ffi.format5(fmt, reflect.typeNameOfObject(arg1), arg1.toTuple(), reflect.typeNameOfObject(arg2), arg2.toTuple(), reflect.typeNameOfObject(arg3), arg3.toTuple(), reflect.typeNameOfObject(arg4), arg4.toTuple(), reflect.typeNameOfObject(arg5), arg5.toTuple());
+fun format5<T1, T2, T3, T4, T5>(
+    fmt: string,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+): string {
+    return ffi.format5(
+        fmt,
+        reflect.typeNameOfObject(arg1),
+        arg1.toTuple(),
+        reflect.typeNameOfObject(arg2),
+        arg2.toTuple(),
+        reflect.typeNameOfObject(arg3),
+        arg3.toTuple(),
+        reflect.typeNameOfObject(arg4),
+        arg4.toTuple(),
+        reflect.typeNameOfObject(arg5),
+        arg5.toTuple(),
+    );
 }
 
 fun ffi.format1(fmt: string, type1: string, arg1: tuple): string
