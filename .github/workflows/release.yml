@@ -84,7 +84,7 @@ jobs:
       - name: Installing additional Rust components
         uses: taiki-e/install-action@v2
         with:
-          tool: nextest,just
+          tool: just
 
       - name: Install LLVM and Clang (don't cache)
         run: |
@@ -101,19 +101,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Cache TON artifacts
+      - name: Restore TON objects
         uses: actions/cache/restore@v5
         with:
-          path: ton-repo/artifacts
-          key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ matrix.os }}-
+          path: objs
+          key: ton-objs-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
           fail-on-cache-miss: true
-
-      - name: Copy TON artifacts to objs directory
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Detect architecture
         id: detect-arch
