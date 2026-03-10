@@ -18,7 +18,8 @@ permissions:
   actions: write
 
 jobs:
-  build-linux:
+  build:
+    name: Build
     strategy:
       matrix:
         os: [ ubicloud-standard-4-ubuntu-2204 ]
@@ -150,12 +151,62 @@ jobs:
         run: |
           acton test
 
+  lint:
+    name: Lint
+    strategy:
+      matrix:
+        os: [ ubicloud-standard-4-ubuntu-2204 ]
+    runs-on: ${{ matrix.os }}
+    if: true
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@v6
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Get TON commit hash
+        id: ton-commit
+        run: |
+          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
+          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Cache TON artifacts
+        id: cache-ton-artifacts
+        uses: actions/cache@v5
+        with:
+          path: ton-repo/artifacts
+          key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
+          restore-keys: ton-artifacts-${{ matrix.os }}-
+          fail-on-cache-miss: true
+
+      - name: Copy TON artifacts to objs directory
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
       - name: Run formatter and linter
         run: |
           just check-ci
 
   create-canary-release:
-    needs: [ build-linux ]
+    name: Create Canary Release
+    needs: [ build, lint ]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' && false
 
