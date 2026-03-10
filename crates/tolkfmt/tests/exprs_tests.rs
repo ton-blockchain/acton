@@ -268,6 +268,18 @@ fn test_function_call_breaking() {
 }
 
 #[test]
+fn test_single_long_string_argument_does_not_break() {
+    check_with_width(
+        r#"fun test() { log("This is a very very very very very long string argument"); }"#,
+        expect![[r#"
+                fun test() {
+                    log("This is a very very very very very long string argument");
+                }"#]],
+        20,
+    );
+}
+
+#[test]
 fn test_object_literal() {
     check(
         "fun test() { x = Point { x: 10, y: 20 }; }",

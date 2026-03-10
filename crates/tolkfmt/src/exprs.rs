@@ -530,7 +530,7 @@ pub fn print_argument_list<'a>(ctx: &Context<'_>, args: &[CallArgument]) -> Opti
     // TODO: better way?
     if args.len() == 1
         && let Some(single) = args.first()
-        && matches!(single.expr(), Some(Expr::ObjectLit(_)))
+        && matches!(single.expr(), Some(Expr::ObjectLit(_) | Expr::StringLit(_)))
     {
         return Some(RcDoc::group(RcDoc::concat([
             RcDoc::text("("),
