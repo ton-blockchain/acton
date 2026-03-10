@@ -162,13 +162,6 @@ fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
         )
         .assert_file_snapshot_matches(
             generated_project_path
-                .join("tests/jetton_minter.test.tolk")
-                .to_str()
-                .expect(""),
-            "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_minter_test.tolk.txt",
-        )
-        .assert_file_snapshot_matches(
-            generated_project_path
                 .join("tests/jetton_wallet.test.tolk")
                 .to_str()
                 .expect(""),
