@@ -25,7 +25,6 @@ jobs:
         os:
           - ubicloud-standard-4-ubuntu-2204
     runs-on: ${{ matrix.os }}
-    if: true
 
     outputs:
       ton_commit: ${{ steps.ton-commit.outputs.commit }}
