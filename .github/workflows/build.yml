@@ -18,11 +18,97 @@ permissions:
   actions: write
 
 jobs:
+  prepare:
+    name: Prepare TON objects
+    strategy: &linux_strategy
+      matrix:
+        os:
+          - ubicloud-standard-4-ubuntu-2204
+    runs-on: ${{ matrix.os }}
+    if: true
+
+    outputs:
+      ton_commit: ${{ steps.ton-commit.outputs.commit }}
+
+    steps:
+      - name: Get TON commit hash
+        id: ton-commit
+        run: |
+          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
+          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Cache TON artifacts
+        id: cache-ton-objs
+        uses: actions/cache/save@v5
+        with:
+          path: objs
+          key: ton-objs-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
+
+      - name: Check cache hits
+        run: |
+          echo 'TON artifacts: ${{ steps.cache-ton-objs.outputs.cache-hit }}'
+
+      - name: Install system dependencies (cache not exist)
+        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
+          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+
+      - name: Maximize Build Space
+        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      - name: Clone TON repository
+        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: i582/ton
+          ref: ${{ steps.ton-commit.outputs.commit }}
+          fetch-depth: 1
+          submodules: true
+          path: ton-repo
+
+      - name: Build TON static libraries
+        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+        env:
+          CC: clang-16
+          CXX: clang++-16
+          AR: llvm-ar-16
+          RANLIB: llvm-ranlib-16
+        run: |
+          cd ton-repo
+          cp assembly/native/build-ubuntu-static.sh .
+          chmod +x build-ubuntu-static.sh
+          ./build-ubuntu-static.sh -a -c
+
+      - name: Show ccache stats
+        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+        run: ccache -s
+
+      - name: Collect TON objects
+        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
+      - name: Cache TON objects
+        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: objs
+          key: ton-objs-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
+
   build:
     name: Build
-    strategy:
-      matrix:
-        os: [ ubicloud-standard-4-ubuntu-2204 ]
+    needs: [ prepare ]
+    strategy: *linux_strategy
     runs-on: ${{ matrix.os }}
     if: true
 
@@ -47,79 +133,19 @@ jobs:
         with:
           tool: nextest,just
 
+      - name: Restore TON objects
+        uses: actions/cache/restore@v5
+        with:
+          path: objs
+          key: ton-objs-${{ matrix.os }}-${{ needs.prepare.outputs.ton_commit }}
+          fail-on-cache-miss: true
+
       - name: Install LLVM and Clang (don't cache)
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 16 clang
           rm llvm.sh
-
-      - name: Get TON commit hash
-        id: ton-commit
-        run: |
-          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
-          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Cache TON artifacts
-        id: cache-ton-artifacts
-        uses: actions/cache@v5
-        with:
-          path: ton-repo/artifacts
-          key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ matrix.os }}-
-
-      - name: Check cache hits
-        run: |
-          echo 'TON artifacts: ${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
-
-      - name: Install system dependencies (cache not exist)
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
-          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
-
-      - name: Maximize Build Space
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      - name: Clone TON repository
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: actions/checkout@v6
-        with:
-          repository: i582/ton
-          ref: pmakhnev/acton
-          fetch-depth: 1
-          submodules: true
-          path: ton-repo
-
-      - name: Build TON static libraries
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        env:
-          CC: clang-16
-          CXX: clang++-16
-          AR: llvm-ar-16
-          RANLIB: llvm-ranlib-16
-        run: |
-          cd ton-repo
-          cp assembly/native/build-ubuntu-static.sh .
-          chmod +x build-ubuntu-static.sh
-          ./build-ubuntu-static.sh -a -c
-
-      - name: Show ccache stats
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: ccache -s
-
-      - name: Copy TON artifacts to objs directory
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Detect architecture
         id: detect-arch
@@ -153,9 +179,8 @@ jobs:
 
   lint:
     name: Lint
-    strategy:
-      matrix:
-        os: [ ubicloud-standard-4-ubuntu-2204 ]
+    needs: [ prepare ]
+    strategy: *linux_strategy
     runs-on: ${{ matrix.os }}
     if: true
 
@@ -177,28 +202,12 @@ jobs:
         with:
           tool: just
 
-      - name: Get TON commit hash
-        id: ton-commit
-        run: |
-          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
-          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Cache TON artifacts
-        id: cache-ton-artifacts
-        uses: actions/cache@v5
+      - name: Restore TON objects
+        uses: actions/cache/restore@v5
         with:
-          path: ton-repo/artifacts
-          key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ matrix.os }}-
+          path: objs
+          key: ton-objs-${{ matrix.os }}-${{ needs.prepare.outputs.ton_commit }}
           fail-on-cache-miss: true
-
-      - name: Copy TON artifacts to objs directory
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Run formatter and linter
         run: |
