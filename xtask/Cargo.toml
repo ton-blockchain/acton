@@ -14,8 +14,10 @@ license = { workspace = true }
 workspace = true
 
 [dependencies]
+acton-config = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
+schemars = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

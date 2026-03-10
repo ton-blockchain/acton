@@ -54,9 +54,12 @@ typos:
 check-docgen:
     cargo run -- docgen --check # always use latest acton
 
+check-schema:
+    cargo run -p xtask -- schema --check
+
 check-ci: fmt-check check-docgen check-deps clippy typos
 
-check: check-ci test
+check: check-ci check-schema test
 
 coverage-setup:
     cargo install cargo-llvm-cov
