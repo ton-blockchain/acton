@@ -177,7 +177,6 @@ jobs:
           acton --help
 
       - name: Run tests
-        if: false
         run: |
           just test
 
