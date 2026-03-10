@@ -41,7 +41,7 @@ jobs:
 
       - name: Cache TON artifacts
         id: cache-ton-objs
-        uses: actions/cache/save@v5
+        uses: actions/cache/restore@v5
         with:
           path: objs
           key: ton-objs-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
