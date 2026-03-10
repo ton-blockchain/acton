@@ -344,14 +344,10 @@ pub fn verify_cmd(
     let cell = Boc::decode(cell_data)?;
     let cell_boc64 = Boc::encode_base64(&cell);
 
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key)?;
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
-    wait_for_rate_limit(&api_key);
-
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
-
-    wait_for_rate_limit(&api_key);
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
@@ -536,14 +532,6 @@ fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Resul
 fn remove_random<T>(els: &mut Vec<T>) -> T {
     let index = (rand::random::<usize>()) % els.len();
     els.remove(index)
-}
-
-fn wait_for_rate_limit(api_key: &Option<String>) {
-    if api_key.is_none() {
-        // rate limit
-        println!("  {} Waiting for Toncenter rate limit", "→".blue().bold());
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
 }
 
 fn show_verifier_link(network: &Network, contract_address: TonAddress) {

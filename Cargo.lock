@@ -2536,6 +2536,7 @@ version = "0.0.9"
 dependencies = [
  "anyhow",
  "base64",
+ "log",
  "num-bigint",
  "reqwest",
  "serde",
@@ -3539,6 +3540,7 @@ name = "ton-api"
 version = "0.0.9"
 dependencies = [
  "anyhow",
+ "log",
  "num-bigint",
  "reqwest",
  "serde",

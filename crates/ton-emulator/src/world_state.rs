@@ -15,7 +15,6 @@ use std::env;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 use ton_api::TonApiClient;
 use ton_executor::{DEFAULT_CONFIG, DEFAULT_CONFIG_CELL, DEFAULT_CONFIG_DICT};
 use ton_networks::Network;
@@ -26,8 +25,6 @@ use tycho_types::models::{
     Account, AccountState, CurrencyCollection, IntAddr, OptionalAccount, ShardAccount, StateInit,
     StdAddr, StorageInfo,
 };
-
-const TONCENTER_RATE_LIMIT_DELAY: Duration = Duration::from_millis(1000);
 
 /// Represents the source of the world state.
 ///
@@ -242,11 +239,6 @@ impl RemoteAccountState {
         };
         if let Some(cached) = self.cache.get(&cache_key) {
             return Ok(cached);
-        }
-
-        if self.api_key.is_none() {
-            // we need to wait for TonCenter rate limit
-            std::thread::sleep(TONCENTER_RATE_LIMIT_DELAY);
         }
 
         let info = self

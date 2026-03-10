@@ -39,6 +39,9 @@ You can provide the TonCenter key either as a flag or via environment:
 export TONCENTER_API_KEY=your_key_here
 ```
 
+If no key is provided, retrace applies a built-in TonCenter request throttle
+(1 request per second) to reduce rate-limit failures.
+
 For library-cell fallback lookups, retrace also supports:
 
 ```bash

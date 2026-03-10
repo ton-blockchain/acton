@@ -19,6 +19,7 @@ urlencoding = { workspace = true }
 num-bigint = { workspace = true }
 tycho-types = { workspace = true }
 ton-networks = { workspace = true }
+log = "0.4.29"
 
 [lints]
 workspace = true

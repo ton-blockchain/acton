@@ -6,6 +6,13 @@ use crate::types::{
 };
 use reqwest::Client;
 use serde::Deserialize;
+use std::sync::LazyLock;
+use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
+
+const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1200);
+static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 /// Client for `TonCenter` V2/V3 API.
 ///
@@ -31,6 +38,27 @@ impl TonCenterClient {
         }
     }
 
+    /// Applies a simple global rate limit for unauthenticated TonCenter requests.
+    ///
+    /// TonCenter has stricter limits without an API key, so we serialize
+    /// requests and keep at least 1 second between request starts.
+    async fn maybe_wait_for_rate_limit(&self) {
+        if self.api_key.is_some() {
+            return;
+        }
+
+        let mut last_request = TONCENTER_REQUEST_GATE.lock().await;
+        if let Some(last) = *last_request {
+            let elapsed = last.elapsed();
+            if elapsed < TONCENTER_MIN_REQUEST_INTERVAL {
+                let wait_for = TONCENTER_MIN_REQUEST_INTERVAL - elapsed;
+                log::debug!("throttle for {:?}", wait_for);
+                tokio::time::sleep(wait_for).await;
+            }
+        }
+        *last_request = Some(Instant::now());
+    }
+
     /// Fetches transaction metadata by its hash using V3 API.
     pub(crate) async fn get_transactions(
         &self,
@@ -46,6 +74,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V3 returned status: {}", response.status());
@@ -82,6 +111,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V3 returned status: {}", response.status());
@@ -131,6 +161,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V2 returned status: {}", response.status());
@@ -159,6 +190,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V2 returned status: {}", response.status());
