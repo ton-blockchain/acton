@@ -19,8 +19,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
+permissions: { }
 
 jobs:
   cargo-deny:
@@ -30,12 +29,17 @@ jobs:
         os: [ ubicloud-standard-4-ubuntu-2204 ]
     runs-on: ${{ matrix.os }}
 
+    permissions:
+      contents: read
+
     steps:
       - name: Check out Acton repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           key: ${{ matrix.os }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -44,7 +48,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
         with:
           tool: cargo-deny
 

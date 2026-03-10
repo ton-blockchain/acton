@@ -16,6 +16,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: { }
+
 jobs:
   tree-sitter-grammars:
     name: Test tree-sitter-${{ matrix.language }} grammar
@@ -29,9 +31,14 @@ jobs:
           - tasm
     if: true
 
+    permissions:
+      contents: read
+
     steps:
       - name: Fetch Sources
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Enable Corepack
         run: corepack enable

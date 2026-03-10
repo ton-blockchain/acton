@@ -26,12 +26,14 @@ concurrency:
   group: cache-cleanup
   cancel-in-progress: true
 
+permissions: { }
+
 jobs:
   cleanup-cache:
     name: Delete unused caches
     runs-on: ubicloud-standard-2
+
     permissions:
-      contents: read
       actions: write
 
     steps:

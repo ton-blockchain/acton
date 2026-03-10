@@ -1,0 +1,38 @@
+name: Check Zizmor
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/**"
+  workflow_dispatch:
+
+permissions: { }
+
+jobs:
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@main
+        with:
+          advanced-security: 'false'
+          annotations: 'true'
+          online-audits: 'false'
+          min-severity: 'high'
