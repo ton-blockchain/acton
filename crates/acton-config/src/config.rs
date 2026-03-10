@@ -27,6 +27,7 @@ pub enum CheckOutputFormat {
     Json,
     Sarif,
     Github,
+    Gitlab,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Default)]
@@ -871,6 +872,23 @@ unused-variable = "warn"
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
         let lint_settings = config.lint.as_ref().unwrap();
         assert_eq!(lint_settings.max_warnings, usize::MAX);
+    }
+
+    #[test]
+    fn test_lint_config_parses_gitlab_output_format() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[lint]
+output-format = "gitlab"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let lint_settings = config.lint.as_ref().unwrap();
+        assert_eq!(lint_settings.output_format, Some(CheckOutputFormat::Gitlab));
     }
 
     #[test]

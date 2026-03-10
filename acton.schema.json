@@ -316,7 +316,7 @@
         },
         "output-format": {
           "type": "string",
-          "enum": ["plain", "json", "sarif", "github"],
+          "enum": ["plain", "json", "sarif", "github", "gitlab"],
           "description": "Output format for `acton check` diagnostics"
         },
         "rules": {

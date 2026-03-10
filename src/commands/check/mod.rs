@@ -235,6 +235,14 @@ pub fn check_cmd(
         CheckOutputFormat::Github => {
             output::github::write_report(&mut writer, &all_diagnostics, &file_db, &project_root)?;
         }
+        CheckOutputFormat::Gitlab => {
+            output::gitlab_code_quality::write_report(
+                &mut writer,
+                &all_diagnostics,
+                &file_db,
+                &project_root,
+            )?;
+        }
     }
 
     if output_format != CheckOutputFormat::Plain {
