@@ -312,6 +312,50 @@ fn send_message_impl(
     Ok(())
 }
 
+extension!(run_tick_tock in (Context) with (is_tock: BigInt, on_account: StdAddr) using run_tick_tock_impl);
+fn run_tick_tock_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    is_tock: BigInt,
+    on_account: StdAddr,
+) -> anyhow::Result<()> {
+    let emulator = &ctx.chain.emulator;
+    let is_tock = is_tock != BigInt::ZERO;
+
+    let addr = IntAddr::Std(on_account.clone());
+    let libs = ctx.chain.build_libs(&addr);
+
+    // TODO: debug mode support for tick-tock (send_message_debug equivalent)
+    let emulations = emulator
+        .run_tick_tock(ctx.chain.world_state, &on_account, is_tock, &libs)
+        .context("Cannot run tick-tock transaction")?;
+
+    if let [SendMessageResult::Error(error), ..] = &emulations[..]
+        && emulations.len() == 1
+    {
+        ctx.chain
+            .emulations
+            .save_message(&ctx.env.running_id, emulations.clone());
+
+        anyhow::bail!("Cannot run tick-tock transaction: {}", error.error)
+    }
+
+    let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
+        SendMessageResult::Success(res) => Some(res),
+        SendMessageResult::Error(_) => None,
+    });
+
+    let transaction_cells = successful_emulations
+        .filter_map(emulation_to_send_result)
+        .collect::<Vec<_>>();
+
+    ctx.chain
+        .emulations
+        .save_message(&ctx.env.running_id, emulations);
+    stack.push(TupleItem::big_array_from_items(transaction_cells));
+    Ok(())
+}
+
 fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<TupleItem> {
     let child_txs = Tuple(
         emulation
@@ -343,6 +387,10 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
 
     let gas_used = match parsed_tx.load_info() {
         Ok(TxInfo::Ordinary(info)) => match info.compute_phase {
+            ComputePhase::Executed(compute) => compute.gas_used.into(),
+            _ => BigInt::ZERO,
+        },
+        Ok(TxInfo::TickTock(info)) => match info.compute_phase {
             ComputePhase::Executed(compute) => compute.gas_used.into(),
             _ => BigInt::ZERO,
         },
@@ -1457,5 +1505,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         33 => get_shard_account : 1,
         34 => set_shard_account : 2,
         35 => save_trace_name : 2,
+        36 => run_tick_tock : 2,
     });
 }

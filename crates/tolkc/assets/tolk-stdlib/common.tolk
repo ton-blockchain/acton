@@ -1534,7 +1534,7 @@ const RESERVE_MODE_EXACT_AMOUNT = 0
 const RESERVE_MODE_ALL_BUT_AMOUNT = 1
 /// +2: Actually set `min(amount, currentContractBalance)` (without this mode, if amount is greater, the action will fail)
 const RESERVE_MODE_AT_MOST = 2
-/// +4: [amount] is increased by the _original_ balance of the current account (before the compute phase).
+/// +4: `amount` is increased by the _original_ balance of the current account (before the compute phase).
 const RESERVE_MODE_INCREASE_BY_ORIGINAL_BALANCE = 4
 /// +8: Actually sets `amount = -amount` before performing any further actions.
 const RESERVE_MODE_NEGATE_AMOUNT = 8
