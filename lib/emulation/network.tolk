@@ -491,6 +491,20 @@ fun net.sendExternal(msg: OutMessage): SendResultList? {
     );
 }
 
+/// Runs a tick or tock transaction on the specified account.
+///
+/// Tick-tock transactions have no incoming message and are triggered by the blockchain
+/// on special accounts (e.g., elector, config).
+///
+/// Example:
+/// ```tolk
+/// val results = net.runTickTock(electorAddress, false); // run tick
+/// val results = net.runTickTock(electorAddress, true);  // run tock
+/// ```
+fun net.runTickTock(onAccount: address, isTock: bool): SendResultList {
+    return ffi.runTickTock(onAccount, isTock);
+}
+
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
 ///
 /// Example:
@@ -1290,3 +1304,4 @@ fun ffi.setConfig(config: dict): bool asm "32 EXTCALL"
 fun ffi.getShardAccount(addr: address): cell? asm "33 EXTCALL";
 fun ffi.setShardAccount(addr: address, account: cell?): void asm "34 EXTCALL";
 fun ffi.saveTraceName(txs: SendResultList, name: string): void asm "35 EXTCALL";
+fun ffi.runTickTock(onAccount: address, isTock: bool): SendResultList asm "36 EXTCALL";
