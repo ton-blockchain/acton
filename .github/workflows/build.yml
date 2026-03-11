@@ -129,7 +129,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.runner }}
-          save-if: github.ref == 'refs/heads/master'
+          save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install Rust
         run: rustup toolchain install
@@ -207,7 +207,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.runner }}
-          save-if: github.ref == 'refs/heads/master'
+          save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install Rust
         run: rustup toolchain install
