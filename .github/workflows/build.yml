@@ -22,9 +22,11 @@ jobs:
     name: Prepare TON objects
     strategy: &runner_strategy
       matrix:
-        os:
-          - ubicloud-standard-4-ubuntu-2204
-    runs-on: ${{ matrix.os }}
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            os: linux
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
 
     outputs:
       ton_commit: ${{ steps.ton-commit.outputs.commit }}
@@ -43,7 +45,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: objs
-          key: ton-objs-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
+          key: ton-objs-${{ matrix.runner }}-${{ steps.ton-commit.outputs.commit }}
 
       - name: Check cache hits
         run: |
@@ -110,17 +112,14 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: objs
-          key: ton-objs-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
+          key: ton-objs-${{ matrix.runner }}-${{ steps.ton-commit.outputs.commit }}
 
   build:
-    name: Build
+    name: Build (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy: *runner_strategy
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     if: true
-
-    outputs:
-      arch: ${{ steps.detect-arch.outputs.arch }}
 
     steps:
       - name: Check out Acton repository
@@ -129,8 +128,8 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.os }}
-          save-if: ${{ github.ref == 'refs/heads/master' }}
+          key: ${{ matrix.runner }}
+          save-if: github.ref == 'refs/heads/master'
 
       - name: Install Rust
         run: rustup toolchain install
@@ -144,7 +143,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: objs
-          key: ton-objs-${{ matrix.os }}-${{ needs.prepare.outputs.ton_commit }}
+          key: ton-objs-${{ matrix.runner }}-${{ needs.prepare.outputs.ton_commit }}
           fail-on-cache-miss: true
 
       - name: Install LLVM and Clang
@@ -153,10 +152,6 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 16 clang
           rm llvm.sh
-
-      - name: Detect architecture
-        id: detect-arch
-        run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
@@ -167,10 +162,10 @@ jobs:
           CXX: clang++-16
         run: |
           just build-ui
-          cargo build --bin acton
+          just build
 
       - name: Add acton to PATH
-        run: echo "${GITHUB_WORKSPACE}/target/debug" >> "$GITHUB_PATH"
+        run: echo "${GITHUB_WORKSPACE}/target/release" >> "$GITHUB_PATH"
 
       - name: Test acton binary
         run: |
@@ -184,11 +179,24 @@ jobs:
         run: |
           acton test
 
+      - name: Prepare trunk archive
+        if: github.ref == 'refs/heads/master'
+        run: |
+          tar -C target/release -czf target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz acton
+
+      - name: Upload trunk archive artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v7
+        with:
+          name: acton-${{ matrix.os }}-${{ matrix.arch }}
+          path: target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
   lint:
-    name: Lint
+    name: Lint (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy: *runner_strategy
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     if: true
 
     steps:
@@ -198,8 +206,8 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.os }}
-          save-if: ${{ github.ref == 'refs/heads/master' }}
+          key: ${{ matrix.runner }}
+          save-if: github.ref == 'refs/heads/master'
 
       - name: Install Rust
         run: rustup toolchain install
@@ -213,74 +221,80 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: objs
-          key: ton-objs-${{ matrix.os }}-${{ needs.prepare.outputs.ton_commit }}
+          key: ton-objs-${{ matrix.runner }}-${{ needs.prepare.outputs.ton_commit }}
           fail-on-cache-miss: true
 
       - name: Run formatter and linter
         run: |
           just check-ci
 
-  create-canary-release:
-    name: Create Canary Release
-    needs: [ build, lint ]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && false
+  create-trunk-release:
+    name: Create Trunk Release
+    needs: [ build ]
+    runs-on: ubicloud-standard-2
+    if: github.ref == 'refs/heads/master'
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Download Linux binary
-        uses: actions/download-artifact@v7
+      - name: Download trunk archives
+        uses: actions/download-artifact@v8
         with:
-          name: acton-linux-binary
-          path: binaries/linux/
+          pattern: acton-*
+          path: artifacts/
+          merge-multiple: true
 
-      - name: Make binaries executable
-        run: |
-          chmod +x binaries/linux/acton
+      - name: Delete download artifacts
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          # language=JavaScript
+          script: |
+            const {
+              data: artifacts
+            } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
 
-      - name: Create Linux archive
-        run: |
-          mkdir -p dist
-          tar -czf dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
-            -C binaries/linux acton
+            if (artifacts.total_count === 0) {
+              core.warning('No downloadable artifacts to delete');
+              return;
+            } else {
+              core.info(`Found ${artifacts.total_count} artifacts to delete`);
+            }
 
-      - name: Delete previous canary release and tag
+            for (const artifact of artifacts.artifacts) {
+              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+            }
+
+      - name: Display structure of downloaded files
+        run: ls -lhR artifacts
+
+      - name: Delete previous trunk release and tag
         env:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
         run: |
-          gh release delete canary -y || true
+          gh release delete trunk --repo "${GITHUB_REPOSITORY}" -y || true
 
           gh api \
-            repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
+            repos/${GITHUB_REPOSITORY}/git/refs/tags/trunk \
             -X DELETE || true
 
-      - name: Create canary release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: canary
-          release_name: Canary Build
-          body: |
-            Automated canary build of Acton.
-
-            ## Archives
-
-            - `acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz` — Linux archive
-
-            Built from commit: ${{ github.sha }}
-          draft: false
-          prerelease: true
+      - name: Create trunk release
         env:
-          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+        run: |
+          release_notes=$'Automated trunk build of Acton.\n\nBuilt from commit: '"${GITHUB_SHA}"
 
-      - name: Upload Linux archive to release
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_name: acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_content_type: application/gzip
-        env:
-          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          gh release create trunk \
+            --repo "${GITHUB_REPOSITORY}" \
+            artifacts/* \
+            --title "Trunk" \
+            --notes "${release_notes}" \
+            --prerelease \
+            --target "${GITHUB_SHA}"

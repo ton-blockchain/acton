@@ -8,6 +8,9 @@ all: precommit
 build:
     cargo build --release
 
+build-dev:
+    cargo build
+
 test-unit:
     {{ CARGO_TEST }} --workspace --lib --bins \
         --exclude retrace
