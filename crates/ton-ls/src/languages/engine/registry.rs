@@ -1,13 +1,20 @@
 use crate::backend::utils::SourceLanguage;
 use crate::languages::engine::adapter::{FiftSyntaxAdapter, TasmSyntaxAdapter, TomlSyntaxAdapter};
-use crate::languages::engine::cache::{IncrementalParseCache, ParsedSnapshot};
+use crate::languages::engine::cache::{CacheSyncResult, IncrementalParseCache, ParsedSnapshot};
 use lsp_types::{TextDocumentContentChangeEvent, Url};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct SelfContainedLanguageRegistry {
     tasm_cache: IncrementalParseCache<TasmSyntaxAdapter>,
     fift_cache: IncrementalParseCache<FiftSyntaxAdapter>,
     toml_cache: IncrementalParseCache<TomlSyntaxAdapter>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelfContainedDidChange {
+    pub has_snapshot: bool,
+    pub parse_failed: bool,
 }
 
 impl SelfContainedLanguageRegistry {
@@ -44,20 +51,20 @@ impl SelfContainedLanguageRegistry {
         uri: &Url,
         version: i32,
         changes: &[TextDocumentContentChangeEvent],
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<SelfContainedDidChange>> {
         match language {
             SourceLanguage::Tasm => Ok(self
                 .tasm_cache
                 .sync_changes(uri, version, changes)?
-                .map(|snapshot| snapshot.text.to_string())),
+                .map(map_sync_result)),
             SourceLanguage::Fift => Ok(self
                 .fift_cache
                 .sync_changes(uri, version, changes)?
-                .map(|snapshot| snapshot.text.to_string())),
+                .map(map_sync_result)),
             SourceLanguage::Toml => Ok(self
                 .toml_cache
                 .sync_changes(uri, version, changes)?
-                .map(|snapshot| snapshot.text.to_string())),
+                .map(map_sync_result)),
             SourceLanguage::Tolk | SourceLanguage::Unknown => Ok(None),
         }
     }
@@ -81,12 +88,31 @@ impl SelfContainedLanguageRegistry {
         self.tasm_cache.snapshot(uri)
     }
 
+    pub fn find_tasm_text(&self, uri: &Url) -> Option<Arc<str>> {
+        self.tasm_cache.text(uri)
+    }
+
     pub fn find_fift_file(&self, uri: &Url) -> Option<ParsedSnapshot<fift_syntax::SourceFile>> {
         self.fift_cache.snapshot(uri)
     }
 
+    pub fn find_fift_text(&self, uri: &Url) -> Option<Arc<str>> {
+        self.fift_cache.text(uri)
+    }
+
     pub fn find_toml_file(&self, uri: &Url) -> Option<ParsedSnapshot<toml_syntax::SourceFile>> {
         self.toml_cache.snapshot(uri)
+    }
+
+    pub fn find_toml_text(&self, uri: &Url) -> Option<Arc<str>> {
+        self.toml_cache.text(uri)
+    }
+}
+
+fn map_sync_result<TSourceFile>(result: CacheSyncResult<TSourceFile>) -> SelfContainedDidChange {
+    SelfContainedDidChange {
+        has_snapshot: result.snapshot.is_some(),
+        parse_failed: result.parse_failed,
     }
 }
 
@@ -121,18 +147,31 @@ mod tests {
 
         registry.did_open(SourceLanguage::Tasm, &uri, 1, "PUSHINT_4 1\n")?;
         assert!(registry.find_tasm_file(&uri).is_some());
+        let opened_text = registry
+            .find_tasm_text(&uri)
+            .expect("tasm text should be tracked after open");
+        assert_eq!(opened_text.as_ref(), "PUSHINT_4 1\n");
 
         let changes = vec![change(Some(range(0, 10, 0, 11)), "2")];
-        registry.did_change(SourceLanguage::Tasm, &uri, 2, &changes)?;
+        let change_result = registry
+            .did_change(SourceLanguage::Tasm, &uri, 2, &changes)?
+            .expect("change result should be present");
+        assert!(change_result.has_snapshot);
+        assert!(!change_result.parse_failed);
 
         let snapshot = registry
             .find_tasm_file(&uri)
             .expect("tasm snapshot should exist");
         assert_eq!(snapshot.text.as_ref(), "PUSHINT_4 2\n");
         assert_eq!(snapshot.version, 2);
+        let changed_text = registry
+            .find_tasm_text(&uri)
+            .expect("tasm text should be tracked after change");
+        assert_eq!(changed_text.as_ref(), "PUSHINT_4 2\n");
 
         registry.did_close(SourceLanguage::Tasm, &uri);
         assert!(registry.find_tasm_file(&uri).is_none());
+        assert!(registry.find_tasm_text(&uri).is_none());
         Ok(())
     }
 
@@ -142,8 +181,8 @@ mod tests {
         let uri = Url::parse("file:///tmp/registry-missing.tasm")?;
         let changes = vec![change(Some(range(0, 0, 0, 0)), "PUSHINT_4 1\n")];
 
-        let updated_text = registry.did_change(SourceLanguage::Tasm, &uri, 1, &changes)?;
-        assert!(updated_text.is_none());
+        let change_result = registry.did_change(SourceLanguage::Tasm, &uri, 1, &changes)?;
+        assert!(change_result.is_none());
         assert!(registry.find_tasm_file(&uri).is_none());
         Ok(())
     }

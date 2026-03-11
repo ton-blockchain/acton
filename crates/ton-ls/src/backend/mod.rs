@@ -135,12 +135,12 @@ impl LanguageServer for Backend {
 
         log::info!("Notification: did_open for {}", uri);
 
-        self.update_document(&uri, text.clone());
-
-        if language.is_self_contained()
-            && let Err(error) = self.registry.did_open(language, &uri, version, &text)
-        {
-            log::warn!("Failed to initialize self-contained cache for {uri}: {error}");
+        if language.is_self_contained() {
+            if let Err(error) = self.registry.did_open(language, &uri, version, &text) {
+                log::warn!("Failed to initialize self-contained cache for {uri}: {error}");
+            }
+        } else {
+            self.update_document(&uri, text.clone());
         }
 
         if language == SourceLanguage::Tolk {
@@ -171,7 +171,6 @@ impl LanguageServer for Backend {
         let language = detect_language(&uri);
 
         if language.is_self_contained() {
-            self.documents.remove(&uri);
             self.registry.did_close(language, &uri);
         }
     }
@@ -298,27 +297,19 @@ impl Backend {
             .registry
             .did_change(language, &uri, version, &params.content_changes)
         {
-            Ok(Some(updated_text)) => {
-                self.update_document(&uri, updated_text);
+            Ok(Some(change)) => {
+                if change.parse_failed {
+                    log::debug!(
+                        "Self-contained parse failed for {uri}; cached text/version advanced without snapshot"
+                    );
+                }
             }
             Ok(None) => {
-                let current_text = self
-                    .documents
-                    .get(&uri)
-                    .map(|d| d.clone())
-                    .unwrap_or_default();
-                let applied = apply_lsp_changes(&current_text, &params.content_changes);
-                self.update_document(&uri, applied.text);
-                log::debug!("No self-contained snapshot found for {uri} during did_change");
+                log::debug!(
+                    "No self-contained cache entry for {uri} during did_change; skipping text fallback"
+                );
             }
             Err(error) => {
-                let current_text = self
-                    .documents
-                    .get(&uri)
-                    .map(|d| d.clone())
-                    .unwrap_or_default();
-                let applied = apply_lsp_changes(&current_text, &params.content_changes);
-                self.update_document(&uri, applied.text);
                 log::warn!("Failed to sync self-contained cache for {uri}: {error}");
             }
         }

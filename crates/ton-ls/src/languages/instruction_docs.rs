@@ -80,13 +80,13 @@ pub fn get_tasm_spec() -> Option<&'static InstructionDocsIndex> {
         .as_ref()
 }
 
-pub fn build_hover_markdown(name: &str, tasp_spec: &InstructionDocsIndex) -> Option<String> {
-    if let Some(alias) = tasp_spec.alias(name) {
-        let actual_instruction = tasp_spec.instruction(&alias.actual_name);
+pub fn build_hover_markdown(name: &str, tasm_spec: &InstructionDocsIndex) -> Option<String> {
+    if let Some(alias) = tasm_spec.alias(name) {
+        let actual_instruction = tasm_spec.instruction(&alias.actual_name);
         return Some(format_alias_markdown(alias, actual_instruction));
     }
 
-    let instruction = tasp_spec.instruction(name)?;
+    let instruction = tasm_spec.instruction(name)?;
     Some(format_instruction_markdown(&instruction.name, instruction))
 }
 

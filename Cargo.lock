@@ -3892,6 +3892,7 @@ dependencies = [
  "toml",
  "toml-syntax",
  "ton-json-schema",
+ "ton-syntax",
  "tower-lsp",
  "tree-sitter",
 ]

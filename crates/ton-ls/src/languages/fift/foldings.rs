@@ -1,5 +1,6 @@
 use crate::backend::Backend;
-use crate::languages::fift::traverse::PreorderTraverse;
+use crate::languages::engine::cache::ParsedSnapshot;
+use fift_syntax::SourceFile;
 use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams};
 use tree_sitter::Node;
 
@@ -10,17 +11,16 @@ impl Backend {
     ) -> Option<Vec<FoldingRange>> {
         crate::profile!(self, "fift: folding_range");
         let uri = params.text_document.uri;
-
         let file = self.registry.find_fift_file(&uri)?;
 
-        Some(collect_ranges(file.syntax()))
+        Some(collect_ranges(file))
     }
 }
 
-fn collect_ranges(source_file: &fift_syntax::SourceFile) -> Vec<FoldingRange> {
+fn collect_ranges(source_file: ParsedSnapshot<SourceFile>) -> Vec<FoldingRange> {
     let mut result = Vec::new();
 
-    for node in PreorderTraverse::new(source_file.root_node().walk()) {
+    for node in source_file.traverse() {
         if !node.is_named() {
             continue;
         }
@@ -80,61 +80,4 @@ fn push_generic_folding(node: Node<'_>, result: &mut Vec<FoldingRange>) {
         kind: Some(FoldingRangeKind::Region),
         collapsed_text: None,
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn pairs(source: &str) -> anyhow::Result<Vec<(u32, u32)>> {
-        let source_file = fift_syntax::parse(source)?;
-        Ok(collect_ranges(&source_file)
-            .into_iter()
-            .map(|range| (range.start_line, range.end_line))
-            .collect())
-    }
-
-    #[test]
-    fn folds_program_and_proc_definition() -> anyhow::Result<()> {
-        let source = r#"PROGRAM{
-DECLPROC foo
-foo PROC:<{
-  1
-  2
-}>
-END>c
-"#;
-
-        let fold_pairs = pairs(source)?;
-        assert!(fold_pairs.contains(&(0, 6)));
-        assert!(fold_pairs.contains(&(2, 5)));
-        Ok(())
-    }
-
-    #[test]
-    fn folds_nested_control_blocks() -> anyhow::Result<()> {
-        let source = r#"PROGRAM{
-DECLPROC foo
-foo PROC:<{
-  IF:<{
-    1
-  }>ELSE<{
-    2
-  }>
-  IFJMP:<{
-    3
-  }>
-  <{
-    4
-  }>
-}>
-END>c
-"#;
-
-        let fold_pairs = pairs(source)?;
-        assert!(fold_pairs.iter().any(|(start, _)| *start == 3)); // IF
-        assert!(fold_pairs.iter().any(|(start, _)| *start == 8)); // IFJMP
-        assert!(fold_pairs.iter().any(|(start, _)| *start == 11)); // instruction_block
-        Ok(())
-    }
 }

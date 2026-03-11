@@ -1,10 +1,11 @@
 use crate::languages::engine::adapter::SyntaxAdapter;
 use crate::languages::engine::edits::apply_lsp_changes;
-use crate::languages::fift::traverse::PreorderTraverse;
+use crate::languages::engine::text_index::TextIndex;
 use dashmap::DashMap;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, Url};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use ton_syntax::ast::PreorderTraverse;
 use tree_sitter::{InputEdit, Node, Point};
 
 pub trait HasRootNode {
@@ -35,7 +36,7 @@ pub struct ParsedSnapshot<TSourceFile> {
     pub version: i32,
     pub text: Arc<str>,
     pub source_file: Arc<TSourceFile>,
-    pub(crate) line_offsets: Arc<Vec<usize>>,
+    pub(crate) text_index: Arc<TextIndex>,
 }
 
 impl<TSourceFile> ParsedSnapshot<TSourceFile> {
@@ -50,19 +51,19 @@ impl<TSourceFile> ParsedSnapshot<TSourceFile> {
     }
 
     pub fn line_offsets(&self) -> &[usize] {
-        &self.line_offsets
+        self.text_index.line_starts()
     }
 
     pub fn point(&self, position: Position) -> Point {
-        position_to_point(&self.line_offsets, self.source(), position)
+        self.text_index.position_to_point(self.source(), position)
     }
 
     pub fn position_to_offset(&self, position: Position) -> usize {
-        point_to_offset(self.source(), &self.line_offsets, self.point(position))
+        self.text_index.position_to_offset(self.source(), position)
     }
 
     pub fn position(&self, offset: usize) -> Position {
-        offset_to_position(self.line_offsets.as_ref(), self.source(), offset)
+        self.text_index.offset_to_position(self.source(), offset)
     }
 
     pub fn range_of(&self, node: Node) -> Range {
@@ -84,14 +85,14 @@ impl<TSourceFile> ParsedSnapshot<TSourceFile> {
         source_file: Arc<TSourceFile>,
     ) -> Self {
         let text = text.into();
-        let line_offsets = Arc::new(build_line_offsets(&text));
+        let text_index = Arc::new(TextIndex::new(&text));
 
         Self {
             uri,
             version,
             text,
             source_file,
-            line_offsets,
+            text_index,
         }
     }
 }
@@ -113,8 +114,21 @@ impl<TSourceFile: HasRootNode> ParsedSnapshot<TSourceFile> {
     }
 }
 
+#[derive(Debug, Clone)]
+struct CachedDocument<TSourceFile> {
+    version: i32,
+    text: Arc<str>,
+    snapshot: Option<ParsedSnapshot<TSourceFile>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CacheSyncResult<TSourceFile> {
+    pub snapshot: Option<ParsedSnapshot<TSourceFile>>,
+    pub parse_failed: bool,
+}
+
 pub struct IncrementalParseCache<A: SyntaxAdapter> {
-    docs: DashMap<Url, ParsedSnapshot<A::SourceFile>>,
+    docs: DashMap<Url, CachedDocument<A::SourceFile>>,
     _adapter: PhantomData<A>,
 }
 
@@ -138,11 +152,19 @@ impl<A: SyntaxAdapter> IncrementalParseCache<A> {
     }
 
     pub fn remove(&self, uri: &Url) -> Option<ParsedSnapshot<A::SourceFile>> {
-        self.docs.remove(uri).map(|(_, snapshot)| snapshot)
+        self.docs
+            .remove(uri)
+            .and_then(|(_, document)| document.snapshot)
     }
 
     pub fn snapshot(&self, uri: &Url) -> Option<ParsedSnapshot<A::SourceFile>> {
-        self.docs.get(uri).map(|snapshot| snapshot.clone())
+        self.docs
+            .get(uri)
+            .and_then(|document| document.snapshot.clone())
+    }
+
+    pub fn text(&self, uri: &Url) -> Option<Arc<str>> {
+        self.docs.get(uri).map(|document| document.text.clone())
     }
 
     pub fn open(
@@ -151,11 +173,33 @@ impl<A: SyntaxAdapter> IncrementalParseCache<A> {
         version: i32,
         text: &str,
     ) -> anyhow::Result<ParsedSnapshot<A::SourceFile>> {
-        let parsed = A::parse(text)?;
-        let snapshot = ParsedSnapshot::new(uri.clone(), version, Arc::from(text), Arc::new(parsed));
-
-        self.docs.insert(uri.clone(), snapshot.clone());
-        Ok(snapshot)
+        let text = Arc::<str>::from(text);
+        match A::parse(text.as_ref()) {
+            Ok(parsed) => {
+                let snapshot =
+                    ParsedSnapshot::new(uri.clone(), version, text.clone(), Arc::new(parsed));
+                self.docs.insert(
+                    uri.clone(),
+                    CachedDocument {
+                        version,
+                        text,
+                        snapshot: Some(snapshot.clone()),
+                    },
+                );
+                Ok(snapshot)
+            }
+            Err(error) => {
+                self.docs.insert(
+                    uri.clone(),
+                    CachedDocument {
+                        version,
+                        text,
+                        snapshot: None,
+                    },
+                );
+                Err(error)
+            }
+        }
     }
 
     pub fn sync_changes(
@@ -163,31 +207,64 @@ impl<A: SyntaxAdapter> IncrementalParseCache<A> {
         uri: &Url,
         version: i32,
         changes: &[TextDocumentContentChangeEvent],
-    ) -> anyhow::Result<Option<ParsedSnapshot<A::SourceFile>>> {
-        let Some(current) = self.snapshot(uri) else {
+    ) -> anyhow::Result<Option<CacheSyncResult<A::SourceFile>>> {
+        let Some(current) = self.docs.get(uri).map(|document| document.clone()) else {
             return Ok(None);
         };
 
         if version < current.version {
-            return Ok(Some(current));
+            return Ok(Some(CacheSyncResult {
+                snapshot: current.snapshot,
+                parse_failed: false,
+            }));
         }
 
         let applied = apply_lsp_changes(current.text.as_ref(), changes);
-        let parsed = parse_with_incremental_fallback::<A>(
-            &current,
-            &applied.text,
-            applied.incremental_edits.as_deref(),
-        )?;
+        let next_text = Arc::<str>::from(applied.text);
 
-        let snapshot = ParsedSnapshot::new(
-            uri.clone(),
-            version,
-            Arc::from(applied.text),
-            Arc::new(parsed),
-        );
+        let parsed = if let Some(snapshot) = current.snapshot.as_ref() {
+            parse_with_incremental_fallback::<A>(
+                snapshot,
+                next_text.as_ref(),
+                applied.incremental_edits.as_deref(),
+            )
+        } else {
+            A::parse(next_text.as_ref())
+        };
 
-        self.docs.insert(uri.clone(), snapshot.clone());
-        Ok(Some(snapshot))
+        match parsed {
+            Ok(parsed) => {
+                let snapshot =
+                    ParsedSnapshot::new(uri.clone(), version, next_text.clone(), Arc::new(parsed));
+                self.docs.insert(
+                    uri.clone(),
+                    CachedDocument {
+                        version,
+                        text: next_text.clone(),
+                        snapshot: Some(snapshot.clone()),
+                    },
+                );
+                Ok(Some(CacheSyncResult {
+                    snapshot: Some(snapshot),
+                    parse_failed: false,
+                }))
+            }
+            Err(error) => {
+                log::debug!("self-contained parse failed for {uri}: {error}");
+                self.docs.insert(
+                    uri.clone(),
+                    CachedDocument {
+                        version,
+                        text: next_text.clone(),
+                        snapshot: None,
+                    },
+                );
+                Ok(Some(CacheSyncResult {
+                    snapshot: None,
+                    parse_failed: true,
+                }))
+            }
+        }
     }
 }
 
@@ -220,95 +297,6 @@ fn parse_with_incremental_fallback<A: SyntaxAdapter>(
             A::parse(source)
         }
     }
-}
-
-fn build_line_offsets(text: &str) -> Vec<usize> {
-    let mut offsets = Vec::new();
-    offsets.push(0);
-
-    let mut last_offset = 0;
-    for line in text.lines() {
-        last_offset += line.len() + 1;
-        offsets.push(last_offset);
-    }
-
-    offsets
-}
-
-fn position_to_point(line_offsets: &[usize], source: &str, position: Position) -> Point {
-    let line_start = line_offsets
-        .get(position.line as usize)
-        .copied()
-        .unwrap_or_else(|| *line_offsets.last().unwrap_or(&0));
-    if line_start >= source.len() {
-        return Point::new(position.line as usize, 0);
-    }
-
-    let mut byte_column = 0;
-    let mut utf16_column = 0;
-    for ch in source[line_start..].chars() {
-        if utf16_column >= position.character as usize {
-            break;
-        }
-        byte_column += ch.len_utf8();
-        utf16_column += ch.len_utf16();
-    }
-
-    Point::new(position.line as usize, byte_column)
-}
-
-fn point_to_offset(source: &str, line_offsets: &[usize], point: Point) -> usize {
-    let line_start = line_offsets
-        .get(point.row)
-        .copied()
-        .unwrap_or_else(|| *line_offsets.last().unwrap_or(&0));
-
-    if line_start >= source.len() {
-        return line_start;
-    }
-
-    let mut byte_column = 0;
-    for ch in source[line_start..].chars() {
-        if byte_column >= point.column {
-            break;
-        }
-        byte_column += ch.len_utf8();
-    }
-
-    line_start + byte_column
-}
-
-fn offset_to_position(line_offsets: &[usize], source: &str, offset: usize) -> Position {
-    if source.is_empty() {
-        return Position::new(0, 0);
-    }
-
-    let clamped_offset = offset.min(source.len());
-    let line = line_offsets
-        .binary_search(&clamped_offset)
-        .unwrap_or_else(|idx| idx.saturating_sub(1));
-
-    if line >= line_offsets.len() {
-        return Position::new(line_offsets.len() as u32, 0);
-    }
-
-    let line_start = line_offsets.get(line).copied().unwrap_or_default();
-    if line_start >= source.len() {
-        return Position::new(line as u32, 0);
-    }
-
-    let col_byte_offset = offset.saturating_sub(line_start);
-    let mut byte_count = 0usize;
-    let mut utf16_count = 0usize;
-    for ch in source[line_start..].chars() {
-        if byte_count >= col_byte_offset {
-            break;
-        }
-        byte_count += ch.len_utf8();
-        utf16_count += ch.len_utf16();
-    }
-
-    Position::new(line as u32, utf16_count as u32)
 }
 
 #[cfg(test)]
@@ -351,10 +339,13 @@ mod tests {
         let updated = cache
             .sync_changes(&uri, 2, &changes)?
             .expect("snapshot should be present");
+        let snapshot = updated
+            .snapshot
+            .expect("parsed snapshot should be present after successful parse");
 
-        assert_eq!(updated.version, 2);
-        assert_eq!(updated.text.as_ref(), "PUSHINT_4 2\n");
-        assert_eq!(updated.source_file.top_levels().count(), 1);
+        assert_eq!(snapshot.version, 2);
+        assert_eq!(snapshot.text.as_ref(), "PUSHINT_4 2\n");
+        assert_eq!(snapshot.source_file.top_levels().count(), 1);
         Ok(())
     }
 
@@ -394,9 +385,107 @@ mod tests {
         let updated = cache
             .sync_changes(&uri, 2, &changes)?
             .expect("snapshot should be present");
+        let snapshot = updated
+            .snapshot
+            .expect("parsed snapshot should be present after fallback parse");
 
-        assert_eq!(updated.text.as_ref(), "PUSHINT_4 2\n");
-        assert_eq!(updated.source_file.top_levels().count(), 1);
+        assert_eq!(snapshot.text.as_ref(), "PUSHINT_4 2\n");
+        assert_eq!(snapshot.source_file.top_levels().count(), 1);
+        Ok(())
+    }
+
+    #[derive(Debug, Clone, Copy, Default)]
+    struct RejectingAdapter;
+
+    impl SyntaxAdapter for RejectingAdapter {
+        type SourceFile = tasm_syntax::SourceFile;
+
+        fn parse(source: &str) -> anyhow::Result<Self::SourceFile> {
+            if source.contains("INVALID") {
+                bail!("rejected source");
+            }
+            tasm_syntax::parse(source)
+        }
+
+        fn parse_with_old_tree(
+            source: &str,
+            old_tree: Option<&Tree>,
+        ) -> anyhow::Result<Self::SourceFile> {
+            if source.contains("INVALID") {
+                bail!("rejected source");
+            }
+            tasm_syntax::parse_with_old_tree(source, old_tree)
+        }
+
+        fn tree(source_file: &Self::SourceFile) -> &Tree {
+            &source_file.tree
+        }
+    }
+
+    #[test]
+    fn keeps_latest_text_and_version_when_parse_fails_then_recovers() -> anyhow::Result<()> {
+        let cache = IncrementalParseCache::<RejectingAdapter>::new();
+        let uri = Url::parse("file:///tmp/cache_recovery.tasm")?;
+
+        cache.open(&uri, 1, "PUSHINT_4 1\n")?;
+
+        let break_parse = vec![change(None, "INVALID\n")];
+        let failed = cache
+            .sync_changes(&uri, 2, &break_parse)?
+            .expect("doc state should exist");
+
+        assert!(failed.parse_failed);
+        assert!(failed.snapshot.is_none());
+        let failed_text = cache
+            .text(&uri)
+            .expect("recoverable text should be available after parse failure");
+        assert_eq!(failed_text.as_ref(), "INVALID\n");
+        assert!(cache.snapshot(&uri).is_none());
+
+        let recover = vec![change(None, "PUSHINT_4 3\n")];
+        let recovered = cache
+            .sync_changes(&uri, 3, &recover)?
+            .expect("doc state should exist");
+        let recovered_snapshot = recovered
+            .snapshot
+            .expect("parsed snapshot should recover on valid source");
+
+        assert!(!recovered.parse_failed);
+        assert_eq!(recovered_snapshot.text.as_ref(), "PUSHINT_4 3\n");
+        let recovered_text = cache
+            .text(&uri)
+            .expect("recoverable text should be available after parse recovery");
+        assert_eq!(recovered_text.as_ref(), "PUSHINT_4 3\n");
+        assert_eq!(recovered_snapshot.version, 3);
+        assert_eq!(recovered_snapshot.source_file.top_levels().count(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn keeps_recoverable_state_when_open_parse_fails() -> anyhow::Result<()> {
+        let cache = IncrementalParseCache::<RejectingAdapter>::new();
+        let uri = Url::parse("file:///tmp/cache_open_fail.tasm")?;
+
+        let open_error = cache
+            .open(&uri, 1, "INVALID\n")
+            .expect_err("open should fail for rejected source");
+        assert!(open_error.to_string().contains("rejected source"));
+        let failed_open_text = cache
+            .text(&uri)
+            .expect("recoverable text should be available after failed open");
+        assert_eq!(failed_open_text.as_ref(), "INVALID\n");
+        assert!(cache.snapshot(&uri).is_none());
+
+        let recover = vec![change(None, "PUSHINT_4 10\n")];
+        let recovered = cache
+            .sync_changes(&uri, 2, &recover)?
+            .expect("doc state should exist after failed open");
+        let recovered_snapshot = recovered
+            .snapshot
+            .expect("snapshot should recover without re-open");
+
+        assert_eq!(recovered_snapshot.version, 2);
+        assert_eq!(recovered_snapshot.text.as_ref(), "PUSHINT_4 10\n");
         Ok(())
     }
 
@@ -414,6 +503,23 @@ mod tests {
 
         let byte_offset = snapshot.position_to_offset(position);
         assert_eq!(byte_offset, 5);
+        assert_eq!(snapshot.position(byte_offset), position);
+    }
+
+    #[test]
+    fn snapshot_position_and_offset_roundtrip_with_crlf() {
+        let uri = Url::parse("file:///tmp/position_snapshot_crlf.tasm").expect("uri should parse");
+        let text = "ab\r\nc😀d\r\n";
+        let source_file = Arc::new(tasm_syntax::parse(text).expect("sample text should parse"));
+        let snapshot = ParsedSnapshot::new(uri, 1, text, source_file);
+
+        let position = Position::new(1, 3);
+        let point = snapshot.point(position);
+        assert_eq!(point.row, 1);
+        assert_eq!(point.column, 5);
+
+        let byte_offset = snapshot.position_to_offset(position);
+        assert_eq!(byte_offset, 9);
         assert_eq!(snapshot.position(byte_offset), position);
     }
 }

@@ -1,4 +1,4 @@
-use crate::backend::utils::{get_byte_offset, get_point, offset_to_lsp_pos};
+use crate::languages::engine::text_index::TextIndex;
 use lsp_types::TextDocumentContentChangeEvent;
 use tree_sitter::InputEdit;
 
@@ -14,21 +14,23 @@ pub fn apply_lsp_changes(
     changes: &[TextDocumentContentChangeEvent],
 ) -> AppliedTextChanges {
     let mut text = initial_text.to_owned();
+    let mut text_index = TextIndex::new(&text);
     let mut incremental_edits = Vec::with_capacity(changes.len());
     let mut can_apply_incremental = true;
 
     for change in changes {
         if let Some(range) = change.range {
-            let start_byte = get_byte_offset(&text, range.start);
-            let old_end_byte = get_byte_offset(&text, range.end);
-            let start_position = get_point(&text, range.start);
-            let old_end_position = get_point(&text, range.end);
+            let start_byte = text_index.position_to_offset(&text, range.start);
+            let old_end_byte = text_index.position_to_offset(&text, range.end);
+            let start_position = text_index.position_to_point(&text, range.start);
+            let old_end_position = text_index.position_to_point(&text, range.end);
 
             text.replace_range(start_byte..old_end_byte, &change.text);
+            text_index = TextIndex::new(&text);
 
             if can_apply_incremental {
                 let new_end_byte = start_byte + change.text.len();
-                let new_end_position = get_point(&text, offset_to_lsp_pos(new_end_byte, &text));
+                let new_end_position = text_index.offset_to_point(&text, new_end_byte);
 
                 incremental_edits.push(InputEdit {
                     start_byte,
@@ -41,6 +43,7 @@ pub fn apply_lsp_changes(
             }
         } else {
             text = change.text.clone();
+            text_index = TextIndex::new(&text);
             can_apply_incremental = false;
             incremental_edits.clear();
         }
@@ -103,6 +106,23 @@ mod tests {
 
         let applied = apply_lsp_changes(initial, &changes);
         assert_eq!(applied.text, "a😀c");
+
+        let edits = applied
+            .incremental_edits
+            .expect("incremental edits should be available");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].start_byte, 5);
+        assert_eq!(edits[0].old_end_byte, 6);
+        assert_eq!(edits[0].new_end_byte, 6);
+    }
+
+    #[test]
+    fn handles_crlf_ranges_when_building_input_edit() {
+        let initial = "ab\r\ncd\r\n";
+        let changes = vec![change(Some(range(1, 1, 1, 2)), "D")];
+
+        let applied = apply_lsp_changes(initial, &changes);
+        assert_eq!(applied.text, "ab\r\ncD\r\n");
 
         let edits = applied
             .incremental_edits

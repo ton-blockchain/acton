@@ -1,5 +1,5 @@
-use crate::languages::fift::traverse::PreorderTraverse;
 use fift_syntax::{AstNode, DefinitionKind, TopLevel};
+use ton_syntax::ast::PreorderTraverse;
 use tree_sitter::Node;
 
 #[allow(dead_code)]
