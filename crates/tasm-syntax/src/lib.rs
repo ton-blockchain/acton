@@ -10,15 +10,18 @@
 //! - [`AstNode`]: A trait implemented by all AST nodes.
 
 pub mod ast;
-mod errors;
 
 pub use ast::expressions::*;
 pub use ast::node::*;
 pub use ast::top_level::*;
-pub use ast::traits::*;
 pub use ast::walker::*;
+pub use ton_syntax::ast::{
+    AstNode, AstNodeBytesKind, HasName, HasTreeSitterKind, InvalidNodeKindError, TryFromNode,
+};
+pub use ton_syntax::errors::{ParseError, ParseErrorKind, Span};
+pub use ton_syntax::impl_ast_node;
 
-use tree_sitter::{Language, Parser, Tree};
+use tree_sitter::{Language, Tree};
 
 /// Parses the given TASM source code into a [`SourceFile`].
 ///
@@ -35,12 +38,12 @@ pub fn parse(code: &str) -> anyhow::Result<SourceFile> {
 ///
 /// Returns an error if the tree-sitter parser cannot be initialized.
 pub fn parse_with_old_tree(code: &str, old_tree: Option<&Tree>) -> anyhow::Result<SourceFile> {
-    let mut parser = Parser::new();
-    parser.set_language(&tree_sitter_tasm::LANGUAGE.into())?;
-
-    let Some(tree) = parser.parse(code, old_tree) else {
-        anyhow::bail!("cannot parse TASM file");
-    };
+    let tree = ton_syntax::parser::parse_with_old_tree(
+        code,
+        old_tree,
+        tree_sitter_tasm::LANGUAGE.into(),
+        "TASM",
+    )?;
 
     Ok(SourceFile {
         tree,

@@ -1,5 +1,5 @@
 [package]
-name = "tolk-syntax"
+name = "ton-syntax"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }
@@ -11,10 +11,9 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ton-syntax = { workspace = true }
-tree-sitter = { workspace = true }
-tree-sitter-tolk = { workspace = true }
 anyhow = { workspace = true }
+memchr = { workspace = true }
+tree-sitter = { workspace = true }
 
 [lints]
 workspace = true

@@ -39,6 +39,7 @@ ton-executor = { path = "crates/ton-executor" }
 tolk-syntax = { path = "crates/tolk-syntax" }
 tasm-syntax = { path = "crates/tasm-syntax" }
 fift-syntax = { path = "crates/fift-syntax" }
+ton-syntax = { path = "crates/ton-syntax" }
 tolk-resolver = { path = "crates/tolk-resolver" }
 tolk-ty = { path = "crates/tolk-ty" }
 tolk-analysis = { path = "crates/tolk-analysis" }

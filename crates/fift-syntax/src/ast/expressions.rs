@@ -1,6 +1,6 @@
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::traits::{AstNode, InvalidNodeKindError, TryFromNode};
-use crate::{AstNodeBytesKind, impl_ast_node};
+use crate::impl_ast_node;
+use ton_syntax::ast::{AstNode, AstNodeBytesKind, InvalidNodeKindError, TryFromNode};
 use tree_sitter::Node;
 
 #[derive(Clone, Copy, Debug)]

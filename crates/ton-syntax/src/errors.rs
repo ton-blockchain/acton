@@ -23,11 +23,7 @@ pub struct ParseError {
 }
 
 /// Collects parser errors for ERROR/MISSING nodes.
-pub(crate) fn collect_errors(
-    source: &Arc<str>,
-    tree: &Tree,
-    language: &Language,
-) -> Vec<ParseError> {
+pub fn collect_errors(source: &Arc<str>, tree: &Tree, language: &Language) -> Vec<ParseError> {
     let root = tree.root_node();
     if !root.has_error() {
         return vec![];

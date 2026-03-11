@@ -1,7 +1,7 @@
 use crate::ast::expressions::{Argument, Code, DataLiteral, Ident};
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::{AstNode, HasName, InvalidNodeKindError, TryFromNode};
 use crate::{AstNodeBytesKind, impl_ast_node};
+use ton_syntax::ast::{AstNode, HasName, InvalidNodeKindError, TryFromNode};
 use tree_sitter::Node;
 
 #[derive(Clone, Copy, Debug)]
@@ -46,6 +46,8 @@ impl<'tree> AstNode<'tree> for TopLevel<'tree> {
 }
 
 impl<'tree> HasName<'tree> for TopLevel<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         match self {
             TopLevel::Instruction(node) => node.name(),
@@ -92,6 +94,8 @@ impl<'tree> Instruction<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Instruction<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }

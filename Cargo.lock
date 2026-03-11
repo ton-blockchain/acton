@@ -977,7 +977,7 @@ name = "fift-syntax"
 version = "0.0.11"
 dependencies = [
  "anyhow",
- "memchr",
+ "ton-syntax",
  "tree-sitter",
  "tree-sitter-fift",
 ]
@@ -3171,7 +3171,7 @@ name = "tasm-syntax"
 version = "0.0.11"
 dependencies = [
  "anyhow",
- "memchr",
+ "ton-syntax",
  "tree-sitter",
  "tree-sitter-tasm",
 ]
@@ -3443,7 +3443,7 @@ name = "tolk-syntax"
 version = "0.0.11"
 dependencies = [
  "anyhow",
- "memchr",
+ "ton-syntax",
  "tree-sitter",
  "tree-sitter-tolk",
 ]
@@ -3684,6 +3684,15 @@ dependencies = [
  "pathdiff",
  "serde",
  "tycho-types",
+]
+
+[[package]]
+name = "ton-syntax"
+version = "0.0.11"
+dependencies = [
+ "anyhow",
+ "memchr",
+ "tree-sitter",
 ]
 
 [[package]]

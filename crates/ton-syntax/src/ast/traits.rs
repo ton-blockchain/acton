@@ -1,13 +1,7 @@
-use crate::ast::expressions::Ident;
 use memchr::memchr;
 use std::ffi::CStr;
 use std::fmt;
 use tree_sitter::ffi::ts_node_type;
-
-/// Trait for AST nodes that have a name identifier.
-pub trait HasName<'tree> {
-    fn name(&self) -> Option<Ident<'tree>>;
-}
 
 /// Trait for AST nodes that correspond to a specific tree-sitter node kind.
 pub trait HasTreeSitterKind {
@@ -41,7 +35,7 @@ pub trait TryFromNode<'tree>: Sized {
     fn try_from_node(node: tree_sitter::Node<'tree>) -> Result<Self, Self::Error>;
 }
 
-/// The base trait for all AST nodes in this crate.
+/// The base trait for all AST nodes.
 pub trait AstNode<'tree>: TryFromNode<'tree> + Clone {
     /// Returns the underlying tree-sitter node.
     fn syntax(&self) -> tree_sitter::Node<'tree>;
@@ -92,6 +86,13 @@ pub trait AstNode<'tree>: TryFromNode<'tree> + Clone {
         let slice = &source.as_bytes()[start..end];
         memchr(ch, slice)
     }
+}
+
+/// Trait for AST nodes that have a name identifier.
+pub trait HasName<'tree> {
+    type Name: AstNode<'tree>;
+
+    fn name(&self) -> Option<Self::Name>;
 }
 
 /// A macro to implement [`TryFromNode`] and [`AstNode`] for a given type.

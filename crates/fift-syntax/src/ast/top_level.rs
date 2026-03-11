@@ -1,7 +1,7 @@
 use crate::ast::expressions::{Ident, Instruction, NumberLit};
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::{AstNode, HasName, InvalidNodeKindError, TryFromNode};
-use crate::{AstNodeBytesKind, impl_ast_node};
+use crate::impl_ast_node;
+use ton_syntax::ast::{AstNode, AstNodeBytesKind, HasName, InvalidNodeKindError, TryFromNode};
 use tree_sitter::Node;
 
 #[derive(Clone, Copy, Debug)]
@@ -91,6 +91,8 @@ impl<'tree> Declaration<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Declaration<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.kind().and_then(|kind| kind.name())
     }
@@ -149,6 +151,8 @@ impl<'tree> ProcDeclaration<'tree> {
 }
 
 impl<'tree> HasName<'tree> for ProcDeclaration<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
@@ -171,6 +175,8 @@ impl<'tree> MethodDeclaration<'tree> {
 }
 
 impl<'tree> HasName<'tree> for MethodDeclaration<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
@@ -188,6 +194,8 @@ impl<'tree> GlobalVar<'tree> {
 }
 
 impl<'tree> HasName<'tree> for GlobalVar<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
@@ -205,6 +213,8 @@ impl<'tree> Definition<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Definition<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.kind().and_then(|kind| kind.name())
     }
@@ -273,6 +283,8 @@ impl<'tree> ProcDefinition<'tree> {
 }
 
 impl<'tree> HasName<'tree> for ProcDefinition<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
@@ -294,6 +306,8 @@ impl<'tree> ProcInlineDefinition<'tree> {
 }
 
 impl<'tree> HasName<'tree> for ProcInlineDefinition<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
@@ -315,6 +329,8 @@ impl<'tree> ProcRefDefinition<'tree> {
 }
 
 impl<'tree> HasName<'tree> for ProcRefDefinition<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
@@ -336,6 +352,8 @@ impl<'tree> MethodDefinition<'tree> {
 }
 
 impl<'tree> HasName<'tree> for MethodDefinition<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.name()
     }
