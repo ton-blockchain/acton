@@ -194,7 +194,6 @@ dashmap = { workspace = true }
 tvmffi = { workspace = true }
 vmlogs = { workspace = true }
 tasm = { workspace = true }
-dap-client = { workspace = true }
 ton-api = { workspace = true }
 retrace = { workspace = true }
 ton-source-map = { workspace = true }
@@ -211,7 +210,6 @@ num-traits = { workspace = true }
 
 hex = { workspace = true }
 crc = { workspace = true }
-owo-colors = { workspace = true } # overall coloring
 comfy-table = { workspace = true } # coverage table
 tree-sitter = { workspace = true } # tolk parser
 clap = { workspace = true } # CLI
@@ -280,7 +278,6 @@ similar = { workspace = true }
 # actin check
 codespan-reporting = { workspace = true }
 rustc-hash = { workspace = true }
-function_name = { workspace = true }
 path-absolutize = { workspace = true }
 
 [dev-dependencies]
@@ -289,6 +286,9 @@ strip-ansi-escapes = "0.2.1"
 fs_extra = "1.3.0"
 base64 = { workspace = true }
 expectrl = "0.5.2"
+dap-client = { workspace = true }
+function_name = { workspace = true }
+owo-colors = { workspace = true } # overall coloring
 
 [build-dependencies]
 chrono = { workspace = true }

@@ -18,7 +18,6 @@ tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }
 tolk-syntax = { workspace = true }
 tolk-linter = { workspace = true }
-tolk-analysis = { workspace = true }
 tasm-syntax = { workspace = true }
 tasm = { workspace = true }
 fift-syntax = { workspace = true }
@@ -28,11 +27,8 @@ ton-json-schema = { workspace = true }
 rustc-hash = { workspace = true }
 tower-lsp = { workspace = true }
 lsp-types = { workspace = true }
-tokio = { workspace = true }
 anyhow = { workspace = true }
-serde = { workspace = true }
 serde_json = { workspace = true }
 tree-sitter = { workspace = true }
 dashmap = { workspace = true }
-toml = { workspace = true }
 log = { workspace = true }
