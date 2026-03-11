@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   prepare:
-    name: Prepare TON objects
+    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     strategy: &runner_strategy
       matrix:
         include:
