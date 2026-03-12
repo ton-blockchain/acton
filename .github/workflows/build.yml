@@ -187,12 +187,12 @@ jobs:
           acton test
 
       - name: Prepare trunk archive
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         run: |
           tar -C target/release -czf target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz acton
 
       - name: Upload trunk archive artifact
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         uses: actions/upload-artifact@v7
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
@@ -244,7 +244,7 @@ jobs:
     name: Create Trunk Release
     needs: [ build ]
     runs-on: ubicloud-standard-2
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
 
     permissions:
       actions: write

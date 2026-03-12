@@ -5,12 +5,14 @@ on:
     branches:
       - master
     paths:
-      - crates/tree-sitter-**/**
+      - ".github/workflows/grammars.yml"
+      - "crates/tree-sitter-**/**"
   push:
     branches:
       - master
     paths:
-      - crates/tree-sitter-**/**
+      - ".github/workflows/grammars.yml"
+      - "crates/tree-sitter-**/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
