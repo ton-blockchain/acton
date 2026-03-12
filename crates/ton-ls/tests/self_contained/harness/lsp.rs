@@ -1,9 +1,9 @@
 use anyhow::bail;
 use lsp_types::{
-    FoldingRangeParams, GotoDefinitionParams, HoverParams, InitializeResult, PartialResultParams,
-    Position, ReferenceContext, ReferenceParams, SemanticTokensLegend, SemanticTokensParams,
-    SemanticTokensRegistrationOptions, SemanticTokensServerCapabilities, TextDocumentIdentifier,
-    TextDocumentPositionParams, Url, WorkDoneProgressParams,
+    CodeLensParams, FoldingRangeParams, GotoDefinitionParams, HoverParams, InitializeResult,
+    PartialResultParams, Position, ReferenceContext, ReferenceParams, SemanticTokensLegend,
+    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensServerCapabilities,
+    TextDocumentIdentifier, TextDocumentPositionParams, Url, WorkDoneProgressParams,
 };
 
 pub(crate) fn uri_for_case(case_name: &str, extension: &str) -> Url {
@@ -80,6 +80,18 @@ pub(crate) fn references_params(
 
 pub(crate) fn folding_range_params(uri: Url) -> FoldingRangeParams {
     FoldingRangeParams {
+        text_document: TextDocumentIdentifier { uri },
+        work_done_progress_params: WorkDoneProgressParams {
+            work_done_token: Option::<lsp_types::ProgressToken>::None,
+        },
+        partial_result_params: PartialResultParams {
+            partial_result_token: Option::<lsp_types::ProgressToken>::None,
+        },
+    }
+}
+
+pub(crate) fn code_lens_params(uri: Url) -> CodeLensParams {
+    CodeLensParams {
         text_document: TextDocumentIdentifier { uri },
         work_done_progress_params: WorkDoneProgressParams {
             work_done_token: Option::<lsp_types::ProgressToken>::None,

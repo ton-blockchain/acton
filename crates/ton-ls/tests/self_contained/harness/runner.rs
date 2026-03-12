@@ -4,8 +4,8 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use expect_test::Expect;
 use lsp_types::{
-    DidOpenTextDocumentParams, FoldingRange, GotoDefinitionResponse, Hover, InitializeParams,
-    InitializeResult, Location, SemanticTokensResult, TextDocumentItem, Url,
+    CodeLens, DidOpenTextDocumentParams, FoldingRange, GotoDefinitionResponse, Hover,
+    InitializeParams, InitializeResult, Location, SemanticTokensResult, TextDocumentItem, Url,
 };
 use tolk_resolver::file_db::FileDb;
 use ton_ls::{Backend, SelfContainedLanguageRegistry};
@@ -14,7 +14,8 @@ use tower_lsp::{LanguageServer, LspService};
 use crate::self_contained::harness::case::parse_source;
 use crate::self_contained::harness::lsp::{extract_semantic_legend, uri_for_case};
 use crate::self_contained::harness::render::{
-    render_folding_ranges, render_hover, render_references, render_resolve, render_semantic_tokens,
+    render_code_lenses, render_folding_ranges, render_hover, render_references, render_resolve,
+    render_semantic_tokens,
 };
 
 pub(crate) trait ResolveFeature {
@@ -59,6 +60,13 @@ pub(crate) trait FoldingFeature {
     const FILE_EXT: &'static str;
 
     async fn request(backend: &Backend, uri: Url) -> Option<Vec<FoldingRange>>;
+}
+
+pub(crate) trait CodeLensFeature {
+    const LANGUAGE_ID: &'static str;
+    const FILE_EXT: &'static str;
+
+    async fn request(backend: &Backend, uri: Url) -> Option<Vec<CodeLens>>;
 }
 
 pub(crate) fn case_resolve<F: ResolveFeature>(case_name: &str, source: &str, expect: Expect) {
@@ -193,6 +201,27 @@ pub(crate) fn case_folding<F: FoldingFeature>(case_name: &str, source: &str, exp
 
         let response = F::request(server.backend(), uri).await;
         render_folding_ranges(response)
+    });
+
+    expect.assert_eq(&actual);
+}
+
+pub(crate) fn case_code_lens<F: CodeLensFeature>(case_name: &str, source: &str, expect: Expect) {
+    let parsed = parse_source(source).expect("failed to parse source snippet");
+    assert!(
+        parsed.carets.is_empty(),
+        "code lens case must not contain carets"
+    );
+
+    let actual = run_async(async move {
+        let server = TestServer::new();
+        let uri = uri_for_case(case_name, F::FILE_EXT);
+        server
+            .open_document(&uri, F::LANGUAGE_ID, &parsed.source)
+            .await;
+
+        let response = F::request(server.backend(), uri).await;
+        render_code_lenses(response)
     });
 
     expect.assert_eq(&actual);

@@ -1,5 +1,5 @@
 use lsp_types::{
-    FoldingRange, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
+    CodeLens, FoldingRange, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
     MarkedString, Position, SemanticToken, SemanticTokensLegend,
 };
 
@@ -75,6 +75,32 @@ pub(crate) fn render_folding_ranges(response: Option<Vec<FoldingRange>>) -> Stri
         .map(|range| format!("[{}, {}]", range.start_line, range.end_line))
         .collect::<Vec<_>>();
     parts.join(", ")
+}
+
+pub(crate) fn render_code_lenses(response: Option<Vec<CodeLens>>) -> String {
+    let Some(mut lenses) = response else {
+        return "<none>".to_owned();
+    };
+    if lenses.is_empty() {
+        return "<none>".to_owned();
+    }
+
+    lenses.sort_by_key(|lens| (lens.range.start.line, lens.range.start.character));
+    let parts = lenses
+        .into_iter()
+        .map(|lens| {
+            let title = lens
+                .command
+                .as_ref()
+                .map(|command| command.title.clone())
+                .unwrap_or_else(|| "<no-command>".to_owned());
+            format!(
+                "{}:{} title={}",
+                lens.range.start.line, lens.range.start.character, title
+            )
+        })
+        .collect::<Vec<_>>();
+    parts.join("\n")
 }
 
 pub(crate) fn render_semantic_tokens(
