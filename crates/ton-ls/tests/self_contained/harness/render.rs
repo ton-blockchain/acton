@@ -1,4 +1,7 @@
-use lsp_types::{GotoDefinitionResponse, Position, SemanticToken, SemanticTokensLegend};
+use lsp_types::{
+    FoldingRange, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
+    MarkedString, Position, SemanticToken, SemanticTokensLegend,
+};
 
 use crate::self_contained::harness::lsp::slice_line_utf16;
 
@@ -20,6 +23,58 @@ pub(crate) fn render_resolve(
         .into_iter()
         .map(|target| format!("{caret} -> {} resolved", format_position(target)))
         .collect()
+}
+
+pub(crate) fn render_references(
+    caret_position: Position,
+    response: Option<Vec<Location>>,
+) -> String {
+    let caret = format_position(caret_position);
+    let Some(locations) = response else {
+        return format!("{caret} refs=unresolved");
+    };
+
+    let mut positions = locations
+        .into_iter()
+        .map(|location| location.range.start)
+        .collect::<Vec<_>>();
+    positions.sort_by_key(|pos| (pos.line, pos.character));
+    positions.dedup_by_key(|pos| (pos.line, pos.character));
+
+    if positions.is_empty() {
+        return format!("{caret} refs=[]");
+    }
+
+    let rendered = positions
+        .into_iter()
+        .map(format_position)
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{caret} refs=[{rendered}]")
+}
+
+pub(crate) fn render_hover(response: Option<Hover>) -> String {
+    let Some(hover) = response else {
+        return "<none>".to_owned();
+    };
+
+    render_hover_contents(&hover.contents)
+}
+
+pub(crate) fn render_folding_ranges(response: Option<Vec<FoldingRange>>) -> String {
+    let Some(mut ranges) = response else {
+        return "<none>".to_owned();
+    };
+    if ranges.is_empty() {
+        return "<none>".to_owned();
+    }
+
+    ranges.sort_by_key(|range| (range.start_line, range.end_line));
+    let parts = ranges
+        .into_iter()
+        .map(|range| format!("[{}, {}]", range.start_line, range.end_line))
+        .collect::<Vec<_>>();
+    parts.join(", ")
 }
 
 pub(crate) fn render_semantic_tokens(
@@ -112,4 +167,45 @@ fn collect_modifiers(bitset: u32, legend: &SemanticTokensLegend) -> Vec<String> 
 
 fn format_position(position: Position) -> String {
     format!("{}:{}", position.line, position.character)
+}
+
+fn render_hover_contents(contents: &HoverContents) -> String {
+    let rendered = match contents {
+        HoverContents::Markup(markup) => normalize_hover_markdown(&markup.value),
+        HoverContents::Scalar(marked) => render_marked_string(marked),
+        HoverContents::Array(items) => {
+            let mut blocks = Vec::new();
+            for item in items {
+                let block = render_marked_string(item);
+                if !block.is_empty() {
+                    blocks.push(block);
+                }
+            }
+            blocks.join("\n\n")
+        }
+    };
+
+    if rendered.is_empty() {
+        return "<empty>".to_owned();
+    }
+    rendered
+}
+
+fn render_marked_string(marked: &MarkedString) -> String {
+    match marked {
+        MarkedString::String(value) => normalize_hover_markdown(value),
+        MarkedString::LanguageString(value) => render_language_string(value),
+    }
+}
+
+fn render_language_string(value: &LanguageString) -> String {
+    let body = normalize_hover_markdown(&value.value);
+    if body.is_empty() {
+        return String::new();
+    }
+    format!("```{}\n{body}\n```", value.language)
+}
+
+fn normalize_hover_markdown(text: &str) -> String {
+    text.replace('\r', "").trim().to_owned()
 }

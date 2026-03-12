@@ -1,8 +1,9 @@
 use anyhow::bail;
 use lsp_types::{
-    GotoDefinitionParams, InitializeResult, PartialResultParams, Position, SemanticTokensLegend,
-    SemanticTokensParams, SemanticTokensRegistrationOptions, SemanticTokensServerCapabilities,
-    TextDocumentIdentifier, TextDocumentPositionParams, Url, WorkDoneProgressParams,
+    FoldingRangeParams, GotoDefinitionParams, HoverParams, InitializeResult, PartialResultParams,
+    Position, ReferenceContext, ReferenceParams, SemanticTokensLegend, SemanticTokensParams,
+    SemanticTokensRegistrationOptions, SemanticTokensServerCapabilities, TextDocumentIdentifier,
+    TextDocumentPositionParams, Url, WorkDoneProgressParams,
 };
 
 pub(crate) fn uri_for_case(case_name: &str, extension: &str) -> Url {
@@ -40,6 +41,52 @@ pub(crate) fn semantic_tokens_params(uri: Url) -> SemanticTokensParams {
             partial_result_token: Option::<lsp_types::ProgressToken>::None,
         },
         text_document: TextDocumentIdentifier { uri },
+    }
+}
+
+pub(crate) fn hover_params(uri: Url, position: Position) -> HoverParams {
+    HoverParams {
+        text_document_position_params: TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier { uri },
+            position,
+        },
+        work_done_progress_params: WorkDoneProgressParams {
+            work_done_token: Option::<lsp_types::ProgressToken>::None,
+        },
+    }
+}
+
+pub(crate) fn references_params(
+    uri: Url,
+    position: Position,
+    include_declaration: bool,
+) -> ReferenceParams {
+    ReferenceParams {
+        text_document_position: TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier { uri },
+            position,
+        },
+        work_done_progress_params: WorkDoneProgressParams {
+            work_done_token: Option::<lsp_types::ProgressToken>::None,
+        },
+        partial_result_params: PartialResultParams {
+            partial_result_token: Option::<lsp_types::ProgressToken>::None,
+        },
+        context: ReferenceContext {
+            include_declaration,
+        },
+    }
+}
+
+pub(crate) fn folding_range_params(uri: Url) -> FoldingRangeParams {
+    FoldingRangeParams {
+        text_document: TextDocumentIdentifier { uri },
+        work_done_progress_params: WorkDoneProgressParams {
+            work_done_token: Option::<lsp_types::ProgressToken>::None,
+        },
+        partial_result_params: PartialResultParams {
+            partial_result_token: Option::<lsp_types::ProgressToken>::None,
+        },
     }
 }
 

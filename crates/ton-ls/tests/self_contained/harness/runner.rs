@@ -4,8 +4,8 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use expect_test::Expect;
 use lsp_types::{
-    DidOpenTextDocumentParams, GotoDefinitionResponse, InitializeParams, InitializeResult,
-    SemanticTokensResult, TextDocumentItem, Url,
+    DidOpenTextDocumentParams, FoldingRange, GotoDefinitionResponse, Hover, InitializeParams,
+    InitializeResult, Location, SemanticTokensResult, TextDocumentItem, Url,
 };
 use tolk_resolver::file_db::FileDb;
 use ton_ls::{Backend, SelfContainedLanguageRegistry};
@@ -13,7 +13,9 @@ use tower_lsp::{LanguageServer, LspService};
 
 use crate::self_contained::harness::case::parse_source;
 use crate::self_contained::harness::lsp::{extract_semantic_legend, uri_for_case};
-use crate::self_contained::harness::render::{render_resolve, render_semantic_tokens};
+use crate::self_contained::harness::render::{
+    render_folding_ranges, render_hover, render_references, render_resolve, render_semantic_tokens,
+};
 
 pub(crate) trait ResolveFeature {
     const LANGUAGE_ID: &'static str;
@@ -31,6 +33,32 @@ pub(crate) trait SemanticTokensFeature {
     const FILE_EXT: &'static str;
 
     async fn request(backend: &Backend, uri: Url) -> Option<SemanticTokensResult>;
+}
+
+pub(crate) trait HoverFeature {
+    const LANGUAGE_ID: &'static str;
+    const FILE_EXT: &'static str;
+
+    async fn request(backend: &Backend, uri: Url, position: lsp_types::Position) -> Option<Hover>;
+}
+
+pub(crate) trait ReferencesFeature {
+    const LANGUAGE_ID: &'static str;
+    const FILE_EXT: &'static str;
+    const INCLUDE_DECLARATION: bool;
+
+    async fn request(
+        backend: &Backend,
+        uri: Url,
+        position: lsp_types::Position,
+    ) -> Option<Vec<Location>>;
+}
+
+pub(crate) trait FoldingFeature {
+    const LANGUAGE_ID: &'static str;
+    const FILE_EXT: &'static str;
+
+    async fn request(backend: &Backend, uri: Url) -> Option<Vec<FoldingRange>>;
 }
 
 pub(crate) fn case_resolve<F: ResolveFeature>(case_name: &str, source: &str, expect: Expect) {
@@ -94,6 +122,77 @@ pub(crate) fn case_semantic_tokens<F: SemanticTokensFeature>(
         }
 
         render_semantic_tokens(&parsed.source, &tokens, &legend).join("\n")
+    });
+
+    expect.assert_eq(&actual);
+}
+
+pub(crate) fn case_hover<F: HoverFeature>(case_name: &str, source: &str, expect: Expect) {
+    let parsed = parse_source(source).expect("failed to parse source snippet");
+    assert!(
+        !parsed.carets.is_empty(),
+        "hover case must contain at least one caret marker"
+    );
+
+    let actual = run_async(async move {
+        let server = TestServer::new();
+        let uri = uri_for_case(case_name, F::FILE_EXT);
+        server
+            .open_document(&uri, F::LANGUAGE_ID, &parsed.source)
+            .await;
+
+        let mut lines = Vec::new();
+        for caret in &parsed.carets {
+            let response = F::request(server.backend(), uri.clone(), caret.position).await;
+            lines.push(render_hover(response));
+        }
+        lines.join("\n\n---\n\n")
+    });
+
+    expect.assert_eq(&actual);
+}
+
+pub(crate) fn case_references<F: ReferencesFeature>(case_name: &str, source: &str, expect: Expect) {
+    let parsed = parse_source(source).expect("failed to parse source snippet");
+    assert!(
+        !parsed.carets.is_empty(),
+        "references case must contain at least one caret marker"
+    );
+
+    let actual = run_async(async move {
+        let server = TestServer::new();
+        let uri = uri_for_case(case_name, F::FILE_EXT);
+        server
+            .open_document(&uri, F::LANGUAGE_ID, &parsed.source)
+            .await;
+
+        let mut lines = Vec::new();
+        for caret in &parsed.carets {
+            let response = F::request(server.backend(), uri.clone(), caret.position).await;
+            lines.push(render_references(caret.position, response));
+        }
+        lines.join("\n")
+    });
+
+    expect.assert_eq(&actual);
+}
+
+pub(crate) fn case_folding<F: FoldingFeature>(case_name: &str, source: &str, expect: Expect) {
+    let parsed = parse_source(source).expect("failed to parse source snippet");
+    assert!(
+        parsed.carets.is_empty(),
+        "folding case must not contain carets"
+    );
+
+    let actual = run_async(async move {
+        let server = TestServer::new();
+        let uri = uri_for_case(case_name, F::FILE_EXT);
+        server
+            .open_document(&uri, F::LANGUAGE_ID, &parsed.source)
+            .await;
+
+        let response = F::request(server.backend(), uri).await;
+        render_folding_ranges(response)
     });
 
     expect.assert_eq(&actual);
