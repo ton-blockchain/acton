@@ -443,8 +443,8 @@ pub fn map_emulate_trace_response(
     emulation: &EmulateTraceResult,
     with_actions: bool,
     include_code_data: bool,
-    include_address_book: bool,
-    include_metadata: bool,
+    address_book: Option<Value>,
+    metadata: Option<Value>,
 ) -> Value {
     let tn = &emulation.trace;
     let mapped = map_traces(tn);
@@ -496,12 +496,12 @@ pub fn map_emulate_trace_response(
         );
     }
 
-    if include_address_book {
-        response.insert("address_book".to_string(), serde_json::json!({}));
+    if let Some(address_book) = address_book {
+        response.insert("address_book".to_string(), address_book);
     }
 
-    if include_metadata {
-        response.insert("metadata".to_string(), serde_json::json!({}));
+    if let Some(metadata) = metadata {
+        response.insert("metadata".to_string(), metadata);
     }
 
     response.insert("rand_seed".to_string(), serde_json::json!(""));

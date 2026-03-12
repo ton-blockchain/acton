@@ -6,7 +6,7 @@ use crate::server::models::{
     GetJettonWalletsRequest, GetNftItemsRequest, GetPendingTransactionsV3Query, GetTracesQuery,
     GetTransactionsByMessageV3Query, GetTransactionsV3Query, RunGetMethodRequest, SendBocRequest,
 };
-use crate::storage::JettonMasterMeta;
+use crate::storage::{JettonMasterMeta, TraceNode};
 use crate::types::{Addr, Hash256};
 use axum::{
     Json,
@@ -22,7 +22,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
 use toncenter_v3 as v3;
-use tycho_types::models::{StdAddr, StdAddrFormat};
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr, StdAddrFormat};
+use tycho_types::prelude::HashBytes;
 
 pub async fn get_traces(
     State(node): State<Arc<LiteNode>>,
@@ -112,21 +113,29 @@ pub async fn emulate_trace_v1(State(node): State<Arc<LiteNode>>, body: Bytes) ->
     let include_metadata = payload.include_metadata.unwrap_or(false);
     let with_actions = payload.with_actions.unwrap_or(false);
 
-    if include_address_book || include_metadata {
-        return emulate_bad_request("invalid request: address book and metadata are not available");
-    }
-
     match node
         .emulate_trace(boc, payload.ignore_chksig, payload.mc_block_seqno)
         .await
     {
         Ok(trace) => {
+            let (address_book, metadata) = match build_emulate_v1_extra_data(
+                node.as_ref(),
+                &trace.trace,
+                include_address_book,
+                include_metadata,
+            )
+            .await
+            {
+                Ok(extra) => extra,
+                Err(e) => return emulate_internal_error(e.to_string()),
+            };
+
             let response = v3::map_emulate_trace_response(
                 &trace,
                 with_actions,
                 include_code_data,
-                include_address_book,
-                include_metadata,
+                address_book,
+                metadata,
             );
             (StatusCode::OK, Json(response))
         }
@@ -603,6 +612,238 @@ fn parse_sort(sort: Option<String>) -> anyhow::Result<SortOrder> {
         "desc" => Ok(SortOrder::Desc),
         other => anyhow::bail!("Invalid `sort`: {other}. Supported values: asc, desc"),
     }
+}
+
+#[derive(Default)]
+struct EmulateAddressInfo {
+    interfaces: BTreeSet<String>,
+    token_info: Vec<Value>,
+    extra_jetton_masters: BTreeSet<Addr>,
+}
+
+async fn build_emulate_v1_extra_data(
+    node: &LiteNode,
+    trace: &TraceNode,
+    include_address_book: bool,
+    include_metadata: bool,
+) -> anyhow::Result<(Option<Value>, Option<Value>)> {
+    if !include_address_book && !include_metadata {
+        return Ok((None, None));
+    }
+
+    let mut addresses = BTreeSet::new();
+    collect_trace_addresses(trace, &mut addresses);
+
+    let mut address_book = serde_json::Map::new();
+    let mut metadata = serde_json::Map::new();
+    let mut pending_jetton_masters = BTreeSet::new();
+
+    for address in &addresses {
+        let info = collect_emulate_address_info(node, *address).await?;
+        pending_jetton_masters.extend(info.extra_jetton_masters.iter().copied());
+
+        if include_address_book {
+            address_book.insert(
+                address.to_string(),
+                json!({
+                    "user_friendly": as_user_friendly(*address),
+                    "domain": Value::Null,
+                    "interfaces": info.interfaces.into_iter().collect::<Vec<_>>(),
+                }),
+            );
+        }
+
+        if include_metadata && !info.token_info.is_empty() {
+            metadata.insert(
+                address.to_string(),
+                json!({
+                    "is_indexed": true,
+                    "token_info": info.token_info,
+                }),
+            );
+        }
+    }
+
+    if include_metadata {
+        for master_address in pending_jetton_masters {
+            let key = master_address.to_string();
+            if metadata.contains_key(&key) {
+                continue;
+            }
+            let info = collect_emulate_address_info(node, master_address).await?;
+            if info.token_info.is_empty() {
+                continue;
+            }
+            metadata.insert(
+                key,
+                json!({
+                    "is_indexed": true,
+                    "token_info": info.token_info,
+                }),
+            );
+        }
+    }
+
+    let address_book = include_address_book.then_some(Value::Object(address_book));
+    let metadata = include_metadata.then_some(Value::Object(metadata));
+
+    Ok((address_book, metadata))
+}
+
+fn collect_trace_addresses(trace: &TraceNode, out: &mut BTreeSet<Addr>) {
+    out.insert(trace.transaction.meta.account);
+    if let Some(in_msg) = &trace.transaction.in_msg {
+        if let Some(src) = in_msg.meta.src {
+            out.insert(src);
+        }
+        if let Some(dst) = in_msg.meta.dst {
+            out.insert(dst);
+        }
+    }
+    for out_msg in &trace.transaction.out_msgs {
+        if let Some(src) = out_msg.meta.src {
+            out.insert(src);
+        }
+        if let Some(dst) = out_msg.meta.dst {
+            out.insert(dst);
+        }
+    }
+    for child in &trace.children {
+        collect_trace_addresses(child, out);
+    }
+}
+
+async fn collect_emulate_address_info(
+    node: &LiteNode,
+    address: Addr,
+) -> anyhow::Result<EmulateAddressInfo> {
+    let mut out = EmulateAddressInfo::default();
+    let address_str = address.to_string();
+
+    let wallets = node
+        .get_jetton_wallets(
+            Some(address_str.clone()),
+            None,
+            None,
+            Some(false),
+            Some(1),
+            Some(0),
+        )
+        .await?;
+    if let Some(wallet) = wallets.first() {
+        out.interfaces.insert("jetton_wallet".to_string());
+        out.token_info.push(json!({
+            "valid": true,
+            "type": "jetton_wallets",
+            "extra": {
+                "owner": wallet.owner_address.to_string(),
+                "jetton": wallet.jetton_address.to_string(),
+                "balance": wallet.balance.to_string(),
+            },
+        }));
+        out.extra_jetton_masters.insert(wallet.jetton_address);
+    }
+
+    let masters = node
+        .get_jetton_masters(Some(address_str.clone()), None, Some(1), Some(0))
+        .await?;
+    if let Some(master) = masters.first() {
+        out.interfaces.insert("jetton_master".to_string());
+        out.token_info.push(map_emulate_jetton_master_token_info(
+            master.jetton_content.clone(),
+        ));
+    }
+
+    let items = node
+        .get_nft_items(
+            Some(address_str),
+            None,
+            None,
+            None,
+            Some(false),
+            Some(1),
+            Some(0),
+        )
+        .await?;
+    if let Some(item) = items.first() {
+        out.interfaces.insert("nft_item".to_string());
+        out.token_info.push(map_emulate_nft_item_token_info(
+            item.index.clone(),
+            item.content.clone(),
+        ));
+    }
+
+    Ok(out)
+}
+
+fn map_emulate_jetton_master_token_info(content: Value) -> Value {
+    let mut mapped = serde_json::Map::new();
+    mapped.insert("valid".to_string(), Value::Bool(true));
+    mapped.insert(
+        "type".to_string(),
+        Value::String("jetton_masters".to_string()),
+    );
+
+    if let Some(name) = token_content_string(&content, "name") {
+        mapped.insert("name".to_string(), Value::String(name));
+    }
+    if let Some(symbol) = token_content_string(&content, "symbol") {
+        mapped.insert("symbol".to_string(), Value::String(symbol));
+    }
+    if let Some(description) = token_content_string(&content, "description") {
+        mapped.insert("description".to_string(), Value::String(description));
+    }
+    if let Some(image) = token_content_string(&content, "image") {
+        mapped.insert("image".to_string(), Value::String(image));
+    }
+
+    mapped.insert("extra".to_string(), content);
+    Value::Object(mapped)
+}
+
+fn map_emulate_nft_item_token_info(index: String, content: Value) -> Value {
+    let mut mapped = serde_json::Map::new();
+    mapped.insert("valid".to_string(), Value::Bool(true));
+    mapped.insert("type".to_string(), Value::String("nft_items".to_string()));
+    mapped.insert("nft_index".to_string(), Value::String(index));
+
+    if let Some(name) = token_content_string(&content, "name") {
+        mapped.insert("name".to_string(), Value::String(name));
+    }
+    if let Some(symbol) = token_content_string(&content, "symbol") {
+        mapped.insert("symbol".to_string(), Value::String(symbol));
+    }
+    if let Some(description) = token_content_string(&content, "description") {
+        mapped.insert("description".to_string(), Value::String(description));
+    }
+    if let Some(image) = token_content_string(&content, "image") {
+        mapped.insert("image".to_string(), Value::String(image));
+    }
+
+    mapped.insert("extra".to_string(), content);
+    Value::Object(mapped)
+}
+
+fn token_content_string(content: &Value, key: &str) -> Option<String> {
+    content
+        .as_object()
+        .and_then(|map| map.get(key))
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+}
+
+fn as_user_friendly(address: Addr) -> String {
+    let workchain = i8::try_from(address.workchain).ok().unwrap_or_default();
+    let std_addr = StdAddr::new(workchain, HashBytes(address.addr));
+    DisplayBase64StdAddr {
+        addr: &std_addr,
+        flags: Base64StdAddrFlags {
+            testnet: false,
+            base64_url: true,
+            bounceable: false,
+        },
+    }
+    .to_string()
 }
 
 fn parse_opcode(opcode: &str) -> anyhow::Result<u32> {

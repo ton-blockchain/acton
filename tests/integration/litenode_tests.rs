@@ -1286,24 +1286,37 @@ fn litenode_supports_emulate_v1_emulate_trace() {
         serde_json::to_string_pretty(&missing_boc).unwrap_or_default()
     );
 
-    let (unsupported_status, unsupported) = node.post_json_with_status(
+    let (with_extras_status, with_extras) = node.post_json_with_status(
         "/api/emulate/v1/emulateTrace",
         &json!({
             "boc": V3_MESSAGE_TEST_BOC,
-            "include_address_book": true
+            "include_address_book": true,
+            "include_metadata": true
         }),
     );
     assert_eq!(
-        unsupported_status, 400,
-        "include_address_book/include_metadata must return 400 when unavailable"
+        with_extras_status, 200,
+        "include_address_book/include_metadata emulateTrace request must succeed"
     );
     assert!(
-        unsupported["error"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("address book and metadata are not available"),
-        "Unexpected error for include_address_book/include_metadata:\n{}",
-        serde_json::to_string_pretty(&unsupported).unwrap_or_default()
+        with_extras.get("address_book").is_some(),
+        "include_address_book=true must include `address_book` in response:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
+    );
+    assert!(
+        with_extras.get("metadata").is_some(),
+        "include_metadata=true must include `metadata` in response:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
+    );
+    assert!(
+        with_extras["address_book"].is_object(),
+        "`address_book` must be an object:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
+    );
+    assert!(
+        with_extras["metadata"].is_object(),
+        "`metadata` must be an object:\n{}",
+        serde_json::to_string_pretty(&with_extras).unwrap_or_default()
     );
 
     node.stop();
