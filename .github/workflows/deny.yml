@@ -5,6 +5,7 @@ on:
     branches:
       - master
     paths:
+      - ".github/workflows/deny.yml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "**/Cargo.toml"
