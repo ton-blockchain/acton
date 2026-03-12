@@ -523,22 +523,20 @@ impl Emulator {
     pub fn set_config(&self, state: &mut WorldState, config: Cell) -> anyhow::Result<bool> {
         let config_boc = Boc::encode_base64(&config);
 
+        let mut config_slice = config.as_slice_allow_exotic();
+
+        let config_dict = Dict::<u32, Cell>::load_from_root_ext(
+            &mut config_slice,
+            Cell::empty_context(),
+        )
+        .context("Failed to load config dict from cell")?;
+
+        // Always update the world state so that get methods see the change,
+        // even if the C executor rejects the config due to validation.
+        state.set_config(config_dict);
+
         match self.executor.set_config(&config_boc) {
-            Ok(res) => match res {
-                true => {
-                    let mut config_slice = config.as_slice_allow_exotic();
-
-                    let config_dict = Dict::<u32, Cell>::load_from_root_ext(
-                        &mut config_slice,
-                        Cell::empty_context(),
-                    )
-                    .context("Failed to load config dict from cell")?;
-
-                    state.set_config(config_dict);
-                    Ok(true)
-                }
-                false => Ok(false),
-            },
+            Ok(res) => Ok(res),
             Err(e) => Err(e),
         }
     }
