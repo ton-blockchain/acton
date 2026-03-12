@@ -27,8 +27,9 @@ jobs:
       matrix:
         language:
           - fift
-          - tolk
           - tasm
+          - tlb
+          - tolk
     if: true
 
     permissions:
