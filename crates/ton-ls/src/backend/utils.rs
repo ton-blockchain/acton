@@ -11,6 +11,7 @@ pub enum SourceLanguage {
     Tolk,
     Tasm,
     Fift,
+    Tlb,
     Toml,
     Unknown,
 }
@@ -18,7 +19,7 @@ pub enum SourceLanguage {
 impl SourceLanguage {
     #[must_use]
     pub const fn is_self_contained(self) -> bool {
-        matches!(self, Self::Tasm | Self::Fift | Self::Toml)
+        matches!(self, Self::Tasm | Self::Fift | Self::Tlb | Self::Toml)
     }
 }
 
@@ -33,6 +34,7 @@ pub fn detect_language(uri: &Url) -> SourceLanguage {
         Some("tolk") => SourceLanguage::Tolk,
         Some("tasm") => SourceLanguage::Tasm,
         Some("fif") | Some("fift") => SourceLanguage::Fift,
+        Some("tlb") => SourceLanguage::Tlb,
         Some("toml") => SourceLanguage::Toml,
         _ => SourceLanguage::Unknown,
     }

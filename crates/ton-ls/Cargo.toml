@@ -22,6 +22,7 @@ tasm-syntax = { workspace = true }
 tasm = { workspace = true }
 fift-syntax = { workspace = true }
 toml-syntax = { workspace = true }
+tlb-syntax = { workspace = true }
 ton-syntax = { workspace = true }
 ton-json-schema = { workspace = true }
 rustc-hash = { workspace = true }

@@ -40,6 +40,7 @@ tolk-syntax = { path = "crates/tolk-syntax" }
 tasm-syntax = { path = "crates/tasm-syntax" }
 fift-syntax = { path = "crates/fift-syntax" }
 toml-syntax = { path = "crates/toml-syntax" }
+tlb-syntax = { path = "crates/tlb-syntax" }
 ton-json-schema = { path = "crates/ton-json-schema" }
 ton-syntax = { path = "crates/ton-syntax" }
 tolk-resolver = { path = "crates/tolk-resolver" }
@@ -63,6 +64,7 @@ ton-indexer = { path = "crates/ton-indexer" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
 tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
 tree-sitter-fift = { path = "crates/tree-sitter-fift" }
+tree-sitter-tlb = { path = "crates/tree-sitter-tlb" }
 tree-sitter-toml-ng = "0.7.0"
 
 # remote crates

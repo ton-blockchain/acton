@@ -30,6 +30,12 @@ impl HasRootNode for toml_syntax::SourceFile {
     }
 }
 
+impl HasRootNode for tlb_syntax::SourceFile {
+    fn root_node<'tree>(&'tree self) -> Node<'tree> {
+        self.tree.root_node()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedSnapshot<TSourceFile> {
     pub uri: Url,

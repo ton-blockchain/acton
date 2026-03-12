@@ -78,3 +78,25 @@ impl SyntaxAdapter for TomlSyntaxAdapter {
         &source_file.tree
     }
 }
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct TlbSyntaxAdapter;
+
+impl SyntaxAdapter for TlbSyntaxAdapter {
+    type SourceFile = tlb_syntax::SourceFile;
+
+    fn parse(source: &str) -> anyhow::Result<Self::SourceFile> {
+        tlb_syntax::parse(source)
+    }
+
+    fn parse_with_old_tree(
+        source: &str,
+        old_tree: Option<&Tree>,
+    ) -> anyhow::Result<Self::SourceFile> {
+        tlb_syntax::parse_with_old_tree(source, old_tree)
+    }
+
+    fn tree(source_file: &Self::SourceFile) -> &Tree {
+        &source_file.tree
+    }
+}

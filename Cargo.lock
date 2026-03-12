@@ -3502,6 +3502,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlb-syntax"
+version = "0.0.11"
+dependencies = [
+ "anyhow",
+ "ton-syntax",
+ "tree-sitter",
+ "tree-sitter-tlb",
+]
+
+[[package]]
 name = "tokio"
 version = "1.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3879,6 +3889,7 @@ dependencies = [
  "serde_json",
  "tasm",
  "tasm-syntax",
+ "tlb-syntax",
  "tolk-linter",
  "tolk-resolver",
  "tolk-syntax",
@@ -4156,6 +4167,15 @@ checksum = "c4013970217383f67b18aef68f6fb2e8d409bc5755227092d32efb0422ba24b8"
 
 [[package]]
 name = "tree-sitter-tasm"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "tree-sitter",
+ "tree-sitter-language",
+]
+
+[[package]]
+name = "tree-sitter-tlb"
 version = "0.1.0"
 dependencies = [
  "cc",

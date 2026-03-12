@@ -21,6 +21,10 @@
           - "crates/dap-client/**"
           - "crates/ton-ls/**"
           - "crates/tree-sitter-tolk/**"
+          - "crates/tree-sitter-fift/**"
+          - "crates/tree-sitter-tlb/**"
+          - "crates/tree-sitter-tasm/**"
+          - "crates/tree-sitter-toml/**"
           - "src/commands/ls/**"
 
 "libraries":

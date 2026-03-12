@@ -1,5 +1,7 @@
 use crate::backend::utils::SourceLanguage;
-use crate::languages::engine::adapter::{FiftSyntaxAdapter, TasmSyntaxAdapter, TomlSyntaxAdapter};
+use crate::languages::engine::adapter::{
+    FiftSyntaxAdapter, TasmSyntaxAdapter, TlbSyntaxAdapter, TomlSyntaxAdapter,
+};
 use crate::languages::engine::cache::{CacheSyncResult, IncrementalParseCache, ParsedSnapshot};
 use lsp_types::{TextDocumentContentChangeEvent, Url};
 use std::sync::Arc;
@@ -8,6 +10,7 @@ use std::sync::Arc;
 pub struct SelfContainedLanguageRegistry {
     tasm_cache: IncrementalParseCache<TasmSyntaxAdapter>,
     fift_cache: IncrementalParseCache<FiftSyntaxAdapter>,
+    tlb_cache: IncrementalParseCache<TlbSyntaxAdapter>,
     toml_cache: IncrementalParseCache<TomlSyntaxAdapter>,
 }
 
@@ -37,6 +40,9 @@ impl SelfContainedLanguageRegistry {
             SourceLanguage::Fift => {
                 self.fift_cache.open(uri, version, text)?;
             }
+            SourceLanguage::Tlb => {
+                self.tlb_cache.open(uri, version, text)?;
+            }
             SourceLanguage::Toml => {
                 self.toml_cache.open(uri, version, text)?;
             }
@@ -61,6 +67,10 @@ impl SelfContainedLanguageRegistry {
                 .fift_cache
                 .sync_changes(uri, version, changes)?
                 .map(map_sync_result)),
+            SourceLanguage::Tlb => Ok(self
+                .tlb_cache
+                .sync_changes(uri, version, changes)?
+                .map(map_sync_result)),
             SourceLanguage::Toml => Ok(self
                 .toml_cache
                 .sync_changes(uri, version, changes)?
@@ -76,6 +86,9 @@ impl SelfContainedLanguageRegistry {
             }
             SourceLanguage::Fift => {
                 self.fift_cache.remove(uri);
+            }
+            SourceLanguage::Tlb => {
+                self.tlb_cache.remove(uri);
             }
             SourceLanguage::Toml => {
                 self.toml_cache.remove(uri);
@@ -98,6 +111,14 @@ impl SelfContainedLanguageRegistry {
 
     pub fn find_fift_text(&self, uri: &Url) -> Option<Arc<str>> {
         self.fift_cache.text(uri)
+    }
+
+    pub fn find_tlb_file(&self, uri: &Url) -> Option<ParsedSnapshot<tlb_syntax::SourceFile>> {
+        self.tlb_cache.snapshot(uri)
+    }
+
+    pub fn find_tlb_text(&self, uri: &Url) -> Option<Arc<str>> {
+        self.tlb_cache.text(uri)
     }
 
     pub fn find_toml_file(&self, uri: &Url) -> Option<ParsedSnapshot<toml_syntax::SourceFile>> {

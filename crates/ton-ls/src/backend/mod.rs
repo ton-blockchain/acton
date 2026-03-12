@@ -84,6 +84,11 @@ impl LanguageServer for Backend {
                                         scheme: Some("file".to_string()),
                                         pattern: None,
                                     },
+                                    DocumentFilter {
+                                        language: Some("tlb".to_string()),
+                                        scheme: Some("file".to_string()),
+                                        pattern: None,
+                                    },
                                 ]),
                             },
                             semantic_tokens_options: SemanticTokensOptions {
@@ -182,7 +187,10 @@ impl LanguageServer for Backend {
         match detect_language(&params.text_document_position_params.text_document.uri) {
             SourceLanguage::Tolk => self.handle_goto_definition(params).await,
             SourceLanguage::Fift => Ok(self.handle_fift_goto_definition(params).await),
-            SourceLanguage::Tasm | SourceLanguage::Toml | SourceLanguage::Unknown => Ok(None),
+            SourceLanguage::Tasm
+            | SourceLanguage::Tlb
+            | SourceLanguage::Toml
+            | SourceLanguage::Unknown => Ok(None),
         }
     }
 
@@ -190,7 +198,10 @@ impl LanguageServer for Backend {
         match detect_language(&params.text_document_position.text_document.uri) {
             SourceLanguage::Tolk => self.handle_references(params).await,
             SourceLanguage::Fift => Ok(self.handle_fift_references(params).await),
-            SourceLanguage::Tasm | SourceLanguage::Toml | SourceLanguage::Unknown => Ok(None),
+            SourceLanguage::Tasm
+            | SourceLanguage::Tlb
+            | SourceLanguage::Toml
+            | SourceLanguage::Unknown => Ok(None),
         }
     }
 
@@ -199,6 +210,7 @@ impl LanguageServer for Backend {
             SourceLanguage::Tolk => self.handle_inlay_hint(params).await,
             SourceLanguage::Tasm
             | SourceLanguage::Fift
+            | SourceLanguage::Tlb
             | SourceLanguage::Toml
             | SourceLanguage::Unknown => Ok(None),
         }
@@ -209,6 +221,7 @@ impl LanguageServer for Backend {
             SourceLanguage::Tolk => self.handle_code_action(params).await,
             SourceLanguage::Tasm
             | SourceLanguage::Fift
+            | SourceLanguage::Tlb
             | SourceLanguage::Toml
             | SourceLanguage::Unknown => Ok(None),
         }
@@ -228,6 +241,7 @@ impl LanguageServer for Backend {
         match detect_language(&params.text_document.uri) {
             SourceLanguage::Tolk => self.handle_semantic_tokens_full(params).await,
             SourceLanguage::Fift => Ok(self.handle_fift_semantic_tokens_full(params).await),
+            SourceLanguage::Tlb => Ok(self.handle_tlb_semantic_tokens_full(params).await),
             SourceLanguage::Tasm | SourceLanguage::Toml | SourceLanguage::Unknown => Ok(None),
         }
     }
@@ -239,7 +253,10 @@ impl LanguageServer for Backend {
         match detect_language(&params.text_document.uri) {
             SourceLanguage::Tasm => Ok(self.handle_tasm_folding_range(params).await),
             SourceLanguage::Fift => Ok(self.handle_fift_folding_range(params).await),
-            SourceLanguage::Tolk | SourceLanguage::Toml | SourceLanguage::Unknown => Ok(None),
+            SourceLanguage::Tolk
+            | SourceLanguage::Tlb
+            | SourceLanguage::Toml
+            | SourceLanguage::Unknown => Ok(None),
         }
     }
 
@@ -248,7 +265,7 @@ impl LanguageServer for Backend {
             SourceLanguage::Tasm => Ok(self.handle_tasm_hover(params).await),
             SourceLanguage::Fift => Ok(self.handle_fift_hover(params).await),
             SourceLanguage::Toml => Ok(self.handle_toml_hover(params).await),
-            SourceLanguage::Tolk | SourceLanguage::Unknown => Ok(None),
+            SourceLanguage::Tolk | SourceLanguage::Tlb | SourceLanguage::Unknown => Ok(None),
         }
     }
 
@@ -258,6 +275,7 @@ impl LanguageServer for Backend {
             SourceLanguage::Tolk
             | SourceLanguage::Tasm
             | SourceLanguage::Fift
+            | SourceLanguage::Tlb
             | SourceLanguage::Unknown => Ok(None),
         }
     }
@@ -267,6 +285,7 @@ impl LanguageServer for Backend {
             SourceLanguage::Tasm => Ok(self.handle_tasm_code_lens(params).await),
             SourceLanguage::Tolk
             | SourceLanguage::Fift
+            | SourceLanguage::Tlb
             | SourceLanguage::Toml
             | SourceLanguage::Unknown => Ok(None),
         }
