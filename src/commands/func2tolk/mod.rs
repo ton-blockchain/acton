@@ -14,6 +14,7 @@ pub fn func2tolk_cmd(
         TempDir::new().context("Failed to create a temporary npm cache directory")?;
     let mut cmd = Command::new("npx");
     cmd.env("npm_config_cache", npm_cache_dir.path())
+        .env("npm_config_update_notifier", "false")
         .arg("--yes")
         .arg(CONVERT_FUNC_TO_TOLK_NPM_PACKAGE);
     if warnings_as_comments {
