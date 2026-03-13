@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::process::{Command, Stdio};
+use tempfile::TempDir;
 
 const CONVERT_FUNC_TO_TOLK_NPM_PACKAGE: &str = "@ton/convert-func-to-tolk@1.0.0";
 
@@ -9,8 +10,12 @@ pub fn func2tolk_cmd(
     warnings_as_comments: bool,
     no_camel_case: bool,
 ) -> Result<()> {
+    let npm_cache_dir =
+        TempDir::new().context("Failed to create a temporary npm cache directory")?;
     let mut cmd = Command::new("npx");
-    cmd.arg(CONVERT_FUNC_TO_TOLK_NPM_PACKAGE);
+    cmd.env("npm_config_cache", npm_cache_dir.path())
+        .arg("--yes")
+        .arg(CONVERT_FUNC_TO_TOLK_NPM_PACKAGE);
     if warnings_as_comments {
         cmd.arg("--warnings-as-comments");
     }
