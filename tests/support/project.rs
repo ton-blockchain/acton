@@ -62,6 +62,7 @@ pub(crate) struct TestConfig {
     pub coverage_file: Option<String>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
 }
 
@@ -920,6 +921,10 @@ version = "0.1.0"
 
             if let Some(fail_fast) = config.fail_fast {
                 toml_content.push_str(&format!("fail-fast = {fail_fast}\n"));
+            }
+
+            if let Some(fail_on_diff) = config.fail_on_diff {
+                toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
             }
 
             toml_content.push('\n');

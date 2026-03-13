@@ -21,6 +21,7 @@ depends = []
 
 [test]
 include = ["tests/acton-stdlib/**", ".jetton/**"]
+fail-on-diff = false
 
 [test.mutation]
 

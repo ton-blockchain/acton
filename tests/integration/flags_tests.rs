@@ -54,6 +54,47 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+const PROFILED_TEST_WITH_DRIFT: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+
+get fun `test-profiled-transaction`() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployer = net.treasury("deployer");
+    val deployMessage = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    });
+    val deployResult = net.send(deployer.address, deployMessage);
+    expect(deployResult.size()).toEqual(1);
+
+    val ping = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    });
+    val pingResult = net.send(deployer.address, ping);
+    expect(pingResult.size()).toEqual(1);
+
+    val secondPing = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    });
+    val secondPingResult = net.send(deployer.address, secondPing);
+    expect(secondPingResult.size()).toEqual(1);
+}
+"#;
+
 const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
 import "../../lib/build/build"
 import "../../lib/testing/expect"
@@ -857,6 +898,196 @@ fn test_manifest_path_test_profiling_snapshots_use_project_root() {
         "baseline snapshot must be loaded from project root, stderr:\n{}",
         stderr
     );
+}
+
+#[test]
+fn test_fail_on_diff_exits_non_zero_for_profile_drift() {
+    let project = ProjectBuilder::new("profiling-fail-on-diff")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let baseline_filename = "profile-baseline.json";
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg(baseline_filename)
+        .run()
+        .success();
+
+    fs::write(
+        project.path().join("tests/profile.test.tolk"),
+        PROFILED_TEST_WITH_DRIFT,
+    )
+    .expect("Failed to write drifted test file");
+
+    let failed = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg(baseline_filename)
+        .arg("--fail-on-diff")
+        .run()
+        .failure();
+
+    failed
+        .assert_contains("CHAIN GAS & FEES SUMMARY COMPARISON")
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_fail_on_diff_exits_non_zero_for_profile_drift.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fail_on_diff_succeeds_when_profile_matches_baseline() {
+    let project = ProjectBuilder::new("profiling-fail-on-diff-no-drift")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    let baseline_filename = "profile-baseline.json";
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--snapshot")
+        .arg(baseline_filename)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg(baseline_filename)
+        .arg("--fail-on-diff")
+        .run()
+        .success();
+
+    output.assert_contains("CHAIN GAS & FEES SUMMARY COMPARISON");
+    let stderr = output.get_normalized_stderr();
+    assert!(
+        !stderr.contains("Profiling drift detected"),
+        "unexpected drift error in stderr:\n{}",
+        stderr
+    );
+}
+
+#[test]
+fn test_baseline_missing_without_fail_on_diff_warns_and_succeeds() {
+    let project = ProjectBuilder::new("profiling-baseline-missing-non-strict")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("missing-baseline.json")
+        .run()
+        .success()
+        .assert_contains("CHAIN GAS & FEES SUMMARY")
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_baseline_missing_without_fail_on_diff_warns_and_succeeds.stderr.txt",
+        );
+}
+
+#[test]
+fn test_baseline_missing_with_fail_on_diff_fails() {
+    let project = ProjectBuilder::new("profiling-baseline-missing-strict")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("missing-baseline.json")
+        .arg("--fail-on-diff")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_baseline_missing_with_fail_on_diff_fails.stderr.txt",
+        );
+}
+
+#[test]
+fn test_baseline_invalid_without_fail_on_diff_warns_and_succeeds() {
+    let project = ProjectBuilder::new("profiling-baseline-invalid-non-strict")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    fs::write(project.path().join("invalid-baseline.json"), "{invalid")
+        .expect("Failed to write invalid baseline snapshot");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("invalid-baseline.json")
+        .run()
+        .success()
+        .assert_contains("CHAIN GAS & FEES SUMMARY")
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_baseline_invalid_without_fail_on_diff_warns_and_succeeds.stderr.txt",
+        );
+}
+
+#[test]
+fn test_baseline_invalid_with_fail_on_diff_fails() {
+    let project = ProjectBuilder::new("profiling-baseline-invalid-strict")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+    project.acton().init().run().success();
+
+    fs::write(project.path().join("invalid-baseline.json"), "{invalid")
+        .expect("Failed to write invalid baseline snapshot");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("invalid-baseline.json")
+        .arg("--fail-on-diff")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_baseline_invalid_with_fail_on_diff_fails.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fail_on_diff_without_baseline_is_rejected_by_cli() {
+    let project = ProjectBuilder::new("profiling-fail-on-diff-without-baseline")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST)
+        .build();
+
+    project
+        .acton()
+        .test()
+        .arg("--fail-on-diff")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_fail_on_diff_without_baseline_is_rejected_by_cli.stderr.txt",
+        );
 }
 
 #[test]

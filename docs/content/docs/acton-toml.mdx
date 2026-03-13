@@ -180,25 +180,26 @@ rate-limit = 1
 
 Configures the behavior of `acton test`.
 
-| Field               | Type       | Default       | Description                                               |
-|:--------------------|:-----------|:--------------|:----------------------------------------------------------|
-| `filter`            | `string`   | -             | Regex pattern to filter tests by name.                    |
-| `reporter`          | `string[]` | `["console"]` | List of reporters: `console`, `teamcity`, `junit`, `dot`. |
-| `debug`             | `boolean`  | `false`       | Enable debug mode (activates debugger).                   |
-| `debug-port`        | `integer`  | `12345`       | Port for the debug server.                                |
-| `backtrace`         | `string`   | -             | Set to `full` to enable full stack traces on failure.     |
-| `coverage`          | `boolean`  | `false`       | Enable code coverage collection.                          |
-| `coverage-format`   | `string`   | `lcov`        | Format for coverage report (`lcov`, `text`).              |
-| `coverage-file`     | `string`   | -             | Path to save the coverage report.                         |
-| `exclude`           | `string[]` | -             | Glob patterns of files to exclude from testing.           |
-| `include`           | `string[]` | -             | Glob patterns of files to include in testing.             |
-| `junit-path`        | `string`   | -             | Directory for JUnit XML reports.                          |
-| `junit-merge`       | `boolean`  | `false`       | Merge all test results into a single JUnit file.          |
-| `fork-net`          | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).   |
-| `api-key`           | `string`   | -             | API key for the network provider when forking.            |
-| `fork-block-number` | `integer`  | -             | Specific block number to fork from.                       |
-| `fail-fast`         | `boolean`  | `false`       | Stop execution after the first test failure.              |
-| `mutation`          | `object`   | -             | Configuration for mutation testing (see below).           |
+| Field               | Type       | Default       | Description                                                            |
+|:--------------------|:-----------|:--------------|:-----------------------------------------------------------------------|
+| `filter`            | `string`   | -             | Regex pattern to filter tests by name.                                 |
+| `reporter`          | `string[]` | `["console"]` | List of reporters: `console`, `teamcity`, `junit`, `dot`.              |
+| `debug`             | `boolean`  | `false`       | Enable debug mode (activates debugger).                                |
+| `debug-port`        | `integer`  | `12345`       | Port for the debug server.                                             |
+| `backtrace`         | `string`   | -             | Set to `full` to enable full stack traces on failure.                  |
+| `coverage`          | `boolean`  | `false`       | Enable code coverage collection.                                       |
+| `coverage-format`   | `string`   | `lcov`        | Format for coverage report (`lcov`, `text`).                           |
+| `coverage-file`     | `string`   | -             | Path to save the coverage report.                                      |
+| `exclude`           | `string[]` | -             | Glob patterns of files to exclude from testing.                        |
+| `include`           | `string[]` | -             | Glob patterns of files to include in testing.                          |
+| `junit-path`        | `string`   | -             | Directory for JUnit XML reports.                                       |
+| `junit-merge`       | `boolean`  | `false`       | Merge all test results into a single JUnit file.                       |
+| `fork-net`          | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).                |
+| `api-key`           | `string`   | -             | API key for the network provider when forking.                         |
+| `fork-block-number` | `integer`  | -             | Specific block number to fork from.                                    |
+| `fail-fast`         | `boolean`  | `false`       | Stop execution after the first test failure.                           |
+| `fail-on-diff`      | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `mutation`          | `object`   | -             | Configuration for mutation testing (see below).                        |
 
 ### Mutation Testing Configuration
 
@@ -214,10 +215,13 @@ Example:
 reporter = ["console", "junit"]
 coverage = true
 fail-fast = true
+fail-on-diff = true
 
 [test.mutation]
 disable-rules = ["flip_plus"]
 ```
+
+`fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`).
 
 ---
 

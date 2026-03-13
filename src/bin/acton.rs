@@ -182,6 +182,13 @@ enum Commands {
             help_heading = "Profiling"
         )]
         baseline_snapshot: Option<String>,
+        #[arg(
+            long,
+            help = "Exit with non-zero code when profiling differs from baseline snapshot",
+            help_heading = "Profiling",
+            requires = "baseline_snapshot"
+        )]
+        fail_on_diff: bool,
 
         // Reporting
         #[arg(
@@ -1772,6 +1779,7 @@ fn main() {
             junit_merge,
             snapshot,
             baseline_snapshot,
+            fail_on_diff,
             fork_net,
             api_key,
             save_test_trace,
@@ -1801,6 +1809,7 @@ fn main() {
                     junit_merge,
                     snapshot,
                     baseline_snapshot,
+                    fail_on_diff,
                     fork_net,
                     api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     fork_block_number,
@@ -2328,6 +2337,7 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    fail_on_diff: bool,
     fork_net: Option<Network>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
@@ -2377,6 +2387,7 @@ fn create_test_config(
             mutate_overrides,
             mutate_contract,
             disable_rules,
+            if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
             Some(ui_port),
@@ -2399,6 +2410,7 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
+        fail_on_diff,
         api_key,
         fork_block_number,
         save_test_trace,

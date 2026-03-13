@@ -154,6 +154,10 @@
         "fail-fast": {
           "type": "boolean",
           "description": "Stop test execution after the first failure"
+        },
+        "fail-on-diff": {
+          "type": "boolean",
+          "description": "Exit with non-zero code when gas profiling differs from baseline snapshot"
         }
       }
     },

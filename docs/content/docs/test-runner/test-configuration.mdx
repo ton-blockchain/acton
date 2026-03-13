@@ -159,6 +159,25 @@ coverage = true
 coverage-format = "lcov"
 ```
 
+### Profiling Options
+
+| Configuration  | CLI Flag         | Type    | Description                                                           |
+|----------------|------------------|---------|-----------------------------------------------------------------------|
+| `fail-on-diff` | `--fail-on-diff` | Boolean | Exit with non-zero code when profiling differs from baseline snapshot |
+
+`fail-on-diff` is applied when running baseline comparison mode with
+`--baseline-snapshot <FILE>`.
+
+**Examples:**
+```toml
+[test]
+fail-on-diff = true
+```
+
+```bash
+acton test --baseline-snapshot gas-baseline.json --fail-on-diff
+```
+
 ### JUnit Options
 
 | Configuration     | CLI Flag        | Type    | Description                      |
