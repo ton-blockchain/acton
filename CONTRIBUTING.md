@@ -367,6 +367,10 @@ Rules:
 - `DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1`: preserve temp test directories.
 - `ACTON_LOG_DIR`: custom directory for Acton debug logs.
 
+## AI Policy
+
+Do what you want and how it is convenient for you.
+
 ## Additional references
 
 - Task catalog: [`justfile`](justfile)
