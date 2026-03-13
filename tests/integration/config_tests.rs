@@ -523,6 +523,31 @@ fn test_include_patterns_via_config() {
 }
 
 #[test]
+fn test_include_patterns_via_config_with_explicit_directory_path() {
+    ProjectBuilder::new("include-config-explicit-path")
+        .contract("simple", SIMPLE_CONTRACT)
+        .raw_file(
+            "tests/selected/path_case.test.tolk",
+            r#"
+            get fun `test-folder-path`() {}
+        "#,
+        )
+        .with_test_config(TestConfig {
+            include_patterns: Some(vec!["tests/selected/**".to_string()]),
+            ..Default::default()
+        })
+        .build()
+        .acton()
+        .test()
+        .path("tests/selected")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_include_patterns_via_config_with_explicit_directory_path.stdout.txt",
+        );
+}
+
+#[test]
 fn test_reporters_via_config() {
     ProjectBuilder::new("reporters-config")
         .contract("simple", SIMPLE_CONTRACT)

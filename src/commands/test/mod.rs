@@ -453,10 +453,18 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                 .to_string(),
         ]
     } else if metadata.is_dir() {
-        find_test_files_recursively(&path, &config.exclude_patterns, &config.include_patterns)?
-            .into_iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect()
+        let search_root = dunce::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
+        let project_root_abs =
+            dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
+        find_test_files_recursively(
+            &search_root,
+            &project_root_abs,
+            &config.exclude_patterns,
+            &config.include_patterns,
+        )?
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect()
     } else {
         anyhow::bail!("Path '{path}' is neither a file nor a directory");
     };
@@ -652,7 +660,8 @@ fn build_overrides_for_mutations(config: &TestConfig) -> anyhow::Result<BTreeMap
 }
 
 pub fn find_test_files_recursively(
-    dir_path: &str,
+    dir_path: &Path,
+    project_root: &Path,
     exclude_patterns: &[String],
     include_patterns: &[String],
 ) -> anyhow::Result<Vec<PathBuf>> {
@@ -682,7 +691,7 @@ pub fn find_test_files_recursively(
         Some(include_builder.build()?)
     };
 
-    let root = Path::new(dir_path);
+    let root = dir_path;
 
     let it = WalkDir::new(root)
         .follow_links(false)
@@ -692,7 +701,7 @@ pub fn find_test_files_recursively(
                 return true;
             }
             let p = entry.path();
-            let rel = p.strip_prefix(root).unwrap_or(p);
+            let rel = p.strip_prefix(project_root).unwrap_or(p);
             !excludes.is_match(rel)
         });
 
@@ -710,7 +719,7 @@ pub fn find_test_files_recursively(
         if entry.file_type().is_file() {
             let path = entry.path();
 
-            let rel = path.strip_prefix(root).unwrap_or(path);
+            let rel = path.strip_prefix(project_root).unwrap_or(path);
 
             if let Some(name) = rel.file_name().and_then(|s| s.to_str()) {
                 if name.ends_with(".test.tolk.test.tolk") {
