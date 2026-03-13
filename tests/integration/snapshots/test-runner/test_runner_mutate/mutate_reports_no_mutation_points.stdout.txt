@@ -1,7 +1,7 @@
 Mutation Testing
 ────────────────────────────────────────────────────────────
-Contract: simple
-Source:   contracts/simple.tolk
+Contract: main
+Source:   contracts/main.tolk
 Files:    1
 Mutants:  0
 

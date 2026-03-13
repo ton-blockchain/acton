@@ -53,6 +53,11 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
+const NO_MUTATION_POINTS_CONTRACT: &str = r#"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 fn mutation_project(name: &str) -> Project {
     ProjectBuilder::new(name)
         .contract("simple", MUTATION_CONTRACT)
@@ -252,5 +257,23 @@ fn mutate_compile_errors_are_excluded_from_score() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/test_runner_mutate/mutate_compile_errors_are_excluded_from_score.stdout.txt",
+        );
+}
+
+#[test]
+fn mutate_reports_no_mutation_points() {
+    ProjectBuilder::new("j-mutate-no-mutation-points")
+        .contract("main", NO_MUTATION_POINTS_CONTRACT)
+        .test_file("mutation", PASSING_TEST)
+        .build()
+        .acton()
+        .test()
+        .arg("--mutate")
+        .arg("--mutate-contract")
+        .arg("main")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/test_runner_mutate/mutate_reports_no_mutation_points.stdout.txt",
         );
 }

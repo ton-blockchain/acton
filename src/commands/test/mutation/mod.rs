@@ -544,7 +544,9 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         }
     );
 
-    if survived_count > 0 {
+    if results.is_empty() {
+        println!("\n{} No mutation points found.\n", "○".dimmed());
+    } else if survived_count > 0 {
         println!("\n{}", "Survived Mutants".yellow());
         println!("{}", "─".repeat(60).dimmed());
 
