@@ -1,11 +1,13 @@
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, global_libraries_path, global_wallets_path, resolved_paths_diagnostics,
+    ActonConfig, LibrariesFile, WalletsFile, global_libraries_path, global_wallets_path,
+    resolved_paths_diagnostics,
 };
 use anyhow::Result;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 #[derive(Debug, Serialize)]
@@ -52,11 +54,46 @@ struct DoctorPaths {
 }
 
 #[derive(Debug, Serialize)]
+struct DoctorOverlayFile {
+    path: DoctorPath,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parse_ok: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entries_count: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+struct DoctorOverlayConfig {
+    load_ok: bool,
+    merged_entries_count: Option<usize>,
+    local: DoctorOverlayFile,
+    global: Option<DoctorOverlayFile>,
+}
+
+#[derive(Debug, Serialize)]
+struct DoctorConfigOverlays {
+    wallets: DoctorOverlayConfig,
+    libraries: DoctorOverlayConfig,
+}
+
+#[derive(Debug, Serialize)]
 struct DoctorStdlib {
     path: DoctorPath,
+    common_tolk: DoctorPath,
+    status: String,
     version: Option<String>,
+    expected_version: String,
     revision: Option<String>,
     source: String,
+}
+
+#[derive(Debug, Serialize)]
+struct DoctorLogging {
+    acton_log_dir_env: Option<String>,
+    resolved_dir: DoctorPath,
+    debug_log: DoctorPath,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,8 +118,10 @@ struct DoctorEnvironment {
 struct DoctorReport {
     versions: DoctorVersions,
     paths: DoctorPaths,
+    config_overlays: DoctorConfigOverlays,
     manifest: DoctorManifest,
     stdlib: DoctorStdlib,
+    logging: DoctorLogging,
     environment: DoctorEnvironment,
 }
 
@@ -93,19 +132,27 @@ struct ManifestSummary {
     mappings: Option<BTreeMap<String, toml::Value>>,
 }
 
+struct OverlayInspection {
+    report: DoctorOverlayFile,
+    names: BTreeSet<String>,
+    load_ok: bool,
+}
+
 fn is_writable(path: &Path) -> bool {
-    let metadata = if path.exists() {
-        fs::metadata(path)
+    let mut candidate = if path.exists() {
+        Some(path)
     } else {
-        path.parent().map_or_else(
-            || Err(std::io::Error::other("missing parent")),
-            fs::metadata,
-        )
+        path.parent()
     };
 
-    metadata
-        .map(|meta| !meta.permissions().readonly())
-        .unwrap_or(false)
+    while let Some(current) = candidate {
+        match fs::metadata(current) {
+            Ok(metadata) => return !metadata.permissions().readonly(),
+            Err(_) => candidate = current.parent(),
+        }
+    }
+
+    false
 }
 
 fn describe_path(path: &Path, resolution_source: Option<&str>) -> DoctorPath {
@@ -178,7 +225,206 @@ fn inspect_manifest(path: &Path) -> DoctorManifest {
     }
 }
 
-fn read_runtime_path(label: &str, result: std::io::Result<std::path::PathBuf>) -> String {
+fn inspect_overlay_file<T>(
+    path: &Path,
+    extract_names: impl Fn(&T) -> BTreeSet<String>,
+) -> OverlayInspection
+where
+    T: DeserializeOwned,
+{
+    if !path.exists() {
+        return OverlayInspection {
+            report: DoctorOverlayFile {
+                path: describe_path(path, None),
+                parse_ok: None,
+                error: None,
+                entries_count: None,
+            },
+            names: BTreeSet::new(),
+            load_ok: true,
+        };
+    }
+
+    match fs::read_to_string(path) {
+        Ok(content) => match toml::from_str::<T>(&content) {
+            Ok(parsed) => {
+                let names = extract_names(&parsed);
+                OverlayInspection {
+                    report: DoctorOverlayFile {
+                        path: describe_path(path, None),
+                        parse_ok: Some(true),
+                        error: None,
+                        entries_count: Some(names.len()),
+                    },
+                    names,
+                    load_ok: true,
+                }
+            }
+            Err(err) => OverlayInspection {
+                report: DoctorOverlayFile {
+                    path: describe_path(path, None),
+                    parse_ok: Some(false),
+                    error: Some(err.to_string()),
+                    entries_count: None,
+                },
+                names: BTreeSet::new(),
+                load_ok: false,
+            },
+        },
+        Err(err) => OverlayInspection {
+            report: DoctorOverlayFile {
+                path: describe_path(path, None),
+                parse_ok: Some(false),
+                error: Some(err.to_string()),
+                entries_count: None,
+            },
+            names: BTreeSet::new(),
+            load_ok: false,
+        },
+    }
+}
+
+fn inspect_wallet_overlays(local_path: &Path, global_path: Option<&Path>) -> DoctorOverlayConfig {
+    let local = inspect_overlay_file::<WalletsFile>(local_path, |file| {
+        file.wallets
+            .as_ref()
+            .map(|wallets| wallets.wallets.keys().cloned().collect())
+            .unwrap_or_default()
+    });
+    let global = global_path.map(|path| {
+        inspect_overlay_file::<WalletsFile>(path, |file| {
+            file.wallets
+                .as_ref()
+                .map(|wallets| wallets.wallets.keys().cloned().collect())
+                .unwrap_or_default()
+        })
+    });
+    let load_ok = local.load_ok && global.as_ref().is_none_or(|global| global.load_ok);
+    let merged_entries_count = if load_ok {
+        let mut merged = BTreeSet::new();
+        if let Some(global) = &global {
+            merged.extend(global.names.iter().cloned());
+        }
+        merged.extend(local.names.iter().cloned());
+        Some(merged.len())
+    } else {
+        None
+    };
+
+    DoctorOverlayConfig {
+        load_ok,
+        merged_entries_count,
+        local: local.report,
+        global: global.map(|global| global.report),
+    }
+}
+
+fn inspect_library_overlays(local_path: &Path, global_path: Option<&Path>) -> DoctorOverlayConfig {
+    let local = inspect_overlay_file::<LibrariesFile>(local_path, |file| {
+        file.libraries
+            .as_ref()
+            .map(|libraries| libraries.libraries.keys().cloned().collect())
+            .unwrap_or_default()
+    });
+    let global = global_path.map(|path| {
+        inspect_overlay_file::<LibrariesFile>(path, |file| {
+            file.libraries
+                .as_ref()
+                .map(|libraries| libraries.libraries.keys().cloned().collect())
+                .unwrap_or_default()
+        })
+    });
+    let load_ok = local.load_ok && global.as_ref().is_none_or(|global| global.load_ok);
+    let merged_entries_count = if load_ok {
+        let mut merged = BTreeSet::new();
+        if let Some(global) = &global {
+            merged.extend(global.names.iter().cloned());
+        }
+        merged.extend(local.names.iter().cloned());
+        Some(merged.len())
+    } else {
+        None
+    };
+
+    DoctorOverlayConfig {
+        load_ok,
+        merged_entries_count,
+        local: local.report,
+        global: global.map(|global| global.report),
+    }
+}
+
+fn inspect_stdlib(acton_dir: &Path, stdlib_path: &Path) -> DoctorStdlib {
+    let version = read_first_existing(&[&acton_dir.join(".version")]);
+    let revision = read_first_existing(&[
+        &stdlib_path.join(".revision"),
+        &stdlib_path.join(".git_hash"),
+        &stdlib_path.join("REVISION"),
+        &stdlib_path.join("VERSION"),
+    ]);
+    let common_tolk = stdlib_path.join("common.tolk");
+    let expected_version = env!("CARGO_PKG_VERSION").to_string();
+    let status = if !stdlib_path.exists() {
+        "missing"
+    } else if !common_tolk.exists() {
+        "incomplete"
+    } else if version.as_deref() == Some(expected_version.as_str()) {
+        "healthy"
+    } else if version.is_some() {
+        "outdated"
+    } else {
+        "unknown-version"
+    };
+
+    DoctorStdlib {
+        path: describe_path(stdlib_path, None),
+        common_tolk: describe_path(&common_tolk, None),
+        status: status.to_string(),
+        version,
+        expected_version,
+        revision,
+        source: "embedded-bundle".to_string(),
+    }
+}
+
+fn non_empty_env_string(var: &str) -> Option<String> {
+    env::var(var).ok().filter(|value| !value.is_empty())
+}
+
+fn env_path(var: &str) -> Option<PathBuf> {
+    let value = env::var_os(var)?;
+    if value.is_empty() {
+        return None;
+    }
+    Some(PathBuf::from(value))
+}
+
+fn resolve_acton_log_dir(project_root: &Path) -> (PathBuf, &'static str) {
+    if let Some(path) = env_path("ACTON_LOG_DIR") {
+        return (path, "ACTON_LOG_DIR");
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(path) = env_path("USERPROFILE") {
+            return (path.join(".acton").join("logs"), "USERPROFILE");
+        }
+        if let Some(path) = env_path("HOME") {
+            return (path.join(".acton").join("logs"), "HOME");
+        }
+        return (project_root.join(".acton").join("logs"), "project_root");
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(path) = env_path("HOME") {
+            return (path.join(".acton").join("logs"), "HOME");
+        }
+        (project_root.join(".acton").join("logs"), "project_root")
+    }
+}
+
+fn read_runtime_path(label: &str, result: std::io::Result<PathBuf>) -> String {
     match result {
         Ok(path) => path.display().to_string(),
         Err(err) => format!("<unavailable: {label}: {err}>"),
@@ -197,15 +443,15 @@ fn collect_doctor_report() -> Result<DoctorReport> {
     let cache_dir = project_root.join(".acton").join("cache");
     let local_wallets = project_root.join("wallets.toml");
     let local_libraries = project_root.join("libraries.toml");
+    let global_wallets = global_wallets_path();
+    let global_libraries = global_libraries_path();
 
     let stdlib_path = acton_dir.join("tolk-stdlib");
-    let stdlib_version = read_first_existing(&[&acton_dir.join(".version")]);
-    let stdlib_revision = read_first_existing(&[
-        &stdlib_path.join(".revision"),
-        &stdlib_path.join(".git_hash"),
-        &stdlib_path.join("REVISION"),
-        &stdlib_path.join("VERSION"),
-    ]);
+    let stdlib = inspect_stdlib(&acton_dir, &stdlib_path);
+    let wallets_overlay = inspect_wallet_overlays(&local_wallets, global_wallets.as_deref());
+    let libraries_overlay = inspect_library_overlays(&local_libraries, global_libraries.as_deref());
+    let (resolved_log_dir, log_dir_source) = resolve_acton_log_dir(&project_root);
+    let debug_log = resolved_log_dir.join("debug.log");
 
     let current_dir = read_runtime_path("current_dir", env::current_dir());
     let executable = read_runtime_path("current_exe", env::current_exe());
@@ -226,20 +472,24 @@ fn collect_doctor_report() -> Result<DoctorReport> {
             acton_dir: describe_path(&acton_dir, None),
             cache_dir: describe_path(&cache_dir, None),
             wallets: describe_path(&local_wallets, None),
-            global_wallets: global_wallets_path()
+            global_wallets: global_wallets
                 .as_deref()
                 .map(|path| describe_path(path, None)),
             libraries: describe_path(&local_libraries, None),
-            global_libraries: global_libraries_path()
+            global_libraries: global_libraries
                 .as_deref()
                 .map(|path| describe_path(path, None)),
         },
+        config_overlays: DoctorConfigOverlays {
+            wallets: wallets_overlay,
+            libraries: libraries_overlay,
+        },
         manifest: manifest_status,
-        stdlib: DoctorStdlib {
-            path: describe_path(&stdlib_path, None),
-            version: stdlib_version,
-            revision: stdlib_revision,
-            source: "embedded-bundle".to_string(),
+        stdlib,
+        logging: DoctorLogging {
+            acton_log_dir_env: non_empty_env_string("ACTON_LOG_DIR"),
+            resolved_dir: describe_path(&resolved_log_dir, Some(log_dir_source)),
+            debug_log: describe_path(&debug_log, None),
         },
         environment: DoctorEnvironment {
             current_dir,
@@ -302,6 +552,26 @@ fn print_path(label: &str, value: &DoctorPath) {
         && canonical_path != &value.path
     {
         print_kv(&format!("{label}.canonical"), canonical_path);
+    }
+}
+
+fn print_overlay_file(label: &str, value: &DoctorOverlayFile) {
+    print_path(&format!("{label}.path"), &value.path);
+    print_kv(
+        &format!("{label}.parse_ok"),
+        value
+            .parse_ok
+            .map_or_else(|| "<n/a>".to_string(), |value| value.to_string()),
+    );
+    print_kv(
+        &format!("{label}.entries"),
+        value
+            .entries_count
+            .map_or_else(|| "<n/a>".to_string(), |value| value.to_string()),
+    );
+    match &value.error {
+        Some(error) => print_kv(&format!("{label}.error"), error),
+        None => print_kv(&format!("{label}.error"), "<none>"),
     }
 }
 
@@ -372,17 +642,73 @@ fn print_report(report: &DoctorReport) {
     );
     println!();
 
+    print_section("Wallet Overlays");
+    print_kv(
+        "load_ok",
+        report.config_overlays.wallets.load_ok.to_string(),
+    );
+    print_kv(
+        "merged_entries",
+        report
+            .config_overlays
+            .wallets
+            .merged_entries_count
+            .map_or_else(|| "<n/a>".to_string(), |value| value.to_string()),
+    );
+    print_overlay_file("local", &report.config_overlays.wallets.local);
+    match &report.config_overlays.wallets.global {
+        Some(global) => print_overlay_file("global", global),
+        None => print_kv("global", "unavailable (HOME/USERPROFILE is not set)"),
+    }
+    println!();
+
+    print_section("Library Overlays");
+    print_kv(
+        "load_ok",
+        report.config_overlays.libraries.load_ok.to_string(),
+    );
+    print_kv(
+        "merged_entries",
+        report
+            .config_overlays
+            .libraries
+            .merged_entries_count
+            .map_or_else(|| "<n/a>".to_string(), |value| value.to_string()),
+    );
+    print_overlay_file("local", &report.config_overlays.libraries.local);
+    match &report.config_overlays.libraries.global {
+        Some(global) => print_overlay_file("global", global),
+        None => print_kv("global", "unavailable (HOME/USERPROFILE is not set)"),
+    }
+    println!();
+
     print_section("Stdlib");
     print_path("path", &report.stdlib.path);
+    print_path("common_tolk", &report.stdlib.common_tolk);
+    print_kv("status", &report.stdlib.status);
     print_kv(
         "version",
         report.stdlib.version.as_deref().unwrap_or("<unknown>"),
     );
+    print_kv("expected_version", &report.stdlib.expected_version);
     print_kv(
         "revision",
         report.stdlib.revision.as_deref().unwrap_or("<unknown>"),
     );
     print_kv("source", &report.stdlib.source);
+    println!();
+
+    print_section("Logging");
+    print_kv(
+        "ACTON_LOG_DIR",
+        report
+            .logging
+            .acton_log_dir_env
+            .as_deref()
+            .unwrap_or("<unset>"),
+    );
+    print_path("resolved_dir", &report.logging.resolved_dir);
+    print_path("debug_log", &report.logging.debug_log);
     println!();
 
     print_section("Environment");
