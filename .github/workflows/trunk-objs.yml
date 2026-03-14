@@ -153,7 +153,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
         run: |
-          release_notes=$'Automated trunk build of TON object files for Acton.\n\nActon commit: '"${GITHUB_SHA}"$'\nTON commit: '"${{ needs.build_objs.outputs.ton_commit }}"
+          release_notes="Ton commit: ${{ needs.build_objs.outputs.ton_commit }}"
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
