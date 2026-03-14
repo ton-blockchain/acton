@@ -13,17 +13,21 @@ permissions: { }
 
 jobs:
   build-linux:
+    name: Build Linux (${{ matrix.arch }})
     strategy:
       matrix:
-        os: [ ubicloud-standard-4-ubuntu-2204 ]
-    runs-on: ${{ matrix.os }}
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            os: linux
+            arch: x86_64
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
+            os: linux
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
     if: true
 
     permissions:
       contents: read
-
-    outputs:
-      arch: ${{ steps.detect-arch.outputs.arch }}
 
     steps:
       - name: Check out Acton repository
@@ -79,7 +83,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.os }}
+          key: ${{ matrix.runner }}
           save-if: false
 
       - name: Install Rust
@@ -97,14 +101,10 @@ jobs:
           sudo ./llvm.sh 16 clang
           rm llvm.sh
 
-      - name: Detect architecture
-        id: detect-arch
-        run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
-
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
-          ARCHIVE_NAME: ton-objs-linux-${{ steps.detect-arch.outputs.arch }}.tar.gz
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
           mkdir -p dist objs
           gh release download trunk-objs \
@@ -128,11 +128,18 @@ jobs:
         run: |
           ./target/release-size/acton --help
 
-      - name: Upload acton binary as artifact
+      - name: Prepare Linux archive
+        env:
+          ARCHIVE_NAME: acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        run: |
+          mkdir -p dist
+          tar -czf "dist/${ARCHIVE_NAME}" -C target/release-size acton
+
+      - name: Upload Linux archive as artifact
         uses: actions/upload-artifact@v7
         with:
-          name: acton-linux-binary
-          path: target/release-size/acton
+          name: acton-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           retention-days: 1
 
   create-release:
@@ -144,33 +151,18 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - name: Download Linux binary
+      - name: Download Linux archives
         uses: actions/download-artifact@v8
         with:
-          name: acton-linux-binary
-          path: binaries/linux/
+          pattern: acton-*
+          path: dist/
+          merge-multiple: true
 
-      - name: Make binaries executable
-        run: |
-          chmod +x binaries/linux/acton
-
-      - name: Create Linux archive
-        run: |
-          mkdir -p dist
-          tar -czf dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
-            -C binaries/linux acton
-
-      - name: Upload Linux archive to release
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_name: acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_content_type: application/gzip
+      - name: Upload Linux archives to release
         env:
-          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "${RELEASE_TAG}" dist/*.tar.gz \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
