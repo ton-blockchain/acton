@@ -10,7 +10,7 @@ concurrency:
 permissions: { }
 
 jobs:
-  build-objs:
+  build_objs:
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     strategy:
       matrix:
@@ -35,41 +35,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Cache TON artifacts
-        id: cache-ton-objs
-        uses: actions/cache/restore@v5
-        with:
-          path: objs
-          key: ton-objs-${{ matrix.runner }}-${{ steps.ton-commit.outputs.commit }}
-
-      - name: Check cache hits
-        run: |
-          echo 'TON artifacts: ${{ steps.cache-ton-objs.outputs.cache-hit }}'
-
       - name: Install LLVM and Clang
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 16 clang
           rm llvm.sh
 
-      - name: Install system dependencies (cache not exist)
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
       - name: Maximize Build Space
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
         with:
           tool-cache: false
           large-packages: false
 
       - name: Clone TON repository
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -80,7 +65,6 @@ jobs:
           path: ton-repo
 
       - name: Build TON static libraries
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
         env:
           CC: clang-16
           CXX: clang++-16
@@ -93,38 +77,35 @@ jobs:
           ./build-ubuntu-static.sh -a -c
 
       - name: Show ccache stats
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
         run: ccache -s
 
       - name: Collect TON objects
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
         run: |
           mkdir -p objs
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
-      - name: Cache TON objects
-        if: steps.cache-ton-objs.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+      - name: Upload TON objects artifact
+        uses: actions/upload-artifact@v7
         with:
+          name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
           path: objs
-          key: ton-objs-${{ matrix.runner }}-${{ steps.ton-commit.outputs.commit }}
+          if-no-files-found: error
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ build-objs ]
+    needs: [ build_objs ]
     runs-on: ubicloud-standard-2
 
     permissions:
       contents: read
 
     steps:
-      - name: Restore TON objects
-        uses: actions/cache/restore@v5
+      - name: Download TON objects artifact
+        uses: actions/download-artifact@v8
         with:
+          name: ton-objs-linux-x86_64
           path: objs
-          key: ton-objs-ubicloud-standard-4-ubuntu-2204-${{ needs.prepare.outputs.ton_commit }}
-          fail-on-cache-miss: true
 
       - name: Validate TON objects
         run: |
@@ -146,7 +127,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
         run: |
-          release_notes=$'Automated trunk build of TON object files for Acton.\n\nActon commit: '"${GITHUB_SHA}"$'\nTON commit: '"${{ needs.prepare.outputs.ton_commit }}"
+          release_notes=$'Automated trunk build of TON object files for Acton.\n\nActon commit: '"${GITHUB_SHA}"$'\nTON commit: '"${{ needs.build_objs.outputs.ton_commit }}"
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
