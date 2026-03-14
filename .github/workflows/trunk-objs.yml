@@ -89,12 +89,14 @@ jobs:
           cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Generate TON artifacts lock file
+        env:
+          TON_COMMIT: ${{ steps.ton-commit.outputs.commit }}
         run: |
           libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
           libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
 
           jq -n \
-            --arg ton_commit "${{ steps.ton-commit.outputs.commit }}" \
+            --arg ton_commit "${TON_COMMIT}" \
             --arg libemulator_sha256 "${libemulator_sha256}" \
             --arg libtolk_sha256 "${libtolk_sha256}" \
             '{
@@ -112,9 +114,11 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
+        env:
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
           mkdir -p dist
-          tar -C objs -czf dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz \
+          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
             libemulator.a \
             libtolk.a \
             ton-artifacts.lock
@@ -185,8 +189,9 @@ jobs:
       - name: Create trunk-objs release
         env:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          TON_COMMIT: ${{ needs.build_objs.outputs.ton_commit }}
         run: |
-          release_notes="https://github.com/i582/ton/commit/${{ needs.build_objs.outputs.ton_commit }}"
+          release_notes="Generate from: https://github.com/i582/ton/commit/${TON_COMMIT}"
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
