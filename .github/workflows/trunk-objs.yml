@@ -100,6 +100,14 @@ jobs:
               sha256_libtolk: $libtolk_sha256
             }' > objs/ton-artifacts.lock
 
+      - name: Validate TON objects
+        run: |
+          ls -lh objs
+          test -f objs/libemulator.a
+          test -f objs/libtolk.a
+          test -f objs/ton-artifacts.lock
+          cat objs/ton-artifacts.lock
+
       - name: Upload TON objects artifact
         uses: actions/upload-artifact@v7
         with:
@@ -121,14 +129,6 @@ jobs:
         with:
           name: ton-objs-linux-x86_64
           path: objs
-
-      - name: Validate TON objects
-        run: |
-          test -f objs/libemulator.a
-          test -f objs/libtolk.a
-          test -f objs/ton-artifacts.lock
-          ls -lh objs
-          cat objs/ton-artifacts.lock
 
       - name: Delete previous trunk-objs release and tag
         env:
