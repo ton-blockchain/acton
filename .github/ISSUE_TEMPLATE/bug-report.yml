@@ -75,6 +75,15 @@ body:
       required: false
 
   - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor Report
+      description: Paste the output of `acton doctor`, run from the same directory where the issue reproduces.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
     id: project
     attributes:
       label: Project Or Input Files

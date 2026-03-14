@@ -14,4 +14,10 @@ fn main() {
 
     let build_date = Utc::now().format("%Y-%m-%d").to_string();
     println!("cargo:rustc-env=BUILD_DATE={build_date}");
+
+    let target_triple = std::env::var("TARGET").unwrap_or_else(|_| "unknown-target".to_string());
+    println!("cargo:rustc-env=TARGET_TRIPLE={target_triple}");
+
+    let build_profile = std::env::var("PROFILE").unwrap_or_else(|_| "unknown-profile".to_string());
+    println!("cargo:rustc-env=BUILD_PROFILE={build_profile}");
 }
