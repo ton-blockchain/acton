@@ -652,10 +652,7 @@ enum Commands {
         about = "Inspect resolved project environment",
         after_help = example_doctor_usage()
     )]
-    Doctor {
-        #[arg(long, help = "Output doctor report as JSON")]
-        json: bool,
-    },
+    Doctor,
     #[command(
         about = "Generate shell completions for selected shell",
         after_help = example_completions_usage()
@@ -1353,13 +1350,7 @@ fn example_up_usage() -> StyledStr {
 }
 
 fn example_doctor_usage() -> StyledStr {
-    format_examples(
-        &[
-            ("Show environment diagnostics", "acton doctor"),
-            ("Show diagnostics as JSON", "acton doctor --json"),
-        ],
-        "",
-    )
+    format_examples(&[("Show environment diagnostics", "acton doctor")], "")
 }
 
 fn example_fmt_usage() -> StyledStr {
@@ -1486,8 +1477,8 @@ fn root_help(show_global_options: bool) -> StyledStr {
     let support_commands = vec![
         ("ls", ""),
         ("up", ""),
-        ("doctor", ""),
         ("help", "[COMMAND]"),
+        ("doctor", ""),
         ("func2tolk", "<PATH>"),
         ("completions", "<SHELL>"),
     ];
@@ -2143,7 +2134,7 @@ fn main() {
             warnings_as_comments,
             no_camel_case,
         } => func2tolk_cmd(path, output, warnings_as_comments, no_camel_case),
-        Commands::Doctor { json } => doctor_cmd(json),
+        Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())

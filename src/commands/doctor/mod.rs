@@ -759,12 +759,8 @@ fn print_report(report: &DoctorReport) {
     );
 }
 
-pub fn doctor_cmd(json: bool) -> Result<()> {
+pub fn doctor_cmd() -> Result<()> {
     let report = collect_doctor_report()?;
-    if json {
-        println!("{}", serde_json::to_string_pretty(&report)?);
-    } else {
-        print_report(&report);
-    }
+    print_report(&report);
     Ok(())
 }
