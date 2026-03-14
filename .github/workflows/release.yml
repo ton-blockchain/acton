@@ -136,6 +136,7 @@ jobs:
         with:
           name: acton-linux-binary
           path: target/release-size/acton
+          retention-days: 1
 
   create-release:
     needs: [ build-linux ]

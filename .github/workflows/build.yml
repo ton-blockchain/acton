@@ -197,6 +197,7 @@ jobs:
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
           path: target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
           if-no-files-found: error
 
   lint:
