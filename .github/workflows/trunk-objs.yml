@@ -108,11 +108,19 @@ jobs:
           test -f objs/ton-artifacts.lock
           cat objs/ton-artifacts.lock
 
+      - name: Pack TON objects
+        run: |
+          mkdir -p dist
+          tar -C objs -czf dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz \
+            libemulator.a \
+            libtolk.a \
+            ton-artifacts.lock
+
       - name: Upload TON objects artifact
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
-          path: objs
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
   create-trunk-objs-release:
@@ -128,7 +136,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ton-objs-linux-x86_64
-          path: objs
+          path: dist
 
       - name: Delete previous trunk-objs release and tag
         env:
@@ -148,9 +156,7 @@ jobs:
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
-            objs/libemulator.a \
-            objs/libtolk.a \
-            objs/ton-artifacts.lock \
+            dist/ton-objs-linux-x86_64.tar.gz \
             --title "Trunk Objs" \
             --notes "${release_notes}" \
             --prerelease \
