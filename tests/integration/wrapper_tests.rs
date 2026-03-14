@@ -551,6 +551,42 @@ fn test_wrapper_generation_with_typed_cell_param() {
 }
 
 #[test]
+fn test_wrapper_generation_with_snake_case_getters() {
+    let project = ProjectBuilder::new("wrapper_getters")
+        .contract(
+            "my_contract",
+            r#"
+                contract MyContract {}
+
+                fun onInternalMessage(_in: InMessage) {}
+
+                get fun is_allowed(): bool {
+                    return true;
+                }
+
+                get fun get_total_supply(owner_address: address): int {
+                    return 0;
+                }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/wrappers/MyContract.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_snake_case_getters/wrapper.tolk.txt",
+        );
+}
+
+#[test]
 fn test_wrapper_custom_output() {
     let project = ProjectBuilder::new("wrapper_custom")
         .contract("my_contract", SIMPLE_CONTRACT)

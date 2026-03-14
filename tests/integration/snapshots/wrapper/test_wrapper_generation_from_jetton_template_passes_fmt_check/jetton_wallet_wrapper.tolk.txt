@@ -135,6 +135,6 @@ fun JettonWalletContract.sendAny(
     return net.send(from, genericMsg);
 }
 
-fun JettonWalletContract.get_wallet_data(self): JettonWalletDataReply {
+fun JettonWalletContract.getWalletData(self): JettonWalletDataReply {
     return net.runGetMethod(self.address, "get_wallet_data");
 }

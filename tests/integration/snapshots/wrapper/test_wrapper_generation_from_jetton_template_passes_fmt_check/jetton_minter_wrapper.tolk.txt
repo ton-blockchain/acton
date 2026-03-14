@@ -151,10 +151,10 @@ fun JettonMinterContract.sendAny(
     return net.send(from, genericMsg);
 }
 
-fun JettonMinterContract.get_jetton_data(self): JettonDataReply {
+fun JettonMinterContract.getJettonData(self): JettonDataReply {
     return net.runGetMethod(self.address, "get_jetton_data");
 }
 
-fun JettonMinterContract.get_wallet_address(self, ownerAddress: address): address {
+fun JettonMinterContract.getWalletAddress(self, ownerAddress: address): address {
     return net.runGetMethod(self.address, "get_wallet_address", ownerAddress);
 }

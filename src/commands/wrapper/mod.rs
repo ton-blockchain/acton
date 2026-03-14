@@ -2,6 +2,7 @@ use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root};
 use anyhow::anyhow;
+use heck::ToLowerCamelCase;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -475,17 +476,31 @@ fn generate_send_any_method(contract_name: &str) -> String {
 
 fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String {
     let mut code = String::new();
-    let method_name = &get_method.name;
-
+    let method_name = normalize_get_method_name(&get_method.name);
+    let tvm_method_name = &get_method.name;
     let params = get_method
         .parameters
         .iter()
         .map(|p| {
             let type_name = p.ty.render_param_type();
-            format!("{}: {}", p.name, type_name)
+            let param_name = normalize_get_param_name(&p.name);
+            format!("{}: {}", param_name, type_name)
         })
         .collect::<Vec<_>>()
         .join(", ");
+
+    let args = get_method
+        .parameters
+        .iter()
+        .map(|p| {
+            let param_name = normalize_get_param_name(&p.name);
+            if p.ty.is_typed_cell() {
+                format!("{}.toCell()", param_name)
+            } else {
+                param_name
+            }
+        })
+        .collect::<Vec<_>>();
 
     let return_type = get_method.return_ty.render_type();
 
@@ -494,49 +509,28 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
             "fun {contract_name}.{method_name}(self): {return_type} {{\n"
         ));
         code.push_str(&format!(
-            "    return net.runGetMethod(self.address, \"{method_name}\")\n"
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
         ));
     } else {
         code.push_str(&format!(
             "fun {contract_name}.{method_name}(self, {params}): {return_type} {{\n"
         ));
 
-        let args = get_method
-            .parameters
-            .iter()
-            .map(|p| p.name.as_str())
-            .collect::<Vec<_>>();
-
         if args.is_empty() {
             code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{method_name}\")\n"
+                "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
             ));
         } else if args.len() == 1 {
-            let arg_name = if get_method.parameters[0].ty.is_typed_cell() {
-                format!("{}.toCell()", args[0])
-            } else {
-                args[0].to_string()
-            };
+            let arg_name = &args[0];
 
             code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{method_name}\", {arg_name})\n"
+                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", {arg_name})\n"
             ));
         } else {
-            let args = get_method
-                .parameters
-                .iter()
-                .map(|p| {
-                    if p.ty.is_typed_cell() {
-                        format!("{}.toCell()", p.name)
-                    } else {
-                        p.name.clone()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
+            let args = args.join(", ");
 
             code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{method_name}\", [{args}] as tuple)\n"
+                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}] as tuple)\n"
             ));
         }
     }
@@ -544,6 +538,19 @@ fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String
     code.push_str("}\n");
 
     code
+}
+
+fn normalize_get_method_name(name: &str) -> String {
+    name.to_lower_camel_case()
+}
+
+fn normalize_get_param_name(name: &str) -> String {
+    let normalized = name.to_lower_camel_case();
+    if normalized == "from" || normalized == "config" {
+        format!("{}_", normalized)
+    } else {
+        normalized
+    }
 }
 
 fn generate_test(model: &WrapperModel) -> String {
