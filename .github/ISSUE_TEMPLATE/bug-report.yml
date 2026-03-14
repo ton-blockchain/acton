@@ -1,0 +1,93 @@
+name: Bug Report
+description: Report a bug in Acton.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for incorrect behavior, unexpected errors, failed commands, or regressions.
+
+  - type: input
+    id: version
+    attributes:
+      label: Acton Version
+      description: Paste the output of `acton -V`.
+      placeholder: 0.0.11 (abc1234 2026-03-14)
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The exact Acton command that triggered the issue.
+      placeholder: acton test
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What Happened
+      description: Describe the incorrect behavior.
+      placeholder: Acton failed to compile the contract and printed...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps To Reproduce
+      description: List the shortest reliable reproduction you know.
+      placeholder: |
+        1. Run `acton new my-project`
+        2. Replace `contracts/counter.tolk` with...
+        3. Run `acton test`
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: The command should succeed and generate...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Output
+      description: Paste the relevant terminal output or error text.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Acton Logs
+      description: Paste relevant content from `~/.acton/logs/debug.log`, or from `$ACTON_LOG_DIR/debug.log` if that env var is set.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: project
+    attributes:
+      label: Project Or Input Files
+      description: Share the minimal contract, test, config, or input files needed to reproduce the issue.
+      placeholder: Paste snippets or attach a small reproducer.
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, shell, architecture, CI/local, and any relevant env vars.
+      placeholder: macOS 15, zsh, arm64, local machine, ACTON_LOG_DIR unset
+    validations:
+      required: false
