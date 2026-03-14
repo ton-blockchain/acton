@@ -1,8 +1,6 @@
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    global_libraries_path, global_wallets_path, manifest_path as configured_manifest_path,
-    manifest_path_resolution_source, project_root as configured_project_root,
-    project_root_resolution_source,
+    ActonConfig, global_libraries_path, global_wallets_path, resolved_paths_diagnostics,
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -135,24 +133,40 @@ fn inspect_manifest(path: &Path) -> DoctorManifest {
     }
 
     match fs::read_to_string(path) {
-        Ok(content) => match toml::from_str::<ManifestSummary>(&content) {
-            Ok(summary) => DoctorManifest {
-                exists: true,
-                parse_ok: true,
-                error: None,
-                contracts_count: summary.contracts.as_ref().map(BTreeMap::len),
-                scripts_count: summary.scripts.as_ref().map(BTreeMap::len),
-                mappings_count: summary.mappings.as_ref().map(BTreeMap::len),
-            },
-            Err(err) => DoctorManifest {
-                exists: true,
-                parse_ok: false,
-                error: Some(err.to_string()),
-                contracts_count: None,
-                scripts_count: None,
-                mappings_count: None,
-            },
-        },
+        Ok(content) => {
+            let summary = toml::from_str::<ManifestSummary>(&content).ok();
+
+            match toml::from_str::<ActonConfig>(&content) {
+                Ok(_) => DoctorManifest {
+                    exists: true,
+                    parse_ok: true,
+                    error: None,
+                    contracts_count: summary
+                        .as_ref()
+                        .and_then(|summary| summary.contracts.as_ref().map(BTreeMap::len)),
+                    scripts_count: summary
+                        .as_ref()
+                        .and_then(|summary| summary.scripts.as_ref().map(BTreeMap::len)),
+                    mappings_count: summary
+                        .as_ref()
+                        .and_then(|summary| summary.mappings.as_ref().map(BTreeMap::len)),
+                },
+                Err(err) => DoctorManifest {
+                    exists: true,
+                    parse_ok: false,
+                    error: Some(err.to_string()),
+                    contracts_count: summary
+                        .as_ref()
+                        .and_then(|summary| summary.contracts.as_ref().map(BTreeMap::len)),
+                    scripts_count: summary
+                        .as_ref()
+                        .and_then(|summary| summary.scripts.as_ref().map(BTreeMap::len)),
+                    mappings_count: summary
+                        .as_ref()
+                        .and_then(|summary| summary.mappings.as_ref().map(BTreeMap::len)),
+                },
+            }
+        }
         Err(err) => DoctorManifest {
             exists: true,
             parse_ok: false,
@@ -164,26 +178,20 @@ fn inspect_manifest(path: &Path) -> DoctorManifest {
     }
 }
 
-fn read_first_existing(paths: &[&Path]) -> Option<String> {
-    for path in paths {
-        if path.exists()
-            && let Ok(content) = fs::read_to_string(path)
-        {
-            let value = content.trim();
-            if !value.is_empty() {
-                return Some(value.to_string());
-            }
-        }
+fn read_runtime_path(label: &str, result: std::io::Result<std::path::PathBuf>) -> String {
+    match result {
+        Ok(path) => path.display().to_string(),
+        Err(err) => format!("<unavailable: {label}: {err}>"),
     }
-    None
 }
 
 fn collect_doctor_report() -> Result<DoctorReport> {
-    let project_root = configured_project_root().to_path_buf();
-    let manifest_path = configured_manifest_path().to_path_buf();
+    let resolved_paths = resolved_paths_diagnostics();
+    let project_root = resolved_paths.project_root;
+    let manifest_path = resolved_paths.manifest_path;
     let manifest_status = inspect_manifest(&manifest_path);
-    let project_root_source = project_root_resolution_source().as_str();
-    let manifest_source = manifest_path_resolution_source().as_str();
+    let project_root_source = resolved_paths.project_root_source.as_str();
+    let manifest_source = resolved_paths.manifest_path_source.as_str();
 
     let acton_dir = project_root.join(".acton");
     let cache_dir = project_root.join(".acton").join("cache");
@@ -199,8 +207,8 @@ fn collect_doctor_report() -> Result<DoctorReport> {
         &stdlib_path.join("VERSION"),
     ]);
 
-    let current_dir = env::current_dir()?.display().to_string();
-    let executable = env::current_exe()?.display().to_string();
+    let current_dir = read_runtime_path("current_dir", env::current_dir());
+    let executable = read_runtime_path("current_exe", env::current_exe());
 
     Ok(DoctorReport {
         versions: DoctorVersions {
@@ -247,6 +255,20 @@ fn collect_doctor_report() -> Result<DoctorReport> {
             },
         },
     })
+}
+
+fn read_first_existing(paths: &[&Path]) -> Option<String> {
+    for path in paths {
+        if path.exists()
+            && let Ok(content) = fs::read_to_string(path)
+        {
+            let value = content.trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn print_section(title: &str) {

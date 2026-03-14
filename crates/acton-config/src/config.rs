@@ -33,6 +33,14 @@ impl ResolutionSource {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ResolvedPathsDiagnostics {
+    pub project_root: PathBuf,
+    pub manifest_path: PathBuf,
+    pub project_root_source: ResolutionSource,
+    pub manifest_path_source: ResolutionSource,
+}
+
 #[derive(clap::ValueEnum, Debug, Copy, Clone)]
 pub enum Explorer {
     Tonscan,
@@ -690,6 +698,16 @@ pub fn manifest_path_resolution_source() -> ResolutionSource {
 #[must_use]
 pub fn project_root_resolution_source() -> ResolutionSource {
     *PROJECT_ROOT_SOURCE.get_or_init(|| ResolutionSource::FallbackCwd)
+}
+
+#[must_use]
+pub fn resolved_paths_diagnostics() -> ResolvedPathsDiagnostics {
+    ResolvedPathsDiagnostics {
+        project_root: project_root().to_path_buf(),
+        manifest_path: manifest_path().to_path_buf(),
+        project_root_source: project_root_resolution_source(),
+        manifest_path_source: manifest_path_resolution_source(),
+    }
 }
 
 fn default_project_root_and_manifest_path() -> (PathBuf, PathBuf) {
