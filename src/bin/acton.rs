@@ -2137,6 +2137,13 @@ fn main() {
                 json,
             } => doc_tvm_cmd(&instruction, json, find, description),
         },
+        Commands::Func2Tolk {
+            path,
+            output,
+            warnings_as_comments,
+            no_camel_case,
+        } => func2tolk_cmd(path, output, warnings_as_comments, no_camel_case),
+        Commands::Doctor { json } => doctor_cmd(json),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
             Ok(())

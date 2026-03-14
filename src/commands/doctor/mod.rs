@@ -115,7 +115,7 @@ fn describe_path(path: &Path, resolution_source: Option<&str>) -> DoctorPath {
         path: path.display().to_string(),
         exists: path.exists(),
         writable: is_writable(path),
-        canonical_path: fs::canonicalize(path)
+        canonical_path: dunce::canonicalize(path)
             .ok()
             .map(|resolved| resolved.display().to_string()),
         resolution_source: resolution_source.map(ToOwned::to_owned),
@@ -166,12 +166,12 @@ fn inspect_manifest(path: &Path) -> DoctorManifest {
 
 fn read_first_existing(paths: &[&Path]) -> Option<String> {
     for path in paths {
-        if path.exists() {
-            if let Ok(content) = fs::read_to_string(path) {
-                let value = content.trim();
-                if !value.is_empty() {
-                    return Some(value.to_string());
-                }
+        if path.exists()
+            && let Ok(content) = fs::read_to_string(path)
+        {
+            let value = content.trim();
+            if !value.is_empty() {
+                return Some(value.to_string());
             }
         }
     }
