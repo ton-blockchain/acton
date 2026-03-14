@@ -24,6 +24,9 @@ jobs:
           - runner: ubicloud-standard-4-ubuntu-2204
             os: linux
             arch: x86_64
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
+            os: linux
+            arch: aarch64
     runs-on: ${{ matrix.runner }}
 
     permissions:
