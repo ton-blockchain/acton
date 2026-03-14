@@ -61,6 +61,45 @@ fn test_init_already_initialized() {
 }
 
 #[test]
+fn test_init_patches_missing_default_mappings_in_existing_config() {
+    let project = ProjectBuilder::new("init-patch-mappings")
+        .without_acton_toml()
+        .build();
+
+    fs::write(
+        project.path().join("Acton.toml"),
+        r#"[package]
+name = "my-acton-project"
+description = "A TON blockchain project"
+version = "0.1.0"
+license = "MIT"
+
+[fmt]
+width = 100
+ignore = []
+
+[mappings]
+tests = "custom-tests"
+"#,
+    )
+    .unwrap();
+
+    let output = project.acton().init().run().success();
+
+    output
+        .assert_contains("Updated Acton project")
+        .assert_contains("Patched Acton.toml with default mappings");
+
+    let content = fs::read_to_string(project.path().join("Acton.toml")).unwrap();
+    assertion().eq(
+        normalize_output(content.as_str(), project.path()),
+        snapbox::file!(
+            "snapshots/test_init_patches_missing_default_mappings_in_existing_config.toml.gen"
+        ),
+    );
+}
+
+#[test]
 fn test_init_updates_stdlib_if_already_initialized() {
     let project = ProjectBuilder::new("init-update-stdlib")
         .without_acton_toml()

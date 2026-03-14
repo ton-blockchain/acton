@@ -34,8 +34,15 @@ pub fn init_cmd() -> anyhow::Result<()> {
             "    {} Acton.toml project configuration",
             "Skipping".green().bold()
         );
+        if patch_default_mappings()? {
+            println!(
+                "     {} Acton.toml with default mappings",
+                "Patched".green().bold()
+            );
+        }
     } else {
         let mut config = ActonConfig::default();
+        config.ensure_default_mappings();
 
         let discovered_contracts = discover_contracts();
         let contract_count = discovered_contracts.len();
@@ -94,6 +101,18 @@ pub fn init_cmd() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn patch_default_mappings() -> anyhow::Result<bool> {
+    let content = fs::read_to_string("Acton.toml")?;
+    let mut config: ActonConfig = toml::from_str(&content)?;
+
+    if !config.ensure_default_mappings() {
+        return Ok(false);
+    }
+
+    config.save()?;
+    Ok(true)
 }
 
 fn patch_or_create_gitignore() -> anyhow::Result<()> {

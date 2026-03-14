@@ -1,7 +1,9 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
 use crate::stdlib;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig};
+use acton_config::config::{
+    ActonConfig, ContractConfig, ContractsConfig, default_project_mappings,
+};
 use inquire::{Select, Text};
 use std::collections::BTreeMap;
 use std::fs;
@@ -227,14 +229,7 @@ pub fn new_cmd(
         "acton script scripts/deploy.tolk --broadcast --net testnet".to_owned(),
     );
     config.scripts = Some(scripts);
-
-    let mut mappings = BTreeMap::new();
-    mappings.insert("acton".to_owned(), ".acton".to_owned());
-    mappings.insert("contracts".to_owned(), "contracts".to_owned());
-    mappings.insert("tests".to_owned(), "tests".to_owned());
-    mappings.insert("wrappers".to_owned(), "tests/wrappers".to_owned());
-    mappings.insert("gen".to_owned(), "gen".to_owned());
-    config.mappings = Some(mappings);
+    config.mappings = Some(default_project_mappings());
 
     config.save()?;
 

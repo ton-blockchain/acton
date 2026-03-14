@@ -12,6 +12,13 @@ static MANIFEST_PATH: OnceLock<PathBuf> = OnceLock::new();
 static PROJECT_ROOT: OnceLock<PathBuf> = OnceLock::new();
 static MANIFEST_PATH_SOURCE: OnceLock<ResolutionSource> = OnceLock::new();
 static PROJECT_ROOT_SOURCE: OnceLock<ResolutionSource> = OnceLock::new();
+pub const DEFAULT_PROJECT_MAPPINGS: &[(&str, &str)] = &[
+    ("acton", ".acton"),
+    ("contracts", "contracts"),
+    ("tests", "tests"),
+    ("wrappers", "tests/wrappers"),
+    ("gen", "gen"),
+];
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ResolutionSource {
@@ -590,6 +597,28 @@ impl ActonConfig {
     pub fn mappings(&self) -> Option<BTreeMap<String, String>> {
         normalize_mappings(&self.mappings, project_root())
     }
+
+    pub fn ensure_default_mappings(&mut self) -> bool {
+        let mappings = self.mappings.get_or_insert_with(default_project_mappings);
+        let mut changed = false;
+
+        for (prefix, target) in DEFAULT_PROJECT_MAPPINGS {
+            if !mappings.contains_key(*prefix) {
+                mappings.insert((*prefix).to_string(), (*target).to_string());
+                changed = true;
+            }
+        }
+
+        changed
+    }
+}
+
+#[must_use]
+pub fn default_project_mappings() -> BTreeMap<String, String> {
+    DEFAULT_PROJECT_MAPPINGS
+        .iter()
+        .map(|(prefix, target)| ((*prefix).to_string(), (*target).to_string()))
+        .collect()
 }
 
 #[must_use]
