@@ -186,7 +186,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
         run: |
-          release_notes="Ton commit: ${{ needs.build_objs.outputs.ton_commit }}"
+          release_notes="https://github.com/i582/ton/commit/${{ needs.build_objs.outputs.ton_commit }}"
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
