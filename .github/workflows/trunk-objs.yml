@@ -132,11 +132,12 @@ jobs:
       contents: read
 
     steps:
-      - name: Download TON objects artifact
+      - name: Download TON objects artifacts
         uses: actions/download-artifact@v8
         with:
-          name: ton-objs-linux-x86_64
+          pattern: ton-objs-*
           path: dist
+          merge-multiple: true
 
       - name: Delete previous trunk-objs release and tag
         env:
@@ -156,7 +157,7 @@ jobs:
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
-            dist/ton-objs-linux-x86_64.tar.gz \
+            dist/*.tar.gz \
             --title "Trunk Objs" \
             --notes "${release_notes}" \
             --prerelease \
