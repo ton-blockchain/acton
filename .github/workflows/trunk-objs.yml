@@ -138,7 +138,7 @@ jobs:
     runs-on: ubicloud-standard-2
 
     permissions:
-      contents: read
+      actions: write
 
     steps:
       - name: Download TON objects artifacts
