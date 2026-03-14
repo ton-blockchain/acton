@@ -85,6 +85,19 @@ jobs:
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
+      - name: Generate TON artifacts lock file
+        run: |
+          libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
+
+          cat > objs/ton-artifacts.lock <<EOF
+          {
+            "ton_commit": "${{ steps.ton-commit.outputs.commit }}",
+            "sha256(libemulator)": "${libemulator_sha256}",
+            "sha256(libtolk)": "${libtolk_sha256}"
+          }
+          EOF
+
       - name: Upload TON objects artifact
         uses: actions/upload-artifact@v7
         with:
@@ -111,7 +124,9 @@ jobs:
         run: |
           test -f objs/libemulator.a
           test -f objs/libtolk.a
+          test -f objs/ton-artifacts.lock
           ls -lh objs
+          cat objs/ton-artifacts.lock
 
       - name: Delete previous trunk-objs release and tag
         env:
@@ -133,6 +148,7 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             objs/libemulator.a \
             objs/libtolk.a \
+            objs/ton-artifacts.lock \
             --title "Trunk Objs" \
             --notes "${release_notes}" \
             --prerelease \
