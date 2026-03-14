@@ -7,6 +7,7 @@ use anyhow::Result;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
@@ -139,20 +140,30 @@ struct OverlayInspection {
 }
 
 fn is_writable(path: &Path) -> bool {
-    let mut candidate = if path.exists() {
-        Some(path)
-    } else {
-        path.parent()
-    };
+    match fs::metadata(path) {
+        Ok(metadata) if metadata.is_dir() => tempfile::Builder::new()
+            .prefix(".acton-doctor-write-check-")
+            .tempfile_in(path)
+            .is_ok(),
+        Ok(_) => OpenOptions::new().write(true).open(path).is_ok(),
+        Err(_) => {
+            let mut candidate = path.parent();
 
-    while let Some(current) = candidate {
-        match fs::metadata(current) {
-            Ok(metadata) => return !metadata.permissions().readonly(),
-            Err(_) => candidate = current.parent(),
+            while let Some(current) = candidate {
+                match fs::metadata(current) {
+                    Ok(metadata) if metadata.is_dir() => {
+                        return tempfile::Builder::new()
+                            .prefix(".acton-doctor-write-check-")
+                            .tempfile_in(current)
+                            .is_ok();
+                    }
+                    Ok(_) | Err(_) => candidate = current.parent(),
+                }
+            }
+
+            false
         }
     }
-
-    false
 }
 
 fn describe_path(path: &Path, resolution_source: Option<&str>) -> DoctorPath {
