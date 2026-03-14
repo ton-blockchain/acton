@@ -90,13 +90,15 @@ jobs:
           libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
           libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
 
-          cat > objs/ton-artifacts.lock <<EOF
-          {
-            "ton_commit": "${{ steps.ton-commit.outputs.commit }}",
-            "sha256(libemulator)": "${libemulator_sha256}",
-            "sha256(libtolk)": "${libtolk_sha256}"
-          }
-          EOF
+          jq -n \
+            --arg ton_commit "${{ steps.ton-commit.outputs.commit }}" \
+            --arg libemulator_sha256 "${libemulator_sha256}" \
+            --arg libtolk_sha256 "${libtolk_sha256}" \
+            '{
+              ton_commit: $ton_commit,
+              sha256_libemulator: $libemulator_sha256,
+              sha256_libtolk: $libtolk_sha256
+            }' > objs/ton-artifacts.lock
 
       - name: Upload TON objects artifact
         uses: actions/upload-artifact@v7
