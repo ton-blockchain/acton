@@ -97,24 +97,21 @@ jobs:
           sudo ./llvm.sh 16 clang
           rm llvm.sh
 
-      - name: Get TON commit hash
-        id: ton-commit
-        run: |
-          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
-          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Restore TON objects
-        uses: actions/cache/restore@v5
-        with:
-          path: objs
-          key: ton-objs-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
-          fail-on-cache-miss: true
-
       - name: Detect architecture
         id: detect-arch
         run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
+
+      - name: Download TON objects archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_NAME: ton-objs-linux-${{ steps.detect-arch.outputs.arch }}.tar.gz
+        run: |
+          mkdir -p dist objs
+          gh release download trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir dist
+          tar -C objs -xzf "dist/${ARCHIVE_NAME}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
