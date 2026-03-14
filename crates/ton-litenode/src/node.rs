@@ -1,6 +1,8 @@
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::remote::{RemoteProvider, fetch_remote_shard_account};
-use crate::storage::{self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta};
+use crate::storage::{
+    self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta, NftItemMeta,
+};
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
     LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
@@ -469,6 +471,7 @@ impl Node {
 
         self.detect_jetton_masters(&dst)?;
         self.detect_jetton_wallets(&dst)?;
+        self.detect_nft_items(&dst)?;
 
         Ok((block_meta, tx_meta))
     }
@@ -579,6 +582,57 @@ impl Node {
         Ok(())
     }
 
+    fn detect_nft_items(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        let Some(meta) = self.latest.accounts.get(addr) else {
+            return Ok(());
+        };
+
+        if meta.status != AccountStatus::Active {
+            return Ok(());
+        }
+
+        let Some(code_hash) = meta.code_hash else {
+            return Ok(());
+        };
+        let Some(data_hash) = meta.data_hash else {
+            return Ok(());
+        };
+
+        let Some(code_boc) = self.cas.get(&code_hash) else {
+            return Ok(());
+        };
+        let Some(data_boc) = self.cas.get(&data_hash) else {
+            return Ok(());
+        };
+
+        let code = Boc::decode(&code_boc)?;
+        let data = Boc::decode(&data_boc)?;
+
+        if let Some(nft_data) = ton_indexer::nfts::get_nft_item_data(addr.to_string(), code, data) {
+            let nft_meta = NftItemMeta {
+                address: *addr,
+                code_hash,
+                data_hash,
+                collection_address: nft_data
+                    .collection_address
+                    .as_deref()
+                    .and_then(|a| self.parse_addr_internal(a)),
+                owner_address: nft_data
+                    .owner_address
+                    .as_deref()
+                    .and_then(|a| self.parse_addr_internal(a)),
+                content: ton_indexer::nfts::parse_nft_content(nft_data.individual_content),
+                index: nft_data.index.to_str_radix(10),
+                init: nft_data.init,
+                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
+            };
+
+            self.history.nft_items.insert(*addr, nft_meta);
+        }
+
+        Ok(())
+    }
+
     pub fn get_jetton_masters(
         &self,
         address: Option<Addr>,
@@ -657,6 +711,63 @@ impl Node {
         let end = (start + limit).min(wallets.len());
 
         Ok(wallets[start..end].to_vec())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn get_nft_items(
+        &self,
+        address: Option<Addr>,
+        owner_address: Option<Addr>,
+        collection_address: Option<Addr>,
+        index: Option<String>,
+        sort_by_last_transaction_lt: bool,
+        limit: usize,
+        offset: usize,
+    ) -> anyhow::Result<Vec<NftItemMeta>> {
+        let mut items: Vec<_> = self
+            .history
+            .nft_items
+            .values()
+            .filter(|item| {
+                if let Some(addr) = address
+                    && item.address != addr
+                {
+                    return false;
+                }
+                if let Some(addr) = owner_address
+                    && item.owner_address != Some(addr)
+                {
+                    return false;
+                }
+                if let Some(addr) = collection_address
+                    && item.collection_address != Some(addr)
+                {
+                    return false;
+                }
+                if let Some(expected_index) = &index
+                    && &item.index != expected_index
+                {
+                    return false;
+                }
+                true
+            })
+            .cloned()
+            .collect();
+
+        if sort_by_last_transaction_lt {
+            items.sort_by(|a, b| {
+                b.last_transaction_lt
+                    .cmp(&a.last_transaction_lt)
+                    .then_with(|| a.address.cmp(&b.address))
+            });
+        } else {
+            items.sort_by_key(|item| item.address);
+        }
+
+        let start = offset.min(items.len());
+        let end = (start + limit).min(items.len());
+
+        Ok(items[start..end].to_vec())
     }
 
     fn parse_addr_internal(&self, s: &str) -> Option<Addr> {

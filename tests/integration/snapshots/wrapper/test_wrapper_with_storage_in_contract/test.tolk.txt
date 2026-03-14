@@ -2,13 +2,11 @@ import "@stdlib/gas-payments"
 import "@acton/emulation/network"
 import "@acton/testing/expect"
 import "@acton/testing/transaction_expect"
-import "../contracts/types"
 import "wrappers/MyContract"
 
 /// Example test case demonstrating the basic flow
 get fun `test-basic-flow`() {
     val (contract, deployer, not_deployer) = setupTest();
-
     // TODO: Implement your test logic here
     // Example:
     // val res = contract.sendMsg(deployer.address, ...);
@@ -28,5 +26,5 @@ fun setupTest() {
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
-    return (contract, deployer, not_deployer)
+    return (contract, deployer, not_deployer);
 }

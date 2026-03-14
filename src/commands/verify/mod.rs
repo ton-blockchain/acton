@@ -93,7 +93,7 @@ pub fn verify_cmd(
         "  {} Contract address: {}",
         "→".blue().bold(),
         contract_address
-            .to_base64_url_flags(true, network == Network::Testnet)
+            .to_base64_url_flags(true, network.uses_testnet_address_format())
             .dimmed()
     );
 
@@ -111,7 +111,7 @@ pub fn verify_cmd(
         wallet
             .wallet
             .address
-            .to_base64_url_flags(true, network == Network::Testnet)
+            .to_base64_url_flags(true, network.uses_testnet_address_format())
             .dimmed()
     );
 
@@ -187,11 +187,11 @@ pub fn verify_cmd(
     let sources_object = SourcesObject {
         known_contract_hash: contract_hash.clone(),
         known_contract_address: contract_address
-            .to_base64_url_flags(true, network == Network::Testnet),
+            .to_base64_url_flags(true, network.uses_testnet_address_format()),
         sender_address: wallet
             .wallet
             .address
-            .to_base64_url_flags(true, network == Network::Testnet),
+            .to_base64_url_flags(true, network.uses_testnet_address_format()),
         sources: sources_meta,
         compiler: CompilerSettings::Tolk {
             compiler_settings: TolkCompilerSettings {
@@ -344,14 +344,10 @@ pub fn verify_cmd(
     let cell = Boc::decode(cell_data)?;
     let cell_boc64 = Boc::encode_base64(&cell);
 
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key)?;
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
-    wait_for_rate_limit(&api_key);
-
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
-
-    wait_for_rate_limit(&api_key);
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
@@ -529,7 +525,9 @@ fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Resul
             backends: config.backends_testnet.clone(),
             id: "orbs-testnet".to_string(),
         }),
-        _ => anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet"),
+        _ => anyhow::bail!(
+            "Unsupported network: {network}. Verification backends are available only for mainnet and testnet"
+        ),
     }
 }
 
@@ -538,16 +536,8 @@ fn remove_random<T>(els: &mut Vec<T>) -> T {
     els.remove(index)
 }
 
-fn wait_for_rate_limit(api_key: &Option<String>) {
-    if api_key.is_none() {
-        // rate limit
-        println!("  {} Waiting for Toncenter rate limit", "→".blue().bold());
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-}
-
 fn show_verifier_link(network: &Network, contract_address: TonAddress) {
-    let is_testnet = network == &Network::Testnet;
+    let is_testnet = network.uses_testnet_address_format();
     println!(
         "View at: {}",
         format!(

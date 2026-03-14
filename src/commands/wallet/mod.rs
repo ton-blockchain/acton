@@ -828,6 +828,7 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
                 CustomNetworkUrls {
                     v2_url: Arc::clone(&normalized),
                     v3_url: Some(normalized),
+                    explorer_url: None,
                 },
             );
             TonApiClient::new(

@@ -58,14 +58,19 @@ This command discovers and runs all test files in project root and its subdirect
 
 ### Profiling Options
 
-| Option                          | Type   | Description                                       |
-|---------------------------------|--------|---------------------------------------------------|
-| `--snapshot <FILE>`             | String | Create JSON snapshot of gas usage statistics      |
-| `--baseline-snapshot <FILE>`    | String | Compare gas usage with baseline snapshot file     |
+| Option                       | Type   | Description                                            |
+|------------------------------|--------|--------------------------------------------------------|
+| `--snapshot <FILE>`          | String | Create JSON snapshot of gas usage statistics           |
+| `--baseline-snapshot <FILE>` | String | Compare gas usage with baseline snapshot file          |
+| `--fail-on-diff`             | Flag   | Exit with non-zero code when compared snapshot differs |
 
 <Callout type="info">
 If both `--snapshot` and `--baseline-snapshot` are provided, Acton runs in
 comparison mode and does not overwrite the snapshot file.
+</Callout>
+
+<Callout type="info">
+`--fail-on-diff` requires `--baseline-snapshot`.
 </Callout>
 
 ### Mutation Testing Options
@@ -153,6 +158,9 @@ acton test --snapshot .acton/gas-baseline.json
 
 # Compare current run with baseline snapshot
 acton test --baseline-snapshot .acton/gas-baseline.json
+
+# CI mode: fail build on benchmark drift
+acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff
 ```
 
 ### Debug mode

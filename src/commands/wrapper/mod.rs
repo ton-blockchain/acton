@@ -2,33 +2,48 @@ use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root};
 use anyhow::anyhow;
-use std::collections::{BTreeMap, HashSet};
+use heck::ToLowerCamelCase;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use ton_abi::{ContractAbi, TypeAbi};
+use tolkc::CompilerResult;
+use tolkc::abi::{ABIGetMethod, ABIResolvedStruct, ContractABI};
+use ton_abi::ContractAbi as LegacyContractAbi;
 
 struct WrapperModel {
     project_root: PathBuf,
     contract_id: String,
     contract_name: String,
-    contract_path: PathBuf,
-    abi: ContractAbi,
-    handled_messages: Vec<String>,
+    abi: ContractABI,
+    storage: Option<ABIResolvedStruct>,
+    incoming_messages: Vec<ABIResolvedStruct>,
     storage_path: Option<PathBuf>,
     message_paths: Vec<PathBuf>,
     wrapper_path: PathBuf,
     test_path: PathBuf,
     mappings: Option<BTreeMap<String, String>>,
+    format_options: tolkfmt::FormatOptions,
 }
 
 fn build_model(
     contract_id: &str,
     wrapper_output: Option<String>,
     test_output: Option<String>,
-    storage_struct_name: Option<String>,
 ) -> anyhow::Result<WrapperModel> {
     let config = ActonConfig::load().map_err(|e| anyhow!("Failed to load Acton.toml: {e}"))?;
+
+    let format_options = {
+        let fmt_settings = config.fmt.as_ref();
+        let width = fmt_settings.and_then(|s| s.width).unwrap_or(100);
+        let separate_import_groups = fmt_settings
+            .and_then(|s| s.separate_import_groups)
+            .unwrap_or(false);
+        tolkfmt::FormatOptions {
+            width,
+            separate_import_groups,
+        }
+    };
     let project_root = project_root().to_path_buf();
 
     let contract_config = config
@@ -52,8 +67,20 @@ fn build_model(
 
     let contract_path_str = contract_path.to_str().unwrap_or_default();
     let mappings = config.mappings();
-    let mut abi = ton_abi::contract_abi(content.clone(), contract_path_str, &mappings);
-    let handled_messages = ton_abi::extract_handled_messages(content, contract_path_str, &mappings);
+    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
+    let abi = match compiler.compile(&contract_path, false) {
+        CompilerResult::Success(result) => result
+            .abi
+            .ok_or_else(|| anyhow!("Compiler did not produce ABI for {}", contract_id.yellow()))?,
+        CompilerResult::Error(error) => {
+            anyhow::bail!(
+                "Failed to compile contract {} for wrapper generation: {}",
+                contract_id.yellow(),
+                error.message
+            );
+        }
+    };
+    let fallback_abi = ton_abi::contract_abi(content, contract_path_str, &mappings);
 
     let file_stem = contract_path
         .file_stem()
@@ -61,45 +88,16 @@ fn build_model(
         .unwrap_or(contract_id);
 
     let contract_name = to_pascal_case(file_stem);
-
-    if let Some(storage_name) = storage_struct_name {
-        let storage = abi.types.iter().find(|t| t.name == storage_name).cloned();
-        if let Some(storage) = storage {
-            abi.storage = Some(storage);
-        } else {
-            anyhow::bail!(
-                "Storage struct {} not found in contract {}. Available types:\n{}",
-                storage_name.yellow(),
-                contract_id.yellow(),
-                abi.storages()
-                    .iter()
-                    .map(|t| format!(" {}", t.name.as_str().yellow()))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            );
-        }
-    } else if abi.storage.is_none() {
-        let candidates = abi.storages();
-
-        if candidates.len() == 1 {
-            abi.storage = Some(candidates[0].clone());
-        } else if !abi.storages().is_empty() {
-            let options = abi
-                .storages()
-                .iter()
-                .map(|t| t.name.clone())
-                .collect::<Vec<_>>();
-            let selection = inquire::Select::new("Select storage struct:", options).prompt()?;
-            abi.storage = abi.types.iter().find(|t| t.name == selection).cloned();
-        }
-    }
-
-    let storage_path = abi.storage.as_ref().map(|typ| PathBuf::from(&typ.pos.uri));
-    let message_paths = abi
-        .messages
+    let storage = abi.resolve_storage_struct()?;
+    let incoming_messages = abi.resolve_incoming_message_structs()?;
+    let storage_path = storage
         .iter()
-        .map(|typ| typ.pos.uri.clone())
-        .collect::<HashSet<_>>();
+        .flat_map(|storage| find_type_path(&fallback_abi, &storage.name))
+        .next();
+    let message_paths = incoming_messages
+        .iter()
+        .filter_map(|message| find_type_path(&fallback_abi, &message.name))
+        .collect::<BTreeSet<_>>();
 
     let default_wrapper = project_root
         .join("tests")
@@ -113,22 +111,43 @@ fn build_model(
     let wrapper_path = wrapper_output.map_or(default_wrapper, PathBuf::from);
     let test_path = test_output.map_or(default_test, PathBuf::from);
 
-    let mut message_paths: Vec<PathBuf> = message_paths.iter().map(PathBuf::from).collect();
-    message_paths.sort();
+    let message_paths = message_paths.into_iter().collect();
 
     Ok(WrapperModel {
         project_root,
         contract_id: contract_id.to_owned(),
         contract_name,
-        contract_path,
         abi,
-        handled_messages,
+        storage,
+        incoming_messages,
         storage_path,
         message_paths,
         wrapper_path,
         test_path,
         mappings,
+        format_options,
     })
+}
+
+fn format_generated_tolk(
+    model: &WrapperModel,
+    raw: String,
+    output_path: &Path,
+    artifact_label: &str,
+) -> String {
+    match tolkfmt::format_source(&raw, model.format_options) {
+        Ok(formatted) => formatted,
+        Err(err) => {
+            eprintln!(
+                "{} Failed to format generated {} {}: {}. Writing unformatted output.",
+                "Error:".red().bold(),
+                artifact_label,
+                output_path.display().to_string().yellow(),
+                err
+            );
+            raw
+        }
+    }
 }
 
 pub fn wrapper_cmd(
@@ -136,14 +155,8 @@ pub fn wrapper_cmd(
     wrapper_output: Option<String>,
     test_output: Option<String>,
     generate_test_stub: bool,
-    storage_struct_name: Option<String>,
 ) -> anyhow::Result<()> {
-    let model = build_model(
-        contract_id,
-        wrapper_output,
-        test_output,
-        storage_struct_name,
-    )?;
+    let model = build_model(contract_id, wrapper_output, test_output)?;
 
     if let Some(parent) = model.wrapper_path.parent() {
         fs::create_dir_all(parent)
@@ -154,25 +167,16 @@ pub fn wrapper_cmd(
             .map_err(|e| anyhow!("Failed to create directory {}: {}", parent.display(), e))?;
     }
 
-    let types_in_contract_file = is_types_in_contract_file(&model);
+    let wrapper_code = generate_wrapper(&model);
+    let test_code = generate_test(&model);
 
-    let (wrapper_code, test_code) = if types_in_contract_file {
-        let types_file_path = create_types_file(&model.contract_path)?;
-        print_types_warning(&model.contract_path, &types_file_path, &model.abi);
-
-        let wrapper_code = generate_wrapper(&model, Some(&types_file_path));
-        let test_code = generate_test(&model, Some(&types_file_path));
-        (wrapper_code, test_code)
-    } else {
-        let wrapper_code = generate_wrapper(&model, None);
-        let test_code = generate_test(&model, None);
-        (wrapper_code, test_code)
-    };
+    let wrapper_code = format_generated_tolk(&model, wrapper_code, &model.wrapper_path, "wrapper");
 
     fs::write(&model.wrapper_path, wrapper_code)
         .map_err(|e| anyhow!("Failed to write wrapper file: {e}"))?;
 
     if generate_test_stub {
+        let test_code = format_generated_tolk(&model, test_code, &model.test_path, "test stub");
         fs::write(&model.test_path, test_code)
             .map_err(|e| anyhow!("Failed to write test file: {e}"))?;
     }
@@ -198,72 +202,12 @@ pub fn wrapper_cmd(
     Ok(())
 }
 
-fn is_types_in_contract_file(model: &WrapperModel) -> bool {
-    let storage_in_contract_file =
-        matches!(&model.storage_path, Some(storage_path) if storage_path == &model.contract_path);
-
-    let messages_in_contract_file = model
-        .message_paths
+fn find_type_path(fallback_abi: &LegacyContractAbi, type_name: &str) -> Option<PathBuf> {
+    fallback_abi
+        .types
         .iter()
-        .any(|msg| msg == &model.contract_path);
-
-    storage_in_contract_file || messages_in_contract_file
-}
-
-fn create_types_file(contract_path: &Path) -> anyhow::Result<PathBuf> {
-    let contract_dir = contract_path
-        .parent()
-        .ok_or_else(|| anyhow!("Failed to get contract directory"))?;
-    let types_file_path = contract_dir.join("types.tolk");
-
-    if !types_file_path.exists() {
-        let types_content =
-            "// Auto-generated types file\n// Move your Storage struct and message types here\n\n";
-        fs::write(&types_file_path, types_content)
-            .map_err(|e| anyhow!("Failed to create types.tolk: {e}"))?;
-    }
-
-    Ok(types_file_path)
-}
-
-fn print_types_warning(contract_path: &Path, types_file_path: &Path, abi: &ContractAbi) {
-    println!("\n{}", "WARNING".yellow().bold());
-    println!(
-        "{}",
-        "═══════════════════════════════════════════════════════════".yellow()
-    );
-    println!();
-    println!("Your contract defines types in the same file as the contract logic.");
-    println!("Tests and wrappers cannot import from contract files directly.");
-    println!();
-    println!(
-        "{} Please move the following types to {}:",
-        "→".yellow().bold(),
-        types_file_path.display().green()
-    );
-    println!();
-
-    if let Some(storage) = &abi.storage
-        && storage.pos.uri == contract_path.to_string_lossy()
-    {
-        println!("  • {} struct", "Storage".cyan().bold());
-    }
-
-    for message in &abi.messages {
-        if message.pos.uri == contract_path.to_string_lossy() {
-            println!("  • {} struct", message.name.cyan().bold());
-        }
-    }
-
-    println!();
-    println!("After moving the types, update your contract to import them:");
-    println!("  {}", "import \"types\"".to_owned().dimmed());
-    println!();
-    println!(
-        "{}",
-        "═══════════════════════════════════════════════════════════".yellow()
-    );
-    println!();
+        .find(|typ| typ.name == type_name)
+        .map(|typ| PathBuf::from(&typ.pos.uri))
 }
 
 fn to_pascal_case(s: &str) -> String {
@@ -288,7 +232,7 @@ fn to_pascal_case(s: &str) -> String {
     result
 }
 
-fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> String {
+fn generate_wrapper(model: &WrapperModel) -> String {
     let proot = &model.project_root;
     let root = &model.wrapper_path;
     let contract = &model.contract_name;
@@ -303,29 +247,14 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     code.push_str(&import_stdlib("testing/expect"));
     code.push_str(&import_stdlib("types/message"));
 
-    if let Some(types_path) = types_file_path {
-        let types_import = get_import_path(proot, root, types_path, mappings);
-        code.push_str(&gen_import_path(types_import));
-    }
-
-    if let Some(storage_path) = &model.storage_path
-        && Some(storage_path) != types_file_path
-    {
-        // add storage file import only if it different from types file
+    if let Some(storage_path) = &model.storage_path {
         let storage_import = get_import_path(proot, root, storage_path, mappings);
         code.push_str(&gen_import_path(storage_import));
     }
 
     for messages_path in &model.message_paths {
-        if Some(messages_path) == types_file_path
-            || Some(messages_path) == model.storage_path.as_ref()
-        {
+        if Some(messages_path) == model.storage_path.as_ref() {
             // don't add duplicate import
-            continue;
-        }
-
-        if messages_path == &model.contract_path {
-            // never import file with contract itself since this will break all
             continue;
         }
 
@@ -340,17 +269,11 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     code.push_str("    stateInit: ContractState? = null\n");
     code.push_str("}\n\n");
 
-    if model.abi.storage.is_some() {
+    if let Some(storage) = &model.storage {
         code.push_str(&generate_from_storage(
             contract,
             &model.contract_id,
-            model
-                .abi
-                .storage
-                .as_ref()
-                .map(|s| s.name.clone())
-                .as_deref()
-                .unwrap_or("Storage"),
+            &storage.name,
         ));
     } else {
         code.push_str(&generate_empty_from_storage(contract, &model.contract_id));
@@ -362,11 +285,9 @@ fn generate_wrapper(model: &WrapperModel, types_file_path: Option<&PathBuf>) -> 
     code.push_str(&generate_deploy(contract));
     code.push('\n');
 
-    for message_name in &model.handled_messages {
-        if let Some(message_type) = model.abi.messages.iter().find(|m| &m.name == message_name) {
-            code.push_str(&generate_send_method(contract, message_type));
-            code.push('\n');
-        }
+    for message in &model.incoming_messages {
+        code.push_str(&generate_send_method(contract, message));
+        code.push('\n');
     }
 
     code.push_str(&generate_send_any_method(contract));
@@ -468,7 +389,7 @@ fn generate_deploy(contract_name: &str) -> String {
     code
 }
 
-fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
+fn generate_send_method(contract_name: &str, message_type: &ABIResolvedStruct) -> String {
     let mut code = String::new();
     let method_name = format!("send{}", message_type.name);
 
@@ -477,12 +398,7 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
     let params = fields
         .iter()
         .map(|f| {
-            let type_name =
-                if let ton_abi::BaseTypeInfo::Cell { inner: Some(inner) } = &f.type_info.base {
-                    &inner.human_readable
-                } else {
-                    &f.type_info.human_readable
-                };
+            let type_name = f.ty.render_param_type();
             let name = normalize_param_name(&f.name);
             format!("{}: {}", name, type_name)
         })
@@ -510,7 +426,7 @@ fn generate_send_method(contract_name: &str, message_type: &TypeAbi) -> String {
         for field in &fields {
             let param_name = normalize_param_name(&field.name);
 
-            if let ton_abi::BaseTypeInfo::Cell { inner: Some(_) } = &field.type_info.base {
+            if field.ty.is_typed_cell() {
                 code.push_str(&format!(
                     "            {}: {}.toCell(),\n",
                     field.name, param_name
@@ -558,77 +474,63 @@ fn generate_send_any_method(contract_name: &str) -> String {
     code
 }
 
-fn generate_get_method(contract_name: &str, get_method: &ton_abi::GetMethod) -> String {
+fn generate_get_method(contract_name: &str, get_method: &ABIGetMethod) -> String {
     let mut code = String::new();
-    let method_name = &get_method.name;
-
+    let method_name = normalize_get_method_name(&get_method.name);
+    let tvm_method_name = &get_method.name;
     let params = get_method
         .parameters
         .iter()
         .map(|p| {
-            let type_name =
-                if let ton_abi::BaseTypeInfo::Cell { inner: Some(inner) } = &p.type_info.base {
-                    &inner.human_readable
-                } else {
-                    &p.type_info.human_readable
-                };
-            format!("{}: {}", p.name, type_name)
+            let type_name = p.ty.render_param_type();
+            let param_name = normalize_get_param_name(&p.name);
+            format!("{}: {}", param_name, type_name)
         })
         .collect::<Vec<_>>()
         .join(", ");
 
-    let return_type = &get_method.return_type.human_readable;
+    let args = get_method
+        .parameters
+        .iter()
+        .map(|p| {
+            let param_name = normalize_get_param_name(&p.name);
+            if p.ty.is_typed_cell() {
+                format!("{}.toCell()", param_name)
+            } else {
+                param_name
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let return_type = get_method.return_ty.render_type();
 
     if params.is_empty() {
         code.push_str(&format!(
             "fun {contract_name}.{method_name}(self): {return_type} {{\n"
         ));
         code.push_str(&format!(
-            "    return net.runGetMethod(self.address, \"{method_name}\")\n"
+            "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
         ));
     } else {
         code.push_str(&format!(
             "fun {contract_name}.{method_name}(self, {params}): {return_type} {{\n"
         ));
 
-        let args = get_method
-            .parameters
-            .iter()
-            .map(|p| p.name.as_str())
-            .collect::<Vec<_>>();
-
         if args.is_empty() {
             code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{method_name}\")\n"
+                "    return net.runGetMethod(self.address, \"{tvm_method_name}\")\n"
             ));
         } else if args.len() == 1 {
-            let arg_name = if let ton_abi::BaseTypeInfo::Cell { inner: Some(_) } =
-                &get_method.parameters[0].type_info.base
-            {
-                format!("{}.toCell()", args[0])
-            } else {
-                args[0].to_string()
-            };
+            let arg_name = &args[0];
 
             code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{method_name}\", {arg_name})\n"
+                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", {arg_name})\n"
             ));
         } else {
-            let args = get_method
-                .parameters
-                .iter()
-                .map(|p| {
-                    if let ton_abi::BaseTypeInfo::Cell { inner: Some(_) } = &p.type_info.base {
-                        format!("{}.toCell()", p.name)
-                    } else {
-                        p.name.clone()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
+            let args = args.join(", ");
 
             code.push_str(&format!(
-                "    return net.runGetMethod(self.address, \"{method_name}\", [{args}] as tuple)\n"
+                "    return net.runGetMethod(self.address, \"{tvm_method_name}\", [{args}] as tuple)\n"
             ));
         }
     }
@@ -638,7 +540,20 @@ fn generate_get_method(contract_name: &str, get_method: &ton_abi::GetMethod) -> 
     code
 }
 
-fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) -> String {
+fn normalize_get_method_name(name: &str) -> String {
+    name.to_lower_camel_case()
+}
+
+fn normalize_get_param_name(name: &str) -> String {
+    let normalized = name.to_lower_camel_case();
+    if normalized == "from" || normalized == "config" {
+        format!("{}_", normalized)
+    } else {
+        normalized
+    }
+}
+
+fn generate_test(model: &WrapperModel) -> String {
     let proot = &model.project_root;
     let root = &model.test_path;
     let contract = &model.contract_name;
@@ -651,22 +566,7 @@ fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) ->
     code.push_str(&import_stdlib("testing/expect"));
     code.push_str(&import_stdlib("testing/transaction_expect"));
 
-    if let Some(types_path) = types_file_override {
-        let types_import = get_import_path(proot, root, types_path, mappings);
-        code.push_str(&gen_import_path(types_import));
-    }
-
     for messages_path in &model.message_paths {
-        if Some(messages_path) == types_file_override {
-            // don't add duplicate import
-            continue;
-        }
-
-        if messages_path == &model.contract_path {
-            // never import file with contract itself since this will break all
-            continue;
-        }
-
         let types_import = get_import_path(proot, root, messages_path, mappings);
         code.push_str(&gen_import_path(types_import));
     }
@@ -678,7 +578,11 @@ fn generate_test(model: &WrapperModel, types_file_override: Option<&PathBuf>) ->
     code.push_str(&generate_example_test(contract));
     code.push('\n');
 
-    code.push_str(&generate_setup_test(contract, &model.abi));
+    code.push_str(&generate_setup_test(
+        contract,
+        &model.abi,
+        model.storage.as_ref(),
+    ));
 
     format!("{}\n", code.trim())
 }
@@ -774,7 +678,11 @@ fn normalize_abs_path(project_root: &Path, path: &Path) -> PathBuf {
     dunce::canonicalize(&abs_path).unwrap_or(abs_path)
 }
 
-fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
+fn generate_setup_test(
+    contract_name: &str,
+    abi: &ContractABI,
+    storage: Option<&ABIResolvedStruct>,
+) -> String {
     let mut code = String::new();
 
     code.push_str(
@@ -792,7 +700,7 @@ fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
     code.push('\n');
     code.push_str("    // Initialize and deploy the contract with default values\n");
 
-    if let Some(storage) = &abi.storage {
+    if let Some(storage) = storage {
         code.push_str(&format!(
             "    val contract = {contract_name}.fromStorage({{"
         ));
@@ -801,13 +709,10 @@ fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
             .fields
             .iter()
             .map(|f| {
-                let default_value = get_default_value(&f.type_info.human_readable);
-                match &f.type_info.base {
-                    ton_abi::BaseTypeInfo::Cell { inner: Some(inner) } => {
-                        let default_value = get_default_value(&inner.human_readable);
-                        format!(" {}: {}.toCell()", f.name, default_value)
-                    }
-                    _ => format!(" {}: {}", f.name, default_value),
+                if let Some(default_value) = f.ty.typed_cell_payload_default_value(abi) {
+                    format!(" {}: {default_value}.toCell()", f.name)
+                } else {
+                    format!(" {}: {}", f.name, f.ty.default_value(abi))
                 }
             })
             .collect::<Vec<_>>()
@@ -828,21 +733,6 @@ fn generate_setup_test(contract_name: &str, abi: &ContractAbi) -> String {
     code.push_str("}\n");
 
     code
-}
-
-fn get_default_value(type_name: &str) -> &str {
-    match type_name {
-        _ if type_name.starts_with("int") => "0",
-        _ if type_name.starts_with("uint") => "0",
-        "coins" => "0",
-        "bool" => "false",
-        "address" => "address(\"EQD__________________________________________0vo\")",
-        "any_address" => "address(\"EQD__________________________________________0vo\")",
-        "cell" => "createEmptyCell()",
-        "slice" => "createEmptySlice()",
-        _ if type_name.starts_with("map<") => "createEmptyMap()",
-        _ => "null",
-    }
 }
 
 fn generate_example_test(_contract_name: &str) -> String {

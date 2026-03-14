@@ -1,27 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
-use tree_sitter::{Language, Node, Point, Tree, TreeCursor};
+use tree_sitter::{Language, Node, Tree, TreeCursor};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Span {
-    pub start: Point,
-    pub end: Point,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ParseErrorKind {
-    Unexpected, // ERROR node
-    Missing,    // MISSING node
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseError {
-    pub kind: ParseErrorKind,
-    pub span: Span,
-    pub message: String,
-    pub expected: Vec<String>,
-}
+use ton_syntax::errors::{ParseError, ParseErrorKind, Span};
 
 /// Collects errors for ERROR/MISSING nodes.
 pub(crate) fn collect_errors(

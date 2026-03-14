@@ -1,3 +1,6 @@
+[alias]
+xtask = "run --package xtask --"
+
 # uncomment for flamegraph collection
 #[build]
 #rustflags = ["-C", "force-frame-pointers=yes"]

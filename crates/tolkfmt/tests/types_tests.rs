@@ -22,8 +22,17 @@ fn test_single_type_instantiated_ts() {
 }
 
 #[test]
+fn test_single_type_instantiated_ts_does_not_break_on_small_width() {
+    check_with_width(
+        "const x: VeryLongContainer<int> = 0;",
+        expect!["const x: VeryLongContainer<int> = 0"],
+        20,
+    );
+}
+
+#[test]
 fn test_type_instantiated_ts_breaking() {
-    check_with_width_without_trees(
+    check_with_width(
         "const x: VeryLongTypeName<FirstType, SecondType, ThirdType> = 0;",
         expect![[r#"
                 const x: VeryLongTypeName<
@@ -73,6 +82,15 @@ fn test_tensor_type_breaking() {
 }
 
 #[test]
+fn test_tensor_type_two_elements_do_not_break() {
+    check_with_width(
+        "const x: (FirstVeryLongType, SecondVeryLongType) = 0;",
+        expect!["const x: (FirstVeryLongType, SecondVeryLongType) = 0"],
+        25,
+    );
+}
+
+#[test]
 fn test_tuple_type() {
     check(
         "const x: [int, slice] = 0;",
@@ -96,6 +114,15 @@ fn test_tuple_type_breaking() {
                     ThirdType,
                 ] = 0"#]],
         30,
+    );
+}
+
+#[test]
+fn test_tuple_type_two_elements_do_not_break() {
+    check_with_width(
+        "const x: [FirstVeryLongType, SecondVeryLongType] = 0;",
+        expect!["const x: [FirstVeryLongType, SecondVeryLongType] = 0"],
+        25,
     );
 }
 

@@ -180,7 +180,7 @@ pub fn open_wallets(
                     .address_mainnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.to_string())),
-                Network::Testnet => expected
+                Network::Testnet | Network::Localnet => expected
                     .address_testnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.to_string())),
@@ -191,18 +191,21 @@ pub fn open_wallets(
                 match expected_addr {
                     Ok(expected_addr) => {
                         if ton_wallet.address != expected_addr {
+                            let derived_address = ton_wallet
+                                .address
+                                .to_base64_url_flags(true, net.uses_testnet_address_format());
                             anyhow::bail!(
                                 "Wallet address mismatch for '{name}' on '{net}':\n  Expected: {expected_addr}\n  Derived:  {}\n\nPossible causes:\n  - Wrong mnemonic/private key\n  - Incorrect 'kind' or 'workchain'\n  - Keys rotated but expected.address-{net} not updated",
-                                ton_wallet
-                                    .address
-                                    .to_base64_url_flags(true, net == &Network::Testnet),
+                                derived_address,
                             );
                         }
                     }
                     Err(err) => {
                         let expected_address = match net {
                             Network::Mainnet => expected.address_mainnet.as_deref(),
-                            Network::Testnet => expected.address_testnet.as_deref(),
+                            Network::Testnet | Network::Localnet => {
+                                expected.address_testnet.as_deref()
+                            }
                             _ => None,
                         }
                         .unwrap_or("<unknown>");
@@ -279,10 +282,10 @@ pub fn open_selected_wallets(
 }
 
 #[must_use]
-pub fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
+pub const fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
     match wallet {
         WalletVersion::V5R1 => {
-            if net == &Network::Testnet {
+            if net.uses_testnet_address_format() {
                 return DEFAULT_WALLET_ID_V5R1_TESTNET;
             }
             DEFAULT_WALLET_ID_V5R1

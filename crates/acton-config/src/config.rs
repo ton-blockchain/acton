@@ -49,6 +49,7 @@ pub enum CheckOutputFormat {
     Json,
     Sarif,
     Github,
+    Gitlab,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, Eq, PartialEq, Default)]
@@ -73,11 +74,18 @@ pub enum ContractDependency {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct CustomNetworkApiConfig {
+    pub v2: Option<String>,
+    pub v3: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CustomNetworkConfig {
-    pub v2_url: String,
-    pub v3_url: Option<String>,
+    pub explorer: Option<String>,
+    pub api: Option<CustomNetworkApiConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +160,7 @@ pub struct TestSettings {
     pub fork_block_number: Option<u64>,
     pub mutation: Option<MutationConfig>,
     pub fail_fast: Option<bool>,
+    pub fail_on_diff: Option<bool>,
     pub ui: Option<bool>,
     pub ui_port: Option<u16>,
     #[serde(flatten)]
@@ -230,6 +239,7 @@ pub struct LitenodeSettings {
     pub fork_net: Option<String>,
     pub fork_block_number: Option<u64>,
     pub accounts: Option<Vec<String>>,
+    pub rate_limit: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -500,14 +510,65 @@ impl ActonConfig {
     #[must_use]
     pub fn custom_networks(&self) -> HashMap<String, CustomNetworkUrls> {
         let mut result = HashMap::new();
+
+        let localnet_port = self
+            .litenode
+            .as_ref()
+            .and_then(|cfg| cfg.port)
+            .unwrap_or(5411);
+        let default_localnet_v2 = format!("http://localhost:{localnet_port}/api/v2");
+        let default_localnet_v3 = format!("http://localhost:{localnet_port}/api/v3");
+
+        let localnet_config = self
+            .networks
+            .as_ref()
+            .and_then(|networks| networks.get("localnet"));
+        let localnet_v2 = localnet_config
+            .and_then(|config| config.api.as_ref())
+            .and_then(|api| api.v2.as_deref())
+            .unwrap_or(default_localnet_v2.as_str());
+        let localnet_v3 = localnet_config
+            .and_then(|config| config.api.as_ref())
+            .and_then(|api| api.v3.as_deref())
+            .unwrap_or(default_localnet_v3.as_str());
+
+        result.insert(
+            "localnet".to_string(),
+            CustomNetworkUrls {
+                v2_url: Arc::from(localnet_v2.trim_end_matches("/")),
+                v3_url: Some(Arc::from(localnet_v3.trim_end_matches("/"))),
+                explorer_url: localnet_config
+                    .and_then(|config| config.explorer.as_ref())
+                    .map(|s| Arc::from(s.trim_end_matches("/"))),
+            },
+        );
+
         if let Some(networks) = &self.networks {
             for (name, config) in networks {
+                if name == "localnet" {
+                    continue;
+                }
+
+                let Some(v2_url) = config
+                    .api
+                    .as_ref()
+                    .and_then(|api| api.v2.as_ref())
+                    .map(String::as_str)
+                else {
+                    continue;
+                };
+
                 result.insert(
                     name.clone(),
                     CustomNetworkUrls {
-                        v2_url: Arc::from(config.v2_url.trim_end_matches("/")),
+                        v2_url: Arc::from(v2_url.trim_end_matches("/")),
                         v3_url: config
-                            .v3_url
+                            .api
+                            .as_ref()
+                            .and_then(|api| api.v3.as_ref())
+                            .map(|s| Arc::from(s.trim_end_matches("/"))),
+                        explorer_url: config
+                            .explorer
                             .as_ref()
                             .map(|s| Arc::from(s.trim_end_matches("/"))),
                     },
@@ -735,6 +796,7 @@ impl TestSettings {
         mutate_overrides_override: Option<String>,
         mutate_contract_override: Option<String>,
         disable_rules_override: Vec<String>,
+        fail_on_diff_override: Option<bool>,
         fail_fast_override: Option<bool>,
         ui_override: bool,
         ui_port_override: Option<u16>,
@@ -805,6 +867,7 @@ impl TestSettings {
                     .and_then(|n| match n.to_lowercase().as_str() {
                         "mainnet" => Some(Network::Mainnet),
                         "testnet" => Some(Network::Testnet),
+                        "localnet" => Some(Network::Localnet),
                         _ => None,
                     })
             }),
@@ -822,6 +885,8 @@ impl TestSettings {
             } else {
                 disable_rules_override
             },
+            fail_on_diff: fail_on_diff_override
+                .unwrap_or_else(|| self.fail_on_diff.unwrap_or(false)),
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
             ui: ui_override || self.ui.unwrap_or(false),
             ui_port: ui_port_override.unwrap_or_else(|| self.ui_port.unwrap_or(12344)),
@@ -867,6 +932,120 @@ depends = []
         assert_eq!(wallet.name, "Wallet V5");
         assert_eq!(wallet.src, "wallet-v5.tolk");
         assert_eq!(wallet.depends, Some(vec![]));
+    }
+
+    #[test]
+    fn test_networks_api_config_parsing() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[networks.localnet]
+api = { v2 = "http://localhost:3010/api/v2/", v3 = "http://localhost:3010/api/v3/" }
+explorer = "http://localhost:3010/explorer/"
+
+[networks.my-custom]
+api = { v2 = "https://example.com/api/v2/" }
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let networks = config.custom_networks();
+
+        let localnet = networks
+            .get("localnet")
+            .expect("localnet config should be present");
+        assert_eq!(localnet.v2_url.as_ref(), "http://localhost:3010/api/v2");
+        assert_eq!(
+            localnet.v3_url.as_deref(),
+            Some("http://localhost:3010/api/v3")
+        );
+        assert_eq!(
+            localnet.explorer_url.as_deref(),
+            Some("http://localhost:3010/explorer")
+        );
+
+        let custom = networks
+            .get("my-custom")
+            .expect("custom network config should be present");
+        assert_eq!(custom.v2_url.as_ref(), "https://example.com/api/v2");
+        assert_eq!(custom.v3_url, None);
+        assert_eq!(custom.explorer_url, None);
+    }
+
+    #[test]
+    fn test_localnet_api_defaults_to_litenode_port() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[litenode]
+port = 3015
+
+[networks.localnet]
+explorer = "http://localhost:3015/explorer"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let networks = config.custom_networks();
+        let localnet = networks
+            .get("localnet")
+            .expect("localnet config should always be present");
+
+        assert_eq!(localnet.v2_url.as_ref(), "http://localhost:3015/api/v2");
+        assert_eq!(
+            localnet.v3_url.as_deref(),
+            Some("http://localhost:3015/api/v3")
+        );
+        assert_eq!(
+            localnet.explorer_url.as_deref(),
+            Some("http://localhost:3015/explorer")
+        );
+    }
+
+    #[test]
+    fn test_localnet_api_defaults_to_5411_without_litenode_port() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let networks = config.custom_networks();
+        let localnet = networks
+            .get("localnet")
+            .expect("localnet config should always be present");
+
+        assert_eq!(localnet.v2_url.as_ref(), "http://localhost:5411/api/v2");
+        assert_eq!(
+            localnet.v3_url.as_deref(),
+            Some("http://localhost:5411/api/v3")
+        );
+        assert_eq!(localnet.explorer_url, None);
+    }
+
+    #[test]
+    fn test_networks_legacy_v2_url_is_rejected() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[networks.localnet]
+v2-url = "http://localhost:3010/api/v2"
+"#;
+
+        let err = toml::from_str::<ActonConfig>(toml_content).expect_err("legacy key must fail");
+        assert!(
+            err.to_string().contains("unknown field `v2-url`"),
+            "unexpected parse error: {err}"
+        );
     }
 
     #[test]
@@ -938,6 +1117,23 @@ unused-variable = "warn"
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
         let lint_settings = config.lint.as_ref().unwrap();
         assert_eq!(lint_settings.max_warnings, usize::MAX);
+    }
+
+    #[test]
+    fn test_lint_config_parses_gitlab_output_format() {
+        let toml_content = r#"
+[package]
+name = "test-project"
+description = "Test project"
+version = "0.1.0"
+
+[lint]
+output-format = "gitlab"
+"#;
+
+        let config: ActonConfig = toml::from_str(toml_content).unwrap();
+        let lint_settings = config.lint.as_ref().unwrap();
+        assert_eq!(lint_settings.output_format, Some(CheckOutputFormat::Gitlab));
     }
 
     #[test]
@@ -1128,6 +1324,7 @@ port = 3015
 fork-net = "testnet"
 fork-block-number = 1234567
 accounts = ["deployer", "user"]
+rate-limit = 3
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -1139,5 +1336,6 @@ accounts = ["deployer", "user"]
             litenode.accounts,
             Some(vec!["deployer".to_string(), "user".to_string()])
         );
+        assert_eq!(litenode.rate_limit, Some(3));
     }
 }

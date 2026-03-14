@@ -33,4 +33,5 @@
 /// ```
 ///
 /// The path should be absolute or relative to the project root (the directory with `Acton.toml`).
-fun build(name: string, path: string = ""): cell asm "6 EXTCALL"
+fun build(name: string, path: string = ""): cell
+    asm "6 EXTCALL"

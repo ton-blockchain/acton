@@ -28,11 +28,9 @@ To build and test Acton locally, install:
    ```bash
    cargo install cargo-nextest
    ```
-4. `cargo-udeps` (unused dependency linter)
+4. `cargo-shear` (unused dependency linter)
    ```bash
-   cargo install cargo-udeps --locked
-   rustup toolchain install nightly --profile minimal
-   rustup component add rust-src --toolchain nightly
+   cargo install cargo-shear --locked
    ```
 5. Bun (required for UI packages)
    ```bash
@@ -165,7 +163,7 @@ Rust:
 just fmt
 just fmt-check
 just clippy
-just check-udeps
+just check-deps
 ```
 
 UI:
@@ -284,7 +282,7 @@ just check
 ```
 
 This command runs `fmt-check`, `clippy`, and `test`.
-It also runs `check-udeps` to detect unused Rust dependencies.
+It also runs `check-deps` to detect unused Rust dependencies.
 
 If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-litenode-ui`,
 `crates/acton-shared-ui`, or root UI config in `package.json`), you must also
@@ -303,13 +301,36 @@ just precommit
 
 `just precommit` additionally runs UI formatting/lint and full build steps.
 
-For release PRs (or release branch prep), make sure versions are synchronized:
+## Release workflow (maintainers)
 
-- `Acton.toml` (`package.version`)
-- `Cargo.toml` (`workspace.package.version`)
-- `package.json` (`version`)
+Use the release `xtask` instead of manual version bump/tag/release steps:
 
-Release tags must use `v<version>` format and match those files.
+```bash
+cargo xtask release --version <major.minor.patch>
+```
+
+Example:
+
+```bash
+cargo xtask release --version 0.22.0
+```
+
+Prerequisites:
+
+- `gh` CLI installed and authenticated (`gh auth status`)
+- `yq` v4 installed (the `xtask` uses it to update `package.json`)
+- local `master` branch with no uncommitted changes
+
+What `cargo xtask release` does:
+
+- validates version format (`X.Y.Z`) and that `vX.Y.Z` does not exist on `origin`
+- fetches `origin/master` and checks local `master` is up to date
+- verifies GitHub Actions runs for current `master` `HEAD` are all successful
+- bumps versions in `Acton.toml`, `Cargo.toml`, and `package.json`
+- runs `cargo update --workspace` to refresh `Cargo.lock`
+- creates commit `chore(acton): bump to version \`X.Y.Z\`` and tag `vX.Y.Z`
+- asks for explicit confirmation (`yes`) before pushing `master` and the tag
+- pushes to `origin` and creates GitHub Release with generated notes
 
 ## Commit message style
 
@@ -345,6 +366,10 @@ Rules:
 - `TONCENTER_API_KEY`: API key used by commands that query blockchain data.
 - `DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1`: preserve temp test directories.
 - `ACTON_LOG_DIR`: custom directory for Acton debug logs.
+
+## AI Policy
+
+Do what you want and how it is convenient for you.
 
 ## Additional references
 

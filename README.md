@@ -27,11 +27,12 @@ Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
 ```bash
 # 1) clone repositories
 git clone https://github.com/i582/acton.git
-git clone --branch pmakhnev/acton https://github.com/i582/ton.git ton-repo
+git clone --branch pmakhnev/acton https://github.com/i582/ton.git ton-repo --recurse-submodules
 
 # 2) build TON static artifacts (example for Linux)
 cd ton-repo
-./assembly/native/build-ubuntu-static.sh -a -c
+sh ./assembly/native/build-ubuntu-static.sh -a -c
+# or sh ./assembly/native/build-macos-static.sh -a -c
 cd ..
 
 # 3) copy artifacts into Acton

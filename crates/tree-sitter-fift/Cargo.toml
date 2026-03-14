@@ -1,0 +1,37 @@
+[package]
+name = "tree-sitter-fift"
+description = "Fift grammar for tree-sitter"
+version = "0.1.0"
+authors = [
+  "TON Core",
+  "TON Studio"
+]
+license = "MIT"
+readme = "README.md"
+keywords = ["incremental", "parsing", "tree-sitter", "fift"]
+categories = ["parser-implementations", "parsing", "text-editors"]
+repository = "https://github.com/ton-blockchain/ton-language-server"
+edition = "2021"
+autoexamples = false
+
+build = "bindings/rust/build.rs"
+include = [
+  "bindings/rust/*",
+  "grammar.js",
+  "queries/*",
+  "src/*",
+  "tree-sitter.json",
+  "/LICENSE",
+]
+
+[lib]
+path = "bindings/rust/lib.rs"
+
+[dependencies]
+tree-sitter-language = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }
+
+[dev-dependencies]
+tree-sitter = { workspace = true }

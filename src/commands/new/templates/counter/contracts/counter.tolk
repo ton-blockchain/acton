@@ -1,5 +1,10 @@
 import "types"
 
+contract Counter {
+    storage: Storage
+    incomingMessages: AllowedMessage
+}
+
 type AllowedMessage = IncreaseCounter | ResetCounter
 
 fun onInternalMessage(in: InMessage) {

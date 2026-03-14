@@ -1,7 +1,7 @@
 use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node};
 use crate::storage::{
     self, AccountDelta, AccountMeta, AccountStatus, BlockMeta, Globals, Indexes, JettonMasterMeta,
-    MsgMeta, ReverseLtKey, TxMeta,
+    MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use core::cmp;
@@ -24,6 +24,8 @@ pub(crate) struct NodeStateSnapshot {
     pub history_address_names: Vec<(Addr, String)>,
     pub history_jetton_masters: Vec<(Addr, JettonMasterMeta)>,
     pub history_jetton_wallets: Vec<(Addr, storage::JettonWalletMeta)>,
+    #[serde(default)]
+    pub history_nft_items: Vec<(Addr, NftItemMeta)>,
     pub cas_entries: Vec<(Hash256, BocBytes)>,
     pub pool_external: VecDeque<Hash256>,
     pub pool_internal: VecDeque<Hash256>,
@@ -120,6 +122,14 @@ impl Node {
             .collect::<Vec<_>>();
         history_jetton_wallets.sort_by_key(|(addr, _)| *addr);
 
+        let mut history_nft_items = self
+            .history
+            .nft_items
+            .iter()
+            .map(|(addr, meta)| (*addr, meta.clone()))
+            .collect::<Vec<_>>();
+        history_nft_items.sort_by_key(|(addr, _)| *addr);
+
         let cas_entries = self.export_cas_entries()?;
 
         Ok(NodeStateSnapshot {
@@ -141,6 +151,7 @@ impl Node {
             history_address_names,
             history_jetton_masters,
             history_jetton_wallets,
+            history_nft_items,
             cas_entries,
             pool_external: self.pool.external.clone(),
             pool_internal: self.pool.internal.clone(),
@@ -209,6 +220,7 @@ impl Node {
         self.history.address_names = snapshot.history_address_names.into_iter().collect();
         self.history.jetton_masters = snapshot.history_jetton_masters.into_iter().collect();
         self.history.jetton_wallets = snapshot.history_jetton_wallets.into_iter().collect();
+        self.history.nft_items = snapshot.history_nft_items.into_iter().collect();
 
         self.pool.external = snapshot.pool_external;
         self.pool.internal = snapshot.pool_internal;

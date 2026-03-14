@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tolk_resolver::file_db::FileDb;
-use ton_ls::Backend;
+use ton_ls::{Backend, SelfContainedLanguageRegistry};
 use tower_lsp::{LspService, Server};
 
 pub async fn ls_cmd(
@@ -73,6 +73,7 @@ async fn ls_cmd_internal(
             documents: DashMap::new(),
             analysis: DashMap::new(),
             file_urls: DashMap::new(),
+            registry: SelfContainedLanguageRegistry::new(),
             #[cfg(feature = "profiling")]
             profiling,
         }

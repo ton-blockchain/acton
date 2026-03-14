@@ -57,6 +57,7 @@ pub struct TestConfig {
     pub junit_merge: bool,
     pub snapshot: Option<String>,
     pub baseline_snapshot: Option<String>,
+    pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
     pub api_key: Option<String>,
     pub fork_block_number: Option<u64>,

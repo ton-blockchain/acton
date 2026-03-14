@@ -131,7 +131,7 @@ pub fn publish_cmd(
         "  {} Publisher address: {}",
         "→".blue().bold(),
         publisher_address
-            .to_base64_url_flags(true, net == "testnet")
+            .to_base64_url_flags(true, network.uses_testnet_address_format())
             .dimmed()
     );
 
@@ -148,7 +148,7 @@ pub fn publish_cmd(
         wallet
             .wallet
             .address
-            .to_base64_url_flags(true, net == "testnet")
+            .to_base64_url_flags(true, network.uses_testnet_address_format())
             .dimmed()
     );
 
@@ -199,7 +199,7 @@ pub fn publish_cmd(
 
     let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
-    let api_client = TonApiClient::new(network, custom_networks, api_key)?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key)?;
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
@@ -249,9 +249,13 @@ pub fn publish_cmd(
         contract_id.as_deref().unwrap_or("unknown"),
         &hex::encode(library_hash),
         &Boc::encode_base64(&library_code_cell),
-        &publisher_address.to_base64_url_flags(true, net == "testnet"),
+        &publisher_address.to_base64_url_flags(true, network.uses_testnet_address_format()),
         duration_seconds,
-        net,
+        if network == Network::Localnet {
+            "localnet".to_string()
+        } else {
+            net
+        },
         bits,
         cells,
         local,
@@ -508,7 +512,7 @@ pub fn topup_cmd(
         wallet
             .wallet
             .address
-            .to_base64_url_flags(true, lib.network == Network::Testnet)
+            .to_base64_url_flags(true, lib.network.uses_testnet_address_format())
             .dimmed()
     );
 

@@ -2,23 +2,29 @@ import "@acton/emulation/network"
 import "@acton/testing/expect"
 import "@acton/testing/transaction_expect"
 
-import "@wrappers/Counter"
 import "@contracts/types"
+import "@wrappers/Counter"
 
 get fun `test increase counter`() {
     val (contract, deployer, _) = setupTest();
 
     val res = contract.sendIncreaseCounter(deployer.address, 123);
-    expect(res).toHaveSuccessfulTx<IncreaseCounter>({ from: deployer.address, to: contract.address });
+    expect(res).toHaveSuccessfulTx<IncreaseCounter>({
+        from: deployer.address,
+        to: contract.address,
+    });
 
-    expect(contract.currentCounter()).toEqual(123)
+    expect(contract.currentCounter()).toEqual(123);
 }
 
 get fun `test reset counter`() {
     val (contract, deployer, _) = setupTest();
 
     val res = contract.sendIncreaseCounter(deployer.address, 123);
-    expect(res).toHaveSuccessfulTx<IncreaseCounter>({ from: deployer.address, to: contract.address });
+    expect(res).toHaveSuccessfulTx<IncreaseCounter>({
+        from: deployer.address,
+        to: contract.address,
+    });
 
     expect(contract.currentCounter()).toEqual(123);
 
@@ -33,7 +39,11 @@ get fun `test unknown message`() {
 
     // non-empty message
     val res = contract.sendAny(deployer.address, beginCell().storeInt(0x999, 32).endCell());
-    expect(res).toHaveFailedTx({ from: deployer.address, to: contract.address, exitCode: 0xFFFF });
+    expect(res).toHaveFailedTx({
+        from: deployer.address,
+        to: contract.address,
+        exitCode: 0xFFFF,
+    });
 
     // empty message
     val res2 = contract.sendAny(deployer.address, createEmptyCell());
@@ -53,5 +63,5 @@ fun setupTest(): (Counter, Treasury, Treasury) {
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
-    return (contract, deployer, notDeployer)
+    return (contract, deployer, notDeployer);
 }

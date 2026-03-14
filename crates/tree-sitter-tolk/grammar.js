@@ -557,6 +557,7 @@ const TOLK_GRAMMAR = {
                 // prec.dynamic is important
                 "<",
                 field("types", commaSep1($._type_hint)),
+                optional(","),
                 ">",
             ),
         ),

@@ -188,3 +188,15 @@ pub struct GetJettonWalletsRequest {
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
+
+#[derive(Deserialize, Serialize)]
+pub struct GetNftItemsRequest {
+    pub address: Option<String>,
+    pub owner_address: Option<String>,
+    pub collection_address: Option<String>,
+    pub index: Option<String>,
+    pub include_on_sale: Option<bool>,
+    pub sort_by_last_transaction_lt: Option<bool>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}

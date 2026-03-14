@@ -58,6 +58,10 @@ Generics 2
 fun main() {
     Slice<int>.parse;
     Slice<int>.parse();
+    Slice<
+        int,
+        slice,
+    >.parse();
 }
 ------------------------------------------------------------------------
 
@@ -79,6 +83,16 @@ fun main() {
             obj: (generic_instantiation
               expr: (identifier)
               instantiationTs: (instantiationT_list
+                types: (type_identifier)))
+            field: (identifier))
+          arguments: (argument_list)))
+      (expression_statement
+        (function_call
+          callee: (dot_access
+            obj: (generic_instantiation
+              expr: (identifier)
+              instantiationTs: (instantiationT_list
+                types: (type_identifier)
                 types: (type_identifier)))
             field: (identifier))
           arguments: (argument_list))))))

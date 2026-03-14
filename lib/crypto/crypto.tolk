@@ -28,8 +28,8 @@ struct crypto
 ///
 /// Both fields are plain `int` for compatibility with TVM builtins like [isSignatureValid].
 struct KeyPair {
-    privateKey: int;
-    publicKey: int;
+    privateKey: int
+    publicKey: int
 }
 
 // Mnemonic phrase represented as `array<string>` (24 words for `crypto.createMnemonic()`).
@@ -63,10 +63,7 @@ fun crypto.createMnemonic(): Mnemonic {
 /// ```
 fun Mnemonic.toKeyPair(self): KeyPair {
     val [privateKey, publicKey] = ffi.__mnemonicToKeyPair(self);
-    return KeyPair {
-        privateKey,
-        publicKey,
-    };
+    return KeyPair { privateKey, publicKey };
 }
 
 /// Signs a cell by hashing it and then signing the hash.
@@ -172,10 +169,7 @@ fun crypto.generateKeyPair(): KeyPair {
 /// ```
 fun crypto.seedToKeyPair(seed: uint256): KeyPair {
     val [privateKey, publicKey] = ffi.__seedToKeyPair(seed);
-    return KeyPair {
-        privateKey,
-        publicKey,
-    };
+    return KeyPair { privateKey, publicKey };
 }
 
 fun ffi.__seedToKeyPair(seed: uint256): [int, int] asm "404 EXTCALL";

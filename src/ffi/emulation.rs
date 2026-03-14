@@ -312,6 +312,50 @@ fn send_message_impl(
     Ok(())
 }
 
+extension!(run_tick_tock in (Context) with (is_tock: BigInt, on_account: StdAddr) using run_tick_tock_impl);
+fn run_tick_tock_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    is_tock: BigInt,
+    on_account: StdAddr,
+) -> anyhow::Result<()> {
+    let emulator = &ctx.chain.emulator;
+    let is_tock = is_tock != BigInt::ZERO;
+
+    let addr = IntAddr::Std(on_account.clone());
+    let libs = ctx.chain.build_libs(&addr);
+
+    // TODO: debug mode support for tick-tock (send_message_debug equivalent)
+    let emulations = emulator
+        .run_tick_tock(ctx.chain.world_state, &on_account, is_tock, &libs)
+        .context("Cannot run tick-tock transaction")?;
+
+    if let [SendMessageResult::Error(error), ..] = &emulations[..]
+        && emulations.len() == 1
+    {
+        ctx.chain
+            .emulations
+            .save_message(&ctx.env.running_id, emulations.clone());
+
+        anyhow::bail!("Cannot run tick-tock transaction: {}", error.error)
+    }
+
+    let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
+        SendMessageResult::Success(res) => Some(res),
+        SendMessageResult::Error(_) => None,
+    });
+
+    let transaction_cells = successful_emulations
+        .filter_map(emulation_to_send_result)
+        .collect::<Vec<_>>();
+
+    ctx.chain
+        .emulations
+        .save_message(&ctx.env.running_id, emulations);
+    stack.push(TupleItem::big_array_from_items(transaction_cells));
+    Ok(())
+}
+
 fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<TupleItem> {
     let child_txs = Tuple(
         emulation
@@ -343,6 +387,10 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
 
     let gas_used = match parsed_tx.load_info() {
         Ok(TxInfo::Ordinary(info)) => match info.compute_phase {
+            ComputePhase::Executed(compute) => compute.gas_used.into(),
+            _ => BigInt::ZERO,
+        },
+        Ok(TxInfo::TickTock(info)) => match info.compute_phase {
             ComputePhase::Executed(compute) => compute.gas_used.into(),
             _ => BigInt::ZERO,
         },
@@ -389,10 +437,6 @@ fn send_wallet_message(
         wallet
             .wallet
             .create_external_msg(expire_at, seqno, need_state_init, vec![message_ton])?;
-
-    if api_key.is_none() && network != &Network::Custom("localnet".into()) {
-        std::thread::sleep(Duration::from_millis(1000)); // rate limit
-    }
 
     client.send_boc(&external.to_boc_b64(false)?)?;
 
@@ -1274,7 +1318,7 @@ fn wait_for_transaction_impl(
 
     let custom_networks = ctx.env.config.custom_networks();
     let api_key = ctx.env.api_key.clone();
-    let api_client = match TonApiClient::new(network.clone(), custom_networks, api_key.clone()) {
+    let api_client = match TonApiClient::new(network, custom_networks, api_key) {
         Ok(client) => client,
         Err(_) => {
             stack.push_bool(false);
@@ -1283,10 +1327,6 @@ fn wait_for_transaction_impl(
     };
 
     let ext_message_hash_bytes = ext_message_hash.as_slice();
-
-    if api_key.is_none() && network != Network::Custom("localnet".into()) {
-        std::thread::sleep(Duration::from_millis(1000)); // rate limit
-    }
 
     for attempt in 1..=attempts {
         if !quiet {
@@ -1343,7 +1383,22 @@ fn get_transaction_link(
     tx: TonCenterTransaction,
     hex: String,
 ) -> String {
-    let network_prefix = if ctx.network() == Network::Testnet {
+    let network = ctx.network();
+    match &network {
+        Network::Localnet => {
+            if let Some(url) = localnet_transaction_link(ctx, &hex) {
+                return url;
+            }
+        }
+        Network::Custom(network_name) => {
+            if let Some(url) = custom_network_transaction_link(ctx, network_name.as_ref(), &hex) {
+                return url;
+            }
+        }
+        Network::Mainnet | Network::Testnet => {}
+    }
+
+    let network_prefix = if network.uses_testnet_address_format() {
         "testnet."
     } else {
         ""
@@ -1363,6 +1418,55 @@ fn get_transaction_link(
         ),
         Explorer::Tonviewer => format!("https://{network_prefix}tonviewer.com/transaction/{hex}"),
     }
+}
+
+fn custom_network_transaction_link(
+    ctx: &Context,
+    network_name: &str,
+    tx_hash_hex: &str,
+) -> Option<String> {
+    let custom_networks = ctx.env.config.custom_networks();
+    let network_urls = custom_networks.get(network_name)?;
+    configured_network_transaction_link(network_urls, tx_hash_hex)
+}
+
+fn localnet_transaction_link(ctx: &Context, tx_hash_hex: &str) -> Option<String> {
+    let custom_networks = ctx.env.config.custom_networks();
+    let localnet_urls = custom_networks.get("localnet")?;
+    configured_network_transaction_link(localnet_urls, tx_hash_hex)
+}
+
+fn configured_network_transaction_link(
+    network_urls: &acton_config::config::CustomNetworkUrls,
+    tx_hash_hex: &str,
+) -> Option<String> {
+    if let Some(explorer_url) = network_urls.explorer_url.as_deref() {
+        return explorer_transaction_link(explorer_url, tx_hash_hex);
+    }
+
+    let mut explorer_base = reqwest::Url::parse(network_urls.v2_url.as_ref()).ok()?;
+    explorer_base.set_path("/explorer");
+    explorer_base.set_query(None);
+    explorer_base.set_fragment(None);
+
+    explorer_transaction_link(explorer_base.as_str(), tx_hash_hex)
+}
+
+fn explorer_transaction_link(explorer_base: &str, tx_hash_hex: &str) -> Option<String> {
+    let mut url = reqwest::Url::parse(explorer_base).ok()?;
+    let base_path = url.path().trim_end_matches('/');
+    let tx_base = if base_path.is_empty() {
+        "/tx".to_string()
+    } else if base_path.ends_with("/tx") {
+        base_path.to_string()
+    } else {
+        format!("{base_path}/tx")
+    };
+    let path = format!("{tx_base}/{tx_hash_hex}");
+    url.set_path(&path);
+    url.set_query(None);
+    url.set_fragment(None);
+    Some(url.to_string())
 }
 
 extension!(get_config in (Context) using get_config_impl);
@@ -1465,5 +1569,64 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         33 => get_shard_account : 1,
         34 => set_shard_account : 2,
         35 => save_trace_name : 2,
+        36 => run_tick_tock : 2,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[test]
+    fn configured_network_transaction_link_prefers_explorer_url() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: Some(Arc::from("https://explorer.example/explorer")),
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("explorer link should be built");
+        assert_eq!(url, "https://explorer.example/explorer/tx/abc123");
+    }
+
+    #[test]
+    fn configured_network_transaction_link_keeps_existing_tx_suffix() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: Some(Arc::from("https://explorer.example/explorer/tx/")),
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("explorer link should be built");
+        assert_eq!(url, "https://explorer.example/explorer/tx/abc123");
+    }
+
+    #[test]
+    fn configured_network_transaction_link_appends_tx_for_host_only_explorer() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: Some(Arc::from("http://localhost:3006")),
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("explorer link should be built");
+        assert_eq!(url, "http://localhost:3006/tx/abc123");
+    }
+
+    #[test]
+    fn configured_network_transaction_link_falls_back_to_v2() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: None,
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("fallback link should be built");
+        assert_eq!(url, "http://localhost:3010/explorer/tx/abc123");
+    }
 }

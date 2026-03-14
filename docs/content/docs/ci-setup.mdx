@@ -1,0 +1,121 @@
+---
+title: "CI Integration"
+description: "Learn how to set up Acton checks, tests, and reports in CI pipelines"
+icon: Workflow
+---
+
+import {Callout} from "fumadocs-ui/components/callout";
+
+This guide shows how to set up Acton in CI to catch issues before merging.
+
+## GitHub Actions
+
+Acton offers an easy-to-use GitHub action for configuring Acton:
+
+```yaml
+- name: Setup Acton
+  uses: i582/setup-acton@master
+```
+
+`setup-acton` downloads a release binary, adds it to `PATH`, and exposes `acton-path` output.
+
+Learn more in `setup-acton` [repository](https://github.com/i582/setup-acton).
+
+## Full workflow example
+
+```yaml title=".github/workflows/ci.yml"
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Acton
+        uses: i582/setup-acton@master
+
+      - name: Verify version
+        run: acton --version
+
+      - name: Build
+        run: acton build
+
+      - name: Tests
+        run: acton test
+
+      - name: Lint
+        run: acton check --output-format github
+
+      - name: Format check
+        run: acton fmt --check
+```
+
+## Wallets and Secrets in CI
+
+For non-interactive deployment/verification jobs, store mnemonics in CI secrets and use `mnemonic-env`.
+
+```toml title="wallets.toml"
+[wallets.deployer]
+kind = "v5r1"
+keys = { mnemonic-env = "DEPLOYER_MNEMONIC" }
+```
+
+Then inject the secret in your CI environment:
+
+```yaml
+env:
+  DEPLOYER_MNEMONIC: ${{ secrets.DEPLOYER_MNEMONIC }}
+```
+
+See [Setup wallets](/docs/setup-wallets) for all secure storage options.
+
+<Callout type="warn">
+  Never commit mnemonic phrases or wallet files with plaintext secrets.
+</Callout>
+
+## Coverage reports
+
+Generate and upload coverage reports:
+
+```yaml title=".github/workflows/ci.yml"
+name: Coverage
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Acton
+        uses: i582/setup-acton@master
+
+      - name: Verify version
+        run: acton --version
+
+      - name: Build
+        run: acton build
+
+      - name: Tests
+        run: acton test --coverage --coverage-format lcov
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+```

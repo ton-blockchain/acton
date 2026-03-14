@@ -172,7 +172,9 @@ fun vm.cellFromHex(cellHex: string): cell {
 
 fun ffi.registerLibrary(cell: cell): void
     asm "18 EXTCALL"
+
 fun ffi.convertAddress(addr: string): cell
     asm "19 EXTCALL"
+
 fun ffi.cellFromHex(cellHex: string): cell
     asm "20 EXTCALL"

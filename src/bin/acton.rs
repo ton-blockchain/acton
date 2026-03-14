@@ -7,6 +7,7 @@ use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
 use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
+use acton::commands::func2tolk::func2tolk_cmd;
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
@@ -183,6 +184,13 @@ enum Commands {
             help_heading = "Profiling"
         )]
         baseline_snapshot: Option<String>,
+        #[arg(
+            long,
+            help = "Exit with non-zero code when profiling differs from baseline snapshot",
+            help_heading = "Profiling",
+            requires = "baseline_snapshot"
+        )]
+        fail_on_diff: bool,
 
         // Reporting
         #[arg(
@@ -309,8 +317,6 @@ enum Commands {
         test: bool,
         #[arg(long, help = "Output path for test file", help_heading = "Tests")]
         test_output: Option<String>,
-        #[arg(long, help = "Storage struct name to use for wrapper generation")]
-        storage_struct: Option<String>,
     },
     #[command(
         about = "Execute a Tolk script file",
@@ -520,7 +526,7 @@ enum Commands {
             long = "output-format",
             value_enum,
             value_name = "FORMAT",
-            help = "Output format (plain, json, sarif, github)"
+            help = "Output format (plain, json, sarif, github, gitlab)"
         )]
         output_format: Option<CheckOutputFormat>,
         #[arg(
@@ -625,6 +631,24 @@ enum Commands {
         check: bool,
     },
     #[command(
+        name = "func2tolk",
+        about = "Convert FunC files to Tolk via @ton/convert-func-to-tolk",
+        after_help = example_func2tolk_usage()
+    )]
+    Func2Tolk {
+        #[arg(help = "Path to a .fc/.func file or a directory containing them")]
+        path: String,
+        #[arg(long, help = "Output path")]
+        output: Option<String>,
+        #[arg(
+            long,
+            help = "Insert /* _WARNING_ */ comments in output instead of printing warnings only"
+        )]
+        warnings_as_comments: bool,
+        #[arg(long, help = "Don't transform snake_case to camelCase")]
+        no_camel_case: bool,
+    },
+    #[command(
         about = "Inspect resolved project environment",
         after_help = example_doctor_usage()
     )]
@@ -666,7 +690,7 @@ enum Commands {
 pub enum LitenodeCommand {
     #[command(about = "Start the lightweight TON node")]
     Start {
-        #[arg(long, help = "LiteNode server port (default: [litenode].port or 3000)")]
+        #[arg(long, help = "LiteNode server port (default: [litenode].port or 5411)")]
         port: Option<u16>,
         #[arg(
             long,
@@ -690,6 +714,13 @@ pub enum LitenodeCommand {
         api_key: Option<String>,
         #[arg(long, help = "Path to SQLite database for persistent storage")]
         db_path: Option<String>,
+        #[arg(
+            long,
+            value_name = "RPS",
+            value_parser = clap::value_parser!(u32).range(1..),
+            help = "Maximum API requests per second to simulate provider rate limits (default: [litenode].rate-limit)"
+        )]
+        rate_limit: Option<u32>,
         #[arg(
             long,
             help = "Load LiteNode state from JSON snapshot before startup",
@@ -857,6 +888,10 @@ fn example_litenode_usage() -> StyledStr {
             (
                 "Dump network state to JSON snapshot on shutdown",
                 "acton litenode start --dump-state snapshots/localnet.json",
+            ),
+            (
+                "Simulate provider API limits (1 request/sec)",
+                "acton litenode start --rate-limit 1",
             ),
             (
                 "Request 100 TON from faucet to specified address",
@@ -1382,6 +1417,26 @@ fn example_completions_usage() -> StyledStr {
     )
 }
 
+fn example_func2tolk_usage() -> StyledStr {
+    format_examples(
+        &[
+            (
+                "Convert all .fc/.func files in a directory",
+                "acton func2tolk contracts",
+            ),
+            (
+                "Convert a single file and add warning comments",
+                "acton func2tolk jetton-minter.fc --warnings-as-comments",
+            ),
+            (
+                "Convert without camelCase renaming",
+                "acton func2tolk jetton-minter.fc --no-camel-case",
+            ),
+        ],
+        "https://github.com/ton-blockchain/convert-func-to-tolk",
+    )
+}
+
 fn root_help(show_global_options: bool) -> StyledStr {
     use std::collections::HashMap;
     use std::fmt::Write as _;
@@ -1433,6 +1488,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("up", ""),
         ("doctor", ""),
         ("help", "[COMMAND]"),
+        ("func2tolk", "<PATH>"),
         ("completions", "<SHELL>"),
     ];
 
@@ -1719,6 +1775,13 @@ fn main() {
             .authors("TON Core")
             .homepage("https://github.com/i582/acton")
     );
+    let _crash_handler = acton::crash::install().map_err(|err| {
+        eprintln!(
+            "Warning: failed to install fatal signal handler ({err}). Continuing without fatal signal diagnostics."
+        );
+        err
+    }).ok();
+
     dotenv().ok();
     let Cli {
         color,
@@ -1774,6 +1837,7 @@ fn main() {
             junit_merge,
             snapshot,
             baseline_snapshot,
+            fail_on_diff,
             fork_net,
             api_key,
             save_test_trace,
@@ -1803,6 +1867,7 @@ fn main() {
                     junit_merge,
                     snapshot,
                     baseline_snapshot,
+                    fail_on_diff,
                     fork_net,
                     api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
                     fork_block_number,
@@ -1843,14 +1908,7 @@ fn main() {
             output: wrapper_output,
             test_output,
             test,
-            storage_struct,
-        } => wrapper_cmd(
-            &contract_id,
-            wrapper_output,
-            test_output,
-            test,
-            storage_struct,
-        ),
+        } => wrapper_cmd(&contract_id, wrapper_output, test_output, test),
         Commands::Script {
             path,
             args,
@@ -2070,7 +2128,6 @@ fn main() {
             }
             result
         }
-        Commands::Doctor { json } => doctor_cmd(json),
         Commands::Fmt { paths, check } => fmt_cmd(paths, check),
         Commands::Doc { command } => match command {
             DocCommand::Tvm {
@@ -2106,11 +2163,17 @@ fn main() {
                 accounts,
                 api_key,
                 db_path,
+                rate_limit,
                 load_state,
                 dump_state,
             } => {
-                let resolved_litenode =
-                    resolve_litenode_settings(port, fork_net, fork_block_number, accounts);
+                let resolved_litenode = resolve_litenode_settings(
+                    port,
+                    fork_net,
+                    fork_block_number,
+                    accounts,
+                    rate_limit,
+                );
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
@@ -2122,6 +2185,7 @@ fn main() {
                         resolved_litenode.fork_net,
                         resolved_litenode.fork_block_number,
                         resolved_litenode.accounts,
+                        resolved_litenode.rate_limit,
                         load_state,
                         dump_state,
                         api_key.or_else(|| env::var("TONCENTER_API_KEY").ok()),
@@ -2168,10 +2232,11 @@ struct ResolvedLitenodeSettings {
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
     accounts: Vec<String>,
+    rate_limit: Option<u32>,
 }
 
 fn resolve_litenode_port(cli_port: Option<u16>) -> u16 {
-    resolve_litenode_settings(cli_port, None, None, None).port
+    resolve_litenode_settings(cli_port, None, None, None, None).port
 }
 
 fn resolve_litenode_settings(
@@ -2179,13 +2244,15 @@ fn resolve_litenode_settings(
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
+    cli_rate_limit: Option<u32>,
 ) -> ResolvedLitenodeSettings {
     let config = load_litenode_settings_from_config();
     ResolvedLitenodeSettings {
-        port: cli_port.or(config.port).unwrap_or(3000),
+        port: cli_port.or(config.port).unwrap_or(5411),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
         accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
+        rate_limit: cli_rate_limit.or(config.rate_limit),
     }
 }
 
@@ -2315,6 +2382,7 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    fail_on_diff: bool,
     fork_net: Option<Network>,
     api_key: Option<String>,
     fork_block_number: Option<u64>,
@@ -2364,6 +2432,7 @@ fn create_test_config(
             mutate_overrides,
             mutate_contract,
             disable_rules,
+            if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
             Some(ui_port),
@@ -2386,6 +2455,7 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
+        fail_on_diff,
         api_key,
         fork_block_number,
         save_test_trace,

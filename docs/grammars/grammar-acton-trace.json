@@ -1,0 +1,205 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "acton-trace",
+  "scopeName": "source.acton-trace",
+  "patterns": [
+    {
+      "include": "#tree"
+    },
+    {
+      "include": "#roots"
+    },
+    {
+      "include": "#traceKinds"
+    },
+    {
+      "include": "#messages"
+    },
+    {
+      "include": "#amounts"
+    },
+    {
+      "include": "#status"
+    },
+    {
+      "include": "#metrics"
+    },
+    {
+      "include": "#actions"
+    },
+    {
+      "include": "#locations"
+    },
+    {
+      "include": "#hashes"
+    },
+    {
+      "include": "#literals"
+    },
+    {
+      "include": "#aliases"
+    }
+  ],
+  "repository": {
+    "tree": {
+      "patterns": [
+        {
+          "name": "comment.line.acton-trace",
+          "match": "[│├└─]+"
+        }
+      ]
+    },
+    "roots": {
+      "patterns": [
+        {
+          "match": "\\bN/A\\b",
+          "name": "comment.line.acton-trace"
+        },
+        {
+          "match": "\\bexternal\\b",
+          "name": "comment.line.acton-trace"
+        },
+        {
+          "match": "->",
+          "name": "keyword.operator.acton-trace"
+        }
+      ]
+    },
+    "traceKinds": {
+      "patterns": [
+        {
+          "match": "\\bext-(?:in|out)\\b",
+          "name": "entity.name.function.acton-trace"
+        },
+        {
+          "match": "\\breserve\\b",
+          "name": "entity.name.function.acton-trace"
+        },
+        {
+          "match": "\\bmsg:\\b",
+          "name": "entity.name.function.acton-trace"
+        }
+      ]
+    },
+    "messages": {
+      "patterns": [
+        {
+          "match": "(?<=\\bext-(?:in|out)\\s)(?:empty|0x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9_]*)",
+          "name": "keyword.control.acton-trace"
+        },
+        {
+          "match": "(?:empty|0x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9_]*)(?=\\s+\\d+(?:\\.\\d+)?\\s+TON\\s+->)",
+          "name": "keyword.control.acton-trace"
+        }
+      ]
+    },
+    "amounts": {
+      "patterns": [
+        {
+          "match": "\\b\\d+(?:\\.\\d+)?\\s+TON\\b",
+          "name": "string.unquoted.acton-trace"
+        }
+      ]
+    },
+    "status": {
+      "patterns": [
+        {
+          "match": "\\(!\\)",
+          "name": "markup.deleted.acton-trace"
+        },
+        {
+          "match": "\\baborted\\b",
+          "name": "markup.deleted.acton-trace"
+        },
+        {
+          "match": "\\b(?:compute phase skipped|account created|account destroyed)\\b",
+          "name": "support.type.acton-trace"
+        },
+        {
+          "match": "\\b(?:Compute phase failed|Action phase failed)\\b",
+          "name": "invalid.deprecated.acton-trace"
+        },
+        {
+          "match": "\\bDescription:\\b",
+          "name": "support.type.acton-trace"
+        },
+        {
+          "match": "\\bExecuted actions:\\b",
+          "name": "support.type.acton-trace"
+        },
+        {
+          "match": "\\bRe-run with\\b|\\bto get actions location\\b",
+          "name": "support.type.acton-trace"
+        },
+        {
+          "match": "--backtrace\\s+full",
+          "name": "string.unquoted.acton-trace"
+        }
+      ]
+    },
+    "metrics": {
+      "patterns": [
+        {
+          "match": "\\bgas=\\d+\\b",
+          "name": "comment.line.acton-trace"
+        },
+        {
+          "match": "\\b(?:exit_code|action_result_code)=\\d+\\b",
+          "name": "markup.deleted.acton-trace"
+        }
+      ]
+    },
+    "actions": {
+      "patterns": [
+        {
+          "match": "\\bbalance:\\s+\\d+(?:\\.\\d+)?\\s+TON\\b",
+          "name": "string.unquoted.acton-trace"
+        },
+        {
+          "match": "\\b(?:BOUNCE_ON_ACTION_FAIL|PAY_FEES_SEPARATELY|IGNORE_ERRORS|DESTROY|CARRY_ALL_REMAINING_MESSAGE_VALUE|CARRY_ALL_BALANCE|ALL_BUT_AMOUNT|AT_MOST|INCREASE_BY_ORIGINAL_BALANCE|NEGATE_AMOUNT|EXACT_AMOUNT|REGULAR)\\b",
+          "name": "constant.language.acton-trace"
+        }
+      ]
+    },
+    "locations": {
+      "patterns": [
+        {
+          "match": "\\bat\\s+[^\\s]+:\\d+:\\d+\\b",
+          "name": "comment.line.acton-trace"
+        }
+      ]
+    },
+    "hashes": {
+      "patterns": [
+        {
+          "match": "\\b[A-F0-9]{32,}\\b",
+          "name": "constant.numeric.hex.acton-trace"
+        }
+      ]
+    },
+    "literals": {
+      "patterns": [
+        {
+          "match": "\\bnone\\b",
+          "name": "constant.language.acton-trace"
+        },
+        {
+          "match": "\\b0x[0-9a-fA-F]+\\b",
+          "name": "constant.numeric.hex.acton-trace"
+        },
+        {
+          "match": "\\(\\d+ bits\\)",
+          "name": "comment.line.acton-trace"
+        }
+      ]
+    },
+    "aliases": {
+      "patterns": [
+        {
+          "match": "(?<!/)\\b[A-Z](?:\\d+)?\\b(?!/)",
+          "name": "variable.parameter.acton-trace"
+        }
+      ]
+    }
+  }
+}

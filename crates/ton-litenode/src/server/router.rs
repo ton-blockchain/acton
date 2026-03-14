@@ -1,14 +1,21 @@
+use super::handlers::utils::get_extra;
 use super::handlers::*;
 use crate::litenode::LiteNode;
 use axum::{
-    Router,
+    Json, Router,
+    http::StatusCode,
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
+use serde_json::json;
 use std::sync::Arc;
+use tower_governor::governor::GovernorConfigBuilder;
+use tower_governor::key_extractor::GlobalKeyExtractor;
+use tower_governor::{GovernorError, GovernorLayer};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
-pub fn create_router(node: Arc<LiteNode>) -> Router {
+pub fn create_router(node: Arc<LiteNode>, rate_limit_rps: Option<u32>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -66,14 +73,32 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
         .route("/v3/message", post(send_message_v3))
         .route("/v3/runGetMethod", post(run_get_method_v3))
         .route("/v3/jetton/masters", get(get_jetton_masters))
-        .route("/v3/jetton/wallets", get(get_jetton_wallets));
+        .route("/v3/jetton/wallets", get(get_jetton_wallets))
+        .route("/v3/nft/items", get(get_nft_items));
 
     let emulate_router = Router::new().route("/emulate/v1/emulateTrace", post(emulate_trace_v1));
 
+    let mut api_router = Router::new()
+        .merge(api_v2_router)
+        .merge(api_v3_router)
+        .merge(emulate_router);
+
+    if let Some(limit) = rate_limit_rps {
+        let mut governor_config = GovernorConfigBuilder::default();
+        governor_config.per_second(1).burst_size(limit);
+        let mut governor_config = governor_config.key_extractor(GlobalKeyExtractor);
+        let governor_config = Arc::new(
+            governor_config
+                .finish()
+                .expect("Rate limit configuration must be valid"),
+        );
+        let governor_layer = GovernorLayer::new(governor_config)
+            .error_handler(move |error| governor_error_response(error, limit));
+        api_router = api_router.layer(governor_layer);
+    }
+
     Router::new()
-        .nest("/api", api_v2_router)
-        .nest("/api", api_v3_router)
-        .nest("/api", emulate_router)
+        .nest("/api", api_router)
         .route("/admin/faucet", post(faucet))
         .route(
             "/admin/address-name",
@@ -86,4 +111,54 @@ pub fn create_router(node: Arc<LiteNode>) -> Router {
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(node)
+}
+
+fn governor_error_response(error: GovernorError, max_requests_per_second: u32) -> Response {
+    match error {
+        GovernorError::TooManyRequests { wait_time, headers } => {
+            let mut response = (
+                StatusCode::TOO_MANY_REQUESTS,
+                Json(json!({
+                    "ok": false,
+                    "error": format!(
+                        "Rate limit exceeded: max {} request(s) per second (retry in {}s)",
+                        max_requests_per_second, wait_time
+                    ),
+                    "code": 429,
+                    "@extra": get_extra()
+                })),
+            )
+                .into_response();
+            if let Some(headers) = headers {
+                response.headers_mut().extend(headers);
+            }
+            response
+        }
+        GovernorError::UnableToExtractKey => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({
+                "ok": false,
+                "error": "Rate limiter was unable to extract request key",
+                "code": 500,
+                "@extra": get_extra()
+            })),
+        )
+            .into_response(),
+        GovernorError::Other { code, msg, headers } => {
+            let mut response = (
+                code,
+                Json(json!({
+                    "ok": false,
+                    "error": msg.unwrap_or_else(|| "Rate limiter error".to_string()),
+                    "code": code.as_u16(),
+                    "@extra": get_extra()
+                })),
+            )
+                .into_response();
+            if let Some(headers) = headers {
+                response.headers_mut().extend(headers);
+            }
+            response
+        }
+    }
 }

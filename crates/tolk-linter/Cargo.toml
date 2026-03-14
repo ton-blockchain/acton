@@ -21,7 +21,6 @@ acton-config = { workspace = true }
 tree-sitter = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
-log = { workspace = true }
 rustc-hash = { workspace = true }
 memchr = { workspace = true }
 heck = { workspace = true }

@@ -38,15 +38,23 @@
       "description": "Custom network configurations",
       "additionalProperties": {
         "type": "object",
-        "required": ["v2-url", "v3-url"],
         "properties": {
-          "v2-url": {
-            "type": "string",
-            "description": "The URL for the TonCenter API v2"
+          "api": {
+            "type": "object",
+            "properties": {
+              "v2": {
+                "type": "string",
+                "description": "The URL for the TonCenter API v2. For localnet this defaults to http://localhost:<litenode.port>/api/v2 (port 5411 fallback)"
+              },
+              "v3": {
+                "type": "string",
+                "description": "The URL for the TonCenter API v3. For localnet this defaults to http://localhost:<litenode.port>/api/v3 (port 5411 fallback)"
+              }
+            }
           },
-          "v3-url": {
+          "explorer": {
             "type": "string",
-            "description": "The URL for the TonCenter API v3"
+            "description": "Base URL used to build transaction links for this network. Acton appends /tx/<hash> automatically (adds /tx/ if missing). If omitted, links are derived from api.v2"
           }
         }
       }
@@ -146,6 +154,10 @@
         "fail-fast": {
           "type": "boolean",
           "description": "Stop test execution after the first failure"
+        },
+        "fail-on-diff": {
+          "type": "boolean",
+          "description": "Exit with non-zero code when gas profiling differs from baseline snapshot"
         }
       }
     },
@@ -217,6 +229,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "rate-limit": {
+          "type": "integer",
+          "description": "Maximum number of API requests per second served by LiteNode `/api` endpoints",
+          "minimum": 1
         }
       }
     },
@@ -311,7 +328,7 @@
         },
         "output-format": {
           "type": "string",
-          "enum": ["plain", "json", "sarif", "github"],
+          "enum": ["plain", "json", "sarif", "github", "gitlab"],
           "description": "Output format for `acton check` diagnostics"
         },
         "rules": {

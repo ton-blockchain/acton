@@ -62,23 +62,27 @@ This gets you from zero to a running test in one command!
 
 ## Requirements and "Gotchas"
 
-### Separate Your Types
+### Contract Header Is Required
 
-The most important requirement for wrapper generation is that **shared types must be in a separate file**.
+Wrapper generation uses the ABI emitted by the Tolk compiler. The contract header is the source of truth for:
+- storage, via `storage: ...`
+- incoming message wrappers, via `incomingMessages: ...`
 
-If your contract defines message types or the storage struct inside the contract file itself, the wrapper generator (and the tests that use the wrapper) cannot import them without importing the contract logic itself. Since both the contract and the wrapper/test might define or import functions like `onInternalMessage`, this causes **compilation errors due to duplicate definitions**.
-
-<Callout type="warn">
-If you see errors about duplicate `main` or `onInternalMessage` definitions when running tests, check that your types are separated!
-</Callout>
-
-**Bad Structure:**
-
-Defining types inside the contract file makes them impossible to import safely in tests.
+If `incomingMessages` is not declared in the `contract` header, `send{MessageName}` methods will not be generated. If `storage` is missing, the wrapper falls back to an empty `fromStorage()` initializer instead of a typed storage-based one.
 
 ```tolk title="contracts/counter.tolk"
-// ❌ Don't do this!
-struct (0x7e8764ef) Increase { amount: int32 }
+contract Counter {
+    storage: Storage
+    incomingMessages: AllowedMessage
+}
+
+struct Storage {
+    counter: uint32
+}
+
+struct (0x7e8764ef) Increase {
+    amount: int32
+}
 
 type AllowedMessage = Increase
 
@@ -90,13 +94,14 @@ fun onInternalMessage(in: InMessage) {
 }
 ```
 
-**Good Structure:**
+### Types Can Be Local Or Imported
 
-Move your types to a separate file (e.g., `contracts/types.tolk`) and import them.
+Storage and message types may live either in the contract file itself or in imported files. Both layouts are supported.
 
 ```tolk title="contracts/types.tolk"
-// ✅ Do this!
-struct (0x7e8764ef) Increase { amount: int32 }
+struct (0x7e8764ef) Increase {
+    amount: int32
+}
 
 type AllowedMessage = Increase
 ```
@@ -104,6 +109,15 @@ type AllowedMessage = Increase
 ```tolk title="contracts/counter.tolk"
 import "types"
 
+contract Counter {
+    storage: Storage
+    incomingMessages: AllowedMessage
+}
+
+struct Storage {
+    counter: uint32
+}
+
 fun onInternalMessage(in: InMessage) {
     val msg = lazy AllowedMessage.fromSlice(in.body);
     match (msg) {
@@ -111,11 +125,6 @@ fun onInternalMessage(in: InMessage) {
     }
 }
 ```
-
-If you run `acton wrapper` on a contract with inline types, it will:
-1.  Create a `types.tolk` file for you.
-2.  Warn you to move the types there.
-3.  Generate the wrapper expecting the types to be in `types.tolk`.
 
 ### Contract must be in Acton.toml
 
@@ -154,7 +163,7 @@ get fun `test-example`() {
 
 ### Sending Messages
 
-For every message type handled in your contract (e.g., in `match` statements), the wrapper generates a corresponding `send{MessageName}` method.
+For every message type listed in `contract { incomingMessages: ... }`, the wrapper generates a corresponding `send{MessageName}` method.
 
 If your contract handles `Increase`:
 
@@ -194,7 +203,7 @@ You can customize the output paths:
 acton wrapper counter --output tests/my_wrapper.tolk
 
 # Generate a test file alongside the wrapper
-acton wrapper counter --test tests/my.test.tolk
+acton wrapper counter --test --test-output tests/my.test.tolk
 ```
 
 See the [wrapper command reference](/docs/commands/wrapper) for more details about CLI options.

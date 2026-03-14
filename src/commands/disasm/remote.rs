@@ -15,14 +15,14 @@ pub(super) fn fetch_contract_boc(
     if let Some(network) = network {
         let config = acton_config::config::ActonConfig::load().unwrap_or_default();
         let custom_networks = config.custom_networks();
-        let mainnet_client = TonApiClient::new(
+        let client = TonApiClient::new(
             network.clone(),
             custom_networks,
             api_key.map(ToString::to_string),
         )?;
-        if let Err(error) = mainnet_client.get_contract_boc(address) {
-            anyhow::bail!("Failed to fetch contract boc from {network:?}: {error}");
-        }
+        return client
+            .get_contract_boc(address)
+            .with_context(|| format!("Failed to fetch contract boc from {network}"));
     }
 
     // No explicit network given, trying both

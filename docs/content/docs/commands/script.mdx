@@ -23,12 +23,12 @@ This command executes `my_script.tolk` in the local emulator environment.
 
 ### Network Options
 
-| Option                 | Type   | Description                                            |
-|------------------------|--------|--------------------------------------------------------|
-| `--broadcast`          | Flag   | Execute transactions on real blockchain                |
-| `--net <NET>`          | String | Target network: "testnet" (default) or "mainnet"       |
-| `--fork-net <NETWORK>` | String | Fork blockchain state from network for local execution |
-| `--api-key <API_KEY>`  | String | TonCenter API key for blockchain queries               |
+| Option                 | Type   | Description                                                                                                   |
+|------------------------|--------|---------------------------------------------------------------------------------------------------------------|
+| `--broadcast`          | Flag   | Execute transactions on real blockchain                                                                       |
+| `--net <NET>`          | String | Target network for broadcast: `testnet` (default), `mainnet`, `localnet`, or `custom:<name>`                  |
+| `--fork-net <NETWORK>` | String | Fork blockchain state from network for local execution (`mainnet`, `testnet`, `localnet`, or `custom:<name>`) |
+| `--api-key <API_KEY>`  | String | TonCenter API key for blockchain queries                                                                      |
 
 ### Debug Options
 
@@ -78,7 +78,7 @@ acton script experiment.tolk --clear-cache
 
 ### Deploying to Blockchain
 
-Deploy a contract to testnet or mainnet using real wallets:
+Deploy a contract to the selected network using wallets:
 
 ```bash
 # Deploy to testnet (default)
@@ -86,10 +86,13 @@ acton script deploy.tolk --broadcast
 
 # Deploy to mainnet
 acton script deploy.tolk --broadcast --net mainnet
+
+# Deploy to localnet
+acton script deploy.tolk --broadcast --net localnet
 ```
 
-<Callout type="error" title="Real TON will be spent">
-When using `--broadcast`, your script will send real transactions and spend real TON. Always test without `--broadcast` first!
+<Callout type="error" title="Broadcast sends real transactions">
+With `--broadcast`, transactions are sent to the selected network. On `mainnet`/`testnet` this spends real TON. On `localnet`, local node balances are used.
 </Callout>
 
 Example deployment script:
@@ -158,6 +161,8 @@ Scripts are executed as smart contracts with these characteristics:
 | `--fork-net testnet`             | Real testnet state | Test wallets | No             |
 | `--broadcast`                    | Local emulator     | Real wallets | Yes            |
 | `--broadcast --fork-net testnet` | Real testnet state | Real wallets | Yes            |
+
+Custom networks follow the same model through `custom:<name>`.
 
 ## Learn More
 

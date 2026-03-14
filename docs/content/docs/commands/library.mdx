@@ -24,18 +24,18 @@ This command initiates the publication process for the specified contract. If no
 
 ### Command Options
 
-| Option                  | Type     | Description                                                     |
-|-------------------------|----------|-----------------------------------------------------------------|
-| `[CONTRACT_ID]`         | Argument | The ID of the contract in `Acton.toml` to publish               |
-| `--code <CODE>`         | String   | Base64 or Hex code to publish instead of compiling a contract   |
-| `--duration <DURATION>` | String   | Duration to store the library (e.g., `100d`, `1y`, `31536000s`) |
-| `--wallet <WALLET>`     | String   | Name of the wallet to use for the transaction                   |
-| `--net <NET>`           | String   | Network to use (`testnet` or `mainnet`), defaults to `testnet`  |
-| `--api-key <KEY>`       | String   | TonCenter API key for blockchain interactions                   |
-| `--amount <AMOUNT>`     | String   | Explicit TON amount to send (overrides suggested calculation)   |
-| `-y, --yes`             | Flag     | Skip confirmation prompts                                       |
-| `--local`               | Flag     | Save library info to local `libraries.toml`                     |
-| `--global`              | Flag     | Save library info to global `global.libraries.toml`             |
+| Option                  | Type     | Description                                                                                  |
+|-------------------------|----------|----------------------------------------------------------------------------------------------|
+| `[CONTRACT_ID]`         | Argument | The ID of the contract in `Acton.toml` to publish                                            |
+| `--code <CODE>`         | String   | Base64 or Hex code to publish instead of compiling a contract                                |
+| `--duration <DURATION>` | String   | Duration to store the library (e.g., `100d`, `1y`, `31536000s`)                              |
+| `--wallet <WALLET>`     | String   | Name of the wallet to use for the transaction                                                |
+| `--net <NET>`           | String   | Network to use (`testnet`, `mainnet`, `localnet`, or `custom:<name>`), defaults to `testnet` |
+| `--api-key <KEY>`       | String   | TonCenter API key for blockchain interactions                                                |
+| `--amount <AMOUNT>`     | String   | Explicit TON amount to send (overrides suggested calculation)                                |
+| `-y, --yes`             | Flag     | Skip confirmation prompts                                                                    |
+| `--local`               | Flag     | Save library info to local `libraries.toml`                                                  |
+| `--global`              | Flag     | Save library info to global `global.libraries.toml`                                          |
 
 ### Examples
 
@@ -69,14 +69,14 @@ acton library fetch <HASH>
 
 ### Command Options
 
-| Option                | Type      | Description                                                         |
-|-----------------------|-----------|---------------------------------------------------------------------|
-| `<HASH>`              | Argument  | The SHA-256 hash of the library code                                |
-| `--disasm`            | Flag      | Disassemble the fetched code and print TASM                         |
-| `-o, --output <FILE>` | File path | Save fetched code to file (binary if `.boc` extension, else Base64) |
-| `--json`              | Flag      | Output result as JSON                                               |
-| `--net <NET>`         | String    | Network to use (`testnet` or `mainnet`), defaults to `testnet`      |
-| `--api-key <KEY>`     | String    | TonCenter API key for blockchain interactions                       |
+| Option                | Type      | Description                                                                                  |
+|-----------------------|-----------|----------------------------------------------------------------------------------------------|
+| `<HASH>`              | Argument  | The SHA-256 hash of the library code                                                         |
+| `--disasm`            | Flag      | Disassemble the fetched code and print TASM                                                  |
+| `-o, --output <FILE>` | File path | Save fetched code to file (binary if `.boc` extension, else Base64)                          |
+| `--json`              | Flag      | Output result as JSON                                                                        |
+| `--net <NET>`         | String    | Network to use (`testnet`, `mainnet`, `localnet`, or `custom:<name>`), defaults to `testnet` |
+| `--api-key <KEY>`     | String    | TonCenter API key for blockchain interactions                                                |
 
 ### Examples
 
@@ -198,17 +198,17 @@ After a successful top-up transaction, Acton updates `last_topup_timestamp` in t
 
 When library metadata is saved to `libraries.toml` (or `global.libraries.toml`), each entry includes:
 
-| Field                  | Type   | Description                                                                |
-|------------------------|--------|----------------------------------------------------------------------------|
-| `name`                 | String | Contract/library name from config                                          |
-| `hash`                 | String | Library code hash (hex)                                                    |
-| `code`                 | String | Library code BoC (base64)                                                  |
-| `account`              | String | Library account address on-chain                                           |
-| `duration`             | Number | Initial funded duration in seconds (used for publish/top-up estimation)    |
-| `network`              | String | Network where the library is used (`testnet` / `mainnet` / custom network) |
-| `timestamp`            | String | Publication time (RFC3339)                                                 |
-| `last_topup_timestamp` | String | Last successful top-up time (RFC3339), used for `Remaining` calculation    |
-| `bits`                 | Number | Library code size in bits                                                  |
-| `cells`                | Number | Library code size in cells                                                 |
+| Field                  | Type   | Description                                                                              |
+|------------------------|--------|------------------------------------------------------------------------------------------|
+| `name`                 | String | Contract/library name from config                                                        |
+| `hash`                 | String | Library code hash (hex)                                                                  |
+| `code`                 | String | Library code BoC (base64)                                                                |
+| `account`              | String | Library account address on-chain                                                         |
+| `duration`             | Number | Initial funded duration in seconds (used for publish/top-up estimation)                  |
+| `network`              | String | Network where the library is used (`testnet` / `mainnet` / `localnet` / `custom:<name>`) |
+| `timestamp`            | String | Publication time (RFC3339)                                                               |
+| `last_topup_timestamp` | String | Last successful top-up time (RFC3339), used for `Remaining` calculation                  |
+| `bits`                 | Number | Library code size in bits                                                                |
+| `cells`                | Number | Library code size in cells                                                               |
 
 `last_topup_timestamp` is required and is used by `acton library info` to estimate remaining storage runway.

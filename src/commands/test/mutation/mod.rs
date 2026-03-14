@@ -229,6 +229,34 @@ fn apply_mutation(source: &str, candidate: &MutationCandidate) -> String {
     }
 }
 
+fn prepare_project_for_mutation(config: &TestConfig) -> anyhow::Result<()> {
+    // Ensure generated dependency files (e.g. gen/*_code.tolk) exist before collecting
+    // file dependencies and compiling mutants.
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("acton"));
+    let mut cmd = process::Command::new(exe);
+    cmd.arg("build");
+    if config.clear_cache {
+        cmd.arg("--clear-cache");
+    }
+
+    let output = cmd.output()?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let details = if !stderr.is_empty() {
+        stderr
+    } else if !stdout.is_empty() {
+        stdout
+    } else {
+        format!("exit status {}", output.status)
+    };
+
+    anyhow::bail!("Failed to prepare project for mutation testing: {details}");
+}
+
 pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Result<()> {
     let Some(mutate_contract) = &config.mutate_contract else {
         anyhow::bail!("Provide --mutate-contract flag to specify a contract to mutate")
@@ -240,6 +268,7 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             mutate_contract
         ))
     })?;
+    prepare_project_for_mutation(config)?;
 
     let all_disable_rules = &config.disable_rules;
     let project_root = dunce::canonicalize(configured_project_root())
@@ -344,6 +373,12 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         global_mutations.len().to_string().bright_cyan()
     );
 
+    // Default behavior in mutation child test runs is to skip per-mutant rebuilds.
+    // Any explicit value other than "1" turns this optimization off.
+    let skip_build_for_child_tests = std::env::var("ACTON_INTERNAL_SKIP_BUILD")
+        .map(|value| value.trim() == "1")
+        .unwrap_or(true);
+
     let mut results = Vec::new();
 
     for (index, global_mutation) in global_mutations.iter().enumerate() {
@@ -405,6 +440,9 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
             .arg("--fail-fast")
             .arg("--mutate-overrides")
             .arg(format!("{mutate_contract}:{code_b64}"));
+        if skip_build_for_child_tests {
+            cmd.env("ACTON_INTERNAL_SKIP_BUILD", "1");
+        }
 
         if let Some(filter) = &config.filter {
             cmd.arg("--filter").arg(filter);
@@ -448,9 +486,10 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         .filter(|r| !r.survived && !r.compile_failed)
         .count();
     let survived_count = results.iter().filter(|r| r.survived).count();
-    let executed_total = results.len();
-    let mutation_score = if executed_total > 0 {
-        ((killed_count + compile_failed_count) as f64 / executed_total as f64) * 100.0
+    // Compilation failures are reported separately and excluded from score.
+    let scored_total = killed_count + survived_count;
+    let mutation_score = if scored_total > 0 {
+        (killed_count as f64 / scored_total as f64) * 100.0
     } else {
         0.0
     };
@@ -514,7 +553,9 @@ pub fn test_mutate_cmd(path: &Option<String>, config: &TestConfig) -> anyhow::Re
         }
     );
 
-    if survived_count > 0 {
+    if results.is_empty() {
+        println!("\n{} No mutation points found.\n", "○".dimmed());
+    } else if survived_count > 0 {
         println!("\n{}", "Survived Mutants".yellow());
         println!("{}", "─".repeat(60).dimmed());
 

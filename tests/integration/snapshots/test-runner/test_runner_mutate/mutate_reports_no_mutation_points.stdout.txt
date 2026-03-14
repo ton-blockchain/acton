@@ -1,0 +1,17 @@
+Mutation Testing
+────────────────────────────────────────────────────────────
+Contract: main
+Source:   contracts/main.tolk
+Files:    1
+Mutants:  0
+
+
+    Total mutants        0
+  ✓ Killed               0
+  ✗ Survived             0
+  ! Compile errors       0
+
+  ◆ Mutation Score       0.0%
+
+○ No mutation points found.
+

@@ -1,0 +1,140 @@
+import "@stdlib/gas-payments"
+import "@acton/build/build"
+import "@acton/emulation/network"
+import "@acton/testing/assert"
+import "@acton/testing/expect"
+import "@acton/types/message"
+import "@contracts/messages"
+import "@contracts/storage"
+
+struct JettonWalletContract {
+    address: address
+    stateInit: ContractState? = null
+}
+
+/// Creates a contract wrapper instance from the storage data
+fun JettonWalletContract.fromStorage(
+    storage: WalletStorage,
+    toShard: AddressShardingOptions? = null,
+) {
+    val stateInit = ContractState {
+        code: build("jetton_wallet"),
+        data: storage.toCell(),
+    };
+    val address = toShard == null
+        ? AutoDeployAddress { stateInit }.calculateAddress()
+        : AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    return JettonWalletContract { address, stateInit };
+}
+
+/// Creates a contract wrapper instance from the address
+fun JettonWalletContract.fromAddress(address: address) {
+    return JettonWalletContract { address };
+}
+
+/// Deploys the contract to the blockchain
+fun JettonWalletContract.deploy(self, from: address, config: SendParams = {}): SendResultList {
+    if (self.stateInit == null) {
+        Assert.fail("Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment");
+    }
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: { stateInit: self.stateInit },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonWalletContract.sendInternalTransferStep(
+    self,
+    from: address,
+    queryId: uint64,
+    jettonAmount: coins,
+    transferInitiator: address?,
+    sendExcessesTo: address?,
+    forwardTonAmount: coins,
+    forwardPayload: ForwardPayloadRemainder,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: InternalTransferStep {
+            queryId,
+            jettonAmount,
+            transferInitiator,
+            sendExcessesTo,
+            forwardTonAmount,
+            forwardPayload,
+        },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonWalletContract.sendAskToTransfer(
+    self,
+    from: address,
+    queryId: uint64,
+    jettonAmount: coins,
+    transferRecipient: address,
+    sendExcessesTo: address?,
+    customPayload: cell?,
+    forwardTonAmount: coins,
+    forwardPayload: ForwardPayloadRemainder,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: AskToTransfer {
+            queryId,
+            jettonAmount,
+            transferRecipient,
+            sendExcessesTo,
+            customPayload,
+            forwardTonAmount,
+            forwardPayload,
+        },
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonWalletContract.sendAskToBurn(
+    self,
+    from: address,
+    queryId: uint64,
+    jettonAmount: coins,
+    sendExcessesTo: address?,
+    customPayload: cell?,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body: AskToBurn { queryId, jettonAmount, sendExcessesTo, customPayload },
+    });
+    return net.send(from, genericMsg);
+}
+
+/// Send message to the contract with a custom body cell
+fun JettonWalletContract.sendAny(
+    self,
+    from: address,
+    body: cell,
+    config: SendParams = {},
+): SendResultList {
+    val genericMsg = createMessage({
+        bounce: config.bounce,
+        value: config.value,
+        dest: self.address,
+        body,
+    });
+    return net.send(from, genericMsg);
+}
+
+fun JettonWalletContract.getWalletData(self): JettonWalletDataReply {
+    return net.runGetMethod(self.address, "get_wallet_data");
+}

@@ -10,6 +10,8 @@ allow = [
   "ISC",
   "MIT",
   "Unicode-3.0",
+  "Zlib",
+  "MIT-0",
 ]
 confidence-threshold = 0.8
 exceptions = [

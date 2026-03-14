@@ -282,6 +282,16 @@ pub(crate) enum Request {
         offset: usize,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonWalletMeta>>>,
     },
+    GetNftItems {
+        address: Option<Addr>,
+        owner_address: Option<Addr>,
+        collection_address: Option<Addr>,
+        index: Option<String>,
+        sort_by_last_transaction_lt: bool,
+        limit: usize,
+        offset: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<storage::NftItemMeta>>>,
+    },
     SetAddressName {
         address: Addr,
         name: String,
@@ -694,6 +704,39 @@ impl LiteNode {
         rx.await?
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub async fn get_nft_items(
+        &self,
+        address: Option<String>,
+        owner_address: Option<String>,
+        collection_address: Option<String>,
+        index: Option<String>,
+        sort_by_last_transaction_lt: Option<bool>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
+        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let collection_address = collection_address
+            .map(|s| Self::parse_addr(&s))
+            .transpose()?;
+
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetNftItems {
+                address,
+                owner_address,
+                collection_address,
+                index,
+                sort_by_last_transaction_lt: sort_by_last_transaction_lt.unwrap_or(false),
+                limit: limit.unwrap_or(10),
+                offset: offset.unwrap_or(0),
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
         let address = Self::parse_addr(&address_str)?;
         let (resp, rx) = oneshot::channel();
@@ -949,6 +992,27 @@ fn process_loop_request(node: &mut Node, req: Request) {
                 owner_address,
                 jetton_address,
                 exclude_zero_balance,
+                limit,
+                offset,
+            );
+            let _ = resp.send(res);
+        }
+        Request::GetNftItems {
+            address,
+            owner_address,
+            collection_address,
+            index,
+            sort_by_last_transaction_lt,
+            limit,
+            offset,
+            resp,
+        } => {
+            let res = node.get_nft_items(
+                address,
+                owner_address,
+                collection_address,
+                index,
+                sort_by_last_transaction_lt,
                 limit,
                 offset,
             );

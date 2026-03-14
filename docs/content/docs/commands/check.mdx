@@ -15,13 +15,13 @@ acton check <path-to-file.tolk>
 
 ## Options
 
-| Option                           | Type   | Description                                                |
-|:---------------------------------|:-------|:-----------------------------------------------------------|
-| `--fix`                          | Flag   | Automatically apply available fixes (plain output only).   |
-| `--output-format <FORMAT>`       | String | Output format: `plain`, `json`, `sarif`, or `github`.      |
-| `--output-file <PATH>`           | String | Write non-plain output to file (not allowed with `plain`). |
-| `--enable-only <CODE[,CODE...]>` | String | Run only selected rule codes (for example `E001,S001`).    |
-| `--explain <CODE>`               | String | Explain a rule.                                            |
+| Option                           | Type   | Description                                                     |
+|:---------------------------------|:-------|:----------------------------------------------------------------|
+| `--fix`                          | Flag   | Automatically apply available fixes (plain output only).        |
+| `--output-format <FORMAT>`       | String | Output format: `plain`, `json`, `sarif`, `github`, or `gitlab`. |
+| `--output-file <PATH>`           | String | Write non-plain output to file (not allowed with `plain`).      |
+| `--enable-only <CODE[,CODE...]>` | String | Run only selected rule codes (for example `E001,S001`).         |
+| `--explain <CODE>`               | String | Explain a rule.                                                 |
 
 For setup and configuration, see [Linting](/docs/linting).
 For the full rules catalog, see [Linter Rules](/docs/linting/rules).
@@ -29,7 +29,7 @@ For the full rules catalog, see [Linter Rules](/docs/linting/rules).
 ## Behavior Notes
 
 - `--fix` applies edits only in `plain` output mode.
-- In non-plain output modes (`json`, `sarif`, `github`), diagnostics are reported without applying edits to source files.
+- In non-plain output modes (`json`, `sarif`, `github`, `gitlab`), diagnostics are reported without applying edits to source files.
 - `github` format emits GitHub Actions workflow annotations (`::warning ...` / `::error ...`), useful in CI logs.
 - Output format is resolved in this order: CLI `--output-format`, then `[lint].output-format` from `Acton.toml`, then default `plain`.
 - `--output-file` cannot be used with `plain` format.
@@ -60,4 +60,7 @@ acton check --output-format sarif --output-file .acton/reports/lint.sarif
 
 # Emit GitHub annotations to stdout (for GitHub Actions)
 acton check --output-format github
+
+# Emit GitLab Code Quality JSON
+acton check --output-format gitlab --output-file gl-code-quality-report.json
 ```

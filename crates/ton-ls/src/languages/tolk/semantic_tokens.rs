@@ -1,8 +1,10 @@
 use crate::backend::Backend;
 use crate::backend::utils::SpanExt;
+use crate::languages::semantic_tokens::{
+    SemanticTokensBuilder as CommonSemanticTokensBuilder, semantic_tokens_result_id,
+};
 use lsp_types::*;
 use std::sync::Arc;
-use std::time::SystemTime;
 use tolk_resolver::resolve_index::{FileResolveIndex, LocalDef, LocalDefKind, NameUse, Resolved};
 use tolk_resolver::{FileInfo, Span, Symbol, SymbolKind};
 use tower_lsp::jsonrpc::Result as LspResult;
@@ -50,76 +52,26 @@ pub enum TokenModifier {
 }
 
 pub struct SemanticTokensBuilder {
-    tokens: Vec<RawSemanticToken>,
+    inner: CommonSemanticTokensBuilder,
     file: Arc<FileInfo>,
-}
-
-struct RawSemanticToken {
-    line: u32,
-    start: u32,
-    length: u32,
-    token_type: u32,
-    token_modifiers: u32,
 }
 
 impl SemanticTokensBuilder {
     pub fn new(file: Arc<FileInfo>) -> Self {
         Self {
-            tokens: Vec::new(),
+            inner: CommonSemanticTokensBuilder::new(),
             file,
         }
     }
 
     pub fn add_token_at_span(&mut self, span: Span, token_type: TokenType, token_modifiers: u32) {
         let range = span.range(&self.file);
-        self.tokens.push(RawSemanticToken {
-            line: range.start.line,
-            start: range.start.character,
-            length: range.end.character - range.start.character,
-            token_type: token_type as u32,
-            token_modifiers,
-        });
+        self.inner
+            .add_token_at_range(range, token_type as u32, token_modifiers);
     }
 
-    pub fn build(mut self) -> Vec<SemanticToken> {
-        if self.tokens.is_empty() {
-            return Vec::new();
-        }
-
-        // Sort tokens as required by the LSP specification
-        self.tokens.sort_by(|a, b| {
-            if a.line != b.line {
-                a.line.cmp(&b.line)
-            } else {
-                a.start.cmp(&b.start)
-            }
-        });
-
-        let mut result = Vec::with_capacity(self.tokens.len());
-        let mut last_line = 0;
-        let mut last_start = 0;
-
-        for tok in self.tokens {
-            let delta_line = tok.line - last_line;
-            let delta_start = if delta_line == 0 {
-                tok.start - last_start
-            } else {
-                tok.start
-            };
-
-            result.push(SemanticToken {
-                delta_line,
-                delta_start,
-                length: tok.length,
-                token_type: tok.token_type,
-                token_modifiers_bitset: tok.token_modifiers,
-            });
-
-            last_line = tok.line;
-            last_start = tok.start;
-        }
-
-        result
+    pub fn build(self) -> Vec<SemanticToken> {
+        self.inner.build()
     }
 }
 
@@ -139,7 +91,7 @@ impl Backend {
 
         log::info!("Response: semantic_tokens_full took {:?}", now.elapsed());
         Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
-            result_id: Some(Self::result_id()),
+            result_id: Some(semantic_tokens_result_id()),
             data,
         })))
     }
@@ -292,14 +244,6 @@ impl Backend {
             | SymbolKind::GetMethod { .. } => TokenType::Function,
         };
         builder.add_token_at_span(symbol.name_span, token_type, 0);
-    }
-
-    fn result_id() -> String {
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
-            .to_string()
     }
 }
 

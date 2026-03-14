@@ -1,6 +1,5 @@
 use crate::ast::expressions::NullLit;
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::traits::HasTreeSitterKind;
 use crate::ast::{AstNode, InvalidNodeKindError, TryFromNode};
 use crate::{AstNodeBytesKind, impl_ast_node};
 use tree_sitter::Node;

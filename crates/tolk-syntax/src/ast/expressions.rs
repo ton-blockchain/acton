@@ -1,5 +1,5 @@
 use crate::ast::node::{AstChildren, RawNode};
-use crate::ast::traits::{HasName, HasTreeSitterKind};
+use crate::ast::traits::HasName;
 use crate::ast::types::{InstantiationTList, Type};
 use crate::ast::{AstNode, Block};
 use crate::ast::{InvalidNodeKindError, TryFromNode};
@@ -674,6 +674,8 @@ impl<'tree> LambdaParameter<'tree> {
 }
 
 impl<'tree> HasName<'tree> for LambdaParameter<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -817,6 +819,8 @@ impl<'tree> VarDecl<'tree> {
 }
 
 impl<'tree> HasName<'tree> for VarDecl<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -968,6 +972,8 @@ impl<'tree> InstanceArg<'tree> {
 }
 
 impl<'tree> HasName<'tree> for InstanceArg<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }

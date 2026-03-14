@@ -3,7 +3,8 @@ use num_bigint::{BigInt, ToBigInt};
 use reqwest::blocking::Response;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::time::Duration;
+use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, Instant};
 pub use ton_networks::{CustomNetworkUrls, Network};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
@@ -12,6 +13,9 @@ const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
 const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
 const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
+const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
+static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 pub struct TonApiClient {
     client: reqwest::blocking::Client,
@@ -84,7 +88,10 @@ impl TonApiClient {
         F: FnMut() -> reqwest::blocking::RequestBuilder,
     {
         for attempt in 0..HTTP_RETRY_ATTEMPTS {
-            return match build_request().send() {
+            self.maybe_wait_for_rate_limit();
+            let request = build_request();
+            log::info!("Send {:?}", request);
+            return match request.send() {
                 Ok(response) => {
                     if Self::should_retry_status(response.status())
                         && attempt + 1 < HTTP_RETRY_ATTEMPTS
@@ -106,6 +113,32 @@ impl TonApiClient {
         }
 
         unreachable!("retry loop must return on success or final failure");
+    }
+
+    fn maybe_wait_for_rate_limit(&self) {
+        if self.api_key.is_some() {
+            return;
+        }
+
+        if self.network == Network::Localnet {
+            // we don't have rate limit on localnet by default
+            return;
+        }
+
+        let mut last_request = TONCENTER_REQUEST_GATE
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        if let Some(last) = *last_request {
+            let elapsed = last.elapsed();
+            if elapsed < TONCENTER_MIN_REQUEST_INTERVAL {
+                let wait_for = TONCENTER_MIN_REQUEST_INTERVAL - elapsed;
+                log::debug!("throttle for {:?}", wait_for);
+                std::thread::sleep(TONCENTER_MIN_REQUEST_INTERVAL - elapsed);
+            }
+        }
+
+        *last_request = Some(Instant::now());
     }
 
     fn should_retry_status(status: reqwest::StatusCode) -> bool {

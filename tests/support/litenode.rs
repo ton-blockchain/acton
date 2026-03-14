@@ -149,6 +149,22 @@ impl LiteNodeHandle {
             .unwrap_or_else(|e| panic!("GET {} returned invalid JSON: {}\n{}", url, e, body))
     }
 
+    pub(crate) fn get_json_with_status(&self, path: &str) -> (u16, Value) {
+        let url = format!("{}{}", self.base_url(), normalize_path(path));
+        let response = self
+            .client
+            .get(&url)
+            .send()
+            .unwrap_or_else(|e| panic!("Failed GET {}: {}", url, e));
+        let status = response.status().as_u16();
+        let body = response
+            .text()
+            .unwrap_or_else(|e| panic!("Failed to read GET {} response body: {}", url, e));
+        let json = serde_json::from_str(&body)
+            .unwrap_or_else(|e| panic!("GET {} returned invalid JSON: {}\n{}", url, e, body));
+        (status, json)
+    }
+
     pub(crate) fn post_json(&self, path: &str, payload: &Value) -> Value {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self

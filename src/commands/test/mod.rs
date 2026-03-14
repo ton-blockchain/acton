@@ -425,8 +425,11 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let mut config = config.clone();
     resolve_test_output_paths_from_project_root(&mut config, project_root);
 
-    // First we need to build all contracts and generate all dependency files with code
-    build_cmd(None, config.clear_cache, None, None, None, None, false)?;
+    // First we need to build all contracts and generate all dependency files with code.
+    // Internal mutation child runs may skip this via environment variable.
+    if need_to_build() {
+        build_cmd(None, config.clear_cache, None, None, None, None, false)?;
+    }
     println!("     {} tests", "Running".green().bold());
 
     // If path is omitted, default to project root.
@@ -453,10 +456,18 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                 .to_string(),
         ]
     } else if metadata.is_dir() {
-        find_test_files_recursively(&path, &config.exclude_patterns, &config.include_patterns)?
-            .into_iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect()
+        let search_root = dunce::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
+        let project_root_abs =
+            dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
+        find_test_files_recursively(
+            &search_root,
+            &project_root_abs,
+            &config.exclude_patterns,
+            &config.include_patterns,
+        )?
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect()
     } else {
         anyhow::bail!("Path '{path}' is neither a file nor a directory");
     };
@@ -564,6 +575,9 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         match profiling::collect_profile(&runner) {
             Ok(()) => {}
             Err(err) => {
+                if config.fail_on_diff {
+                    return Err(err);
+                }
                 eprintln!(
                     "{}: Cannot collect profiling result: {}",
                     "Error".red(),
@@ -612,6 +626,14 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     Ok(())
 }
 
+fn need_to_build() -> bool {
+    let Ok(value) = std::env::var("ACTON_INTERNAL_SKIP_BUILD") else {
+        return true;
+    };
+
+    value.trim() != "1"
+}
+
 fn resolve_test_output_paths_from_project_root(config: &mut TestConfig, project_root: &Path) {
     config.save_test_trace = config
         .save_test_trace
@@ -649,7 +671,8 @@ fn build_overrides_for_mutations(config: &TestConfig) -> anyhow::Result<BTreeMap
 }
 
 pub fn find_test_files_recursively(
-    dir_path: &str,
+    dir_path: &Path,
+    project_root: &Path,
     exclude_patterns: &[String],
     include_patterns: &[String],
 ) -> anyhow::Result<Vec<PathBuf>> {
@@ -679,7 +702,7 @@ pub fn find_test_files_recursively(
         Some(include_builder.build()?)
     };
 
-    let root = Path::new(dir_path);
+    let root = dir_path;
 
     let it = WalkDir::new(root)
         .follow_links(false)
@@ -689,7 +712,7 @@ pub fn find_test_files_recursively(
                 return true;
             }
             let p = entry.path();
-            let rel = p.strip_prefix(root).unwrap_or(p);
+            let rel = p.strip_prefix(project_root).unwrap_or(p);
             !excludes.is_match(rel)
         });
 
@@ -707,7 +730,7 @@ pub fn find_test_files_recursively(
         if entry.file_type().is_file() {
             let path = entry.path();
 
-            let rel = path.strip_prefix(root).unwrap_or(path);
+            let rel = path.strip_prefix(project_root).unwrap_or(path);
 
             if let Some(name) = rel.file_name().and_then(|s| s.to_str()) {
                 if name.ends_with(".test.tolk.test.tolk") {

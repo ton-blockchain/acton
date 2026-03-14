@@ -1,5 +1,6 @@
 use super::GITHUB_SOURCE_BASE;
 use anyhow::Result;
+use path_absolutize::Absolutize;
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
@@ -221,7 +222,16 @@ fn write_doc_page(
                                 )
                             }
                         } else {
-                            eprintln!("Warning: Symbol '{name}' not found in documentation");
+                            let full_path = match doc.source_path.absolutize() {
+                                Ok(path) => path.to_path_buf(),
+                                Err(_) => doc.source_path.clone(),
+                            };
+
+                            eprintln!(
+                                "Warning: Symbol '{name}' in '{}:{}' not found in documentation",
+                                full_path.to_string_lossy(),
+                                symbol.start_line
+                            );
                             name.to_string()
                         }
                     });

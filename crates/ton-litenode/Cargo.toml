@@ -27,6 +27,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 axum = { workspace = true }
 tower-http = { workspace = true, features = ["cors", "trace"] }
+tower_governor = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }
 ton-indexer = { workspace = true }

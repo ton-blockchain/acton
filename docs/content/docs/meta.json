@@ -17,6 +17,7 @@
     "linting",
     "local-development-node",
     "acton-toml.mdx",
+    "ci-setup.mdx",
     "--- Advanced ---",
     "advanced/libraries",
     "--- Miscellaneous ---",

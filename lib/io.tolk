@@ -62,7 +62,7 @@ fun println<T>(value: T): void {
 /// - For non-int arguments, `{:x}` and `{:ton}` fall back to the same behavior as `{}`.
 /// - `{:ton}` uses floating-point conversion, so very large values can be rounded.
 fun println1<T>(fmt: string, value: T): void {
-    println(format1(fmt, value))
+    println(format1(fmt, value));
 }
 
 /// Prints the given slice string to the standard error output.

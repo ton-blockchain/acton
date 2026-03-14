@@ -144,6 +144,19 @@ pub struct JettonWalletMeta {
     pub owner_address: Addr,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NftItemMeta {
+    pub address: Addr,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+    pub collection_address: Option<Addr>,
+    pub owner_address: Option<Addr>,
+    pub content: serde_json::Value,
+    pub index: String,
+    pub init: bool,
+    pub last_transaction_lt: Lt,
+}
+
 pub struct LatestState {
     pub accounts: HashMap<Addr, AccountMeta>,
 }
@@ -279,6 +292,7 @@ pub struct History {
     pub address_names: HashMap<Addr, String>,
     pub jetton_masters: HashMap<Addr, JettonMasterMeta>,
     pub jetton_wallets: HashMap<Addr, JettonWalletMeta>,
+    pub nft_items: HashMap<Addr, NftItemMeta>,
 }
 
 impl Default for History {
@@ -301,6 +315,7 @@ impl History {
             address_names,
             jetton_masters: HashMap::new(),
             jetton_wallets: HashMap::new(),
+            nft_items: HashMap::new(),
         }
     }
 
@@ -317,6 +332,7 @@ impl History {
             address_names,
             jetton_masters: HashMap::new(),
             jetton_wallets: HashMap::new(),
+            nft_items: HashMap::new(),
         }
     }
 

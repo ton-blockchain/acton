@@ -66,12 +66,122 @@ fn test_wrapper_generation_without_test_stub() {
 }
 
 #[test]
+fn test_wrapper_generation_from_jetton_template_passes_fmt_check() {
+    let workspace = ProjectBuilder::new("wrapper_jetton_template")
+        .without_acton_toml()
+        .build();
+
+    let generated_project_name = "generated-jetton";
+    let generated_project_path = workspace.path().join(generated_project_name);
+    let generated_project_path_str = generated_project_path.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&generated_project_path_str)
+        .arg("--name")
+        .arg(generated_project_name)
+        .arg("--description")
+        .arg("Jetton wrapper generation fmt check")
+        .arg("--template")
+        .arg("jetton")
+        .arg("--license")
+        .arg("MIT")
+        .current_dir(workspace.path())
+        .run()
+        .success();
+
+    assert!(generated_project_path.join("Acton.toml").exists());
+
+    let tests_dir = generated_project_path.join("tests");
+    if tests_dir.exists() {
+        fs::remove_dir_all(&tests_dir).expect("Failed to remove template tests directory");
+    }
+    fs::create_dir_all(generated_project_path.join("tests/wrappers"))
+        .expect("Failed to recreate wrappers directory");
+
+    let minter_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg(&generated_project_path_str)
+        .wrapper("jetton_minter")
+        .generate_test_stub()
+        .current_dir(workspace.path())
+        .run()
+        .success();
+    minter_output.assert_contains("Generated");
+
+    let wallet_output = workspace
+        .acton()
+        .arg("--project-root")
+        .arg(&generated_project_path_str)
+        .wrapper("jetton_wallet")
+        .generate_test_stub()
+        .current_dir(workspace.path())
+        .run()
+        .success();
+    wallet_output.assert_contains("Generated");
+
+    assert!(
+        generated_project_path
+            .join("tests/wrappers/JettonMinterContract.tolk")
+            .exists()
+    );
+    assert!(
+        generated_project_path
+            .join("tests/wrappers/JettonWalletContract.tolk")
+            .exists()
+    );
+    assert!(
+        generated_project_path
+            .join("tests/jetton_minter.test.tolk")
+            .exists()
+    );
+    assert!(
+        generated_project_path
+            .join("tests/jetton_wallet.test.tolk")
+            .exists()
+    );
+
+    wallet_output
+        .assert_file_snapshot_matches(
+            generated_project_path
+                .join("tests/wrappers/JettonMinterContract.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_minter_wrapper.tolk.txt",
+        )
+        .assert_file_snapshot_matches(
+            generated_project_path
+                .join("tests/wrappers/JettonWalletContract.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_from_jetton_template_passes_fmt_check/jetton_wallet_wrapper.tolk.txt",
+        );
+
+    workspace
+        .acton()
+        .arg("--project-root")
+        .arg(&generated_project_path_str)
+        .fmt()
+        .arg("--check")
+        .current_dir(workspace.path())
+        .run()
+        .success();
+}
+
+#[test]
 fn test_wrapper_generation_with_types_and_storage_in_the_same_file() {
     let project = ProjectBuilder::new("wrapper_simple")
         .contract(
             "my_contract",
             r#"
                 import "types"
+
+                contract MyContract {
+                    storage: Storage
+                    incomingMessages: AllowedMessage
+                }
 
                 fun onInternalMessage(in: InMessage) {
                     val msg = lazy AllowedMessage.fromSlice(in.body);
@@ -105,7 +215,7 @@ fn test_wrapper_generation_with_types_and_storage_in_the_same_file() {
                 }
 
                 struct (0x00000002) Decrement {
-                    value: int
+                    value: int32
                 }
 
                 type AllowedMessage = Increment | Decrement;
@@ -148,6 +258,10 @@ fn test_wrapper_generation_with_several_storages() {
             r#"
                 import "storage"
 
+                contract MyContract {
+                    storage: FirstStorage
+                }
+
                 fun onInternalMessage(in: InMessage) {}
                 fun onBouncedMessage(_: InMessageBounced) {}
             "#,
@@ -184,12 +298,7 @@ fn test_wrapper_generation_with_several_storages() {
         )
         .build();
 
-    let output = project
-        .acton()
-        .wrapper("my_contract")
-        .storage_struct("FirstStorage")
-        .run()
-        .success();
+    let output = project.acton().wrapper("my_contract").run().success();
 
     output
         .assert_contains("Generated")
@@ -201,66 +310,6 @@ fn test_wrapper_generation_with_several_storages() {
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_several_storages/first_wrapper.tolk.txt",
         );
-
-    let output = project
-        .acton()
-        .wrapper("my_contract")
-        .storage_struct("SecondStorage")
-        .run()
-        .success();
-
-    output
-        .assert_contains("Generated")
-        .assert_file_snapshot_matches(
-            project
-                .path()
-                .join("tests/wrappers/MyContract.tolk")
-                .to_str()
-                .expect(""),
-            "integration/snapshots/wrapper/test_wrapper_generation_with_several_storages/second_wrapper.tolk.txt",
-        );
-}
-
-#[test]
-fn test_wrapper_generation_with_unknown_explicit_storage() {
-    let project = ProjectBuilder::new("wrapper_simple")
-        .contract(
-            "my_contract",
-            r#"
-                import "storage"
-
-                fun onInternalMessage(in: InMessage) {}
-                fun onBouncedMessage(_: InMessageBounced) {}
-            "#,
-        )
-        .file(
-            "contracts/storage",
-            r"
-                struct FirstStorage {
-                    id: uint32
-                    counter: uint32
-                }
-
-                fun FirstStorage.load() {
-                    return FirstStorage.fromCell(contract.getData());
-                }
-
-                fun FirstStorage.save(self) {
-                    contract.setData(self.toCell());
-                }
-            ",
-        )
-        .build();
-
-    project
-        .acton()
-        .wrapper("my_contract")
-        .storage_struct("SomeStorage")
-        .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/wrapper/test_wrapper_generation_with_unknown_explicit_storage/stderr.txt",
-        );
 }
 
 #[test]
@@ -271,6 +320,11 @@ fn test_wrapper_generation_with_typed_cell_field_in_storage() {
             r#"
                 import "storage"
                 import "types"
+
+                contract MyContract {
+                    storage: Storage
+                    incomingMessages: AllowedMessage
+                }
 
                 fun onInternalMessage(in: InMessage) {
                     val msg = lazy AllowedMessage.fromSlice(in.body);
@@ -308,7 +362,7 @@ fn test_wrapper_generation_with_typed_cell_field_in_storage() {
                 }
 
                 struct (0x00000002) Decrement {
-                    value: int
+                    value: int32
                 }
 
                 type AllowedMessage = Increment | Decrement;
@@ -351,6 +405,11 @@ fn test_wrapper_generation_with_typed_cell_field() {
                 import "storage"
                 import "types"
 
+                contract MyContract {
+                    storage: Storage
+                    incomingMessages: AllowedMessage
+                }
+
                 fun onInternalMessage(in: InMessage) {
                     val msg = lazy AllowedMessage.fromSlice(in.body);
 
@@ -387,7 +446,7 @@ fn test_wrapper_generation_with_typed_cell_field() {
                 }
 
                 struct (0x00000002) Decrement {
-                    value: int
+                    value: int32
                 }
 
                 type AllowedMessage = Increment | Decrement;
@@ -421,6 +480,11 @@ fn test_wrapper_generation_with_typed_cell_param() {
             r#"
                 import "storage"
                 import "types"
+
+                contract MyContract {
+                    storage: Storage
+                    incomingMessages: AllowedMessage
+                }
 
                 fun onInternalMessage(in: InMessage) {
                     val msg = lazy AllowedMessage.fromSlice(in.body);
@@ -460,7 +524,7 @@ fn test_wrapper_generation_with_typed_cell_param() {
                 }
 
                 struct (0x00000002) Decrement {
-                    value: int
+                    value: int32
                 }
 
                 type AllowedMessage = Increment | Decrement;
@@ -483,6 +547,42 @@ fn test_wrapper_generation_with_typed_cell_param() {
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_with_typed_cell_param/wrapper.tolk.txt",
+        );
+}
+
+#[test]
+fn test_wrapper_generation_with_snake_case_getters() {
+    let project = ProjectBuilder::new("wrapper_getters")
+        .contract(
+            "my_contract",
+            r#"
+                contract MyContract {}
+
+                fun onInternalMessage(_in: InMessage) {}
+
+                get fun is_allowed(): bool {
+                    return true;
+                }
+
+                get fun get_total_supply(owner_address: address): int {
+                    return 0;
+                }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/wrappers/MyContract.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_snake_case_getters/wrapper.tolk.txt",
         );
 }
 
@@ -560,6 +660,12 @@ fn test_with_several_files_contract() {
             r#"
                 import "storage"
                 import "types"
+                import "types_other"
+
+                contract MyContract {
+                    storage: Storage
+                    incomingMessages: AllowedMessage
+                }
 
                 fun onInternalMessage(in: InMessage) {
                     val msg = lazy AllowedMessage.fromSlice(in.body);
@@ -595,7 +701,7 @@ fn test_with_several_files_contract() {
                 import "types_other"
 
                 struct (0x00000001) Increment {
-                    value: int
+                    value: int32
                 }
 
                 type AllowedMessage = Increment | Decrement;
@@ -605,7 +711,7 @@ fn test_with_several_files_contract() {
             "contracts/types_other",
             r"
                 struct (0x00000002) Decrement {
-                    value: int
+                    value: int32
                 }
             ",
         )
@@ -645,7 +751,11 @@ fn test_wrapper_with_storage_in_contract() {
             "my_contract",
             r"
                 struct Storage {
-                    some: int
+                    some: int32
+                }
+
+                contract MyContract {
+                    storage: Storage
                 }
 
                 fun onInternalMessage(in: InMessage) {}
@@ -687,7 +797,11 @@ fn test_wrapper_with_message_in_contract() {
             "my_contract",
             r"
                 struct (0x00000001) Increment {
-                    value: int
+                    value: int32
+                }
+
+                contract MyContract {
+                    incomingMessages: Increment
                 }
 
                 fun onInternalMessage(in: InMessage) {}
@@ -720,6 +834,85 @@ fn test_wrapper_with_message_in_contract() {
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_with_message_in_contract/test.tolk.txt",
         );
+}
+
+#[test]
+fn test_generated_wrapper_test_runs_with_contract_local_types() {
+    let workspace = ProjectBuilder::new("wrapper_types_runtime")
+        .without_acton_toml()
+        .build();
+
+    let generated_project_name = "generated-counter";
+    let generated_project_path = workspace.path().join(generated_project_name);
+    let generated_project_path_str = generated_project_path.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&generated_project_path_str)
+        .arg("--name")
+        .arg(generated_project_name)
+        .arg("--description")
+        .arg("Wrapper runtime check")
+        .arg("--template")
+        .arg("counter")
+        .arg("--license")
+        .arg("MIT")
+        .current_dir(workspace.path())
+        .run()
+        .success();
+
+    let tests_dir = generated_project_path.join("tests");
+    if tests_dir.exists() {
+        fs::remove_dir_all(&tests_dir).expect("Failed to remove template tests directory");
+    }
+    fs::create_dir_all(generated_project_path.join("tests/wrappers"))
+        .expect("Failed to recreate wrappers directory");
+
+    fs::write(
+        generated_project_path.join("contracts/counter.tolk"),
+        r#"
+                struct Storage {
+                    counter: uint32
+                }
+
+                struct (0x00000001) Increment {
+                    value: int32
+                }
+
+                contract Counter {
+                    storage: Storage
+                    incomingMessages: Increment
+                }
+
+                fun onInternalMessage(_: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+    )
+    .expect("Failed to write contract");
+
+    workspace
+        .acton()
+        .arg("--project-root")
+        .arg(&generated_project_path_str)
+        .wrapper("counter")
+        .generate_test_stub()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .current_dir(workspace.path())
+        .run()
+        .success()
+        .assert_contains("Generated");
+
+    workspace
+        .acton()
+        .arg("--project-root")
+        .arg(&generated_project_path_str)
+        .test()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .current_dir(workspace.path())
+        .run()
+        .success()
+        .assert_passed(1);
 }
 
 #[test]
@@ -769,7 +962,7 @@ fn test_wrapper_generation_with_mappings() {
                 }
 
                 struct (0x00000002) Decrement {
-                    value: int
+                    value: int32
                 }
 
                 type AllowedMessage = Increment | Decrement;
@@ -781,6 +974,11 @@ fn test_wrapper_generation_with_mappings() {
             import "@core/types"
 
             struct Storage {}
+
+            contract Main {
+                storage: Storage
+                incomingMessages: AllowedMessage
+            }
 
             fun onInternalMessage(in: InMessage) {
                 val msg = lazy AllowedMessage.fromSlice(in.body);
@@ -842,6 +1040,11 @@ fn test_wrapper_generation_with_wrappers_mapping() {
             r#"
             import "types"
 
+            contract Main {
+                storage: Storage
+                incomingMessages: AllowedMessage
+            }
+
             fun onInternalMessage(in: InMessage) {
                 val msg = lazy AllowedMessage.fromSlice(in.body);
 
@@ -887,7 +1090,7 @@ fn test_wrapper_generation_prefers_specific_mapping() {
             "libs/core/types",
             r#"
                 struct (0x00000002) Pong {
-                    value: int
+                    value: int32
                 }
 
                 type AllowedMessage = Pong;
@@ -897,6 +1100,10 @@ fn test_wrapper_generation_prefers_specific_mapping() {
             "main",
             r#"
             import "@core_sub/types"
+
+            contract Main {
+                incomingMessages: AllowedMessage
+            }
 
             fun onInternalMessage(in: InMessage) {
                 val msg = lazy AllowedMessage.fromSlice(in.body);
@@ -958,6 +1165,11 @@ fn test_wrapper_generation_with_import_mappings() {
             r#"
                 import "@contracts/types"
 
+                contract MyContract {
+                    storage: Storage
+                    incomingMessages: AllowedMessage
+                }
+
                 fun onInternalMessage(in: InMessage) {
                     val msg = lazy AllowedMessage.fromSlice(in.body);
 
@@ -1002,6 +1214,10 @@ fn test_wrapper_generation_with_conflicting_field_names() {
             r#"
                 import "types"
 
+                contract MyContract {
+                    incomingMessages: AllowedMessage
+                }
+
                 fun onInternalMessage(in: InMessage) {
                     val msg = lazy AllowedMessage.fromSlice(in.body);
 
@@ -1017,7 +1233,7 @@ fn test_wrapper_generation_with_conflicting_field_names() {
             r"
                 struct (0x00000001) MessageWithConflicts {
                     from: address
-                    config: int
+                    config: int32
                     other: uint32
                 }
 

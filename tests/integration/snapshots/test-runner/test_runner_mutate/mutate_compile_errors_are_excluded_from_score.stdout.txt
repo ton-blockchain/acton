@@ -1,0 +1,37 @@
+Mutation Testing
+────────────────────────────────────────────────────────────
+Contract: main
+Source:   contracts/main.tolk
+Files:    1
+Mutants:  2
+
+  ◉ Mutation 1/2 contracts/main[LINE] Remove throw keyword COMPILE ERROR
+  ◉ Mutation 2/2 contracts/main[LINE] Replace + with - SURVIVED
+
+    Total mutants        2
+  ✓ Killed               0
+  ✗ Survived             1
+  ! Compile errors       1
+
+  ◆ Mutation Score       0.0%
+
+Survived Mutants
+────────────────────────────────────────────────────────────
+
+  ✗ Mutation #2
+  Rule:  Replace + with - [flip_plus]
+  Level: major
+  Group: arithmetic
+  at contracts/main[LINE]
+     5 │ 
+     6 │ get fun addOne(x: int): int {
+     7 │     return x + 1;
+       │              -
+     8 │ }
+     9 │ 
+
+  Why it's bad: This arithmetic operation is not fully covered by tests. Changing + to - did not cause any tests to fail.
+────────────────────────────────────────────────────────────
+These mutants were not caught by your tests!
+Consider adding more test cases to improve mutation coverage.
+

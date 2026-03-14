@@ -142,6 +142,42 @@ fn test_contract_declaration() {
 }
 
 #[test]
+fn test_empty_contract_declaration_with_comments() {
+    check(
+        "contract Contract {\n// storage: Storage\n// incomingMessages: AllowedMessages\n}",
+        expect![[r#"
+                contract Contract {
+                    // storage: Storage
+                    // incomingMessages: AllowedMessages
+                }"#]],
+    );
+}
+
+#[test]
+fn test_empty_struct_declaration_with_comments() {
+    check(
+        "struct Storage {\n// counter: int\n// owner: address\n}",
+        expect![[r#"
+                struct Storage {
+                    // counter: int
+                    // owner: address
+                }"#]],
+    );
+}
+
+#[test]
+fn test_empty_enum_declaration_with_comments() {
+    check(
+        "enum Mode {\n// User\n// Admin\n}",
+        expect![[r#"
+                enum Mode {
+                    // User
+                    // Admin
+                }"#]],
+    );
+}
+
+#[test]
 fn test_global_var() {
     check("global x: int;", expect!["global x: int"]);
 }
@@ -595,6 +631,17 @@ fn test_function_with_annotations() {
 }
 
 #[test]
+fn test_function_doc_comment_with_annotation() {
+    check(
+        "/// Returns value\n@pure\nfun foo() {}",
+        expect![[r#"
+                /// Returns value
+                @pure
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
 fn test_function_generics() {
     check(
         "fun identity<T>(x: T): T { return x; }",
@@ -725,6 +772,72 @@ fn test_annotation_empty_args() {
         expect![[r#"
                 @deprecated()
                 fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_annotation_empty_args_inline_comment() {
+    check(
+        "@foo() // comment\nfun main() {}",
+        expect![[r#"
+                @foo() // comment
+                fun main() {}"#]],
+    );
+}
+
+#[test]
+fn test_annotation_with_arguments_inline_comment() {
+    check(
+        "@deprecated(\"use bar instead\") // comment\nfun foo() {}",
+        expect![[r#"
+                @deprecated("use bar instead") // comment
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_multiple_annotations_with_inline_comments() {
+    check(
+        "@pure // first\n@test() // second\nfun foo() {}",
+        expect![[r#"
+                @pure // first
+                @test() // second
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_annotation_list_last_annotation_inline_comment() {
+    check(
+        "@pure\n@test() // trailing list\nfun foo() {}",
+        expect![[r#"
+                @pure
+                @test() // trailing list
+                fun foo() {}"#]],
+    );
+}
+
+#[test]
+fn test_method_annotation_inline_comment() {
+    check(
+        "@pure() // comment\nfun int.abs(): int { return self; }",
+        expect![[r#"
+                @pure() // comment
+                fun int.abs(): int {
+                    return self;
+                }"#]],
+    );
+}
+
+#[test]
+fn test_get_method_annotation_inline_comment() {
+    check(
+        "@pure() // comment\nget fun value(): int { return 42; }",
+        expect![[r#"
+                @pure() // comment
+                get fun value(): int {
+                    return 42;
+                }"#]],
     );
 }
 
@@ -884,6 +997,36 @@ fn test_asm_body() {
         expect![[r#"
                 fun add(a: int, b: int)
                     asm(a b -> 1) "ADD""#]],
+    );
+}
+
+#[test]
+fn test_multiline_string_asm_stays_after_keyword_when_single_literal() {
+    check(
+        "fun codeCell(): cell asm \"\"\"\n    \"te6ccgEBAQEAAgAAAA==\" base64>B B>boc PUSHREF\n\"\"\"",
+        expect![[r#"
+            fun codeCell(): cell asm """
+                "te6ccgEBAQEAAgAAAA==" base64>B B>boc PUSHREF
+            """"#]],
+    );
+}
+
+#[test]
+fn test_single_line_triple_quoted_asm_stays_after_keyword() {
+    check(
+        "fun codeCell(): cell asm \"\"\"PUSHNULL\"\"\"",
+        expect![[r#"
+            fun codeCell(): cell asm """PUSHNULL""""#]],
+    );
+}
+
+#[test]
+fn test_multiple_string_literals_after_asm_break_after_keyword() {
+    check(
+        "fun codeCell(): cell asm \"\"\"PUSHNULL\"\"\" \"DROP\"",
+        expect![[r#"
+            fun codeCell(): cell
+                asm """PUSHNULL""" "DROP""#]],
     );
 }
 
@@ -1079,20 +1222,20 @@ fn test_imports_sorted_by_group_depth_and_name() {
                 import "@stdlib/gas-payments"
                 fun foo() {}"#,
         expect![[r#"
-                import "@stdlib/gas-payments"
-                import "@stdlib/reflection"
-                import "@acton/io"
-                import "@acton/testing/expect"
-                import "@other/a"
-                import "@other/b"
-                import "../a"
-                import "../z"
-                import "./a"
-                import "./b"
-                import "local/mod"
-                import "./a/c"
+            import "@stdlib/gas-payments"
+            import "@stdlib/reflection"
+            import "@acton/io"
+            import "@acton/testing/expect"
+            import "@other/a"
+            import "@other/b"
+            import "local/mod"
+            import "./a"
+            import "./b"
+            import "./a/c"
+            import "../a"
+            import "../z"
 
-                fun foo() {}"#]],
+            fun foo() {}"#]],
     );
 }
 
@@ -1112,22 +1255,22 @@ fn test_import_sorting_preserves_attached_comments_and_group_separators() {
                 import "../a"
                 fun foo() {}"#,
         expect![[r#"
-                // for stdlib
-                import "@stdlib/reflection" // inline stdlib
+            // for stdlib
+            import "@stdlib/reflection" // inline stdlib
 
-                // for acton
-                import "@acton/testing/expect" // inline acton
+            // for acton
+            import "@acton/testing/expect" // inline acton
 
-                // for other
-                import "@contracts/types" // inline other
+            // for other
+            import "@contracts/types" // inline other
 
-                import "../a"
-                import "../z"
+            import "./a" // inline relative
+            import "./b"
 
-                import "./a" // inline relative
-                import "./b"
+            import "../a"
+            import "../z"
 
-                fun foo() {}"#]],
+            fun foo() {}"#]],
         true,
     );
 }
@@ -1221,7 +1364,7 @@ fn test_import_sorting_keeps_between_import_comment_with_next_import() {
 }
 
 #[test]
-fn test_plain_import_path_is_relative_current_group() {
+fn test_plain_import_path_is_separate_group_before_relative_imports() {
     check_with_import_group_separators(
         r#"
                 import "@contracts/types"
@@ -1230,14 +1373,15 @@ fn test_plain_import_path_is_relative_current_group() {
                 import "./bar"
                 fun foo() {}"#,
         expect![[r#"
-                import "@contracts/types"
+            import "@contracts/types"
 
-                import "../z"
+            import "foo"
 
-                import "foo"
-                import "./bar"
+            import "./bar"
 
-                fun foo() {}"#]],
+            import "../z"
+
+            fun foo() {}"#]],
         true,
     );
 }

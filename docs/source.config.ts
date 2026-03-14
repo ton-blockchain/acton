@@ -5,6 +5,7 @@ import tolkGrammarRaw from './grammars/grammar-tolk.json';
 import funcGrammarRaw from './grammars/grammar-func.json';
 import tasmGrammarRaw from './grammars/grammar-tasm.json';
 import tlbGrammarRaw from './grammars/grammar-tlb.json';
+import actonTraceGrammarRaw from './grammars/grammar-acton-trace.json';
 
 export const docs = defineDocs({
     dir: 'content/docs',
@@ -15,7 +16,6 @@ export const docs = defineDocs({
     },
 });
 
-// @ts-ignore
 const tolkGrammar: LanguageRegistration = {
     ...tolkGrammarRaw,
     name: 'tolk',
@@ -31,7 +31,12 @@ const tasmGrammar: LanguageRegistration = {
     name: 'tasm',
 };
 
-// @ts-ignore
+const actonTraceGrammar: LanguageRegistration = {
+    ...actonTraceGrammarRaw,
+    name: 'acton-trace',
+};
+
+// @ts-expect-error JSON grammar type is wider than LanguageRegistration
 const tlbGrammar: LanguageRegistration = {
     ...tlbGrammarRaw,
     name: 'tlb',
@@ -49,6 +54,7 @@ export default defineConfig({
                 tolkGrammar,
                 funcGrammar,
                 tasmGrammar,
+                actonTraceGrammar,
                 tlbGrammar,
             ],
         } as RehypeCodeOptions,

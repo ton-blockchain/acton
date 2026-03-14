@@ -17,13 +17,14 @@ This command will disassemble the bytecode from `contract.boc` and display the T
 
 ### Input Options
 
-| Option                      | Type      | Description                                                             |
-|-----------------------------|-----------|-------------------------------------------------------------------------|
-| `<BOC_FILE>`                | File path | Path to the binary BoC file containing the bytecode to disassemble      |
-| `-s, --string <STRING>`     | String    | Pass bytecode as a hex or base64 string instead of a file               |
-| `--address <ADDRESS>`       | String    | Contract address to fetch bytecode from blockchain (mainnet or testnet) |
-| `--api-key <API_KEY>`       | String    | TonCenter API key for blockchain queries                                |
-| `--source-map <SOURCE_MAP>` | File path | Path to source map file for displaying Tolk source code locations       |
+| Option                      | Type      | Description                                                                   |
+|-----------------------------|-----------|-------------------------------------------------------------------------------|
+| `<BOC_FILE>`                | File path | Path to the binary BoC file containing the bytecode to disassemble            |
+| `-s, --string <STRING>`     | String    | Pass bytecode as a hex or base64 string instead of a file                     |
+| `--address <ADDRESS>`       | String    | Contract address to fetch bytecode from blockchain                            |
+| `--net <NET>`               | String    | Network for `--address`: `mainnet`, `testnet`, `localnet`, or `custom:<name>` |
+| `--api-key <API_KEY>`       | String    | TonCenter API key for blockchain queries                                      |
+| `--source-map <SOURCE_MAP>` | File path | Path to source map file for displaying Tolk source code locations             |
 
 ### Output Options
 

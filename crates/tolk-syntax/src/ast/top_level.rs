@@ -64,6 +64,8 @@ impl<'tree> TopLevel<'tree> {
 }
 
 impl<'tree> HasName<'tree> for TopLevel<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         let name_node = self.syntax().child_by_field_name("name")?;
         Some(name_node.into())
@@ -276,6 +278,8 @@ impl<'tree> Contract<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Contract<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -305,6 +309,8 @@ impl<'tree> ContractField<'tree> {
 }
 
 impl<'tree> HasName<'tree> for ContractField<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -364,6 +370,8 @@ impl<'tree> Constant<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Constant<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -393,6 +401,8 @@ impl<'tree> GlobalVar<'tree> {
 }
 
 impl<'tree> HasName<'tree> for GlobalVar<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -422,6 +432,8 @@ impl<'tree> TypeAlias<'tree> {
 }
 
 impl<'tree> HasName<'tree> for TypeAlias<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -462,6 +474,8 @@ impl<'tree> Struct<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Struct<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -513,6 +527,8 @@ impl<'tree> StructField<'tree> {
 }
 
 impl<'tree> HasName<'tree> for StructField<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -596,6 +612,8 @@ impl<'tree> Enum<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Enum<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -636,6 +654,8 @@ impl<'tree> EnumMember<'tree> {
 }
 
 impl<'tree> HasName<'tree> for EnumMember<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -656,6 +676,8 @@ impl<'tree> Func<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Func<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -713,6 +735,8 @@ impl<'tree> Parameter<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Parameter<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -780,6 +804,8 @@ impl<'tree> Method<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Method<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -832,6 +858,8 @@ impl<'tree> GetMethod<'tree> {
 }
 
 impl<'tree> HasName<'tree> for GetMethod<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -907,6 +935,8 @@ impl<'tree> Annotation<'tree> {
 }
 
 impl<'tree> HasName<'tree> for Annotation<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -947,6 +977,8 @@ impl<'tree> TypeParameter<'tree> {
 }
 
 impl<'tree> HasName<'tree> for TypeParameter<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
     }
@@ -1031,6 +1063,8 @@ impl<'tree> BaseFunction<'tree> {
 }
 
 impl<'tree> HasName<'tree> for BaseFunction<'tree> {
+    type Name = Ident<'tree>;
+
     fn name(&self) -> Option<Ident<'tree>> {
         match self {
             BaseFunction::Function(f) => f.name(),
