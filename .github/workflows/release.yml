@@ -246,12 +246,21 @@ jobs:
       contents: read
 
     steps:
-      - name: Download release archives
+      - name: Download Acton release archives
         uses: actions/download-artifact@v8
         with:
           pattern: acton-*
           path: dist/
           merge-multiple: true
+
+      - name: Download TON objects release archives
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+        run: |
+          gh release download trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "ton-objs-*.tar.gz" \
+            --dir dist
 
       - name: Upload release archives
         env:
