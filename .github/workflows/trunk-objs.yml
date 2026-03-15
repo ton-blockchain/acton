@@ -10,18 +10,9 @@ concurrency:
 permissions: { }
 
 jobs:
-  build_objs:
-    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
-    strategy:
-      matrix:
-        include:
-          - runner: ubicloud-standard-4-ubuntu-2204
-            os: linux
-            arch: x86_64
-          - runner: ubicloud-standard-4-arm-ubuntu-2204
-            os: linux
-            arch: aarch64
-    runs-on: ${{ matrix.runner }}
+  prepare:
+    name: Resolve TON Commit
+    runs-on: ubuntu-latest
 
     permissions:
       contents: read
@@ -38,6 +29,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+  build_objs_linux:
+    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
+    needs: [ prepare ]
+    strategy:
+      matrix:
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            os: linux
+            arch: x86_64
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
+            os: linux
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+
+    steps:
       - name: Install LLVM and Clang
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -62,7 +71,7 @@ jobs:
         with:
           persist-credentials: false
           repository: i582/ton
-          ref: ${{ steps.ton-commit.outputs.commit }}
+          ref: ${{ needs.prepare.outputs.ton_commit }}
           fetch-depth: 1
           submodules: true
           path: ton-repo
@@ -90,7 +99,7 @@ jobs:
 
       - name: Generate TON artifacts lock file
         env:
-          TON_COMMIT: ${{ steps.ton-commit.outputs.commit }}
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
           libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
           libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
@@ -114,6 +123,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
+        if: github.ref == 'refs/heads/master'
         env:
           ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -124,6 +134,93 @@ jobs:
             ton-artifacts.lock
 
       - name: Upload TON objects artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+  build_objs_macos:
+    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
+    needs: [ prepare ]
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15-intel
+            os: macos
+            arch: x86_64
+          - runner: macos-15
+            os: macos
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone TON repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          repository: i582/ton
+          ref: ${{ needs.prepare.outputs.ton_commit }}
+          fetch-depth: 1
+          submodules: true
+          path: ton-repo
+
+      - name: Build TON static libraries
+        run: |
+          cd ton-repo
+          cp assembly/native/build-macos-static.sh .
+          chmod +x build-macos-static.sh
+          ./build-macos-static.sh -a
+
+      - name: Collect TON objects
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
+      - name: Generate TON artifacts lock file
+        env:
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        run: |
+          libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
+
+          jq -n \
+            --arg ton_commit "${TON_COMMIT}" \
+            --arg libemulator_sha256 "${libemulator_sha256}" \
+            --arg libtolk_sha256 "${libtolk_sha256}" \
+            '{
+              ton_commit: $ton_commit,
+              sha256_libemulator: $libemulator_sha256,
+              sha256_libtolk: $libtolk_sha256
+            }' > objs/ton-artifacts.lock
+
+      - name: Validate TON objects
+        run: |
+          ls -lh objs
+          test -f objs/libemulator.a
+          test -f objs/libtolk.a
+          test -f objs/ton-artifacts.lock
+          cat objs/ton-artifacts.lock
+
+      - name: Pack TON objects
+        if: github.ref == 'refs/heads/master'
+        env:
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        run: |
+          mkdir -p dist
+          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+            libemulator.a \
+            libtolk.a \
+            ton-artifacts.lock
+
+      - name: Upload TON objects artifact
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
@@ -133,8 +230,9 @@ jobs:
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ build_objs ]
+    needs: [ prepare, build_objs_linux, build_objs_macos ]
     runs-on: ubicloud-standard-2
+    if: github.ref == 'refs/heads/master'
 
     permissions:
       actions: write
@@ -190,7 +288,7 @@ jobs:
       - name: Create trunk-objs release
         env:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
-          TON_COMMIT: ${{ needs.build_objs.outputs.ton_commit }}
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
           release_notes="Generate from: https://github.com/i582/ton/commit/${TON_COMMIT}"
 
