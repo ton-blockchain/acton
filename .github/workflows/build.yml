@@ -162,6 +162,7 @@ jobs:
 
     permissions:
       actions: write
+      contents: write
 
     steps:
       - name: Download trunk archives
@@ -206,7 +207,7 @@ jobs:
 
       - name: Delete previous trunk release and tag
         env:
-          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete trunk --repo "${GITHUB_REPOSITORY}" -y || true
 
@@ -216,7 +217,7 @@ jobs:
 
       - name: Create trunk release
         env:
-          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           release_notes=$'Automated trunk build of Acton.\n\nBuilt from commit: '"${GITHUB_SHA}"
 
