@@ -10,7 +10,6 @@ rules:
         actions/labeler: ref-pin
         actions/setup-node: ref-pin
         actions/upload-artifact: ref-pin
-        actions/upload-release-asset: ref-pin
         i582/setup-acton: ref-pin
         zizmorcore/zizmor-action: ref-pin
   dangerous-triggers:
