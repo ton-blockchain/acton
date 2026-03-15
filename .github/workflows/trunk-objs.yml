@@ -29,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  build_objs_linux:
+  build-objs-linux:
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy:
@@ -47,7 +47,16 @@ jobs:
       contents: read
 
     steps:
+      - name: Restore TON objects archive cache
+        if: github.ref == 'refs/heads/master'
+        id: archive-cache
+        uses: actions/cache@v5
+        with:
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
+
       - name: Install LLVM and Clang
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -55,18 +64,21 @@ jobs:
           rm llvm.sh
 
       - name: Install system dependencies
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
           echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
 
       - name: Maximize Build Space
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
         with:
           tool-cache: false
           large-packages: false
 
       - name: Clone TON repository
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -77,6 +89,7 @@ jobs:
           path: ton-repo
 
       - name: Build TON static libraries
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         env:
           CC: clang-16
           CXX: clang++-16
@@ -89,15 +102,18 @@ jobs:
           ./build-ubuntu-static.sh -a -c
 
       - name: Show ccache stats
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: ccache -s
 
       - name: Collect TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p objs
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Generate TON artifacts lock file
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         env:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
@@ -115,6 +131,7 @@ jobs:
             }' > objs/ton-artifacts.lock
 
       - name: Validate TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
           ls -lh objs
           test -f objs/libemulator.a
@@ -123,7 +140,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
         env:
           ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -142,7 +159,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  build_objs_macos:
+  build-objs-macos:
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy:
@@ -160,7 +177,16 @@ jobs:
       contents: read
 
     steps:
+      - name: Restore TON objects archive cache
+        if: github.ref == 'refs/heads/master'
+        id: archive-cache
+        uses: actions/cache@v5
+        with:
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
+
       - name: Clone TON repository
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -171,6 +197,7 @@ jobs:
           path: ton-repo
 
       - name: Build TON static libraries
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
           cd ton-repo
           cp assembly/native/build-macos-static.sh .
@@ -178,17 +205,19 @@ jobs:
           ./build-macos-static.sh -a
 
       - name: Collect TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p objs
           cp ton-repo/artifacts/libemulator.a objs/
           cp ton-repo/artifacts/libtolk.a objs/
 
       - name: Generate TON artifacts lock file
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         env:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
-          libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
-          libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
+          libemulator_sha256=$(shasum -a 256 objs/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(shasum -a 256 objs/libtolk.a | awk '{ print $1 }')
 
           jq -n \
             --arg ton_commit "${TON_COMMIT}" \
@@ -201,6 +230,7 @@ jobs:
             }' > objs/ton-artifacts.lock
 
       - name: Validate TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
         run: |
           ls -lh objs
           test -f objs/libemulator.a
@@ -209,7 +239,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
         env:
           ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -230,7 +260,7 @@ jobs:
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, build_objs_linux, build_objs_macos ]
+    needs: [ prepare, build-objs-linux, build-objs-macos ]
     runs-on: ubicloud-standard-2
     if: github.ref == 'refs/heads/master'
 
