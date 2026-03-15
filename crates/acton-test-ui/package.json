@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "lint": "eslint --max-warnings 0 . --cache",
-    "lint:fix": "eslint --fix . --cache",
+    "lint": "eslint --max-warnings 0 .",
+    "lint:fix": "eslint --fix .",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "fmt": "prettier --write -l --cache .",
     "fmt:check": "prettier --check --cache .",
     "precommit": "bun fmt && bun lint && bun build"
@@ -19,6 +21,7 @@
   "type": "module",
   "packageManager": "bun@1.3.5",
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

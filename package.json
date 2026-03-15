@@ -14,6 +14,7 @@
     "fmt": "bun --filter '*' fmt",
     "fmt:check": "bun --filter '*' fmt:check",
     "build": "bun --filter '*' build",
+    "test:e2e:test-ui": "bun --filter acton-test-ui test:e2e",
     "dev:litenode": "bun --filter acton-litenode-ui dev",
     "dev:test": "bun --filter acton-test-ui dev"
   },

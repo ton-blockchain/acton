@@ -22,5 +22,5 @@
       "@/*": ["../acton-shared-ui/src/*"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts", "playwright.config.ts", "e2e/**/*.ts", "e2e/**/*.d.ts"]
 }

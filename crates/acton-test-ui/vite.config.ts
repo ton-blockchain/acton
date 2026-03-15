@@ -4,6 +4,17 @@ import react from "@vitejs/plugin-react"
 import {defineConfig, type PluginOption} from "vite"
 import {nodePolyfills} from "vite-plugin-node-polyfills"
 
+const apiProxyTarget = process.env.ACTON_TEST_UI_API_PROXY_TARGET
+const apiProxy =
+  apiProxyTarget === undefined
+    ? undefined
+    : {
+        "/api": {
+          target: apiProxyTarget,
+          changeOrigin: false,
+        },
+      }
+
 export default defineConfig({
   plugins: [
     react() as PluginOption,
@@ -26,5 +37,10 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    proxy: apiProxy,
+  },
+  preview: {
+    port: 4173,
+    proxy: apiProxy,
   },
 })
