@@ -20,7 +20,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.0.13"
+version = "0.0.14"
 authors = ["TON Core"]
 edition = "2024"
 rust-version = "1.93.0"
