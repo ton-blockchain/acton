@@ -143,6 +143,7 @@ jobs:
           ./target/release-size/acton --help
 
       - name: Prepare Linux archive
+        if: github.event_name == 'release'
         env:
           ARCHIVE_NAME: acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -150,6 +151,7 @@ jobs:
           tar -czf "dist/${ARCHIVE_NAME}" -C target/release-size acton
 
       - name: Upload Linux archive as artifact
+        if: github.event_name == 'release'
         uses: actions/upload-artifact@v7
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
