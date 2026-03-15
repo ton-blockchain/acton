@@ -5,6 +5,7 @@ import tolkGrammarRaw from './grammars/grammar-tolk.json';
 import funcGrammarRaw from './grammars/grammar-func.json';
 import tasmGrammarRaw from './grammars/grammar-tasm.json';
 import tlbGrammarRaw from './grammars/grammar-tlb.json';
+import actonCliGrammarRaw from './grammars/grammar-acton-cli.json';
 import actonTraceGrammarRaw from './grammars/grammar-acton-trace.json';
 
 export const docs = defineDocs({
@@ -36,6 +37,11 @@ const actonTraceGrammar: LanguageRegistration = {
     name: 'acton-trace',
 };
 
+const actonCliGrammar: LanguageRegistration = {
+    ...actonCliGrammarRaw,
+    name: 'acton-cli',
+};
+
 // @ts-expect-error JSON grammar type is wider than LanguageRegistration
 const tlbGrammar: LanguageRegistration = {
     ...tlbGrammarRaw,
@@ -54,6 +60,7 @@ export default defineConfig({
                 tolkGrammar,
                 funcGrammar,
                 tasmGrammar,
+                actonCliGrammar,
                 actonTraceGrammar,
                 tlbGrammar,
             ],
