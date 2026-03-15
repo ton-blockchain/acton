@@ -140,9 +140,97 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  build_objs_macos:
+    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
+    needs: [ prepare ]
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15-intel
+            os: macos
+            arch: x86_64
+          - runner: macos-15
+            os: macos
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+
+    steps:
+#      - name: Install macOS dependencies
+#        run: |
+#          brew install libsodium libmicrohttpd pkg-config
+
+      - name: Clone TON repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          repository: i582/ton
+          ref: ${{ needs.prepare.outputs.ton_commit }}
+          fetch-depth: 1
+          submodules: true
+          path: ton-repo
+
+      - name: Build TON static libraries
+        run: |
+          cd ton-repo
+          cp assembly/native/build-macos-static.sh .
+          chmod +x build-macos-static.sh
+          ./build-macos-static.sh -a
+
+      - name: Collect TON objects
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
+      - name: Generate TON artifacts lock file
+        env:
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        run: |
+          libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
+
+          jq -n \
+            --arg ton_commit "${TON_COMMIT}" \
+            --arg libemulator_sha256 "${libemulator_sha256}" \
+            --arg libtolk_sha256 "${libtolk_sha256}" \
+            '{
+              ton_commit: $ton_commit,
+              sha256_libemulator: $libemulator_sha256,
+              sha256_libtolk: $libtolk_sha256
+            }' > objs/ton-artifacts.lock
+
+      - name: Validate TON objects
+        run: |
+          ls -lh objs
+          test -f objs/libemulator.a
+          test -f objs/libtolk.a
+          test -f objs/ton-artifacts.lock
+          cat objs/ton-artifacts.lock
+
+      - name: Pack TON objects
+        env:
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        run: |
+          mkdir -p dist
+          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+            libemulator.a \
+            libtolk.a \
+            ton-artifacts.lock
+
+      - name: Upload TON objects artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, build_objs_linux ]
+    needs: [ prepare, build_objs_linux, build_objs_macos ]
     runs-on: ubicloud-standard-2
 
     permissions:
