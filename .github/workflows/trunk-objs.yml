@@ -29,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  build_objs:
+  build_objs_linux:
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy:
@@ -142,7 +142,7 @@ jobs:
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, build_objs ]
+    needs: [ prepare, build_objs_linux ]
     runs-on: ubicloud-standard-2
 
     permissions:
