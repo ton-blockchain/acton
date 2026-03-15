@@ -158,10 +158,6 @@ jobs:
       contents: read
 
     steps:
-#      - name: Install macOS dependencies
-#        run: |
-#          brew install libsodium libmicrohttpd pkg-config
-
       - name: Clone TON repository
         uses: actions/checkout@v6
         with:
