@@ -266,6 +266,7 @@ jobs:
 
     permissions:
       actions: write
+      contents: write
 
     steps:
       - name: Download TON objects artifacts
@@ -307,7 +308,7 @@ jobs:
 
       - name: Delete previous trunk-objs release and tag
         env:
-          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete trunk-objs --repo "${GITHUB_REPOSITORY}" -y || true
 
@@ -317,7 +318,7 @@ jobs:
 
       - name: Create trunk-objs release
         env:
-          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
           release_notes="Generate from: https://github.com/i582/ton/commit/${TON_COMMIT}"
