@@ -32,7 +32,7 @@ license = "MIT"
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
-arton-objs = { path = "crates/arton-objs" }
+ton-objs = { path = "crates/ton-objs" }
 tolkc = { path = "crates/tolkc" }
 ton-abi = { path = "crates/ton-abi" }
 ton-emulator = { path = "crates/ton-emulator" }

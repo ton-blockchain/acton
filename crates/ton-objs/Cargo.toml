@@ -1,5 +1,5 @@
 [package]
-name = "arton-objs"
+name = "ton-objs"
 description = "Linking crate for TON static archives in objs/"
 version = { workspace = true }
 publish = false
@@ -10,7 +10,7 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
-links = "arton-objs"
+links = "ton-objs"
 
 [features]
 default = []
