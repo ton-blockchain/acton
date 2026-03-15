@@ -29,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  build_objs_linux:
+  build-objs-linux:
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy:
@@ -159,7 +159,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  build_objs_macos:
+  build-objs-macos:
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy:
@@ -260,7 +260,7 @@ jobs:
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, build_objs_linux, build_objs_macos ]
+    needs: [ prepare, build-objs-linux, build-objs-macos ]
     runs-on: ubicloud-standard-2
     if: github.ref == 'refs/heads/master'
 
