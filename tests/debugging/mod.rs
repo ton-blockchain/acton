@@ -22,6 +22,10 @@ use std::time::{Duration, UNIX_EPOCH};
 use std::{fs, thread};
 use tasm::printer::FormatOptions;
 use tolkc::CompilerResult;
+use ton::block_tlb::StateInit;
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_core::types::TonAddress;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{AccountsState, LocalAccountsState, WorldState};
@@ -29,9 +33,6 @@ use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use ton_source_map::SourceMap;
-use tonlib_core::TonAddress;
-use tonlib_core::cell::{ArcCell, CellBuilder};
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -162,8 +163,8 @@ pub(crate) fn run_script_file(
 
     match compiler.compile(Path::new(file_path), true) {
         CompilerResult::Success(result) => {
-            let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
-            let data_cell = ArcCell::default();
+            let code_cell = TonCell::from_boc_base64(&result.code_boc64)?;
+            let data_cell = TonCell::empty().clone();
 
             fs::write(
                 "out.source_map.json",
@@ -181,7 +182,7 @@ pub(crate) fn run_script_file(
                 }),
             )?;
             fs::write("out.disasm.fif", result.fift_code)?;
-            fs::write("out.boc", code_cell.to_boc(false)?)?;
+            fs::write("out.boc", code_cell.to_boc()?)?;
 
             let source_map = result.source_map.unwrap_or_default();
             let (script_result, io, formatter) = execute_script(
@@ -202,8 +203,8 @@ pub(crate) fn run_script_file(
 }
 
 fn execute_script<'a>(
-    code_cell: &'a ArcCell,
-    data_cell: &'a ArcCell,
+    code_cell: &'a TonCell,
+    data_cell: &'a TonCell,
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
     debug_port: u16,
@@ -216,8 +217,8 @@ fn execute_script<'a>(
     let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
     let params = RunGetMethodArgs {
-        code: code_cell.to_boc_b64(false)?,
-        data: data_cell.to_boc_b64(false)?,
+        code: code_cell.to_boc_base64()?,
+        data: data_cell.to_boc_base64()?,
         verbosity,
         libs: String::new(),
         address: dest_address.to_string(),
@@ -354,15 +355,8 @@ fn get_script_result(
     }
 }
 
-fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
-    let state_init = CellBuilder::new()
-        .store_bit(false)?
-        .store_bit(false)?
-        .store_ref_cell_optional(Some(code))?
-        .store_ref_cell_optional(Some(&ArcCell::default()))?
-        .store_bit(false)?
-        .build()?;
-
-    let dest_address = TonAddress::new(0, state_init.cell_hash());
-    Ok(dest_address)
+fn contract_address(code: &TonCell) -> anyhow::Result<TonAddress> {
+    StateInit::new(code.clone(), TonCell::empty().clone())
+        .derive_address(0)
+        .map_err(Into::into)
 }

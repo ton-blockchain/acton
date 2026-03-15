@@ -3,6 +3,7 @@ use crate::wallets::new_mnemonic;
 use ed25519_dalek::{Signer, SigningKey};
 use num_bigint::{BigInt, Sign};
 use rand::RngCore;
+use ton::ton_wallet::Mnemonic;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvmffi::stack::{Tuple, TupleItem};
@@ -55,7 +56,7 @@ fn mnemonic_to_key_pair_impl(
 ) -> anyhow::Result<()> {
     let words = words.iter().map(String::as_str).collect();
 
-    let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::new(words, &None)?;
+    let mnemonic = Mnemonic::new(words, None)?;
     let key_pair = mnemonic.to_key_pair()?;
 
     // Return KeyPair { privateKey: bytes32, publicKey: bytes32 }

@@ -9,12 +9,10 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
-use tonlib_core::cell::Cell;
-use tonlib_core::tlb_types::tlb::TLB;
-use tonlib_core::wallet::mnemonic::Mnemonic;
-use tonlib_core::wallet::ton_wallet::TonWallet;
-use tonlib_core::wallet::wallet_version::WalletVersion;
 
 #[allow(dead_code)]
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
@@ -37,7 +35,7 @@ struct CapturedToncenterRequest {
 }
 
 fn wallet_sign_fixture() -> (String, String, String) {
-    let mnemonic = Mnemonic::from_str(TEST_MNEMONIC, &None).expect("invalid test mnemonic");
+    let mnemonic = Mnemonic::from_str(TEST_MNEMONIC, None).expect("invalid test mnemonic");
     let key_pair = mnemonic.to_key_pair().expect("mnemonic to keypair failed");
     let version = WalletVersion::V5R1;
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
@@ -45,20 +43,18 @@ fn wallet_sign_fixture() -> (String, String, String) {
         .expect("failed to build test wallet");
 
     let body = wallet
-        .create_external_body(1_700_000_000, 7, Vec::<tonlib_core::cell::ArcCell>::new())
+        .create_ext_in_body(1_700_000_000, 7, Vec::<TonCell>::new())
         .expect("failed to build external body");
-    let body_hex = body
-        .to_boc_hex(false)
-        .expect("failed to encode body hex boc");
+    let body_hex = body.to_boc_hex().expect("failed to encode body hex boc");
     let body_base64 = body
-        .to_boc_b64(false)
+        .to_boc_base64()
         .expect("failed to encode body base64 boc");
 
     let signed = wallet
-        .sign_external_body(&body)
+        .sign_ext_in_body(&body)
         .expect("failed to sign external body");
     let signed_hex = signed
-        .to_boc_hex(false)
+        .to_boc_hex()
         .expect("failed to encode signed body hex boc");
 
     (body_hex, body_base64, signed_hex)
@@ -1058,7 +1054,7 @@ fn test_wallet_sign_outputs_signed_body_boc_hex() {
 
     let signed_hex = output.get_stdout().trim().to_owned();
     assert_eq!(signed_hex, signed_hex_expected);
-    assert!(Cell::from_boc_hex(&signed_hex).is_ok());
+    assert!(TonCell::from_boc_hex(&signed_hex).is_ok());
 }
 
 #[test]
@@ -1139,7 +1135,7 @@ fn test_wallet_sign_json_reports_detected_format() {
     assert_eq!(json["signed_body"], signed_hex_expected);
 
     let signed_hex = json["signed_body"].as_str().unwrap();
-    assert!(Cell::from_boc_hex(signed_hex).is_ok());
+    assert!(TonCell::from_boc_hex(signed_hex).is_ok());
 }
 
 #[test]

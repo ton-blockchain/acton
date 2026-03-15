@@ -21,6 +21,8 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -30,8 +32,6 @@ use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
 use ton_executor::message::{EmulationResult, RunTransactionArgs};
-use tonlib_core::cell::ArcCell as TonArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -42,10 +42,6 @@ use tycho_types::models::{
     LibDescr, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
-
-fn tycho_to_ton_cell(cell: &Cell) -> anyhow::Result<TonArcCell> {
-    TonArcCell::from_boc(&Boc::encode(cell)).map_err(Into::into)
-}
 
 extension!(build in (Context) with (path: String, name: String) using build_impl);
 fn build_impl(
@@ -432,13 +428,13 @@ fn send_wallet_message(
     let client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
 
     let (seqno, need_state_init) = wallet.seqno(&client)?;
-    let message_ton = tycho_to_ton_cell(message)?;
+    let message_ton = TonCell::from_boc(Boc::encode(message))?;
     let external =
         wallet
             .wallet
-            .create_external_msg(expire_at, seqno, need_state_init, vec![message_ton])?;
+            .create_ext_in_msg(vec![message_ton], seqno, expire_at, need_state_init)?;
 
-    client.send_boc(&external.to_boc_b64(false)?)?;
+    client.send_boc(&external.to_boc_base64()?)?;
 
     Ok(())
 }

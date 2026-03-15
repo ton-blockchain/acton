@@ -8,6 +8,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use ton::ton_wallet::TonWallet;
 use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -15,7 +16,6 @@ use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use ton_source_map::{SourceLocation, SourceMap};
-use tonlib_core::wallet::ton_wallet::TonWallet;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
@@ -376,7 +376,7 @@ pub struct Wallet {
 
 impl Wallet {
     pub fn seqno(&self, client: &TonApiClient) -> anyhow::Result<(u32, bool)> {
-        client.get_wallet_seqno(&self.wallet.address.to_base64_url())
+        client.get_wallet_seqno(&self.wallet.address.to_base64(true, true, true))
     }
 
     #[must_use]
@@ -384,8 +384,8 @@ impl Wallet {
         StdAddr {
             anycast: None,
             address: HashBytes(
-                <[u8; 32]>::try_from(self.wallet.address.hash_part.as_slice())
-                    .expect("TonAddress hash part must be exactly 32 bytes"),
+                <[u8; 32]>::try_from(self.wallet.address.hash.as_slice())
+                    .expect("TonAddress hash must be exactly 32 bytes"),
             ),
             workchain: self.wallet.address.workchain as i8,
         }

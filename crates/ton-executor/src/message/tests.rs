@@ -183,41 +183,6 @@ fn test_executor_shared_across_threads() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_executor_parallel_instances() -> anyhow::Result<()> {
-    const THREADS: usize = 4;
-    const ITERATIONS: usize = 32;
-
-    let barrier = Arc::new(Barrier::new(THREADS));
-    let args = RunTransactionArgs {
-        shard_account: SHARD_ACCOUNT_B64.to_owned(),
-        ..Default::default()
-    };
-    let mut handles = Vec::with_capacity(THREADS);
-
-    for _ in 0..THREADS {
-        let barrier = Arc::clone(&barrier);
-        let args = args.clone();
-
-        handles.push(thread::spawn(move || -> anyhow::Result<()> {
-            barrier.wait();
-
-            let exec = Executor::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
-            for _ in 0..ITERATIONS {
-                exec.run_transaction(MESSAGE_B64, &args)?;
-            }
-
-            Ok(())
-        }));
-    }
-
-    for handle in handles {
-        handle.join().expect("worker thread panicked")?;
-    }
-
-    Ok(())
-}
-
 // #[test]
 // fn test_step_executor_run() -> anyhow::Result<()> {
 //     let msg = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";

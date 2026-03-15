@@ -7,12 +7,12 @@ use retrace::Network;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
 use ton_litenode::node::StateSource;
 use ton_litenode::remote::RemoteProvider;
 use ton_litenode::storage::AccountStatus;
 use ton_litenode::{LiteNode, ServerArgs, run_server};
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellSliceParts};
 use tycho_types::models::{
@@ -173,11 +173,11 @@ fn build_wallet_deploy_message(wallet: &Wallet) -> anyhow::Result<String> {
     };
 
     let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = ArcCell::from_boc(&message_cell_boc)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
     let external = wallet
         .wallet
-        .create_external_msg(expire_at, 0, true, vec![message_cell])?;
-    Ok(external.to_boc_b64(false)?)
+        .create_ext_in_msg(vec![message_cell], 0, expire_at, true)?;
+    Ok(external.to_boc_base64()?)
 }
 
 fn format_std_address(address: &StdAddr, network: &Network) -> String {

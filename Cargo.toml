@@ -71,7 +71,7 @@ tree-sitter-toml-ng = "0.7.0"
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
 # base TON libraries
-tonlib-core = "0.26.6"
+ton = "0.1.1"
 tycho-types = { version = "0.3.0", features = ["bigint"] }
 
 num-bigint = "0.4.6"
@@ -207,7 +207,7 @@ ton-litenode = { workspace = true }
 
 # remote crates
 # base TON libraries
-tonlib-core = { workspace = true }
+ton = { workspace = true }
 tycho-types = { workspace = true }
 
 num-bigint = { workspace = true }

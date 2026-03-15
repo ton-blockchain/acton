@@ -19,13 +19,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use toml_edit::{DocumentMut, Item, Table, value};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_core::types::TonAddress;
+use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::{CustomNetworkUrls, Network, TonApiClient};
-use tonlib_core::TonAddress;
-use tonlib_core::cell::Cell;
-use tonlib_core::tlb_types::tlb::TLB;
-use tonlib_core::wallet::mnemonic::Mnemonic;
-use tonlib_core::wallet::ton_wallet::TonWallet;
-use tonlib_core::wallet::wallet_version::WalletVersion;
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
 #[clap(rename_all = "lowercase")]
@@ -104,11 +102,11 @@ impl From<WalletVersionArg> for WalletVersion {
             WalletVersionArg::V4R1 => WalletVersion::V4R1,
             WalletVersionArg::V4R2 => WalletVersion::V4R2,
             WalletVersionArg::V5R1 => WalletVersion::V5R1,
-            WalletVersionArg::HighloadV1R1 => WalletVersion::HighloadV1R1,
-            WalletVersionArg::HighloadV1R2 => WalletVersion::HighloadV1R2,
-            WalletVersionArg::HighloadV2 => WalletVersion::HighloadV2,
-            WalletVersionArg::HighloadV2R1 => WalletVersion::HighloadV2R1,
-            WalletVersionArg::HighloadV2R2 => WalletVersion::HighloadV2R2,
+            WalletVersionArg::HighloadV1R1 => WalletVersion::HLV1R1,
+            WalletVersionArg::HighloadV1R2 => WalletVersion::HLV1R2,
+            WalletVersionArg::HighloadV2 => WalletVersion::HLV2,
+            WalletVersionArg::HighloadV2R1 => WalletVersion::HLV2R1,
+            WalletVersionArg::HighloadV2R2 => WalletVersion::HLV2R2,
         }
     }
 }
@@ -600,7 +598,7 @@ fn sign_wallet_external_body(
     let (external_body, input) = decode_sign_input(&body)?;
 
     let mnemonic_str = wallets::load_mnemonic(wallet)?;
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
+    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let key_pair = mnemonic.to_key_pair()?;
     let version = parse_wallet_version(&wallet.kind)?;
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
@@ -608,10 +606,10 @@ fn sign_wallet_external_body(
         TonWallet::new_with_params(version, key_pair, wallet.workchain.unwrap_or(0), wallet_id)?;
 
     let signed_body = ton_wallet
-        .sign_external_body(&external_body)
+        .sign_ext_in_body(&external_body)
         .context("Failed to sign external body")?;
     let signed_body_hex = signed_body
-        .to_boc_hex(false)
+        .to_boc_hex()
         .context("Failed to encode signed body to hex BoC")?;
 
     if json {
@@ -642,19 +640,19 @@ fn read_sign_body(body: Option<String>) -> anyhow::Result<String> {
         .context("Failed to read body")
 }
 
-fn decode_sign_input(body: &str) -> anyhow::Result<(Cell, SignMessageFormat)> {
+fn decode_sign_input(body: &str) -> anyhow::Result<(TonCell, SignMessageFormat)> {
     let body = body.trim();
     if body.is_empty() {
         anyhow::bail!("Body cannot be empty");
     }
 
     if is_hex_payload(body)
-        && let Ok(cell) = Cell::from_boc_hex(body)
+        && let Ok(cell) = TonCell::from_boc_hex(body)
     {
         return Ok((cell, SignMessageFormat::Hex));
     }
 
-    if let Ok(cell) = Cell::from_boc_b64(body) {
+    if let Ok(cell) = TonCell::from_boc_base64(body) {
         return Ok((cell, SignMessageFormat::Base64));
     }
 
@@ -663,6 +661,10 @@ fn decode_sign_input(body: &str) -> anyhow::Result<(Cell, SignMessageFormat)> {
 
 fn is_hex_payload(value: &str) -> bool {
     value.len().is_multiple_of(2) && value.as_bytes().iter().all(u8::is_ascii_hexdigit)
+}
+
+fn format_testnet_wallet_address(address: &TonAddress) -> String {
+    address.to_base64(false, true, true)
 }
 
 fn remove_wallet(name: Option<String>, yes: bool, json: bool) -> anyhow::Result<()> {
@@ -872,7 +874,7 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
                         && let Ok(b_int) = b.parse::<i128>()
                         && let Ok(address) = TonAddress::from_str(&state.address)
                     {
-                        balances.insert(address.to_base64_url_flags(false, true), b_int);
+                        balances.insert(format_testnet_wallet_address(&address), b_int);
                     }
                 }
             }
@@ -939,12 +941,12 @@ fn get_wallet_address(wallet: &config::WalletConfig) -> anyhow::Result<String> {
         && let Some(addr) = &expected.address_testnet
     {
         let addr = TonAddress::from_str(addr)?;
-        return Ok(addr.to_base64_url_flags(false, true));
+        return Ok(format_testnet_wallet_address(&addr));
     }
 
     let mnemonic_str = wallets::load_mnemonic(wallet)?;
 
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
+    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let version = parse_wallet_version(&wallet.kind)?;
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let ton_wallet = TonWallet::new_with_params(
@@ -953,7 +955,7 @@ fn get_wallet_address(wallet: &config::WalletConfig) -> anyhow::Result<String> {
         wallet.workchain.unwrap_or(0),
         wallet_id,
     )?;
-    Ok(ton_wallet.address.to_base64_url_flags(false, true))
+    Ok(format_testnet_wallet_address(&ton_wallet.address))
 }
 
 fn remove_wallet_from_config_file(config_path: &Path, name: &str) -> anyhow::Result<bool> {
@@ -1000,11 +1002,11 @@ fn wallet_version_to_string(v: &WalletVersion) -> String {
         WalletVersion::V4R1 => "v4r1",
         WalletVersion::V4R2 => "v4r2",
         WalletVersion::V5R1 => "v5r1",
-        WalletVersion::HighloadV1R1 => "highloadv1r1",
-        WalletVersion::HighloadV1R2 => "highloadv1r2",
-        WalletVersion::HighloadV2 => "highloadv2",
-        WalletVersion::HighloadV2R1 => "highloadv2r1",
-        WalletVersion::HighloadV2R2 => "highloadv2r2",
+        WalletVersion::HLV1R1 => "highloadv1r1",
+        WalletVersion::HLV1R2 => "highloadv1r2",
+        WalletVersion::HLV2 => "highloadv2",
+        WalletVersion::HLV2R1 => "highloadv2r1",
+        WalletVersion::HLV2R2 => "highloadv2r2",
     }
     .to_string()
 }
@@ -1137,11 +1139,11 @@ fn get_or_prompt_version(version: Option<WalletVersionArg>) -> anyhow::Result<Wa
             WalletVersion::V1R3,
             WalletVersion::V1R2,
             WalletVersion::V1R1,
-            WalletVersion::HighloadV2R2,
-            WalletVersion::HighloadV2R1,
-            WalletVersion::HighloadV2,
-            WalletVersion::HighloadV1R2,
-            WalletVersion::HighloadV1R1,
+            WalletVersion::HLV2R2,
+            WalletVersion::HLV2R1,
+            WalletVersion::HLV2,
+            WalletVersion::HLV1R2,
+            WalletVersion::HLV1R1,
         ];
 
         let versions_str: Vec<String> = versions.iter().map(wallet_version_to_string).collect();
@@ -1250,13 +1252,13 @@ fn new_wallet(
     let mnemonic_words = wallets::new_mnemonic()?;
     let mnemonic_str = mnemonic_words.join(" ");
 
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
+    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let key_pair = mnemonic.to_key_pair()?;
 
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
-    let wallet_address = wallet.address.to_base64_url_flags(false, true);
+    let wallet_address = format_testnet_wallet_address(&wallet.address);
 
     let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
@@ -1429,7 +1431,7 @@ fn import_wallet(
     };
 
     let mnemonic =
-        Mnemonic::from_str(mnemonic_str.trim(), &None).context("Invalid mnemonic phrase")?;
+        Mnemonic::from_str(mnemonic_str.trim(), None).context("Invalid mnemonic phrase")?;
     let key_pair = mnemonic.to_key_pair()?;
 
     let version = get_or_prompt_version(version)?;
@@ -1437,7 +1439,7 @@ fn import_wallet(
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
-    let wallet_address = wallet.address.to_base64_url_flags(false, true);
+    let wallet_address = format_testnet_wallet_address(&wallet.address);
 
     let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
@@ -1562,11 +1564,11 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
         "v4r1" => Ok(WalletVersion::V4R1),
         "v4r2" => Ok(WalletVersion::V4R2),
         "v5r1" => Ok(WalletVersion::V5R1),
-        "highloadv1r1" => Ok(WalletVersion::HighloadV1R1),
-        "highloadv1r2" => Ok(WalletVersion::HighloadV1R2),
-        "highloadv2" => Ok(WalletVersion::HighloadV2),
-        "highloadv2r1" => Ok(WalletVersion::HighloadV2R1),
-        "highloadv2r2" => Ok(WalletVersion::HighloadV2R2),
+        "highloadv1r1" => Ok(WalletVersion::HLV1R1),
+        "highloadv1r2" => Ok(WalletVersion::HLV1R2),
+        "highloadv2" => Ok(WalletVersion::HLV2),
+        "highloadv2r1" => Ok(WalletVersion::HLV2R1),
+        "highloadv2r2" => Ok(WalletVersion::HLV2R2),
         _ => Err(anyhow!(
             "Unsupported wallet version {}. Supported versions: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2",
             kind.yellow()
@@ -1603,8 +1605,8 @@ mod wallet_name_tests {
 
     #[test]
     fn test_decode_sign_input_hex() {
-        let cell = Cell::default();
-        let body_hex = cell.to_boc_hex(false).expect("must encode hex boc");
+        let cell = TonCell::empty().clone();
+        let body_hex = cell.to_boc_hex().expect("must encode hex boc");
         let (decoded, format) = decode_sign_input(&body_hex).expect("must decode hex");
         assert_eq!(decoded, cell);
         assert_eq!(format, SignMessageFormat::Hex);
@@ -1612,8 +1614,8 @@ mod wallet_name_tests {
 
     #[test]
     fn test_decode_sign_input_base64() {
-        let cell = Cell::default();
-        let body_b64 = cell.to_boc_b64(false).expect("must encode base64 boc");
+        let cell = TonCell::empty().clone();
+        let body_b64 = cell.to_boc_base64().expect("must encode base64 boc");
         let (decoded, format) = decode_sign_input(&body_b64).expect("must decode base64");
         assert_eq!(decoded, cell);
         assert_eq!(format, SignMessageFormat::Base64);
@@ -1661,13 +1663,13 @@ mod wallet_name_tests {
         let actual =
             get_wallet_address(&wallet).expect("must derive testnet address from mnemonic");
 
-        let mnemonic = Mnemonic::from_str(mnemonic_str, &None).expect("valid mnemonic");
+        let mnemonic = Mnemonic::from_str(mnemonic_str, None).expect("valid mnemonic");
         let key_pair = mnemonic.to_key_pair().expect("keypair from mnemonic");
         let version = WalletVersion::V5R1;
         let wallet_id = wallets::wallet_id(version, &Network::Testnet);
         let expected_wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)
             .expect("wallet from mnemonic");
-        let expected = expected_wallet.address.to_base64_url_flags(false, true);
+        let expected = format_testnet_wallet_address(&expected_wallet.address);
 
         assert_eq!(actual, expected);
     }

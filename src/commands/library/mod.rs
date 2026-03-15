@@ -16,9 +16,9 @@ use tasm::printer::FormatOptions;
 use tempfile::TempDir;
 use tolkc::CompilerResult;
 use toml_edit::{DocumentMut, Item, Table, value};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient};
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::Boc;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{Cell, CellBuilder, CellImpl, CellSliceParts, HashBytes};
@@ -218,14 +218,14 @@ pub fn publish_cmd(
     };
 
     let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = ArcCell::from_boc(&message_cell_boc)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
     let external =
         wallet
             .wallet
-            .create_external_msg(expire_at, seqno, need_state_init, vec![message_cell])?;
+            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
     api_client
-        .send_boc(&external.to_boc_b64(false)?)
+        .send_boc(&external.to_boc_base64()?)
         .context("Failed to send publication transaction")?;
 
     println!("  {} Transaction sent successfully", "✓".green().bold());
@@ -582,15 +582,15 @@ pub fn topup_cmd(
     };
 
     let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = ArcCell::from_boc(&message_cell_boc)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
     let external =
         wallet
             .wallet
-            .create_external_msg(expire_at, seqno, need_state_init, vec![message_cell])?;
+            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
     println!("  {} Sending transaction...", "→".blue().bold());
     api_client
-        .send_boc(&external.to_boc_b64(false)?)
+        .send_boc(&external.to_boc_base64()?)
         .context("Failed to send top-up transaction")?;
 
     println!(
@@ -941,7 +941,7 @@ fn format_std_address(address: &StdAddr, network: &Network) -> String {
         flags: Base64StdAddrFlags {
             testnet: network.uses_testnet_address_format(),
             base64_url: true,
-            bounceable: true,
+            bounceable: false,
         },
     }
     .to_string()

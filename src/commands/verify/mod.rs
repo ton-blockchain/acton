@@ -8,9 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, StackItem, TonApiClient};
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::models::{
     Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
@@ -367,15 +367,15 @@ pub fn verify_cmd(
     };
 
     let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = ArcCell::from_boc(&message_cell_boc)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
 
     let external =
         wallet
             .wallet
-            .create_external_msg(expire_at, seqno, need_state_init, vec![message_cell])?;
+            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
     api_client
-        .send_boc(&external.to_boc_b64(false)?)
+        .send_boc(&external.to_boc_base64()?)
         .context("Failed to send verification transaction")?;
 
     println!("  {} Transaction sent successfully", "✓".green().bold());
@@ -550,7 +550,7 @@ fn format_std_address(address: &StdAddr, network: &Network) -> String {
         flags: Base64StdAddrFlags {
             testnet: network.uses_testnet_address_format(),
             base64_url: true,
-            bounceable: true,
+            bounceable: false,
         },
     }
     .to_string()
