@@ -27,7 +27,7 @@ rust-version = "1.93.0"
 homepage = "https://i582.github.io/acton"
 documentation = "https://i582.github.io/acton/docs/welcome"
 repository = "https://github.com/i582/acton"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # local crates
