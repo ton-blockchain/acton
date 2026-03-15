@@ -261,6 +261,3 @@ jobs:
           gh release upload "${RELEASE_TAG}" dist/*.tar.gz \
             --repo "${GITHUB_REPOSITORY}" \
             --clobber
-
-https://github:
-  com/i582/acton/actions/runs/23100593843/job/67101238710:
