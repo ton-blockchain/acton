@@ -15,6 +15,7 @@ jobs:
   check-versions:
     name: Check Release Versions
     runs-on: ubuntu-latest
+    if: github.event_name == 'release'
 
     permissions:
       contents: read
@@ -26,7 +27,6 @@ jobs:
           persist-credentials: false
 
       - name: Check versions match tag
-        if: github.event_name == 'release'
         env:
           RAW_TAG: ${{ github.event.release.tag_name }}
         # language=Bash
