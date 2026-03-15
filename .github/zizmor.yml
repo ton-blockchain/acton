@@ -4,6 +4,7 @@ rules:
       policies:
         actions/cache/restore: ref-pin
         actions/cache/save: ref-pin
+        actions/cache: ref-pin
         actions/checkout: ref-pin
         actions/download-artifact: ref-pin
         actions/github-script: ref-pin
