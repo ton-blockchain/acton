@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+arton-objs = { workspace = true, features = ["emulator"] }
 serde = { workspace = true, features = ["rc"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
@@ -19,9 +20,6 @@ tycho-types = { workspace = true }
 rustc-hash = { workspace = true }
 num-bigint = { workspace = true }
 tvmffi = { workspace = true }
-
-[target.'cfg(target_os = "linux")'.build-dependencies]
-pkg-config = { workspace = true }
 
 [lints]
 workspace = true

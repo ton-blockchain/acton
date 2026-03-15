@@ -28,6 +28,8 @@
 //! All executors support registering custom extension methods (external opcodes) using
 //! `register_ext_method`. These are triggered by the `EXTCALL <ID>` instruction in the TVM.
 
+use arton_objs as _;
+
 mod common;
 mod config;
 

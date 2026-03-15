@@ -1,0 +1,26 @@
+[package]
+name = "arton-objs"
+description = "Linking crate for TON static archives in objs/"
+version = { workspace = true }
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+links = "arton-objs"
+
+[features]
+default = []
+emulator = []
+tolk = []
+
+[dependencies]
+
+[build-dependencies]
+pkg-config = { workspace = true }
+
+[lints]
+workspace = true

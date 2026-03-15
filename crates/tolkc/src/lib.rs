@@ -17,6 +17,8 @@
 //! }
 //! ```
 
+use arton_objs as _;
+
 pub mod abi;
 pub mod compiler;
 
