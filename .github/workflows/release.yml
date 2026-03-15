@@ -15,18 +15,19 @@ jobs:
   check-versions:
     name: Check Release Versions
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
 
     permissions:
       contents: read
 
     steps:
       - name: Check out Acton repository
+        if: github.event_name == 'release'
         uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Check versions match tag
+        if: github.event_name == 'release'
         env:
           RAW_TAG: ${{ github.event.release.tag_name }}
         # language=Bash
