@@ -6143,9 +6143,11 @@ dependencies = [
  "anyhow",
  "clap",
  "owo-colors",
+ "reqwest",
  "serde",
  "serde_json",
  "toml_edit 0.24.0+spec-1.1.0",
+ "urlencoding",
 ]
 
 [[package]]

@@ -1,0 +1,73 @@
+name: Cleanup Ubicloud GitHub Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview cache cleanup without deleting anything
+        required: false
+        type: boolean
+        default: true
+      keep:
+        description: Keep the last N Ubicloud cache entries; leave empty to keep 5 and auto-enable dry-run
+        required: false
+        type: number
+        default: 5
+
+concurrency:
+  group: ubicloud-cleanup
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  cleanup-cache-ubicloud:
+    name: Delete caches via Ubicloud xtask
+    if: github.repository == 'i582/acton'
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    env:
+      UBICLOUD_API_TOKEN: ${{ secrets.UBI_TOKEN }}
+      UBICLOUD_PROJECT_ID: pj3hr0c5d1ny7mx25m3tch57hn
+      XTASK_KEEP: ${{ inputs.keep }}
+      XTASK_DRY_RUN: ${{ inputs.dry_run }}
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          key: ubicloud-cleanup
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Run Ubicloud cache cleanup xtask
+        env:
+          GITHUB_INSTALLATION: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+        # language=Bash
+        run: |
+          args=(
+            run -p xtask -- ubicloud-cleanup
+            --project "${UBICLOUD_PROJECT_ID}"
+            --installation "${GITHUB_INSTALLATION}"
+            --repository "${GITHUB_REPOSITORY_NAME}"
+          )
+
+          if [[ -n "${XTASK_KEEP}" ]]; then
+            args+=(--keep "${XTASK_KEEP}")
+          fi
+
+          if [[ "${XTASK_DRY_RUN}" == 'true' ]]; then
+            args+=(--dry-run)
+          fi
+
+          cargo "${args[@]}"
