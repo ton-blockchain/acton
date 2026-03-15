@@ -1,8 +1,9 @@
 name: Release Acton
 
 on:
-  release:
-    types: [ released ]
+  push:
+    tags:
+      - v*
   workflow_dispatch:
 
 concurrency:
@@ -21,15 +22,15 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        if: github.event_name == 'release'
+        if: github.event_name == 'push'
         uses: actions/checkout@v6
         with:
           persist-credentials: false
 
       - name: Check versions match tag
-        if: github.event_name == 'release'
+        if: github.event_name == 'push'
         env:
-          RAW_TAG: ${{ github.event.release.tag_name }}
+          RAW_TAG: ${{ github.ref_name }}
         # language=Bash
         run: |
           set -euo pipefail
@@ -144,7 +145,7 @@ jobs:
           ./target/release-size/acton --help
 
       - name: Prepare Acton archive
-        if: github.event_name == 'release'
+        if: github.event_name == 'push'
         env:
           ARCHIVE_NAME: acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -152,7 +153,7 @@ jobs:
           tar -czf "dist/${ARCHIVE_NAME}" -C target/release-size acton
 
       - name: Upload Acton archive as artifact
-        if: github.event_name == 'release'
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
@@ -222,7 +223,7 @@ jobs:
           ./target/release-size/acton --help
 
       - name: Prepare Acton archive
-        if: github.event_name == 'release'
+        if: github.event_name == 'push'
         env:
           ARCHIVE_NAME: acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -230,7 +231,7 @@ jobs:
           tar -czf "dist/${ARCHIVE_NAME}" -C target/release-size acton
 
       - name: Upload Acton archive as artifact
-        if: github.event_name == 'release'
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
@@ -240,10 +241,10 @@ jobs:
   create-release:
     needs: [ build-linux, build-macos ]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+    if: github.event_name == 'push'
 
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Download Acton release archives
@@ -262,11 +263,14 @@ jobs:
             --pattern "ton-objs-*.tar.gz" \
             --dir dist
 
-      - name: Upload release archives
+      - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          gh release upload "${RELEASE_TAG}" dist/*.tar.gz \
+          gh release create "${RELEASE_TAG}" dist/*.tar.gz \
             --repo "${GITHUB_REPOSITORY}" \
-            --clobber
+            --title "${RELEASE_TAG}" \
+            --latest \
+            --verify-tag \
+            --generate-notes

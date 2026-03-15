@@ -12,22 +12,6 @@ impl Github {
         Self
     }
 
-    pub(crate) fn create_release(&self, tag: &str, target: &str) -> Result<()> {
-        self.command_output(&[
-            "release",
-            "create",
-            tag,
-            "--title",
-            tag,
-            "--latest",
-            "--target",
-            target,
-            "--verify-tag",
-            "--generate-notes",
-        ])
-        .map(|_| ())
-    }
-
     pub(crate) fn ensure_branch_builds_succeeded(
         &self,
         branch: &str,

@@ -34,8 +34,8 @@ pub(crate) fn run(args: ReleaseArgs) -> Result<()> {
     release_workflow().run(&context)?;
 
     println!(
-        "GitHub release created successfully: {}/releases/tag/{}",
-        GITHUB_REPOSITORY_URL, context.tag
+        "Release tag pushed successfully. GitHub Actions will publish the GitHub release from tag `{}` at {}/releases/tag/{}",
+        context.tag, GITHUB_REPOSITORY_URL, context.tag
     );
     Ok(())
 }
@@ -116,10 +116,6 @@ fn release_workflow() -> Workflow<'static, ReleaseContext> {
             WorkflowStep {
                 name: "push release commit and tag",
                 run: push_release_commit_and_tag,
-            },
-            WorkflowStep {
-                name: "create GitHub release",
-                run: create_github_release,
             },
         ],
     }
@@ -277,12 +273,6 @@ fn push_release_commit_and_tag(context: &ReleaseContext) -> Result<()> {
     context
         .git
         .push_refs(ORIGIN_REMOTE_NAME, &[DEFAULT_BRANCH_NAME, &context.tag])
-}
-
-fn create_github_release(context: &ReleaseContext) -> Result<()> {
-    context
-        .github
-        .create_release(&context.tag, DEFAULT_BRANCH_NAME)
 }
 
 fn update_toml_file(path: &str, update: impl FnOnce(&mut toml_edit::DocumentMut)) -> Result<()> {
