@@ -1,0 +1,57 @@
+- name: Install LLVM and Clang
+  if: ${{ runner.os == 'Linux' }}
+  shell: bash
+  run: |
+    set -euo pipefail
+    wget https://apt.llvm.org/llvm.sh
+    chmod +x llvm.sh
+    sudo ./llvm.sh 16 clang
+    rm llvm.sh
+
+- name: Configure Linux compiler env
+  if: ${{ runner.os == 'Linux' }}
+  shell: bash
+  run: |
+    echo "CC=clang-16" >> "$GITHUB_ENV"
+    echo "CXX=clang++-16" >> "$GITHUB_ENV"
+
+- name: Download TON objects archive
+  shell: bash
+  env:
+    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    DIST_TARGET: ${{ join(matrix.targets, '') }}
+  run: |
+    set -euo pipefail
+
+    case "$DIST_TARGET" in
+      x86_64-unknown-linux-gnu) archive_name="ton-objs-linux-x86_64.tar.gz" ;;
+      aarch64-unknown-linux-gnu) archive_name="ton-objs-linux-aarch64.tar.gz" ;;
+      x86_64-apple-darwin) archive_name="ton-objs-macos-x86_64.tar.gz" ;;
+      aarch64-apple-darwin) archive_name="ton-objs-macos-aarch64.tar.gz" ;;
+      *)
+        echo "unsupported dist target: $DIST_TARGET" >&2
+        exit 1
+        ;;
+    esac
+
+    mkdir -p dist objs
+    gh release download trunk-objs \
+      --repo "${GITHUB_REPOSITORY}" \
+      --pattern "$archive_name" \
+      --dir dist
+    tar -C objs -xzf "dist/$archive_name"
+
+- name: Setup Bun
+  uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461
+
+- name: Build embedded UI assets
+  shell: bash
+  run: |
+    set -euo pipefail
+    bun install
+    cd crates/acton-test-ui
+    bun i
+    bun run build
+    cd ../acton-litenode-ui
+    bun i
+    bun run build

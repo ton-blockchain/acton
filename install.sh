@@ -43,38 +43,17 @@ function check_dependency() {
 
 # Check dependencies
 check_dependency "curl"
-check_dependency "tar"
 check_dependency "python3"
 
 REPO="i582/acton"
-BIN="acton"
-DEST="${HOME}/.acton/bin"
 TAG="${1:-latest}"
 
-: "${GITHUB_TOKEN:?Set GITHUB_TOKEN (token must have access to ${REPO})}"
-
-# OS
-case "$(uname -s)" in
-  Darwin) OS="darwin" ;;
-  Linux)  OS="linux" ;;
-  *) error "Unsupported OS: $(uname -s)"; exit 1 ;;
-esac
-
-# ARCH
-case "$(uname -m)" in
-  arm64|aarch64) ARCH="arm64" ;;
-  x86_64|amd64)  ARCH="x86_64" ;;
-  *) error "Unsupported architecture: $(uname -m)"; exit 1 ;;
-esac
-
-# Acton supports linux-x86_64 only for now
-if [[ "$OS" == "linux" && "$ARCH" != "x86_64" ]]; then
-  error "Unsupported platform: ${OS}-${ARCH} (linux-x86_64 only)"
-  exit 1
-fi
-
 API="https://api.github.com/repos/${REPO}"
-AUTH=(-H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json")
+AUTH=(-H "Accept: application/vnd.github+json")
+
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  AUTH=(-H "Authorization: Bearer ${GITHUB_TOKEN}" "${AUTH[@]}")
+fi
 
 info "Fetching release information for ${TAG}..."
 # Fetch release JSON
@@ -106,65 +85,36 @@ if [[ -z "$tag_name" ]]; then
   exit 1
 fi
 
-ASSET="${BIN}-${tag_name}-${OS}-${ARCH}.tar.gz"
+ASSET="acton-installer.sh"
 
-# Find asset id by exact name
-asset_id="$(
+# Find installer download URL by exact name
+asset_url="$(
   python3 -c '
 import json, sys
 r = json.load(sys.stdin)
 want = sys.argv[1]
-print(next((str(a["id"]) for a in r.get("assets", []) if a.get("name") == want), ""))
+print(next((a.get("browser_download_url", "") for a in r.get("assets", []) if a.get("name") == want), ""))
 ' "$ASSET" <<<"$release_json"
 )"
 
-if [[ -z "${asset_id:-}" ]]; then
+if [[ -z "${asset_url:-}" ]]; then
   error "Asset not found in release ${tag_name}: ${ASSET}"
   exit 1
 fi
 
 tmp="$(mktemp -d)"
 
-mkdir -p "$DEST"
-
 info "Downloading ${ASSET}..."
 curl -fL --progress-bar \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Accept: application/octet-stream" \
-  "${API}/releases/assets/${asset_id}" \
+  "${AUTH[@]}" \
+  "${asset_url}" \
   -o "$tmp/$ASSET"
 
-info "Extracting and installing to ${DEST}..."
-tar -xzf "$tmp/$ASSET" -C "$tmp"
-# Find the binary
-BIN_PATH="$(find "$tmp" -maxdepth 3 -type f -name "$BIN" | head -n1)"
+chmod +x "$tmp/$ASSET"
 
-if [[ -z "$BIN_PATH" ]]; then
-  error "Could not find binary '${BIN}' in the downloaded archive."
-  exit 1
+info "Running the release installer for ${tag_name}..."
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  export ACTON_GITHUB_TOKEN="${GITHUB_TOKEN}"
 fi
 
-install -m 0755 "$BIN_PATH" "$DEST/$BIN"
-
-# Final success message and instructions
-echo
-success "Acton ${tag_name} has been installed successfully!"
-
-echo
-info "Verify installation by running:"
-echo -e "${BOLD}$DEST/$BIN --version${NC}"
-echo
-
-# Check if DEST is in PATH
-if [[ ":$PATH:" != *":$DEST:"* ]]; then
-    echo -e "Add Acton to your PATH by adding this line to your shell profile (e.g., ~/.zshrc or ~/.bashrc):"
-    echo -e "${BOLD}export PATH=\"$DEST:\$PATH\"${NC}"
-    echo
-    echo -e "Then, restart your terminal or source your profile."
-else
-    echo -e "${GREEN}${BOLD}Acton is already in your PATH.${NC}"
-fi
-
-echo
-echo -e "We recommend enabling shell completions for a better experience"
-echo -e "Learn more in the documentation: ${BLUE}https://i582.github.io/acton/docs/commands/shell-completions/${NC}"
+sh "$tmp/$ASSET"
