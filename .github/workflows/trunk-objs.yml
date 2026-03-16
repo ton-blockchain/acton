@@ -38,9 +38,9 @@ jobs:
           - runner: ubicloud-standard-4-ubuntu-2204
             os: linux
             arch: x86_64
-          - runner: ubicloud-standard-4-arm-ubuntu-2204
-            os: linux
-            arch: aarch64
+#          - runner: ubicloud-standard-4-arm-ubuntu-2204
+#            os: linux
+#            arch: aarch64
     runs-on: ${{ matrix.runner }}
 
     permissions:
@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Restore TON objects archive cache
-        if: github.ref == 'refs/heads/master' || true
+        if: github.ref == 'refs/heads/master'
         id: archive-cache
         uses: actions/cache@v5
         with:
@@ -160,6 +160,7 @@ jobs:
           if-no-files-found: error
 
   build-objs-macos:
+    if: false
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy:
