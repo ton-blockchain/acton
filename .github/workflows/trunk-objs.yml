@@ -261,7 +261,7 @@ jobs:
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, build-objs-linux, build-objs-macos ]
+    needs: [ prepare, build-objs-linux ]
     runs-on: ubicloud-standard-2
     if: github.ref == 'refs/heads/master' || true
 
