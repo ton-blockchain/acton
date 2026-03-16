@@ -15,6 +15,10 @@ concurrency:
 
 permissions: { }
 
+env:
+  ENABLE_MIRRORING_RELEASE: 'true'
+  PUBLIC_ACTON_REPOSITORY: i582/acton-public
+
 jobs:
   build:
     name: Build (${{ matrix.os }}-${{ matrix.arch }})
@@ -228,3 +232,28 @@ jobs:
             --notes "${release_notes}" \
             --prerelease \
             --target "${GITHUB_SHA}"
+
+      - name: Delete previous trunk release and tag (mirror)
+        if: env.ENABLE_MIRRORING_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        run: |
+          gh release delete trunk --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+
+          gh api \
+            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk \
+            -X DELETE || true
+
+      - name: Create trunk release (mirror)
+        if: env.ENABLE_MIRRORING_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        run: |
+          release_notes=$'Automated trunk build of Acton.\n\nBuilt from source commit:\nhttps://github.com/'"${GITHUB_REPOSITORY}"$'/commit/'"${GITHUB_SHA}"
+
+          gh release create trunk \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            artifacts/* \
+            --title "Trunk" \
+            --notes "${release_notes}" \
+            --prerelease
