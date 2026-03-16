@@ -325,8 +325,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
-          release_notes=$(
-            cat <<EOF
+          release_notes=$(cat <<EOF
           Generated from TON commit: https://github.com/i582/ton/commit/${TON_COMMIT}
           EOF
           )
@@ -356,10 +355,8 @@ jobs:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
-          release_notes=$(
-            cat <<EOF
+          release_notes=$(cat <<EOF
           Generated from TON commit: https://github.com/i582/ton/commit/${TON_COMMIT}
-
           Source Acton commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
           EOF
           )
