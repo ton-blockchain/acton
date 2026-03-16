@@ -223,7 +223,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          release_notes=$'Automated trunk build of Acton.\n\nBuilt from commit: '"${GITHUB_SHA}"
+          release_notes=$(cat <<EOF
+          Automated trunk build of Acton.
+
+          Built from source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+          EOF
+          )
 
           gh release create trunk \
             --repo "${GITHUB_REPOSITORY}" \
@@ -249,7 +254,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
         run: |
-          release_notes=$'Automated trunk build of Acton.\n\nBuilt from source commit:\nhttps://github.com/'"${GITHUB_REPOSITORY}"$'/commit/'"${GITHUB_SHA}"
+          release_notes=$(cat <<EOF
+          Automated trunk build of Acton.
+
+          Built from source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+          EOF
+          )
 
           gh release create trunk \
             --repo "${PUBLIC_ACTON_REPOSITORY}" \
