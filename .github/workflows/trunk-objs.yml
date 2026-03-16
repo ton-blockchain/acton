@@ -166,7 +166,6 @@ jobs:
           if-no-files-found: error
 
   build-objs-macos:
-    if: false
     name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
     needs: [ prepare ]
     strategy:
@@ -267,7 +266,7 @@ jobs:
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, build-objs-linux ]
+    needs: [ prepare, build-objs-linux, build-objs-macos ]
     runs-on: ubicloud-standard-2
     if: github.ref == 'refs/heads/master'
 
@@ -314,7 +313,6 @@ jobs:
             }
 
       - name: Delete previous trunk-objs release and tag
-        if: false
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -325,7 +323,6 @@ jobs:
             -X DELETE || true
 
       - name: Create trunk-objs release
-        if: false
         env:
           GH_TOKEN: ${{ github.token }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
