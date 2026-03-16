@@ -15,6 +15,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum CliCommand {
     Hello,
+    UbicloudCleanup(tasks::ubicloud_cleanup::UbicloudCleanupArgs),
     Release(tasks::release::ReleaseArgs),
 }
 
@@ -23,6 +24,7 @@ fn main() -> Result<()> {
 
     match args.command {
         CliCommand::Hello => tasks::hello::run(),
+        CliCommand::UbicloudCleanup(args) => tasks::ubicloud_cleanup::run(args),
         CliCommand::Release(args) => tasks::release::run(args),
     }
 }
