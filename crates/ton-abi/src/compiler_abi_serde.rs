@@ -107,20 +107,20 @@ fn decode_struct(
     struct_name: &str,
     type_args: &[ABIType],
 ) -> anyhow::Result<Data> {
-    let (type_params, prefix, fields, custom_pack_unpack) = find_struct_decl(abi, struct_name)
+    let decl = find_struct_decl(abi, struct_name)
         .ok_or_else(|| anyhow!("struct {struct_name} referenced by ABI was not found"))?;
-    ensure_standard_layout(struct_name, custom_pack_unpack)?;
+    ensure_standard_layout(struct_name, decl.custom_pack_unpack)?;
 
-    if let Some(prefix) = prefix {
+    if let Some(prefix) = decl.prefix {
         check_prefix(data, &prefix.prefix_str, prefix.prefix_len, struct_name)?;
     }
 
-    let bindings = bind_type_params(struct_name, type_params, type_args)?;
+    let bindings = bind_type_params(struct_name, decl.type_params, type_args)?;
     let mut result = DataObject {
         name: struct_name.to_owned(),
-        fields: Vec::with_capacity(fields.len()),
+        fields: Vec::with_capacity(decl.fields.len()),
     };
-    for field in fields {
+    for field in decl.fields {
         let value = decode_type(data, abi, &field.ty, &bindings)
             .with_context(|| format!("failed to decode field {struct_name}.{}", field.name))?;
         result.fields.push(DataField {
@@ -138,11 +138,11 @@ fn decode_alias(
     alias_name: &str,
     type_args: &[ABIType],
 ) -> anyhow::Result<Data> {
-    let (type_params, target_ty, custom_pack_unpack) = find_alias_decl(abi, alias_name)
+    let decl = find_alias_decl(abi, alias_name)
         .ok_or_else(|| anyhow!("alias {alias_name} referenced by ABI was not found"))?;
-    ensure_standard_layout(alias_name, custom_pack_unpack)?;
-    let bindings = bind_type_params(alias_name, type_params, type_args)?;
-    decode_type(data, abi, target_ty, &bindings)
+    ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
+    let bindings = bind_type_params(alias_name, decl.type_params, type_args)?;
+    decode_type(data, abi, decl.target_ty, &bindings)
 }
 
 fn decode_enum(
@@ -150,15 +150,15 @@ fn decode_enum(
     abi: &ContractABI,
     enum_name: &str,
 ) -> anyhow::Result<Data> {
-    let (encoded_as, members, custom_pack_unpack) = find_enum_decl(abi, enum_name)
+    let decl = find_enum_decl(abi, enum_name)
         .ok_or_else(|| anyhow!("enum {enum_name} referenced by ABI was not found"))?;
-    ensure_standard_layout(enum_name, custom_pack_unpack)?;
+    ensure_standard_layout(enum_name, decl.custom_pack_unpack)?;
 
-    let encoded_ty = parse_enum_encoded_as(encoded_as)?;
+    let encoded_ty = parse_enum_encoded_as(decl.encoded_as)?;
     let value = decode_type(data, abi, encoded_ty, &BTreeMap::new())?;
 
     if let Data::Number(number) = &value
-        && let Some(member_name) = find_enum_member_name(number, members)
+        && let Some(member_name) = find_enum_member_name(number, decl.members)
     {
         return Ok(Data::Symbol(format!("{enum_name}.{member_name}")));
     }
@@ -473,16 +473,16 @@ fn map_key_bit_len(abi: &ContractABI, ty: &ABIType) -> anyhow::Result<u16> {
         }
         ABIType::Address => Ok(StdAddr::BITS_WITHOUT_ANYCAST),
         ABIType::AliasRef { alias_name, .. } => {
-            let (_, target_ty, custom_pack_unpack) = find_alias_decl(abi, alias_name)
+            let decl = find_alias_decl(abi, alias_name)
                 .ok_or_else(|| anyhow!("alias {alias_name} referenced by ABI was not found"))?;
-            ensure_standard_layout(alias_name, custom_pack_unpack)?;
-            map_key_bit_len(abi, target_ty)
+            ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
+            map_key_bit_len(abi, decl.target_ty)
         }
         ABIType::EnumRef { enum_name } => {
-            let (encoded_as, _, custom_pack_unpack) = find_enum_decl(abi, enum_name)
+            let decl = find_enum_decl(abi, enum_name)
                 .ok_or_else(|| anyhow!("enum {enum_name} referenced by ABI was not found"))?;
-            ensure_standard_layout(enum_name, custom_pack_unpack)?;
-            map_key_bit_len(abi, parse_enum_encoded_as(encoded_as)?)
+            ensure_standard_layout(enum_name, decl.custom_pack_unpack)?;
+            map_key_bit_len(abi, parse_enum_encoded_as(decl.encoded_as)?)
         }
         _ => anyhow::bail!("unsupported map key type {}", ty.render_type()),
     }
@@ -568,10 +568,10 @@ fn union_label_simple(abi: &ContractABI, ty: &ABIType) -> anyhow::Result<String>
         ABIType::EnumRef { enum_name } => enum_name.clone(),
         ABIType::StructRef { struct_name, .. } => struct_name.clone(),
         ABIType::AliasRef { alias_name, .. } => {
-            let (_, target_ty, custom_pack_unpack) = find_alias_decl(abi, alias_name)
+            let decl = find_alias_decl(abi, alias_name)
                 .ok_or_else(|| anyhow!("alias {alias_name} referenced by ABI was not found"))?;
-            ensure_standard_layout(alias_name, custom_pack_unpack)?;
-            union_label_simple(abi, target_ty)?
+            ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
+            union_label_simple(abi, decl.target_ty)?
         }
         ABIType::GenericT { name_t } => name_t.clone(),
         ABIType::Union { variants } => variants
@@ -590,21 +590,33 @@ fn type_has_own_label(abi: &ContractABI, ty: &ABIType) -> anyhow::Result<bool> {
     Ok(match ty {
         ABIType::StructRef { .. } => true,
         ABIType::AliasRef { alias_name, .. } => {
-            let (_, target_ty, custom_pack_unpack) = find_alias_decl(abi, alias_name)
+            let decl = find_alias_decl(abi, alias_name)
                 .ok_or_else(|| anyhow!("alias {alias_name} referenced by ABI was not found"))?;
-            ensure_standard_layout(alias_name, custom_pack_unpack)?;
-            type_has_own_label(abi, target_ty)?
+            ensure_standard_layout(alias_name, decl.custom_pack_unpack)?;
+            type_has_own_label(abi, decl.target_ty)?
         }
         _ => false,
     })
 }
 
-type StructDeclRef<'a> = (
-    Option<&'a [String]>,
-    Option<&'a tolkc::abi::ABIOpcode>,
-    &'a [tolkc::abi::ABIStructField],
-    Option<&'a ABICustomPackUnpack>,
-);
+struct StructDeclRef<'a> {
+    type_params: Option<&'a [String]>,
+    prefix: Option<&'a tolkc::abi::ABIOpcode>,
+    fields: &'a [tolkc::abi::ABIStructField],
+    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+}
+
+struct AliasDeclRef<'a> {
+    type_params: Option<&'a [String]>,
+    target_ty: &'a ABIType,
+    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+}
+
+struct EnumDeclRef<'a> {
+    encoded_as: &'a ABIType,
+    members: &'a [ABIEnumMember],
+    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+}
 
 fn find_struct_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<StructDeclRef<'a>> {
     abi.declarations.iter().find_map(|decl| match decl {
@@ -614,56 +626,44 @@ fn find_struct_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<Struc
             prefix,
             fields,
             custom_pack_unpack,
-        } if name == target_name => Some((
-            type_params.as_deref(),
-            prefix.as_ref(),
-            fields.as_slice(),
-            custom_pack_unpack.as_ref(),
-        )),
+        } if name == target_name => Some(StructDeclRef {
+            type_params: type_params.as_deref(),
+            prefix: prefix.as_ref(),
+            fields: fields.as_slice(),
+            custom_pack_unpack: custom_pack_unpack.as_ref(),
+        }),
         _ => None,
     })
 }
 
-fn find_alias_decl<'a>(
-    abi: &'a ContractABI,
-    target_name: &str,
-) -> Option<(
-    Option<&'a [String]>,
-    &'a ABIType,
-    Option<&'a ABICustomPackUnpack>,
-)> {
+fn find_alias_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<AliasDeclRef<'a>> {
     abi.declarations.iter().find_map(|decl| match decl {
         ABIDeclaration::Alias {
             name,
             target_ty,
             type_params,
             custom_pack_unpack,
-        } if name == target_name => Some((
-            type_params.as_deref(),
+        } if name == target_name => Some(AliasDeclRef {
+            type_params: type_params.as_deref(),
             target_ty,
-            custom_pack_unpack.as_ref(),
-        )),
+            custom_pack_unpack: custom_pack_unpack.as_ref(),
+        }),
         _ => None,
     })
 }
 
-fn find_enum_decl<'a>(
-    abi: &'a ContractABI,
-    target_name: &str,
-) -> Option<(
-    &'a ABIType,
-    &'a [ABIEnumMember],
-    Option<&'a ABICustomPackUnpack>,
-)> {
+fn find_enum_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<EnumDeclRef<'a>> {
     abi.declarations.iter().find_map(|decl| match decl {
         ABIDeclaration::Enum {
             name,
             encoded_as,
             members,
             custom_pack_unpack,
-        } if name == target_name => {
-            Some((encoded_as, members.as_slice(), custom_pack_unpack.as_ref()))
-        }
+        } if name == target_name => Some(EnumDeclRef {
+            encoded_as,
+            members: members.as_slice(),
+            custom_pack_unpack: custom_pack_unpack.as_ref(),
+        }),
         _ => None,
     })
 }

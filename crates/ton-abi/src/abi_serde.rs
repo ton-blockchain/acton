@@ -99,14 +99,12 @@ fn decode_field(
 
             anyhow::bail!("expected internal address for address type")
         }
-        BaseTypeInfo::AnyAddress => {
-            return Ok(match AnyAddr::load_from(data)? {
-                AnyAddr::None => Data::Null,
-                AnyAddr::Ext(ext_addr) => Data::ExtAddress(ext_addr),
-                AnyAddr::Std(addr) => Data::Address(IntAddr::Std(addr)),
-                AnyAddr::Var(addr) => Data::Address(IntAddr::Var(addr)),
-            });
-        }
+        BaseTypeInfo::AnyAddress => Ok(match AnyAddr::load_from(data)? {
+            AnyAddr::None => Data::Null,
+            AnyAddr::Ext(ext_addr) => Data::ExtAddress(ext_addr),
+            AnyAddr::Std(addr) => Data::Address(IntAddr::Std(addr)),
+            AnyAddr::Var(addr) => Data::Address(IntAddr::Var(addr)),
+        }),
         BaseTypeInfo::Bits { width } => {
             let bits = data.load_prefix(*width as u16, 0)?;
             let bytes = (*width).div_ceil(8);
