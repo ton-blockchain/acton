@@ -157,9 +157,7 @@ fn decode_enum(
     let encoded_ty = parse_enum_encoded_as(decl.encoded_as)?;
     let value = decode_type(data, abi, encoded_ty, &BTreeMap::new())?;
 
-    if let Data::Number(number) = &value
-        && let Some(member_name) = find_enum_member_name(number, decl.members)
-    {
+    if let Some(member_name) = find_enum_member_name(&value, decl.members) {
         return Ok(Data::Symbol(format!("{enum_name}.{member_name}")));
     }
 
@@ -454,14 +452,20 @@ fn parse_enum_encoded_as(encoded_as: &ABIType) -> anyhow::Result<&ABIType> {
     }
 }
 
-fn find_enum_member_name<'a>(value: &BigInt, members: &'a [ABIEnumMember]) -> Option<&'a str> {
-    members.iter().find_map(|member| {
-        member
+fn find_enum_member_name<'a>(value: &Data, members: &'a [ABIEnumMember]) -> Option<&'a str> {
+    members.iter().find_map(|member| match value {
+        Data::Number(number) => member
             .value
             .parse::<BigInt>()
             .ok()
-            .filter(|member_value| member_value == value)
-            .map(|_| member.name.as_str())
+            .filter(|member_value| member_value == number)
+            .map(|_| member.name.as_str()),
+        Data::Bool(boolean) => match member.value.as_str() {
+            "false" if !boolean => Some(member.name.as_str()),
+            "true" if *boolean => Some(member.name.as_str()),
+            _ => None,
+        },
+        _ => None,
     })
 }
 
@@ -889,6 +893,44 @@ mod tests {
         .unwrap();
 
         assert_eq!(format!("{data:?}"), "Symbol(\"Color.Blue\")");
+    }
+
+    #[test]
+    fn decodes_bool_encoded_enum_to_symbol() {
+        let mut abi = empty_abi();
+        abi.declarations = vec![ABIDeclaration::Enum {
+            name: "Toggle".to_owned(),
+            encoded_as: ABIType::Bool,
+            members: vec![
+                ABIEnumMember {
+                    name: "Off".to_owned(),
+                    value: "false".to_owned(),
+                    description: String::new(),
+                },
+                ABIEnumMember {
+                    name: "On".to_owned(),
+                    value: "true".to_owned(),
+                    description: String::new(),
+                },
+            ],
+            custom_pack_unpack: None,
+        }];
+
+        let mut builder = CellBuilder::new();
+        builder.store_bit(true).unwrap();
+        let cell = builder.build().unwrap();
+        let mut slice = cell.as_slice_allow_exotic();
+
+        let data = decode(
+            &mut slice,
+            &abi,
+            &ABIType::EnumRef {
+                enum_name: "Toggle".to_owned(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(format!("{data:?}"), "Symbol(\"Toggle.On\")");
     }
 
     #[test]
