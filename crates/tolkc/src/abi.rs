@@ -319,7 +319,7 @@ pub enum ABIDeclaration {
         name: String,
 
         #[serde(rename = "encodedAs")]
-        encoded_as: String,
+        encoded_as: ABIType,
 
         members: Vec<ABIEnumMember>,
 
@@ -773,11 +773,17 @@ fn find_alias_decl_full<'a>(
     })
 }
 
-fn find_enum_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<&'a [ABIEnumMember]> {
+fn find_enum_decl<'a>(
+    abi: &'a ContractABI,
+    target_name: &str,
+) -> Option<(&'a ABIType, &'a [ABIEnumMember])> {
     abi.declarations.iter().find_map(|decl| match decl {
-        ABIDeclaration::Enum { name, members, .. } if name == target_name => {
-            Some(members.as_slice())
-        }
+        ABIDeclaration::Enum {
+            name,
+            encoded_as,
+            members,
+            ..
+        } if name == target_name => Some((encoded_as, members.as_slice())),
         _ => None,
     })
 }
@@ -988,7 +994,7 @@ fn default_alias_value(
 
 fn default_enum_value(abi: &ContractABI, enum_name: &str) -> String {
     find_enum_decl(abi, enum_name)
-        .and_then(|members| members.first())
+        .and_then(|(_, members)| members.first())
         .map(|member| format!("{enum_name}.{}", member.name))
         .unwrap_or_else(|| "null".to_owned())
 }
@@ -1126,6 +1132,47 @@ mod tests {
         assert_eq!(error.kind, None);
         assert_eq!(error.const_name, "ERR_NOT_ENOUGH_TON");
         assert_eq!(error.err_code, 57);
+    }
+
+    #[test]
+    fn contract_abi_deserializes_enum_encoded_as_type_object() {
+        let abi: ContractABI = serde_json::from_str(
+            r#"{
+                "abiSchemaVersion": "1.0",
+                "contractName": "Test",
+                "author": "",
+                "version": "",
+                "description": "",
+                "declarations": [
+                    {
+                        "kind": "Enum",
+                        "name": "Mode",
+                        "encodedAs": { "kind": "uintN", "n": 2 },
+                        "members": [
+                            { "name": "Alpha", "value": "1", "description": "" },
+                            { "name": "Beta", "value": "2", "description": "" }
+                        ]
+                    }
+                ],
+                "incomingMessages": [],
+                "incomingExternal": [],
+                "outgoingMessages": [],
+                "emittedEvents": [],
+                "storage": {},
+                "getMethods": [],
+                "thrownErrors": [],
+                "constants": [],
+                "compilerName": "tolkc",
+                "compilerVersion": "test"
+            }"#,
+        )
+        .expect("failed to deserialize ABI with enum encodedAs type object");
+
+        let Some(ABIDeclaration::Enum { encoded_as, .. }) = abi.declarations.first() else {
+            panic!("expected enum declaration");
+        };
+
+        assert!(matches!(encoded_as, ABIType::UintN { n: 2 }));
     }
 
     #[test]
@@ -1357,7 +1404,7 @@ mod tests {
         abi.declarations = vec![
             ABIDeclaration::Enum {
                 name: "Color".to_owned(),
-                encoded_as: "uint2".to_owned(),
+                encoded_as: ABIType::UintN { n: 2 },
                 members: vec![
                     ABIEnumMember {
                         name: "Red".to_owned(),

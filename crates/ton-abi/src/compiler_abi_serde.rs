@@ -155,7 +155,7 @@ fn decode_enum(
     ensure_standard_layout(enum_name, custom_pack_unpack)?;
 
     let encoded_ty = parse_enum_encoded_as(encoded_as)?;
-    let value = decode_type(data, abi, &encoded_ty, &BTreeMap::new())?;
+    let value = decode_type(data, abi, encoded_ty, &BTreeMap::new())?;
 
     if let Data::Number(number) = &value
         && let Some(member_name) = find_enum_member_name(number, members)
@@ -442,34 +442,16 @@ fn unsupported_type(name: &str) -> anyhow::Result<Data> {
     anyhow::bail!("cannot decode unsupported ABI type {name}")
 }
 
-fn parse_enum_encoded_as(encoded_as: &str) -> anyhow::Result<ABIType> {
-    if encoded_as == "bool" {
-        return Ok(ABIType::Bool);
+fn parse_enum_encoded_as(encoded_as: &ABIType) -> anyhow::Result<&ABIType> {
+    match encoded_as {
+        ABIType::Bool
+        | ABIType::Coins
+        | ABIType::UintN { .. }
+        | ABIType::IntN { .. }
+        | ABIType::VarUintN { .. }
+        | ABIType::VarIntN { .. } => Ok(encoded_as),
+        other => anyhow::bail!("unsupported enum encoding {}", other.render_type()),
     }
-    if encoded_as == "coins" {
-        return Ok(ABIType::Coins);
-    }
-    if let Some(bits) = encoded_as.strip_prefix("uint") {
-        return Ok(ABIType::UintN {
-            n: bits.parse().context("invalid enum uint width")?,
-        });
-    }
-    if let Some(bits) = encoded_as.strip_prefix("int") {
-        return Ok(ABIType::IntN {
-            n: bits.parse().context("invalid enum int width")?,
-        });
-    }
-    if let Some(bits) = encoded_as.strip_prefix("varuint") {
-        return Ok(ABIType::VarUintN {
-            n: bits.parse().context("invalid enum varuint width")?,
-        });
-    }
-    if let Some(bits) = encoded_as.strip_prefix("varint") {
-        return Ok(ABIType::VarIntN {
-            n: bits.parse().context("invalid enum varint width")?,
-        });
-    }
-    anyhow::bail!("unsupported enum encoding {encoded_as}")
 }
 
 fn find_enum_member_name<'a>(value: &BigInt, members: &'a [ABIEnumMember]) -> Option<&'a str> {
@@ -500,7 +482,7 @@ fn map_key_bit_len(abi: &ContractABI, ty: &ABIType) -> anyhow::Result<u16> {
             let (encoded_as, _, custom_pack_unpack) = find_enum_decl(abi, enum_name)
                 .ok_or_else(|| anyhow!("enum {enum_name} referenced by ABI was not found"))?;
             ensure_standard_layout(enum_name, custom_pack_unpack)?;
-            map_key_bit_len(abi, &parse_enum_encoded_as(encoded_as)?)
+            map_key_bit_len(abi, parse_enum_encoded_as(encoded_as)?)
         }
         _ => anyhow::bail!("unsupported map key type {}", ty.render_type()),
     }
@@ -669,7 +651,7 @@ fn find_enum_decl<'a>(
     abi: &'a ContractABI,
     target_name: &str,
 ) -> Option<(
-    &'a str,
+    &'a ABIType,
     &'a [ABIEnumMember],
     Option<&'a ABICustomPackUnpack>,
 )> {
@@ -679,11 +661,9 @@ fn find_enum_decl<'a>(
             encoded_as,
             members,
             custom_pack_unpack,
-        } if name == target_name => Some((
-            encoded_as.as_str(),
-            members.as_slice(),
-            custom_pack_unpack.as_ref(),
-        )),
+        } if name == target_name => {
+            Some((encoded_as, members.as_slice(), custom_pack_unpack.as_ref()))
+        }
         _ => None,
     })
 }
@@ -878,7 +858,7 @@ mod tests {
         let mut abi = empty_abi();
         abi.declarations = vec![ABIDeclaration::Enum {
             name: "Color".to_owned(),
-            encoded_as: "uint8".to_owned(),
+            encoded_as: ABIType::UintN { n: 8 },
             members: vec![
                 ABIEnumMember {
                     name: "Red".to_owned(),
