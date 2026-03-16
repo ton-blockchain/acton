@@ -268,6 +268,10 @@ jobs:
       actions: write
       contents: write
 
+    env:
+      ENABLE_PUBLIC_TRUNK_OBJS_RELEASE: 'true'
+      PUBLIC_TRUNK_OBJS_REPOSITORY: i582/acton-public
+
     steps:
       - name: Download TON objects artifacts
         uses: actions/download-artifact@v8
@@ -321,7 +325,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
-          release_notes="Generate from: https://github.com/i582/ton/commit/${TON_COMMIT}"
+          release_notes=$(
+            cat <<EOF
+          Generated from TON commit: https://github.com/i582/ton/commit/${TON_COMMIT}
+          EOF
+          )
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
@@ -332,24 +340,32 @@ jobs:
             --target "${GITHUB_SHA}"
 
       - name: Delete previous public trunk-objs release and tag
+        if: env.ENABLE_PUBLIC_TRUNK_OBJS_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
         run: |
-          gh release delete trunk-objs --repo "i582/acton-public" -y || true
+          gh release delete trunk-objs --repo "${PUBLIC_TRUNK_OBJS_REPOSITORY}" -y || true
 
           gh api \
-            repos/i582/acton-public/git/refs/tags/trunk-objs \
+            repos/${PUBLIC_TRUNK_OBJS_REPOSITORY}/git/refs/tags/trunk-objs \
             -X DELETE || true
 
       - name: Create public trunk-objs release
+        if: env.ENABLE_PUBLIC_TRUNK_OBJS_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
         run: |
-          release_notes=$'Generated from TON commit: https://github.com/i582/ton/commit/'"${TON_COMMIT}"$'\nSource Acton commit: https://github.com/'"${GITHUB_REPOSITORY}"$'/commit/'"${GITHUB_SHA}"
+          release_notes=$(
+            cat <<EOF
+          Generated from TON commit: https://github.com/i582/ton/commit/${TON_COMMIT}
+
+          Source Acton commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+          EOF
+          )
 
           gh release create trunk-objs \
-            --repo "i582/acton-public" \
+            --repo "${PUBLIC_TRUNK_OBJS_REPOSITORY}" \
             dist/*.tar.gz \
             --title "Trunk Objs" \
             --notes "${release_notes}" \
