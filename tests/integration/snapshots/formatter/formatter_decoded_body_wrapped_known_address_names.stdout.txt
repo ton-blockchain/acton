@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_wrapped_known_address_sink
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_wrapped_known_address.test.tolk (1 test)
+  ✓ formatter-decoded-body-wrapped-known-addresses [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmWrappedKnownAddressBody 0.05 TON -> fm_wrapped_known_address_sink B       gas=333
+               internalTransferMsg: {
+                   queryId: 0
+                   newAdminAddress: [WALLET_ADDRESS_BASE] (not_deployer)
+                   tonAmount: 1000000000
+               }
+
+ ✓ 1 passed in 1 file

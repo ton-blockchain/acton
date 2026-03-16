@@ -43,6 +43,12 @@ This command executes `my_script.tolk` in the local emulator environment.
 |-------------------------|-----------|-----------------------------------------------------------|
 | `--clear-cache`         | Flag      | Clear compilation cache before running                    |
 
+### Output Options
+
+| Option          | Type | Description                                                                |
+|-----------------|------|----------------------------------------------------------------------------|
+| `--show-bodies` | Flag | Show decoded message bodies in printed transaction trees when ABI is known |
+
 ## Script Structure
 
 Every Tolk script must define a `main()` function with no arguments:
@@ -71,6 +77,9 @@ Run a script in the local emulator (no real TON spent):
 ```bash
 # Basic script execution
 acton script experiment.tolk
+
+# Show decoded transaction bodies in println(txs) / println(result)
+acton script experiment.tolk --show-bodies
 
 # Clear cache before running
 acton script experiment.tolk --clear-cache

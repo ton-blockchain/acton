@@ -4,6 +4,11 @@ import "messages"
 import "fees-management"
 import "storage"
 
+contract JettonWallet {
+    incomingMessages: AllowedMessageToWallet
+    storage: WalletStorage
+}
+
 type AllowedMessageToWallet =
     | AskToTransfer
     | AskToBurn

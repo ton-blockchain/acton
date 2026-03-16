@@ -12,6 +12,7 @@
     └─ Test output:
        N/A -> sender A
        └── FmDebugPing 0.2 TON -> fm_debug B                                           gas=648
+           queryId: 1
            └── Debug logs:
                fmt-debug-marker
                s0 = 1

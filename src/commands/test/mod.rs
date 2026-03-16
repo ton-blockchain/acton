@@ -276,6 +276,7 @@ impl<'a> TestRunner<'a> {
                 config: &self.acton_config,
                 project_root: self.project_root.clone(),
                 abi,
+                show_bodies: self.config.show_bodies,
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
                 open_wallets: Default::default(), // in tests, we never use real wallets
@@ -862,12 +863,14 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
     let source_map = result.source_map.unwrap_or_default();
+    let compiler_abi = result.abi.map(Arc::new);
     let stats = run_file_tests(
         runner,
         filepath,
         tests,
         &code_cell,
         Arc::new(abi),
+        compiler_abi,
         Arc::new(source_map),
     )?;
     Ok(stats)
@@ -879,6 +882,7 @@ fn run_file_tests(
     tests: Vec<TestDescriptor>,
     code: &Cell,
     abi: Arc<ContractAbi>,
+    compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
     source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
@@ -927,7 +931,9 @@ fn run_file_tests(
             details: None,
             location: None,
             abi: abi.clone(),
+            compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
+            show_bodies: runner.config.show_bodies,
             backtrace: runner.config.backtrace,
             execution: None,
             trace_path: runner
@@ -1046,6 +1052,7 @@ fn run_file_tests(
                 emulations: Cow::Borrowed(&runner.emulations),
                 known_addresses: Cow::Borrowed(&runner.known_addresses),
                 known_code_cells: Cow::Borrowed(&runner.known_code_cells),
+                show_bodies: runner.config.show_bodies,
                 has_wallets_config: false,
                 available_wallets: vec![],
                 backtrace: runner.config.backtrace,
@@ -1116,6 +1123,7 @@ fn run_file_tests(
                         contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
                             .into(),
                     ),
+                    None,
                 );
             }
         }

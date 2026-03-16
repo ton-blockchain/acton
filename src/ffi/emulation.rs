@@ -126,6 +126,7 @@ fn build_impl(
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             cached_entry.source_map.clone().unwrap_or_default().into(),
             Some(contract_abi(content, &path, &mappings).into()),
+            cached_entry.abi.clone().map(Into::into),
         );
 
         let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
@@ -163,6 +164,7 @@ fn build_impl(
                 HashBytes::from_str(&success.code_hash_hex)?,
                 success.source_map.unwrap_or_default().into(),
                 Some(contract_abi(content, &path, &mappings).into()),
+                success.abi.clone().map(Into::into),
             );
             let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")

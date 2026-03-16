@@ -7,6 +7,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
+use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
 use ton_executor::get::GetMethodResult;
 use ton_source_map::{SourceLocation, SourceMap};
@@ -66,7 +67,11 @@ pub struct TestReport {
     #[serde(skip)]
     pub abi: Arc<ContractAbi>,
     #[serde(skip)]
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
+    #[serde(skip)]
     pub source_map: Arc<SourceMap>,
+    #[serde(skip)]
+    pub show_bodies: bool,
     #[serde(skip)]
     pub backtrace: Option<BacktraceMode>,
     #[serde(skip)]

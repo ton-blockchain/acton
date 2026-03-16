@@ -1,19 +1,22 @@
 use crate::{BaseTypeInfo, TypeAbi, TypeInfo};
 use num_bigint::BigInt;
-use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellSlice, Load};
-use tycho_types::models::{ExtAddr, IntAddr};
+use tycho_types::cell::{Cell, CellBuilder, CellSlice, Load};
+use tycho_types::models::{AnyAddr, ExtAddr, IntAddr};
 
 #[derive(Debug)]
 pub enum Data {
     Null,
     Number(BigInt),
     Bool(bool),
+    String(String),
+    Symbol(String),
     Address(IntAddr),
     ExtAddress(ExtAddr),
     Cell(Cell),
     RemainingBitsAndRefs(Cell),
     Bits((Vec<u8>, usize)),
+    Array(Vec<Data>),
+    Map(Vec<(Data, Data)>),
     Object(DataObject),
 }
 
@@ -96,18 +99,12 @@ fn decode_field(
 
             anyhow::bail!("expected internal address for address type")
         }
-        BaseTypeInfo::AnyAddress => {
-            if let Ok(int_addr) = IntAddr::load_from(data) {
-                return Ok(Data::Address(int_addr));
-            }
-
-            // TODO: load external address
-            // if let Ok(int_addr) = ExtAddr::load_from(data) {
-            //     return Ok(Data::Address(int_addr))
-            // }
-
-            anyhow::bail!("external addresses are not supported yet")
-        }
+        BaseTypeInfo::AnyAddress => Ok(match AnyAddr::load_from(data)? {
+            AnyAddr::None => Data::Null,
+            AnyAddr::Ext(ext_addr) => Data::ExtAddress(ext_addr),
+            AnyAddr::Std(addr) => Data::Address(IntAddr::Std(addr)),
+            AnyAddr::Var(addr) => Data::Address(IntAddr::Var(addr)),
+        }),
         BaseTypeInfo::Bits { width } => {
             let bits = data.load_prefix(*width as u16, 0)?;
             let bytes = (*width).div_ceil(8);
@@ -184,10 +181,9 @@ fn decode_field(
             Ok(value)
         }
         BaseTypeInfo::RemainingBitsAndRefs => {
-            // TODO: this is not correct
-            let cloned = *data;
-            let cell = cloned.cell();
-            let cell = Boc::decode(Boc::encode(cell))?;
+            let mut builder = CellBuilder::new();
+            builder.store_slice(data.load_remaining())?;
+            let cell = builder.build()?;
             let value = Data::RemainingBitsAndRefs(cell);
             Ok(value)
         }

@@ -5,6 +5,79 @@ use std::fs;
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 
+fn script_body_project(project_name: &str) -> ProjectBuilder {
+    ProjectBuilder::new(project_name)
+        .file(
+            "contracts/script_body_messages",
+            r#"
+struct (0xF8000001) ScriptBodyMsg {
+    queryId: uint64
+    recipient: address
+    amount: coins
+}
+"#,
+        )
+        .contract(
+            "script_body_sink",
+            r#"
+import "script_body_messages"
+
+contract ScriptBodySink {
+    incomingMessages: ScriptBodyMsg
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy ScriptBodyMsg.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "print_txs",
+            r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../contracts/script_body_messages"
+
+fun main() {
+    val sender = net.treasury("sender");
+    val init = ContractState {
+        code: build("script_body_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }));
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: sinkAddress,
+        body: ScriptBodyMsg {
+            queryId: 11,
+            recipient: sender.address,
+            amount: ton("0.02"),
+        },
+    }));
+
+    println(txs);
+}
+"#,
+        )
+}
+
 #[test]
 fn test_script_simple_execution() {
     let project = ProjectBuilder::new("script-simple")
@@ -99,6 +172,35 @@ fn test_script_with_calculations() {
         .code(0)
         .assert_contains("Result:")
         .assert_contains("6");
+}
+
+#[test]
+fn test_script_hides_transaction_bodies_without_show_bodies_flag() {
+    let project = script_body_project("script-hides-transaction-bodies").build();
+
+    project
+        .acton()
+        .script("scripts/print_txs.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_hides_transaction_bodies_without_show_bodies_flag.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
+    let project = script_body_project("script-shows-transaction-bodies").build();
+
+    project
+        .acton()
+        .script("scripts/print_txs.tolk")
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_shows_transaction_bodies_with_show_bodies_flag.stdout.txt",
+        );
 }
 
 #[test]

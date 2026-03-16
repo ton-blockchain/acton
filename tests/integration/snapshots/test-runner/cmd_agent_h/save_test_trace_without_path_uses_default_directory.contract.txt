@@ -16,6 +16,21 @@
     "types": []
   },
   "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
+  "compiler_abi": {
+    "abiSchemaVersion": "1.0",
+    "compilerName": "tolk",
+    "compilerVersion": "1.2.0",
+    "constants": [],
+    "contractName": "",
+    "declarations": [],
+    "emittedEvents": [],
+    "getMethods": [],
+    "incomingExternal": [],
+    "incomingMessages": [],
+    "outgoingMessages": [],
+    "storage": {},
+    "thrownErrors": []
+  },
   "name": "simple",
   "source_map": {
     "debug_marks": {},

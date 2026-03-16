@@ -12,16 +12,11 @@
  TEST  [ROOT]
 
  > tests/formatter_linear.test.tolk (1 test)
-  ✓ formatter-linear-chain-println [TIME]
+  ✓ formatter-hides-bodies-without-show-bodies-flag [TIME]
     └─ Test output:
        N/A -> sender A
        └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1828
-           │   queryId: 101
-           │   mid: [WALLET_ADDRESS_BASE] (fm_linear_mid)
-           │   sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
            └── FmRelay 0.1994148 TON -> fm_linear_mid C                                gas=1782
-               queryId: 101, sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
                └── FmDelivered 0.1 TON -> fm_linear_sink D                             gas=333
-                   queryId: 101, hop: 2
 
  ✓ 1 passed in 1 file

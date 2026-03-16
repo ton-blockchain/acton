@@ -319,7 +319,7 @@ pub enum ABIDeclaration {
         name: String,
 
         #[serde(rename = "encodedAs")]
-        encoded_as: String,
+        encoded_as: ABIType,
 
         members: Vec<ABIEnumMember>,
 
@@ -773,11 +773,17 @@ fn find_alias_decl_full<'a>(
     })
 }
 
-fn find_enum_decl<'a>(abi: &'a ContractABI, target_name: &str) -> Option<&'a [ABIEnumMember]> {
+fn find_enum_decl<'a>(
+    abi: &'a ContractABI,
+    target_name: &str,
+) -> Option<(&'a ABIType, &'a [ABIEnumMember])> {
     abi.declarations.iter().find_map(|decl| match decl {
-        ABIDeclaration::Enum { name, members, .. } if name == target_name => {
-            Some(members.as_slice())
-        }
+        ABIDeclaration::Enum {
+            name,
+            encoded_as,
+            members,
+            ..
+        } if name == target_name => Some((encoded_as, members.as_slice())),
         _ => None,
     })
 }
@@ -988,7 +994,7 @@ fn default_alias_value(
 
 fn default_enum_value(abi: &ContractABI, enum_name: &str) -> String {
     find_enum_decl(abi, enum_name)
-        .and_then(|members| members.first())
+        .and_then(|(_, members)| members.first())
         .map(|member| format!("{enum_name}.{}", member.name))
         .unwrap_or_else(|| "null".to_owned())
 }
@@ -1357,7 +1363,7 @@ mod tests {
         abi.declarations = vec![
             ABIDeclaration::Enum {
                 name: "Color".to_owned(),
-                encoded_as: "uint2".to_owned(),
+                encoded_as: ABIType::UintN { n: 2 },
                 members: vec![
                     ABIEnumMember {
                         name: "Red".to_owned(),

@@ -50,6 +50,7 @@ pub fn script_cmd(
     broadcast: bool,
     net: Option<String>,
     explorer: Option<Explorer>,
+    show_bodies: bool,
 ) -> anyhow::Result<()> {
     let project_root = project_root().to_path_buf();
     stdlib::ensure_latest(&project_root)?;
@@ -99,6 +100,7 @@ pub fn script_cmd(
         broadcast,
         network,
         explorer,
+        show_bodies,
     )
 }
 
@@ -121,6 +123,7 @@ fn run_script_file(
     broadcast: bool,
     net: Option<Network>,
     explorer: Option<Explorer>,
+    show_bodies: bool,
 ) -> anyhow::Result<()> {
     let abi = contract_abi(content.into(), file_path, mappings);
 
@@ -146,6 +149,7 @@ fn run_script_file(
                 broadcast,
                 net.as_ref(),
                 explorer,
+                show_bodies,
             )?;
             Ok(())
         }
@@ -175,6 +179,7 @@ fn execute_script(
     broadcast: bool,
     net: Option<&Network>,
     explorer: Option<Explorer>,
+    show_bodies: bool,
 ) -> anyhow::Result<()> {
     let dest_address = contract_address(code_cell)?;
     let formatted_address = format_std_address(&dest_address, net);
@@ -229,6 +234,7 @@ fn execute_script(
             config: &config,
             project_root: project_root().to_path_buf(),
             abi,
+            show_bodies,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets,

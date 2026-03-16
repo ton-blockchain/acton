@@ -4,6 +4,11 @@ import "messages"
 import "storage"
 import "fees-management"
 
+contract JettonMinter {
+    incomingMessages: AllowedMessageToMinter
+    storage: MinterStorage
+}
+
 type AllowedMessageToMinter =
     | MintNewJettons
     | BurnNotificationForMinter

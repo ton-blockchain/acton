@@ -24,6 +24,7 @@ fn merge_test_config(
     settings.to_test_config(
         None,
         vec![],
+        false,
         debug_override,
         debug_port_override,
         None,
