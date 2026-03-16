@@ -48,7 +48,7 @@ jobs:
 
     steps:
       - name: Restore TON objects archive cache
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || true
         id: archive-cache
         uses: actions/cache@v5
         with:
@@ -140,7 +140,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
+        if: (github.ref == 'refs/heads/master' || true) && steps.archive-cache.outputs.cache-hit != 'true'
         env:
           ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -151,7 +151,7 @@ jobs:
             ton-artifacts.lock
 
       - name: Upload TON objects artifact
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || true
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
@@ -178,7 +178,7 @@ jobs:
 
     steps:
       - name: Restore TON objects archive cache
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || true
         id: archive-cache
         uses: actions/cache@v5
         with:
@@ -239,7 +239,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
+        if: (github.ref == 'refs/heads/master' || true) && steps.archive-cache.outputs.cache-hit != 'true'
         env:
           ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -250,7 +250,7 @@ jobs:
             ton-artifacts.lock
 
       - name: Upload TON objects artifact
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master' || true
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
@@ -262,7 +262,7 @@ jobs:
     name: Create Trunk Objs Release
     needs: [ prepare, build-objs-linux, build-objs-macos ]
     runs-on: ubicloud-standard-2
-    if: github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' || true
 
     permissions:
       actions: write
@@ -311,6 +311,7 @@ jobs:
             }
 
       - name: Delete previous trunk-objs release and tag
+        if: false
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -321,6 +322,7 @@ jobs:
             -X DELETE || true
 
       - name: Create trunk-objs release
+        if: false
         env:
           GH_TOKEN: ${{ github.token }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
