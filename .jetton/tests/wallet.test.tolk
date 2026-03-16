@@ -1,4 +1,5 @@
 // Acton library imports
+import "@local-acton/io"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
@@ -128,6 +129,8 @@ get fun `test minter admin can change admin`() {
 
     val changeAdminResult = minter.sendChangeAdmin(deployer.address, notDeployer.address);
     expect(changeAdminResult).toHaveSuccessfulTx({ from: deployer.address, to: minter.address });
+
+    println(changeAdminResult);
 
     val adminAfter = minter.getAdminAddress();
     expect(adminAfter).toEqual(notDeployer.address);

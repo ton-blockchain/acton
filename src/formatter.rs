@@ -15,6 +15,9 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::sync::Arc;
+use tolkc::abi::{ABIType as CompilerAbiType, ContractABI as CompilerContractABI};
+use ton_abi::abi_serde::Data as ParsedAbiData;
+use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
 use ton_source_map::{DebugLocation, SourceLocation};
@@ -24,8 +27,8 @@ use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes, Load};
 use tycho_types::dict;
 use tycho_types::models::{
     AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
-    DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, MsgInfo, RelaxedMessage, RelaxedMsgInfo,
-    ReserveCurrencyFlags, SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
+    DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, Message, MsgInfo, RelaxedMessage,
+    RelaxedMsgInfo, ReserveCurrencyFlags, SendMsgFlags, ShardAccount, StdAddr, Transaction, TxInfo,
 };
 use tycho_types::num::Tokens;
 
@@ -45,6 +48,17 @@ struct SendResult {
 struct TransactionNode {
     send_result: SendResult,
     children: Vec<TransactionNode>,
+}
+
+#[derive(Debug)]
+struct DecodedMessageBody {
+    name: String,
+    data: ParsedAbiData,
+}
+
+enum FormattedExtraInfo {
+    Tree(String),
+    Annotation(String),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -481,6 +495,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             }
         }
 
+        roots.sort_by_key(|node| node.send_result.tx.lt);
         roots
     }
 
@@ -503,6 +518,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 children.push(child_node);
             }
         }
+        children.sort_by_key(|node| node.send_result.tx.lt);
 
         Some(TransactionNode {
             send_result: result.clone(),
@@ -656,8 +672,13 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         if let Some(in_msg) = &tx.in_msg
             && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
         {
-            let message_part =
-                self.format_single_message(&in_msg, contract_letters, show_full_names);
+            let resolved_body = self.resolve_incoming_message_body(&in_msg);
+            let message_part = self.format_single_message(
+                &in_msg,
+                contract_letters,
+                show_full_names,
+                resolved_body.as_ref(),
+            );
             if !message_part.is_empty() {
                 return message_part;
             }
@@ -666,9 +687,14 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         if let Ok(Some(in_msg)) = tx.load_in_msg()
             && let MsgInfo::ExtIn(info) = &in_msg.info
         {
-            let mut body = in_msg.body;
-            let opcode = body.load_u32().unwrap_or(0);
-            let message_name = self.get_message_name(opcode);
+            let resolved_body = self.resolve_external_incoming_message_body(tx, &in_msg);
+            let message_name = resolved_body.as_ref().map_or_else(
+                || {
+                    let mut body = in_msg.body;
+                    self.get_message_name(body.load_u32().unwrap_or(0))
+                },
+                |body| Self::color_message_name(&body.name),
+            );
             let destination = self.format_address_with_letter(&info.dst, contract_letters, true);
 
             return format!(
@@ -688,6 +714,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         in_msg: &RelaxedMessage,
         contract_letters: &HashMap<IntAddr, String>,
         show_full_names: bool,
+        resolved_body: Option<&DecodedMessageBody>,
     ) -> String {
         let RelaxedMsgInfo::Int(info) = &in_msg.info else {
             if let RelaxedMsgInfo::ExtOut(_) = &in_msg.info {
@@ -713,8 +740,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             result += " -> ".dimmed().to_string().as_str();
         }
 
-        let opcode = Self::extract_opcode(in_msg);
-        let message_name = self.get_message_name(opcode);
+        let message_name = resolved_body.map_or_else(
+            || self.get_message_name(Self::extract_opcode(in_msg)),
+            |body| Self::color_message_name(&body.name),
+        );
         result += &message_name;
         result += " ";
 
@@ -736,6 +765,366 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         format!("{amount} TON").green().to_string()
     }
 
+    fn format_inbound_message_body(&self, tx: &Transaction) -> Option<String> {
+        if let Some(in_msg) = tx.in_msg.as_ref()
+            && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
+            && let Some(body) = self.resolve_incoming_message_body(&in_msg)
+        {
+            return Some(self.format_decoded_message_body(&body));
+        }
+
+        let in_msg = tx.load_in_msg().ok()??;
+        let body = self.resolve_external_incoming_message_body(tx, &in_msg)?;
+        Some(self.format_decoded_message_body(&body))
+    }
+
+    fn resolve_incoming_message_body(&self, in_msg: &RelaxedMessage) -> Option<DecodedMessageBody> {
+        let build = self.build_result_for_incoming_message(in_msg)?;
+        let compiler_abi = build.compiler_abi.as_ref()?;
+        match &in_msg.info {
+            RelaxedMsgInfo::Int(info) => self.try_decode_message_body_types(
+                in_msg.body,
+                compiler_abi,
+                compiler_abi
+                    .incoming_messages
+                    .iter()
+                    .map(|message| &message.body_ty),
+                if info.bounced { 32 } else { 0 },
+            ),
+            RelaxedMsgInfo::ExtOut(_) => None,
+        }
+    }
+
+    fn format_outgoing_external_message(
+        &self,
+        tx: &Transaction,
+        msg: &RelaxedMessage,
+    ) -> Option<Vec<FormattedExtraInfo>> {
+        let RelaxedMsgInfo::ExtOut(info) = &msg.info else {
+            return None;
+        };
+
+        let resolved_body = self.resolve_outgoing_external_message_body(tx, msg);
+        let message_name = resolved_body.as_ref().map_or_else(
+            || self.get_message_name(Self::extract_opcode(msg)),
+            |body| Self::color_message_name(&body.name),
+        );
+
+        let mut infos = Vec::new();
+        if let Some(ext_addr) = &info.dst {
+            let hex_data = hex::encode(&ext_addr.data);
+            infos.push(FormattedExtraInfo::Tree(format!(
+                "{} {} {} {} {}",
+                "ext-out".blue(),
+                message_name,
+                "->".dimmed(),
+                format!("0x{hex_data}").cyan(),
+                format!("({} bits)", ext_addr.data_bit_len).dimmed(),
+            )));
+        } else {
+            infos.push(FormattedExtraInfo::Tree(format!(
+                "{} {} {} {}",
+                "ext-out".blue(),
+                message_name,
+                "->".dimmed(),
+                "none".cyan()
+            )));
+        }
+
+        if let Some(body) = resolved_body {
+            infos.push(FormattedExtraInfo::Annotation(
+                self.format_decoded_message_body(&body),
+            ));
+        }
+
+        Some(infos)
+    }
+
+    fn resolve_external_incoming_message_body(
+        &self,
+        tx: &Transaction,
+        in_msg: &Message<'_>,
+    ) -> Option<DecodedMessageBody> {
+        let MsgInfo::ExtIn(_) = &in_msg.info else {
+            return None;
+        };
+
+        let build = self.build_result_for_tx_account(tx)?;
+        let compiler_abi = build.compiler_abi.as_ref()?;
+        self.try_decode_message_body_types(
+            in_msg.body,
+            compiler_abi,
+            compiler_abi
+                .incoming_external
+                .iter()
+                .map(|message| &message.body_ty),
+            0,
+        )
+    }
+
+    fn resolve_outgoing_external_message_body(
+        &self,
+        tx: &Transaction,
+        msg: &RelaxedMessage,
+    ) -> Option<DecodedMessageBody> {
+        let build = self.build_result_for_tx_account(tx)?;
+        let compiler_abi = build.compiler_abi.as_ref()?;
+        self.try_decode_message_body_types(
+            msg.body,
+            compiler_abi,
+            compiler_abi
+                .emitted_events
+                .iter()
+                .map(|message| &message.body_ty),
+            0,
+        )
+    }
+
+    fn build_result_for_incoming_message(
+        &self,
+        in_msg: &RelaxedMessage,
+    ) -> Option<context::CompilationResult> {
+        let dst = match &in_msg.info {
+            RelaxedMsgInfo::Int(info) => Some(&info.dst),
+            RelaxedMsgInfo::ExtOut(_) => return None,
+        };
+        self.build_result_for_address(dst)
+    }
+
+    fn build_result_for_tx_account(&self, tx: &Transaction) -> Option<context::CompilationResult> {
+        let code = self
+            .accounts
+            .iter()
+            .find_map(|(addr, _)| {
+                (addr.address == tx.account).then(|| Self::account_code(&self.accounts, addr))
+            })
+            .flatten();
+        self.build_cache
+            .result_for_code(&code)
+            .map(|(_, result)| result)
+    }
+
+    fn build_result_for_address(
+        &self,
+        dst: Option<&IntAddr>,
+    ) -> Option<context::CompilationResult> {
+        let code = match dst? {
+            IntAddr::Std(addr) => Self::account_code(&self.accounts, addr),
+            IntAddr::Var(_) => None,
+        };
+        self.build_cache
+            .result_for_code(&code)
+            .map(|(_, result)| result)
+    }
+
+    fn try_decode_message_body_types<'msg, I>(
+        &self,
+        body: CellSlice<'msg>,
+        abi: &CompilerContractABI,
+        candidates: I,
+        prefix_to_skip: u16,
+    ) -> Option<DecodedMessageBody>
+    where
+        I: IntoIterator<Item = &'msg CompilerAbiType>,
+    {
+        for body_ty in candidates {
+            let mut parser = body;
+            if prefix_to_skip > 0 && parser.skip_first(prefix_to_skip, 0).is_err() {
+                continue;
+            }
+
+            let Ok(data) = compiler_abi_serde::decode(&mut parser, abi, body_ty) else {
+                continue;
+            };
+            if parser.size_bits() != 0 || parser.size_refs() != 0 {
+                continue;
+            }
+
+            return Some(DecodedMessageBody {
+                name: Self::compiler_body_type_name(body_ty),
+                data,
+            });
+        }
+
+        None
+    }
+
+    fn compiler_body_type_name(body_ty: &CompilerAbiType) -> String {
+        match body_ty {
+            CompilerAbiType::StructRef { struct_name, .. } => struct_name.clone(),
+            CompilerAbiType::AliasRef { alias_name, .. } => alias_name.clone(),
+            CompilerAbiType::EnumRef { enum_name } => enum_name.clone(),
+            _ => body_ty.render_type(),
+        }
+    }
+
+    fn format_decoded_message_body(&self, body: &DecodedMessageBody) -> String {
+        self.format_annotation_body(&body.data)
+    }
+
+    fn format_annotation_body(&self, data: &ParsedAbiData) -> String {
+        match data {
+            ParsedAbiData::Object(object) => self.format_annotation_object(object, 0, true),
+            _ => format!("body: {}", self.format_annotation_value(data, 0)),
+        }
+    }
+
+    fn format_annotation_object(
+        &self,
+        object: &ton_abi::abi_serde::DataObject,
+        indent: usize,
+        is_root: bool,
+    ) -> String {
+        if object.fields.is_empty() {
+            return if is_root {
+                "body: {}".to_owned()
+            } else {
+                "{}".to_owned()
+            };
+        }
+
+        if object.fields.len() <= 2
+            && object
+                .fields
+                .iter()
+                .all(|field| Self::is_annotation_scalar(&field.value))
+        {
+            let inner = object
+                .fields
+                .iter()
+                .map(|field| {
+                    format!(
+                        "{}: {}",
+                        field.name,
+                        self.format_annotation_scalar(&field.value)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            return if is_root {
+                format!("body: {inner}")
+            } else {
+                format!("{{ {inner} }}")
+            };
+        }
+
+        let indent_str = "    ".repeat(indent);
+        let field_indent = "    ".repeat(indent + 1);
+        let mut lines = if is_root {
+            vec!["body:".to_owned()]
+        } else {
+            vec!["{".to_owned()]
+        };
+        for field in &object.fields {
+            let value = self.format_annotation_value(&field.value, indent + 1);
+            let mut value_lines = value.lines();
+            if let Some(first) = value_lines.next() {
+                lines.push(format!("{field_indent}{}: {first}", field.name));
+                lines.extend(value_lines.map(str::to_owned));
+            }
+        }
+        if !is_root {
+            lines.push(format!("{indent_str}}}"));
+        }
+        lines.join("\n")
+    }
+
+    fn format_annotation_value(&self, data: &ParsedAbiData, indent: usize) -> String {
+        match data {
+            ParsedAbiData::Object(object) => self.format_annotation_object(object, indent, false),
+            ParsedAbiData::Array(items) => self.format_annotation_array(items, indent),
+            ParsedAbiData::Map(entries) => self.format_annotation_map(entries, indent),
+            _ => self.format_annotation_scalar(data),
+        }
+    }
+
+    fn format_annotation_array(&self, items: &[ParsedAbiData], indent: usize) -> String {
+        if items.is_empty() {
+            return "[]".to_owned();
+        }
+
+        if items.len() <= 3 && items.iter().all(Self::is_annotation_scalar) {
+            let inner = items
+                .iter()
+                .map(|item| self.format_annotation_scalar(item))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return format!("[{inner}]");
+        }
+
+        let indent_str = "    ".repeat(indent);
+        let item_indent = "    ".repeat(indent + 1);
+        let mut lines = vec!["[".to_owned()];
+        for item in items {
+            let value = self.format_annotation_value(item, indent + 1);
+            let mut value_lines = value.lines();
+            if let Some(first) = value_lines.next() {
+                lines.push(format!("{item_indent}{first}"));
+                lines.extend(value_lines.map(str::to_owned));
+            }
+        }
+        lines.push(format!("{indent_str}]"));
+        lines.join("\n")
+    }
+
+    fn format_annotation_map(
+        &self,
+        entries: &[(ParsedAbiData, ParsedAbiData)],
+        indent: usize,
+    ) -> String {
+        if entries.is_empty() {
+            return "{}".to_owned();
+        }
+
+        let indent_str = "    ".repeat(indent);
+        let entry_indent = "    ".repeat(indent + 1);
+        let mut lines = vec!["{".to_owned()];
+        for (key, value) in entries {
+            let key = self.format_annotation_value(key, indent + 1);
+            let value = self.format_annotation_value(value, indent + 1);
+            let mut value_lines = value.lines();
+            if let Some(first) = value_lines.next() {
+                lines.push(format!("{entry_indent}{key} => {first}"));
+                lines.extend(value_lines.map(str::to_owned));
+            }
+        }
+        lines.push(format!("{indent_str}}}"));
+        lines.join("\n")
+    }
+
+    fn format_annotation_scalar(&self, data: &ParsedAbiData) -> String {
+        match data {
+            ParsedAbiData::Null => "null".to_owned(),
+            ParsedAbiData::Number(value) => value.to_string(),
+            ParsedAbiData::Bool(value) => value.to_string(),
+            ParsedAbiData::String(value) => format!("{value:?}"),
+            ParsedAbiData::Symbol(value) => value.clone(),
+            ParsedAbiData::Address(value) => self.address_to_string(value),
+            ParsedAbiData::ExtAddress(value) => value.to_string(),
+            ParsedAbiData::Cell(value) | ParsedAbiData::RemainingBitsAndRefs(value) => {
+                Boc::encode_hex(value)
+            }
+            ParsedAbiData::Bits((bytes, bit_len)) => {
+                let hex = hex::encode_upper(bytes);
+                if bit_len % 8 == 0 {
+                    format!("0x{hex}")
+                } else {
+                    format!("0x{hex} ({bit_len} bits)")
+                }
+            }
+            ParsedAbiData::Object(_) | ParsedAbiData::Array(_) | ParsedAbiData::Map(_) => {
+                self.format_annotation_value(data, 0)
+            }
+        }
+    }
+
+    fn is_annotation_scalar(data: &ParsedAbiData) -> bool {
+        !matches!(
+            data,
+            ParsedAbiData::Object(_) | ParsedAbiData::Array(_) | ParsedAbiData::Map(_)
+        )
+    }
+
     /// Format transaction execution info (gas, exit code, account changes)
     #[allow(clippy::too_many_arguments)]
     fn format_transaction_info(
@@ -755,6 +1144,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         let mut result = String::new();
         let mut extra_infos = vec![];
 
+        if let Some(body) = self.format_inbound_message_body(tx) {
+            extra_infos.push(FormattedExtraInfo::Annotation(body));
+        }
+
         let padding_len = 80usize.saturating_sub(prefix_len + main_part_visible_len);
 
         if let ComputePhase::Executed(compute) = info.compute_phase {
@@ -769,7 +1162,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             if let Some(debug_logs) = debug_logs
                 && !debug_logs.is_empty()
             {
-                extra_infos.push(format!(
+                extra_infos.push(FormattedExtraInfo::Tree(format!(
                     "Debug logs:\n{}",
                     debug_logs
                         .lines()
@@ -780,7 +1173,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                         ))
                         .collect::<Vec<_>>()
                         .join("\n")
-                ));
+                )));
             }
 
             if compute.exit_code != 0 {
@@ -805,10 +1198,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
 
         if tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active {
-            extra_infos.push("account created".to_string());
+            extra_infos.push(FormattedExtraInfo::Tree("account created".to_string()));
         }
         if tx.orig_status == AccountStatus::Active && tx.end_status == AccountStatus::NotExists {
-            extra_infos.push("account destroyed".to_string());
+            extra_infos.push(FormattedExtraInfo::Tree("account destroyed".to_string()));
         }
 
         match info.action_phase {
@@ -819,13 +1212,13 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                         .red()
                         .to_string();
 
-                    extra_infos.push("Action phase failed".to_string());
+                    extra_infos.push(FormattedExtraInfo::Tree("Action phase failed".to_string()));
 
                     if let Some(info) = exit_codes::find(action.result_code) {
-                        extra_infos.push(format!(
+                        extra_infos.push(FormattedExtraInfo::Tree(format!(
                             "Description: {}",
                             info.description.to_string().yellow()
-                        ));
+                        )));
                     }
 
                     // Trying to collect installed and executed out actions
@@ -839,10 +1232,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                     let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
                     if let Some(logs) = executor_logs {
                         if self.backtrace.is_none() {
-                            extra_infos.push(format!(
+                            extra_infos.push(FormattedExtraInfo::Tree(format!(
                                 "Re-run with {} to get actions location",
                                 "--backtrace full".yellow()
-                            ));
+                            )));
                         }
 
                         let actions = self.format_actions_retrace(
@@ -853,7 +1246,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                             contract_letters,
                         );
                         if !actions.is_empty() {
-                            extra_infos.push(actions);
+                            extra_infos.push(FormattedExtraInfo::Tree(actions));
                         }
                     }
                 }
@@ -865,11 +1258,11 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 continue;
             };
 
-            let Some(msg_info) = self.format_ext_out_message(&msg) else {
+            let Some(msg_infos) = self.format_outgoing_external_message(tx, &msg) else {
                 continue;
             };
 
-            extra_infos.push(msg_info);
+            extra_infos.extend(msg_infos);
         }
 
         if !extra_infos.is_empty() {
@@ -877,35 +1270,49 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
 
         for (idx, info) in extra_infos.iter().enumerate() {
-            let has_next_sibling = has_children || idx < extra_infos.len() - 1;
-            let branch = if has_next_sibling {
-                "├── ".dimmed().to_string()
-            } else {
-                "└── ".dimmed().to_string()
-            };
-
-            result += child_prefix;
-            result += &branch;
-
-            let mut lines = info.lines();
-            if let Some(first_line) = lines.next() {
-                result += first_line;
-            }
-
-            for line in lines {
-                result += "\n";
-                result += child_prefix;
-
-                let line_without_prefix = line.strip_prefix(child_prefix).unwrap_or(line);
-                if has_next_sibling {
-                    result += "│   ".dimmed().to_string().as_str();
-                    if let Some(rest) = line_without_prefix.strip_prefix("    ") {
-                        result += rest;
+            match info {
+                FormattedExtraInfo::Tree(info) => {
+                    let has_next_sibling = has_children || idx < extra_infos.len() - 1;
+                    let branch = if has_next_sibling {
+                        "├── ".dimmed().to_string()
                     } else {
-                        result += line_without_prefix;
+                        "└── ".dimmed().to_string()
+                    };
+
+                    result += child_prefix;
+                    result += &branch;
+
+                    let mut lines = info.lines();
+                    if let Some(first_line) = lines.next() {
+                        result += first_line;
                     }
-                } else {
-                    result += line_without_prefix;
+
+                    for line in lines {
+                        result += "\n";
+                        result += child_prefix;
+
+                        let line_without_prefix = line.strip_prefix(child_prefix).unwrap_or(line);
+                        if has_next_sibling {
+                            result += "│   ".dimmed().to_string().as_str();
+                            if let Some(rest) = line_without_prefix.strip_prefix("    ") {
+                                result += rest;
+                            } else {
+                                result += line_without_prefix;
+                            }
+                        } else {
+                            result += line_without_prefix;
+                        }
+                    }
+                }
+                FormattedExtraInfo::Annotation(info) => {
+                    for (line_idx, line) in info.lines().enumerate() {
+                        if line_idx > 0 {
+                            result += "\n";
+                        }
+                        result += child_prefix;
+                        result += "    ";
+                        result += line.dimmed().to_string().as_str();
+                    }
                 }
             }
 
@@ -921,7 +1328,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         &self,
         tx: &Transaction,
         child_prefix: &str,
-        extra_infos: &mut Vec<String>,
+        extra_infos: &mut Vec<FormattedExtraInfo>,
         compute: &ExecutedComputePhase,
     ) -> String {
         let mut result = String::new();
@@ -930,10 +1337,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             .to_string();
 
         if let Some(info) = exit_codes::find(compute.exit_code) {
-            extra_infos.push(format!(
+            extra_infos.push(FormattedExtraInfo::Tree(format!(
                 "Compute phase failed: {}",
                 info.description.to_string().yellow()
-            ));
+            )));
         }
 
         if let Some(missing_libraries) = self.emulations.find_tx_missing_libraries(tx.lt)
@@ -943,26 +1350,26 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             missing_libraries.sort_unstable();
 
             if missing_libraries.len() == 1 {
-                extra_infos.push(format!(
+                extra_infos.push(FormattedExtraInfo::Tree(format!(
                     "Library {} is missing, which is what causes this error",
                     missing_libraries.join(", ").yellow()
-                ));
+                )));
             } else {
-                extra_infos.push(format!(
+                extra_infos.push(FormattedExtraInfo::Tree(format!(
                     "Missing libraries: {}",
                     missing_libraries.join(", ").yellow()
-                ));
+                )));
             }
-            extra_infos.push(
+            extra_infos.push(FormattedExtraInfo::Tree(
                 "This most likely happened because the library is not registered in tests"
                     .to_owned(),
-            );
-            extra_infos.push(format!(
+            ));
+            extra_infos.push(FormattedExtraInfo::Tree(format!(
                 "To manually register library use {} somewhere in {}-like function",
                 "vm.registerLibrary(code)".yellow(),
                 "setupTests()".yellow(),
-            ));
-            extra_infos.push("Learn more about libraries in documentation: https://i582.github.io/acton/docs/advanced/libraries/".to_owned());
+            )));
+            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://i582.github.io/acton/docs/advanced/libraries/".to_owned()));
         }
 
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);
@@ -974,7 +1381,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         &self,
         tx: &Transaction,
         child_prefix: &str,
-        extra_infos: &mut Vec<String>,
+        extra_infos: &mut Vec<FormattedExtraInfo>,
     ) -> Option<()> {
         // Trying to retrace exit code to find out exact Tolk source location
         let logs = self.emulations.find_tx_logs(tx.lt)?;
@@ -1002,11 +1409,11 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             .collect::<Vec<String>>()
             .join("\n");
 
-        extra_infos.push(format!(
+        extra_infos.push(FormattedExtraInfo::Tree(format!(
             "at {}\n{}",
             loc.format().dimmed(),
             backtrace_result
-        ));
+        )));
 
         Some(())
     }
@@ -1045,8 +1452,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             return None;
         };
 
-        let opcode = Self::extract_opcode(msg);
-        let message_name = self.get_message_name(opcode);
+        let message_name = self.get_message_name(Self::extract_opcode(msg));
 
         let msg_info = if let Some(ext_addr) = &info.dst {
             let hex_data = hex::encode(&ext_addr.data);
@@ -1104,7 +1510,9 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                         let msg = message.message();
 
                         let formatted = match msg {
-                            Some(msg) => self.format_single_message(&msg, contract_letters, false),
+                            Some(msg) => {
+                                self.format_single_message(&msg, contract_letters, false, None)
+                            }
                             None => hash.to_string(),
                         };
 
@@ -1347,6 +1755,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             &format!("0x{opcode:x}")
         };
 
+        Self::color_message_name(name)
+    }
+
+    fn color_message_name(name: &str) -> String {
         name.purple().bold().to_string()
     }
 

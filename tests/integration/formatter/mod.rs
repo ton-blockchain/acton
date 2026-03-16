@@ -24,6 +24,10 @@ struct (0xF1000003) FmDelivered {
 const LINEAR_ROOT_CONTRACT: &str = r#"
 import "fm_linear_messages"
 
+contract FmLinearRoot {
+    incomingMessages: FmRoute
+}
+
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
         return;
@@ -46,6 +50,10 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const LINEAR_MID_CONTRACT: &str = r#"
 import "fm_linear_messages"
+
+contract FmLinearMid {
+    incomingMessages: FmRelay
+}
 
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
@@ -70,6 +78,10 @@ fun onBouncedMessage(_: InMessageBounced) {}
 const LINEAR_ROOT_OPCODE_MISMATCH_CONTRACT: &str = r#"
 import "fm_linear_messages"
 
+contract FmLinearMismatchRoot {
+    incomingMessages: FmRoute
+}
+
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
         return;
@@ -92,6 +104,10 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const LINEAR_SINK_CONTRACT: &str = r#"
 import "fm_linear_messages"
+
+contract FmLinearSink {
+    incomingMessages: FmDelivered
+}
 
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
@@ -196,6 +212,10 @@ struct (0xF2000003) FmRightNotice {
 const FANOUT_ROOT_CONTRACT: &str = r#"
 import "fm_fanout_messages"
 
+contract FmFanoutRoot {
+    incomingMessages: FmFanKick
+}
+
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
         return;
@@ -228,6 +248,10 @@ fun onBouncedMessage(_: InMessageBounced) {}
 const FANOUT_LEFT_CONTRACT: &str = r#"
 import "fm_fanout_messages"
 
+contract FmFanoutLeft {
+    incomingMessages: FmLeftNotice
+}
+
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
         return;
@@ -241,6 +265,10 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const FANOUT_RIGHT_CONTRACT: &str = r#"
 import "fm_fanout_messages"
+
+contract FmFanoutRight {
+    incomingMessages: FmRightNotice
+}
 
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
@@ -347,6 +375,10 @@ const EXTERNAL_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
 import "fm_external_messages"
 
+contract FmExternalRoot {
+    incomingExternal: FmExternalTrigger
+}
+
 fun fmExternalAddress(tag: uint32): any_address {
     return beginCell()
         .storeUint(0b01, 2)
@@ -420,6 +452,11 @@ fun deployFmExternalHarness() {
 
 const EXTERNAL_THROW_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
+import "fm_external_messages"
+
+contract FmExternalThrow {
+    incomingExternal: FmExternalTrigger
+}
 
 fun onExternalMessage() {
     acceptExternalMessage();
@@ -481,6 +518,10 @@ struct (0xF4000002) FmBounceAck {
 
 const BOUNCE_CONTRACT: &str = r#"
 import "fm_bounce_messages"
+
+contract FmBounceEcho {
+    incomingMessages: FmBouncePing
+}
 
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
@@ -592,6 +633,12 @@ struct (0xF5000003) FmFlagsActionFail {
 const FLAGS_CONTRACT: &str = r#"
 import "fm_flags_messages"
 
+type FmFlagsMessage = FmFlagsOk | FmFlagsThrow | FmFlagsActionFail
+
+contract FmFlags {
+    incomingMessages: FmFlagsMessage
+}
+
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
         return;
@@ -657,6 +704,10 @@ struct (0xF6000001) FmDebugPing {
 const DEBUG_CONTRACT: &str = r#"
 import "fm_debug_messages"
 
+contract FmDebug {
+    incomingMessages: FmDebugPing
+}
+
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {
         return;
@@ -706,6 +757,10 @@ struct (0xF7000001) FmDestroyNow {
 
 const DESTROY_CONTRACT: &str = r#"
 import "fm_destroy_messages"
+
+contract FmDestroy {
+    incomingMessages: FmDestroyNow
+}
 
 fun onInternalMessage(in: InMessage) {
     if (in.body.isEmpty()) {

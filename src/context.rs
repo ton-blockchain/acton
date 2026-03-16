@@ -8,6 +8,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tolkc::abi::ContractABI as CompilerContractABI;
 use ton::ton_wallet::TonWallet;
 use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
@@ -145,6 +146,7 @@ impl BuildCache {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn memoize(
         &mut self,
         name: &str,
@@ -153,6 +155,7 @@ impl BuildCache {
         code_hash: HashBytes,
         source_map: Arc<SourceMap>,
         abi: Option<Arc<ContractAbi>>,
+        compiler_abi: Option<Arc<CompilerContractABI>>,
     ) {
         self.built.insert(
             path.to_owned(),
@@ -162,6 +165,7 @@ impl BuildCache {
                 code_hash,
                 source_map,
                 abi,
+                compiler_abi,
             },
         );
     }
@@ -184,6 +188,7 @@ pub struct CompilationResult {
     pub code_hash: HashBytes,
     pub source_map: Arc<SourceMap>,
     pub abi: Option<Arc<ContractAbi>>,
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
 #[derive(Debug, Clone)]

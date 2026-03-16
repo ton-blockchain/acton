@@ -862,12 +862,14 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
     let source_map = result.source_map.unwrap_or_default();
+    let compiler_abi = result.abi.map(Arc::new);
     let stats = run_file_tests(
         runner,
         filepath,
         tests,
         &code_cell,
         Arc::new(abi),
+        compiler_abi,
         Arc::new(source_map),
     )?;
     Ok(stats)
@@ -879,6 +881,7 @@ fn run_file_tests(
     tests: Vec<TestDescriptor>,
     code: &Cell,
     abi: Arc<ContractAbi>,
+    compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
     source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
@@ -927,6 +930,7 @@ fn run_file_tests(
             details: None,
             location: None,
             abi: abi.clone(),
+            compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
             backtrace: runner.config.backtrace,
             execution: None,
@@ -1116,6 +1120,7 @@ fn run_file_tests(
                         contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
                             .into(),
                     ),
+                    None,
                 );
             }
         }

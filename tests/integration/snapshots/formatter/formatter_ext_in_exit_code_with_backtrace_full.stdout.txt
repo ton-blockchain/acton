@@ -12,6 +12,7 @@
     └─ Test output:
        N/A -> external
        └── ext-in FmExternalTrigger -> fm_external_throw A                             gas=388 exit_code=10 aborted
+           ├── body FmExternalTrigger { queryId: 404 }
            ├── Compute phase failed: Dictionary error
            └── at contracts/fm_external_throw[LINE]
                   __throw   at contracts/fm_external_throw[LINE]

@@ -1,4 +1,5 @@
 pub mod abi_serde;
+pub mod compiler_abi_serde;
 
 use num_bigint::BigInt;
 use path_absolutize::Absolutize;

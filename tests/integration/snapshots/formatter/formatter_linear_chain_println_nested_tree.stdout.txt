@@ -16,7 +16,14 @@
     └─ Test output:
        N/A -> sender A
        └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1828
+           ├── body FmRoute {
+           │       queryId: 101
+           │       mid: [WALLET_ADDRESS_BASE]
+           │       sink: [WALLET_ADDRESS_BASE]
+           │   }
            └── FmRelay 0.1994148 TON -> fm_linear_mid C                                gas=1782
+               ├── body FmRelay { queryId: 101, sink: [WALLET_ADDRESS_BASE] }
                └── FmDelivered 0.1 TON -> fm_linear_sink D                             gas=333
+                   └── body FmDelivered { queryId: 101, hop: 2 }
 
  ✓ 1 passed in 1 file
