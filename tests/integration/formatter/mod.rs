@@ -954,6 +954,7 @@ fn run_success_case(project: ProjectBuilder, snapshot_path: &str) {
         .build()
         .acton()
         .test()
+        .show_bodies()
         .run()
         .success()
         .assert_passed(1)
@@ -1117,6 +1118,31 @@ get fun `test-formatter-linear-chain-println`() {
 }
 
 #[test]
+fn formatter_hides_bodies_without_show_bodies_flag() {
+    linear_formatter_project(
+        "formatter-hides-bodies-without-show-bodies-flag",
+        r#"
+get fun `test-formatter-hides-bodies-without-show-bodies-flag`() {
+    val (sender, rootAddress, midAddress, sinkAddress) = deployFmLinearHarness();
+    val txs = sendFmLinear(sender, rootAddress, midAddress, sinkAddress, 707);
+
+    expect(txs).toHaveLength(3);
+    println(txs);
+}
+"#,
+    )
+    .build()
+    .acton()
+    .test()
+    .run()
+    .success()
+    .assert_passed(1)
+    .assert_snapshot_matches(
+        "integration/snapshots/formatter/formatter_hides_bodies_without_show_bodies_flag.stdout.txt",
+    );
+}
+
+#[test]
 fn formatter_linear_chain_println_renders_exit_code63_for_opcode_mismatch() {
     run_success_case(
         linear_mismatch_formatter_project(
@@ -1252,6 +1278,7 @@ get fun `test-formatter-exit-code63-from-cell-mismatch-in-test-body`() {
     .build()
     .acton()
     .test()
+    .show_bodies()
     .run()
     .failure()
     .assert_failed(1)
@@ -1282,6 +1309,7 @@ get fun `test-formatter-exit-code63-from-cell-mismatch-in-test-body-with-backtra
     .build()
     .acton()
     .test()
+    .show_bodies()
     .with_backtrace("full")
     .run()
     .failure()
@@ -1361,6 +1389,7 @@ get fun `test-formatter-ext-in-exit-code-with-backtrace-full`() {
     .build()
     .acton()
     .test()
+    .show_bodies()
     .with_backtrace("full")
     .run()
     .success()
@@ -1512,6 +1541,7 @@ get fun `test-formatter-action-phase-failure-println-with-backtrace-full`() {
         .build()
         .acton()
         .test()
+        .show_bodies()
         .with_backtrace("full")
         .run()
         .success()
@@ -1646,6 +1676,7 @@ get fun `test-formatter-exit-code-with-backtrace-full`() {
         .build()
         .acton()
         .test()
+        .show_bodies()
         .with_backtrace("full")
         .run()
         .success()
@@ -1694,6 +1725,7 @@ get fun `test-formatter-exit-code-with-backtrace-full-and-account-created-event`
         .build()
         .acton()
         .test()
+        .show_bodies()
         .with_backtrace("full")
         .run()
         .success()
@@ -1751,6 +1783,7 @@ get fun `test-formatter-debug-logs-println`() {
     .build()
     .acton()
     .test()
+    .show_bodies()
     .with_backtrace("full")
     .run()
     .success()

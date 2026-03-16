@@ -401,6 +401,7 @@ pub struct Env<'a> {
     pub config: &'a ActonConfig,
     pub project_root: PathBuf,
     pub abi: Arc<ContractAbi>,
+    pub show_bodies: bool,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,

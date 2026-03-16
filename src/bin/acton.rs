@@ -202,6 +202,12 @@ enum Commands {
         reporter: Vec<ReportFormat>,
         #[arg(
             long,
+            help = "Show decoded message bodies in printed transaction trees when ABI is known",
+            help_heading = "Reporting"
+        )]
+        show_bodies: bool,
+        #[arg(
+            long,
             default_value = "test-results",
             help = "JUnit XML output directory",
             help_heading = "Reporting"
@@ -392,6 +398,12 @@ enum Commands {
             value_name = "NAME"
         )]
         explorer: Option<Explorer>,
+        #[arg(
+            long,
+            help = "Show decoded message bodies in printed transaction trees when ABI is known",
+            help_heading = "Output"
+        )]
+        show_bodies: bool,
     },
     #[command(
         about = "Build the specified contract or all contracts",
@@ -1815,6 +1827,7 @@ fn main() {
             path,
             filter,
             reporter,
+            show_bodies,
             debug,
             debug_port,
             backtrace,
@@ -1844,6 +1857,7 @@ fn main() {
             Ok(fork_net) => {
                 let config = create_test_config(
                     filter,
+                    show_bodies,
                     debug,
                     debug_port,
                     backtrace,
@@ -1912,6 +1926,7 @@ fn main() {
             broadcast,
             net,
             explorer,
+            show_bodies,
         } => script_cmd(
             &path,
             args,
@@ -1924,6 +1939,7 @@ fn main() {
             broadcast,
             net,
             explorer,
+            show_bodies,
         ),
         Commands::Build {
             contract_id,
@@ -2366,6 +2382,7 @@ fn setup_logging() -> anyhow::Result<()> {
 #[allow(clippy::too_many_arguments)]
 fn create_test_config(
     filter: Option<String>,
+    show_bodies: bool,
     debug: bool,
     debug_port: Option<u16>,
     backtrace: Option<BacktraceMode>,
@@ -2401,6 +2418,7 @@ fn create_test_config(
         return test_settings.to_test_config(
             filter,
             report_formats,
+            show_bodies,
             if debug { Some(true) } else { None },
             debug_port,
             backtrace,
@@ -2438,6 +2456,7 @@ fn create_test_config(
     }
 
     TestConfig {
+        show_bodies,
         debug,
         debug_port: debug_port.unwrap_or(12345),
         backtrace,

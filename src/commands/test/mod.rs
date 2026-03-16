@@ -276,6 +276,7 @@ impl<'a> TestRunner<'a> {
                 config: &self.acton_config,
                 project_root: self.project_root.clone(),
                 abi,
+                show_bodies: self.config.show_bodies,
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
                 open_wallets: Default::default(), // in tests, we never use real wallets
@@ -932,6 +933,7 @@ fn run_file_tests(
             abi: abi.clone(),
             compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
+            show_bodies: runner.config.show_bodies,
             backtrace: runner.config.backtrace,
             execution: None,
             trace_path: runner
@@ -1050,6 +1052,7 @@ fn run_file_tests(
                 emulations: Cow::Borrowed(&runner.emulations),
                 known_addresses: Cow::Borrowed(&runner.known_addresses),
                 known_code_cells: Cow::Borrowed(&runner.known_code_cells),
+                show_bodies: runner.config.show_bodies,
                 has_wallets_config: false,
                 available_wallets: vec![],
                 backtrace: runner.config.backtrace,

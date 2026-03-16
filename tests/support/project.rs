@@ -1571,6 +1571,12 @@ impl ActonCommand {
         self
     }
 
+    /// Show decoded message bodies in printed transaction trees.
+    pub(crate) fn show_bodies(mut self) -> Self {
+        self.cmd = self.cmd.arg("--show-bodies");
+        self
+    }
+
     fn into_prepared_command(mut self) -> ProcessCommandBuilder {
         if let Some(path) = self.test_path {
             self.cmd = self.cmd.arg(path);

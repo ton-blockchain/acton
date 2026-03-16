@@ -93,6 +93,7 @@ pub struct FormatterContext<'a> {
     pub emulations: Cow<'a, EmulationsState>,
     pub known_addresses: Cow<'a, KnownAddresses>,
     pub known_code_cells: Cow<'a, FxHashMap<HashBytes, String>>,
+    pub show_bodies: bool,
     pub has_wallets_config: bool,
     pub available_wallets: Vec<String>,
     pub backtrace: Option<BacktraceMode>,
@@ -111,6 +112,7 @@ impl<'a> FormatterContext<'a> {
             emulations: Cow::Owned(EmulationsState::new()),
             known_addresses: Cow::Owned(KnownAddresses::new()),
             known_code_cells: Cow::Owned(FxHashMap::default()),
+            show_bodies: false,
             has_wallets_config: false,
             available_wallets: vec![],
             backtrace: None,
@@ -130,6 +132,7 @@ impl<'a> FormatterContext<'a> {
             emulations: Cow::Borrowed(ctx.chain.emulations),
             known_addresses: Cow::Borrowed(ctx.build.known_addresses),
             known_code_cells: Cow::Borrowed(ctx.build.known_code_cells),
+            show_bodies: ctx.env.show_bodies,
             has_wallets_config: ctx.env.wallets.is_some(),
             available_wallets: ctx.env.open_wallets.keys().cloned().collect(),
             backtrace: ctx.build.backtrace,
@@ -780,6 +783,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     fn format_inbound_message_body(&self, tx: &Transaction) -> Option<String> {
+        if !self.show_bodies {
+            return None;
+        }
+
         if let Some(in_msg) = tx.in_msg.as_ref()
             && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
             && let Some(body) = self.resolve_incoming_message_body(&in_msg)
@@ -845,7 +852,9 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             )));
         }
 
-        if let Some(body) = resolved_body {
+        if self.show_bodies
+            && let Some(body) = resolved_body
+        {
             infos.push(FormattedExtraInfo::Annotation(
                 self.format_decoded_message_body(&body),
             ));

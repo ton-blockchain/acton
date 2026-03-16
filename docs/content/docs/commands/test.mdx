@@ -32,9 +32,10 @@ This command discovers and runs all test files in project root and its subdirect
 
 ### Reporter Options
 
-| Option                  | Type      | Description                                               |
-|-------------------------|-----------|-----------------------------------------------------------|
-| `--reporter <FORMATS>`  | Array     | Test output format(s)                                     |
+| Option                 | Type  | Description                                                                |
+|------------------------|-------|----------------------------------------------------------------------------|
+| `--reporter <FORMATS>` | Array | Test output format(s)                                                      |
+| `--show-bodies`        | Flag  | Show decoded message bodies in printed transaction trees when ABI is known |
 
 **Supported reporters:**
 - `console` — Detailed console output with code context (default)
@@ -132,6 +133,9 @@ acton test --filter "test-integration.*"
 ```bash
 # Console output with TeamCity integration
 acton test --reporter console,teamcity
+
+# Show decoded message bodies in printed transaction trees
+acton test --show-bodies
 
 # Generate JUnit XML reports
 acton test --reporter junit --junit-path ./reports
