@@ -285,19 +285,7 @@ jobs:
             --verify-tag \
             --generate-notes
 
-      - name: Delete previous mirror release and tag
-        if: env.ENABLE_MIRRORING_RELEASE == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          gh release delete "${RELEASE_TAG}" --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
-
-          gh api \
-            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/${RELEASE_TAG} \
-            -X DELETE || true
-
-      - name: Create mirror release
+      - name: Create GitHub release (mirror)
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
