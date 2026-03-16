@@ -12,6 +12,10 @@ concurrency:
 
 permissions: { }
 
+env:
+  ENABLE_MIRRORING_RELEASE: 'true'
+  PUBLIC_ACTON_REPOSITORY: i582/acton-public
+
 jobs:
   check-versions:
     name: Check Release Versions
@@ -280,3 +284,23 @@ jobs:
             --latest \
             --verify-tag \
             --generate-notes
+
+      - name: Create GitHub release (mirror)
+        if: env.ENABLE_MIRRORING_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          release_notes=$(cat <<EOF
+          Mirror of Acton release ${RELEASE_TAG}.
+
+          Source release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}
+          Source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+          EOF
+          )
+
+          gh release create "${RELEASE_TAG}" dist/*.tar.gz \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            --title "${RELEASE_TAG}" \
+            --latest \
+            --notes "${release_notes}"
