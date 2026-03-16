@@ -1,5 +1,4 @@
 // Acton library imports
-import "@local-acton/io"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
@@ -51,8 +50,6 @@ get fun `test minter admin should be able to mint jettons`() {
         ton("1")
     );
     expect(mintResult).toHaveSuccessfulTx({ from: minter.address, to: wallet.address });
-
-    println(mintResult);
 
     // excesses
     expect(mintResult).toHaveTx({ from: wallet.address, to: minter.address, exitCode: 65535 });
@@ -131,8 +128,6 @@ get fun `test minter admin can change admin`() {
 
     val changeAdminResult = minter.sendChangeAdmin(deployer.address, notDeployer.address);
     expect(changeAdminResult).toHaveSuccessfulTx({ from: deployer.address, to: minter.address });
-
-    println(changeAdminResult);
 
     val adminAfter = minter.getAdminAddress();
     expect(adminAfter).toEqual(notDeployer.address);

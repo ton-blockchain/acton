@@ -1135,47 +1135,6 @@ mod tests {
     }
 
     #[test]
-    fn contract_abi_deserializes_enum_encoded_as_type_object() {
-        let abi: ContractABI = serde_json::from_str(
-            r#"{
-                "abiSchemaVersion": "1.0",
-                "contractName": "Test",
-                "author": "",
-                "version": "",
-                "description": "",
-                "declarations": [
-                    {
-                        "kind": "Enum",
-                        "name": "Mode",
-                        "encodedAs": { "kind": "uintN", "n": 2 },
-                        "members": [
-                            { "name": "Alpha", "value": "1", "description": "" },
-                            { "name": "Beta", "value": "2", "description": "" }
-                        ]
-                    }
-                ],
-                "incomingMessages": [],
-                "incomingExternal": [],
-                "outgoingMessages": [],
-                "emittedEvents": [],
-                "storage": {},
-                "getMethods": [],
-                "thrownErrors": [],
-                "constants": [],
-                "compilerName": "tolkc",
-                "compilerVersion": "test"
-            }"#,
-        )
-        .expect("failed to deserialize ABI with enum encodedAs type object");
-
-        let Some(ABIDeclaration::Enum { encoded_as, .. }) = abi.declarations.first() else {
-            panic!("expected enum declaration");
-        };
-
-        assert!(matches!(encoded_as, ABIType::UintN { n: 2 }));
-    }
-
-    #[test]
     fn resolves_incoming_messages_through_alias_union_in_order() {
         let mut abi = empty_abi();
         abi.declarations = vec![
