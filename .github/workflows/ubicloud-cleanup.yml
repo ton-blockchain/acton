@@ -10,7 +10,7 @@ on:
         description: Preview cache cleanup without deleting anything
         required: false
         type: boolean
-        default: true
+        default: false
       keep:
         description: Keep the last N Ubicloud cache entries; leave empty to keep 5 and auto-enable dry-run
         required: false
