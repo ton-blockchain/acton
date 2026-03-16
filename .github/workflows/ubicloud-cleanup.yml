@@ -1,6 +1,9 @@
 name: Cleanup Ubicloud GitHub Cache
 
 on:
+  schedule:
+    # 00:00 Europe/Moscow (21:00 UTC)
+    - cron: "0 21 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
