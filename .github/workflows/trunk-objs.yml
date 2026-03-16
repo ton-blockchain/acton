@@ -330,3 +330,27 @@ jobs:
             --notes "${release_notes}" \
             --prerelease \
             --target "${GITHUB_SHA}"
+
+      - name: Delete previous public trunk-objs release and tag
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        run: |
+          gh release delete trunk-objs --repo "i582/acton-public" -y || true
+
+          gh api \
+            repos/i582/acton-public/git/refs/tags/trunk-objs \
+            -X DELETE || true
+
+      - name: Create public trunk-objs release
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        run: |
+          release_notes=$'Generated from TON commit: https://github.com/i582/ton/commit/'"${TON_COMMIT}"$'\nSource Acton commit: https://github.com/'"${GITHUB_REPOSITORY}"$'/commit/'"${GITHUB_SHA}"
+
+          gh release create trunk-objs \
+            --repo "i582/acton-public" \
+            dist/*.tar.gz \
+            --title "Trunk Objs" \
+            --notes "${release_notes}" \
+            --prerelease
