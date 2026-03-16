@@ -235,8 +235,8 @@ jobs:
             artifacts/* \
             --title "Trunk" \
             --notes "${release_notes}" \
-            --prerelease \
-            --target "${GITHUB_SHA}"
+            --target "${GITHUB_SHA}" \
+            --prerelease
 
       - name: Delete previous trunk release and tag (mirror)
         if: env.ENABLE_MIRRORING_RELEASE == 'true'
