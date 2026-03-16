@@ -271,7 +271,7 @@ jobs:
 
     env:
       ENABLE_PUBLIC_TRUNK_OBJS_RELEASE: 'true'
-      PUBLIC_TRUNK_OBJS_REPOSITORY: i582/acton-public
+      PUBLIC_ACTON_REPOSITORY: i582/acton-public
 
     steps:
       - name: Download TON objects artifacts
@@ -346,10 +346,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
         run: |
-          gh release delete trunk-objs --repo "${PUBLIC_TRUNK_OBJS_REPOSITORY}" -y || true
+          gh release delete trunk-objs --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
 
           gh api \
-            repos/${PUBLIC_TRUNK_OBJS_REPOSITORY}/git/refs/tags/trunk-objs \
+            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk-objs \
             -X DELETE || true
 
       - name: Create public trunk-objs release
@@ -365,7 +365,7 @@ jobs:
           )
 
           gh release create trunk-objs \
-            --repo "${PUBLIC_TRUNK_OBJS_REPOSITORY}" \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
             dist/*.tar.gz \
             --title "Trunk Objs" \
             --notes "${release_notes}" \
