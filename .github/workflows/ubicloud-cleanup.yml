@@ -44,11 +44,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-        with:
-          key: ubicloud-cleanup
-
       - name: Install Rust
         run: rustup toolchain install
 
