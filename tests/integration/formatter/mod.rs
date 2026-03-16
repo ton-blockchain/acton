@@ -1361,6 +1361,36 @@ get fun `test-formatter-decoded-body-known-addresses`() {
 }
 
 #[test]
+fn formatter_decoded_body_uses_contract_type_for_deployed_addresses() {
+    run_success_case(
+        known_address_formatter_project(
+            "formatter-decoded-body-deployed-contract-addresses",
+            r#"
+get fun `test-formatter-decoded-body-deployed-contract-addresses`() {
+    val (sender, _notDeployer, sinkAddress) = deployFmKnownAddressHarness();
+    val txs = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.05"),
+            dest: sinkAddress,
+            body: FmKnownAddressBody {
+                queryId: 0,
+                newAdminAddress: sinkAddress,
+            },
+        }),
+    );
+
+    expect(txs).toHaveLength(1);
+    println(txs);
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_decoded_body_deployed_contract_address_names.stdout.txt",
+    );
+}
+
+#[test]
 fn formatter_decoded_body_unwraps_cell_and_keeps_nested_indent_compact() {
     run_success_case(
         wrapped_known_address_formatter_project(

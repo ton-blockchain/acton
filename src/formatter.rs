@@ -220,16 +220,11 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
 
     fn format_annotation_address(&self, address: &IntAddr) -> String {
         let rendered = self.address_to_string(address);
-
-        let IntAddr::Std(addr) = address else {
+        let Some(contract_type) = self.get_contract_type(address) else {
             return rendered;
         };
 
-        let Some(known_address) = self.known_addresses.addresses.get(addr) else {
-            return rendered;
-        };
-
-        format!("{rendered} ({})", known_address.name)
+        format!("{rendered} ({contract_type})")
     }
 
     fn format_address_slice(&self, slice: &Cell, colorize: bool) -> String {
