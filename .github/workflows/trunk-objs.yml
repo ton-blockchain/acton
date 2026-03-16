@@ -44,9 +44,9 @@ jobs:
           - runner: ubicloud-standard-4-ubuntu-2204
             os: linux
             arch: x86_64
-#          - runner: ubicloud-standard-4-arm-ubuntu-2204
-#            os: linux
-#            arch: aarch64
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
+            os: linux
+            arch: aarch64
     runs-on: ${{ matrix.runner }}
 
     permissions:
@@ -146,7 +146,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: (github.ref == 'refs/heads/master' || true) && steps.archive-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
         env:
           ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -157,7 +157,7 @@ jobs:
             ton-artifacts.lock
 
       - name: Upload TON objects artifact
-        if: github.ref == 'refs/heads/master' || true
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
@@ -185,7 +185,7 @@ jobs:
 
     steps:
       - name: Restore TON objects archive cache
-        if: github.ref == 'refs/heads/master' || true
+        if: github.ref == 'refs/heads/master'
         id: archive-cache
         uses: actions/cache@v5
         with:
@@ -246,7 +246,7 @@ jobs:
           cat objs/ton-artifacts.lock
 
       - name: Pack TON objects
-        if: (github.ref == 'refs/heads/master' || true) && steps.archive-cache.outputs.cache-hit != 'true'
+        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
         env:
           ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
@@ -257,7 +257,7 @@ jobs:
             ton-artifacts.lock
 
       - name: Upload TON objects artifact
-        if: github.ref == 'refs/heads/master' || true
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
@@ -269,7 +269,7 @@ jobs:
     name: Create Trunk Objs Release
     needs: [ prepare, build-objs-linux ]
     runs-on: ubicloud-standard-2
-    if: github.ref == 'refs/heads/master' || true
+    if: github.ref == 'refs/heads/master'
 
     permissions:
       actions: write
@@ -343,8 +343,7 @@ jobs:
             --prerelease \
             --target "${GITHUB_SHA}"
 
-      - name: Delete previous public trunk-objs release and tag
-        if: env.ENABLE_MIRRORING_RELEASE == 'true'
+      - name: Delete previous trunk-objs release and tag (mirror)
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
         run: |
@@ -354,8 +353,7 @@ jobs:
             repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk-objs \
             -X DELETE || true
 
-      - name: Create public trunk-objs release
-        if: env.ENABLE_MIRRORING_RELEASE == 'true'
+      - name: Create trunk-objs release (mirror)
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
