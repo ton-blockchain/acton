@@ -16,8 +16,8 @@
     └─ Test output:
        N/A -> fm_linear_root A
        └── FmRelay 0.1994148 TON -> fm_linear_mid B                                    gas=1782
-           ├── body FmRelay { queryId: 909, sink: [WALLET_ADDRESS_BASE] }
+           queryId: 909, sink: [WALLET_ADDRESS_BASE]
            └── FmDelivered 0.1 TON -> fm_linear_sink C                                 gas=333
-               └── body FmDelivered { queryId: 909, hop: 2 }
+               queryId: 909, hop: 2
 
  ✓ 1 passed in 1 file

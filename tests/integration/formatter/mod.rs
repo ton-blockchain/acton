@@ -193,6 +193,143 @@ fun sendFmLinear(sender: Treasury, rootAddress: address, midAddress: address, si
 }
 "#;
 
+const KNOWN_ADDRESS_MESSAGES: &str = r#"
+struct (0xF1800001) FmKnownAddressBody {
+    queryId: uint64
+    newAdminAddress: address
+}
+"#;
+
+const WRAPPED_KNOWN_ADDRESS_MESSAGES: &str = r#"
+struct FmWrappedKnownAddress {
+    queryId: uint64
+    newAdminAddress: address
+    tonAmount: coins
+}
+
+struct (0xF1800002) FmWrappedKnownAddressBody {
+    internalTransferMsg: Cell<FmWrappedKnownAddress>
+}
+"#;
+
+const KNOWN_ADDRESS_CONTRACT: &str = r#"
+import "fm_known_address_messages"
+
+contract FmKnownAddressSink {
+    incomingMessages: FmKnownAddressBody
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy FmKnownAddressBody.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const KNOWN_ADDRESS_IMPORTS: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../../lib/testing/expect"
+import "../../lib/testing/transaction_expect"
+import "../contracts/fm_known_address_messages"
+
+fun deployFmKnownAddressHarness() {
+    val sender = net.treasury("sender");
+    val notDeployer = net.treasury("not_deployer");
+
+    val init = ContractState {
+        code: build("fm_known_address_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+    return (sender, notDeployer, sinkAddress);
+}
+"#;
+
+const WRAPPED_KNOWN_ADDRESS_CONTRACT: &str = r#"
+import "fm_wrapped_known_address_messages"
+
+contract FmWrappedKnownAddressSink {
+    incomingMessages: FmWrappedKnownAddressBody
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy FmWrappedKnownAddressBody.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const WRAPPED_KNOWN_ADDRESS_FORWARDER_CONTRACT: &str = r#"
+import "fm_wrapped_known_address_messages"
+
+contract FmWrappedKnownAddressForwarder {
+    incomingMessages: FmWrappedKnownAddressBody
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    createMessage({
+        bounce: false,
+        value: ton("0.01"),
+        dest: in.senderAddress,
+    }).send(SEND_MODE_REGULAR);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const WRAPPED_KNOWN_ADDRESS_IMPORTS: &str = r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../../lib/testing/expect"
+import "../../lib/testing/transaction_expect"
+import "../contracts/fm_wrapped_known_address_messages"
+
+fun deployFmWrappedKnownAddressHarness() {
+    val sender = net.treasury("sender");
+    val notDeployer = net.treasury("not_deployer");
+
+    val init = ContractState {
+        code: build("fm_wrapped_known_address_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+    return (sender, notDeployer, sinkAddress);
+}
+"#;
+
 const FANOUT_MESSAGES: &str = r#"
 struct (0xF2000001) FmFanKick {
     queryId: uint64
@@ -853,6 +990,48 @@ fn fanout_formatter_project(project_name: &str, test_body: &str) -> ProjectBuild
         .test_file("formatter_fanout", &source)
 }
 
+fn known_address_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
+    let source = format!("{KNOWN_ADDRESS_IMPORTS}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .file(
+            "contracts/fm_known_address_messages",
+            KNOWN_ADDRESS_MESSAGES,
+        )
+        .contract("fm_known_address_sink", KNOWN_ADDRESS_CONTRACT)
+        .test_file("formatter_known_address", &source)
+}
+
+fn wrapped_known_address_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
+    let source = format!("{WRAPPED_KNOWN_ADDRESS_IMPORTS}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .file(
+            "contracts/fm_wrapped_known_address_messages",
+            WRAPPED_KNOWN_ADDRESS_MESSAGES,
+        )
+        .contract(
+            "fm_wrapped_known_address_sink",
+            WRAPPED_KNOWN_ADDRESS_CONTRACT,
+        )
+        .test_file("formatter_wrapped_known_address", &source)
+}
+
+fn wrapped_known_address_forwarder_formatter_project(
+    project_name: &str,
+    test_body: &str,
+) -> ProjectBuilder {
+    let source = format!("{WRAPPED_KNOWN_ADDRESS_IMPORTS}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .file(
+            "contracts/fm_wrapped_known_address_messages",
+            WRAPPED_KNOWN_ADDRESS_MESSAGES,
+        )
+        .contract(
+            "fm_wrapped_known_address_sink",
+            WRAPPED_KNOWN_ADDRESS_FORWARDER_CONTRACT,
+        )
+        .test_file("formatter_wrapped_known_address", &source)
+}
+
 fn external_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
     let source = format!("{EXTERNAL_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
@@ -953,6 +1132,102 @@ get fun `test-formatter-linear-chain-println-exit-code63-opcode-mismatch`() {
 "#,
         ),
         "integration/snapshots/formatter/formatter_linear_chain_println_exit_code63_opcode_mismatch.stdout.txt",
+    );
+}
+
+#[test]
+fn formatter_decoded_body_renders_known_address_names() {
+    run_success_case(
+        known_address_formatter_project(
+            "formatter-decoded-body-known-addresses",
+            r#"
+get fun `test-formatter-decoded-body-known-addresses`() {
+    val (sender, notDeployer, sinkAddress) = deployFmKnownAddressHarness();
+    val txs = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.05"),
+            dest: sinkAddress,
+            body: FmKnownAddressBody {
+                queryId: 0,
+                newAdminAddress: notDeployer.address,
+            },
+        }),
+    );
+
+    expect(txs).toHaveLength(1);
+    println(txs);
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_decoded_body_known_address_names.stdout.txt",
+    );
+}
+
+#[test]
+fn formatter_decoded_body_unwraps_cell_and_keeps_nested_indent_compact() {
+    run_success_case(
+        wrapped_known_address_formatter_project(
+            "formatter-decoded-body-wrapped-known-addresses",
+            r#"
+get fun `test-formatter-decoded-body-wrapped-known-addresses`() {
+    val (sender, notDeployer, sinkAddress) = deployFmWrappedKnownAddressHarness();
+    val txs = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.05"),
+            dest: sinkAddress,
+            body: FmWrappedKnownAddressBody {
+                internalTransferMsg: FmWrappedKnownAddress {
+                    queryId: 0,
+                    newAdminAddress: notDeployer.address,
+                    tonAmount: ton("1"),
+                }.toCell(),
+            },
+        }),
+    );
+
+    expect(txs).toHaveLength(1);
+    println(txs);
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_decoded_body_wrapped_known_address_names.stdout.txt",
+    );
+}
+
+#[test]
+fn formatter_multiline_body_uses_tree_gutter_when_children_follow() {
+    run_success_case(
+        wrapped_known_address_forwarder_formatter_project(
+            "formatter-multiline-body-tree-gutter",
+            r#"
+get fun `test-formatter-multiline-body-tree-gutter`() {
+    val (sender, notDeployer, sinkAddress) = deployFmWrappedKnownAddressHarness();
+    val txs = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("0.05"),
+            dest: sinkAddress,
+            body: FmWrappedKnownAddressBody {
+                internalTransferMsg: FmWrappedKnownAddress {
+                    queryId: 0,
+                    newAdminAddress: notDeployer.address,
+                    tonAmount: ton("1"),
+                }.toCell(),
+            },
+        }),
+    );
+
+    expect(txs).toHaveLength(2);
+    println(txs);
+}
+"#,
+        ),
+        "integration/snapshots/formatter/formatter_multiline_body_tree_gutter.stdout.txt",
     );
 }
 

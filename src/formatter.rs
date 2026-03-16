@@ -215,6 +215,20 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         }
     }
 
+    fn format_annotation_address(&self, address: &IntAddr) -> String {
+        let rendered = self.address_to_string(address);
+
+        let IntAddr::Std(addr) = address else {
+            return rendered;
+        };
+
+        let Some(known_address) = self.known_addresses.addresses.get(addr) else {
+            return rendered;
+        };
+
+        format!("{rendered} ({})", known_address.name)
+    }
+
     fn format_address_slice(&self, slice: &Cell, colorize: bool) -> String {
         let mut parser = slice.as_slice_allow_exotic();
         let Ok(addr) = IntAddr::load_from(&mut parser) else {
@@ -963,9 +977,10 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     fn format_annotation_body(&self, data: &ParsedAbiData) -> String {
+        let data = Self::unwrap_annotation_data(data);
         match data {
             ParsedAbiData::Object(object) => self.format_annotation_object(object, 0, true),
-            _ => format!("body: {}", self.format_annotation_value(data, 0)),
+            _ => self.format_annotation_value(data, 0),
         }
     }
 
@@ -976,11 +991,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         is_root: bool,
     ) -> String {
         if object.fields.is_empty() {
-            return if is_root {
-                "body: {}".to_owned()
-            } else {
-                "{}".to_owned()
-            };
+            return "{}".to_owned();
         }
 
         if object.fields.len() <= 2
@@ -1002,16 +1013,20 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                 .collect::<Vec<_>>()
                 .join(", ");
             return if is_root {
-                format!("body: {inner}")
+                inner
             } else {
                 format!("{{ {inner} }}")
             };
         }
 
-        let indent_str = "    ".repeat(indent);
-        let field_indent = "    ".repeat(indent + 1);
+        let indent_str = "    ".repeat(Self::annotation_container_closing_indent(indent));
+        let field_indent = if is_root {
+            "    ".repeat(indent)
+        } else {
+            "    ".repeat(Self::annotation_container_inner_indent(indent))
+        };
         let mut lines = if is_root {
-            vec!["body:".to_owned()]
+            Vec::new()
         } else {
             vec!["{".to_owned()]
         };
@@ -1030,6 +1045,7 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     fn format_annotation_value(&self, data: &ParsedAbiData, indent: usize) -> String {
+        let data = Self::unwrap_annotation_data(data);
         match data {
             ParsedAbiData::Object(object) => self.format_annotation_object(object, indent, false),
             ParsedAbiData::Array(items) => self.format_annotation_array(items, indent),
@@ -1052,8 +1068,8 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             return format!("[{inner}]");
         }
 
-        let indent_str = "    ".repeat(indent);
-        let item_indent = "    ".repeat(indent + 1);
+        let indent_str = "    ".repeat(Self::annotation_container_closing_indent(indent));
+        let item_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
         let mut lines = vec!["[".to_owned()];
         for item in items {
             let value = self.format_annotation_value(item, indent + 1);
@@ -1076,8 +1092,8 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
             return "{}".to_owned();
         }
 
-        let indent_str = "    ".repeat(indent);
-        let entry_indent = "    ".repeat(indent + 1);
+        let indent_str = "    ".repeat(Self::annotation_container_closing_indent(indent));
+        let entry_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
         let mut lines = vec!["{".to_owned()];
         for (key, value) in entries {
             let key = self.format_annotation_value(key, indent + 1);
@@ -1093,13 +1109,14 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     fn format_annotation_scalar(&self, data: &ParsedAbiData) -> String {
+        let data = Self::unwrap_annotation_data(data);
         match data {
             ParsedAbiData::Null => "null".to_owned(),
             ParsedAbiData::Number(value) => value.to_string(),
             ParsedAbiData::Bool(value) => value.to_string(),
             ParsedAbiData::String(value) => format!("{value:?}"),
             ParsedAbiData::Symbol(value) => value.clone(),
-            ParsedAbiData::Address(value) => self.address_to_string(value),
+            ParsedAbiData::Address(value) => self.format_annotation_address(value),
             ParsedAbiData::ExtAddress(value) => value.to_string(),
             ParsedAbiData::Cell(value) | ParsedAbiData::RemainingBitsAndRefs(value) => {
                 Boc::encode_hex(value)
@@ -1119,10 +1136,36 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
     }
 
     fn is_annotation_scalar(data: &ParsedAbiData) -> bool {
+        let data = Self::unwrap_annotation_data(data);
         !matches!(
             data,
             ParsedAbiData::Object(_) | ParsedAbiData::Array(_) | ParsedAbiData::Map(_)
         )
+    }
+
+    fn unwrap_annotation_data(mut data: &ParsedAbiData) -> &ParsedAbiData {
+        while let ParsedAbiData::Object(object) = data {
+            let Some(next) = Self::annotation_wrapper_value(object) else {
+                break;
+            };
+            data = next;
+        }
+        data
+    }
+
+    fn annotation_wrapper_value(object: &ton_abi::abi_serde::DataObject) -> Option<&ParsedAbiData> {
+        if object.name == "Cell" && object.fields.len() == 1 && object.fields[0].name == "ref" {
+            return Some(&object.fields[0].value);
+        }
+        None
+    }
+
+    const fn annotation_container_inner_indent(indent: usize) -> usize {
+        if indent == 0 { 1 } else { indent }
+    }
+
+    const fn annotation_container_closing_indent(indent: usize) -> usize {
+        indent.saturating_sub(1)
     }
 
     /// Format transaction execution info (gas, exit code, account changes)
@@ -1272,7 +1315,11 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
         for (idx, info) in extra_infos.iter().enumerate() {
             match info {
                 FormattedExtraInfo::Tree(info) => {
-                    let has_next_sibling = has_children || idx < extra_infos.len() - 1;
+                    let has_next_sibling = has_children
+                        || extra_infos
+                            .iter()
+                            .skip(idx + 1)
+                            .any(|next| matches!(next, FormattedExtraInfo::Tree(_)));
                     let branch = if has_next_sibling {
                         "├── ".dimmed().to_string()
                     } else {
@@ -1305,12 +1352,24 @@ See https://i582.github.io/acton/docs/setup-wallets/ for more information
                     }
                 }
                 FormattedExtraInfo::Annotation(info) => {
+                    let is_multiline = info.contains('\n');
+                    let has_next_tree = has_children
+                        || extra_infos
+                            .iter()
+                            .skip(idx + 1)
+                            .any(|next| matches!(next, FormattedExtraInfo::Tree(_)));
                     for (line_idx, line) in info.lines().enumerate() {
                         if line_idx > 0 {
                             result += "\n";
                         }
                         result += child_prefix;
-                        result += "    ";
+                        if is_multiline {
+                            if has_next_tree {
+                                result += "│   ".dimmed().to_string().as_str();
+                            } else {
+                                result += "    ";
+                            }
+                        }
                         result += line.dimmed().to_string().as_str();
                     }
                 }
