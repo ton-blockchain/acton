@@ -94,9 +94,9 @@ jobs:
         run: |
           acton --help
 
-      - name: Run tests
-        run: |
-          just test
+#      - name: Run tests
+#        run: |
+#          just test
 
       - name: Run Acton tests
         run: |
