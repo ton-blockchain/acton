@@ -103,13 +103,16 @@ jobs:
         if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         run: |
           tar -C target/release -czf target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz acton
+          shasum -a 256 target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz > target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload trunk archive artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         uses: actions/upload-artifact@v7
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
-          path: target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          path: |
+            target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+            target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
 
