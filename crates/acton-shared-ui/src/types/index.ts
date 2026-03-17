@@ -27,6 +27,12 @@ export interface TestReport {
   readonly trace_path?: string
 }
 
+export interface TestExecutionLogs {
+  readonly stdout?: string
+  readonly stderr?: string
+  readonly vm_log_diff?: string
+}
+
 export interface BackendTransaction {
   readonly lt: string
   readonly raw_transaction: string

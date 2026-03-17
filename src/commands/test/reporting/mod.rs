@@ -25,6 +25,7 @@ pub struct TestExecutionContext {
     pub gas_used: u64,
     pub stdout: String,
     pub stderr: String,
+    pub vm_log_diff: Option<String>,
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: i32,
     pub failure: Option<TestFailureExecutionContext>,

@@ -1002,6 +1002,13 @@ fn run_file_tests(
         let expected_exit_code = dyn_expected_exit_code
             .or(test.expected_exit_code)
             .unwrap_or(0);
+        let vm_log_diff = match &get_result {
+            GetMethodResult::Success(result) => {
+                let logs = vmlogs::convert_to_diff_logs(&result.vm_log);
+                (!logs.trim().is_empty()).then_some(logs)
+            }
+            GetMethodResult::Error(_) => None,
+        };
 
         if exit_code != expected_exit_code {
             test_passed = false;
@@ -1034,6 +1041,7 @@ fn run_file_tests(
             gas_used,
             stdout: captured_stdout,
             stderr: captured_stderr,
+            vm_log_diff,
             assert_failure: assert_failure.clone(),
             expected_exit_code,
             failure: failure_execution,

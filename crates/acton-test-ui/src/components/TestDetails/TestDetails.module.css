@@ -324,6 +324,68 @@
   gap: var(--spacing-sm);
 }
 
+.infoLogsSection {
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-color);
+  overflow: hidden;
+}
+
+.infoLogsSummary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  cursor: pointer;
+  color: var(--text-primary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.infoLogsSummary:focus {
+  outline: none;
+}
+
+.infoLogsSummary:focus-visible {
+  border-radius: calc(var(--border-radius-md) - 1px);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+.infoLogsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.infoLogsSummary::after {
+  content: "+";
+  color: var(--text-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+.infoLogsSection[open] .infoLogsSummary::after {
+  content: "-";
+}
+
+.infoLogsTitle {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.infoLogsMeta {
+  margin-left: auto;
+  padding-right: var(--spacing-sm);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.infoLogsContent {
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
 .traceFeesTitle {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);

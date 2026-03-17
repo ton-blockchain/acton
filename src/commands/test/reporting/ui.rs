@@ -107,6 +107,7 @@ pub(crate) async fn start_ui_server(
 fn build_ui_api_router(state: Arc<UiServerState>) -> Router {
     Router::new()
         .route("/api/reports", get(handle_api_reports))
+        .route("/api/test-logs", get(handle_api_test_logs))
         .route("/api/trace/{name}", get(handle_api_trace))
         .route("/api/contract/{name}", get(handle_api_contract))
         .route("/api/file", get(handle_api_file))
@@ -205,6 +206,52 @@ async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl Int
 }
 
 #[derive(Deserialize)]
+struct TestLogsQuery {
+    file_path: String,
+    name: String,
+    row: usize,
+    column: usize,
+}
+
+#[derive(Default, Serialize)]
+struct TestExecutionLogsResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    stdout: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    stderr: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    vm_log_diff: Option<String>,
+}
+
+async fn handle_api_test_logs(
+    Query(query): Query<TestLogsQuery>,
+    State(state): State<Arc<UiServerState>>,
+) -> impl IntoResponse {
+    let file_path = Path::new(&query.file_path);
+    let Some(test) = state.reports.iter().find(|report| {
+        report.file_path == file_path
+            && report.name.as_ref() == query.name
+            && report.row == query.row
+            && report.column == query.column
+    }) else {
+        return (StatusCode::NOT_FOUND, "Test not found").into_response();
+    };
+
+    let response =
+        test.execution
+            .as_ref()
+            .map_or_else(TestExecutionLogsResponse::default, |execution| {
+                TestExecutionLogsResponse {
+                    stdout: non_empty_text(&execution.stdout),
+                    stderr: non_empty_text(&execution.stderr),
+                    vm_log_diff: execution.vm_log_diff.clone(),
+                }
+            });
+
+    Json(response).into_response()
+}
+
+#[derive(Deserialize)]
 struct FileQuery {
     path: String,
 }
@@ -289,4 +336,8 @@ fn resolve_path_within_root(root: &Path, requested: &Path) -> Option<PathBuf> {
     };
     let candidate = dunce::canonicalize(candidate).ok()?;
     candidate.starts_with(root).then_some(candidate)
+}
+
+fn non_empty_text(value: &str) -> Option<String> {
+    (!value.trim().is_empty()).then(|| value.to_owned())
 }
