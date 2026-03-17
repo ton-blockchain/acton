@@ -7,7 +7,7 @@ use serde::Deserialize;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-const GITHUB_RELEASES_API_BASE: &str = "https://api.github.com/repos/i582/acton-public";
+const GITHUB_RELEASE_REPOSITORIES: [&str; 2] = ["ton-blockchain/acton", "i582/acton-public"];
 
 #[derive(Deserialize, Debug, Clone)]
 pub(super) struct Release {
@@ -39,6 +39,11 @@ pub(super) struct GitHubClient {
     token: Option<String>,
 }
 
+enum RepoFetchResult<T> {
+    Found(T),
+    NotFound,
+}
+
 impl GitHubClient {
     pub(super) fn new(token: Option<String>) -> Self {
         Self {
@@ -46,92 +51,151 @@ impl GitHubClient {
             token,
         }
     }
-}
 
-impl ReleaseClient for GitHubClient {
-    fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
-        let url = if let Some(v) = version {
+    fn release_request_path(version: Option<&str>, trunk: bool) -> String {
+        if let Some(v) = version {
             let normalized = v.trim();
             if normalized.eq_ignore_ascii_case("trunk") || normalized.eq_ignore_ascii_case("vtrunk")
             {
-                format!("{GITHUB_RELEASES_API_BASE}/releases/tags/trunk")
+                "releases/tags/trunk".to_string()
             } else {
                 let tag = if normalized.starts_with('v') {
                     normalized.to_string()
                 } else {
                     format!("v{normalized}")
                 };
-                format!("{GITHUB_RELEASES_API_BASE}/releases/tags/{tag}")
+                format!("releases/tags/{tag}")
             }
         } else if trunk {
-            format!("{GITHUB_RELEASES_API_BASE}/releases/tags/trunk")
+            "releases/tags/trunk".to_string()
         } else {
-            format!("{GITHUB_RELEASES_API_BASE}/releases/latest")
-        };
+            "releases/latest".to_string()
+        }
+    }
 
-        let mut req = self.client.get(&url).header(USER_AGENT, "acton-cli");
+    fn api_base_for_repo(repo: &str) -> String {
+        format!("https://api.github.com/repos/{repo}")
+    }
 
+    fn request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
+        let mut req = self.client.get(url).header(USER_AGENT, "acton-cli");
         if let Some(token) = &self.token {
             req = req.header("Authorization", format!("token {token}"));
         }
-
-        let resp = req
-            .send()
-            .context("Failed to fetch release info from GitHub")?;
-
-        if !resp.status().is_success() {
-            if resp.status().as_u16() == 404 {
-                if let Some(v) = version {
-                    bail!("Release not found: {v}");
-                }
-                bail!("Release not found");
-            }
-            bail!("GitHub API request failed: {}", resp.status());
-        }
-
-        let release: Release = resp.json().context("Failed to parse release JSON")?;
-        Ok(release)
+        req
     }
 
-    fn list_releases(&self) -> Result<Vec<String>> {
+    fn fetch_release_from_repo(&self, repo: &str, path: &str) -> RepoFetchResult<Release> {
+        let url = format!("{}/{path}", Self::api_base_for_repo(repo));
+        let resp = match self.request(&url).send() {
+            Ok(resp) => resp,
+            Err(_) => return RepoFetchResult::NotFound,
+        };
+
+        if resp.status().as_u16() != 200 {
+            return RepoFetchResult::NotFound;
+        }
+
+        if !resp.status().is_success() {
+            return RepoFetchResult::NotFound;
+        }
+
+        match resp.json() {
+            Ok(release) => RepoFetchResult::Found(release),
+            Err(_) => RepoFetchResult::NotFound,
+        }
+    }
+
+    fn fetch_release_tags_from_repo(&self, repo: &str) -> RepoFetchResult<Vec<String>> {
         let mut tags = Vec::new();
         let per_page = 100;
         let mut page = 1;
 
         loop {
-            let url =
-                format!("{GITHUB_RELEASES_API_BASE}/releases?per_page={per_page}&page={page}");
+            let url = format!(
+                "{}/releases?per_page={per_page}&page={page}",
+                Self::api_base_for_repo(repo)
+            );
 
-            let mut req = self.client.get(&url).header(USER_AGENT, "acton-cli");
+            let resp = match self.request(&url).send() {
+                Ok(resp) => resp,
+                Err(_) => return RepoFetchResult::NotFound,
+            };
 
-            if let Some(token) = &self.token {
-                req = req.header("Authorization", format!("token {token}"));
+            if resp.status().as_u16() == 404 {
+                return RepoFetchResult::NotFound;
             }
-
-            let resp = req.send().context("Failed to fetch releases from GitHub")?;
 
             if !resp.status().is_success() {
-                bail!("GitHub API request failed: {}", resp.status());
+                return RepoFetchResult::NotFound;
             }
 
-            let releases: Vec<Release> = resp.json().context("Failed to parse releases JSON")?;
+            let releases: Vec<Release> = match resp.json() {
+                Ok(releases) => releases,
+                Err(_) => {
+                    return RepoFetchResult::NotFound;
+                }
+            };
+            let page_len = releases.len();
+
             if releases.is_empty() {
                 break;
             }
 
-            for release in &releases {
+            for release in releases {
                 if !tags.iter().any(|tag| tag == &release.tag_name) {
-                    tags.push(release.tag_name.clone());
+                    tags.push(release.tag_name);
                 }
             }
 
-            if releases.len() < per_page {
+            if page_len < per_page {
                 break;
             }
+
             page += 1;
         }
 
-        Ok(tags)
+        RepoFetchResult::Found(tags)
+    }
+}
+
+impl ReleaseClient for GitHubClient {
+    fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
+        let path = Self::release_request_path(version, trunk);
+
+        for repo in GITHUB_RELEASE_REPOSITORIES {
+            match self.fetch_release_from_repo(repo, &path) {
+                RepoFetchResult::Found(release) => return Ok(release),
+                RepoFetchResult::NotFound => continue,
+            }
+        }
+
+        bail!("Failed to fetch release info from GitHub");
+    }
+
+    fn list_releases(&self) -> Result<Vec<String>> {
+        let mut tags = Vec::new();
+        let mut success = false;
+
+        for repo in GITHUB_RELEASE_REPOSITORIES {
+            match self.fetch_release_tags_from_repo(repo) {
+                RepoFetchResult::Found(repo_tags) => {
+                    success = true;
+                    for tag in repo_tags {
+                        if !tags.iter().any(|existing| existing == &tag) {
+                            tags.push(tag);
+                        }
+                    }
+                }
+                RepoFetchResult::NotFound => {}
+            }
+        }
+
+        if success {
+            return Ok(tags);
+        }
+
+        bail!("Failed to fetch releases from GitHub")
     }
 
     fn download_asset(&self, asset: &Asset) -> Result<PathBuf> {
