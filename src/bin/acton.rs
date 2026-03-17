@@ -664,8 +664,8 @@ enum Commands {
     Up {
         #[arg(help = "Specific version to install")]
         version: Option<String>,
-        #[arg(long, help = "Install the most recent canary release")]
-        canary: bool,
+        #[arg(long, help = "Install the most recent trunk release")]
+        trunk: bool,
         #[arg(long, help = "Install the latest stable release")]
         stable: bool,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -1400,6 +1400,7 @@ fn example_up_usage() -> StyledStr {
     format_examples(
         &[
             ("Upgrade Acton to the latest stable version", "acton up"),
+            ("Switch to the trunk release", "acton up --trunk"),
             ("List all available versions", "acton up --list"),
         ],
         "https://i582.github.io/acton/docs/installation",
@@ -2163,13 +2164,13 @@ fn main() {
         ),
         Commands::Up {
             version,
-            canary,
+            trunk,
             stable,
             yes,
             list,
             check,
         } => {
-            let result = up_cmd(version, canary, stable, yes, list, check);
+            let result = up_cmd(version, trunk, stable, yes, list, check);
             if check {
                 report_error_as_json(result);
                 return;

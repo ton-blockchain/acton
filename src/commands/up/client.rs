@@ -27,7 +27,7 @@ pub(super) struct Asset {
 }
 
 pub(super) trait ReleaseClient {
-    fn get_release(&self, version: Option<&str>, canary: bool) -> Result<Release>;
+    fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release>;
     fn list_releases(&self) -> Result<Vec<String>>;
     fn download_asset(&self, asset: &Asset) -> Result<PathBuf>;
 }
@@ -47,7 +47,7 @@ impl GitHubClient {
 }
 
 impl ReleaseClient for GitHubClient {
-    fn get_release(&self, version: Option<&str>, canary: bool) -> Result<Release> {
+    fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
         let url = if let Some(v) = version {
             let tag = if v.starts_with('v') {
                 v.to_string()
@@ -55,8 +55,8 @@ impl ReleaseClient for GitHubClient {
                 format!("v{v}")
             };
             format!("https://api.github.com/repos/i582/acton/releases/tags/{tag}")
-        } else if canary {
-            "https://api.github.com/repos/i582/acton/releases/tags/canary".to_string()
+        } else if trunk {
+            "https://api.github.com/repos/i582/acton/releases/tags/trunk".to_string()
         } else {
             "https://api.github.com/repos/i582/acton/releases/latest".to_string()
         };

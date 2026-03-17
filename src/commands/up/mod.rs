@@ -13,7 +13,7 @@ use workflow::{check_update, run_update};
 
 pub fn up_cmd(
     version: Option<String>,
-    canary: bool,
+    trunk: bool,
     stable: bool,
     yes: bool,
     list: bool,
@@ -44,7 +44,7 @@ pub fn up_cmd(
         &current_exe,
         current_version_str,
         version,
-        canary,
+        trunk,
         stable,
         yes,
     );
