@@ -104,8 +104,10 @@ jobs:
             acton-${{ env.TARGET_NAME }}.tar.gz
             acton-${{ env.TARGET_NAME }}.tar.gz.sha256
           retention-days: 1
+          if-no-files-found: error
 
   build-macos:
+    if: fales
     name: Build macOS (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -187,3 +189,4 @@ jobs:
             acton-${{ env.TARGET_NAME }}.tar.gz
             acton-${{ env.TARGET_NAME }}.tar.gz.sha256
           retention-days: 1
+          if-no-files-found: error
