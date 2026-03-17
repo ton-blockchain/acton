@@ -88,7 +88,7 @@ jobs:
           cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
-        run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release/acton" >> "$GITHUB_PATH"
+        run: echo "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release" >> "$GITHUB_PATH"
 
       - name: Test acton binary
         run: |
