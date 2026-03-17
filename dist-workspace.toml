@@ -15,6 +15,7 @@ installers = ["shell"]
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
 # Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
 auto-includes = false
+
 # Which phase dist should use to create the GitHub release
 github-release = "announce"
 # Whether to enable GitHub Attestations
