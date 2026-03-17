@@ -25,6 +25,7 @@ jobs:
             os: linux
             arch: aarch64
     env:
+      OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
       TARGET_NAME: ${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
 
     permissions:
@@ -62,7 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
           mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
@@ -81,7 +82,7 @@ jobs:
           CXX: clang++-16
         run: |
           just build-ui
-          cargo build --profile release-size --target "${TARGET_NAME}" --bin acton
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |
@@ -124,6 +125,7 @@ jobs:
             os: apple-darwin
             arch: aarch64
     env:
+      OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.os }}
 
     permissions:
@@ -154,7 +156,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
           mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
@@ -170,7 +172,7 @@ jobs:
       - name: Build acton binary
         run: |
           just build-ui
-          cargo build --profile release-size --target "${TARGET_NAME} --bin acton
+          cargo build --profile release-size --locked --target "${TARGET_NAME} --bin acton
 
       - name: Test acton binary
         run: |
