@@ -103,7 +103,7 @@ jobs:
           acton test
 
       - name: Prepare trunk archive
-        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
+        #        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         shell: bash
         # language=Bash
         run: |
@@ -118,7 +118,7 @@ jobs:
           shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 
       - name: Upload trunk archive artifact
-        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
+        #        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         uses: actions/upload-artifact@v7
         with:
           name: artifacts-${{ env.TARGET_NAME }}
@@ -160,14 +160,15 @@ jobs:
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
-          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
         run: |
-          mkdir -p dist objs
+          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
+          mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern "${ARCHIVE_NAME}" \
-            --dir dist
-          tar -C objs -xzf "dist/${ARCHIVE_NAME}"
+            --dir "${RUNNER_TEMP}"
+          tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
 
       - name: Run formatter and linter
         run: |
@@ -177,7 +178,7 @@ jobs:
     name: Create Trunk Release
     needs: [ build ]
     runs-on: ubicloud-standard-2
-    if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
+    #    if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
 
     permissions:
       actions: write
