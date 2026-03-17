@@ -30,9 +30,10 @@ jobs:
         name: Read release metadata from dist-manifest.json
         # language=Bash
         run: |
+          manifest_path=artifacts/dist-manifest.json
           echo "artifacts uploaded and released successfully"
-          cat dist-manifest.json
-          echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
+          cat "$manifest_path"
+          echo "manifest=$(jq -c "." "$manifest_path")" >> "$GITHUB_OUTPUT"
 
       - name: Create mirror release
         env:
