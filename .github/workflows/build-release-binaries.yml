@@ -86,9 +86,10 @@ jobs:
 
       - name: Test acton binary
         run: |
-          ./target/release-size/acton --help
+          "./target/${TARGET_NAME}/release-size/acton" --help
 
       - name: Prepare Acton archive
+        shell: bash
         # language=Bash
         run: |
           set -euo pipefail
@@ -97,7 +98,7 @@ jobs:
           ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
 
           mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/release-size/acton" "${ARTIFACTS_DIR}/acton"
+          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
           tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
           shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 
@@ -125,7 +126,7 @@ jobs:
             os: apple-darwin
             arch: aarch64
     env:
-      OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+      OBJS_NAME: ton-objs-macos-${{ matrix.arch }}
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.os }}
 
     permissions:
@@ -172,13 +173,14 @@ jobs:
       - name: Build acton binary
         run: |
           just build-ui
-          cargo build --profile release-size --locked --target "${TARGET_NAME} --bin acton
+          cargo build --profile release-size --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Test acton binary
         run: |
-          ./target/release-size/acton --help
+          "./target/${TARGET_NAME}/release-size/acton" --help
 
       - name: Prepare Acton archive
+        shell: bash
         # language=Bash
         run: |
           set -euo pipefail
@@ -187,7 +189,7 @@ jobs:
           ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
 
           mkdir -p "${ARTIFACTS_DIR}"
-          cp "target/release-size/acton" "${ARTIFACTS_DIR}/acton"
+          cp "target/${TARGET_NAME}/release-size/acton" "${ARTIFACTS_DIR}/acton"
           tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
           shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 
