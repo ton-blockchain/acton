@@ -48,6 +48,7 @@ jobs:
 
           gh release create "$RELEASE_TAG" \
             --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            $PRERELEASE_FLAG \
             --title "$ANNOUNCEMENT_TITLE" \
             --notes-file "$RUNNER_TEMP/notes.txt" \
             artifacts/*
