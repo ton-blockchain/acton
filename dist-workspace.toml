@@ -33,3 +33,6 @@ hosting = "github"
 install-updater = false
 # A URL to download artifacts from
 simple-download-url = "https://github.com/i582/acton-public/releases/download/{tag}"
+
+[dist.github-custom-runners]
+global = "ubicloud-standard-2"
