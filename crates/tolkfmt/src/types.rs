@@ -1,5 +1,5 @@
+use crate::pretty::RcDoc;
 use crate::{Context, comments, common};
-use pretty::RcDoc;
 use tolk_syntax::{
     FunCallableType, NullableType, ParenthesizedType, TensorType, TupleType, Type,
     TypeInstantiatedTs, UnionType,
@@ -149,6 +149,7 @@ fn print_tuple_tensor_type<'a>(
         |_| vec![],
         common::ListOptions {
             brackets: (RcDoc::text(open_quote), RcDoc::text(close_quote)),
+            never_break_if_items_lt: 3,
             ..Default::default()
         },
     )
@@ -173,6 +174,16 @@ pub fn print_type_instantiated_ts<'a>(
     let name_doc = common::print_node_text(ctx, &name.0)?;
     let args = inst.arguments()?;
     let types: Vec<_> = args.types().collect();
+
+    if types.len() == 1 {
+        let single_type_doc = print_type(ctx, &types[0])?;
+        return Some(RcDoc::concat([
+            name_doc,
+            RcDoc::text("<"),
+            single_type_doc,
+            RcDoc::text(">"),
+        ]));
+    }
 
     let types_doc = common::print_list(
         ctx,

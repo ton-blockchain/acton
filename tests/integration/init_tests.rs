@@ -61,6 +61,45 @@ fn test_init_already_initialized() {
 }
 
 #[test]
+fn test_init_patches_missing_default_mappings_in_existing_config() {
+    let project = ProjectBuilder::new("init-patch-mappings")
+        .without_acton_toml()
+        .build();
+
+    fs::write(
+        project.path().join("Acton.toml"),
+        r#"[package]
+name = "my-acton-project"
+description = "A TON blockchain project"
+version = "0.1.0"
+license = "MIT"
+
+[fmt]
+width = 100
+ignore = []
+
+[mappings]
+tests = "custom-tests"
+"#,
+    )
+    .unwrap();
+
+    let output = project.acton().init().run().success();
+
+    output
+        .assert_contains("Updated Acton project")
+        .assert_contains("Patched Acton.toml with default mappings");
+
+    let content = fs::read_to_string(project.path().join("Acton.toml")).unwrap();
+    assertion().eq(
+        normalize_output(content.as_str(), project.path()),
+        snapbox::file!(
+            "snapshots/test_init_patches_missing_default_mappings_in_existing_config.toml.gen"
+        ),
+    );
+}
+
+#[test]
 fn test_init_updates_stdlib_if_already_initialized() {
     let project = ProjectBuilder::new("init-update-stdlib")
         .without_acton_toml()
@@ -448,4 +487,84 @@ fn test_init_creates_gitignore_if_not_exists() {
     assert!(content.contains("wallets.toml"));
     assert!(content.contains("*.mnemonic"));
     assert!(content.contains("global.wallets.toml"));
+}
+
+#[test]
+fn test_init_patches_gitignore_adds_only_missing_patterns_per_group() {
+    let initial_gitignore = "\
+# Acton related files
+.acton/
+gen/
+# Mnemonic and wallet files
+wallets.toml
+global.wallets.toml
+";
+
+    let project = ProjectBuilder::new("init-gitignore-missing-per-group")
+        .without_acton_toml()
+        .raw_file(".gitignore", initial_gitignore)
+        .build();
+
+    let output = project.acton().init().run().success();
+    output.assert_contains("Patched .gitignore");
+
+    let content = fs::read_to_string(project.path().join(".gitignore")).unwrap();
+    let lines = content.lines().map(str::trim).collect::<Vec<_>>();
+
+    for pattern in [
+        ".acton/",
+        "gen/",
+        "build/",
+        "lcov.info",
+        "libraries.toml",
+        "global.libraries.toml",
+        ".env",
+        "*.mnemonic",
+        "wallets.toml",
+        "global.wallets.toml",
+    ] {
+        let count = lines.iter().filter(|&&line| line == pattern).count();
+        assert_eq!(
+            count, 1,
+            "Pattern {pattern} should appear exactly once, found {count}\nContent:\n{content}"
+        );
+    }
+
+    for heading in ["# Acton related files", "# Mnemonic and wallet files"] {
+        let count = lines.iter().filter(|&&line| line == heading).count();
+        assert_eq!(
+            count, 1,
+            "Heading {heading} should appear exactly once, found {count}\nContent:\n{content}"
+        );
+    }
+}
+
+#[test]
+fn test_init_does_not_patch_gitignore_when_groups_are_complete() {
+    let initial_gitignore = "\
+# Acton related files
+.acton/
+gen/
+build/
+lcov.info
+libraries.toml
+global.libraries.toml
+
+# Mnemonic and wallet files
+.env
+*.mnemonic
+wallets.toml
+global.wallets.toml
+";
+
+    let project = ProjectBuilder::new("init-gitignore-complete-groups")
+        .without_acton_toml()
+        .raw_file(".gitignore", initial_gitignore)
+        .build();
+
+    let output = project.acton().init().run().success();
+    output.assert_not_contains("Patched .gitignore");
+
+    let content = fs::read_to_string(project.path().join(".gitignore")).unwrap();
+    assert_eq!(content, initial_gitignore);
 }

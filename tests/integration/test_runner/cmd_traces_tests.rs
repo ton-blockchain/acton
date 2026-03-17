@@ -1,6 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use std::fs;
+use std::path::PathBuf;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -84,10 +85,15 @@ fn assert_trace_json_contract(
         Some(expected_test_name),
         "Unexpected trace test name in {relative_path}"
     );
+    let uri = trace["pos"]["uri"]
+        .as_str()
+        .unwrap_or_else(|| panic!("Missing trace source URI in {relative_path}"));
+    let actual_uri = dunce::canonicalize(uri).unwrap_or_else(|_| PathBuf::from(uri));
+    let expected_uri = dunce::canonicalize(project.path().join("tests/trace.test.tolk"))
+        .unwrap_or_else(|_| project.path().join("tests/trace.test.tolk"));
     assert_eq!(
-        trace["pos"]["uri"].as_str(),
-        Some("./tests/trace.test.tolk"),
-        "Unexpected trace source URI in {relative_path}"
+        actual_uri, expected_uri,
+        "Unexpected trace source URI in {relative_path}: {uri}"
     );
 
     let contracts = trace["contracts"]

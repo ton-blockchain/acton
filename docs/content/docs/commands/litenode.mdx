@@ -28,16 +28,17 @@ acton litenode start [OPTIONS]
 
 ### Options
 
-| Option                        | Type    | Description                                                                           |
-|-------------------------------|---------|---------------------------------------------------------------------------------------|
-| `--port <PORT>`               | Integer | Server port (default: `[litenode].port` or `3000`)                                    |
-| `--fork-net <NETWORK>`        | String  | Remote network for account resolution (default: `[litenode].fork-net`)                |
-| `--fork-block-number <SEQNO>` | Integer | Historical fork block seqno (default: `[litenode].fork-block-number`)                 |
-| `--accounts <NAME[,NAME...]>` | Array   | Wallet names to auto-fund and auto-deploy on startup (default: `[litenode].accounts`) |
-| `--api-key <API_KEY>`         | String  | TonCenter API key for remote blockchain queries (also reads `TONCENTER_API_KEY`)      |
-| `--db-path <PATH>`            | String  | Path to SQLite database for persistent state                                          |
-| `--load-state <PATH>`         | String  | Load JSON snapshot before startup                                                     |
-| `--dump-state <PATH>`         | String  | Dump JSON snapshot on graceful shutdown                                               |
+| Option                        | Type    | Description                                                                                             |
+|-------------------------------|---------|---------------------------------------------------------------------------------------------------------|
+| `--port <PORT>`               | Integer | Server port (default: `[litenode].port` or `3000`)                                                      |
+| `--fork-net <NETWORK>`        | String  | Remote network for account resolution (default: `[litenode].fork-net`)                                  |
+| `--fork-block-number <SEQNO>` | Integer | Historical fork block seqno (default: `[litenode].fork-block-number`)                                   |
+| `--accounts <NAME[,NAME...]>` | Array   | Wallet names to auto-fund and auto-deploy on startup (default: `[litenode].accounts`)                   |
+| `--rate-limit <RPS>`          | Integer | Maximum `/api` requests per second; returns HTTP `429` when exceeded (default: `[litenode].rate-limit`) |
+| `--api-key <API_KEY>`         | String  | TonCenter API key for remote blockchain queries (also reads `TONCENTER_API_KEY`)                        |
+| `--db-path <PATH>`            | String  | Path to SQLite database for persistent state                                                            |
+| `--load-state <PATH>`         | String  | Load JSON snapshot before startup                                                                       |
+| `--dump-state <PATH>`         | String  | Dump JSON snapshot on graceful shutdown                                                                 |
 
 ### Examples
 
@@ -57,6 +58,9 @@ acton litenode start --fork-net testnet --fork-block-number 55000000
 # Auto-fund and deploy wallets on startup
 acton litenode start --accounts deployer,user
 
+# Simulate provider API rate limits (1 request/sec)
+acton litenode start --rate-limit 1
+
 # Persist state in SQLite
 acton litenode start --db-path .acton/litenode.db
 
@@ -69,6 +73,7 @@ acton litenode start --load-state snapshots/localnet.json --dump-state snapshots
 - `--load-state` and `--db-path` cannot be used together in one run.
 - `--dump-state` writes snapshot during graceful shutdown (`Ctrl+C`).
 - When fork mode is enabled, node startup output includes a second line with fork source.
+- `--rate-limit` applies only to `/api/*` endpoints (v2/v3/emulate). Admin endpoints stay unlimited.
 
 ## `acton litenode airdrop`
 
@@ -109,6 +114,7 @@ port = 3000
 fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
+rate-limit = 1
 ```
 
 CLI options override `Acton.toml` values for the current run.

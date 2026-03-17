@@ -1,9 +1,9 @@
 ---
 title: "API Compatibility"
-description: "Coverage matrix for TonCenter v2 endpoints in Acton local development node"
+description: "Coverage matrix for TonCenter v2/v3 endpoints in Acton local development node"
 ---
 
-This page tracks TonCenter v2 API coverage in Acton local development node.
+This page tracks TonCenter v2 and v3 API coverage in Acton local development node.
 
 ## TonCenter v2 Coverage Matrix
 
@@ -40,16 +40,30 @@ This page tracks TonCenter v2 API coverage in Acton local development node.
 
 ## TonCenter v3 Coverage Matrix
 
-Acton local development node currently supports 4 TonCenter v3 endpoints:
+Acton local development node currently supports 10 TonCenter v3 endpoints:
 
-| Method | Endpoint                 | Available in local node | Purpose                                                              |
-|--------|--------------------------|-------------------------|----------------------------------------------------------------------|
-| `GET`  | `/api/v3/traces`         | ✅                       | Returns transaction trace tree for a transaction hash.               |
-| `POST` | `/api/v3/runGetMethod`   | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
-| `GET`  | `/api/v3/jetton/masters` | ✅                       | Returns jetton master metadata with optional filters and pagination. |
-| `GET`  | `/api/v3/jetton/wallets` | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
+| Method | Endpoint                        | Available in local node | Purpose                                                              |
+|--------|---------------------------------|-------------------------|----------------------------------------------------------------------|
+| `GET`  | `/api/v3/traces`                | ✅                       | Returns transaction trace tree for a transaction hash.               |
+| `GET`  | `/api/v3/addressInformation`    | ✅                       | Returns account state in `V2AddressInformation` shape.               |
+| `GET`  | `/api/v3/transactions`          | ✅                       | Returns transactions with TonCenter v3 blockchain filters.           |
+| `GET`  | `/api/v3/transactionsByMessage` | ✅                       | Returns transactions filtered by message hash/body hash/opcode.      |
+| `GET`  | `/api/v3/pendingTransactions`   | ✅                       | Returns pending transactions filtered by account and trace id.       |
+| `POST` | `/api/v3/message`               | ✅                       | Sends an external message in BOC and returns message hash fields.    |
+| `POST` | `/api/v3/runGetMethod`          | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
+| `GET`  | `/api/v3/jetton/masters`        | ✅                       | Returns jetton master metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/jetton/wallets`        | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/nft/items`             | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
+
+`/api/v3/transactions`, `/api/v3/transactionsByMessage`, and `/api/v3/pendingTransactions` currently support only single-value query filters for `account`, `exclude_account`, and `trace_id` in local development node (no repeated multi-value form yet).
 
 No other v3 endpoints are exposed by the local development node at the moment.
+
+## Emulate API Coverage Matrix
+
+| Method | Endpoint                       | Available in local node | Purpose                                                                      |
+|--------|--------------------------------|-------------------------|------------------------------------------------------------------------------|
+| `POST` | `/api/emulate/v1/emulateTrace` | ✅                       | Emulates external message execution trace against current state (no commit). |
 
 ## Admin API
 

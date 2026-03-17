@@ -1,0 +1,2 @@
+→ Requesting airdrop for wallet airdrop-wallet [WALLET_ADDRESS_BASE]
+✓ Successfully airdropped 100 TON on localnet

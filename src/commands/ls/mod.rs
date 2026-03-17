@@ -1,9 +1,11 @@
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use dashmap::DashMap;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tolk_resolver::file_db::FileDb;
-use ton_ls::Backend;
+use ton_ls::{Backend, SelfContainedLanguageRegistry};
 use tower_lsp::{LspService, Server};
 
 pub async fn ls_cmd(
@@ -26,16 +28,27 @@ pub async fn ls_cmd(
     if common_tolk.exists() {
         let _ = file_db.process(&common_tolk);
     }
+    let project_root = dunce::canonicalize(configured_project_root())
+        .unwrap_or_else(|_| configured_project_root().to_path_buf());
+    let mappings = ActonConfig::load()
+        .ok()
+        .and_then(|config| config.mappings());
 
     if port.is_none() && !stdio {
         // default to stdio if no port is provided and stdio is not explicitly set
-        return ls_cmd_internal(port, true, file_db).await;
+        return ls_cmd_internal(port, true, file_db, project_root, mappings).await;
     }
 
-    ls_cmd_internal(port, stdio, file_db).await
+    ls_cmd_internal(port, stdio, file_db, project_root, mappings).await
 }
 
-async fn ls_cmd_internal(port: Option<u16>, stdio: bool, file_db: FileDb) -> anyhow::Result<()> {
+async fn ls_cmd_internal(
+    port: Option<u16>,
+    stdio: bool,
+    file_db: FileDb,
+    project_root: PathBuf,
+    mappings: Option<BTreeMap<String, String>>,
+) -> anyhow::Result<()> {
     let (service, socket) = LspService::new(|client| {
         #[cfg(feature = "profiling")]
         let profiling = Arc::new(ton_ls::ProfilingContext::new());
@@ -55,9 +68,12 @@ async fn ls_cmd_internal(port: Option<u16>, stdio: bool, file_db: FileDb) -> any
         Backend {
             client,
             file_db: Arc::new(file_db),
+            project_root: project_root.clone(),
+            mappings: mappings.clone(),
             documents: DashMap::new(),
             analysis: DashMap::new(),
             file_urls: DashMap::new(),
+            registry: SelfContainedLanguageRegistry::new(),
             #[cfg(feature = "profiling")]
             profiling,
         }

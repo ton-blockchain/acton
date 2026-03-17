@@ -8,6 +8,9 @@ all: precommit
 build:
     cargo build --release
 
+build-dev:
+    cargo build
+
 test-unit:
     {{ CARGO_TEST }} --workspace --lib --bins \
         --exclude retrace
@@ -42,10 +45,18 @@ fmt-check:
 clippy:
     cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
-check-udeps:
-    cargo +nightly udeps --workspace
+check-deps:
+    cargo shear
 
-check: fmt-check clippy test
+typos:
+    typos .
+
+check-docgen:
+    cargo run -- docgen --check # always use latest acton
+
+check-ci: fmt-check check-docgen check-deps clippy typos
+
+check: check-ci test
 
 coverage-setup:
     cargo install cargo-llvm-cov

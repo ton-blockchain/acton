@@ -96,16 +96,7 @@ impl Compiler {
     /// `import "@root/baz"` will be resolved to `foo/bar/baz`
     pub fn with_mappings(mut self, mappings: &Option<BTreeMap<String, String>>) -> Self {
         if let Some(mappings) = mappings {
-            self.mappings = mappings
-                .iter()
-                .map(|(key, value)| {
-                    if key.starts_with('@') {
-                        (key.clone(), value.clone())
-                    } else {
-                        (format!("@{key}"), value.clone())
-                    }
-                })
-                .collect();
+            self.mappings = mappings.clone().into_iter().collect();
         }
         self
     }

@@ -63,3 +63,54 @@ get fun `test-out-actions`() {
         expect(fourth_action.newCode).toEqual(new_code);
     }
 }
+
+get fun `test-out-message-out-actions-helper`() {
+    val dest = net.randomAddress("counter");
+    val msg = createMessage({
+        bounce: false,
+        value: ton("0.5"),
+        dest,
+        body: IncreaseCounter { queryId: 0, increaseBy: 7 },
+    });
+
+    val actions = msg.outActions(SEND_MODE_REGULAR);
+    expect(actions).toHaveLength(1);
+    expect(actions).toBeSendMessageAt<IncreaseCounter>(0);
+
+    val action = actions.getSendMessageAt(0);
+    expect(action).toBeNotNull();
+    if (action != null) {
+        expect(action.mode).toEqual(SEND_MODE_REGULAR);
+    }
+
+    val body = actions.getSendMessageBodyAt<IncreaseCounter>(0);
+    expect(body).toBeNotNull();
+    if (body != null) {
+        expect(body.queryId).toEqual(0);
+        expect(body.increaseBy).toEqual(7);
+    }
+}
+
+get fun `test-parse-empty-out-actions`() {
+    val actions = vm.parseOutActions(createEmptyCell());
+    expect(actions).toHaveLength(0);
+}
+
+get fun `test-get-send-message-helpers-return-null-for-non-send-action`() {
+    val dest = net.randomAddress("counter");
+    val msg = createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest,
+        body: IncreaseCounter { queryId: 0, increaseBy: 1 },
+    });
+
+    contract.setCodePostponed(beginCell().storeUint(0xEE, 8).endCell());
+    msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveToncoinsOnBalance(ton("0.005"), RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    changeLib(createEmptyCell(), 2);
+
+    val actions = vm.outActions();
+    expect(actions.getSendMessageAt(0)).toBeNull();
+    expect(actions.getSendMessageBodyAt<IncreaseCounter>(0)).toBeNull();
+}

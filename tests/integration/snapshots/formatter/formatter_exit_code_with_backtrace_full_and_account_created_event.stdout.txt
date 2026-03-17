@@ -1,0 +1,22 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling fm_flags
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_flags.test.tolk (1 test)
+  ✓ formatter-exit-code-with-backtrace-full-and-account-created-event [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── FmFlagsThrow 0.2 TON -> fm_flags B                                          gas=682 exit_code=10 aborted
+           queryId: 88
+           ├── Compute phase failed: Dictionary error
+           ├── at contracts/fm_flags[LINE]
+           │      __throw             at contracts/fm_flags[LINE]
+           │      onInternalMessage   at contracts/fm_flags[LINE]
+           └── account created
+
+ ✓ 1 passed in 1 file

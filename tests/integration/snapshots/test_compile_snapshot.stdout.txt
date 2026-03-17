@@ -1,5 +1,0 @@
-  Compiling contracts/simple.tolk
-✓ Compilation successful (compiled in [TIME])
-Code in base64: te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==
-Code in hex: b5ee9c72010102010014000114ff00f4a413f4bcf2c80b01000ad330f891dc
-Code hash hex: E67EEC3BD481C7910C87A061E60CA509E82EDD687A0E1C8BF1B437E6DE3E6973

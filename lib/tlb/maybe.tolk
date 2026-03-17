@@ -18,7 +18,7 @@ struct (0b1) Value<X> {
 /// val empty = Maybe<slice>.none();
 /// ```
 fun Maybe<X>.none(): Maybe<X> {
-    return None{}
+    return None {};
 }
 
 /// Creates a Maybe instance with the given value.
@@ -28,7 +28,7 @@ fun Maybe<X>.none(): Maybe<X> {
 /// val present = Maybe.some(42);
 /// ```
 fun Maybe<X>.some(value: X): Maybe<X> {
-    return Value { value }
+    return Value { value };
 }
 
 /// Unwraps the Maybe, returning the contained value if present,
@@ -65,7 +65,7 @@ fun Maybe<X>.unwrap(self): X {
 /// ```
 fun Maybe<X>.unwrapOr(self, default: X): X {
     if (self is None) {
-        return default
+        return default;
     }
     return self.value;
 }

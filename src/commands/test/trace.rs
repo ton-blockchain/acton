@@ -1,11 +1,12 @@
 use crate::commands::test::{Pos, TestDescriptor};
-use crate::context::{BuildCache, Emulations, KnownAddresses, to_cell};
+use crate::context::{BuildCache, Emulations, FailedSendMessageResult, KnownAddresses, to_cell};
 use retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use tolkc::abi::ContractABI as CompilerContractABI;
 use ton_abi::ContractAbi;
 use ton_source_map::SourceMap;
 use tycho_types::boc::Boc;
@@ -23,6 +24,8 @@ pub(super) struct TestTrace {
 pub(super) struct TransactionList {
     pub name: String,
     pub transactions: Vec<TransactionInfo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failed_messages: Vec<FailedMessageInfo>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -31,6 +34,7 @@ pub(super) struct ContractInfo {
     pub code_boc64: String,
     pub source_map: Arc<SourceMap>,
     pub abi: Option<Arc<ContractAbi>>,
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -47,6 +51,19 @@ pub struct TransactionInfo {
     pub executor_actions: Vec<ExecutorActionInfo>,
     pub actions: Option<Arc<str>>,
     pub dest_contract_info: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FailedMessageInfo {
+    pub error: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vm_log_diff: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vm_exit_code: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executor_logs: Option<Arc<str>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_libraries: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -170,6 +187,7 @@ pub(super) fn dump_test_transactions(
                         code_boc64: info.code_boc64.clone(),
                         source_map: info.source_map.clone(),
                         abi: info.abi,
+                        compiler_abi: info.compiler_abi,
                     });
 
                     TransactionInfo {
@@ -191,12 +209,25 @@ pub(super) fn dump_test_transactions(
                     }
                 })
                 .collect::<Vec<_>>();
+            let failed_messages = txs.failed_messages.get(trace_index).map_or_else(
+                Vec::new,
+                |trace_failed_messages| {
+                    trace_failed_messages
+                        .iter()
+                        .map(failed_message_info)
+                        .collect::<Vec<_>>()
+                },
+            );
 
             let name = txs
                 .trace_name(trace_transactions)
                 .map_or_else(|| format!("Trace {}", trace_index + 1), ToString::to_string);
 
-            TransactionList { name, transactions }
+            TransactionList {
+                name,
+                transactions,
+                failed_messages,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -212,6 +243,7 @@ pub(super) fn dump_test_transactions(
     for result in build_cache.built.values() {
         let info = ContractInfo {
             abi: result.abi.clone(),
+            compiler_abi: result.compiler_abi.clone(),
             name: result.name.clone(),
             code_boc64: result.code_boc64.clone(),
             source_map: result.source_map.clone(),
@@ -252,6 +284,24 @@ pub(super) fn dump_test_transactions(
     fs::write(file_path, str)?;
 
     Ok(())
+}
+
+#[must_use]
+fn failed_message_info(message: &FailedSendMessageResult) -> FailedMessageInfo {
+    let mut missing_libraries = message
+        .missing_libraries
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    missing_libraries.sort_unstable();
+
+    FailedMessageInfo {
+        error: message.error.clone(),
+        vm_log_diff: message.vm_log.as_deref().map(vmlogs::convert_to_diff_logs),
+        vm_exit_code: message.vm_exit_code,
+        executor_logs: message.executor_logs.clone(),
+        missing_libraries,
+    }
 }
 
 #[cfg(test)]

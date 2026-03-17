@@ -4,9 +4,11 @@
 
  TEST  [ROOT]/foobar
 
- > tests/counter.test.tolk (3 tests)
+ > tests/counter.test.tolk (5 tests)
+  ✓ deploy starts at zero [TIME]
   ✓ increase counter [TIME]
+  ✓ any account can increase counter [TIME]
   ✓ reset counter [TIME]
   ✓ unknown message [TIME]
 
- ✓ 3 passed in 1 file
+ ✓ 5 passed in 1 file

@@ -1,1 +1,2 @@
-Deployed counter to [WALLET_ADDRESS_BASE] (counter)
+Deployed counter to [WALLET_ADDRESS_BASE] (Counter)
+Current counter value is 0

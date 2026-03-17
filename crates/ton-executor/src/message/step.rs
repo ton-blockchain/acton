@@ -46,7 +46,7 @@
 use super::create_emulator;
 use crate::config::DEFAULT_CONFIG;
 use crate::message::types::{EmulationInternalParams, EmulationResult, RunTransactionArgs};
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback};
 use anyhow::Context;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
@@ -102,7 +102,8 @@ impl StepExecutor {
             .transpose()?;
         let libs_ptr = libs_cstr.as_ref().map_or(null(), |c| c.as_ptr());
 
-        let internal_params = EmulationInternalParams::from(params);
+        let internal_params = EmulationInternalParams::try_from(params)
+            .context("cannot build internal emulator params")?;
         let params_str =
             serde_json::to_string(&internal_params).context("cannot serialize params to JSON")?;
         let params_cstr = CString::new(params_str).context("params string contains null bytes")?;
@@ -228,6 +229,27 @@ impl StepExecutor {
                 >(callback),
             );
         };
+
+        Ok(())
+    }
+
+    /// Registers callback that is called when TVM fails to resolve a library by hash.
+    pub fn register_missing_library_callback<Ctx>(
+        &mut self,
+        ctx: &mut Ctx,
+        callback: MissingLibraryCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        // SAFETY: `transaction_emulator_register_missing_library_callback` is a safe C API function.
+        unsafe {
+            crate::message::transaction_emulator_register_missing_library_callback(
+                self.inner.as_ptr(),
+                std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                std::mem::transmute::<
+                    unsafe extern "C" fn(*mut Ctx, *const c_char),
+                    unsafe extern "C" fn(*mut c_void, *const c_char),
+                >(callback),
+            );
+        }
 
         Ok(())
     }

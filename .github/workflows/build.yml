@@ -1,4 +1,4 @@
-name: Build and Check Acton
+name: CI
 
 on:
   pull_request:
@@ -13,125 +13,68 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-  actions: write
+permissions: { }
+
+env:
+  ENABLE_MIRRORING_RELEASE: 'true'
+  PUBLIC_ACTON_REPOSITORY: i582/acton-public
 
 jobs:
-  build-linux:
-    strategy:
+  build:
+    name: Build (${{ matrix.os }}-${{ matrix.arch }})
+    strategy: &runner_strategy
       matrix:
-        os: [ ubicloud-standard-4-ubuntu-2204 ]
-    runs-on: ${{ matrix.os }}
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            os: linux
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
     if: true
 
-    outputs:
-      arch: ${{ steps.detect-arch.outputs.arch }}
+    permissions:
+      contents: read
 
     steps:
       - name: Check out Acton repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.os }}
+          key: ${{ matrix.runner }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install Rust
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
         with:
           tool: nextest,just
 
-      - name: Install LLVM and Clang (don't cache)
+      - name: Download TON objects archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        run: |
+          mkdir -p dist objs
+          gh release download trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir dist
+          tar -C objs -xzf "dist/${ARCHIVE_NAME}"
+
+      - name: Install LLVM and Clang
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 16 clang
           rm llvm.sh
 
-      - name: Get TON commit hash
-        id: ton-commit
-        run: |
-          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" repos/i582/ton/commits/pmakhnev/acton)
-          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Cache TON artifacts
-        id: cache-ton-artifacts
-        uses: actions/cache@v5
-        with:
-          path: ton-repo/artifacts
-          key: ton-artifacts-${{ matrix.os }}-${{ steps.ton-commit.outputs.commit }}
-          restore-keys: ton-artifacts-${{ matrix.os }}-
-
-      - name: Check cache hits
-        run: |
-          echo 'TON artifacts: ${{ steps.cache-ton-artifacts.outputs.cache-hit }}'
-
-      - name: Install system dependencies (cache not exist)
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev graphviz
-          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
-
-      - name: Install system dependencies (cache exist)
-        if: steps.cache-ton-artifacts.outputs.cache-hit == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y graphviz
-
-      - name: Maximize Build Space
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      - name: Clone TON repository
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        uses: actions/checkout@v6
-        with:
-          repository: i582/ton
-          ref: pmakhnev/acton
-          fetch-depth: 1
-          submodules: true
-          path: ton-repo
-
-      - name: Build TON static libraries
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        env:
-          CC: clang-16
-          CXX: clang++-16
-          AR: llvm-ar-16
-          RANLIB: llvm-ranlib-16
-        run: |
-          cd ton-repo
-          cp assembly/native/build-ubuntu-static.sh .
-          chmod +x build-ubuntu-static.sh
-          ./build-ubuntu-static.sh -a -c
-
-      - name: Show ccache stats
-        if: steps.cache-ton-artifacts.outputs.cache-hit != 'true'
-        run: ccache -s
-
-      - name: Copy TON artifacts to objs directory
-        run: |
-          mkdir -p objs
-          cp ton-repo/artifacts/libemulator.a objs/
-          cp ton-repo/artifacts/libtolk.a objs/
-
-      - name: Detect architecture
-        id: detect-arch
-        run: echo "arch=$(uname -m)" >> $GITHUB_OUTPUT
-
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
 
       - name: Build acton binary
         env:
@@ -139,11 +82,14 @@ jobs:
           CXX: clang++-16
         run: |
           just build-ui
-          cargo build --bin acton
+          just build
+
+      - name: Add acton to PATH
+        run: echo "${GITHUB_WORKSPACE}/target/release" >> "$GITHUB_PATH"
 
       - name: Test acton binary
         run: |
-          ./target/debug/acton --help
+          acton --help
 
       - name: Run tests
         run: |
@@ -151,73 +97,173 @@ jobs:
 
       - name: Run Acton tests
         run: |
-          ./target/debug/acton test
+          acton test
+
+      - name: Prepare trunk archive
+        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
+        run: |
+          tar -C target/release -czf target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz acton
+
+      - name: Upload trunk archive artifact
+        if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
+        uses: actions/upload-artifact@v7
+        with:
+          name: acton-${{ matrix.os }}-${{ matrix.arch }}
+          path: target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+  lint:
+    name: Lint (${{ matrix.os }}-${{ matrix.arch }})
+    strategy: *runner_strategy
+    runs-on: ${{ matrix.runner }}
+    if: true
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          key: ${{ matrix.runner }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
+        with:
+          tool: just,cargo-shear,typos-cli
+
+      - name: Download TON objects archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        run: |
+          mkdir -p dist objs
+          gh release download trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${ARCHIVE_NAME}" \
+            --dir dist
+          tar -C objs -xzf "dist/${ARCHIVE_NAME}"
 
       - name: Run formatter and linter
         run: |
-          just fmt
-          just clippy
+          just check-ci
 
-  create-canary-release:
-    needs: [ build-linux ]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' && false
+  create-trunk-release:
+    name: Create Trunk Release
+    needs: [ build ]
+    runs-on: ubicloud-standard-2
+    if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
+
+    permissions:
+      actions: write
+      contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Download Linux binary
-        uses: actions/download-artifact@v7
+      - name: Download trunk archives
+        uses: actions/download-artifact@v8
         with:
-          name: acton-linux-binary
-          path: binaries/linux/
+          pattern: acton-*
+          path: artifacts/
+          merge-multiple: true
 
-      - name: Make binaries executable
-        run: |
-          chmod +x binaries/linux/acton
+      - name: Delete download artifacts
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ github.token }}
+          # language=JavaScript
+          script: |
+            const {
+              data: artifacts
+            } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
 
-      - name: Create Linux archive
-        run: |
-          mkdir -p dist
-          tar -czf dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz \
-            -C binaries/linux acton
+            if (artifacts.total_count === 0) {
+              core.warning('No downloadable artifacts to delete');
+              return;
+            } else {
+              core.info(`Found ${artifacts.total_count} artifacts to delete`);
+            }
 
-      - name: Delete previous canary release and tag
+            for (const artifact of artifacts.artifacts) {
+              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+            }
+
+      - name: Display structure of downloaded files
+        run: ls -lhR artifacts
+
+      - name: Delete previous trunk release and tag
         env:
-          GH_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete canary -y || true
+          gh release delete trunk --repo "${GITHUB_REPOSITORY}" -y || true
 
           gh api \
-            repos/${GITHUB_REPOSITORY}/git/refs/tags/canary \
+            repos/${GITHUB_REPOSITORY}/git/refs/tags/trunk \
             -X DELETE || true
 
-      - name: Create canary release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: canary
-          release_name: Canary Build
-          body: |
-            Automated canary build of Acton.
-
-            ## Archives
-
-            - `acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz` — Linux archive
-
-            Built from commit: ${{ github.sha }}
-          draft: false
-          prerelease: true
+      - name: Create trunk release
         env:
-          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_notes=$(cat <<EOF
+          Automated trunk build of Acton.
 
-      - name: Upload Linux archive to release
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/acton-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_name: acton-canary-linux-${{ needs.build-linux.outputs.arch }}.tar.gz
-          asset_content_type: application/gzip
+          Built from source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+          EOF
+          )
+
+          gh release create trunk \
+            --repo "${GITHUB_REPOSITORY}" \
+            artifacts/* \
+            --title "Trunk" \
+            --notes "${release_notes}" \
+            --target "${GITHUB_SHA}" \
+            --prerelease
+
+      - name: Delete previous trunk release and tag (mirror)
+        if: env.ENABLE_MIRRORING_RELEASE == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.ACTON_TOKEN }}
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        run: |
+          gh release delete trunk --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+
+          gh api \
+            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk \
+            -X DELETE || true
+
+      - name: Create trunk release (mirror)
+        if: env.ENABLE_MIRRORING_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        run: |
+          release_notes=$(cat <<EOF
+          Automated trunk build of Acton.
+
+          Built from source commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+          EOF
+          )
+
+          gh release create trunk \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            artifacts/* \
+            --title "Trunk" \
+            --notes "${release_notes}" \
+            --prerelease

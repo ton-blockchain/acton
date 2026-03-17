@@ -106,7 +106,7 @@ pub fn disasm_cmd(
                     final_cell = lib_cell;
                 }
                 Err(err) => {
-                    eprintln!("Warning: Failed to load library {lib_hash}: {err}");
+                    eprintln!("Warning: Failed to load library 0x{lib_hash}: {err}");
                     eprintln!("Showing original code instead");
                 }
             }

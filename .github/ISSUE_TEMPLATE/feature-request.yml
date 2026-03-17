@@ -1,0 +1,63 @@
+name: Feature Request
+description: Suggest an improvement or a new Acton feature.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for new commands, UX improvements, workflow changes, or new capabilities.
+
+  - type: input
+    id: version
+    attributes:
+      label: Acton Version
+      description: Paste the output of `acton -V` if this request is related to current behavior.
+      placeholder: 0.0.11 (abc1234 2026-03-14)
+    validations:
+      required: false
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem To Solve
+      description: What are you trying to do, and what is missing or inconvenient today?
+      placeholder: I want to..., but Acton currently...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the feature or behavior you would like to see.
+      placeholder: Add a command/flag/workflow that...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any workarounds or alternative approaches you considered.
+      placeholder: Today I work around this by...
+    validations:
+      required: false
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples Or Prior Art
+      description: Links, screenshots, CLI examples, or similar tools that do this well.
+      placeholder: Another tool handles this by...
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any extra context about your project, workflow, or why this matters.
+    validations:
+      required: false

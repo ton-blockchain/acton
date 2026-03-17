@@ -1,0 +1,100 @@
+---
+title: "Retracing transactions"
+description: "Replay a TON transaction by hash and inspect VM execution details"
+---
+
+The `retrace` command downloads an on-chain transaction and replays it locally
+in the TON sandbox. It helps debug failures, inspect outgoing actions, and
+verify that local replay matches the original on-chain state update.
+
+## Basic Usage
+
+```bash
+acton retrace <HASH>
+```
+
+Where `<HASH>` is the transaction hash in hex format.
+
+## Command Options
+
+| Option                   | Type    | Description                                                  |
+|--------------------------|---------|--------------------------------------------------------------|
+| `<HASH>`                 | String  | Transaction hash in hex format                               |
+| `--net <NET>`            | String  | Network to retrace from (`mainnet` or `testnet`)            |
+| `--api-key <API_KEY>`    | String  | TonCenter API key for blockchain queries                     |
+| `-v, --verbose`          | Flag    | Print full cell hex in actions instead of only cell hashes   |
+| `--logs-dir <LOGS_DIR>`  | String  | Save full VM and executor logs to the specified directory    |
+
+## Network Behavior
+
+- Without `--net`, Acton tries `mainnet` first, then falls back to `testnet`.
+- With `--net`, only the selected network is used.
+- `localnet` and `custom:<network>` values are not supported by the retrace backend yet.
+
+## API Keys
+
+You can provide the TonCenter key either as a flag or via environment:
+
+```bash
+export TONCENTER_API_KEY=your_key_here
+```
+
+If no key is provided, retrace applies a built-in TonCenter request throttle
+(1 request per second) to reduce rate-limit failures.
+
+For library-cell fallback lookups, retrace also supports:
+
+```bash
+export DTON_API_KEY=your_dton_key
+```
+
+If `DTON_API_KEY` is not set, retrace uses an internal default dton key for
+fallback library fetches.
+
+## Examples
+
+### Basic retrace (auto network fallback)
+
+```bash
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41
+```
+
+### Force mainnet and pass API key
+
+```bash
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --net mainnet --api-key YOUR_API_KEY
+```
+
+### Save logs and show full action cell bodies
+
+```bash
+acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --verbose --logs-dir .acton/retrace
+```
+
+## Output Overview
+
+The command prints:
+
+- Network and `State Hash OK` indicator
+- Transaction details (status, account, sender, LT, timestamp, amount in)
+- Fees and balances (before/after, sent amount, total/gas fees)
+- Compute and action phase summaries
+- Decoded outgoing actions
+- Incoming message opcode (when available)
+
+When `--verbose` is not used, large cells are shown as hashes. Acton prints a
+hint to rerun with `--verbose` for full cell contents.
+
+If `--logs-dir` is set, two files are written:
+
+- `vm.log`
+- `executor.log`
+
+## Notes and Limitations
+
+- Retrace is network/RPC dependent and may fail due to API limits or transient
+  network errors.
+- A successful replay still prints `State Hash OK: No` if local replay state
+  diverges from the on-chain state update.
+- If retrace cannot resolve a transaction on both default networks, it exits
+  with `Failed to retrace transaction in any network`.

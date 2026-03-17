@@ -10,6 +10,7 @@
     "code-coverage",
     "mutation-testing",
     "test-ui",
+    "reading-transaction-chains",
     "writing-your-own-matchers",
     "cookbook"
   ]

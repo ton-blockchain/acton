@@ -38,7 +38,7 @@
 //! ```
 
 use crate::get::{GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
-use crate::{BaseExecutor, ExtMethodCallback, get};
+use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback, get};
 use anyhow::Context;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString, c_char, c_int, c_void};
@@ -206,6 +206,27 @@ impl StepGetExecutor {
                 >(callback),
             );
         };
+
+        Ok(())
+    }
+
+    /// Registers callback that is called when TVM fails to resolve a library by hash.
+    pub fn register_missing_library_callback<Ctx>(
+        &mut self,
+        ctx: &mut Ctx,
+        callback: MissingLibraryCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        // SAFETY: `tvm_emulator_register_missing_library_callback` is a safe C API function.
+        unsafe {
+            get::tvm_emulator_register_missing_library_callback(
+                self.inner.as_ptr(),
+                std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                std::mem::transmute::<
+                    unsafe extern "C" fn(*mut Ctx, *const c_char),
+                    unsafe extern "C" fn(*mut c_void, *const c_char),
+                >(callback),
+            );
+        }
 
         Ok(())
     }

@@ -557,6 +557,7 @@ const TOLK_GRAMMAR = {
                 // prec.dynamic is important
                 "<",
                 field("types", commaSep1($._type_hint)),
+                optional(","),
                 ">",
             ),
         ),
@@ -657,7 +658,7 @@ const TOLK_GRAMMAR = {
 
     tensor_type: $ =>
         prec.dynamic(103, choice(seq("(", ")"), seq("(", commaSep2($._type_hint), ")"))),
-    tuple_type: $ => prec(103, seq("[", commaSep($._type_hint), "]")),
+    tuple_type: $ => prec(103, seq("[", commaSep1($._type_hint), "]")),
     parenthesized_type: $ => prec(103, seq("(", field("inner", $._type_hint), ")")),
 
     fun_callable_type: $ =>

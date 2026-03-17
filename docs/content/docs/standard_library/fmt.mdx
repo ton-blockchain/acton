@@ -105,7 +105,7 @@ val msg = format3("{} + {} = {}", 2, 3, 5);
 println(msg);  // prints "2 + 3 = 5"
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L85" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L91" />
 
 ## `format4`
 
@@ -123,12 +123,19 @@ val msg = format4("{} {} {} {}", "a", "b", "c", "d");
 println(msg);  // prints "a b c d"
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L98" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L112" />
 
 ## `format5`
 
 ```tolk
-fun format5<T1, T2, T3, T4, T5>(fmt: string, arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5): string
+fun format5<T1, T2, T3, T4, T5>(
+    fmt: string,
+    arg1: T1,
+    arg2: T2,
+    arg3: T3,
+    arg4: T4,
+    arg5: T5,
+): string
 ```
 
 Formats a string with 5 arguments.
@@ -141,5 +148,5 @@ val msg = format5("{} {} {} {} {}", 1, 2, 3, 4, 5);
 println(msg);  // prints "1 2 3 4 5"
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L111" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/fmt.tolk#L135" />
 

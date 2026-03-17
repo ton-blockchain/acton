@@ -1,0 +1,1 @@
+::warning file=contracts/main.tolk,line=3,title=[E002]%3A unused-variable::unused variable `x`

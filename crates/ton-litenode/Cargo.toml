@@ -17,7 +17,6 @@ ton-api = { workspace = true }
 acton-config = { workspace = true }
 tycho-types = { workspace = true }
 tvmffi = { workspace = true }
-tonlib-core = { workspace = true }
 crc = { workspace = true }
 hex = { workspace = true }
 anyhow = { workspace = true }
@@ -27,6 +26,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 axum = { workspace = true }
 tower-http = { workspace = true, features = ["cors", "trace"] }
+tower_governor = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }
 ton-indexer = { workspace = true }

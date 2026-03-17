@@ -293,7 +293,7 @@ fn print_retrace_result(
                             println!(
                                 "     {:<15} {}",
                                 "Body Hash:".dimmed(),
-                                hex::encode(msg.body.1.hash(0)).dimmed()
+                                format!("0x{}", hex::encode(msg.body.1.hash(0))).dimmed()
                             );
                             showed_hashes = true;
                         }
@@ -312,7 +312,7 @@ fn print_retrace_result(
                         println!(
                             "     {:<15} {}",
                             "New Code Hash:".dimmed(),
-                            hex::encode(new_code.hash(0)).yellow()
+                            format!("0x{}", hex::encode(new_code.hash(0))).yellow()
                         );
                         showed_hashes = true;
                     }
@@ -339,10 +339,11 @@ fn print_retrace_result(
                     println!("     {:<15} {}", "Mode:".dimmed(), clean_mode.yellow());
                     match lib {
                         tycho_types::models::LibRef::Hash(h) => {
+                            let value = &h.to_string();
                             println!(
                                 "     {:<15} {}",
                                 "Lib Hash:".dimmed(),
-                                h.to_string().yellow()
+                                format!("0x{value}").yellow()
                             );
                         }
                         tycho_types::models::LibRef::Cell(c) => {
@@ -356,7 +357,7 @@ fn print_retrace_result(
                                 println!(
                                     "     {:<15} {}",
                                     "Lib Hash:".dimmed(),
-                                    hex::encode(c.hash(0)).yellow()
+                                    format!("0x{}", hex::encode(c.hash(0))).yellow()
                                 );
                                 showed_hashes = true;
                             }

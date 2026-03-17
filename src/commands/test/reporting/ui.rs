@@ -10,9 +10,8 @@ use axum::{
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use tower_http::cors::CorsLayer;
 #[cfg(debug_assertions)]
 use tower_http::services::ServeDir;
 
@@ -28,8 +27,9 @@ static OPEN_CHROME_SCRIPT: &str = include_str!(concat!(
 
 pub(crate) struct UiServerState {
     pub reports: Arc<Vec<TestReport>>,
-    pub trace_dir: Option<String>,
+    pub trace_dir: Option<PathBuf>,
     pub project_root: String,
+    pub project_root_path: PathBuf,
 }
 
 pub(crate) struct UiReporter {
@@ -64,18 +64,19 @@ pub(crate) async fn start_ui_server(
     project_root: String,
     port: u16,
 ) -> anyhow::Result<()> {
+    let project_root_path =
+        dunce::canonicalize(&project_root).unwrap_or_else(|_| PathBuf::from(&project_root));
+    let trace_dir = trace_dir
+        .map(PathBuf::from)
+        .map(|path| dunce::canonicalize(&path).unwrap_or(path));
     let state = Arc::new(UiServerState {
         reports: Arc::new(reports),
         trace_dir,
         project_root,
+        project_root_path,
     });
 
-    let app = Router::new()
-        .route("/api/reports", get(handle_api_reports))
-        .route("/api/trace/{name}", get(handle_api_trace))
-        .route("/api/contract/{name}", get(handle_api_contract))
-        .route("/api/file", get(handle_api_file))
-        .route("/api/config", get(handle_api_config));
+    let app = build_ui_api_router(state);
 
     // In debug mode, serve UI assets directly from the filesystem for faster development.
     #[cfg(debug_assertions)]
@@ -93,8 +94,6 @@ pub(crate) async fn start_ui_server(
     #[cfg(not(debug_assertions))]
     let app = app.fallback(handle_embedded_ui);
 
-    let app = app.layer(CorsLayer::permissive()).with_state(state);
-
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
     let url = format!("http://127.0.0.1:{port}");
     println!("     {} UI server at {}", "Starting".green().bold(), url);
@@ -103,6 +102,16 @@ pub(crate) async fn start_ui_server(
 
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn build_ui_api_router(state: Arc<UiServerState>) -> Router {
+    Router::new()
+        .route("/api/reports", get(handle_api_reports))
+        .route("/api/trace/{name}", get(handle_api_trace))
+        .route("/api/contract/{name}", get(handle_api_contract))
+        .route("/api/file", get(handle_api_file))
+        .route("/api/config", get(handle_api_config))
+        .with_state(state)
 }
 
 fn open_browser(url: &str) {
@@ -200,8 +209,17 @@ struct FileQuery {
     path: String,
 }
 
-async fn handle_api_file(Query(query): Query<FileQuery>) -> impl IntoResponse {
-    match tokio::fs::read_to_string(&query.path).await {
+async fn handle_api_file(
+    Query(query): Query<FileQuery>,
+    State(state): State<Arc<UiServerState>>,
+) -> impl IntoResponse {
+    let requested_path = PathBuf::from(&query.path);
+    let Some(file_path) = resolve_path_within_root(&state.project_root_path, &requested_path)
+    else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
+
+    match tokio::fs::read_to_string(file_path).await {
         Ok(content) => content.into_response(),
         Err(_) => (StatusCode::NOT_FOUND, "File not found").into_response(),
     }
@@ -226,7 +244,10 @@ async fn handle_api_trace(
         return (StatusCode::NOT_FOUND, "Traces not enabled").into_response();
     };
 
-    let trace_path = PathBuf::from(trace_dir).join(name);
+    let Some(trace_path) = resolve_path_within_root(trace_dir, Path::new(&name)) else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
+
     match tokio::fs::read_to_string(trace_path).await {
         Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
             Ok(json) => Json(json).into_response(),
@@ -244,9 +265,12 @@ async fn handle_api_contract(
         return (StatusCode::NOT_FOUND, "Traces not enabled").into_response();
     };
 
-    let contract_path = PathBuf::from(trace_dir)
-        .join("contracts")
-        .join(format!("{name}.json"));
+    let contracts_dir = trace_dir.join("contracts");
+    let contract_name = format!("{name}.json");
+    let Some(contract_path) = resolve_path_within_root(&contracts_dir, Path::new(&contract_name))
+    else {
+        return (StatusCode::FORBIDDEN, "Access denied").into_response();
+    };
 
     match tokio::fs::read_to_string(contract_path).await {
         Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
@@ -255,4 +279,14 @@ async fn handle_api_contract(
         },
         Err(_) => (StatusCode::NOT_FOUND, "Contract not found").into_response(),
     }
+}
+
+fn resolve_path_within_root(root: &Path, requested: &Path) -> Option<PathBuf> {
+    let candidate = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        root.join(requested)
+    };
+    let candidate = dunce::canonicalize(candidate).ok()?;
+    candidate.starts_with(root).then_some(candidate)
 }

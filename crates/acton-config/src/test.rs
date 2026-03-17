@@ -43,6 +43,7 @@ impl std::fmt::Display for CoverageFormat {
 #[derive(Debug, Clone, Default)]
 pub struct TestConfig {
     pub report_formats: Vec<ReportFormat>,
+    pub show_bodies: bool,
     pub debug: bool,
     pub debug_port: u16,
     pub backtrace: Option<BacktraceMode>,
@@ -57,6 +58,7 @@ pub struct TestConfig {
     pub junit_merge: bool,
     pub snapshot: Option<String>,
     pub baseline_snapshot: Option<String>,
+    pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
     pub api_key: Option<String>,
     pub fork_block_number: Option<u64>,

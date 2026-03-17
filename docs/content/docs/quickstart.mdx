@@ -25,7 +25,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
 
         This will create a new directory `first_counter` with the project structure. You should see output similar to this:
 
-        ```
+        ```acton-cli
         $ acton new first_counter --template counter
         ✓ Created new Acton project
           Project name: first_counter
@@ -72,16 +72,16 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
         Let's look at the included test in `tests/counter.test.tolk`:
 
         ```tolk title="tests/counter.test.tolk"
-        get fun `test-increase-counter`() {
-            val (contract, deployer, _) = setupTest();
+        get fun `test increase counter`() {
+            val (counter, deployer, _) = setupTest();
 
-            val res = contract.sendIncreaseCounter(deployer.address, 123);
+            val res = counter.sendIncreaseCounter(deployer.address, 123);
             expect(res).toHaveSuccessfulTx<IncreaseCounter>({
                 from: deployer.address,
-                to: contract.address
+                to: counter.address
             });
 
-            expect(contract.currentCounter()).toEqual(123)
+            expect(counter.currentCounter()).toEqual(123)
         }
         ```
 
@@ -93,7 +93,7 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
 
         Output:
 
-        ```
+        ```acton-cli
         $ acton test
            Compiling contracts
             Finished in 726.375µs
@@ -123,27 +123,23 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
     </Step>
 
     <Step title="Setup Wallet">
-        To deploy to the blockchain, you need a wallet. Let's create a new one using the `wallet` command:
-
-        ```bash
-        acton wallet new --name deployer --local
-        ```
-
-        This will generate a new wallet and save it to `wallets.toml` in your project root.
-        By default, Acton stores mnemonic in your system's secure keyring/keychain (when available).
-        In interactive mode, Acton will also ask if you want to request testnet TON from faucet right after wallet creation.
-
-        If you run non-interactively (for example in CI), use `--airdrop` to request faucet funds automatically:
+        To deploy to the blockchain, you first need a wallet. Create one with:
 
         ```bash
         acton wallet new --name deployer --local --airdrop
         ```
 
+        This creates a new wallet and saves its configuration to `wallets.toml` in your project root.
+        By default, Acton stores the mnemonic in your system keyring/keychain when secure storage is available.
+
         <Callout type="warn">
-            If secure keyring is unavailable, or you choose plain text storage (`--secure false`), `wallets.toml` will contain your private mnemonic. **Never commit it to git!** Acton automatically adds it to `.gitignore`.
+            If secure storage is unavailable, or if you disable it with `--secure false`, your mnemonic will be written to `wallets.toml`. **Never commit it to git.** Acton adds it to `.gitignore` automatically.
         </Callout>
 
-        If you skip faucet request (or it fails), you can still fund your wallet from the **[Testnet Giver Bot](https://t.me/testgiver_ton_bot)** by sending your wallet address.
+        After creating a wallet, the `--airdrop` flag automatically requests 2 TON on the testnet.
+        <Callout type="warn">
+            If you don't use `--airdrop`, or if the faucet request fails, you can still fund the wallet through the **[Testnet Giver Bot](https://t.me/testgiver_ton_bot)** by sending it your wallet address.
+        </Callout>
     </Step>
 
     <Step title="Deploying contract">
@@ -191,9 +187,9 @@ In this guide, we will explore Acton's capabilities and develop a simple smart c
     </Step>
 </Steps>
 
-## Next Steps
-
 Congratulations! You've successfully built, tested, deployed, and verified a smart contract on the TON blockchain using Acton!
+
+## Next Steps
 
 Explore more advanced topics:
 

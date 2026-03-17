@@ -6,6 +6,13 @@ use crate::types::{
 };
 use reqwest::Client;
 use serde::Deserialize;
+use std::sync::LazyLock;
+use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
+
+const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1200);
+static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 /// Client for `TonCenter` V2/V3 API.
 ///
@@ -18,17 +25,40 @@ pub(crate) struct TonCenterClient {
 
 impl TonCenterClient {
     /// Creates a new `TonCenter` client for the specified network.
-    pub(crate) fn new(network: Network, api_key: Option<String>) -> Self {
+    pub(crate) fn new(network: Network, api_key: Option<String>) -> anyhow::Result<Self> {
         let base_url = match network {
             Network::Mainnet => "https://toncenter.com/api/v3".to_string(),
             Network::Testnet => "https://testnet.toncenter.com/api/v3".to_string(),
-            Network::Custom(_) => todo!("Custom networks are not yet supported in retrace"),
+            Network::Localnet | Network::Custom(_) => {
+                anyhow::bail!("Network {network} is not yet supported in retrace")
+            }
         };
-        Self {
+        Ok(Self {
             client: Client::new(),
             api_key,
             base_url,
+        })
+    }
+
+    /// Applies a simple global rate limit for unauthenticated TonCenter requests.
+    ///
+    /// TonCenter has stricter limits without an API key, so we serialize
+    /// requests and keep at least 1 second between request starts.
+    async fn maybe_wait_for_rate_limit(&self) {
+        if self.api_key.is_some() {
+            return;
         }
+
+        let mut last_request = TONCENTER_REQUEST_GATE.lock().await;
+        if let Some(last) = *last_request {
+            let elapsed = last.elapsed();
+            if elapsed < TONCENTER_MIN_REQUEST_INTERVAL {
+                let wait_for = TONCENTER_MIN_REQUEST_INTERVAL - elapsed;
+                log::debug!("throttle for {:?}", wait_for);
+                tokio::time::sleep(wait_for).await;
+            }
+        }
+        *last_request = Some(Instant::now());
     }
 
     /// Fetches transaction metadata by its hash using V3 API.
@@ -46,6 +76,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V3 returned status: {}", response.status());
@@ -82,6 +113,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V3 returned status: {}", response.status());
@@ -131,6 +163,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V2 returned status: {}", response.status());
@@ -159,6 +192,7 @@ impl TonCenterClient {
             request = request.header("X-API-Key", key);
         }
 
+        self.maybe_wait_for_rate_limit().await;
         let response = request.send().await?;
         if !response.status().is_success() {
             anyhow::bail!("TonCenter V2 returned status: {}", response.status());
@@ -194,16 +228,18 @@ pub(crate) struct TonHubClient {
 
 impl TonHubClient {
     /// Creates a new `TonHub` client for the specified network.
-    pub(crate) fn new(network: Network) -> Self {
+    pub(crate) fn new(network: Network) -> anyhow::Result<Self> {
         let base_url = match network {
             Network::Mainnet => "https://mainnet-v4.tonhubapi.com".to_string(),
             Network::Testnet => "https://testnet-v4.tonhubapi.com".to_string(),
-            Network::Custom(_) => todo!("Custom networks are not yet supported in retrace"),
+            Network::Localnet | Network::Custom(_) => {
+                anyhow::bail!("Network {network} is not yet supported in retrace")
+            }
         };
-        Self {
+        Ok(Self {
             client: Client::new(),
             base_url,
-        }
+        })
     }
 
     /// Fetches full transaction details including `BoC` and blocks for a specific account/lt/hash.
@@ -324,7 +360,9 @@ impl DtonClient {
         let endpoint = match network {
             Network::Mainnet => format!("https://dton.io/{}/graphql", self.api_key),
             Network::Testnet => format!("https://testnet.dton.io/{}/graphql", self.api_key),
-            Network::Custom(_) => anyhow::bail!("Custom networks are not yet supported in retrace"),
+            Network::Localnet | Network::Custom(_) => {
+                anyhow::bail!("Network {network} is not yet supported in retrace")
+            }
         };
 
         let query = serde_json::json!({

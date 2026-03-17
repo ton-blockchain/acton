@@ -15,28 +15,38 @@ Where `<CONTRACT_ID>` is the key defined in your `Acton.toml` (e.g., `[contract.
 
 ## Options
 
-| Option                       | Description                                                                                          |
-|------------------------------|------------------------------------------------------------------------------------------------------|
-| `<CONTRACT_ID>`              | The ID of the contract as defined in `Acton.toml`.                                                   |
-| `-o, --output <PATH>`        | Path where the wrapper file will be generated. Defaults to `tests/wrappers/<ContractName>.tolk`.     |
-| `--storage-struct <NAME>`    | Struct name to use for contract storage (if not named `Storage`).                                    |
-| `-t, --test`                 | If set, generates a test stub file at `tests/<contract_id>.test.tolk`.                               |
-| `--test-output <PATH>`       | Path where the test stub file will be generated (requires `--test` flag).                            |
+| Option                    | Description                                                                                                                                              |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `<CONTRACT_ID>`           | The ID of the contract as defined in `Acton.toml`.                                                                                                       |
+| `-o, --output <PATH>`     | Exact path where the wrapper file will be generated. Conflicts with `--output-dir`.                                                                      |
+| `--output-dir <DIR>`      | Output directory for the generated wrapper file. Acton uses `<ContractName>.tolk` or `<ContractName>.ts` as the file name. Conflicts with `--output`.    |
+| `-t, --test`              | If set, generates a test stub file at `tests/<contract_id>.test.tolk`. Not supported with `--ts`.                                                        |
+| `--test-output <PATH>`    | Path where the test stub file will be generated (requires `--test` flag). Not supported with `--ts`.                                                     |
+| `--test-output-dir <DIR>` | Output directory for the generated test stub file. Acton uses `<contract_id>.test.tolk` as the file name (requires `--test`). Not supported with `--ts`. |
+| `--ts`                    | Generate a TypeScript wrapper through `gen-typescript-from-tolk`.                                                                                        |
 
 ## Features
 
-### Storage Struct Resolution
+### Contract Header ABI
 
-If your contract's storage struct is not named `Storage`, the command will try to find it:
-1.  **Direct match:** If you pass `--storage-struct <NAME>`, it will use that struct.
-2.  **Suffix match:** If there is exactly one struct ending with `Storage` (e.g., `MinterStorage`), it will be used.
-3.  **Interactive:** If there are multiple candidates or none, the command will prompt you to select one from the list of available structs.
+Wrapper generation uses the ABI emitted by the Tolk compiler. The contract header is the source of truth for:
+- **Storage** via `storage: ...`
+- **Incoming message wrappers** via `incomingMessages: ...`
+
+If `incomingMessages` is missing from the contract header, `send{MessageName}` methods will not be generated. If `storage` is missing, the wrapper will fall back to an empty `fromStorage()` initializer instead of a typed storage-based one.
+
+```tolk
+contract Counter {
+    storage: Storage
+    incomingMessages: AllowedMessage
+}
+```
 
 ### Type Extraction
 
-The command analyzes your contract's AST to find:
-- **Storage structure:** Generates a `fromStorage` method to initialize the contract state.
-- **Handled messages:** Generates `send{MessageName}` methods for every message type used in `match` statements.
+The command uses compiler ABI to generate:
+- **Storage structure:** Generates a `fromStorage` method when `contract { storage: ... }` is present.
+- **Incoming messages:** Generates `send{MessageName}` methods for the types listed in `contract { incomingMessages: ... }`.
 - **Get methods:** Generates corresponding methods to call get-methods on the contract.
 
 ### Automatic Stub Test Generation
@@ -45,12 +55,9 @@ When using the `--test` flag, the command generates a stub test file that is rea
 - **`setupTest()` helper:** Initializes the contract with default storage values, creates deployer accounts, and deploys the contract.
 - **Example test case:** A placeholder test that calls `setupTest()` so you can verify the deployment works immediately.
 
-### Automatic Type Handling
+### Contract-Local Types
 
-If the command detects that message types or storage are defined inside the contract file (which prevents importing them in tests), it will:
-1.  Create a `types.tolk` file in the contract's directory.
-2.  Warn you to move the type definitions there.
-3.  Generate the wrapper assuming the types are in `types.tolk`.
+Storage and message types may live either in the contract file itself or in imported files. Wrapper generation supports both layouts as long as the contract header exposes them through `storage` and `incomingMessages`.
 
 ## Examples
 
@@ -72,12 +79,59 @@ Generates:
 *   `tests/wrappers/Counter.tolk`
 *   `tests/counter.test.tolk` (ready to run with `acton test counter.test.tolk`)
 
+You can make these defaults project-wide via `Acton.toml`:
+
+```toml
+[wrappers.tolk]
+output-dir = "tests/wrappers"
+generate-test = true
+test-output-dir = "tests"
+```
+
+### Generate a TypeScript wrapper
+
+```bash
+acton wrapper counter --ts
+```
+
+Generates: `Counter.ts` in the project root
+
+### Generate a TypeScript wrapper into a directory
+
+```bash
+acton wrapper counter --ts --output-dir wrappers
+```
+
+Generates: `wrappers/Counter.ts`
+
 ### Generate to custom locations
 
 ```bash
-# Custom wrapper path
+# Custom wrapper file path
 acton wrapper counter -o lib/wrappers/MyWrapper.tolk
+
+# Custom wrapper output directory
+acton wrapper counter --output-dir tests/generated
 
 # Custom test path
 acton wrapper counter --test --test-output tests/my_contract/test.tolk
+
+# Custom test output directory
+acton wrapper counter --test --test-output-dir tests/generated
 ```
+
+### Configure default output directories
+
+```toml
+[wrappers.tolk]
+output-dir = "tests/generated-wrappers"
+generate-test = true
+test-output-dir = "tests/generated-tests"
+
+[wrappers.typescript]
+output-dir = "./wrappers"
+```
+
+With this config:
+- `acton wrapper counter` writes `tests/generated-wrappers/Counter.tolk` and `tests/generated-tests/counter.test.tolk`
+- `acton wrapper counter --ts` writes `wrappers/Counter.ts`

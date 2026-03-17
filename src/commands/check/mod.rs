@@ -1,15 +1,20 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, ContractConfig, LintLevel};
+use acton_config::config::{
+    ActonConfig, CheckOutputFormat, ContractConfig, LintLevel,
+    project_root as configured_project_root,
+};
 use anyhow::anyhow;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use serde_json;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::Instant;
+use std::{fs, io};
 use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, Severity};
-use tolk_linter::{Checker, Rule};
+use tolk_linter::{Checker, Linter, Rule, Tolk};
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, Span};
 use tolk_resolver::project_index::ProjectIndex;
@@ -23,15 +28,23 @@ mod check_explain;
 mod check_list;
 mod compiler;
 mod fix;
-mod json;
+mod output;
 mod pos;
 mod render;
-mod sarif;
 
 pub(super) struct LintExcludes {
     project_root: PathBuf,
     patterns: Vec<String>,
     excludes: GlobSet,
+}
+
+struct CheckRunOptions<'a> {
+    fix: bool,
+    is_plain_report: bool,
+    project_root: &'a Path,
+    acton_config: &'a ActonConfig,
+    excludes: &'a LintExcludes,
+    only_rules: Option<&'a HashSet<Rule>>,
 }
 
 impl LintExcludes {
@@ -93,35 +106,14 @@ fn diagnostics_summary(diagnostics: &[Diagnostic]) -> (usize, usize) {
     (error_count, warning_count)
 }
 
-fn resolve_sarif_output_path(
-    cwd: &Path,
-    config: &ActonConfig,
-    cli_sarif_path: Option<String>,
-) -> Option<PathBuf> {
-    let path = cli_sarif_path.or_else(|| {
-        config
-            .lint
-            .as_ref()
-            .and_then(|lint| lint.output.as_ref())
-            .and_then(|output| output.sarif.as_ref())
-            .and_then(|sarif| sarif.path.clone())
-    })?;
-
-    let path = PathBuf::from(path);
-    if path.is_absolute() {
-        Some(path)
-    } else {
-        Some(cwd.join(path))
-    }
-}
-
 pub fn check_cmd(
     fix: bool,
-    json: bool,
+    cli_output_format: Option<CheckOutputFormat>,
+    output_file: Option<PathBuf>,
+    enable_only: Option<Vec<String>>,
     explain: Option<String>,
     list_lint_rules: bool,
     target: Option<String>,
-    sarif_path: Option<String>,
 ) -> anyhow::Result<()> {
     if list_lint_rules {
         return check_list::check_list_cmd();
@@ -131,20 +123,42 @@ pub fn check_cmd(
     }
 
     let config = ActonConfig::load()?;
+    let output_format = cli_output_format
+        .or_else(|| {
+            config
+                .lint
+                .as_ref()
+                .and_then(|lint| lint.output_format.clone())
+        })
+        .unwrap_or(CheckOutputFormat::Plain);
+    let is_plain_report = output_format == CheckOutputFormat::Plain;
+    if is_plain_report && output_file.is_some() {
+        anyhow::bail!("output_file cannot be used with plain output format")
+    }
+
     let max_warnings = config
         .lint
         .as_ref()
         .map_or(usize::MAX, |lint| lint.max_warnings);
 
-    let cwd = std::env::current_dir()?;
-    let excludes = LintExcludes::from_config(&cwd, &config)?;
+    let project_root = configured_project_root().to_path_buf();
+    let excludes = LintExcludes::from_config(&project_root, &config)?;
+    let only_rules = parse_rules_filter(enable_only)?;
+    let run_options = CheckRunOptions {
+        fix,
+        is_plain_report,
+        project_root: &project_root,
+        acton_config: &config,
+        excludes: &excludes,
+        only_rules: only_rules.as_ref(),
+    };
 
     let now = Instant::now();
-    let files = find_files(&cwd)?;
+    let files = find_files(&project_root)?;
     log::info!("found {} files in {:?}", files.len(), now.elapsed());
 
-    let stdlib = find_stdlib()?;
-    let acton_stdlib = find_acton_stdlib()?;
+    let stdlib = find_stdlib(&project_root)?;
+    let acton_stdlib = find_acton_stdlib(&project_root)?;
     let common_tolk = stdlib.join("common.tolk");
 
     let file_db = FileDb::new(stdlib, Some(acton_stdlib));
@@ -158,15 +172,13 @@ pub fn check_cmd(
 
     if let Some(target) = target {
         if target.ends_with(".tolk") {
-            let contract_diagnostics =
-                check_test_file(Path::new(&target), &file_db, fix, json, &config, &excludes)?;
+            let contract_diagnostics = check_test_file(Path::new(&target), &file_db, &run_options)?;
             all_diagnostics.extend(contract_diagnostics);
         } else {
             let contract = config
                 .get_contract(&target)
                 .ok_or_else(|| anyhow!(error_fmt::contract_not_found(&config, &target)))?;
-            let contract_diagnostics =
-                check_contract(&target, contract, &file_db, fix, json, &config, &excludes)?;
+            let contract_diagnostics = check_contract(&target, contract, &file_db, &run_options)?;
             all_diagnostics.extend(contract_diagnostics);
         }
     } else {
@@ -175,15 +187,8 @@ pub fn check_cmd(
             if excludes.is_match(Path::new(&contract.src)) {
                 continue;
             }
-            let contract_diagnostics = check_contract(
-                &contract_id,
-                &contract,
-                &file_db,
-                fix,
-                json,
-                &config,
-                &excludes,
-            )?;
+            let contract_diagnostics =
+                check_contract(&contract_id, &contract, &file_db, &run_options)?;
             all_diagnostics.extend(contract_diagnostics);
         }
 
@@ -192,8 +197,7 @@ pub fn check_cmd(
                 continue;
             };
             if name.to_string_lossy().ends_with(".test.tolk") && !excludes.is_match(&file) {
-                let contract_diagnostics =
-                    check_test_file(&file, &file_db, fix, json, &config, &excludes)?;
+                let contract_diagnostics = check_test_file(&file, &file_db, &run_options)?;
                 all_diagnostics.extend(contract_diagnostics);
             }
         }
@@ -206,16 +210,38 @@ pub fn check_cmd(
         .into_iter()
         .collect::<Vec<_>>();
 
-    if let Some(sarif_path) = resolve_sarif_output_path(&cwd, &config, sarif_path) {
-        sarif::write_report(&all_diagnostics, &file_db, &cwd, &sarif_path)?;
+    let mut writer: Box<dyn Write> = match output_file {
+        Some(path) => {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            let file = fs::File::create(path)?;
+            Box::new(BufWriter::new(file))
+        }
+        None => Box::new(BufWriter::new(io::stdout())),
+    };
+
+    match output_format {
+        CheckOutputFormat::Plain => {
+            show_plain_report(fix, max_warnings, &all_diagnostics, &file_db)?;
+        }
+        CheckOutputFormat::Json => {
+            output::json::write_report(&mut writer, &all_diagnostics, &file_db)?;
+        }
+        CheckOutputFormat::Sarif => {
+            output::sarif::write_report(&mut writer, &all_diagnostics, &file_db, &project_root)?;
+        }
+        CheckOutputFormat::Github => {
+            output::github::write_report(&mut writer, &all_diagnostics, &file_db, &project_root)?;
+        }
+        CheckOutputFormat::Gitlab => {
+            output::gitlab::write_report(&mut writer, &all_diagnostics, &file_db, &project_root)?;
+        }
     }
 
-    if json {
-        let json_output = serde_json::json!({
-            "success": true,
-            "diagnostics": all_diagnostics.iter().map(|d| json::diagnostic_to_json(d, &file_db)).collect::<Vec<_>>()
-        });
-        println!("{}", serde_json::to_string_pretty(&json_output)?);
+    if output_format != CheckOutputFormat::Plain {
+        writer.flush()?;
 
         let (error_count, warning_count) = diagnostics_summary(&all_diagnostics);
         let warning_limit_exceeded = warning_count > max_warnings;
@@ -224,89 +250,159 @@ pub fn check_cmd(
         if !is_success {
             std::process::exit(1);
         }
-    } else {
-        if fix {
-            fix::apply_fixes(&file_db, &all_diagnostics)?;
-        }
-
-        let mut shown_diagnostics = if fix {
-            fix::filter_fixed_diagnostics(&all_diagnostics)
-        } else {
-            all_diagnostics
-        };
-        let (error_count, warning_count) = diagnostics_summary(&shown_diagnostics);
-        let warning_limit_exceeded = warning_count > max_warnings;
-
-        if !shown_diagnostics.is_empty() {
-            shown_diagnostics.sort();
-            let first_code = shown_diagnostics
-                .iter()
-                .find(|d| d.code.is_some())
-                .and_then(|d| d.code.clone());
-
-            let mut printed_autofix_notice = false;
-            if !fix {
-                let count_to_autofix = shown_diagnostics
-                    .iter()
-                    .filter(|d| {
-                        d.fixes
-                            .iter()
-                            .any(|f| f.applicability == Applicability::Auto)
-                    })
-                    .count();
-
-                if count_to_autofix > 0 {
-                    let issue_word = if count_to_autofix == 1 {
-                        "issue"
-                    } else {
-                        "issues"
-                    };
-
-                    eprintln!();
-                    eprintln!(
-                        "{count_to_autofix} {issue_word} can be fixed automatically, rerun with {} flag.",
-                        "--fix".yellow()
-                    );
-                    printed_autofix_notice = true;
-                }
-            }
-
-            if warning_limit_exceeded {
-                if !printed_autofix_notice {
-                    eprintln!();
-                }
-                eprintln!(
-                    "Warning limit exceeded: {} {} (max-warnings = {}).",
-                    warning_count,
-                    if warning_count == 1 {
-                        "warning"
-                    } else {
-                        "warnings"
-                    },
-                    max_warnings
-                );
-            }
-
-            if let Some(code) = first_code {
-                eprintln!();
-                eprintln!(
-                    "Use {} to get detailed explanation of a rule.",
-                    "acton check --explain <CODE>".yellow()
-                );
-                eprintln!("For example: acton check --explain {}", code);
-            }
-        }
-
-        if error_count > 0 || warning_limit_exceeded {
-            std::process::exit(1);
-        }
     }
 
     Ok(())
 }
 
-fn find_stdlib() -> anyhow::Result<PathBuf> {
-    let path_to_stdlib = PathBuf::from(".acton/tolk-stdlib");
+fn parse_rules_filter(rule_codes: Option<Vec<String>>) -> anyhow::Result<Option<HashSet<Rule>>> {
+    let Some(rule_codes) = rule_codes else {
+        return Ok(None);
+    };
+
+    let mut rules = HashSet::new();
+    for rule_code in rule_codes {
+        let rule = parse_rule_selector(&rule_code)?;
+        rules.insert(rule);
+    }
+
+    if rules.is_empty() {
+        anyhow::bail!("--enable-only requires at least one rule code");
+    }
+
+    Ok(Some(rules))
+}
+
+fn parse_rule_selector(rule_code: &str) -> anyhow::Result<Rule> {
+    let code = rule_code.trim();
+    if code.is_empty() {
+        anyhow::bail!("rule code cannot be empty");
+    }
+
+    if let Some(rule) = parse_exact_rule_code(code) {
+        return Ok(rule);
+    }
+
+    anyhow::bail!("Unknown rule code: {rule_code}");
+}
+
+fn parse_exact_rule_code(code: &str) -> Option<Rule> {
+    let selector = Tolk::from_str(code).ok()?;
+    let mut rules = selector.rules();
+    let rule = rules.next()?;
+    if rules.next().is_some() {
+        return None;
+    }
+    Some(rule)
+}
+
+fn apply_rules_filter(
+    mut lint_settings: HashMap<Rule, LintLevel>,
+    selected_rules: Option<&HashSet<Rule>>,
+) -> HashMap<Rule, LintLevel> {
+    let Some(selected_rules) = selected_rules else {
+        return lint_settings;
+    };
+
+    for rule in Linter::Tolk.all_rules() {
+        if selected_rules.contains(&rule) {
+            if matches!(lint_settings.get(&rule), Some(LintLevel::Allow)) {
+                lint_settings.remove(&rule);
+            }
+        } else {
+            lint_settings.insert(rule, LintLevel::Allow);
+        }
+    }
+
+    lint_settings
+}
+
+fn show_plain_report(
+    fix: bool,
+    max_warnings: usize,
+    all_diagnostics: &[Diagnostic],
+    file_db: &FileDb,
+) -> anyhow::Result<()> {
+    if fix {
+        fix::apply_fixes(file_db, all_diagnostics)?;
+    }
+
+    let mut shown_diagnostics = if fix {
+        fix::filter_fixed_diagnostics(all_diagnostics)
+    } else {
+        Vec::from(all_diagnostics)
+    };
+    let (error_count, warning_count) = diagnostics_summary(&shown_diagnostics);
+    let warning_limit_exceeded = warning_count > max_warnings;
+
+    if !shown_diagnostics.is_empty() {
+        shown_diagnostics.sort();
+        let first_code = shown_diagnostics
+            .iter()
+            .find(|d| d.code.is_some())
+            .and_then(|d| d.code.clone());
+
+        let mut printed_autofix_notice = false;
+        if !fix {
+            let count_to_autofix = shown_diagnostics
+                .iter()
+                .filter(|d| {
+                    d.fixes
+                        .iter()
+                        .any(|f| f.applicability == Applicability::Auto)
+                })
+                .count();
+
+            if count_to_autofix > 0 {
+                let issue_word = if count_to_autofix == 1 {
+                    "issue"
+                } else {
+                    "issues"
+                };
+
+                eprintln!();
+                eprintln!(
+                    "{count_to_autofix} {issue_word} can be fixed automatically, rerun with {} flag.",
+                    "--fix".yellow()
+                );
+                printed_autofix_notice = true;
+            }
+        }
+
+        if warning_limit_exceeded {
+            if !printed_autofix_notice {
+                eprintln!();
+            }
+            eprintln!(
+                "Warning limit exceeded: {} {} (max-warnings = {}).",
+                warning_count,
+                if warning_count == 1 {
+                    "warning"
+                } else {
+                    "warnings"
+                },
+                max_warnings
+            );
+        }
+
+        if let Some(code) = first_code {
+            eprintln!();
+            eprintln!(
+                "Use {} to get detailed explanation of a rule.",
+                "acton check --explain <CODE>".yellow()
+            );
+            eprintln!("For example: acton check --explain {}", code);
+        }
+    }
+
+    if error_count > 0 || warning_limit_exceeded {
+        std::process::exit(1);
+    }
+    Ok(())
+}
+
+fn find_stdlib(project_root: &Path) -> anyhow::Result<PathBuf> {
+    let path_to_stdlib = project_root.join(".acton/tolk-stdlib");
     if !path_to_stdlib.exists() {
         anyhow::bail!(
             "cannot find Tolk stdlib in .acton/, did you run {}?",
@@ -317,8 +413,8 @@ fn find_stdlib() -> anyhow::Result<PathBuf> {
     Ok(dunce::canonicalize(path_to_stdlib)?)
 }
 
-fn find_acton_stdlib() -> anyhow::Result<PathBuf> {
-    let path_to_acton = PathBuf::from(".acton");
+fn find_acton_stdlib(project_root: &Path) -> anyhow::Result<PathBuf> {
+    let path_to_acton = project_root.join(".acton");
     if !path_to_acton.exists() {
         anyhow::bail!(
             "cannot find Acton in .acton/, did you run {}?",
@@ -333,47 +429,48 @@ fn check_contract(
     contract_id: &str,
     config: &ContractConfig,
     file_db: &FileDb,
-    fix: bool,
-    json: bool,
-    acton_config: &ActonConfig,
-    excludes: &LintExcludes,
+    options: &CheckRunOptions<'_>,
 ) -> anyhow::Result<Vec<Diagnostic>> {
     if !config.src.ends_with(".tolk") {
         // skip contracts with .boc sources
         return Ok(vec![]);
     }
 
-    if !json {
+    if options.is_plain_report {
         println!("    {} {}", "Checking".green().bold(), config.name,);
     }
 
-    let root = dunce::canonicalize(PathBuf::from(&config.src))?;
-    let lint_settings = Checker::build_settings(acton_config, Some(contract_id));
+    let source_path = Path::new(&config.src);
+    let source_path = if source_path.is_absolute() {
+        source_path.to_path_buf()
+    } else {
+        options.project_root.join(source_path)
+    };
+    let root = dunce::canonicalize(source_path)?;
+    let lint_settings = Checker::build_settings(options.acton_config, Some(contract_id));
+    let lint_settings = apply_rules_filter(lint_settings, options.only_rules);
 
     check_root_file(
         &root,
         file_db,
-        fix,
-        json,
+        options.fix,
+        options.is_plain_report,
         lint_settings,
-        acton_config,
-        excludes,
+        options.acton_config,
+        options.excludes,
     )
 }
 
 fn check_test_file(
     file: &Path,
     file_db: &FileDb,
-    fix: bool,
-    json: bool,
-    acton_config: &ActonConfig,
-    excludes: &LintExcludes,
+    options: &CheckRunOptions<'_>,
 ) -> anyhow::Result<Vec<Diagnostic>> {
     let root = dunce::canonicalize(file)?;
     let current_dir = std::env::current_dir().unwrap_or_default();
     let relative_root = pathdiff::diff_paths(&root, &current_dir).unwrap_or_else(|| root.clone());
 
-    if !json {
+    if options.is_plain_report {
         println!(
             "    {} {}",
             "Checking".green().bold(),
@@ -381,22 +478,23 @@ fn check_test_file(
         );
     }
 
-    let mut lint_settings = Checker::build_settings(acton_config, None);
+    let mut lint_settings = Checker::build_settings(options.acton_config, None);
     // we can import any files in tests
     lint_settings.insert(Rule::ActonImportInContract, LintLevel::Allow);
     // random is not so important in tests
     lint_settings.insert(Rule::RandomRequiresInitialization, LintLevel::Allow);
     // division is not so important in tests
     lint_settings.insert(Rule::DivideBeforeMultiply, LintLevel::Allow);
+    let lint_settings = apply_rules_filter(lint_settings, options.only_rules);
 
     check_root_file(
         &root,
         file_db,
-        fix,
-        json,
+        options.fix,
+        options.is_plain_report,
         lint_settings,
-        acton_config,
-        excludes,
+        options.acton_config,
+        options.excludes,
     )
 }
 
@@ -404,7 +502,7 @@ fn check_root_file(
     root: &Path,
     file_db: &FileDb,
     fix: bool,
-    json: bool,
+    is_plain_report: bool,
     lint_settings: HashMap<Rule, LintLevel>,
     acton_config: &ActonConfig,
     excludes: &LintExcludes,
@@ -453,9 +551,10 @@ fn check_root_file(
     // - parse
     // - resolve imports
     let now = Instant::now();
+    let mappings = acton_config.mappings();
     let mut index = ProjectIndex::builder(file_db, root.to_owned())
         .with_stdlib(file_db.stdlib_path().to_owned())
-        .with_mappings(&acton_config.mappings)
+        .with_mappings(&mappings)
         .build()?;
     log::debug!("Build project index took {:?}", now.elapsed());
     log::debug!("Index: {:?}", index.files().len());
@@ -465,7 +564,7 @@ fn check_root_file(
     resolve(file_db, &mut index);
     log::debug!("Resolve project took {:?}", now.elapsed());
 
-    // Infer types of all top level declarations
+    // Infer types of all top-level declarations
     let now = Instant::now();
     let mut interner = TypeInterner::new();
     let mut type_db = TypeDb::new(&mut interner, file_db, &index);
@@ -495,7 +594,9 @@ fn check_root_file(
 
     // And finally run all inspections provided by checker
     let now = Instant::now();
-    let mut checker = Checker::new(file_db, &mut type_db, &body_types).with_settings(lint_settings);
+    let mut checker = Checker::new(file_db, &mut type_db, &body_types)
+        .with_settings(lint_settings)
+        .with_project_root(configured_project_root().to_path_buf());
 
     // locals by file -> file_db -> project_index -> by usage
     // globals one time
@@ -532,7 +633,7 @@ fn check_root_file(
             || !excludes.is_match_file_id(file_db, diagnostic.file_id)
     });
 
-    if !json {
+    if is_plain_report {
         let diagnostics_to_show = if fix {
             fix::filter_fixed_diagnostics(&diagnostics)
         } else {
@@ -553,6 +654,8 @@ fn find_files(root: &Path) -> anyhow::Result<Vec<PathBuf>> {
         "node_modules",
         "target",
         "tolk-stdlib",
+        ".codex",
+        ".claude",
     ];
 
     let mut exclude_builder = GlobSetBuilder::new();

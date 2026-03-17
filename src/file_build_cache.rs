@@ -1,4 +1,4 @@
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Result, anyhow};
 use fs2::FileExt;
 use log::debug;
@@ -59,13 +59,14 @@ pub struct FileBuildCache {
     contract_src_index: FxHashMap<String, String>,
     dependencies_cache: FxHashMap<String, DependenciesCacheEntry>,
     file_hash_cache: FxHashMap<String, FileHashCacheEntry>,
-    cwd: PathBuf,
+    project_root: PathBuf,
     _lock_file: File,
 }
 
 impl FileBuildCache {
     pub fn new(cache_dir: Option<PathBuf>) -> Result<Self> {
-        let cache_dir = cache_dir.unwrap_or_else(|| PathBuf::from(".acton/cache"));
+        let project_root = configured_project_root().to_path_buf();
+        let cache_dir = cache_dir.unwrap_or_else(|| project_root.join(".acton").join("cache"));
 
         if !cache_dir.exists() {
             fs::create_dir_all(&cache_dir)?;
@@ -95,8 +96,7 @@ impl FileBuildCache {
 
         let config = ActonConfig::load().unwrap_or_default();
 
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let contract_src_index = Self::build_contract_src_index(&config, &cwd);
+        let contract_src_index = Self::build_contract_src_index(&config, &project_root);
 
         Ok(Self {
             cache_dir,
@@ -105,7 +105,7 @@ impl FileBuildCache {
             contract_src_index,
             dependencies_cache: FxHashMap::default(),
             file_hash_cache: FxHashMap::default(),
-            cwd,
+            project_root,
             _lock_file: lock_file,
         })
     }
@@ -117,8 +117,8 @@ impl FileBuildCache {
         let lock_file_path = tmp_dir.path().join(".lock");
         let lock_file = File::create(&lock_file_path)?;
 
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let contract_src_index = Self::build_contract_src_index(&config, &cwd);
+        let project_root = configured_project_root().to_path_buf();
+        let contract_src_index = Self::build_contract_src_index(&config, &project_root);
 
         Ok(Self {
             cache_dir: tmp_dir.path().to_path_buf(),
@@ -127,7 +127,7 @@ impl FileBuildCache {
             contract_src_index,
             dependencies_cache: FxHashMap::default(),
             file_hash_cache: FxHashMap::default(),
-            cwd,
+            project_root,
             _lock_file: lock_file,
         })
     }
@@ -274,7 +274,8 @@ impl FileBuildCache {
             return Ok(cached.dependencies.clone());
         }
 
-        let file_deps = ton_abi::get_file_dependencies(file_path, true, &self.config.mappings)
+        let mappings = self.config.mappings();
+        let file_deps = ton_abi::get_file_dependencies(file_path, true, &mappings)
             .map_err(|e| anyhow!("Failed to get file dependencies: {e}"))?;
 
         let Some(contract_name) = self.contract_src_index.get(&normalized_path).cloned() else {
@@ -399,7 +400,7 @@ impl FileBuildCache {
 
     fn normalize_path(&self, path: &str) -> String {
         Path::new(path)
-            .absolutize_from(&self.cwd)
+            .absolutize_from(&self.project_root)
             .unwrap_or_else(|_| Path::new(path).into())
             .to_string_lossy()
             .to_string()
@@ -442,7 +443,10 @@ impl FileBuildCache {
         self.entries.len()
     }
 
-    fn build_contract_src_index(config: &ActonConfig, cwd: &Path) -> FxHashMap<String, String> {
+    fn build_contract_src_index(
+        config: &ActonConfig,
+        project_root: &Path,
+    ) -> FxHashMap<String, String> {
         let mut index = FxHashMap::default();
         let Some(contracts) = config.contracts.as_ref().map(|cfg| &cfg.contracts) else {
             return index;
@@ -450,7 +454,7 @@ impl FileBuildCache {
 
         for (name, contract) in contracts {
             let abs_path = Path::new(&contract.src)
-                .absolutize_from(cwd)
+                .absolutize_from(project_root)
                 .unwrap_or_else(|_| Path::new(&contract.src).into())
                 .to_string_lossy()
                 .to_string();

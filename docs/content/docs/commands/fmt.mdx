@@ -1,0 +1,118 @@
+---
+title: "Formatting Tolk files"
+description: "Learn how to use the fmt command to format Tolk source files"
+---
+
+The `fmt` command formats `.tolk` files using the built-in Tolk formatter.
+It can either rewrite files in place or run in check-only mode for CI.
+
+## Basic Usage
+
+```bash
+acton fmt [PATHS...]
+acton fmt --check [PATHS...]
+```
+
+If `PATHS` are omitted, Acton scans the project root recursively.
+
+## Command Options
+
+| Option       | Type      | Description                                                                         |
+|:-------------|:----------|:------------------------------------------------------------------------------------|
+| `[PATHS]...` | Path list | Files or directories to format (defaults to project root).                          |
+| `--check`    | Flag      | Check formatting without writing files; prints diff and exits non-zero on mismatch. |
+
+## Behavior
+
+- Formats only files with `.tolk` extension.
+- For directory inputs, traversal is recursive.
+- Built-in ignore globs are always applied: `**/node_modules/**`, `**/.git/**`, `**/target/**`, `**/.acton/**`, `**/.codex/**`, `**/.claude/**`.
+- Additional ignore patterns can be configured in `Acton.toml` (`[fmt].ignore`).
+- In normal mode, files are overwritten only when content changes.
+- In `--check` mode, changed files are reported with a unified diff and command fails.
+- Syntax errors are reported as diagnostics (`C001`) and cause non-zero exit.
+
+## `Acton.toml` Integration
+
+`fmt` reads defaults from the `[fmt]` section:
+
+| Field                    | Type       | Default | Description                                        |
+|:-------------------------|:-----------|:--------|:---------------------------------------------------|
+| `width`                  | `integer`  | `100`   | Maximum line width for formatting.                 |
+| `ignore`                 | `string[]` | -       | Glob patterns of files to exclude from formatting. |
+| `separate-import-groups` | `boolean`  | `false` | Inserts empty lines between import groups.         |
+
+Example:
+
+```toml
+[fmt]
+width = 100
+ignore = ["contracts/generated/*.tolk"]
+separate-import-groups = true
+```
+
+## Import Sorting
+
+Imports are sorted by group in this order:
+
+1. `@stdlib`
+2. `@acton`
+3. Other `@...` imports
+4. Plain imports (`"foo"`)
+5. `./...`
+6. `../...`
+
+Within each group, imports are sorted lexicographically.
+
+### Example: default (`separate-import-groups = false`)
+
+```tolk
+import "@stdlib/gas-payments"
+import "@stdlib/reflection"
+import "@acton/io"
+import "@acton/testing/expect"
+import "@contracts/types"
+import "foo"
+import "./a"
+import "./b"
+import "../a"
+import "../z"
+```
+
+### Example: grouped (`separate-import-groups = true`)
+
+With `separate-import-groups = true`, formatter also inserts empty lines between groups:
+
+```tolk
+import "@stdlib/gas-payments"
+import "@stdlib/reflection"
+
+import "@acton/io"
+import "@acton/testing/expect"
+
+import "@contracts/types"
+
+import "foo"
+
+import "./a"
+import "./b"
+
+import "../a"
+import "../z"
+```
+
+## Examples
+
+```bash
+# Format all .tolk files in the project
+acton fmt
+
+# Format only selected paths
+acton fmt contracts scripts/deploy.tolk
+
+# Validate formatting in CI without rewriting files
+acton fmt --check
+
+# Run from another directory
+acton --project-root ../my-project fmt --check
+```

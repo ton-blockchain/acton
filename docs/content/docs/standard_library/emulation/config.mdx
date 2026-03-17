@@ -57,7 +57,7 @@ To apply updates to the emulator globally, call [net.setConfig](../network/#nets
 ## `Config.setParamRaw`
 
 ```tolk
-fun Config.setParamRaw(mutate self, index: uint32, data: cell)
+fun Config.setParamRaw(mutate self, index: uint32, data: cell): void
 ```
 
 Sets a raw configuration parameter at the given index.
@@ -81,7 +81,7 @@ config.setParamRaw(20, gasCell);
 ## `Config.getParamRaw`
 
 ```tolk
-fun Config.getParamRaw(self, index: uint32)
+fun Config.getParamRaw(self, index: uint32): cell
 ```
 
 Retrieves a raw configuration parameter at the given index.
@@ -136,7 +136,7 @@ that indicate which features are supported by the network.
 ## `Config.setGlobalVersion`
 
 ```tolk
-fun Config.setGlobalVersion(mutate self, version: GlobalVersion)
+fun Config.setGlobalVersion(mutate self, version: GlobalVersion): void
 ```
 
 Sets the global network version and capabilities (Param 8).
@@ -166,7 +166,7 @@ if (!net.setConfig(config)) {
 ## `Config.getGlobalVersion`
 
 ```tolk
-fun Config.getGlobalVersion(self)
+fun Config.getGlobalVersion(self): GlobalVersion
 ```
 
 Retrieves the global network version and capabilities (Param 8).
@@ -251,7 +251,7 @@ storage price configuration that applies from the beginning of time.
 ## `StoragePricesDict.getInitial`
 
 ```tolk
-fun StoragePricesDict.getInitial(self)
+fun StoragePricesDict.getInitial(self): StoragePrices
 ```
 
 Retrieves the initial storage price configuration from the dictionary.
@@ -273,7 +273,7 @@ println1("Initial bit price: {}", initialPrices.bitPrice);
 ## `StoragePricesDict.setInitial`
 
 ```tolk
-fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices)
+fun StoragePricesDict.setInitial(mutate self, prices: StoragePrices): void
 ```
 
 Sets the initial storage price configuration in the dictionary.
@@ -306,7 +306,7 @@ if (!net.setConfig(config)) {
 ## `Config.setStoragePrices`
 
 ```tolk
-fun Config.setStoragePrices(mutate self, prices: StoragePricesDict)
+fun Config.setStoragePrices(mutate self, prices: StoragePricesDict): void
 ```
 
 Sets the storage price configuration (Param 18).
@@ -340,7 +340,7 @@ if (!net.setConfig(config)) {
 ## `Config.getStoragePrices`
 
 ```tolk
-fun Config.getStoragePrices(self)
+fun Config.getStoragePrices(self): StoragePricesDict
 ```
 
 Retrieves the storage price configuration (Param 18).
@@ -430,7 +430,7 @@ Configuration parameter index for basechain gas prices (Param 21).
 ## `Config.setGasPrices`
 
 ```tolk
-fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int)
+fun Config.setGasPrices(mutate self, prices: GasPrices, chainType: int): void
 ```
 
 Sets gas price configuration for the masterchain or basechain (Param 20/21).
@@ -450,7 +450,7 @@ This mutates only the local [Config](#config) value until you call [net.setConfi
 ## `Config.getGasPrices`
 
 ```tolk
-fun Config.getGasPrices(self, chainType: int)
+fun Config.getGasPrices(self, chainType: int): GasPrices
 ```
 
 Retrieves gas price configuration for the masterchain or basechain (Param 20/21).
@@ -468,7 +468,7 @@ val gasPrices = config.getGasPrices(BASECHAIN);
 println1("Gas limit basechain: {}", gasPrices);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L346" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L348" />
 
 ## `MsgForwardPrices`
 
@@ -494,7 +494,7 @@ Message forwarding price configuration (Param 24/25).
 This struct defines the costs associated with forwarding messages between accounts and shards
 in the TON Blockchain. Message routing uses these prices to calculate fees for message delivery.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L355" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L359" />
 
 ## `MASTERCHAIN_MSG_FORWARD_PRICES_INDEX`
 
@@ -504,7 +504,7 @@ const MASTERCHAIN_MSG_FORWARD_PRICES_INDEX = 24
 
 Configuration parameter index for masterchain message forwarding prices (Param 24).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L371" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L375" />
 
 ## `BASECHAIN_MSG_FORWARD_PRICES_INDEX`
 
@@ -514,12 +514,12 @@ const BASECHAIN_MSG_FORWARD_PRICES_INDEX = 25
 
 Configuration parameter index for basechain message forwarding prices (Param 25).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L374" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L378" />
 
 ## `Config.setMsgForwardPrices`
 
 ```tolk
-fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int)
+fun Config.setMsgForwardPrices(mutate self, prices: MsgForwardPrices, chainType: int): void
 ```
 
 Sets message forwarding price configuration for the masterchain or basechain (Param 24/25).
@@ -549,12 +549,12 @@ if (!net.setConfig(config)) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L402" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L406" />
 
 ## `Config.getMsgForwardPrices`
 
 ```tolk
-fun Config.getMsgForwardPrices(self, chainType: int)
+fun Config.getMsgForwardPrices(self, chainType: int): MsgForwardPrices
 ```
 
 Retrieves message forwarding price configuration for the masterchain or basechain (Param 24/25).
@@ -573,7 +573,7 @@ println(format3("Lump price: {}, Bit price: {}, Cell price: {}",
     msgPrices.lumpPrice, msgPrices.bitPrice, msgPrices.cellPrice));
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L425" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L429" />
 
 ## `PRECOMPILED_CONTRACTS_CONFIG_INDEX`
 
@@ -587,7 +587,7 @@ Precompiled contracts are built-in smart contracts optimized for specific comput
 They consume a fixed amount of gas regardless of input size, making them more efficient
 than general-purpose contracts for their specific functions.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L438" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L442" />
 
 ## `PrecompiledSmartContract`
 
@@ -602,7 +602,7 @@ Precompiled smart contract configuration.
 
 Specifies the gas usage for a precompiled contract.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L443" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L447" />
 
 ## `PrecompiledContractsConfig`
 
@@ -618,12 +618,16 @@ Configuration for all precompiled contracts (Param 45).
 Contains a dictionary mapping contract addresses to their gas usage specifications.
 Precompiled contracts are optimized implementations of common operations provided by the system.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L452" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L456" />
 
 ## `PrecompiledContractsConfig.addContractGas`
 
 ```tolk
-fun PrecompiledContractsConfig.addContractGas(mutate self, hash: uint256, gasForComputePhase: uint64)
+fun PrecompiledContractsConfig.addContractGas(
+    mutate self,
+    hash: uint256,
+    gasForComputePhase: uint64,
+): bool
 ```
 
 Adds a precompiled contract gas entry if `hash` is not already present.
@@ -631,12 +635,15 @@ Adds a precompiled contract gas entry if `hash` is not already present.
 Returns `true` when a new entry is inserted.
 Returns `false` for duplicate `hash` values, and keeps the original `gasUsage` unchanged.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L461" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L465" />
 
 ## `Config.setPrecompiledContractsConfig`
 
 ```tolk
-fun Config.setPrecompiledContractsConfig(mutate self, precompiledConfig: PrecompiledContractsConfig)
+fun Config.setPrecompiledContractsConfig(
+    mutate self,
+    precompiledConfig: PrecompiledContractsConfig,
+): void
 ```
 
 Sets the precompiled contracts configuration (Param 45).
@@ -662,12 +669,12 @@ if (!net.setConfig(config)) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L489" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L495" />
 
 ## `Config.getPrecompiledContractsConfig`
 
 ```tolk
-fun Config.getPrecompiledContractsConfig(self)
+fun Config.getPrecompiledContractsConfig(self): PrecompiledContractsConfig
 ```
 
 Retrieves the precompiled contracts configuration (Param 45).
@@ -686,5 +693,5 @@ val precompiledConfig = config.getPrecompiledContractsConfig();
 val contractsList = precompiledConfig.list;
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L508" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/emulation/config.tolk#L517" />
 

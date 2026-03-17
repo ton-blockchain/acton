@@ -5,7 +5,6 @@
 
 # Rust build artifacts
 target/
-Cargo.lock
 
 # IDE files
 .vscode/
@@ -27,6 +26,8 @@ docs/out
 # OS files
 .DS_Store
 Thumbs.db
+
+.env
 
 gen/
 *.mnemonic

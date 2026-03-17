@@ -1,32 +1,41 @@
-TON blockchain development tool
+Acton is all-in-one on-chain development tool for TON.
 
-Usage: acton[EXE] [OPTIONS] <COMMAND>
+Usage: acton[EXE] <command> [...flags] [...args]
 
 Commands:
-  init         Initialize a new project in the current directory
-  new          Create a new project in a specified directory
-  wallet       Manage wallets
-  test         Execute tests in file or directory
-  wrapper      Generate wrapper and optionally stub test file for a contract
-  script       Execute a Tolk script file
-  build        Build the specified contract or all contracts
-  run          Run a script defined in Acton.toml
-  compile      Compile a Tolk file
-  disasm       Disassemble TVM bitcode to human-readable TASM
-  verify       Verify contract source code on verifier.ton.org
-  check        Check Tolk files in the project for errors
-  retrace      Retrace a transaction by its hash
-  library      Manage TON libraries
-  litenode     Manage lightweight TON node
-  fmt          Format Tolk source files
-  doc          Lookup reference documentation
-  ls           LSP server for the TON languages and technologies
-  up           Manage Acton versions
-  completions  Generate shell completions for selected shell
-  help         Print this message or the help of the given subcommand(s)
+  new              [PATH]              Create a new project in a specified directory
+  init                                 Initialize a new project in the current directory
 
-Options:
-      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
-      --manifest-path <PATH>  Path to Acton.toml
-  -h, --help                  Print help
-  -V, --version               Print version
+  test             [PATH]              Execute tests in file or directory
+  build            [CONTRACT_ID]       Build the specified contract or all contracts
+  check            [TARGET]            Check Tolk files in the project for errors
+  script           <PATH> [ARGS...]    Execute a Tolk script file
+  fmt              [PATHS...]          Format Tolk source files
+
+  wallet           <COMMAND>           Manage wallets
+  verify           [CONTRACT_ID]       Verify contract source code on verifier.ton.org
+  library          <COMMAND>           Manage TON libraries
+  litenode         <COMMAND>           Manage lightweight TON node
+  retrace          <TX_HASH>           Retrace a transaction by its hash
+
+  run              <SCRIPT> [ARGS...]  Run a script defined in Acton.toml
+  compile          <PATH>              Compile a Tolk file
+  wrapper          <CONTRACT_ID>       Generate wrapper and optionally stub test file for a contract
+  disasm           [BOC_FILE]          Disassemble TVM bitcode to human-readable TASM
+  doc              tvm <QUERY...>      Lookup reference documentation
+
+  ls                                   Run LSP server for the TON languages and technologies
+  up                                   Manage Acton versions
+  help             [COMMAND]           Print this message or the help of the given subcommand(s)
+  doctor                               Inspect resolved project environment
+  func2tolk        <PATH>              Convert FunC files to Tolk via @ton/convert-func-to-tolk
+  completions      <SHELL>             Generate shell completions for selected shell
+
+Global options:
+  --color          <WHEN>              Control when to use colored output
+  --manifest-path  <PATH>              Path to Acton.toml
+  --project-root   <PATH>              Path to project root
+  -h, --help                           Print help
+  -V, --version                        Print version
+
+Learn more about Acton:                https://i582.github.io/acton/docs/welcome

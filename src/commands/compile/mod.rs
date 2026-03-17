@@ -76,7 +76,8 @@ pub fn compile_cmd(
 
     let mut compiler = tolkc::Compiler::new(2);
     if let Some(acton_config) = &acton_config {
-        compiler = compiler.with_mappings(&acton_config.mappings)
+        let mappings = acton_config.mappings();
+        compiler = compiler.with_mappings(&mappings)
     }
 
     let compilation_result = compiler.compile(Path::new(path), with_debug_info);
@@ -252,7 +253,7 @@ fn handle_compilation_result(
         }
         println!("Code in base64: {}", code_boc64.dimmed());
         println!("Code in hex: {}", code_hex.dimmed());
-        println!("Code hash hex: {}", code_hash_hex.dimmed());
+        println!("Code hash hex: {}", format!("0x{code_hash_hex}").dimmed());
     }
     Ok(())
 }

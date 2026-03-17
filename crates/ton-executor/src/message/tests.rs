@@ -5,17 +5,17 @@ use crate::message::types::RunTransactionArgs;
 use crate::{DEFAULT_CONFIG, EXT_METHOD_STACK_ALL_ITEMS};
 use std::ffi::c_char;
 
+const MESSAGE_B64: &str = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
+const SHARD_ACCOUNT_B64: &str = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
+
 #[test]
 fn test_executor() -> anyhow::Result<()> {
     let exec = Executor::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
 
-    let msg = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
-    let shard_account = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
-
     let result = exec.run_transaction(
-        msg,
+        MESSAGE_B64,
         &RunTransactionArgs {
-            shard_account: shard_account.to_owned(),
+            shard_account: SHARD_ACCOUNT_B64.to_owned(),
             ..Default::default()
         },
     );
@@ -29,14 +29,11 @@ fn test_executor() -> anyhow::Result<()> {
 fn test_executor_with_bad_libs() -> anyhow::Result<()> {
     let exec = Executor::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
 
-    let msg = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
-    let shard_account = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
-
     let result = exec.run_transaction(
-        msg,
+        MESSAGE_B64,
         &RunTransactionArgs {
             libs: Some(String::new()), // not a valid cell
-            shard_account: shard_account.to_owned(),
+            shard_account: SHARD_ACCOUNT_B64.to_owned(),
             ..Default::default()
         },
     );
@@ -55,13 +52,10 @@ fn test_executor_with_bad_libs() -> anyhow::Result<()> {
 fn test_executor_fail_with_tick_tock() -> anyhow::Result<()> {
     let exec = Executor::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
 
-    let msg = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
-    let shard_account = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
-
     let result = exec.run_transaction(
-        msg,
+        MESSAGE_B64,
         &RunTransactionArgs {
-            shard_account: shard_account.to_owned(),
+            shard_account: SHARD_ACCOUNT_B64.to_owned(),
             is_tick_tock: Some(false),
             is_tock: Some(true),
             ..Default::default()
@@ -82,13 +76,10 @@ fn test_executor_fail_with_tick_tock() -> anyhow::Result<()> {
 fn test_executor_with_random_seed() -> anyhow::Result<()> {
     let exec = Executor::new(ExecutorVerbosity::FullLocationStackVerbose, None)?;
 
-    let msg = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
-    let shard_account = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
-
     let result = exec.run_transaction(
-        msg,
+        MESSAGE_B64,
         &RunTransactionArgs {
-            shard_account: shard_account.to_owned(),
+            shard_account: SHARD_ACCOUNT_B64.to_owned(),
             random_seed: Some(*&[
                 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4,
                 5, 6, 7, 8,
@@ -122,13 +113,10 @@ fn test_executor_with_ext_method() -> anyhow::Result<()> {
 
     exec.register_ext_method(100, &mut my_ctx, EXT_METHOD_STACK_ALL_ITEMS, my_callback)?;
 
-    let msg = "te6ccgEBAQEAXAAAs2gA3hg/j9iig2aTi8NU/hguuHV4Mf1mEUmqqnI9JLMCjg8ACW3KjJfr/ID5Nkj7xB33xCZD+wzKhEVCVM/gq78qkGEQF9eEAAAAAAAAAAAAAAAAAAAAAAAAwA==";
-    let shard_account = "te6ccgEBAgEAZQABUEIAo/QUie4HOlbbq3s8tbZIXLyq3iMgXy2Ih0e2fuJ7AAAAAAAtxsABAG/AAltyoyX6/yA+TZI+8Qd98QmQ/sMyoRFQlTP4Ku/KpBhCAl3DSqAZUAAAAAAAtxsFgEC6F1wABA==";
-
     let result = exec.run_transaction(
-        msg,
+        MESSAGE_B64,
         &RunTransactionArgs {
-            shard_account: shard_account.to_owned(),
+            shard_account: SHARD_ACCOUNT_B64.to_owned(),
             ..Default::default()
         },
     );

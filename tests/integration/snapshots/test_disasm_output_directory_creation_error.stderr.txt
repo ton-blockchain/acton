@@ -1,1 +1,0 @@
-Error: Failed to create output directory readonly/output/dir: Not a directory (os error 20)

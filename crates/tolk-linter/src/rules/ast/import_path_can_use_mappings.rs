@@ -47,7 +47,7 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
         return None;
     }
 
-    let project_root = std::env::current_dir().ok()?;
+    let project_root = checker.project_root()?.to_path_buf();
 
     for resolved_import in imports {
         let import = resolved_import.import();

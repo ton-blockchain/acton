@@ -1,28 +1,29 @@
 use crate::commands::common::error_fmt;
 use acton_config::color::OwoColorize;
 use anyhow::Context;
-use std::str::FromStr;
 use ton_api::{Network, TonApiClient};
-use tonlib_core::TonAddress;
+use tycho_types::models::{StdAddr, StdAddrFormat};
 
 pub(super) fn fetch_contract_boc(
     network: Option<Network>,
     address: &str,
     api_key: Option<&str>,
 ) -> anyhow::Result<String> {
-    TonAddress::from_str(address).with_context(|| error_fmt::invalid_address(address))?;
+    StdAddr::from_str_ext(address, StdAddrFormat::any())
+        .map_err(|_| anyhow::anyhow!("Invalid address"))
+        .with_context(|| error_fmt::invalid_address(address))?;
 
     if let Some(network) = network {
         let config = acton_config::config::ActonConfig::load().unwrap_or_default();
         let custom_networks = config.custom_networks();
-        let mainnet_client = TonApiClient::new(
+        let client = TonApiClient::new(
             network.clone(),
             custom_networks,
             api_key.map(ToString::to_string),
         )?;
-        if let Err(error) = mainnet_client.get_contract_boc(address) {
-            anyhow::bail!("Failed to fetch contract boc from {network:?}: {error}");
-        }
+        return client
+            .get_contract_boc(address)
+            .with_context(|| format!("Failed to fetch contract boc from {network}"));
     }
 
     // No explicit network given, trying both

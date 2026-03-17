@@ -1,9 +1,10 @@
 Deploying Jetton with JettonInfo {
-    name: "SomeJetton",
-    description: "Sone jetton",
-    symbol: "JTTT",
+    name: "StarterJetton",
+    description: "A starter jetton template",
+    symbol: "SJTN",
     image: "https://ton.org/download/ton_symbol.svg"
 }
 Deploying Jetton contract...
+Deployed Jetton minter to [WALLET_ADDRESS_BASE] (JettonMinter)
 Minting tokens: 1000000000
 Successfully minted and transferred 1000000000 tokens to [WALLET_ADDRESS_BASE] (deployer)

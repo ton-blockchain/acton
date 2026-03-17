@@ -39,8 +39,9 @@
 //!
 //! # Important Note on Concurrency
 //!
-//! Like the transaction executor, the get-method emulator uses global variables
-//! and is **not thread-safe**. All executions must be run in a single thread.
+//! Native emulator state is not safe for unsynchronized shared access.
+//! [`GetExecutor`] serializes FFI calls per instance, so one executor can be shared
+//! across threads, but concurrent calls on that executor are executed one at a time.
 
 #![allow(unsafe_code)]
 pub mod step;
@@ -50,20 +51,24 @@ pub mod types;
 use core::ffi::{c_char, c_int, c_void};
 pub use types::*;
 
-use crate::{BaseExecutor, ExtMethodCallback};
+use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback};
 use anyhow::Context;
+use parking_lot::ReentrantMutex;
 use std::collections::HashSet;
 use std::ffi::{CStr, CString};
-use std::marker::PhantomData;
 use std::ptr::{NonNull, null};
-use std::rc::Rc;
+
+// Opaque native emulator handle guarded by `GetExecutor::inner`.
+struct RawGetExecutorHandle(NonNull<c_void>);
+
+// SAFETY: the native emulator handle is only accessed while holding `GetExecutor::inner`.
+unsafe impl Send for RawGetExecutorHandle {}
 
 /// A thin wrapper around the C++ TON get-method emulator.
 pub struct GetExecutor {
-    inner: NonNull<c_void>,
+    inner: ReentrantMutex<RawGetExecutorHandle>,
     ext_methods: HashSet<i32>, // track extension methods to catch redefinitions
     params_cstr: CString,
-    phantom: PhantomData<Rc<()>>, // mark as !Send and !Sync
 }
 
 impl GetExecutor {
@@ -77,10 +82,9 @@ impl GetExecutor {
         let inner = NonNull::new(emulator_ptr).context("create_tvm_emulator returned null")?;
 
         Ok(Self {
-            inner,
+            inner: ReentrantMutex::new(RawGetExecutorHandle(inner)),
             ext_methods: HashSet::new(),
             params_cstr,
-            phantom: PhantomData,
         })
     }
 
@@ -104,15 +108,17 @@ impl GetExecutor {
             .transpose()?;
         let config_ptr = config_cstr.as_ref().map_or(null(), |c| c.as_ptr());
 
+        let inner = self.inner.lock();
+
         // SAFETY: `tvm_emulator_set_gas_limit` and `run_get_method` are safe functions
         let run_result_ptr = unsafe {
             // We set a very high gas limit by default for get-methods,
             // as they are typically executed off-chain and for some reason,
             // Tolk compilation consumes gas :D
-            tvm_emulator_set_gas_limit(self.inner.as_ptr(), i64::MAX - 1000);
+            tvm_emulator_set_gas_limit(inner.0.as_ptr(), i64::MAX - 1000);
 
             run_get_method(
-                self.inner.as_ptr(),
+                inner.0.as_ptr(),
                 self.params_cstr.as_ptr(),
                 stack_b64_cstr.as_ptr(),
                 config_ptr,
@@ -197,13 +203,34 @@ impl GetExecutor {
         // SAFETY: `transaction_emulator_register_extmethod` is safe function
         unsafe {
             tvm_emulator_register_extmethod(
-                self.inner.as_ptr(),
+                self.inner.lock().0.as_ptr(),
                 id,
                 std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
                 c_int::from(stack_items_count),
                 std::mem::transmute::<
                     unsafe extern "C" fn(*mut Ctx, *const c_char) -> *const c_char,
                     unsafe extern "C" fn(*mut c_void, *const c_char) -> *const c_char,
+                >(callback),
+            );
+        };
+
+        Ok(())
+    }
+
+    /// Registers callback that is called when TVM fails to resolve a library by hash.
+    pub fn register_missing_library_callback<Ctx>(
+        &mut self,
+        ctx: &mut Ctx,
+        callback: MissingLibraryCallback<Ctx>,
+    ) -> anyhow::Result<()> {
+        // SAFETY: `tvm_emulator_register_missing_library_callback` is a safe C API function.
+        unsafe {
+            tvm_emulator_register_missing_library_callback(
+                self.inner.lock().0.as_ptr(),
+                std::ptr::from_mut::<Ctx>(ctx).cast::<c_void>(),
+                std::mem::transmute::<
+                    unsafe extern "C" fn(*mut Ctx, *const c_char),
+                    unsafe extern "C" fn(*mut c_void, *const c_char),
                 >(callback),
             );
         };
@@ -240,6 +267,12 @@ unsafe extern "C" {
         ctx: *mut c_void,
         stack_items_count: c_int,
         callback: ExtMethodCallback<c_void>,
+    ) -> *const c_char;
+
+    pub(crate) fn tvm_emulator_register_missing_library_callback(
+        tvm_emulator: *mut c_void,
+        ctx: *mut c_void,
+        callback: MissingLibraryCallback<c_void>,
     ) -> *const c_char;
 
     pub(crate) fn tvm_emulator_set_gas_limit(tvm_emulator: *mut c_void, gas_limit: i64) -> bool;

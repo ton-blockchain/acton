@@ -4,18 +4,18 @@
 //! and global libraries. The state can be managed purely locally or forked from a remote
 //! TON network (mainnet or testnet).
 
-use crate::remote;
 use acton_config::config::ActonConfig;
 use anyhow::anyhow;
 use num_traits::cast::ToPrimitive;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 use std::env;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
+use ton_api::TonApiClient;
 use ton_executor::{DEFAULT_CONFIG, DEFAULT_CONFIG_CELL, DEFAULT_CONFIG_DICT};
 use ton_networks::Network;
 use tycho_types::boc::Boc;
@@ -170,7 +170,9 @@ pub struct RemoteAccountState {
     pub fork_block_number: Option<u64>,
     /// Optional API key for `TonCenter`.
     pub api_key: Option<String>,
-    pub acton_config: Option<ActonConfig>,
+
+    /// Shared API client for network fetches.
+    api_client: OnceCell<TonApiClient>,
     /// Cache for less network queries in subsequent tests.
     cache: RemoteSnapshotCache,
 }
@@ -184,12 +186,14 @@ impl RemoteAccountState {
         api_key: Option<String>,
         cache: RemoteSnapshotCache,
     ) -> Self {
+        let api_key = api_key.or_else(|| env::var("TONCENTER_API_KEY").ok());
+
         Self {
             accounts: FxHashMap::default(),
             fork_net,
             fork_block_number,
             api_key,
-            acton_config: ActonConfig::load().ok(),
+            api_client: OnceCell::new(),
             cache,
         }
     }
@@ -237,24 +241,9 @@ impl RemoteAccountState {
             return Ok(cached);
         }
 
-        let network = &self.fork_net;
-        let api_key = self
-            .api_key
-            .clone()
-            .or_else(|| env::var("TONCENTER_API_KEY").ok());
-
-        let mut custom_networks = HashMap::new();
-        if let Some(config) = &self.acton_config {
-            custom_networks = config.custom_networks()
-        }
-
-        let info = remote::get_account_info(
-            self.fork_block_number,
-            address,
-            network,
-            api_key,
-            custom_networks,
-        )?;
+        let info = self
+            .api_client()?
+            .get_account_info(self.fork_block_number, &address.to_string())?;
 
         let balance = info
             .balance
@@ -264,8 +253,8 @@ impl RemoteAccountState {
 
         let account_state = match info.state.as_str() {
             "active" => AccountState::Active(StateInit {
-                code: remote::decode_optional_cell(&info.code)?,
-                data: remote::decode_optional_cell(&info.data)?,
+                code: TonApiClient::decode_optional_cell(&info.code)?,
+                data: TonApiClient::decode_optional_cell(&info.data)?,
                 ..Default::default()
             }),
             "uninitialized" => AccountState::Uninit,
@@ -288,6 +277,22 @@ impl RemoteAccountState {
         };
         self.cache.insert(cache_key, acc.clone());
         Ok(acc)
+    }
+
+    fn api_client(&self) -> anyhow::Result<&TonApiClient> {
+        if self.api_client.get().is_none() {
+            let custom_networks = ActonConfig::load()
+                .ok()
+                .map(|config| config.custom_networks())
+                .unwrap_or_default();
+            let client =
+                TonApiClient::new(self.fork_net.clone(), custom_networks, self.api_key.clone())?;
+            let _ = self.api_client.set(client);
+        }
+
+        self.api_client
+            .get()
+            .ok_or_else(|| anyhow!("Failed to initialize Ton API client"))
     }
 }
 

@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod context;
+pub mod crash;
 pub mod debugger;
 pub mod exit_codes;
 pub mod ffi;

@@ -2,6 +2,7 @@ pub mod comments;
 pub mod common;
 pub mod decls;
 pub mod exprs;
+pub mod pretty;
 pub mod stmts;
 pub mod types;
 

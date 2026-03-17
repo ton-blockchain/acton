@@ -1,5 +1,9 @@
 use crate::support::TestOutputExt;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{ProjectBuilder, TestConfig};
+use std::fs;
+use toml_edit::DocumentMut;
+use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -8,6 +12,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 get fun currentCounter(): int { return 0 }
 get fun currentCounter2(arg: int): int { return arg }
 get fun currentCounter3(arg: int): int { return arg + 10 }
+get fun currentCounterFail(): int { throw 10 }
 get fun getCell(): cell { return beginCell().storeInt(32, 32).endCell() }
 ";
 
@@ -73,6 +78,35 @@ fn test_unknown_get_method_call() {
         .run()
         .failure()
         .assert_snapshot_matches("integration/snapshots/test_unknown_get_method_call.stdout.txt");
+}
+
+#[test]
+fn test_unknown_get_method_call_with_backtrace_full() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter999");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_unknown_get_method_call_with_backtrace_full.stdout.txt",
+        );
 }
 
 #[test]
@@ -154,6 +188,207 @@ fn test_no_arg_get_method_call_2() {
         .run()
         .failure()
         .assert_snapshot_matches("integration/snapshots/test_no_arg_get_method_call_2.stdout.txt");
+}
+
+#[test]
+fn test_no_arg_get_method_call_2_with_backtrace_full() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounter3");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_no_arg_get_method_call_2_with_backtrace_full.stdout.txt",
+        );
+}
+
+#[test]
+fn test_get_method_call_shows_exit_code_variant() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+            .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_get_method_call_shows_exit_code_variant.stdout.txt",
+        );
+}
+
+#[test]
+fn test_get_method_call_shows_backtrace_with_full_mode() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+                .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_get_method_call_shows_backtrace_with_full_mode.stdout.txt",
+        );
+}
+
+#[test]
+fn test_get_method_call_shows_backtrace_with_full_mode_from_config() {
+    ProjectBuilder::new("simple")
+        .contract("simple", SIMPLE_CONTRACT)
+        .with_test_config(TestConfig {
+            backtrace: Some("full".to_string()),
+            ..TestConfig::default()
+        })
+        .test_file(
+            "test",
+            (TEST_PREPARE.to_string()
+                + r#"
+
+            get fun `test-foo`() {
+                val (counter, deployer) = setupTest();
+
+                val counterRes = net.runGetMethod<int, tuple>(counter.address, "currentCounterFail");
+                println(format1("Counter: {}", counterRes));
+            }
+        "#)
+                .as_str(),
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_get_method_call_shows_backtrace_with_full_mode_from_config.stdout.txt",
+        );
+}
+
+#[test]
+fn test_debug_dump_stack_output() {
+    let project = ProjectBuilder::new("test-debug-dump-stack-output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r"
+            get fun `test-debug-dump-stack-output`() {
+                debug.dumpStack();
+            }
+        ",
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("Test output:")
+        .assert_snapshot_matches("integration/snapshots/test_debug_dump_stack_output.stdout.txt");
+}
+
+#[test]
+fn test_debug_dump_stack_output_mixed_with_stdout_and_stderr() {
+    let project = ProjectBuilder::new("test-debug-dump-stack-mixed-output")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/io"
+
+            get fun `test-debug-dump-stack-mixed-output`() {
+                println("before");
+                debug.dumpStack();
+                println("after");
+                eprintln("err");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("Test output:")
+        .assert_contains("Test stderr:")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_debug_dump_stack_output_mixed_with_stdout_and_stderr.stdout.txt",
+        );
+}
+
+#[test]
+fn test_debug_dump_stack_output_multiple_debug_lines() {
+    let project = ProjectBuilder::new("test-debug-dump-stack-multiple-debug-lines")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            r#"
+            get fun `test-debug-dump-stack-multiple-debug-lines`() {
+                debug.printString("dbg-line");
+                debug.dumpStack();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("dbg-line")
+        .assert_snapshot_matches(
+            "integration/snapshots/test_debug_dump_stack_output_multiple_debug_lines.stdout.txt",
+        );
 }
 
 #[test]
@@ -836,6 +1071,139 @@ fn test_auto_register_refs_if_any() {
 
     output
         .assert_snapshot_matches("integration/snapshots/test_auto_register_refs_if_any.stdout.txt");
+}
+
+fn replace_library_ref_boc(generated: &str, new_boc_b64: &str) -> String {
+    let marker = "\" base64>B B>boc hashu";
+    let marker_idx = generated
+        .find(marker)
+        .expect("generated dependency file must contain library_ref asm marker");
+    let open_quote_idx = generated[..marker_idx]
+        .rfind('"')
+        .expect("generated dependency file must contain opening quote before boc");
+    let value_start = open_quote_idx + 1;
+
+    format!(
+        "{}{}{}",
+        &generated[..value_start],
+        new_boc_b64,
+        &generated[marker_idx..]
+    )
+}
+
+#[test]
+fn test_missing_library_ref_is_reported_in_transaction_tree() {
+    let project = ProjectBuilder::new("dep-lib-missing-library-ref")
+        .contract("lib", SIMPLE_CONTRACT)
+        .contract_with_detailed_deps(
+            "main",
+            r#"
+            import "../gen/lib_code.tolk"
+
+            fun onInternalMessage(in: InMessage) {
+                if (in.body.isEmpty()) {
+                    return;
+                }
+
+                val childInit = ContractState {
+                    code: libCompiledCode(),
+                    data: createEmptyCell(),
+                };
+
+                val outMsg = createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: {
+                        stateInit: childInit,
+                    },
+                });
+
+                outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
+            }
+            fun onBouncedMessage(_: InMessageBounced) {}
+        "#,
+            vec![("lib", Some("library_ref"), None, None)],
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/build/build"
+            import "../../lib/io"
+            import "../../lib/emulation/network"
+
+            get fun `test-missing-library-ref-is-reported`() {
+                val deployer = net.treasury("deployer");
+                val mainStateInit = ContractState {
+                    code: build("main"),
+                    data: createEmptyCell(),
+                };
+                val mainAddress = AutoDeployAddress { stateInit: mainStateInit }.calculateAddress();
+
+                val deployMain = net.send(
+                    deployer.address,
+                    createMessage({
+                        bounce: false,
+                        value: ton("1"),
+                        dest: {
+                            stateInit: mainStateInit,
+                        },
+                    }),
+                );
+                expect(deployMain).toHaveLength(1);
+
+                val triggerRes = net.send(
+                    deployer.address,
+                    createMessage({
+                        bounce: false,
+                        value: ton("1"),
+                        dest: mainAddress,
+                        body: beginCell().storeUint(1, 32).endCell(),
+                    }),
+                );
+
+                println(triggerRes);
+            }
+        "#,
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    let generated_dep_path = project.path().join("gen/lib_code.tolk");
+    let generated_dep = fs::read_to_string(&generated_dep_path)
+        .expect("must read generated dependency function for lib");
+    let empty_cell_boc = Boc::encode_base64(Cell::default());
+    let tampered_dep = replace_library_ref_boc(&generated_dep, &empty_cell_boc);
+
+    let main_contract_path = project.path().join("contracts/main.tolk");
+    let main_contract =
+        fs::read_to_string(&main_contract_path).expect("must read main contract source");
+    let main_contract_without_import =
+        main_contract.replace("import \"../gen/lib_code.tolk\"\n", "");
+    fs::write(
+        &main_contract_path,
+        format!("{main_contract_without_import}\n{tampered_dep}\n"),
+    )
+    .expect("must rewrite main contract with tampered library_ref function");
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml: DocumentMut = fs::read_to_string(&acton_toml_path)
+        .expect("must read Acton.toml")
+        .parse()
+        .expect("Acton.toml must parse");
+    acton_toml["contracts"]["main"]["depends"] =
+        toml_edit::Item::Value(toml_edit::Value::Array(toml_edit::Array::default()));
+    fs::write(&acton_toml_path, acton_toml.to_string()).expect("must update Acton.toml");
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_missing_library_ref_is_reported_in_transaction_tree.stdout.txt",
+        );
 }
 
 #[test]

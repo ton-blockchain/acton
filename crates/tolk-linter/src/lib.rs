@@ -4,9 +4,9 @@ use crate::ast::name_case_checker::check_name_cases;
 use crate::ast::{
     acton_import_in_contract, bless_call_missing_safety_comment,
     dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, duplicated_condition,
-    identical_conditional_branches, incoming_messages_duplicate_opcode,
-    negated_is_type_can_use_not_is, no_bounce_handler, no_global_variables,
-    several_not_null_assertions,
+    enum_cast_missing_safety_comment, explicit_return_type, identical_conditional_branches,
+    incoming_messages_duplicate_opcode, negated_is_type_can_use_not_is, no_bounce_handler,
+    no_global_variables, several_not_null_assertions,
 };
 use crate::rules::ast::{
     asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
@@ -20,14 +20,16 @@ use rules::diagnostic::{Diagnostic, Severity};
 pub use rules::*;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tolk_resolver::file_db::FileDb;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::resolve_index::FileResolveIndex;
 use tolk_resolver::{AstNodeSpanExt, NameUse, Resolved};
 use tolk_syntax::{
-    Call, Expr, ExprStmt, GlobalVar, HasName, Ident, If, IfAlt, InstanceArg, NotNull, SourceFile,
-    Ternary, TopLevel, TypeIdent, Unary, Walker, walk_ast,
+    AsCast, Call, Expr, ExprStmt, Func, FunctionLike, GetMethod, GlobalVar, HasAnnotations,
+    HasGenericParams, HasName, Ident, If, IfAlt, InstanceArg, Method, NotNull, SourceFile, Ternary,
+    TopLevel, TypeIdent, Unary, Walker, walk_ast,
 };
 use tolk_ty::InferenceResult;
 use tolk_ty::TypeDb;
@@ -69,6 +71,7 @@ pub struct Checker<'a> {
     pub analysis_db: AnalysisDb,
     pub diagnostics: Vec<Diagnostic>,
     pub settings: HashMap<Rule, LintLevel>,
+    project_root: Option<PathBuf>,
 
     /// Map from file ID to a map of line number to list of suppressed rule names/codes
     pub file_suppressions: FxHashMap<FileId, FxHashMap<usize, Vec<String>>>,
@@ -94,6 +97,7 @@ impl<'a> Checker<'a> {
             analysis_db: AnalysisDb::new(),
             diagnostics: Vec::new(),
             settings: HashMap::new(),
+            project_root: None,
             file_suppressions: FxHashMap::default(),
             line_starts: FxHashMap::default(),
             #[cfg(feature = "profile_rules")]
@@ -145,6 +149,15 @@ impl<'a> Checker<'a> {
     pub fn with_settings(mut self, settings: HashMap<Rule, LintLevel>) -> Self {
         self.settings = settings;
         self
+    }
+
+    pub fn with_project_root(mut self, project_root: impl Into<PathBuf>) -> Self {
+        self.project_root = Some(project_root.into());
+        self
+    }
+
+    pub fn project_root(&self) -> Option<&Path> {
+        self.project_root.as_deref()
     }
 
     pub fn should_run(&self, rule: Rule) -> bool {
@@ -634,6 +647,27 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         self.default_result()
     }
 
+    fn walk_as_cast(&mut self, node: &AsCast<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::EnumCastMissingSafetyComment,
+            enum_cast_missing_safety_comment::check_as_cast(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
+        );
+
+        if let Some(expr) = node.expr() {
+            self.visit_expr(&expr);
+        }
+        if let Some(casted_to) = node.casted_to() {
+            self.visit_type(&casted_to);
+        }
+        self.default_result()
+    }
+
     fn walk_unary(&mut self, node: &Unary<'file>) -> Self::Result {
         run_rule!(
             self.checker,
@@ -675,6 +709,105 @@ impl<'a, 'b, 'file> Walker<'file> for CheckerWalker<'a, 'b> {
         }
         if let Some(typ) = node.typ() {
             self.visit_type(&typ);
+        }
+        self.default_result()
+    }
+
+    fn walk_func(&mut self, node: &Func<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::ExplicitReturnType,
+            explicit_return_type::check_return_type(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
+        );
+
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
+        if let Some(type_params) = node.type_parameters() {
+            self.walk_type_parameters(&type_params);
+        }
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        for param in node.parameters() {
+            self.walk_parameter(&param, false);
+        }
+        if let Some(return_type) = node.return_type() {
+            self.visit_type(&return_type);
+        }
+        if let Some(body) = node.body() {
+            self.walk_function_body(&body);
+        }
+        self.default_result()
+    }
+
+    fn walk_method(&mut self, node: &Method<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::ExplicitReturnType,
+            explicit_return_type::check_return_type(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
+        );
+
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
+        if let Some(receiver) = node.receiver() {
+            self.walk_method_receiver(&receiver);
+        }
+        if let Some(type_params) = node.type_parameters() {
+            self.walk_type_parameters(&type_params);
+        }
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        for param in node.parameters() {
+            self.walk_parameter(&param, false);
+        }
+        if let Some(return_type) = node.return_type() {
+            self.visit_type(&return_type);
+        }
+        if let Some(body) = node.body() {
+            self.walk_function_body(&body);
+        }
+        self.default_result()
+    }
+
+    fn walk_get_method(&mut self, node: &GetMethod<'file>) -> Self::Result {
+        run_rule!(
+            self.checker,
+            Rule::ExplicitReturnType,
+            explicit_return_type::check_return_type(
+                self.checker,
+                self.file_id,
+                node,
+                self.current_inference
+            )
+        );
+
+        if let Some(annotations) = node.annotations() {
+            self.walk_annotation_list(&annotations);
+        }
+        if let Some(name) = node.name() {
+            self.walk_ident(&name);
+        }
+        for param in node.parameters() {
+            self.walk_parameter(&param, false);
+        }
+        if let Some(return_type) = node.return_type() {
+            self.visit_type(&return_type);
+        }
+        if let Some(body) = node.body() {
+            self.walk_function_body(&body);
         }
         self.default_result()
     }

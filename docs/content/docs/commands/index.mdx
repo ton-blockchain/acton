@@ -6,6 +6,29 @@ icon: Terminal
 
 This section contains reference documentation for all Acton CLI commands.
 
+## Global Project Selection Flags
+
+These global flags control how Acton selects project files and where it treats
+as project root:
+
+- `--project-root <PATH>` sets project root explicitly.
+- `--manifest-path <PATH>` selects which `Acton.toml` to load for config and
+  does not change project root resolution.
+- Full resolution rules are documented in
+  [`Project Root Resolution`](/docs/acton-toml/#project-root-resolution).
+
+Use `--project-root` when running commands from outside the project directory,
+and you want project-relative outputs (for example `.acton`, `wallets.toml`,
+`test-results`) to be written into that project.
+
+```bash
+# Run tests from a sibling directory as if you were in ../my-project
+acton --project-root ../my-project test
+
+# Load config from another manifest without changing project root resolution
+acton --manifest-path ../my-project/Acton.toml wallet new --local
+```
+
 <Cards>
     <Card href="/docs/commands/new" title="Creating projects">
         Learn how to initialize new Acton projects using the new command
@@ -14,9 +37,17 @@ This section contains reference documentation for all Acton CLI commands.
         Learn how to use the compile command to build Tolk source code into TVM
         bitcode
     </Card>
+    <Card href="/docs/commands/fmt" title="Formatting Tolk files">
+        Learn how to use the fmt command to format `.tolk` files consistently
+        across your project or validate formatting in CI
+    </Card>
     <Card href="/docs/commands/disasm" title="Disassembling TVM bytecode">
         Learn how to use the disasm command to convert compiled TVM bytecode
         back to human-readable TASM instructions
+    </Card>
+    <Card href="/docs/commands/retrace" title="Retracing transactions">
+        Replay on-chain transactions locally to inspect VM phases, actions, and
+        logs by hash
     </Card>
     <Card href="/docs/commands/doc" title="Documentation from CLI">
         Lookup instruction reference from the built-in TVM specification,

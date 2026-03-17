@@ -4,88 +4,69 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-fn read_graph_svg(project_root: &Path, graph_path: &str) -> String {
+fn read_graph_dot(project_root: &Path, graph_path: &str) -> String {
     let full_path = project_root.join(graph_path);
     fs::read_to_string(&full_path)
         .unwrap_or_else(|err| panic!("failed to read graph '{}': {err}", full_path.display()))
 }
 
-fn decode_svg_title(raw_title: &str) -> String {
-    raw_title
-        .replace("&#45;", "-")
-        .replace("&gt;", ">")
-        .replace("&lt;", "<")
-        .replace("&amp;", "&")
+fn trim_quoted_identifier(value: &str) -> String {
+    let value = value.trim();
+    let value = value.strip_prefix('"').unwrap_or(value);
+    let value = value.strip_suffix('"').unwrap_or(value);
+    value.to_string()
 }
 
-fn extract_graph_shape(svg: &str) -> (BTreeSet<String>, BTreeSet<(String, String)>) {
+fn extract_graph_shape(dot: &str) -> (BTreeSet<String>, BTreeSet<(String, String)>) {
     let mut nodes = BTreeSet::new();
     let mut edges = BTreeSet::new();
 
-    for line in svg.lines() {
+    for line in dot.lines() {
         let line = line.trim();
-        let Some(raw_title) = line
-            .strip_prefix("<title>")
-            .and_then(|rest| rest.strip_suffix("</title>"))
-        else {
-            continue;
-        };
-
-        let title = decode_svg_title(raw_title);
-        if title == "Dependencies" {
+        if let Some((from, rest)) = line.split_once(" -> ")
+            && let Some((to, _)) = rest.split_once(" [")
+        {
+            edges.insert((trim_quoted_identifier(from), trim_quoted_identifier(to)));
             continue;
         }
-
-        if let Some((from, to)) = title.split_once("->") {
-            edges.insert((from.to_string(), to.to_string()));
-        } else {
-            nodes.insert(title);
+        if line.starts_with('"')
+            && line.contains(" [label=")
+            && !line.contains("->")
+            && let Some((name, _)) = line.split_once(" [")
+        {
+            nodes.insert(trim_quoted_identifier(name));
         }
     }
 
     (nodes, edges)
 }
 
-fn extract_graph_edge_labels(svg: &str) -> BTreeMap<(String, String), String> {
+fn extract_graph_edge_labels(dot: &str) -> BTreeMap<(String, String), String> {
     let mut labels = BTreeMap::new();
-    let mut current_edge: Option<(String, String)> = None;
-
-    for line in svg.lines() {
+    for line in dot.lines() {
         let line = line.trim();
-
-        if let Some(raw_title) = line
-            .strip_prefix("<title>")
-            .and_then(|rest| rest.strip_suffix("</title>"))
-        {
-            let title = decode_svg_title(raw_title);
-            current_edge = title
-                .split_once("->")
-                .map(|(from, to)| (from.to_string(), to.to_string()));
-            continue;
-        }
-
-        let Some(edge) = current_edge.clone() else {
+        let Some((from, rest)) = line.split_once(" -> ") else {
             continue;
         };
-        if !(line.starts_with("<text ") && line.ends_with("</text>")) {
-            continue;
-        }
-
-        let Some((_, text_with_suffix)) = line.split_once('>') else {
+        let Some((to, attrs)) = rest.split_once(" [") else {
             continue;
         };
-        let Some(raw_text) = text_with_suffix.strip_suffix("</text>") else {
+        let Some((_, after_label)) = attrs.split_once("label=\"") else {
             continue;
         };
-
-        labels.insert(edge, decode_svg_title(raw_text).trim().to_string());
-        current_edge = None;
+        let Some((raw_label, _)) = after_label.split_once('"') else {
+            continue;
+        };
+        labels.insert(
+            (trim_quoted_identifier(from), trim_quoted_identifier(to)),
+            raw_label.trim().to_string(),
+        );
     }
 
     labels
 }
 
-fn assert_graph_shape(svg: &str, expected_nodes: &[&str], expected_edges: &[(&str, &str)]) {
+fn assert_graph_shape(dot: &str, expected_nodes: &[&str], expected_edges: &[(&str, &str)]) {
     let expected_nodes: BTreeSet<String> = expected_nodes
         .iter()
         .map(|name| (*name).to_string())
@@ -95,7 +76,7 @@ fn assert_graph_shape(svg: &str, expected_nodes: &[&str], expected_edges: &[(&st
         .map(|(from, to)| ((*from).to_string(), (*to).to_string()))
         .collect();
 
-    let (actual_nodes, actual_edges) = extract_graph_shape(svg);
+    let (actual_nodes, actual_edges) = extract_graph_shape(dot);
 
     assert_eq!(
         actual_nodes, expected_nodes,
@@ -107,7 +88,7 @@ fn assert_graph_shape(svg: &str, expected_nodes: &[&str], expected_edges: &[(&st
     );
 }
 
-fn assert_graph_edge_labels(svg: &str, expected_labels: &[(&str, &str, &str)]) {
+fn assert_graph_edge_labels(dot: &str, expected_labels: &[(&str, &str, &str)]) {
     let expected: BTreeMap<(String, String), String> = expected_labels
         .iter()
         .map(|(from, to, label)| {
@@ -118,7 +99,7 @@ fn assert_graph_edge_labels(svg: &str, expected_labels: &[(&str, &str, &str)]) {
         })
         .collect();
 
-    let actual = extract_graph_edge_labels(svg);
+    let actual = extract_graph_edge_labels(dot);
     assert_eq!(
         actual, expected,
         "graph edge labels mismatch, actual edge labels: {actual:?}"
@@ -126,7 +107,7 @@ fn assert_graph_edge_labels(svg: &str, expected_labels: &[(&str, &str, &str)]) {
 }
 
 #[test]
-fn test_build_graph_default_path_outputs_expected_svg() {
+fn test_build_graph_default_path_outputs_expected_dot() {
     let project = ProjectBuilder::new("build-cmd-graph-default")
         .contract(
             "base",
@@ -151,17 +132,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .with_graph(None)
         .run()
         .success()
-        .assert_contains("dependency graph: deps.svg")
-        .assert_file_exists("deps.svg");
+        .assert_contains("dependency graph: deps.dot")
+        .assert_file_exists("deps.dot");
 
-    assert!(
-        !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after SVG generation"
-    );
+    let dot = read_graph_dot(project.path(), "deps.dot");
+    assert!(!dot.is_empty(), "deps.dot should not be empty");
 }
 
 #[test]
-fn test_build_graph_custom_path_outputs_expected_svg_only() {
+fn test_build_graph_custom_path_outputs_expected_dot_only() {
     let project = ProjectBuilder::new("build-cmd-graph-custom")
         .contract(
             "parent",
@@ -183,19 +162,15 @@ fun onBouncedMessage(_: InMessageBounced) {}
     project
         .acton()
         .build()
-        .with_graph(Some("custom_graph.svg"))
+        .with_graph(Some("custom_graph.dot"))
         .run()
         .success()
-        .assert_contains("dependency graph: custom_graph.svg")
-        .assert_file_exists("custom_graph.svg");
+        .assert_contains("dependency graph: custom_graph.dot")
+        .assert_file_exists("custom_graph.dot");
 
     assert!(
-        !project.path().join("deps.svg").exists(),
-        "deps.svg should not be created when custom graph path is provided"
-    );
-    assert!(
         !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after SVG generation"
+        "deps.dot should not be created when custom graph path is provided"
     );
 }
 
@@ -225,13 +200,13 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .with_graph(None)
         .run()
         .success()
-        .assert_file_exists("deps.svg");
+        .assert_file_exists("deps.dot");
 
-    let first_svg = fs::read_to_string(project.path().join("deps.svg"))
-        .expect("failed to read deps.svg after first build");
+    let first_dot = fs::read_to_string(project.path().join("deps.dot"))
+        .expect("failed to read deps.dot after first build");
     assert!(
-        !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after first SVG generation"
+        !first_dot.is_empty(),
+        "deps.dot should not be empty after first build"
     );
 
     project
@@ -240,18 +215,18 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .with_graph(None)
         .run()
         .success()
-        .assert_file_exists("deps.svg");
+        .assert_file_exists("deps.dot");
 
-    let second_svg = fs::read_to_string(project.path().join("deps.svg"))
-        .expect("failed to read deps.svg after second build");
+    let second_dot = fs::read_to_string(project.path().join("deps.dot"))
+        .expect("failed to read deps.dot after second build");
     assert!(
-        !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after second SVG generation"
+        !second_dot.is_empty(),
+        "deps.dot should not be empty after second build"
     );
 
     assert_eq!(
-        first_svg, second_svg,
-        "deps.svg should be byte-for-byte deterministic across repeated builds"
+        first_dot, second_dot,
+        "deps.dot should be byte-for-byte deterministic across repeated builds"
     );
 }
 
@@ -310,17 +285,17 @@ fun onBouncedMessage(_: InMessageBounced) {}
     let output = project
         .acton()
         .build()
-        .with_graph(Some("graphs/complex.svg"))
+        .with_graph(Some("graphs/complex.dot"))
         .run()
         .success();
 
     output
-        .assert_contains("dependency graph: graphs/complex.svg")
-        .assert_file_exists("graphs/complex.svg");
+        .assert_contains("dependency graph: graphs/complex.dot")
+        .assert_file_exists("graphs/complex.dot");
 
-    let first_svg = read_graph_svg(project.path(), "graphs/complex.svg");
+    let first_dot = read_graph_dot(project.path(), "graphs/complex.dot");
     assert_graph_shape(
-        &first_svg,
+        &first_dot,
         &["api", "app", "core", "orphan", "util", "worker"],
         &[
             ("api", "core"),
@@ -331,27 +306,27 @@ fun onBouncedMessage(_: InMessageBounced) {}
         ],
     );
     assert_eq!(
-        first_svg.matches("embed code").count(),
+        first_dot.matches("embed code").count(),
         5,
         "expected one 'embed code' edge label per dependency edge"
     );
     assert!(
         !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after SVG generation"
+        "deps.dot should not be created when custom graph path is provided"
     );
 
     let rerun = project
         .acton()
         .build()
-        .with_graph(Some("graphs/complex.svg"))
+        .with_graph(Some("graphs/complex.dot"))
         .run()
         .success();
-    rerun.assert_file_exists("graphs/complex.svg");
+    rerun.assert_file_exists("graphs/complex.dot");
 
-    let second_svg = read_graph_svg(project.path(), "graphs/complex.svg");
+    let second_dot = read_graph_dot(project.path(), "graphs/complex.dot");
     assert_eq!(
-        first_svg, second_svg,
-        "complex graph SVG should be byte-for-byte deterministic across reruns"
+        first_dot, second_dot,
+        "complex graph DOT should be byte-for-byte deterministic across reruns"
     );
 }
 
@@ -397,11 +372,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
     let default_output = project.acton().build().with_graph(None).run().success();
     default_output
-        .assert_contains("dependency graph: deps.svg")
-        .assert_file_exists("deps.svg");
-    let baseline_svg = read_graph_svg(project.path(), "deps.svg");
+        .assert_contains("dependency graph: deps.dot")
+        .assert_file_exists("deps.dot");
+    let baseline_dot = read_graph_dot(project.path(), "deps.dot");
     assert_graph_shape(
-        &baseline_svg,
+        &baseline_dot,
         &["base", "left", "right", "root"],
         &[
             ("left", "base"),
@@ -410,21 +385,16 @@ fun onBouncedMessage(_: InMessageBounced) {}
             ("root", "right"),
         ],
     );
-    assert!(
-        !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after default path SVG generation"
-    );
-
     let absolute_path = project
         .path()
         .join("graphs")
         .join("absolute")
-        .join("variant-absolute.svg")
+        .join("variant-absolute.dot")
         .to_string_lossy()
         .into_owned();
     let variant_paths = vec![
-        "graphs/variant-relative.svg".to_string(),
-        "./graphs/nested/../variant-normalized.svg".to_string(),
+        "graphs/variant-relative.dot".to_string(),
+        "./graphs/nested/../variant-normalized.dot".to_string(),
         absolute_path,
     ];
 
@@ -439,16 +409,11 @@ fun onBouncedMessage(_: InMessageBounced) {}
         output
             .assert_contains("dependency graph:")
             .assert_file_exists(path);
-        let variant_svg = read_graph_svg(project.path(), path);
+        let variant_dot = read_graph_dot(project.path(), path);
 
         assert_eq!(
-            baseline_svg, variant_svg,
+            baseline_dot, variant_dot,
             "graph content changed for --graph path variant '{}'",
-            path
-        );
-        assert!(
-            !project.path().join("deps.dot").exists(),
-            "deps.dot should be cleaned up after generating path variant '{}'",
             path
         );
     }
@@ -456,9 +421,9 @@ fun onBouncedMessage(_: InMessageBounced) {}
     assert!(
         project
             .path()
-            .join("graphs/variant-normalized.svg")
+            .join("graphs/variant-normalized.dot")
             .exists(),
-        "normalized parent-segment path should resolve to graphs/variant-normalized.svg"
+        "normalized parent-segment path should resolve to graphs/variant-normalized.dot"
     );
 }
 
@@ -533,17 +498,17 @@ fun onBouncedMessage(_: InMessageBounced) {}
     let output = project
         .acton()
         .build()
-        .with_graph(Some("graphs/mixed-kinds.svg"))
+        .with_graph(Some("graphs/mixed-kinds.dot"))
         .run()
         .success();
 
     output
-        .assert_contains("dependency graph: graphs/mixed-kinds.svg")
-        .assert_file_exists("graphs/mixed-kinds.svg");
+        .assert_contains("dependency graph: graphs/mixed-kinds.dot")
+        .assert_file_exists("graphs/mixed-kinds.dot");
 
-    let svg = read_graph_svg(project.path(), "graphs/mixed-kinds.svg");
+    let dot = read_graph_dot(project.path(), "graphs/mixed-kinds.dot");
     assert_graph_shape(
-        &svg,
+        &dot,
         &["api", "app", "core", "lib", "orphan", "util", "worker"],
         &[
             ("api", "core"),
@@ -555,7 +520,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         ],
     );
     assert_graph_edge_labels(
-        &svg,
+        &dot,
         &[
             ("api", "core", "embed code"),
             ("api", "lib", "library ref"),
@@ -566,18 +531,18 @@ fun onBouncedMessage(_: InMessageBounced) {}
         ],
     );
     assert_eq!(
-        svg.matches("embed code").count(),
+        dot.matches("embed code").count(),
         4,
         "expected exactly four 'embed code' edge labels in mixed graph output"
     );
     assert_eq!(
-        svg.matches("library ref").count(),
+        dot.matches("library ref").count(),
         2,
         "expected exactly two 'library ref' edge labels in mixed graph output"
     );
     assert!(
         !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after mixed dependency graph generation"
+        "deps.dot should not be created when custom graph path is provided"
     );
 }
 
@@ -644,17 +609,17 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .acton()
         .build()
         .contract("target")
-        .with_graph(Some("graphs/target-only.svg"))
+        .with_graph(Some("graphs/target-only.dot"))
         .run()
         .success();
 
     output
-        .assert_contains("dependency graph: graphs/target-only.svg")
-        .assert_file_exists("graphs/target-only.svg");
+        .assert_contains("dependency graph: graphs/target-only.dot")
+        .assert_file_exists("graphs/target-only.dot");
 
-    let svg = read_graph_svg(project.path(), "graphs/target-only.svg");
+    let dot = read_graph_dot(project.path(), "graphs/target-only.dot");
     assert_graph_shape(
-        &svg,
+        &dot,
         &["base", "left", "right", "shared", "target"],
         &[
             ("left", "base"),
@@ -665,7 +630,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         ],
     );
     assert_graph_edge_labels(
-        &svg,
+        &dot,
         &[
             ("left", "base", "embed code"),
             ("right", "base", "library ref"),
@@ -675,21 +640,21 @@ fun onBouncedMessage(_: InMessageBounced) {}
         ],
     );
     assert!(
-        !svg.contains("<title>outside</title>"),
+        !dot.contains("\"outside\" [label="),
         "filtered graph output should exclude unrelated contract `outside`"
     );
     assert_eq!(
-        svg.matches("embed code").count(),
+        dot.matches("embed code").count(),
         3,
         "expected exactly three 'embed code' edge labels in filtered graph output"
     );
     assert_eq!(
-        svg.matches("library ref").count(),
+        dot.matches("library ref").count(),
         2,
         "expected exactly two 'library ref' edge labels in filtered graph output"
     );
     assert!(
         !project.path().join("deps.dot").exists(),
-        "deps.dot should be cleaned up after filtered graph generation"
+        "deps.dot should not be created when custom graph path is provided"
     );
 }

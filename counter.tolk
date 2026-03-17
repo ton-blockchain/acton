@@ -3,7 +3,7 @@ struct Storage {
     counter: uint32
 }
 
-fun Storage.load() {
+fun Storage.load(): Storage {
     return Storage.fromCell(contract.getData());
 }
 

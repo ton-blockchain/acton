@@ -1,2 +1,7 @@
-Error contracts/broken.tolk: Cannot format code with syntax error
-Error: Failed to format 1 files due to syntax errors
+error[C001]: syntax error: unexpected `{`. Expected: ;, ->, :, |, asm, const, enum, fun, ….
+  --> contracts/broken[LINE]
+  |
+1 | fun broken {
+  |            ^
+
+Error: Failed to format 1 file due to syntax error

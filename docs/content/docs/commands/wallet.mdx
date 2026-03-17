@@ -24,15 +24,24 @@ This command will start an interactive prompt to guide you through the wallet cr
 
 #### Options
 
-| Option                | Type   | Description                                                    |
-|-----------------------|--------|----------------------------------------------------------------|
-| `--name <NAME>`       | String | Name of the wallet (default: prompts user)                     |
-| `--version <VERSION>` | String | Version of the wallet (default: prompts user)                  |
-| `--local`             | Flag   | Save wallet to local `wallets.toml` (mutually exclusive with `--global`) |
+| Option                | Type   | Description                                                                     |
+|-----------------------|--------|---------------------------------------------------------------------------------|
+| `--name <NAME>`       | String | Name of the wallet (default: prompts user)                                      |
+| `--version <VERSION>` | String | Version of the wallet (default: prompts user)                                   |
+| `--local`             | Flag   | Save wallet to local `wallets.toml` (mutually exclusive with `--global`)        |
 | `--global`            | Flag   | Save wallet to global `global.wallets.toml` (mutually exclusive with `--local`) |
-| `--secure`            | Bool   | Use secure native store (Keyring) (default: true if available) |
-| `--airdrop`           | Flag   | Request testnet TON from faucet after wallet creation (default: false) |
-| `--json`              | Flag   | Output result as JSON                                          |
+| `--secure`            | Bool   | Use secure native store (Keyring) (default: true if available)                  |
+| `--airdrop`           | Flag   | Request testnet TON from faucet after wallet creation (default: false)          |
+| `--json`              | Flag   | Output result as JSON                                                           |
+
+<Callout type="info">
+Path behavior:
+
+- Local `wallets.toml` and local `global.wallets.toml` symlink are created in project root for the current invocation.
+- Global project root/manifest resolution is described in
+  [`Project Root Resolution`](/docs/acton-toml/#project-root-resolution).
+- Use `--project-root <PATH>` when running from another directory and you want wallet files to be written into that project.
+</Callout>
 
 **Supported wallet versions:**
 - `v5r1` (Default)
@@ -121,7 +130,7 @@ address-testnet = "EQ..."
 For local wallets, keyring id usually includes project prefix (`<project>:<wallet>`).
 For global wallets, keyring id is wallet name.
 `wallet new` automatically writes only `expected.address-testnet`; add `address-mainnet` manually if needed.
-When a wallet is saved globally, Acton may also create a local `global.wallets.toml` symlink in the current project.
+When a wallet is saved globally, Acton may also create a local `global.wallets.toml` symlink in project root for the current invocation.
 
 In `--json` mode, output includes:
 - `airdrop_requested` (boolean)
@@ -174,7 +183,7 @@ Wallet names are normalized with the same rules as `wallet new` (lowercase, spac
 
 `--secure` behavior is the same as in `wallet new`.
 Saved config format is also the same as in `wallet new`, including `[wallets.<name>.expected].address-testnet`.
-For global imports, Acton may create local `global.wallets.toml` symlink in the current project.
+For global imports, Acton may create local `global.wallets.toml` symlink in project root for the current invocation.
 
 ---
 
@@ -267,45 +276,57 @@ acton wallet sign deployer --body "te6ccgEBAQEA..."
 
 ### `acton wallet airdrop`
 
-Requests testnet TON from a faucet.
+Requests TON from a faucet for the selected wallet.
 
 ```bash
 acton wallet airdrop [NAME]
 ```
 
-This command requests a PoW challenge from faucet, solves it locally, and submits claim for selected wallet address.
-Acton retries transient faucet errors (network/5xx) automatically with short backoff.
+With the default `--net testnet`, Acton requests a PoW challenge from faucet, solves it locally, and submits a claim for the selected wallet address.
+With `--net localnet`, Acton sends a fixed `100 TON` airdrop through the local LiteNode admin faucet using `[litenode].port`.
+Acton retries transient faucet errors (network/5xx) automatically with short backoff for the testnet backend.
 If `[NAME]` is omitted, Acton auto-selects a wallet (single wallet) or asks you to choose (multiple wallets).
 
 #### Options
 
-| Option                 | Type   | Description                          |
-|------------------------|--------|--------------------------------------|
-| `--faucet-url <URL>`   | String | Faucet URL (default: `https://acton.monster/faucet/`) |
-| `--json`               | Flag   | Output result as JSON                |
+| Option                 | Type   | Description                                                                  |
+|------------------------|--------|------------------------------------------------------------------------------|
+| `--net <NETWORK>`      | Enum   | Airdrop backend: `testnet` (default) or `localnet`                           |
+| `--faucet-url <URL>`   | String | Faucet URL for `--net testnet` (default: `https://acton.monster/faucet/`)    |
+| `--json`               | Flag   | Output result as JSON                                                        |
 
 `--faucet-url` validation rules:
 - only `http` / `https` schemes are allowed
 - query parameters and URL fragments are not allowed
+- cannot be used together with `--net localnet`
 
-#### Example
+#### Examples
 
 ```bash
+# Default testnet backend
 acton wallet airdrop deployer --faucet-url https://your-faucet.example
+
+# Localnet backend via LiteNode faucet
+acton wallet airdrop deployer --net localnet
 ```
 
 When `--json` is used:
 
 #### Success JSON
 
-| Field        | Type    | Description                                                  |
-|--------------|---------|--------------------------------------------------------------|
-| `success`    | Boolean | Always `true` for successful airdrop                         |
-| `message`    | String  | Faucet success message (or default `"Success"` if omitted)   |
-| `address`    | String  | Wallet address used for claim                                |
-| `difficulty` | Number  | PoW difficulty returned by faucet                            |
-| `nonce`      | Number  | Solved PoW nonce                                             |
-| `solve_ms`   | Number  | Time spent solving PoW challenge in milliseconds             |
+| Field     | Type    | Description                                                |
+|-----------|---------|------------------------------------------------------------|
+| `success` | Boolean | Always `true` for successful airdrop                       |
+| `message` | String  | Human-readable success message                             |
+| `address` | String  | Wallet address used for claim                              |
+
+For `--net testnet`, success JSON also includes:
+
+| Field        | Type   | Description                                      |
+|--------------|--------|--------------------------------------------------|
+| `difficulty` | Number | PoW difficulty returned by faucet                |
+| `nonce`      | Number | Solved PoW nonce                                 |
+| `solve_ms`   | Number | Time spent solving PoW challenge in milliseconds |
 
 #### Error JSON
 

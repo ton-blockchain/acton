@@ -1,13 +1,18 @@
+use crate::common::strip_ansi;
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use serde_json::Value;
+use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
 const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const MOCK_FAUCET_ACCEPT_TIMEOUT: Duration = Duration::from_secs(20);
+const MOCK_FAUCET_READ_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Copy)]
 struct FaucetMockResponse {
@@ -31,21 +36,37 @@ fn spawn_faucet_mock(
     thread::JoinHandle<()>,
     Arc<Mutex<Vec<CapturedRequest>>>,
 ) {
+    let (port, handle, captured_requests) = spawn_http_mock(responses);
+    (
+        format!("http://127.0.0.1:{port}/faucet"),
+        handle,
+        captured_requests,
+    )
+}
+
+fn spawn_http_mock(
+    responses: Vec<FaucetMockResponse>,
+) -> (
+    u16,
+    thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedRequest>>>,
+) {
     let listener =
         TcpListener::bind(("127.0.0.1", 0)).expect("failed to bind mock faucet listener");
     listener
         .set_nonblocking(true)
         .expect("failed to set non-blocking mode for mock faucet listener");
-    let addr = listener
+    let port = listener
         .local_addr()
-        .expect("failed to get mock faucet listener address");
+        .expect("failed to get mock faucet listener address")
+        .port();
 
     let captured_requests = Arc::new(Mutex::new(Vec::<CapturedRequest>::new()));
     let captured_requests_thread = Arc::clone(&captured_requests);
 
     let handle = thread::spawn(move || {
         for response in responses {
-            let wait_until = Instant::now() + Duration::from_secs(5);
+            let wait_until = Instant::now() + MOCK_FAUCET_ACCEPT_TIMEOUT;
             let mut stream = loop {
                 match listener.accept() {
                     Ok((stream, _)) => break stream,
@@ -63,12 +84,12 @@ fn spawn_faucet_mock(
             };
 
             stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
+                .set_read_timeout(Some(MOCK_FAUCET_READ_TIMEOUT))
                 .expect("failed to set mock faucet read timeout");
 
             let mut reader = BufReader::new(stream.try_clone().expect("failed to clone stream"));
             let mut request_line = String::new();
-            let read_deadline = Instant::now() + Duration::from_secs(2);
+            let read_deadline = Instant::now() + MOCK_FAUCET_READ_TIMEOUT;
             loop {
                 request_line.clear();
                 match reader.read_line(&mut request_line) {
@@ -161,7 +182,18 @@ fn spawn_faucet_mock(
         }
     });
 
-    (format!("http://{addr}/faucet"), handle, captured_requests)
+    (port, handle, captured_requests)
+}
+
+fn spawn_localnet_faucet_mock(
+    responses: Vec<FaucetMockResponse>,
+) -> (
+    u16,
+    thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedRequest>>>,
+) {
+    let (port, handle, captured_requests) = spawn_http_mock(responses);
+    (port, handle, captured_requests)
 }
 
 fn status_text(status: u16) -> &'static str {
@@ -173,6 +205,60 @@ fn status_text(status: u16) -> &'static str {
         500 => "Internal Server Error",
         _ => "Unknown",
     }
+}
+
+fn append_litenode_port(project_path: &Path, port: u16) {
+    let acton_toml_path = project_path.join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
+    acton_toml.push_str(&format!(
+        r#"
+
+[litenode]
+port = {port}
+"#
+    ));
+    fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with litenode port");
+}
+
+fn find_unused_port() -> u16 {
+    TcpListener::bind(("127.0.0.1", 0))
+        .expect("failed to reserve test port")
+        .local_addr()
+        .expect("failed to inspect reserved test port")
+        .port()
+}
+
+fn parse_airdrop_wallet_address(stdout: &str, wallet_name: &str) -> String {
+    let prefix = format!("→ Requesting airdrop for wallet {wallet_name} ");
+    strip_ansi(stdout)
+        .lines()
+        .map(str::trim)
+        .find_map(|line| line.strip_prefix(&prefix).map(ToOwned::to_owned))
+        .unwrap_or_else(|| {
+            panic!(
+                "Airdrop address line not found in output:\n{}",
+                strip_ansi(stdout)
+            )
+        })
+}
+
+fn parse_address_balance(address_information: &Value) -> u128 {
+    address_information["result"]["balance"]
+        .as_str()
+        .unwrap_or_else(|| {
+            panic!(
+                "Expected string balance field in getAddressInformation response:\n{}",
+                serde_json::to_string_pretty(address_information).unwrap_or_default()
+            )
+        })
+        .parse::<u128>()
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to parse balance from getAddressInformation response: {e}\n{}",
+                serde_json::to_string_pretty(address_information).unwrap_or_default()
+            )
+        })
 }
 
 #[test]
@@ -457,6 +543,244 @@ fn test_wallet_airdrop_non_json_success_outputs_human_readable_message() {
     output.assert_contains("Solving challenge (difficulty: 0 bits)...");
     output.assert_contains("Airdrop complete");
     output.assert_not_contains("\"success\": true");
+}
+
+#[test]
+fn test_wallet_airdrop_localnet_success_uses_configured_port_and_fixed_amount() {
+    let project = ProjectBuilder::new("wallet-airdrop-localnet-success").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let node = project.litenode().start();
+    append_litenode_port(project.path(), node.port());
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .run()
+        .success();
+
+    let stdout = output.get_stdout();
+    let address = parse_airdrop_wallet_address(&stdout, "airdrop-wallet");
+    output.assert_snapshot_matches(
+        "integration/snapshots/wallet_airdrop/test_wallet_airdrop_localnet_success_uses_configured_port_and_fixed_amount.stdout.txt",
+    );
+
+    let address_info = node.get_json(&format!("/api/v2/getAddressInformation?address={address}"));
+    assert_eq!(parse_address_balance(&address_info), 100_000_000_000);
+
+    node.stop();
+}
+
+#[test]
+fn test_wallet_airdrop_localnet_transport_error_without_running_node() {
+    let project = ProjectBuilder::new("wallet-airdrop-localnet-transport-error").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    append_litenode_port(project.path(), find_unused_port());
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .run()
+        .failure();
+
+    output.assert_stderr_contains(
+        "Failed to send request to localnet faucet. Make sure `acton litenode start` is running",
+    );
+}
+
+#[test]
+fn test_wallet_airdrop_localnet_http_error_preserves_response_body() {
+    let project = ProjectBuilder::new("wallet-airdrop-localnet-http-error").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![FaucetMockResponse {
+        method: "POST",
+        path: "/admin/faucet",
+        status: 500,
+        body: r#"{"error":"backend unavailable"}"#,
+    }]);
+    append_litenode_port(project.path(), port);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .run()
+        .failure();
+
+    faucet_handle
+        .join()
+        .expect("mock localnet faucet thread must finish without panic");
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/wallet_airdrop/test_wallet_airdrop_localnet_http_error_preserves_response_body.stderr.txt",
+    );
+}
+
+#[test]
+fn test_wallet_airdrop_localnet_invalid_json_response_reports_parse_error() {
+    let project = ProjectBuilder::new("wallet-airdrop-localnet-invalid-json").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (port, faucet_handle, _) = spawn_localnet_faucet_mock(vec![FaucetMockResponse {
+        method: "POST",
+        path: "/admin/faucet",
+        status: 200,
+        body: "not json",
+    }]);
+    append_litenode_port(project.path(), port);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .run()
+        .failure();
+
+    faucet_handle
+        .join()
+        .expect("mock localnet faucet thread must finish without panic");
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/wallet_airdrop/test_wallet_airdrop_localnet_invalid_json_response_reports_parse_error.stderr.txt",
+    );
+}
+
+#[test]
+fn test_wallet_airdrop_localnet_json_success_omits_pow_fields() {
+    let project = ProjectBuilder::new("wallet-airdrop-localnet-json-success").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let node = project.litenode().start();
+    append_litenode_port(project.path(), node.port());
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .arg("--json")
+        .run()
+        .success();
+
+    let stdout = output.get_stdout();
+    let json: Value =
+        serde_json::from_str(stdout.trim()).expect("airdrop --json output must be valid JSON");
+
+    assert_eq!(json["success"], true);
+    assert_eq!(
+        json["message"],
+        "Successfully airdropped 100 TON on localnet"
+    );
+    assert!(
+        json["address"]
+            .as_str()
+            .is_some_and(|address| !address.is_empty())
+    );
+    assert!(json.get("difficulty").is_none());
+    assert!(json.get("nonce").is_none());
+    assert!(json.get("solve_ms").is_none());
+
+    node.stop();
+}
+
+#[test]
+fn test_wallet_airdrop_localnet_rejects_faucet_url_override() {
+    let project = ProjectBuilder::new("wallet-airdrop-localnet-faucet-url").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--net")
+        .arg("localnet")
+        .arg("--faucet-url")
+        .arg("https://example.com/faucet")
+        .run()
+        .failure();
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/wallet_airdrop/test_wallet_airdrop_localnet_rejects_faucet_url_override.stderr.txt",
+    );
 }
 
 #[test]

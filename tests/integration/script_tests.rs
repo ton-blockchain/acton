@@ -5,6 +5,79 @@ use std::fs;
 use tycho_types::boc::Boc;
 use tycho_types::cell::CellBuilder;
 
+fn script_body_project(project_name: &str) -> ProjectBuilder {
+    ProjectBuilder::new(project_name)
+        .file(
+            "contracts/script_body_messages",
+            r#"
+struct (0xF8000001) ScriptBodyMsg {
+    queryId: uint64
+    recipient: address
+    amount: coins
+}
+"#,
+        )
+        .contract(
+            "script_body_sink",
+            r#"
+import "script_body_messages"
+
+contract ScriptBodySink {
+    incomingMessages: ScriptBodyMsg
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy ScriptBodyMsg.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "print_txs",
+            r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/io"
+import "../contracts/script_body_messages"
+
+fun main() {
+    val sender = net.treasury("sender");
+    val init = ContractState {
+        code: build("script_body_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }));
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: sinkAddress,
+        body: ScriptBodyMsg {
+            queryId: 11,
+            recipient: sender.address,
+            amount: ton("0.02"),
+        },
+    }));
+
+    println(txs);
+}
+"#,
+        )
+}
+
 #[test]
 fn test_script_simple_execution() {
     let project = ProjectBuilder::new("script-simple")
@@ -23,6 +96,56 @@ fn test_script_simple_execution() {
     let output = project.acton().script("scripts/hello.tolk").run().code(0);
 
     output.assert_contains("Hello from script!");
+}
+
+#[test]
+fn test_script_ensure_latest_uses_project_root_from_nested_directory() {
+    let project = ProjectBuilder::new("script-ensure-latest-project-root")
+        .script_file(
+            "hello",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                println("Hello from nested script!");
+            }
+        "#,
+        )
+        .build();
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir_all(&nested_dir).expect("Failed to create nested test directory");
+
+    let root_stdlib = project.path().join(".acton/tolk-stdlib");
+    let nested_stdlib = nested_dir.join(".acton/tolk-stdlib");
+    let script_path = project.path().join("scripts/hello.tolk");
+    assert!(
+        !root_stdlib.exists(),
+        "stdlib must not exist before script command"
+    );
+    assert!(
+        !nested_stdlib.exists(),
+        "stdlib must not exist in nested cwd before script command"
+    );
+
+    project
+        .acton()
+        .arg("--project-root")
+        .arg("..")
+        .script(script_path.to_string_lossy().as_ref())
+        .current_dir(&nested_dir)
+        .run()
+        .success()
+        .assert_contains("Hello from nested script!");
+
+    assert!(
+        root_stdlib.exists(),
+        "stdlib should be installed in project root"
+    );
+    assert!(
+        !nested_stdlib.exists(),
+        "stdlib must not be installed in nested cwd"
+    );
 }
 
 #[test]
@@ -49,6 +172,35 @@ fn test_script_with_calculations() {
         .code(0)
         .assert_contains("Result:")
         .assert_contains("6");
+}
+
+#[test]
+fn test_script_hides_transaction_bodies_without_show_bodies_flag() {
+    let project = script_body_project("script-hides-transaction-bodies").build();
+
+    project
+        .acton()
+        .script("scripts/print_txs.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_hides_transaction_bodies_without_show_bodies_flag.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
+    let project = script_body_project("script-shows-transaction-bodies").build();
+
+    project
+        .acton()
+        .script("scripts/print_txs.tolk")
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_shows_transaction_bodies_with_show_bodies_flag.stdout.txt",
+        );
 }
 
 #[test]
@@ -1315,4 +1467,289 @@ fn test_println_nullable_values() {
         .run()
         .success()
         .assert_snapshot_matches("integration/snapshots/test_println_nullable_values.stderr.txt");
+}
+
+#[test]
+fn test_println_non_empty_map_values() {
+    let project = ProjectBuilder::new("script-println-map-values")
+        .script_file(
+            "map_values",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                var balances = createEmptyMap<int32, int32>();
+                balances.set(1, 10);
+                balances.set(2, 20);
+                println(balances);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_values.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_non_empty_map_values.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_empty_map_values() {
+    let project = ProjectBuilder::new("script-println-empty-map-values")
+        .script_file(
+            "map_empty_values",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                val emptyInts = createEmptyMap<int32, int32>();
+                println(emptyInts);
+
+                val emptyStrings = createEmptyMap<int32, string>();
+                println(emptyStrings);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_empty_values.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/test_println_empty_map_values.stderr.txt");
+}
+
+#[test]
+fn test_println_map_supported_key_types() {
+    let project = ProjectBuilder::new("script-println-map-key-types")
+        .script_file(
+            "map_key_types",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                val ownerRaw = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
+
+                var byBool = createEmptyMap<bool, int32>();
+                byBool.set(false, 10);
+                println(byBool);
+
+                var byAddress = createEmptyMap<address, int32>();
+                byAddress.set(ownerRaw, 20);
+                println(byAddress);
+
+                var byInt8 = createEmptyMap<int8, int32>();
+                byInt8.set(-1, 30);
+                println(byInt8);
+
+                var byUint16 = createEmptyMap<uint16, int32>();
+                byUint16.set(65535, 40);
+                println(byUint16);
+
+                var byInt257 = createEmptyMap<int257, int32>();
+                byInt257.set(-1, 50);
+                println(byInt257);
+
+                var byUint256 = createEmptyMap<uint256, int32>();
+                byUint256.set(1, 60);
+                println(byUint256);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_key_types.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_supported_key_types.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_supported_value_types() {
+    let project = ProjectBuilder::new("script-println-map-value-types")
+        .script_file(
+            "map_value_types",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                val ownerRaw = address("0:8356d05f87ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e92598147");
+                val ownerAny = ownerRaw as any_address;
+
+                var withBool = createEmptyMap<int32, bool>();
+                withBool.set(1, true);
+                println(withBool);
+
+                var withAddress = createEmptyMap<int32, address>();
+                withAddress.set(2, ownerRaw);
+                println(withAddress);
+
+                var withAnyAddress = createEmptyMap<int32, any_address>();
+                withAnyAddress.set(3, ownerAny);
+                println(withAnyAddress);
+
+                var withCell = createEmptyMap<int32, cell>();
+                withCell.set(11, beginCell().storeUint(42, 8).endCell());
+                println(withCell);
+
+                var withString = createEmptyMap<int32, string>();
+                withString.set(12, "hello");
+                println(withString);
+
+                var withInt257 = createEmptyMap<int32, int257>();
+                withInt257.set(4, -123);
+                println(withInt257);
+
+                var withUint32 = createEmptyMap<int32, uint32>();
+                withUint32.set(5, 123);
+                println(withUint32);
+
+                var withCoins = createEmptyMap<int32, coins>();
+                withCoins.set(6, ton("1.5"));
+                println(withCoins);
+
+                var withVarInt16 = createEmptyMap<int32, varint16>();
+                withVarInt16.set(7, -77);
+                println(withVarInt16);
+
+                var withVarInt32 = createEmptyMap<int32, varint32>();
+                withVarInt32.set(8, -888888888);
+                println(withVarInt32);
+
+                var withVarUInt16 = createEmptyMap<int32, varuint16>();
+                withVarUInt16.set(9, 65535);
+                println(withVarUInt16);
+
+                var withVarUInt32 = createEmptyMap<int32, varuint32>();
+                withVarUInt32.set(10, 4294967296);
+                println(withVarUInt32);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_value_types.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_supported_value_types.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_fallback_for_unformattable_types() {
+    let project = ProjectBuilder::new("script-println-map-fallback-types")
+        .script_file(
+            "map_fallback_types",
+            r#"
+            import "../../lib/io"
+
+            struct Key {
+                id: int32,
+            }
+
+            fun main() {
+                var byStructKey = createEmptyMap<Key, int32>();
+                byStructKey.set(Key { id: 1 }, 10);
+                println(byStructKey);
+
+                var nested = createEmptyMap<int32, int32>();
+                nested.set(7, 70);
+                var withMapValue = createEmptyMap<int32, map<int32, int32>>();
+                withMapValue.set(3, nested);
+                println(withMapValue);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_fallback_types.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_fallback_for_unformattable_types.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_retyped_from_low_level_dict_parse_failures() {
+    let project = ProjectBuilder::new("script-println-map-retyped-from-dict")
+        .script_file(
+            "map_retyped_from_dict",
+            r#"
+            import "../../lib/io"
+
+            fun main() {
+                var source = createEmptyMap<int32, int32>();
+                source.set(1, 10);
+                source.set(2, 20);
+
+                val lowLevel = source.toLowLevelDict();
+
+                val asAddress = createMapFromLowLevelDict<int32, address>(lowLevel);
+                println(asAddress);
+
+                val asCell = createMapFromLowLevelDict<int32, cell>(lowLevel);
+                println(asCell);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_retyped_from_dict.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_retyped_from_low_level_dict_parse_failures.stderr.txt",
+        );
+}
+
+#[test]
+fn test_println_map_struct_value_falls_back_to_raw_hex() {
+    let project = ProjectBuilder::new("script-println-map-struct-value-raw-hex")
+        .script_file(
+            "map_struct_value_raw_hex",
+            r#"
+            import "../../lib/io"
+
+            struct Payload {
+                a: int32,
+                b: bool,
+            }
+
+            fun main() {
+                var byStructValue = createEmptyMap<int32, Payload>();
+                byStructValue.set(1, Payload {
+                    a: 7,
+                    b: true,
+                });
+                println(byStructValue);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/map_struct_value_raw_hex.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
+        );
 }

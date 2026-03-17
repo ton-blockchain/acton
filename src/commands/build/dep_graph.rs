@@ -3,7 +3,6 @@ use acton_config::config::{ContractConfig, DependencyKind};
 use anyhow::anyhow;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::fs;
-use std::process::Command;
 
 pub(super) fn build_dependency_graph(
     contracts: &[(&String, &ContractConfig)],
@@ -127,8 +126,8 @@ pub(super) fn filter_compilation_order_for_contract(
     Ok(filtered_order)
 }
 
-pub(super) fn generate_dependency_graph_svg(
-    compilation_order: &Vec<String>,
+pub(super) fn generate_dependency_graph_dot(
+    compilation_order: &[String],
     contracts: &BTreeMap<String, ContractConfig>,
     output_path: &str,
 ) -> anyhow::Result<()> {
@@ -172,44 +171,12 @@ pub(super) fn generate_dependency_graph_svg(
 
     dot_content.push_str("}\n");
 
-    let dot_path = "deps.dot";
-    fs::write(dot_path, &dot_content)?;
-
-    let graphviz_check = Command::new("dot").arg("-V").output();
-
-    match graphviz_check {
-        Ok(output) if output.status.success() => {
-            let svg_output = Command::new("dot")
-                .args(["-Tsvg", dot_path, "-o", output_path])
-                .output()?;
-
-            if !svg_output.status.success() {
-                let error_msg = String::from_utf8_lossy(&svg_output.stderr);
-                return Err(anyhow!("Failed to generate SVG: {error_msg}"));
-            }
-
-            let _ = fs::remove_file(dot_path);
-
-            println!(
-                "   {} dependency graph: {}",
-                "Generated".cyan(),
-                output_path
-            );
-        }
-        Ok(_) => {
-            return Err(anyhow!(
-                "Graphviz 'dot' command failed. Please ensure graphviz is properly installed."
-            ));
-        }
-        Err(_) => {
-            return Err(anyhow!(
-                "Graphviz not found. Please install graphviz to generate dependency graphs.\n\
-                On macOS: brew install graphviz\n\
-                On Ubuntu/Debian: sudo apt-get install graphviz\n\
-                On Windows: Download from https://graphviz.org/download/"
-            ));
-        }
-    }
+    fs::write(output_path, &dot_content)?;
+    println!(
+        "   {} dependency graph: {}",
+        "Generated".cyan(),
+        output_path
+    );
 
     Ok(())
 }

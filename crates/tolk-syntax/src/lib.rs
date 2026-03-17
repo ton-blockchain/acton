@@ -33,7 +33,9 @@ pub use ast::traits::*;
 pub use ast::traversal::*;
 pub use ast::types::*;
 pub use ast::walker::*;
-use tree_sitter::{Language, Parser, Tree};
+pub use ton_syntax::errors::{ParseError, ParseErrorKind, Span};
+pub use ton_syntax::impl_ast_node;
+use tree_sitter::{Language, Tree};
 
 /// Parses the given Tolk source code into a [`SourceFile`].
 ///
@@ -52,12 +54,12 @@ pub fn parse(code: &str) -> anyhow::Result<SourceFile> {
 ///
 /// Returns an error if the tree-sitter parser cannot be initialized.
 pub fn parse_with_old_tree(code: &str, old_tree: Option<&Tree>) -> anyhow::Result<SourceFile> {
-    let mut parser = Parser::new();
-    parser.set_language(&tree_sitter_tolk::LANGUAGE.into())?;
-
-    let Some(tree) = parser.parse(code, old_tree) else {
-        anyhow::bail!("cannot parse Tolk file");
-    };
+    let tree = ton_syntax::parser::parse_with_old_tree(
+        code,
+        old_tree,
+        tree_sitter_tolk::LANGUAGE.into(),
+        "Tolk",
+    )?;
     Ok(SourceFile {
         tree,
         source: code.into(),

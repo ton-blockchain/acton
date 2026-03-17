@@ -22,6 +22,10 @@ Homebrew, or download single binary from releases.
 
 ## Installation
 
+<Callout type="warning">
+  Before public release this method is not working, please use [Direct Downloads](#direct-downloads)
+</Callout>
+
 <Tabs items={["macOS", "Linux"]}>
     <Tab value="macOS">
 
@@ -102,7 +106,7 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     <Card
         icon={<SiApple/>}
         title="macOS ARM64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-darwin-aarch64.tar.gz"
+        href="https://github.com/i582/acton/releases/latest/download/acton-macos-aarch64.tar.gz"
     >
         Apple Silicon (M1/M2/M3/etc.)
     </Card>
@@ -110,7 +114,7 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     <Card
         icon={<SiApple/>}
         title="macOS x64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-darwin-x64.tar.gz"
+        href="https://github.com/i582/acton/releases/latest/download/acton-macos-x86_64.tar.gz"
     >
         Intel Macs
     </Card>
@@ -118,13 +122,28 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     <Card
         icon={<SiLinux/>}
         title="Linux x64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-linux-x64.tar.gz"
+        href="https://github.com/i582/acton/releases/latest/download/acton-linux-x86_64.tar.gz"
     >
         Standard Linux x64 binary
     </Card>
+    <Card
+        icon={<SiLinux/>}
+        title="Linux ARM64"
+        href="https://github.com/i582/acton/releases/latest/download/acton-linux-aarch64.tar.gz"
+    >
+        Linux ARM64 binary
+    </Card>
 </Cards>
 
+## CI/CD
+
+See the [CI integration guide](/docs/ci-setup/) for GitHub Actions.
+
 ## Updating
+
+<Callout type="warning">
+  Before public release updating is not working without explicit GitHub token, please update manually
+</Callout>
 
 Once Acton is installed, you can use the built-in `acton up` command to update to the latest version or switch between versions.
 
@@ -152,12 +171,12 @@ To install a specific version:
 acton up 0.1.5
 ```
 
-### Switch to canary
+### Switch to trunk
 
-If you want to try the latest features before they are officially released, you can install the canary version:
+If you want to try the latest features before they are officially released, you can install the trunk version:
 
 ```bash
-acton up --canary
+acton up --trunk
 ```
 
 ## Uninstall

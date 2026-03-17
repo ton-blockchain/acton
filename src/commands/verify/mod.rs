@@ -4,18 +4,18 @@ use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
 use base64::Engine;
-use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, StackItem, TonApiClient};
-use tonlib_core::TonAddress;
-use tonlib_core::cell::ArcCell;
-use tonlib_core::tlb_types::block::coins::{CurrencyCollection, Grams};
-use tonlib_core::tlb_types::primitives::either::EitherRef;
-use tonlib_core::tlb_types::tlb::TLB;
-use tycho_types::boc::Boc;
+use tycho_types::boc::{Boc, BocRepr};
+use tycho_types::models::{
+    Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
+    OwnedMessage, StdAddr, StdAddrFormat,
+};
 
 #[allow(clippy::too_many_arguments)]
 pub fn verify_cmd(
@@ -53,7 +53,8 @@ pub fn verify_cmd(
     }
 
     println!("  {} Compiling contract", "→".blue().bold());
-    let compiler = tolkc::Compiler::new(2).with_mappings(&config.mappings);
+    let mappings = config.mappings();
+    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
     let compilation_result = compiler.compile(Path::new(&contract_path), false);
 
     let code_boc64 = match compilation_result {
@@ -75,25 +76,26 @@ pub fn verify_cmd(
     println!(
         "  {} Code hash: {}",
         "→".blue().bold(),
-        hex::encode(code_hash).dimmed()
+        format!("0x{}", hex::encode(code_hash)).dimmed()
     );
 
     let contract_address = if let Some(addr) = address {
-        TonAddress::from_str(&addr).with_context(|| error_fmt::invalid_address(&addr))?
+        StdAddr::from_str_ext(&addr, StdAddrFormat::any())
+            .map(|(addr, _)| addr)
+            .with_context(|| error_fmt::invalid_address(&addr))?
     } else {
         let addr_input = inquire::Text::new("Enter deployed contract address:")
             .prompt()
             .context("Failed to read address")?;
-        TonAddress::from_str(&addr_input)
+        StdAddr::from_str_ext(&addr_input, StdAddrFormat::any())
+            .map(|(addr, _)| addr)
             .with_context(|| error_fmt::invalid_address(&addr_input))?
     };
 
     println!(
         "  {} Contract address: {}",
         "→".blue().bold(),
-        contract_address
-            .to_base64_url_flags(true, network == Network::Testnet)
-            .dimmed()
+        format_std_address(&contract_address, &network).dimmed()
     );
 
     let wallet_name = select_wallet(wallet_name, &config)?;
@@ -107,11 +109,7 @@ pub fn verify_cmd(
         "  {} Using wallet: {} {}",
         "→".blue().bold(),
         wallet_name.cyan(),
-        wallet
-            .wallet
-            .address
-            .to_base64_url_flags(true, network == Network::Testnet)
-            .dimmed()
+        format_std_address(&wallet.address(), &network).dimmed()
     );
 
     println!("  {} Fetching backends configuration", "→".blue().bold());
@@ -135,11 +133,8 @@ pub fn verify_cmd(
     }
 
     println!("  {} Collecting source files", "→".blue().bold());
-    let source_files = ton_abi::get_file_dependencies(
-        contract_path.to_string_lossy().as_ref(),
-        true,
-        &config.mappings,
-    )?;
+    let source_files =
+        ton_abi::get_file_dependencies(contract_path.to_string_lossy().as_ref(), true, &mappings)?;
     println!(
         "  {} Collected {} source file{}",
         "✓".green().bold(),
@@ -188,12 +183,8 @@ pub fn verify_cmd(
     let contract_hash = base64::engine::general_purpose::STANDARD.encode(code_hash);
     let sources_object = SourcesObject {
         known_contract_hash: contract_hash.clone(),
-        known_contract_address: contract_address
-            .to_base64_url_flags(true, network == Network::Testnet),
-        sender_address: wallet
-            .wallet
-            .address
-            .to_base64_url_flags(true, network == Network::Testnet),
+        known_contract_address: format_std_address(&contract_address, &network),
+        sender_address: format_std_address(&wallet.address(), &network),
         sources: sources_meta,
         compiler: CompilerSettings::Tolk {
             compiler_settings: TolkCompilerSettings {
@@ -248,7 +239,7 @@ pub fn verify_cmd(
                 "Warning".yellow().bold(),
                 format!("'{contract_hash}'").dimmed()
             );
-            show_verifier_link(&network, contract_address);
+            show_verifier_link(&network, &contract_address);
             return Ok(());
         }
         anyhow::bail!("Verification failed: {error_msg}");
@@ -344,60 +335,53 @@ pub fn verify_cmd(
 
     let cell_data = &msg_cell.data;
     let cell = Boc::decode(cell_data)?;
-    let cell_boc64 = Boc::encode_base64(&cell);
 
-    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
+    let api_client = TonApiClient::new(network.clone(), custom_networks, api_key)?;
     let registry_address = get_verifier_address(&backend_info, &api_client)?;
 
-    wait_for_rate_limit(&api_key);
-
     let (seqno, need_state_init) = wallet.seqno(&api_client)?;
-
-    wait_for_rate_limit(&api_key);
 
     let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
     let expire_at = expired_at_time
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;
 
-    let body_cell = ArcCell::from_boc_b64(&cell_boc64)?;
-
-    let message_info = tonlib_core::tlb_types::block::message::IntMsgInfo {
+    let message_info = IntMsgInfo {
         ihr_disabled: true,
         bounce: false,
         bounced: false,
-        src: wallet.wallet.address.to_msg_address(),
-        dest: registry_address.to_msg_address(),
-        value: CurrencyCollection::new(BigUint::from(100_000_000u64)), // 0.1 TON
-        ihr_fee: Grams::new(BigUint::from(0u64)),
-        fwd_fee: Grams::new(BigUint::from(0u64)),
+        src: IntAddr::Std(wallet.address()),
+        dst: IntAddr::Std(registry_address),
+        value: CurrencyCollection::new(100_000_000u64 as u128), // 0.1 TON
+        ihr_fee: Default::default(),
+        fwd_fee: Default::default(),
         created_at: 0,
         created_lt: 0,
     };
 
-    let message = tonlib_core::tlb_types::block::message::Message {
-        info: tonlib_core::tlb_types::block::message::CommonMsgInfo::Int(message_info),
+    let message = OwnedMessage {
+        info: MsgInfo::Int(message_info),
         init: None,
-        body: EitherRef::new(body_cell),
+        body: cell.into(),
+        layout: None,
     };
 
-    let message_cell = message.to_cell()?;
+    let message_cell_boc = BocRepr::encode(message)?;
+    let message_cell = TonCell::from_boc(message_cell_boc)?;
 
-    let external = wallet.wallet.create_external_msg(
-        expire_at,
-        seqno,
-        need_state_init,
-        vec![message_cell.to_arc()],
-    )?;
+    let external =
+        wallet
+            .wallet
+            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
 
     api_client
-        .send_boc(&external.to_boc_b64(false)?)
+        .send_boc(&external.to_boc_base64()?)
         .context("Failed to send verification transaction")?;
 
     println!("  {} Transaction sent successfully", "✓".green().bold());
     println!();
     println!("{}", "✓ Contract verification completed!".green().bold());
-    show_verifier_link(&network, contract_address);
+    show_verifier_link(&network, &contract_address);
 
     Ok(())
 }
@@ -531,7 +515,9 @@ fn get_backend_info(network: &Network, config: &BackendsConfig) -> anyhow::Resul
             backends: config.backends_testnet.clone(),
             id: "orbs-testnet".to_string(),
         }),
-        _ => anyhow::bail!("Unsupported network: {network}. Supported networks: mainnet, testnet"),
+        _ => anyhow::bail!(
+            "Unsupported network: {network}. Verification backends are available only for mainnet and testnet"
+        ),
     }
 }
 
@@ -540,31 +526,40 @@ fn remove_random<T>(els: &mut Vec<T>) -> T {
     els.remove(index)
 }
 
-fn wait_for_rate_limit(api_key: &Option<String>) {
-    if api_key.is_none() {
-        // rate limit
-        println!("  {} Waiting for Toncenter rate limit", "→".blue().bold());
-        std::thread::sleep(std::time::Duration::from_secs(1));
-    }
-}
+fn show_verifier_link(network: &Network, contract_address: &StdAddr) {
+    let formatted = format_std_address(contract_address, network);
 
-fn show_verifier_link(network: &Network, contract_address: TonAddress) {
-    let is_testnet = network == &Network::Testnet;
     println!(
         "View at: {}",
         format!(
             "https://verifier.ton.org/{}{}",
-            contract_address.to_base64_url_flags(true, is_testnet),
-            if is_testnet { "?testnet" } else { "" }
+            formatted,
+            if network.uses_testnet_address_format() {
+                "?testnet"
+            } else {
+                ""
+            }
         )
         .blue()
     );
 }
 
+fn format_std_address(address: &StdAddr, network: &Network) -> String {
+    DisplayBase64StdAddr {
+        addr: address,
+        flags: Base64StdAddrFlags {
+            testnet: network.uses_testnet_address_format(),
+            base64_url: true,
+            bounceable: false,
+        },
+    }
+    .to_string()
+}
+
 fn get_verifier_address(
     backend_info: &BackendInfo,
     api_client: &TonApiClient,
-) -> anyhow::Result<TonAddress> {
+) -> anyhow::Result<StdAddr> {
     let result = api_client.run_get_method(
         &backend_info.source_registry,
         "get_verifier_registry_address",
@@ -579,11 +574,17 @@ fn get_verifier_address(
         match &address_stack[1] {
             StackItem::Obj(obj) => {
                 if let Some(bytes) = obj.get("bytes").and_then(|v| v.as_str()) {
-                    let cell = ArcCell::from_boc_b64(bytes)?;
-                    let mut slice = cell.parser();
-                    slice
-                        .load_address()
-                        .context("Failed to parse registry address from object")?
+                    let cell = Boc::decode_base64(bytes)
+                        .context("Failed to decode verifier registry address from stack cell")?;
+                    let address = cell
+                        .parse::<IntAddr>()
+                        .context("Failed to parse verifier registry address from stack cell")?;
+                    match address {
+                        IntAddr::Std(address) => address,
+                        IntAddr::Var(_) => {
+                            anyhow::bail!("Unsupported variable-length verifier registry address")
+                        }
+                    }
                 } else {
                     anyhow::bail!("No bytes field in registry address response");
                 }

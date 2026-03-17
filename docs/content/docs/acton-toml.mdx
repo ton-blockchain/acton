@@ -6,6 +6,23 @@ icon: FileText
 
 The `Acton.toml` file is the manifest for your Acton project. It defines package metadata, contract definitions, test settings, and custom scripts.
 
+## Project Root Resolution
+
+Acton resolves project root for each CLI invocation using global flags:
+
+- `--project-root <PATH>` sets project root explicitly (no search).
+- Without `--project-root`, Acton searches from current directory up through
+  parent directories for `Acton.toml` (up to git boundary) and uses its
+  directory as project root.
+- If no `Acton.toml` is found in that search range, project root falls back to
+  current working directory.
+- `--manifest-path <PATH>` selects `Acton.toml` for config loading only and
+  does not change project root resolution.
+
+This matters for all relative paths from config sections (for example
+`[contracts].src`, `[build]`, `[test]`, and `[mappings]`), because they are
+resolved relative to project root for the current invocation.
+
 ## Root Section
 
 The top-level of `Acton.toml` contains the following sections:
@@ -90,17 +107,21 @@ depends = [
 
 Configures defaults for `acton build`.
 
-| Field         | Type     | Required | Description                                                                       |
-|:--------------|:---------|:---------|:----------------------------------------------------------------------------------|
+| Field         | Type     | Required | Description                                                                              |
+|:--------------|:---------|:---------|:-----------------------------------------------------------------------------------------|
+| `out-dir`     | `string` | No       | Directory where build JSON artifacts are written (default: `build`).                     |
+| `gen-dir`     | `string` | No       | Directory where generated dependency files are written (default: `gen`).                 |
 | `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
 
 Example:
 ```toml
 [build]
+out-dir = "build"
+gen-dir = "gen"
 output-fift = "build/fift"
 ```
 
-`acton build --output-fift <DIR>` overrides this value for a single run.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run.
 Precompiled `.boc` contracts are skipped for Fift output.
 
 ---
@@ -115,7 +136,7 @@ Configures defaults for `acton fmt`.
 | `ignore`                 | `string[]` | -       | Glob patterns of files to exclude from formatting. |
 | `separate-import-groups` | `boolean`  | `false` | Adds an empty line between import groups.          |
 
-Import groups are ordered as: `@stdlib`, `@acton`, `@<other>`, `../`, `./` (plain imports like `import "foo"` are treated as `./` group).
+Import groups are ordered as: `@stdlib`, `@acton`, `@<other>`, plain imports (`import "foo"`), `./`, `../`.
 
 Example:
 ```toml
@@ -133,12 +154,13 @@ CLI flags still override config values for a single run (for example `acton fmt 
 
 Configures defaults for `acton litenode`.
 
-| Field               | Type       | Default | Description                                                                     |
-|:--------------------|:-----------|:--------|:--------------------------------------------------------------------------------|
-| `port`              | `integer`  | `3000`  | Port used by `acton litenode` commands when `--port` is omitted.                |
-| `fork-net`          | `string`   | -       | Network used by `acton litenode start` when `--fork-net` is omitted.            |
-| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton litenode start` for historical state fork. |
-| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `litenode start`. |
+| Field               | Type       | Default | Description                                                                         |
+|:--------------------|:-----------|:--------|:------------------------------------------------------------------------------------|
+| `port`              | `integer`  | `3000`  | Port used by `acton litenode` commands when `--port` is omitted.                    |
+| `fork-net`          | `string`   | -       | Network used by `acton litenode start` when `--fork-net` is omitted.                |
+| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton litenode start` for historical state fork.     |
+| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `litenode start`.     |
+| `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow). |
 
 Example:
 ```toml
@@ -147,9 +169,10 @@ port = 3010
 fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
+rate-limit = 1
 ```
 
-`acton litenode start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, and `--accounts <NAME[,NAME...]>` override these values for a single run.
+`acton litenode start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, and `--rate-limit <RPS>` override these values for a single run.
 
 ---
 
@@ -157,25 +180,26 @@ accounts = ["deployer", "user"]
 
 Configures the behavior of `acton test`.
 
-| Field               | Type       | Default       | Description                                               |
-|:--------------------|:-----------|:--------------|:----------------------------------------------------------|
-| `filter`            | `string`   | -             | Regex pattern to filter tests by name.                    |
-| `reporter`          | `string[]` | `["console"]` | List of reporters: `console`, `teamcity`, `junit`, `dot`. |
-| `debug`             | `boolean`  | `false`       | Enable debug mode (activates debugger).                   |
-| `debug-port`        | `integer`  | `12345`       | Port for the debug server.                                |
-| `backtrace`         | `string`   | -             | Set to `full` to enable full stack traces on failure.     |
-| `coverage`          | `boolean`  | `false`       | Enable code coverage collection.                          |
-| `coverage-format`   | `string`   | `lcov`        | Format for coverage report (`lcov`, `text`).              |
-| `coverage-file`     | `string`   | -             | Path to save the coverage report.                         |
-| `exclude`           | `string[]` | -             | Glob patterns of files to exclude from testing.           |
-| `include`           | `string[]` | -             | Glob patterns of files to include in testing.             |
-| `junit-path`        | `string`   | -             | Directory for JUnit XML reports.                          |
-| `junit-merge`       | `boolean`  | `false`       | Merge all test results into a single JUnit file.          |
-| `fork-net`          | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).   |
-| `api-key`           | `string`   | -             | API key for the network provider when forking.            |
-| `fork-block-number` | `integer`  | -             | Specific block number to fork from.                       |
-| `fail-fast`         | `boolean`  | `false`       | Stop execution after the first test failure.              |
-| `mutation`          | `object`   | -             | Configuration for mutation testing (see below).           |
+| Field               | Type       | Default       | Description                                                            |
+|:--------------------|:-----------|:--------------|:-----------------------------------------------------------------------|
+| `filter`            | `string`   | -             | Regex pattern to filter tests by name.                                 |
+| `reporter`          | `string[]` | `["console"]` | List of reporters: `console`, `teamcity`, `junit`, `dot`.              |
+| `debug`             | `boolean`  | `false`       | Enable debug mode (activates debugger).                                |
+| `debug-port`        | `integer`  | `12345`       | Port for the debug server.                                             |
+| `backtrace`         | `string`   | -             | Set to `full` to enable full stack traces on failure.                  |
+| `coverage`          | `boolean`  | `false`       | Enable code coverage collection.                                       |
+| `coverage-format`   | `string`   | `lcov`        | Format for coverage report (`lcov`, `text`).                           |
+| `coverage-file`     | `string`   | -             | Path to save the coverage report.                                      |
+| `exclude`           | `string[]` | -             | Glob patterns of files to exclude from testing.                        |
+| `include`           | `string[]` | -             | Glob patterns of files to include in testing.                          |
+| `junit-path`        | `string`   | -             | Directory for JUnit XML reports.                                       |
+| `junit-merge`       | `boolean`  | `false`       | Merge all test results into a single JUnit file.                       |
+| `fork-net`          | `string`   | -             | Network to fork for state (e.g., `mainnet`, `testnet`).                |
+| `api-key`           | `string`   | -             | API key for the network provider when forking.                         |
+| `fork-block-number` | `integer`  | -             | Specific block number to fork from.                                    |
+| `fail-fast`         | `boolean`  | `false`       | Stop execution after the first test failure.                           |
+| `fail-on-diff`      | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `mutation`          | `object`   | -             | Configuration for mutation testing (see below).                        |
 
 ### Mutation Testing Configuration
 
@@ -191,10 +215,13 @@ Example:
 reporter = ["console", "junit"]
 coverage = true
 fail-fast = true
+fail-on-diff = true
 
 [test.mutation]
 disable-rules = ["flip_plus"]
 ```
+
+`fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`).
 
 ---
 
@@ -207,26 +234,25 @@ For practical workflows and CI usage, see [Linting](/docs/linting).
 
 ### General Settings
 
-| Field          | Type       | Description                                                                                             |
-|:---------------|:-----------|:--------------------------------------------------------------------------------------------------------|
-| `exclude`      | `string[]` | Glob patterns for files to exclude from lint diagnostics. Excluded contract roots are skipped entirely. |
-| `max-warnings` | `integer`  | Maximum warning count allowed before `acton check` exits with non-zero code. Default: unlimited.        |
-| `output`       | `object`   | Report output settings. Use `[lint.output.sarif]` to write SARIF report to file.                        |
+| Field           | Type       | Description                                                                                             |
+|:----------------|:-----------|:--------------------------------------------------------------------------------------------------------|
+| `exclude`       | `string[]` | Glob patterns for files to exclude from lint diagnostics. Excluded contract roots are skipped entirely. |
+| `max-warnings`  | `integer`  | Maximum warning count allowed before `acton check` exits with non-zero code. Default: unlimited.        |
+| `output-format` | `string`   | Default report format for `acton check`: `plain`, `json`, `sarif`, `github`, or `gitlab`.               |
 
 Example:
 ```toml
 [lint]
 exclude = ["contracts/generated/*.tolk", "contracts/legacy.tolk"]
 max-warnings = 0 # fail on any warning
-
-[lint.output.sarif]
-path = ".acton/reports/lint.sarif"
+output-format = "sarif"
 ```
 
 Excluded dependency files are still parsed for imports/types, but lint diagnostics for them are hidden.
 When you pass an explicit target to `acton check` (contract id or file path), that target is checked even if it matches `exclude`.
 Compiler errors are never hidden by `exclude`.
-CLI flag `acton check --sarif <PATH>` overrides `lint.output.sarif.path` for the current run.
+CLI flag `acton check --output-format <FORMAT>` overrides `[lint].output-format` for the current run.
+Use `acton check --output-file <PATH>` to write non-plain output into a file.
 For one-off line-level suppressions in source code, use `// acton-disable-next-line ...` comments (see [Linting Configuration](/docs/linting/configuration)).
 Suppressions use rule names (for example `unused-variable`) and do not affect compiler/parser diagnostics (`C001`).
 
@@ -268,21 +294,32 @@ unused-variable = "allow" # Disable for counter contract only
 
 ## `[networks]` Section
 
-Defines custom networks that can be used for deployment, testing, and interaction. Each key is a unique network identifier.
+Defines network settings used by `--net`/`--fork-net`.
 
-| Field    | Type     | Required | Description                               |
-|:---------|:---------|:---------|:------------------------------------------|
-| `v2-url` | `string` | **Yes**  | The URL for the TonCenter v2 API.         |
-| `v3-url` | `string` | No       | The URL for the TonCenter v3 API.         |
+- `mainnet` and `testnet` are built in.
+- `localnet` is a first-class network and is always available.
+- Extra entries under `[networks.<name>]` are used as `custom:<name>`.
+
+| Field      | Type     | Required                                | Description                                                                                                                                                                                                                                                                                     |
+|:-----------|:---------|:----------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `api.v2`   | `string` | Yes for custom, optional for `localnet` | TonCenter API v2 URL. For `localnet`, if omitted, Acton uses `http://localhost:<litenode.port>/api/v2`; if `[litenode].port` is not set, it falls back to port `5411`.                                                                                                                          |
+| `api.v3`   | `string` | No                                      | TonCenter API v3 URL. For `localnet`, if omitted, Acton uses `http://localhost:<litenode.port>/api/v3`; if `[litenode].port` is not set, it falls back to port `5411`.                                                                                                                          |
+| `explorer` | `string` | No                                      | Base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). If omitted, Acton derives explorer links from `api.v2` (`<scheme>://<host>/explorer/tx/<hash>`). For default `localnet`, this becomes `http://localhost:<port>/explorer/tx/<hash>`. |
 
 Example:
 ```toml
+[networks.localnet]
+explorer = "http://localhost:3006"
+
 [networks.my-custom-net]
-v2-url = "https://my-custom-net.com/api/v2"
-v3-url = "https://my-custom-net.com/api/v3"
+api = { v2 = "https://my-custom-net.com/api/v2", v3 = "https://my-custom-net.com/api/v3" }
+explorer = "https://my-custom-net.com/explorer"
 ```
 
-You can then use this network in commands like `acton test --fork-net custom:my-custom-net`, `acton script --net custom:my-custom-net` or in scripts.
+You can use these networks in commands like:
+- `acton script --net localnet`
+- `acton script --net custom:my-custom-net`
+- `acton test --fork-net custom:my-custom-net`
 
 ---
 
@@ -326,7 +363,7 @@ import "@utils/logic" // Resolves to ./libs/utils/logic.tolk
 
 - **Exact Match**: Acton matches the first part of the path (before the first slash) against the defined mappings. For example, in `import "@core/math"`, it looks for the `@core` mapping.
 - **Normalization**: If a mapping key doesn't start with `@` (preferred), Acton automatically prepends it.
-- **Relative Paths**: Relative paths in mappings are resolved relative to the project root (where `Acton.toml` is located).
+- **Relative Paths**: Relative paths in mappings are resolved relative to project root for the current invocation.
 
 ## Additional Properties
 

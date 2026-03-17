@@ -1,0 +1,39 @@
+---
+title: "S002: explicit-return-type"
+description: "Requires explicit return types for function declarations."
+---
+
+import { SourceCodeLink } from '@/components/SourceCodeLink';
+
+## Metadata
+
+- `Code`: `S002`
+- `Rule`: `explicit-return-type`
+- `Status`: Stable since `v0.0.1`
+- `Quick fix`: sometimes available
+
+### What it does
+Requires explicit return types for function declarations.
+
+### Why is this bad?
+Omitting return types makes APIs less clear and can hide accidental signature changes.
+
+### Example
+```tolk
+fun buildSlice() {
+    return beginCell().toSlice();
+}
+```
+
+Use instead:
+```tolk
+fun buildSlice(): slice {
+    return beginCell().toSlice();
+}
+```
+
+### Behavior notes
+- Contract entrypoints `main`, `onInternalMessage`, `onExternalMessage`, `onRunTickTock`, `onSplitPrepare`, `onSplitInstall`, and `onBouncedMessage` are ignored by this rule.
+- Functions whose inferred return type is `void` are ignored by this rule.
+
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolk-linter/src/rules/ast/explicit_return_type.rs#L33" />

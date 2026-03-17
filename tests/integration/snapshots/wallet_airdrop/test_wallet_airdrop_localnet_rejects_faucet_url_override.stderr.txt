@@ -1,0 +1,1 @@
+Error: --faucet-url can only be used with --net testnet

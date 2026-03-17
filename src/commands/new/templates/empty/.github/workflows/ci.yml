@@ -7,20 +7,29 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    if: false # ton/setup-acton is not yet available
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Setup Acton
-        uses: ton/setup-acton@v2
+        uses: i582/setup-acton@master
 
       - name: Build
         run: acton build
 
       - name: Test
         run: acton test
+
+      - name: Linter
+        run: acton check --output-format github
+
+      - name: Formatter
+        run: acton fmt --check

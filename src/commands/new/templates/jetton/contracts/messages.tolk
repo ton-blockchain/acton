@@ -80,7 +80,6 @@ struct JettonWalletDataReply {
     jettonWalletCode: cell
 }
 
-
 struct JettonDataReply {
     totalSupply: int
     mintable: bool

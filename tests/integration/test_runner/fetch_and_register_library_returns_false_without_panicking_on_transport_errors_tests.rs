@@ -38,7 +38,7 @@ get fun `test-bl-stdlib-fetch-register-library-false`() {{
         r#"{base_config}
 
 [networks.bl-unreachable]
-v2-url = "http://127.0.0.1:1/api/v2"
+api = {{ v2 = "http://127.0.0.1:1/api/v2" }}
 "#
     );
     fs::write(&acton_toml_path, patched_config).expect("failed to patch Acton.toml for BL test");

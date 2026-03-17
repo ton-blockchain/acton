@@ -13,5 +13,5 @@ Mutants:  0
 
   ◆ Mutation Score       0.0%
 
-✓ Excellent! All mutants were killed!
+○ No mutation points found.
 

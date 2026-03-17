@@ -1,0 +1,16 @@
+[package]
+name = "my-acton-project"
+description = "A TON blockchain project"
+version = "0.1.0"
+license = "MIT"
+
+[fmt]
+width = 100
+ignore = []
+
+[mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "custom-tests"
+wrappers = "tests/wrappers"

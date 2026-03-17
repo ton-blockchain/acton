@@ -1,30 +1,47 @@
-name: Building Tolk tree-sitter grammar
+name: Building tree-sitter grammar
 
 on:
   pull_request:
     branches:
       - master
     paths:
-      - crates/tree-sitter-tolk/**
+      - ".github/workflows/grammars.yml"
+      - "crates/tree-sitter-**/**"
   push:
     branches:
       - master
     paths:
-      - crates/tree-sitter-tolk/**
+      - ".github/workflows/grammars.yml"
+      - "crates/tree-sitter-**/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: { }
+
 jobs:
   tree-sitter-grammars:
-    name: Test tree-sitter
+    name: Test tree-sitter-${{ matrix.language }} grammar
     runs-on: ubicloud-standard-4-ubuntu-2204
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - fift
+          - tasm
+          - tlb
+          - tolk
     if: true
+
+    permissions:
+      contents: read
 
     steps:
       - name: Fetch Sources
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Enable Corepack
         run: corepack enable
@@ -33,17 +50,17 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22.x
-          cache-dependency-path: crates/tree-sitter-tolk/yarn.lock
+          cache-dependency-path: crates/tree-sitter-${{ matrix.language }}/yarn.lock
           cache: "yarn"
 
       - name: Install dependencies
-        working-directory: crates/tree-sitter-tolk
+        working-directory: crates/tree-sitter-${{ matrix.language }}
         run: yarn install --immutable --check-cache --check-resolutions
 
       - name: Build
-        working-directory: crates/tree-sitter-tolk
+        working-directory: crates/tree-sitter-${{ matrix.language }}
         run: yarn tree-sitter generate
 
       - name: Test parsers
-        working-directory: crates/tree-sitter-tolk
+        working-directory: crates/tree-sitter-${{ matrix.language }}
         run: yarn tree-sitter test

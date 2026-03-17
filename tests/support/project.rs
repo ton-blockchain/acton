@@ -21,8 +21,12 @@ pub(crate) struct ProjectBuilder {
     lint_levels: BTreeMap<String, String>,
     lint_excludes: Vec<String>,
     lint_max_warnings: Option<usize>,
-    lint_sarif_path: Option<String>,
+    lint_output_format: Option<String>,
     test_config: Option<TestConfig>,
+    wrappers_tolk_output_dir: Option<String>,
+    wrappers_tolk_generate_test: Option<bool>,
+    wrappers_tolk_test_output_dir: Option<String>,
+    wrappers_typescript_output_dir: Option<String>,
     license: Option<String>,
     create_acton_toml: bool,
 }
@@ -62,6 +66,7 @@ pub(crate) struct TestConfig {
     pub coverage_file: Option<String>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
+    pub fail_on_diff: Option<bool>,
     pub fail_fast: Option<bool>,
 }
 
@@ -308,8 +313,12 @@ impl ProjectBuilder {
             lint_levels: BTreeMap::new(),
             lint_excludes: Vec::new(),
             lint_max_warnings: None,
-            lint_sarif_path: None,
+            lint_output_format: None,
             test_config: None,
+            wrappers_tolk_output_dir: None,
+            wrappers_tolk_generate_test: None,
+            wrappers_tolk_test_output_dir: None,
+            wrappers_typescript_output_dir: None,
             license: Some("MIT".to_string()),
             create_acton_toml: true,
         }
@@ -373,9 +382,9 @@ impl ProjectBuilder {
         self
     }
 
-    /// Configure path for SARIF report output from `acton check`.
-    pub(crate) fn with_lint_sarif_path(mut self, path: &str) -> Self {
-        self.lint_sarif_path = Some(path.to_string());
+    /// Configure format report output from `acton check`.
+    pub(crate) fn with_lint_output_format(mut self, format: &str) -> Self {
+        self.lint_output_format = Some(format.to_string());
         self
     }
 
@@ -604,6 +613,26 @@ impl ProjectBuilder {
         self
     }
 
+    pub(crate) fn with_wrappers_typescript_output_dir(mut self, path: &str) -> Self {
+        self.wrappers_typescript_output_dir = Some(path.to_string());
+        self
+    }
+
+    pub(crate) fn with_wrappers_tolk_output_dir(mut self, path: &str) -> Self {
+        self.wrappers_tolk_output_dir = Some(path.to_string());
+        self
+    }
+
+    pub(crate) fn with_wrappers_tolk_generate_test(mut self, enabled: bool) -> Self {
+        self.wrappers_tolk_generate_test = Some(enabled);
+        self
+    }
+
+    pub(crate) fn with_wrappers_tolk_test_output_dir(mut self, path: &str) -> Self {
+        self.wrappers_tolk_test_output_dir = Some(path.to_string());
+        self
+    }
+
     pub(crate) fn build(self) -> Project {
         let project_path = self.temp_dir.path().join(&self.name);
         fs::create_dir_all(&project_path).expect("Failed to create project dir");
@@ -668,8 +697,12 @@ impl ProjectBuilder {
                 &self.lint_levels,
                 &self.lint_excludes,
                 self.lint_max_warnings,
-                self.lint_sarif_path.clone(),
+                self.lint_output_format,
                 &self.test_config,
+                self.wrappers_tolk_output_dir.as_deref(),
+                self.wrappers_tolk_generate_test,
+                self.wrappers_tolk_test_output_dir.as_deref(),
+                self.wrappers_typescript_output_dir.as_deref(),
                 &self.license,
             );
         }
@@ -705,8 +738,12 @@ impl ProjectBuilder {
         lint_levels: &BTreeMap<String, String>,
         lint_excludes: &[String],
         lint_max_warnings: Option<usize>,
-        lint_sarif_path: Option<String>,
+        lint_output_format: Option<String>,
         test_config: &Option<TestConfig>,
+        wrappers_tolk_output_dir: Option<&str>,
+        wrappers_tolk_generate_test: Option<bool>,
+        wrappers_tolk_test_output_dir: Option<&str>,
+        wrappers_typescript_output_dir: Option<&str>,
         license: &Option<String>,
     ) {
         use std::fmt::Write as _;
@@ -804,6 +841,29 @@ version = "0.1.0"
             toml_content.push('\n');
         }
 
+        if wrappers_tolk_output_dir.is_some()
+            || wrappers_tolk_generate_test.is_some()
+            || wrappers_tolk_test_output_dir.is_some()
+        {
+            toml_content.push_str("[wrappers.tolk]\n");
+            if let Some(path) = wrappers_tolk_output_dir {
+                toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+            }
+            if let Some(enabled) = wrappers_tolk_generate_test {
+                toml_content.push_str(&format!("generate-test = {enabled}\n"));
+            }
+            if let Some(path) = wrappers_tolk_test_output_dir {
+                toml_content.push_str(&format!("test-output-dir = \"{path}\"\n"));
+            }
+            toml_content.push('\n');
+        }
+
+        if let Some(path) = wrappers_typescript_output_dir {
+            toml_content.push_str("[wrappers.typescript]\n");
+            toml_content.push_str(&format!("output-dir = \"{path}\"\n"));
+            toml_content.push('\n');
+        }
+
         if !scripts.is_empty() {
             toml_content.push_str("[scripts]\n");
             for (name, cmd) in scripts {
@@ -812,7 +872,8 @@ version = "0.1.0"
             toml_content.push('\n');
         }
 
-        if !lint_excludes.is_empty() || lint_max_warnings.is_some() || lint_sarif_path.is_some() {
+        if !lint_excludes.is_empty() || lint_max_warnings.is_some() || lint_output_format.is_some()
+        {
             toml_content.push_str("[lint]\n");
             if !lint_excludes.is_empty() {
                 toml_content.push_str("exclude = [");
@@ -828,12 +889,12 @@ version = "0.1.0"
             if let Some(max_warnings) = lint_max_warnings {
                 toml_content.push_str(&format!("max-warnings = {max_warnings}\n"));
             }
-            toml_content.push('\n');
-        }
 
-        if let Some(path) = lint_sarif_path {
-            toml_content.push_str("[lint.output.sarif]\n");
-            toml_content.push_str(&format!("path = \"{path}\"\n\n"));
+            if let Some(output_format) = lint_output_format {
+                toml_content.push_str(&format!("output-format = \"{output_format}\"\n"));
+            }
+
+            toml_content.push('\n');
         }
 
         if !lint_levels.is_empty() {
@@ -921,6 +982,10 @@ version = "0.1.0"
                 toml_content.push_str(&format!("fail-fast = {fail_fast}\n"));
             }
 
+            if let Some(fail_on_diff) = config.fail_on_diff {
+                toml_content.push_str(&format!("fail-on-diff = {fail_on_diff}\n"));
+            }
+
             toml_content.push('\n');
         }
 
@@ -949,6 +1014,7 @@ impl Project {
             build_clear_cache: false,
             build_graph: None,
             build_out_dir: None,
+            build_gen_dir: None,
             build_output_fift: None,
             disasm_string: None,
             disasm_output: None,
@@ -997,6 +1063,7 @@ pub(crate) struct ActonCommand {
     pub(crate) build_clear_cache: bool,
     pub(crate) build_graph: Option<Option<String>>,
     pub(crate) build_out_dir: Option<String>,
+    pub(crate) build_gen_dir: Option<String>,
     pub(crate) build_output_fift: Option<String>,
     pub(crate) disasm_string: Option<String>,
     pub(crate) disasm_output: Option<String>,
@@ -1055,13 +1122,13 @@ impl ActonCommand {
         self
     }
 
-    pub(crate) fn storage_struct(mut self, name: &str) -> Self {
-        self.cmd = self.cmd.arg("--storage-struct").arg(name);
+    pub(crate) fn generate_test_stub(mut self) -> Self {
+        self.cmd = self.cmd.arg("--test");
         self
     }
 
-    pub(crate) fn generate_test_stub(mut self) -> Self {
-        self.cmd = self.cmd.arg("--test");
+    pub(crate) fn generate_typescript_wrapper(mut self) -> Self {
+        self.cmd = self.cmd.arg("--ts");
         self
     }
 
@@ -1071,9 +1138,19 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn wrapper_output_dir(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--output-dir").arg(path);
+        self
+    }
+
     /// Specify output test file
     pub(crate) fn test_output(mut self, path: &str) -> Self {
         self.cmd = self.cmd.arg("--test-output").arg(path);
+        self
+    }
+
+    pub(crate) fn test_output_dir(mut self, path: &str) -> Self {
+        self.cmd = self.cmd.arg("--test-output-dir").arg(path);
         self
     }
 
@@ -1515,12 +1592,12 @@ impl ActonCommand {
         self
     }
 
-    /// Generate dependency graph SVG (only for build command)
+    /// Generate dependency graph DOT (only for build command)
     ///
     /// # Examples
     /// ```
-    /// .build().with_graph(None)           // Generate deps.svg (default)
-    /// .build().with_graph(Some("my.svg")) // Generate my.svg
+    /// .build().with_graph(None)           // Generate deps.dot (default)
+    /// .build().with_graph(Some("my.dot")) // Generate my.dot
     /// ```
     pub(crate) fn with_graph(mut self, path: Option<&str>) -> Self {
         self.build_graph = Some(path.map(ToString::to_string));
@@ -1536,6 +1613,12 @@ impl ActonCommand {
     /// ```
     pub(crate) fn with_out_dir(mut self, path: &str) -> Self {
         self.build_out_dir = Some(path.to_string());
+        self
+    }
+
+    /// Set output directory for generated dependency files (only for build command)
+    pub(crate) fn with_gen_dir(mut self, path: &str) -> Self {
+        self.build_gen_dir = Some(path.to_string());
         self
     }
 
@@ -1559,6 +1642,12 @@ impl ActonCommand {
     /// ```
     pub(crate) fn broadcast(mut self) -> Self {
         self.script_broadcast = true;
+        self
+    }
+
+    /// Show decoded message bodies in printed transaction trees.
+    pub(crate) fn show_bodies(mut self) -> Self {
+        self.cmd = self.cmd.arg("--show-bodies");
         self
     }
 
@@ -1636,6 +1725,10 @@ impl ActonCommand {
 
         if let Some(out_dir) = self.build_out_dir {
             self.cmd = self.cmd.arg("--out-dir").arg(out_dir);
+        }
+
+        if let Some(gen_dir) = self.build_gen_dir {
+            self.cmd = self.cmd.arg("--gen-dir").arg(gen_dir);
         }
 
         if let Some(output_fift_dir) = self.build_output_fift {

@@ -20,12 +20,12 @@ fun MyContract.fromStorage(toShard: AddressShardingOptions? = null) {
     val address = toShard == null
         ? AutoDeployAddress { stateInit }.calculateAddress()
         : AutoDeployAddress { stateInit, toShard }.calculateAddress();
-    return MyContract { address, stateInit }
+    return MyContract { address, stateInit };
 }
 
 /// Creates a contract wrapper instance from the address
 fun MyContract.fromAddress(address: address) {
-    return MyContract { address }
+    return MyContract { address };
 }
 
 /// Deploys the contract to the blockchain
@@ -36,14 +36,19 @@ fun MyContract.deploy(self, from: address, config: SendParams = {}): SendResultL
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: {
-            stateInit: self.stateInit,
-        },
+        dest: { stateInit: self.stateInit },
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }
 
-fun MyContract.sendMessageWithConflicts(self, from: address, from_: address, config_: int, other: uint32, config: SendParams = {}): SendResultList {
+fun MyContract.sendMessageWithConflicts(
+    self,
+    from: address,
+    from_: address,
+    config_: int32,
+    other: uint32,
+    config: SendParams = {},
+): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
@@ -54,7 +59,7 @@ fun MyContract.sendMessageWithConflicts(self, from: address, from_: address, con
             other,
         },
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }
 
 /// Send message to the contract with a custom body cell
@@ -65,5 +70,5 @@ fun MyContract.sendAny(self, from: address, body: cell, config: SendParams = {})
         dest: self.address,
         body,
     });
-    return net.send(from, genericMsg)
+    return net.send(from, genericMsg);
 }

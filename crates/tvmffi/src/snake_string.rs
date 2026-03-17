@@ -17,6 +17,44 @@ use crate::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 
 impl Tuple {
+    fn build_snake_bytes_cell(bytes: &[u8]) -> Cell {
+        let total_bits = bytes.len() * 8;
+
+        // We leave 8 bits free in each cell for prefixes
+        if total_bits <= 1015 {
+            // Fast path, the string fits in one cell
+            let mut b = CellBuilder::new();
+            b.store_raw(bytes, total_bits as u16).ok();
+            return b.build().expect("cannot build cell");
+        }
+
+        let mut remaining_bytes = bytes;
+        let mut cell_data = Vec::new();
+
+        while !remaining_bytes.is_empty() {
+            let chunk_size = std::cmp::min(remaining_bytes.len(), 126); // 126 bytes = 1008 bits < 1015
+            let chunk = &remaining_bytes[..chunk_size];
+            cell_data.push((chunk, chunk.len() * 8));
+            remaining_bytes = &remaining_bytes[chunk_size..];
+        }
+
+        // build cells from last to first
+        let mut next_cell: Option<Cell> = None;
+
+        for (chunk, bits) in cell_data.into_iter().rev() {
+            let mut b = CellBuilder::new();
+            b.store_raw(chunk, bits as u16).ok();
+
+            if let Some(next) = next_cell {
+                b.store_reference(next).ok();
+            }
+
+            next_cell = Some(b.build().expect("cannot build cell"));
+        }
+
+        next_cell.expect("snake string must have at least one cell")
+    }
+
     /// Parse a snake string from a cell.
     ///
     /// If the slice is not a snake string, returns `None`.
@@ -99,56 +137,25 @@ impl Tuple {
         Some(all_bits)
     }
 
-    /// Push a snake string to the tuple.
+    /// Push a snake string to the tuple as a TVM slice.
+    ///
+    /// If the string is too long, it will be split into multiple cells automatically.
+    pub fn push_string_slice(&mut self, s: &str) {
+        self.push_bytes(s.as_bytes());
+    }
+
+    /// Push a snake string to the tuple as a TVM cell.
     ///
     /// If the string is too long, it will be split into multiple cells automatically.
     pub fn push_string(&mut self, s: &str) {
-        let bytes = s.as_bytes();
-        self.push_bytes(bytes);
+        self.push(TupleItem::Cell(Self::build_snake_bytes_cell(s.as_bytes())));
     }
 
     /// Push a snake bytes to the tuple.
     ///
     /// If the array is too long, it will be split into multiple cells automatically.
     pub fn push_bytes(&mut self, bytes: &[u8]) {
-        let total_bits = bytes.len() * 8;
-
-        // We leave 8 bits free in each cell for prefixes
-        if total_bits <= 1015 {
-            // Fast path, the string fits in one cell
-            let mut b = CellBuilder::new();
-            b.store_raw(bytes, total_bits as u16).ok();
-            self.push(TupleItem::Slice(b.build().expect("cannot build cell")));
-            return;
-        }
-
-        let mut remaining_bytes = bytes;
-        let mut cell_data = Vec::new();
-
-        while !remaining_bytes.is_empty() {
-            let chunk_size = std::cmp::min(remaining_bytes.len(), 126); // 126 bytes = 1008 bits < 1015
-            let chunk = &remaining_bytes[..chunk_size];
-            cell_data.push((chunk, chunk.len() * 8));
-            remaining_bytes = &remaining_bytes[chunk_size..];
-        }
-
-        // build cells from last to first
-        let mut next_cell: Option<Cell> = None;
-
-        for (chunk, bits) in cell_data.into_iter().rev() {
-            let mut b = CellBuilder::new();
-            b.store_raw(chunk, bits as u16).ok();
-
-            if let Some(next) = next_cell {
-                b.store_reference(next).ok();
-            }
-
-            next_cell = Some(b.build().expect("cannot build cell"));
-        }
-
-        if let Some(root_cell) = next_cell {
-            self.push(TupleItem::Slice(root_cell));
-        }
+        self.push(TupleItem::Slice(Self::build_snake_bytes_cell(bytes)));
     }
 }
 
@@ -162,14 +169,14 @@ mod tests {
     fn test_string_roundtrip() {
         let small_string = "Hello World";
         let mut tuple = Tuple::empty();
-        tuple.push_string(small_string);
+        tuple.push_string_slice(small_string);
         let serialized = serialize_tuple(&tuple).unwrap();
         let deserialized = parse_tuple(&serialized).unwrap();
         assert_eq!(tuple, deserialized);
 
         let large_string = "A".repeat(200); // 200 bytes = 1600 bits > 1023
         let mut tuple = Tuple::empty();
-        tuple.push_string(&large_string);
+        tuple.push_string_slice(&large_string);
         let serialized = serialize_tuple(&tuple).unwrap();
         let deserialized = parse_tuple(&serialized).unwrap();
         assert_eq!(tuple, deserialized);
@@ -179,7 +186,7 @@ mod tests {
     fn test_empty_string() {
         let empty_string = "";
         let mut tuple = Tuple::empty();
-        tuple.push_string(empty_string);
+        tuple.push_string_slice(empty_string);
         let serialized = serialize_tuple(&tuple).unwrap();
         let deserialized = parse_tuple(&serialized).unwrap();
         assert_eq!(tuple, deserialized);
@@ -189,6 +196,19 @@ mod tests {
             assert_eq!(parsed, Some(empty_string.to_string()));
         } else {
             panic!("Expected slice item");
+        }
+    }
+
+    #[test]
+    fn test_push_tolk_string_uses_cell_stack_item() {
+        let mut tuple = Tuple::empty();
+        tuple.push_string("Hello World");
+
+        if let Some(TupleItem::Cell(cell)) = tuple.0.first() {
+            let parsed = Tuple::parse_snake_string(cell);
+            assert_eq!(parsed, Some("Hello World".to_string()));
+        } else {
+            panic!("Expected cell item");
         }
     }
 
@@ -208,7 +228,7 @@ mod tests {
             assert_eq!(test_string.len(), expected_len);
 
             let mut tuple = Tuple::empty();
-            tuple.push_string(&test_string);
+            tuple.push_string_slice(&test_string);
             let serialized = serialize_tuple(&tuple).unwrap();
             let deserialized = parse_tuple(&serialized).unwrap();
             assert_eq!(tuple, deserialized);
@@ -235,7 +255,7 @@ mod tests {
 
         for test_string in test_cases {
             let mut tuple = Tuple::empty();
-            tuple.push_string(&test_string);
+            tuple.push_string_slice(&test_string);
             let serialized = serialize_tuple(&tuple).unwrap();
             let deserialized = parse_tuple(&serialized).unwrap();
             assert_eq!(tuple, deserialized);
@@ -301,7 +321,7 @@ mod tests {
         // Test exactly 126 bytes (1008 bits) - should fit in one cell
         let test_string = "a".repeat(126);
         let mut tuple = Tuple::empty();
-        tuple.push_string(&test_string);
+        tuple.push_string_slice(&test_string);
 
         if let Some(TupleItem::Slice(slice)) = tuple.0.first() {
             assert_eq!(slice.bit_len(), 1008);
@@ -319,7 +339,7 @@ mod tests {
         // Test 127 bytes (1016 bits) - should require two cells
         let test_string = "a".repeat(127);
         let mut tuple = Tuple::empty();
-        tuple.push_string(&test_string);
+        tuple.push_string_slice(&test_string);
 
         if let Some(TupleItem::Slice(slice)) = tuple.0.first() {
             assert_eq!(slice.bit_len(), 1008); // First cell has 126 bytes
@@ -340,7 +360,7 @@ mod tests {
     fn test_very_large_string() {
         let large_string = "x".repeat(10000); // ~79 cells needed
         let mut tuple = Tuple::empty();
-        tuple.push_string(&large_string);
+        tuple.push_string_slice(&large_string);
 
         let serialized = serialize_tuple(&tuple).unwrap();
         let deserialized = parse_tuple(&serialized).unwrap();

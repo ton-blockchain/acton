@@ -1,0 +1,19 @@
+warning[S002]: function return type should be explicit
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             fun identity<T>(value: T) {
+  |                 ^^^^^^^^ return type is not explicitly declared
+  |
+  = declare return type explicitly to keep function signatures clear and stable
+
+help: add `: T`
+  --> [ROOT]/contracts/main[LINE]
+  |
+2 |             fun identity<T>(value: T) {
+  |                                      ^ : T
+
+
+1 issue can be fixed automatically, rerun with --fix flag.
+
+Use acton check --explain <CODE> to get detailed explanation of a rule.
+For example: acton check --explain S002

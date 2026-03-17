@@ -1,0 +1,27 @@
+name: PR Labeler
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions: { }
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    if: github.repository == 'i582/acton'
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Label PR by changed files
+        uses: actions/labeler@v6
+        with:
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
+          sync-labels: true

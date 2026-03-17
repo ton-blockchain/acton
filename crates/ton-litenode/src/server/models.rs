@@ -30,6 +30,12 @@ pub struct GetAddressInformationRequest {
 }
 
 #[derive(Deserialize)]
+pub struct GetAddressInformationV3Request {
+    pub address: String,
+    pub use_v2: Option<bool>,
+}
+
+#[derive(Deserialize)]
 pub struct AddressRequest {
     pub address: String,
 }
@@ -109,6 +115,52 @@ pub struct GetTracesQuery {
 }
 
 #[derive(Deserialize)]
+pub struct GetTransactionsV3Query {
+    pub workchain: Option<i32>,
+    pub shard: Option<String>,
+    pub seqno: Option<u32>,
+    pub mc_seqno: Option<u32>,
+    pub account: Option<String>,
+    pub exclude_account: Option<String>,
+    pub hash: Option<String>,
+    pub lt: Option<u64>,
+    pub start_utime: Option<u32>,
+    pub end_utime: Option<u32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+    pub sort: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct GetTransactionsByMessageV3Query {
+    pub msg_hash: Option<String>,
+    pub body_hash: Option<String>,
+    pub opcode: Option<String>,
+    pub direction: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Deserialize)]
+pub struct GetPendingTransactionsV3Query {
+    pub account: Option<String>,
+    pub trace_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct EmulateTraceRequest {
+    pub boc: Option<String>,
+    pub ignore_chksig: Option<bool>,
+    pub include_code_data: Option<bool>,
+    pub include_address_book: Option<bool>,
+    pub include_metadata: Option<bool>,
+    pub with_actions: Option<bool>,
+    pub mc_block_seqno: Option<u32>,
+}
+
+#[derive(Deserialize)]
 pub struct SetAddressNameRequest {
     pub address: String,
     pub name: String,
@@ -133,6 +185,18 @@ pub struct GetJettonWalletsRequest {
     pub owner_address: Option<String>,
     pub jetton_address: Option<String>,
     pub exclude_zero_balance: Option<bool>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct GetNftItemsRequest {
+    pub address: Option<String>,
+    pub owner_address: Option<String>,
+    pub collection_address: Option<String>,
+    pub index: Option<String>,
+    pub include_on_sale: Option<bool>,
+    pub sort_by_last_transaction_lt: Option<bool>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }

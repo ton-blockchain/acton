@@ -1,4 +1,5 @@
 pub mod jettons;
+pub mod nfts;
 
 use base64::Engine;
 use tycho_types::cell::HashBytes;

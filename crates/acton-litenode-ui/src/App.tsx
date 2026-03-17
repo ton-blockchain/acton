@@ -5,10 +5,11 @@ import {BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate} from "
 import {Moon, Sun} from "lucide-react"
 
 import {TonClient} from "./explorer/api/client"
-import {toTestnetAddress} from "./explorer/components/utils"
+import {hashToHex, toTestnetAddress} from "./explorer/components/utils"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
 import {AccountPage} from "./explorer/pages/AccountPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
+import {NftsPage} from "./explorer/pages/NftsPage"
 import {TokensPage} from "./explorer/pages/TokensPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
 import "@acton/shared-ui/styles/tokens.css"
@@ -106,6 +107,17 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
               >
                 Tokens
               </button>
+              <button
+                type="button"
+                className={`${styles.navItem} ${
+                  location.pathname.startsWith("/nfts") ? styles.navItemActive : ""
+                }`}
+                onClick={() => {
+                  void navigate("/nfts")
+                }}
+              >
+                NFTs
+              </button>
             </nav>
           </div>
 
@@ -138,6 +150,7 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
           <Route path="/explorer" element={<ExplorerIndexPage />} />
           <Route path="/explorer/address/:address" element={<AccountPage client={client} />} />
           <Route path="/tokens" element={<TokensPage client={client} />} />
+          <Route path="/nfts" element={<NftsPage client={client} />} />
           <Route path="/explorer/tx/:hash" element={<TransactionPage client={client} />} />
           <Route path="*" element={<Navigate to="/explorer" replace />} />
         </Routes>
@@ -157,9 +170,10 @@ const HeaderSearch: React.FC = () => {
           className={styles.searchInput}
           onKeyDown={e => {
             if (e.key === "Enter") {
-              const val = (e.target as HTMLInputElement).value
-              if (val.length === 64) {
-                void navigate(`/explorer/tx/${val}`)
+              const val = (e.target as HTMLInputElement).value.trim()
+              const hashHex = hashToHex(val)
+              if (hashHex) {
+                void navigate(`/explorer/tx/${hashHex}`)
               } else {
                 const formatted = toTestnetAddress(val)
                 void navigate(`/explorer/address/${formatted ?? val}`)

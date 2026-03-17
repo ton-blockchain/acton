@@ -1,6 +1,6 @@
 /* eslint-disable unicorn/prefer-spread */
 
-import {Cell, loadShardAccount, type Address} from "@ton/core"
+import type {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {
@@ -18,15 +18,10 @@ import {getTransactionOpcode} from "@/utils/transaction"
 import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
 
 import {SmartTooltip} from "./SmartTooltip"
+import {StorageDiffView} from "./StorageDiffView"
 import styles from "./TransactionTree.module.css"
+import {buildStorageDiff, type StorageDiffNode} from "./storageDiff"
 import {useTooltip} from "./useTooltip"
-
-type AccountStateType = "none" | "uninit" | "active" | "frozen"
-
-interface ParsedAccountSnapshot {
-  readonly state: AccountStateType
-  readonly balance: bigint | undefined
-}
 
 interface EdgeTransactionTooltipData {
   readonly fromAddress: string
@@ -49,12 +44,10 @@ interface NodeTransactionTooltipData {
     readonly address: string
   }
   readonly account: {
-    readonly stateBefore: AccountStateType | undefined
-    readonly stateAfter: AccountStateType | undefined
-    readonly balance: bigint | undefined
     readonly isCreated: boolean
     readonly isDestroyed: boolean
   }
+  readonly storageDiff: StorageDiffNode | undefined
 }
 
 interface TransactionTreeProps {
@@ -119,13 +112,13 @@ function EdgeTransactionTooltipContent({
 
 function NodeTransactionTooltipContent({
   data,
+  contracts,
+  onContractClick,
 }: {
   data: NodeTransactionTooltipData
+  contracts: Map<string, ContractData>
+  onContractClick?: (address: string) => void
 }): React.JSX.Element {
-  const stateBefore = formatAccountState(data.account.stateBefore)
-  const stateAfter = formatAccountState(data.account.stateAfter)
-  const hasStateChanged = stateBefore !== stateAfter
-
   return (
     <div className={styles.tooltipContent}>
       <div className={styles.tooltipField}>
@@ -134,17 +127,32 @@ function NodeTransactionTooltipContent({
       </div>
 
       <div className={styles.tooltipField}>
-        <div className={styles.tooltipFieldLabel}>Account</div>
-        <div className={styles.tooltipFieldValue}>
-          <div>Balance: {formatCurrencyOrUnknown(data.account.balance)}</div>
-          {hasStateChanged && (
-            <div>
-              State: {stateBefore} {"->"} {stateAfter}
+        <div className={styles.tooltipFieldLabel}>Storage</div>
+        <div className={`${styles.tooltipFieldValue} ${styles.tooltipFieldValueStructured}`}>
+          {(data.account.isCreated || data.account.isDestroyed) && (
+            <div className={styles.storageMeta}>
+              {data.account.isCreated && (
+                <span className={`${styles.storageMetaBadge} ${styles.storageMetaBadgeCreated}`}>
+                  Account created
+                </span>
+              )}
+              {data.account.isDestroyed && (
+                <span className={`${styles.storageMetaBadge} ${styles.storageMetaBadgeDestroyed}`}>
+                  Account destroyed
+                </span>
+              )}
             </div>
           )}
-          {data.account.isCreated && <div className={styles.tooltipSubValue}>Account created</div>}
-          {data.account.isDestroyed && (
-            <div className={styles.tooltipSubValue}>Account destroyed</div>
+          {data.storageDiff ? (
+            <div className={styles.storageDiffScroll}>
+              <StorageDiffView
+                diff={data.storageDiff}
+                contracts={contracts}
+                onContractClick={onContractClick}
+              />
+            </div>
+          ) : (
+            <span className={styles.storageUnavailable}>Storage data unavailable</span>
           )}
         </div>
       </div>
@@ -210,24 +218,6 @@ export function TransactionTree({
     return map
   }, [transactions])
 
-  const accountSnapshotMap = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        before: ParsedAccountSnapshot | undefined
-        after: ParsedAccountSnapshot | undefined
-      }
-    >()
-
-    for (const tx of transactions) {
-      map.set(tx.lt, {
-        before: parseShardAccountSnapshot(tx.shardAccountBefore),
-        after: parseShardAccountSnapshot(tx.shardAccountAfter),
-      })
-    }
-    return map
-  }, [transactions])
-
   const handleNodeClick = (lt: string): void => {
     const transaction = transactionMap.get(lt)
     if (!transaction) return
@@ -281,13 +271,6 @@ export function TransactionTree({
     triggerRectReference.current = rect
 
     const contractAddress = tx.address ? formatAddress(tx.address, new Map()) : "unknown"
-
-    const accountSnapshot = accountSnapshotMap.get(tx.lt)
-    const stateBefore = accountSnapshot?.before?.state
-    const stateAfter = accountSnapshot?.after?.state
-    const balanceBefore = accountSnapshot?.before?.balance
-    const balanceAfter = accountSnapshot?.after?.balance
-    const balance = balanceAfter ?? balanceBefore
     const isCreated =
       tx.transaction.oldStatus === "non-existing" && tx.transaction.endStatus === "active"
     const isDestroyed =
@@ -299,18 +282,22 @@ export function TransactionTree({
         address: contractAddress,
       },
       account: {
-        stateBefore,
-        stateAfter,
-        balance,
         isCreated,
         isDestroyed,
       },
+      storageDiff: buildStorageDiff(tx.parsedStorageBefore, tx.parsedStorageAfter),
     }
 
     showTooltip({
       x: rect.left,
       y: rect.top,
-      content: <NodeTransactionTooltipContent data={tooltipData} />,
+      content: (
+        <NodeTransactionTooltipContent
+          data={tooltipData}
+          contracts={contracts}
+          onContractClick={onContractClick}
+        />
+      ),
     })
   }
 
@@ -702,51 +689,4 @@ function formatAddress(address: Address | undefined, contracts: Map<string, Cont
   }
 
   return `${displayAddress.slice(0, 5)}...${displayAddress.slice(-5)}`
-}
-
-function parseShardAccountSnapshot(shardAccountBase64: string): ParsedAccountSnapshot | undefined {
-  try {
-    const shard = loadShardAccount(Cell.fromBase64(shardAccountBase64).beginParse())
-    const account = shard.account
-    if (!account) {
-      return {
-        state: "none",
-        balance: undefined,
-      }
-    }
-
-    return {
-      state: account.storage.state.type,
-      balance: account.storage.balance.coins,
-    }
-  } catch {
-    return undefined
-  }
-}
-
-function formatAccountState(state: AccountStateType | undefined): string {
-  switch (state) {
-    case "none": {
-      return "none"
-    }
-    case "uninit": {
-      return "uninit"
-    }
-    case "active": {
-      return "active"
-    }
-    case "frozen": {
-      return "frozen"
-    }
-    default: {
-      return "unknown"
-    }
-  }
-}
-
-function formatCurrencyOrUnknown(value: bigint | undefined): string {
-  if (value === undefined) {
-    return "unknown"
-  }
-  return fmt.formatCurrency(value)
 }

@@ -144,6 +144,19 @@ pub struct JettonWalletMeta {
     pub owner_address: Addr,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NftItemMeta {
+    pub address: Addr,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+    pub collection_address: Option<Addr>,
+    pub owner_address: Option<Addr>,
+    pub content: serde_json::Value,
+    pub index: String,
+    pub init: bool,
+    pub last_transaction_lt: Lt,
+}
+
 pub struct LatestState {
     pub accounts: HashMap<Addr, AccountMeta>,
 }
@@ -235,6 +248,13 @@ pub struct TraceNode {
     pub external_hash: Option<Hash256>,
 }
 
+#[derive(Clone, Debug)]
+pub struct EmulateTraceResult {
+    pub trace: TraceNode,
+    pub code_cells: HashMap<Hash256, BocBytes>,
+    pub data_cells: HashMap<Hash256, BocBytes>,
+}
+
 impl TraceNode {
     pub fn max_lt(&self) -> u64 {
         let mut max = self.transaction.meta.lt;
@@ -272,6 +292,7 @@ pub struct History {
     pub address_names: HashMap<Addr, String>,
     pub jetton_masters: HashMap<Addr, JettonMasterMeta>,
     pub jetton_wallets: HashMap<Addr, JettonWalletMeta>,
+    pub nft_items: HashMap<Addr, NftItemMeta>,
 }
 
 impl Default for History {
@@ -294,6 +315,7 @@ impl History {
             address_names,
             jetton_masters: HashMap::new(),
             jetton_wallets: HashMap::new(),
+            nft_items: HashMap::new(),
         }
     }
 
@@ -310,6 +332,7 @@ impl History {
             address_names,
             jetton_masters: HashMap::new(),
             jetton_wallets: HashMap::new(),
+            nft_items: HashMap::new(),
         }
     }
 

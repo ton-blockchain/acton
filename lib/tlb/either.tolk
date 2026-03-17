@@ -21,14 +21,14 @@ type Either<X, Y> = EitherLeft<X> | EitherRight<Y>
 /// Left constructor.
 /// Encodes with tag bit `0` followed by `value`.
 @inline
-fun Either<X, Y>.left(value: X) {
+fun Either<X, Y>.left(value: X): EitherLeft<X> {
     return EitherLeft { value };
 }
 
 /// Right constructor.
 /// Encodes with tag bit `1` followed by `value`.
 @inline
-fun Either<X, Y>.right(value: Y) {
+fun Either<X, Y>.right(value: Y): EitherRight<Y> {
     return EitherRight { value };
 }
 

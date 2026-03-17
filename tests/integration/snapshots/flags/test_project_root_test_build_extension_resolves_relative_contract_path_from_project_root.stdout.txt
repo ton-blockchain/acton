@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling counter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]/runner
+
+ > ../tests/build_from_project_root.test.tolk (1 test)
+  ✓ build-path-from-project-root [TIME]
+
+ ✓ 1 passed in 1 file

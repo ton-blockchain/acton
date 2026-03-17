@@ -27,7 +27,7 @@ import {useNavigate, useParams} from "react-router-dom"
 import type {TonClient} from "../api/client"
 import type {V3Transaction} from "../api/types"
 import {Breadcrumbs} from "../components/Breadcrumbs"
-import {normalizeAddress} from "../components/utils"
+import {hashToHex, normalizeAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
 
 import styles from "./TransactionPage.module.css"
@@ -70,16 +70,29 @@ const buildBackendTransactions = (
   }))
 }
 
+const buildTransactionsHexIndex = (
+  transactionsMap: Record<string, V3Transaction>,
+): Record<string, V3Transaction> => {
+  const indexed: Record<string, V3Transaction> = {}
+
+  for (const [mapKey, tx] of Object.entries(transactionsMap)) {
+    const normalizedHash = hashToHex(mapKey) ?? hashToHex(tx.hash) ?? mapKey
+    indexed[normalizedHash.toLowerCase()] = tx
+  }
+
+  return indexed
+}
+
 const collectSeqnoBounds = (
   processed: TransactionInfo[],
-  transactionsMap: Record<string, V3Transaction>,
+  transactionsByHex: Record<string, V3Transaction>,
 ) => {
   let minSeqno = Number.MAX_SAFE_INTEGER
   let maxSeqno = 0
 
   for (const t of processed) {
     const txHash = t.transaction.hash().toString("hex")
-    const v3Tx = transactionsMap[txHash]
+    const v3Tx = transactionsByHex[txHash]
     const seqno = v3Tx?.mc_block_seqno || 0
 
     if (seqno > 0) {
@@ -92,7 +105,8 @@ const collectSeqnoBounds = (
 }
 
 export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
-  const {hash = ""} = useParams<{hash: string}>()
+  const {hash: routeHash = ""} = useParams<{hash: string}>()
+  const hash = hashToHex(routeHash) ?? routeHash
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [traces, setTraces] = useState<TransactionInfo[]>([])
@@ -121,6 +135,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
         if (data.traces && data.traces.length > 0) {
           const trace = data.traces[0]
           const transactionsMap = trace.transactions
+          const transactionsByHex = buildTransactionsHexIndex(transactionsMap)
 
           const backendTransactions = buildBackendTransactions(transactionsMap)
 
@@ -134,7 +149,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           for (const t of processed) {
             if (t.address) addresses.add(t.address.toString())
           }
-          const {minSeqno, maxSeqno} = collectSeqnoBounds(processed, transactionsMap)
+          const {minSeqno, maxSeqno} = collectSeqnoBounds(processed, transactionsByHex)
 
           let nextLetterCode = 65
           await Promise.all(

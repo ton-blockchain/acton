@@ -1,6 +1,6 @@
 use crate::comments::CommentKind;
+use crate::pretty::RcDoc;
 use crate::{Context, comments};
-use pretty::RcDoc;
 use tree_sitter::Node;
 
 pub struct ListOptions<'a> {
@@ -8,6 +8,7 @@ pub struct ListOptions<'a> {
     pub brackets: (RcDoc<'a>, RcDoc<'a>),
     pub multiline_threshold: usize,
     pub single_line_edge_space: bool,
+    pub never_break_if_items_lt: usize,
 }
 
 impl Default for ListOptions<'_> {
@@ -17,6 +18,7 @@ impl Default for ListOptions<'_> {
             brackets: (RcDoc::text("("), RcDoc::text(")")),
             multiline_threshold: 5,
             single_line_edge_space: false,
+            never_break_if_items_lt: 0,
         }
     }
 }
@@ -88,9 +90,16 @@ where
             .is_some_and(|cs| !cs.is_empty())
     });
 
-    let is_multiline = items.len() > options.multiline_threshold || has_comments;
+    let force_single_line = options.never_break_if_items_lt > 0
+        && items.len() < options.never_break_if_items_lt
+        && !has_comments;
+
+    let is_multiline =
+        !force_single_line && (items.len() > options.multiline_threshold || has_comments);
     let (separator, item_separator) = if is_multiline {
         (RcDoc::hardline(), RcDoc::hardline())
+    } else if force_single_line {
+        (RcDoc::space(), RcDoc::space())
     } else {
         (RcDoc::line(), RcDoc::line())
     };
@@ -164,6 +173,12 @@ where
 
     let mut docs = vec![if is_multiline {
         separator.clone()
+    } else if force_single_line {
+        if options.single_line_edge_space {
+            RcDoc::space()
+        } else {
+            RcDoc::nil()
+        }
     } else if options.single_line_edge_space {
         RcDoc::line()
     } else {
@@ -181,7 +196,11 @@ where
 
         if !info.ignored {
             if is_last {
-                docs.push(RcDoc::flat_alt(options.separator.clone(), RcDoc::nil()));
+                if force_single_line {
+                    docs.push(RcDoc::nil());
+                } else {
+                    docs.push(RcDoc::flat_alt(options.separator.clone(), RcDoc::nil()));
+                }
             } else {
                 docs.push(options.separator.clone());
             }
@@ -202,6 +221,10 @@ where
             if is_multiline {
                 if !info.ignored {
                     docs.push(RcDoc::hardline());
+                }
+            } else if force_single_line {
+                if options.single_line_edge_space {
+                    docs.push(RcDoc::space());
                 }
             } else if options.single_line_edge_space {
                 docs.push(RcDoc::line());
@@ -345,7 +368,7 @@ pub fn doc_width(doc: &RcDoc) -> usize {
         last_line_len: usize,
     }
 
-    impl pretty::Render for MeasureWriter {
+    impl crate::pretty::Render for MeasureWriter {
         type Error = std::fmt::Error;
 
         fn write_str(&mut self, s: &str) -> Result<usize, Self::Error> {
@@ -364,7 +387,7 @@ pub fn doc_width(doc: &RcDoc) -> usize {
         }
     }
 
-    impl<'a, A> pretty::RenderAnnotated<'a, A> for MeasureWriter {
+    impl<'a, A> crate::pretty::RenderAnnotated<'a, A> for MeasureWriter {
         fn push_annotation(&mut self, _: &'a A) -> Result<(), Self::Error> {
             Ok(())
         }

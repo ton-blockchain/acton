@@ -350,12 +350,12 @@ impl TypeInterner {
 
         if a_def == b_def {
             return match (a_args, b_args) {
-                (Some(aa), Some(ba)) => {
-                    if aa.len() != ba.len() {
+                (Some(aa), Some(bb)) => {
+                    if aa.len() != bb.len() {
                         return true;
                     }
                     !aa.iter()
-                        .zip(ba.iter())
+                        .zip(bb.iter())
                         .all(|(&at, &bt)| self.equals(at, bt))
                 }
                 (None, None) => false,
@@ -474,7 +474,7 @@ impl TypeInterner {
             (
                 TyData::Struct {
                     def: da,
-                    base: ba,
+                    base: base_a,
                     args: aa,
                     ..
                 },
@@ -488,7 +488,7 @@ impl TypeInterner {
                 if da != db {
                     return false;
                 }
-                if let (Some(base_a), Some(base_b)) = (ba, bb)
+                if let (Some(base_a), Some(base_b)) = (base_a, bb)
                     && base_a == base_b
                     && let (Some(args_a), Some(args_b)) = (aa, ab)
                     && args_a.len() == args_b.len()

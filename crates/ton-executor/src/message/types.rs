@@ -1,5 +1,11 @@
+use anyhow::Context;
+use num_bigint::{BigInt, Sign};
+use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::Boc;
+use tycho_types::cell::CellBuilder;
 
 /// Result of a transaction emulation.
 #[derive(Deserialize, Debug, Clone)]
@@ -19,6 +25,9 @@ pub struct RunTransactionResultSuccess {
     pub vm_log: Arc<str>,
     /// Base64 encoded actions `BoC` (if any).
     pub actions: Option<Arc<str>>,
+    /// Hashes of missing libraries observed during this emulator run.
+    #[serde(default)]
+    pub missing_libraries: FxHashSet<String>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -29,12 +38,37 @@ pub struct RunTransactionResultError {
     pub vm_log: Option<String>,
     /// VM exit code (if available).
     pub vm_exit_code: Option<i64>,
+    /// Set by executor.
+    pub executor_logs: Option<Arc<str>>,
+    /// Hashes of missing libraries observed during this emulator run.
+    #[serde(default)]
+    pub missing_libraries: FxHashSet<String>,
 }
 
 /// Information about previous blocks.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PrevBlockId {
+    /// Workchain ID.
+    pub workchain: i32,
+    /// Shard ID in signed representation used by TON APIs.
+    pub shard: i64,
+    /// Block sequence number.
+    pub seqno: u32,
+    /// Root hash (32 bytes).
+    pub root_hash: [u8; 32],
+    /// File hash (32 bytes).
+    pub file_hash: [u8; 32],
+}
+
+/// Information required for `PREVBLOCKS*` TVM instructions.
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PrevBlocksInfo {
-    // TODO: Add fields based on actual requirements
+    /// List used by `PREVMCBLOCKS`.
+    pub last_mc_blocks: Vec<PrevBlockId>,
+    /// Block used by `PREVKEYBLOCK`.
+    pub prev_key_block: PrevBlockId,
+    /// Optional list used by `PREVMCBLOCKS_100`.
+    pub last_mc_blocks_100: Option<Vec<PrevBlockId>>,
 }
 
 /// Arguments for running a transaction emulation.
@@ -108,8 +142,10 @@ pub(crate) struct EmulationInternalParams {
     pub prev_blocks_info: Option<String>,
 }
 
-impl From<&RunTransactionArgs> for EmulationInternalParams {
-    fn from(args: &RunTransactionArgs) -> Self {
+impl TryFrom<&RunTransactionArgs> for EmulationInternalParams {
+    type Error = anyhow::Error;
+
+    fn try_from(args: &RunTransactionArgs) -> Result<Self, Self::Error> {
         let rand_seed = match &args.random_seed {
             Some(seed) => hex::encode(seed),
             None => String::new(),
@@ -118,9 +154,10 @@ impl From<&RunTransactionArgs> for EmulationInternalParams {
         let prev_blocks_info = args
             .prev_blocks_info
             .as_ref()
-            .map(|_| panic!("TODO: Implement prev_blocks_info serialization"));
+            .map(serialize_prev_blocks_info_as_stack_entry)
+            .transpose()?;
 
-        Self {
+        Ok(Self {
             utime: args.now,
             lt: args.lt.to_string(),
             rand_seed,
@@ -129,6 +166,45 @@ impl From<&RunTransactionArgs> for EmulationInternalParams {
             is_tick_tock: args.is_tick_tock,
             is_tock: args.is_tock,
             prev_blocks_info,
-        }
+        })
     }
+}
+
+fn block_id_to_tuple(block_id: &PrevBlockId) -> TupleItem {
+    TupleItem::Tuple(Tuple(vec![
+        TupleItem::Int(BigInt::from(block_id.workchain)),
+        TupleItem::Int(BigInt::from(block_id.shard)),
+        TupleItem::Int(BigInt::from(block_id.seqno)),
+        TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &block_id.root_hash)),
+        TupleItem::Int(BigInt::from_bytes_be(Sign::Plus, &block_id.file_hash)),
+    ]))
+}
+
+fn block_ids_to_tuple_item(blocks: &[PrevBlockId]) -> TupleItem {
+    TupleItem::Tuple(Tuple(blocks.iter().map(block_id_to_tuple).collect()))
+}
+
+fn serialize_prev_blocks_info_as_stack_entry(
+    prev_blocks_info: &PrevBlocksInfo,
+) -> anyhow::Result<String> {
+    let mut fields = vec![
+        block_ids_to_tuple_item(&prev_blocks_info.last_mc_blocks),
+        block_id_to_tuple(&prev_blocks_info.prev_key_block),
+    ];
+
+    if let Some(last_mc_blocks_100) = &prev_blocks_info.last_mc_blocks_100 {
+        fields.push(block_ids_to_tuple_item(last_mc_blocks_100));
+    }
+
+    let tuple_item = TupleItem::Tuple(Tuple(fields));
+    let mut builder = CellBuilder::new();
+
+    tvmffi::serde::serialize_tuple_item(&mut builder, &tuple_item)
+        .context("failed to serialize prev_blocks_info tuple item")?;
+
+    let cell = builder
+        .build()
+        .context("failed to build prev_blocks_info stack-entry cell")?;
+
+    Ok(Boc::encode_base64(&cell))
 }

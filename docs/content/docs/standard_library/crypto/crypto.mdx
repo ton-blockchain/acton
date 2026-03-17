@@ -37,8 +37,8 @@ struct crypto
 
 ```tolk
 struct KeyPair {
-    privateKey: int;
-    publicKey: int;
+    privateKey: int
+    publicKey: int
 }
 ```
 
@@ -117,7 +117,7 @@ val kp = words.toKeyPair();
 val signature = crypto.sign(kp.privateKey, myCell);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L83" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L80" />
 
 ## `crypto.rawSign`
 
@@ -137,7 +137,7 @@ val hash = myCell.hash();
 val signature = crypto.rawSign(kp.privateKey, hash);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L98" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L95" />
 
 ## `crypto.getSecureRandomBytes`
 
@@ -157,7 +157,7 @@ Example:
 val randomBytes = crypto.getSecureRandomBytes(32);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L113" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L110" />
 
 ## `crypto.getFastRandomBytes`
 
@@ -177,7 +177,7 @@ Example:
 val bytes = crypto.getFastRandomBytes(16, 42);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L131" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L128" />
 
 ## `crypto.generateKeyPair`
 
@@ -195,7 +195,7 @@ Example:
 val kp = crypto.generateKeyPair();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L160" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L157" />
 
 ## `crypto.seedToKeyPair`
 
@@ -212,5 +212,5 @@ Example:
 val kp = crypto.seedToKeyPair(mySeed);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L173" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L170" />
 

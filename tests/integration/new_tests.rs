@@ -41,6 +41,7 @@ fn test_new_empty_project_non_interactive() {
     assert!(project.path().join("foobar/tests").exists());
     assert!(project.path().join("foobar/LICENSE").exists());
     assert!(project.path().join("foobar/.gitignore").exists());
+    assert!(project.path().join("foobar/.editorconfig").exists());
 }
 
 #[test]
@@ -77,6 +78,25 @@ fn test_new_counter_project_non_interactive() {
             .exists()
     );
     assert!(content.contains(r"[contracts.counter]"));
+}
+
+#[test]
+fn test_new_invalid_template() {
+    let project = ProjectBuilder::new("new-invalid-template")
+        .without_acton_toml()
+        .build();
+
+    project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--template")
+        .arg("unknown-template")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_invalid_template.stderr.txt",
+        );
 }
 
 #[test]
@@ -277,6 +297,18 @@ fn test_new_empty_project_full_flow() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_new_empty_project_full_flow_check.stderr.txt",
         );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_empty_project_full_flow_fmt.stdout.txt",
+        );
 }
 
 #[test]
@@ -350,6 +382,18 @@ fn test_new_counter_project_full_flow() {
         .success()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_new_counter_project_full_flow_check.stderr.txt",
+        );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_counter_project_full_flow_fmt.stdout.txt",
         );
 }
 
@@ -425,6 +469,18 @@ fn test_new_jetton_project_full_flow() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/test_new_jetton_project_full_flow_check.stderr.txt",
         );
+
+    // 6. Run formatter
+    project
+        .acton()
+        .current_dir(&project_dir)
+        .fmt()
+        .arg("--check")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_jetton_project_full_flow_fmt.stdout.txt",
+        );
 }
 
 #[test]
@@ -467,4 +523,31 @@ fn test_new_empty_project_with_dot_env() {
     assert!(project.path().join("foobar/LICENSE").exists());
     assert!(project.path().join("foobar/.gitignore").exists());
     assert!(project.path().join("foobar/.env").exists());
+    assert!(project.path().join("foobar/.editorconfig").exists());
+}
+
+#[test]
+fn test_new_empty_project_writes_editorconfig_with_tolk_rules() {
+    let project = ProjectBuilder::new("new-editorconfig")
+        .without_acton_toml()
+        .build();
+
+    project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("test-project")
+        .arg("--description")
+        .arg("test description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            "foobar/.editorconfig",
+            "integration/snapshots/test_new_empty_project_editorconfig.gen",
+        );
 }

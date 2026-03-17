@@ -1,7 +1,9 @@
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
 use crate::stdlib;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, ContractConfig, ContractsConfig};
+use acton_config::config::{
+    ActonConfig, ContractConfig, ContractsConfig, default_project_mappings,
+};
 use inquire::{Select, Text};
 use std::collections::BTreeMap;
 use std::fs;
@@ -10,6 +12,7 @@ use std::path::Path;
 
 mod licenses;
 mod template;
+pub use template::ProjectTemplate;
 
 const BASE_GITIGNORE: &str = "
 # Acton main directory
@@ -58,11 +61,36 @@ const BASE_DOT_ENV: &str = "
 # TONCENTER_API_KEY=\"your-key-here\"
 ";
 
+const BASE_EDITORCONFIG: &str = "
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.tolk]
+indent_size = 4
+max_line_length = 100
+";
+
+#[derive(Clone, Copy)]
+struct TemplateSelectItem(ProjectTemplate);
+
+impl std::fmt::Display for TemplateSelectItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:<8} {}", self.0.as_str(), self.0.description(),)
+    }
+}
+
 pub fn new_cmd(
     path: &str,
     name: Option<String>,
     description: Option<String>,
-    template: Option<String>,
+    template: Option<ProjectTemplate>,
     license: Option<String>,
 ) -> anyhow::Result<()> {
     let project_path = if path == "." {
@@ -107,14 +135,18 @@ pub fn new_cmd(
             .prompt()?
     };
 
-    let template_options = template::get_available_templates();
     let template = if let Some(template) = template {
         template
     } else {
+        let template_options = template::get_available_templates()
+            .into_iter()
+            .map(TemplateSelectItem)
+            .collect::<Vec<_>>();
+
         Select::new("Template:", template_options)
             .with_starting_cursor(0)
             .prompt()?
-            .to_string()
+            .0
     };
 
     let license_options = vec![
@@ -151,48 +183,52 @@ pub fn new_cmd(
     std::env::set_current_dir(&project_path)?;
 
     // use `.` since we explicitly change current dir to project dir
-    template::create_project_from_template(&template, Path::new("."))?;
+    template::create_project_from_template(template, Path::new("."))?;
 
     let mut contracts = BTreeMap::new();
-    if template == "empty" {
-        contracts.insert(
-            "empty".to_owned(),
-            ContractConfig {
-                name: "Empty".to_owned(),
-                src: "contracts/contract.tolk".to_owned(),
-                depends: Some(vec![]),
-                output: None,
-            },
-        );
-    } else if template == "counter" {
-        contracts.insert(
-            "counter".to_owned(),
-            ContractConfig {
-                name: "counter".to_owned(),
-                src: "contracts/counter.tolk".to_owned(),
-                depends: Some(vec![]),
-                output: None,
-            },
-        );
-    } else if template == "jetton" {
-        contracts.insert(
-            "jetton_minter".to_owned(),
-            ContractConfig {
-                name: "Minter".to_owned(),
-                src: "contracts/jetton-minter-contract.tolk".to_owned(),
-                depends: Some(vec![]),
-                output: None,
-            },
-        );
-        contracts.insert(
-            "jetton_wallet".to_owned(),
-            ContractConfig {
-                name: "Wallet".to_owned(),
-                src: "contracts/jetton-wallet-contract.tolk".to_owned(),
-                depends: Some(vec![]),
-                output: None,
-            },
-        );
+    match template {
+        ProjectTemplate::Empty => {
+            contracts.insert(
+                "empty".to_owned(),
+                ContractConfig {
+                    name: "Empty".to_owned(),
+                    src: "contracts/contract.tolk".to_owned(),
+                    depends: Some(vec![]),
+                    output: None,
+                },
+            );
+        }
+        ProjectTemplate::Counter => {
+            contracts.insert(
+                "counter".to_owned(),
+                ContractConfig {
+                    name: "Counter".to_owned(),
+                    src: "contracts/counter.tolk".to_owned(),
+                    depends: Some(vec![]),
+                    output: None,
+                },
+            );
+        }
+        ProjectTemplate::Jetton => {
+            contracts.insert(
+                "jetton_minter".to_owned(),
+                ContractConfig {
+                    name: "JettonMinter".to_owned(),
+                    src: "contracts/jetton-minter-contract.tolk".to_owned(),
+                    depends: Some(vec![]),
+                    output: None,
+                },
+            );
+            contracts.insert(
+                "jetton_wallet".to_owned(),
+                ContractConfig {
+                    name: "JettonWallet".to_owned(),
+                    src: "contracts/jetton-wallet-contract.tolk".to_owned(),
+                    depends: Some(vec![]),
+                    output: None,
+                },
+            );
+        }
     }
 
     config.contracts = Some(ContractsConfig { contracts });
@@ -209,14 +245,7 @@ pub fn new_cmd(
         "acton script scripts/deploy.tolk --broadcast --net testnet".to_owned(),
     );
     config.scripts = Some(scripts);
-
-    let mut mappings = BTreeMap::new();
-    mappings.insert("acton".to_owned(), ".acton".to_owned());
-    mappings.insert("contracts".to_owned(), "contracts".to_owned());
-    mappings.insert("tests".to_owned(), "tests".to_owned());
-    mappings.insert("wrappers".to_owned(), "tests/wrappers".to_owned());
-    mappings.insert("gen".to_owned(), "gen".to_owned());
-    config.mappings = Some(mappings);
+    config.mappings = Some(default_project_mappings());
 
     config.save()?;
 
@@ -230,6 +259,7 @@ pub fn new_cmd(
 
     fs::write(".gitignore", BASE_GITIGNORE.trim_start())?;
     fs::write(".env", BASE_DOT_ENV.trim_start())?;
+    fs::write(".editorconfig", BASE_EDITORCONFIG.trim_start())?;
 
     if let Err(e) = symlink_global_wallets() {
         println!(
@@ -263,7 +293,11 @@ pub fn new_cmd(
         project_name.cyan().bold()
     );
     println!("  {} {}", "Description:".bright_black(), description);
-    println!("  {} {}", "Template:".bright_black(), template.cyan());
+    println!(
+        "  {} {}",
+        "Template:".bright_black(),
+        template.to_string().cyan()
+    );
     println!("  {} {}", "License:".bright_black(), license.cyan());
     println!();
     println!("Created {} with project configuration", "Acton.toml".cyan());

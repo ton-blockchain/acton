@@ -213,6 +213,7 @@ impl TestReporter for ConsoleReporter {
                 emulations: Cow::Borrowed(&failure_context.emulations),
                 known_addresses: Cow::Borrowed(&failure_context.known_addresses),
                 known_code_cells: Cow::Borrowed(&failure_context.known_code_cells),
+                show_bodies: test.show_bodies,
                 has_wallets_config: false,
                 available_wallets: vec![],
                 backtrace: test.backtrace,
@@ -291,6 +292,47 @@ fn process_test_fail(
 }
 
 fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &FormatterContext<'_>) {
+    if let AssertFailure::GetMethod(failure) = &failure {
+        let formatted = fmt.format_get_method_assert_failure(failure);
+        let mut lines = formatted.lines();
+        let Some(header) = lines.next() else {
+            println!("    {}", "└─".dimmed());
+            return;
+        };
+
+        println!("    {} {}", "└─".dimmed(), header);
+
+        let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+        for line in lines {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            if line.starts_with("  ")
+                && let Some((_, nested)) = groups.last_mut()
+            {
+                nested.push(line.trim_start().to_string());
+            } else if line.starts_with("  ") {
+                groups.push((line.trim_start().to_string(), Vec::new()));
+            } else {
+                groups.push((line.to_string(), Vec::new()));
+            }
+        }
+
+        for (idx, (line, nested)) in groups.iter().enumerate() {
+            let is_last = idx + 1 == groups.len();
+            let branch = if is_last { "└─" } else { "├─" };
+            println!("      {} {}", branch.dimmed(), line);
+
+            let nested_branch = if is_last { " " } else { "│" };
+            for nested_line in nested {
+                println!("      {}     {}", nested_branch.dimmed(), nested_line);
+            }
+        }
+
+        return;
+    }
+
     if let Some(message) = &failure.message() {
         if message.is_empty() {
             println!("    {}", "└─".dimmed());

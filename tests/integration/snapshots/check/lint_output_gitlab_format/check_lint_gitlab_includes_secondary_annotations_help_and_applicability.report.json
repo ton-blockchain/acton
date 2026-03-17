@@ -1,0 +1,17 @@
+[
+  {
+    "check_name": "E010:used-ignored-identifier",
+    "content": {
+      "body": "Rule: `used-ignored-identifier` (`E010`)\nPrimary: `_value` is marked as unused but used here\nHelp: remove leading underscore if this identifier should be used\nRelated:\n- declared with leading underscore here\nFixes:\n- [auto] rename `_value` to `value`"
+    },
+    "description": "identifier marked as unused is used",
+    "fingerprint": "c081d930f72e9a66ce7e0f8f31014f559236f930a3a954cc93dbd8281136c18d",
+    "location": {
+      "lines": {
+        "begin": 4
+      },
+      "path": "contracts/main.tolk"
+    },
+    "severity": "minor"
+  }
+]

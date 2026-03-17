@@ -21,7 +21,7 @@
             2
         )
       └─ at tests/utils_test.test[LINE]
-##teamcity[testFailed name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='[ROOT]/tests/utils_test.test[LINE]']
+##teamcity[testFailed type='comparisonFailure' name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] message='expect(<actual>).toEqual(<expected>)' details='[ROOT]/tests/utils_test.test[LINE]' expected='2' actual='1']
 ##teamcity[testFinished name='test_pow2_edge' nodeId='test_test_pow2_edge' [DURATION] parentNodeId='suite_utils_test.test.tolk']
 ##teamcity[testSuiteFinished name='utils_test.test.tolk' nodeId='suite_utils_test.test.tolk']
 

@@ -10,7 +10,7 @@ use crate::formatter::FormatterContext;
 use crate::wallets;
 use crate::{ffi, stdlib};
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, Explorer};
+use acton_config::config::{ActonConfig, Explorer, project_root};
 use anyhow::anyhow;
 use log::error;
 use rustc_hash::FxHashMap;
@@ -30,13 +30,11 @@ use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
 use ton_source_map::SourceMap;
-use tonlib_core::TonAddress;
-use tonlib_core::cell::{ArcCell, CellBuilder};
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell as TyCell, CellBuilder as TyCellBuilder};
+use tycho_types::cell::{Cell, CellBuilder, HashBytes};
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StateInit, StdAddr};
 use vmlogs::parser::{CellLike, VmStackValue, vm_stack_value};
 
 #[allow(clippy::too_many_arguments)]
@@ -52,8 +50,13 @@ pub fn script_cmd(
     broadcast: bool,
     net: Option<String>,
     explorer: Option<Explorer>,
+    show_bodies: bool,
 ) -> anyhow::Result<()> {
-    stdlib::ensure_latest(Path::new("."))?;
+    let project_root = project_root().to_path_buf();
+    stdlib::ensure_latest(&project_root)?;
+    let mappings = ActonConfig::load()
+        .ok()
+        .and_then(|config| config.mappings());
 
     if clear_cache {
         let mut file_cache = FileBuildCache::new(None)?;
@@ -74,18 +77,20 @@ pub fn script_cmd(
         anyhow::bail!("Script file must end with {}", ".tolk".yellow());
     }
 
-    if let Some(net) = &net {
-        Network::from_str(net)?; // validate network
-    }
-
     let content = fs::read_to_string(path)
         .map_err(|err| anyhow!("Cannot access {}: {err}", path.yellow()))?;
 
     let stack = parse_stack_args(args)?;
 
+    let network = match &net {
+        Some(net) => Some(Network::from_str(net)?),
+        None => None,
+    };
+
     run_script_file(
         path,
         &content,
+        &mappings,
         stack,
         debug,
         debug_port,
@@ -93,8 +98,9 @@ pub fn script_cmd(
         api_key,
         fork_block_number,
         broadcast,
-        net,
+        network,
         explorer,
+        show_bodies,
     )
 }
 
@@ -107,6 +113,7 @@ pub fn script_cmd(
 fn run_script_file(
     file_path: &str,
     content: &str,
+    mappings: &Option<BTreeMap<String, String>>,
     stack: Tuple,
     debug: bool,
     debug_port: u16,
@@ -114,26 +121,18 @@ fn run_script_file(
     api_key: Option<String>,
     fork_block_number: Option<u64>,
     broadcast: bool,
-    net: Option<String>,
+    net: Option<Network>,
     explorer: Option<Explorer>,
+    show_bodies: bool,
 ) -> anyhow::Result<()> {
-    let acton_config = ActonConfig::load();
-    let mappings = if let Ok(config) = &acton_config {
-        &config.mappings
-    } else {
-        &None
-    };
     let abi = contract_abi(content.into(), file_path, mappings);
 
-    let mut compiler = tolkc::Compiler::new(2);
-    if let Ok(config) = &acton_config {
-        compiler = compiler.with_mappings(&config.mappings);
-    }
+    let compiler = tolkc::Compiler::new(2).with_mappings(mappings);
 
     match compiler.compile(Path::new(file_path), debug) {
         tolkc::CompilerResult::Success(result) => {
-            let code_cell = ArcCell::from_boc_b64(&result.code_boc64)?;
-            let data_cell = ArcCell::default();
+            let code_cell = Boc::decode_base64(&result.code_boc64)?;
+            let data_cell = CellBuilder::new().build()?;
 
             execute_script(
                 &code_cell,
@@ -148,8 +147,9 @@ fn run_script_file(
                 api_key,
                 fork_block_number,
                 broadcast,
-                net,
+                net.as_ref(),
                 explorer,
+                show_bodies,
             )?;
             Ok(())
         }
@@ -165,8 +165,8 @@ struct ScriptResult {
 
 #[allow(clippy::too_many_arguments)]
 fn execute_script(
-    code_cell: &ArcCell,
-    data_cell: &ArcCell,
+    code_cell: &Cell,
+    data_cell: &Cell,
     stack: Tuple,
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
@@ -177,20 +177,22 @@ fn execute_script(
     api_key: Option<String>,
     fork_block_number: Option<u64>,
     broadcast: bool,
-    net: Option<String>,
+    net: Option<&Network>,
     explorer: Option<Explorer>,
+    show_bodies: bool,
 ) -> anyhow::Result<()> {
     let dest_address = contract_address(code_cell)?;
+    let formatted_address = format_std_address(&dest_address, net);
 
     let now = std::time::SystemTime::now();
     let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
     let params = RunGetMethodArgs {
-        code: code_cell.to_boc_b64(false)?,
-        data: data_cell.to_boc_b64(false)?,
+        code: Boc::encode_base64(code_cell),
+        data: Boc::encode_base64(data_cell),
         verbosity,
         libs: String::new(),
-        address: dest_address.to_string(),
+        address: formatted_address,
         unixtime: duration_since_epoch.as_secs().try_into()?,
         balance: "10".to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -202,7 +204,7 @@ fn execute_script(
     };
 
     let config_b64: Option<&str> = None;
-    let fork_net = fork_net.as_deref().map(Network::from_str).transpose()?;
+    let fork_net = fork_net.map(|n| Network::from_str(&n)).transpose()?;
 
     let mut emulator = Emulator::new(verbosity, config_b64)?;
     let resolver = match &fork_net {
@@ -225,13 +227,14 @@ fn execute_script(
     let mut expected_exit_code = None;
 
     let config = ActonConfig::load()?;
-    let network = net.as_deref().map(Network::from_str).transpose()?;
-    let open_wallets = wallets::open_wallets(&config, network.as_ref(), broadcast)?;
+    let open_wallets = wallets::open_wallets(&config, net, broadcast)?;
 
     let mut ctx = Context {
         env: Env {
             config: &config,
+            project_root: project_root().to_path_buf(),
             abi,
+            show_bodies,
             default_log_level: verbosity,
             wallets: config.wallets.as_ref(),
             open_wallets,
@@ -265,7 +268,7 @@ fn execute_script(
         },
         debug: DebugCtx::Disabled,
         is_broadcasting: broadcast,
-        network,
+        network: net.cloned(),
     };
 
     if debug {
@@ -341,23 +344,33 @@ fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
     }
 }
 
-fn contract_address(code: &ArcCell) -> anyhow::Result<TonAddress> {
-    let state_init = CellBuilder::new()
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store bounce flag: {e}"))?
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store maybe libraries: {e}"))?
-        .store_ref_cell_optional(Some(code))
-        .map_err(|e| anyhow!("Failed to store code cell: {e}"))?
-        .store_ref_cell_optional(Some(&ArcCell::default()))
-        .map_err(|e| anyhow!("Failed to store data cell: {e}"))?
-        .store_bit(false)
-        .map_err(|e| anyhow!("Failed to store maybe tick/tock: {e}"))?
-        .build()
-        .map_err(|e| anyhow!("Failed to build state init cell: {e}"))?;
+fn contract_address(code: &Cell) -> anyhow::Result<StdAddr> {
+    let state_init = StateInit {
+        split_depth: None,
+        special: None,
+        code: Some(code.clone()),
+        data: Some(CellBuilder::new().build()?),
+        libraries: Default::default(),
+    };
 
-    let dest_address = TonAddress::new(0, state_init.cell_hash());
-    Ok(dest_address)
+    let state_init_cell = CellBuilder::build_from(state_init)?;
+    Ok(StdAddr::new(
+        0,
+        HashBytes(*state_init_cell.repr_hash().as_array()),
+    ))
+}
+
+fn format_std_address(address: &StdAddr, network: Option<&Network>) -> String {
+    let testnet = network.is_some_and(Network::uses_testnet_address_format);
+    DisplayBase64StdAddr {
+        addr: address,
+        flags: Base64StdAddrFlags {
+            testnet,
+            base64_url: true,
+            bounceable: true,
+        },
+    }
+    .to_string()
 }
 
 fn parse_stack_args(args: Vec<String>) -> anyhow::Result<Tuple> {
@@ -413,20 +426,20 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<Tup
     }
 }
 
-fn convert_cell_like(cell_like: CellLike<'_>) -> anyhow::Result<TyCell> {
+fn convert_cell_like(cell_like: CellLike<'_>) -> anyhow::Result<Cell> {
     match cell_like {
         CellLike::Cell(hex) => Ok(Boc::decode_hex(hex)?),
         CellLike::Builder(hex) => Ok(Boc::decode_hex(hex)?),
     }
 }
 
-fn string_to_slice(s: &str) -> anyhow::Result<TyCell> {
+fn string_to_slice(s: &str) -> anyhow::Result<Cell> {
     let bytes = s.as_bytes();
     let total_bits = bytes.len() * 8;
 
     if total_bits <= 1023 {
         // Fast path, the string fits in one cell
-        let mut b = TyCellBuilder::new();
+        let mut b = CellBuilder::new();
         b.store_raw(bytes, total_bits as u16)?;
         return Ok(b.build()?);
     }
@@ -442,10 +455,10 @@ fn string_to_slice(s: &str) -> anyhow::Result<TyCell> {
     }
 
     // build cells from last to first
-    let mut next_cell: Option<TyCell> = None;
+    let mut next_cell: Option<Cell> = None;
 
     for (chunk, bits) in cell_data.into_iter().rev() {
-        let mut b = TyCellBuilder::new();
+        let mut b = CellBuilder::new();
         b.store_raw(chunk, bits as u16)?;
 
         if let Some(next) = next_cell {

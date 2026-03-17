@@ -2,7 +2,9 @@ use crate::commands::common::{create_symlink, error_fmt, select_wallet};
 use crate::wallets;
 use acton_config::color::OwoColorize;
 use acton_config::config;
-use acton_config::config::{ActonConfig, WalletsFile, global_wallets_path};
+use acton_config::config::{
+    ActonConfig, WalletsFile, global_wallets_path, project_root as configured_project_root,
+};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use inquire::{Confirm, Select, Text};
@@ -17,13 +19,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use toml_edit::{DocumentMut, Item, Table, value};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
+use ton::ton_core::types::TonAddress;
+use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::{CustomNetworkUrls, Network, TonApiClient};
-use tonlib_core::TonAddress;
-use tonlib_core::cell::Cell;
-use tonlib_core::tlb_types::tlb::TLB;
-use tonlib_core::wallet::mnemonic::Mnemonic;
-use tonlib_core::wallet::ton_wallet::TonWallet;
-use tonlib_core::wallet::wallet_version::WalletVersion;
 
 #[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
 #[clap(rename_all = "lowercase")]
@@ -43,6 +43,13 @@ pub enum WalletVersionArg {
     HighloadV2,
     HighloadV2R1,
     HighloadV2R2,
+}
+
+#[derive(clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq)]
+#[clap(rename_all = "lowercase")]
+pub enum WalletAirdropNetworkArg {
+    Testnet,
+    Localnet,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -65,10 +72,24 @@ struct FaucetMessageResponse {
 
 struct AirdropResult {
     address: String,
-    difficulty: u32,
-    nonce: u64,
-    solve_duration: Duration,
+    difficulty: Option<u32>,
+    nonce: Option<u64>,
+    solve_duration: Option<Duration>,
     message: Option<String>,
+}
+
+enum AirdropTarget {
+    Testnet { faucet_url: String },
+    Localnet { port: u16, amount_ton: f64 },
+}
+
+impl AirdropTarget {
+    const fn network(&self) -> Network {
+        match self {
+            Self::Testnet { .. } => Network::Testnet,
+            Self::Localnet { .. } => Network::Localnet,
+        }
+    }
 }
 
 const HTTP_RETRY_ATTEMPTS: usize = 3;
@@ -76,6 +97,8 @@ const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [200, 500, 1000];
 const POW_MAX_SOLVE_DURATION: Duration = Duration::from_secs(60);
 const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
 const DEFAULT_FAUCET_URL: &str = "https://acton.monster/faucet/";
+const DEFAULT_LITENODE_PORT: u16 = 5411;
+const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
 const NEW_WALLET_AIRDROP_FAUCET_URL_ENV: &str = "ACTON_FAUCET_URL"; // for testing purpose
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
 const TEST_TONCENTER_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_V3_URL"; // integration tests only
@@ -102,11 +125,11 @@ impl From<WalletVersionArg> for WalletVersion {
             WalletVersionArg::V4R1 => WalletVersion::V4R1,
             WalletVersionArg::V4R2 => WalletVersion::V4R2,
             WalletVersionArg::V5R1 => WalletVersion::V5R1,
-            WalletVersionArg::HighloadV1R1 => WalletVersion::HighloadV1R1,
-            WalletVersionArg::HighloadV1R2 => WalletVersion::HighloadV1R2,
-            WalletVersionArg::HighloadV2 => WalletVersion::HighloadV2,
-            WalletVersionArg::HighloadV2R1 => WalletVersion::HighloadV2R1,
-            WalletVersionArg::HighloadV2R2 => WalletVersion::HighloadV2R2,
+            WalletVersionArg::HighloadV1R1 => WalletVersion::HLV1R1,
+            WalletVersionArg::HighloadV1R2 => WalletVersion::HLV1R2,
+            WalletVersionArg::HighloadV2 => WalletVersion::HLV2,
+            WalletVersionArg::HighloadV2R1 => WalletVersion::HLV2R1,
+            WalletVersionArg::HighloadV2R2 => WalletVersion::HLV2R2,
         }
     }
 }
@@ -197,16 +220,19 @@ pub enum WalletCommand {
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
-    #[command(about = "Request testnet TONs from faucet")]
+    #[command(about = "Request TON coins from testnet or localnet faucet")]
     Airdrop {
         #[arg(help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
         #[arg(
             long,
-            help = "Faucet URL",
-            default_value = "https://acton.monster/faucet/"
+            value_enum,
+            default_value = "testnet",
+            help = "Airdrop network backend"
         )]
-        faucet_url: String,
+        net: WalletAirdropNetworkArg,
+        #[arg(long, help = "Faucet URL for testnet airdrop backend")]
+        faucet_url: Option<String>,
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
@@ -242,30 +268,40 @@ pub fn wallet_cmd(command: WalletCommand) -> anyhow::Result<()> {
         WalletCommand::Remove { name, yes, json } => remove_wallet(name, yes, json),
         WalletCommand::Airdrop {
             name,
+            net,
             faucet_url,
             json,
-        } => airdrop_wallet(name, faucet_url, json),
+        } => airdrop_wallet(name, net, faucet_url, json),
     }
 }
 
-fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyhow::Result<()> {
-    let run_result = perform_airdrop(name, faucet_url, json);
+fn airdrop_wallet(
+    name: Option<String>,
+    net: WalletAirdropNetworkArg,
+    faucet_url: Option<String>,
+    json: bool,
+) -> anyhow::Result<()> {
+    let run_result = perform_airdrop(name, resolve_airdrop_target(net, faucet_url)?, json);
 
     match run_result {
         Ok(result) => {
             let message = result.message.as_deref().unwrap_or("Success");
             if json {
-                println!(
-                    "{}",
-                    serde_json::to_string(&serde_json::json!({
-                        "success": true,
-                        "message": message,
-                        "address": result.address,
-                        "difficulty": result.difficulty,
-                        "nonce": result.nonce,
-                        "solve_ms": result.solve_duration.as_millis(),
-                    }))?
-                );
+                let mut payload = serde_json::json!({
+                    "success": true,
+                    "message": message,
+                    "address": result.address,
+                });
+                if let Some(difficulty) = result.difficulty {
+                    payload["difficulty"] = serde_json::json!(difficulty);
+                }
+                if let Some(nonce) = result.nonce {
+                    payload["nonce"] = serde_json::json!(nonce);
+                }
+                if let Some(solve_duration) = result.solve_duration {
+                    payload["solve_ms"] = serde_json::json!(solve_duration.as_millis());
+                }
+                println!("{}", serde_json::to_string(&payload)?);
             } else {
                 println!("{} {}", "✓".green(), message);
             }
@@ -288,7 +324,7 @@ fn airdrop_wallet(name: Option<String>, faucet_url: String, json: bool) -> anyho
 
 fn perform_airdrop(
     name: Option<String>,
-    faucet_url: String,
+    target: AirdropTarget,
     json: bool,
 ) -> anyhow::Result<AirdropResult> {
     let config = ActonConfig::load()?;
@@ -299,7 +335,7 @@ fn perform_airdrop(
         .get_wallet(&name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
 
-    let address = get_wallet_address(wallet)?;
+    let address = get_wallet_address(wallet, target.network())?;
 
     if !json {
         println!(
@@ -310,6 +346,45 @@ fn perform_airdrop(
         );
     }
 
+    match target {
+        AirdropTarget::Testnet { faucet_url } => perform_testnet_airdrop(address, faucet_url, json),
+        AirdropTarget::Localnet { port, amount_ton } => {
+            perform_localnet_airdrop(address, amount_ton, port)
+        }
+    }
+}
+
+fn resolve_airdrop_target(
+    net: WalletAirdropNetworkArg,
+    faucet_url: Option<String>,
+) -> anyhow::Result<AirdropTarget> {
+    match net {
+        WalletAirdropNetworkArg::Testnet => Ok(AirdropTarget::Testnet {
+            faucet_url: faucet_url.unwrap_or_else(|| DEFAULT_FAUCET_URL.to_owned()),
+        }),
+        WalletAirdropNetworkArg::Localnet => {
+            if faucet_url.is_some() {
+                anyhow::bail!("--faucet-url can only be used with --net testnet");
+            }
+            let port = ActonConfig::load()
+                .ok()
+                .and_then(|config| config.litenode)
+                .and_then(|litenode| litenode.port)
+                .unwrap_or(DEFAULT_LITENODE_PORT);
+
+            Ok(AirdropTarget::Localnet {
+                port,
+                amount_ton: LOCALNET_WALLET_AIRDROP_AMOUNT_TON,
+            })
+        }
+    }
+}
+
+fn perform_testnet_airdrop(
+    address: String,
+    faucet_url: String,
+    json: bool,
+) -> anyhow::Result<AirdropResult> {
     let faucet_base = parse_faucet_base_url(&faucet_url)?;
     let challenge_url = faucet_base.join("challenge").with_context(|| {
         format!(
@@ -395,9 +470,9 @@ fn perform_airdrop(
             response.json().context("Failed to parse faucet response")?;
         Ok(AirdropResult {
             address,
-            difficulty: challenge_data.difficulty,
-            nonce,
-            solve_duration: duration,
+            difficulty: Some(challenge_data.difficulty),
+            nonce: Some(nonce),
+            solve_duration: Some(duration),
             message: res.message,
         })
     } else {
@@ -416,6 +491,61 @@ fn perform_airdrop(
         };
 
         anyhow::bail!("Faucet returned error {status}: {error_msg}");
+    }
+}
+
+fn perform_localnet_airdrop(
+    address: String,
+    amount_ton: f64,
+    port: u16,
+) -> anyhow::Result<AirdropResult> {
+    let client = reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
+        .build()
+        .context("Failed to build HTTP client")?;
+    let amount_nanotons = (amount_ton * 1_000_000_000.0) as u128;
+
+    let response = client
+        .post(format!("http://localhost:{port}/admin/faucet"))
+        .json(&serde_json::json!({
+            "address": address,
+            "amount": amount_nanotons,
+        }))
+        .send()
+        .context(
+            "Failed to send request to localnet faucet. Make sure `acton litenode start` is running",
+        )?;
+
+    if response.status().is_success() {
+        let json: serde_json::Value = response
+            .json()
+            .context("Failed to parse localnet faucet response")?;
+        if json.get("ok").and_then(|v| v.as_bool()).unwrap_or(false)
+            || json
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        {
+            let message = format!("Successfully airdropped {amount_ton} TON on localnet");
+            Ok(AirdropResult {
+                address,
+                difficulty: None,
+                nonce: None,
+                solve_duration: None,
+                message: Some(message),
+            })
+        } else {
+            let error = json
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown error");
+            anyhow::bail!("Localnet faucet returned error: {error}");
+        }
+    } else {
+        let status = response.status();
+        let body = response.text().unwrap_or_default();
+        anyhow::bail!("Localnet faucet returned error {status}: {body}");
     }
 }
 
@@ -598,7 +728,7 @@ fn sign_wallet_external_body(
     let (external_body, input) = decode_sign_input(&body)?;
 
     let mnemonic_str = wallets::load_mnemonic(wallet)?;
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
+    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let key_pair = mnemonic.to_key_pair()?;
     let version = parse_wallet_version(&wallet.kind)?;
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
@@ -606,10 +736,10 @@ fn sign_wallet_external_body(
         TonWallet::new_with_params(version, key_pair, wallet.workchain.unwrap_or(0), wallet_id)?;
 
     let signed_body = ton_wallet
-        .sign_external_body(&external_body)
+        .sign_ext_in_body(&external_body)
         .context("Failed to sign external body")?;
     let signed_body_hex = signed_body
-        .to_boc_hex(false)
+        .to_boc_hex()
         .context("Failed to encode signed body to hex BoC")?;
 
     if json {
@@ -640,19 +770,19 @@ fn read_sign_body(body: Option<String>) -> anyhow::Result<String> {
         .context("Failed to read body")
 }
 
-fn decode_sign_input(body: &str) -> anyhow::Result<(Cell, SignMessageFormat)> {
+fn decode_sign_input(body: &str) -> anyhow::Result<(TonCell, SignMessageFormat)> {
     let body = body.trim();
     if body.is_empty() {
         anyhow::bail!("Body cannot be empty");
     }
 
     if is_hex_payload(body)
-        && let Ok(cell) = Cell::from_boc_hex(body)
+        && let Ok(cell) = TonCell::from_boc_hex(body)
     {
         return Ok((cell, SignMessageFormat::Hex));
     }
 
-    if let Ok(cell) = Cell::from_boc_b64(body) {
+    if let Ok(cell) = TonCell::from_boc_base64(body) {
         return Ok((cell, SignMessageFormat::Base64));
     }
 
@@ -661,6 +791,10 @@ fn decode_sign_input(body: &str) -> anyhow::Result<(Cell, SignMessageFormat)> {
 
 fn is_hex_payload(value: &str) -> bool {
     value.len().is_multiple_of(2) && value.as_bytes().iter().all(u8::is_ascii_hexdigit)
+}
+
+fn format_testnet_wallet_address(address: &TonAddress) -> String {
+    address.to_base64(false, true, true)
 }
 
 fn remove_wallet(name: Option<String>, yes: bool, json: bool) -> anyhow::Result<()> {
@@ -760,7 +894,7 @@ fn confirm_wallet_removal(name: &str, yes: bool, json: bool) -> anyhow::Result<b
 fn remove_wallet_with_merged_precedence(name: &str, config: &ActonConfig) -> anyhow::Result<bool> {
     // global first, then local override.
     // So removal should target local first (effective winner), then global.
-    let local_path = PathBuf::from("wallets.toml");
+    let local_path = configured_project_root().join("wallets.toml");
     if remove_wallet_from_config_file(&local_path, name)? {
         return Ok(false);
     }
@@ -826,6 +960,7 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
                 CustomNetworkUrls {
                     v2_url: Arc::clone(&normalized),
                     v3_url: Some(normalized),
+                    explorer_url: None,
                 },
             );
             TonApiClient::new(
@@ -846,7 +981,7 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
 
     let mut wallets_data = Vec::new();
     for (name, wallet_config) in wallets {
-        let Ok(address) = get_wallet_address(wallet_config) else {
+        let Ok(address) = get_wallet_address(wallet_config, Network::Testnet) else {
             error!("cannot get wallet address for {name}"); // very unlikely
             continue;
         };
@@ -869,7 +1004,7 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
                         && let Ok(b_int) = b.parse::<i128>()
                         && let Ok(address) = TonAddress::from_str(&state.address)
                     {
-                        balances.insert(address.to_base64_url_flags(false, true), b_int);
+                        balances.insert(format_testnet_wallet_address(&address), b_int);
                     }
                 }
             }
@@ -931,26 +1066,26 @@ fn list_wallets(balance: bool, api_key: Option<String>, json: bool) -> anyhow::R
     Ok(())
 }
 
-fn get_wallet_address(wallet: &config::WalletConfig) -> anyhow::Result<String> {
+fn get_wallet_address(wallet: &config::WalletConfig, network: Network) -> anyhow::Result<String> {
     if let Some(expected) = &wallet.expected
         && let Some(addr) = &expected.address_testnet
     {
         let addr = TonAddress::from_str(addr)?;
-        return Ok(addr.to_base64_url_flags(false, true));
+        return Ok(format_testnet_wallet_address(&addr));
     }
 
     let mnemonic_str = wallets::load_mnemonic(wallet)?;
 
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
+    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let version = parse_wallet_version(&wallet.kind)?;
-    let wallet_id = wallets::wallet_id(version, &Network::Testnet);
+    let wallet_id = wallets::wallet_id(version, &network);
     let ton_wallet = TonWallet::new_with_params(
         version,
         mnemonic.to_key_pair()?,
         wallet.workchain.unwrap_or(0),
         wallet_id,
     )?;
-    Ok(ton_wallet.address.to_base64_url_flags(false, true))
+    Ok(format_testnet_wallet_address(&ton_wallet.address))
 }
 
 fn remove_wallet_from_config_file(config_path: &Path, name: &str) -> anyhow::Result<bool> {
@@ -997,11 +1132,11 @@ fn wallet_version_to_string(v: &WalletVersion) -> String {
         WalletVersion::V4R1 => "v4r1",
         WalletVersion::V4R2 => "v4r2",
         WalletVersion::V5R1 => "v5r1",
-        WalletVersion::HighloadV1R1 => "highloadv1r1",
-        WalletVersion::HighloadV1R2 => "highloadv1r2",
-        WalletVersion::HighloadV2 => "highloadv2",
-        WalletVersion::HighloadV2R1 => "highloadv2r1",
-        WalletVersion::HighloadV2R2 => "highloadv2r2",
+        WalletVersion::HLV1R1 => "highloadv1r1",
+        WalletVersion::HLV1R2 => "highloadv1r2",
+        WalletVersion::HLV2 => "highloadv2",
+        WalletVersion::HLV2R1 => "highloadv2r1",
+        WalletVersion::HLV2R2 => "highloadv2r2",
     }
     .to_string()
 }
@@ -1105,7 +1240,7 @@ fn get_config_path(name: &str, is_global: bool) -> anyhow::Result<PathBuf> {
 
         Ok(config_path)
     } else {
-        let config_path = PathBuf::from("wallets.toml");
+        let config_path = configured_project_root().join("wallets.toml");
         if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
             let wallets: WalletsFile = toml::from_str(&content)?;
@@ -1134,11 +1269,11 @@ fn get_or_prompt_version(version: Option<WalletVersionArg>) -> anyhow::Result<Wa
             WalletVersion::V1R3,
             WalletVersion::V1R2,
             WalletVersion::V1R1,
-            WalletVersion::HighloadV2R2,
-            WalletVersion::HighloadV2R1,
-            WalletVersion::HighloadV2,
-            WalletVersion::HighloadV1R2,
-            WalletVersion::HighloadV1R1,
+            WalletVersion::HLV2R2,
+            WalletVersion::HLV2R1,
+            WalletVersion::HLV2,
+            WalletVersion::HLV1R2,
+            WalletVersion::HLV1R1,
         ];
 
         let versions_str: Vec<String> = versions.iter().map(wallet_version_to_string).collect();
@@ -1208,9 +1343,9 @@ fn save_wallet_to_config(
         .with_context(|| format!("Failed to write to {}", config_path.display()))?;
 
     if is_global {
-        let symlink_path = Path::new("global.wallets.toml");
+        let symlink_path = configured_project_root().join("global.wallets.toml");
         if !symlink_path.exists() {
-            if let Err(e) = create_symlink(config_path, symlink_path) {
+            if let Err(e) = create_symlink(config_path, &symlink_path) {
                 println!(
                     "  {} Failed to create symlink: {}",
                     "Warning:".yellow().bold(),
@@ -1218,9 +1353,8 @@ fn save_wallet_to_config(
                 );
             } else {
                 println!(
-                    "{} Created symlink {} -> {}",
+                    "{} Created symlink global.wallets.toml -> {}",
                     "✓".green(),
-                    symlink_path.display(),
                     config_path.display()
                 );
             }
@@ -1248,13 +1382,13 @@ fn new_wallet(
     let mnemonic_words = wallets::new_mnemonic()?;
     let mnemonic_str = mnemonic_words.join(" ");
 
-    let mnemonic = Mnemonic::from_str(&mnemonic_str, &None)?;
+    let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
     let key_pair = mnemonic.to_key_pair()?;
 
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
-    let wallet_address = wallet.address.to_base64_url_flags(false, true);
+    let wallet_address = format_testnet_wallet_address(&wallet.address);
 
     let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
@@ -1292,17 +1426,28 @@ fn new_wallet(
         if auto_airdrop {
             let airdrop_output = match perform_airdrop(
                 Some(name),
-                airdrop_faucet_url.expect("auto_airdrop implies faucet URL exists"),
+                AirdropTarget::Testnet {
+                    faucet_url: airdrop_faucet_url.expect("auto_airdrop implies faucet URL exists"),
+                },
                 true,
             ) {
-                Ok(result) => serde_json::json!({
-                    "success": true,
-                    "message": result.message.as_deref().unwrap_or("Success"),
-                    "address": result.address,
-                    "difficulty": result.difficulty,
-                    "nonce": result.nonce,
-                    "solve_ms": result.solve_duration.as_millis(),
-                }),
+                Ok(result) => {
+                    let mut airdrop_json = serde_json::json!({
+                        "success": true,
+                        "message": result.message.as_deref().unwrap_or("Success"),
+                        "address": result.address,
+                    });
+                    if let Some(difficulty) = result.difficulty {
+                        airdrop_json["difficulty"] = serde_json::json!(difficulty);
+                    }
+                    if let Some(nonce) = result.nonce {
+                        airdrop_json["nonce"] = serde_json::json!(nonce);
+                    }
+                    if let Some(solve_duration) = result.solve_duration {
+                        airdrop_json["solve_ms"] = serde_json::json!(solve_duration.as_millis());
+                    }
+                    airdrop_json
+                }
                 Err(err) => serde_json::json!({
                     "success": false,
                     "error": err.to_string(),
@@ -1313,10 +1458,15 @@ fn new_wallet(
 
         println!("{}", serde_json::to_string_pretty(&output)?);
     } else {
+        let config_label = if is_global {
+            "global.wallets.toml"
+        } else {
+            "wallets.toml"
+        };
         println!(
             "{} Wallet successfully created and added to {}",
             "✓".green(),
-            config_path.display().cyan(),
+            config_label.cyan(),
         );
         println!("{} Wallet address is {}", "✓".green(), wallet_address);
 
@@ -1330,7 +1480,9 @@ fn new_wallet(
         if auto_airdrop {
             match perform_airdrop(
                 Some(name),
-                airdrop_faucet_url.expect("auto_airdrop implies faucet URL exists"),
+                AirdropTarget::Testnet {
+                    faucet_url: airdrop_faucet_url.expect("auto_airdrop implies faucet URL exists"),
+                },
                 false,
             ) {
                 Ok(result) => {
@@ -1359,7 +1511,7 @@ fn new_wallet(
             );
 
             println!(
-                "\nTo get testnet coins, check official documentation: {}",
+                "\nTo get testnet coins run `acton wallet airdrop` or check official documentation: {}",
                 "https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet"
                     .underline(),
             );
@@ -1394,8 +1546,8 @@ fn maybe_store_mnemonic_in_keystore(
 }
 
 fn keyring_id_for_wallet(name: &str, project_name: Option<String>) -> String {
-    if let Some(pn) = project_name {
-        format!("{pn}:{name}")
+    if let Some(project) = project_name {
+        format!("{project}:{name}")
     } else {
         name.to_string()
     }
@@ -1422,7 +1574,7 @@ fn import_wallet(
     };
 
     let mnemonic =
-        Mnemonic::from_str(mnemonic_str.trim(), &None).context("Invalid mnemonic phrase")?;
+        Mnemonic::from_str(mnemonic_str.trim(), None).context("Invalid mnemonic phrase")?;
     let key_pair = mnemonic.to_key_pair()?;
 
     let version = get_or_prompt_version(version)?;
@@ -1430,7 +1582,7 @@ fn import_wallet(
     let wallet_id = wallets::wallet_id(version, &Network::Testnet);
     let wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)?;
 
-    let wallet_address = wallet.address.to_base64_url_flags(false, true);
+    let wallet_address = format_testnet_wallet_address(&wallet.address);
 
     let use_secure_store = get_or_prompt_use_keystore(secure)?;
 
@@ -1465,10 +1617,15 @@ fn import_wallet(
             }))?
         );
     } else {
+        let config_label = if is_global {
+            "global.wallets.toml"
+        } else {
+            "wallets.toml"
+        };
         println!(
             "\n{} Wallet successfully created and added to {}",
             "✓".green(),
-            config_path.display().cyan(),
+            config_label.cyan(),
         );
         println!("{} Wallet address is {}", "✓".green(), wallet_address);
         if use_secure_store {
@@ -1550,11 +1707,11 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
         "v4r1" => Ok(WalletVersion::V4R1),
         "v4r2" => Ok(WalletVersion::V4R2),
         "v5r1" => Ok(WalletVersion::V5R1),
-        "highloadv1r1" => Ok(WalletVersion::HighloadV1R1),
-        "highloadv1r2" => Ok(WalletVersion::HighloadV1R2),
-        "highloadv2" => Ok(WalletVersion::HighloadV2),
-        "highloadv2r1" => Ok(WalletVersion::HighloadV2R1),
-        "highloadv2r2" => Ok(WalletVersion::HighloadV2R2),
+        "highloadv1r1" => Ok(WalletVersion::HLV1R1),
+        "highloadv1r2" => Ok(WalletVersion::HLV1R2),
+        "highloadv2" => Ok(WalletVersion::HLV2),
+        "highloadv2r1" => Ok(WalletVersion::HLV2R1),
+        "highloadv2r2" => Ok(WalletVersion::HLV2R2),
         _ => Err(anyhow!(
             "Unsupported wallet version {}. Supported versions: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2",
             kind.yellow()
@@ -1591,8 +1748,8 @@ mod wallet_name_tests {
 
     #[test]
     fn test_decode_sign_input_hex() {
-        let cell = Cell::default();
-        let body_hex = cell.to_boc_hex(false).expect("must encode hex boc");
+        let cell = TonCell::empty().clone();
+        let body_hex = cell.to_boc_hex().expect("must encode hex boc");
         let (decoded, format) = decode_sign_input(&body_hex).expect("must decode hex");
         assert_eq!(decoded, cell);
         assert_eq!(format, SignMessageFormat::Hex);
@@ -1600,8 +1757,8 @@ mod wallet_name_tests {
 
     #[test]
     fn test_decode_sign_input_base64() {
-        let cell = Cell::default();
-        let body_b64 = cell.to_boc_b64(false).expect("must encode base64 boc");
+        let cell = TonCell::empty().clone();
+        let body_b64 = cell.to_boc_base64().expect("must encode base64 boc");
         let (decoded, format) = decode_sign_input(&body_b64).expect("must decode base64");
         assert_eq!(decoded, cell);
         assert_eq!(format, SignMessageFormat::Base64);
@@ -1646,16 +1803,16 @@ mod wallet_name_tests {
             }),
         };
 
-        let actual =
-            get_wallet_address(&wallet).expect("must derive testnet address from mnemonic");
+        let actual = get_wallet_address(&wallet, Network::Testnet)
+            .expect("must derive testnet address from mnemonic");
 
-        let mnemonic = Mnemonic::from_str(mnemonic_str, &None).expect("valid mnemonic");
+        let mnemonic = Mnemonic::from_str(mnemonic_str, None).expect("valid mnemonic");
         let key_pair = mnemonic.to_key_pair().expect("keypair from mnemonic");
         let version = WalletVersion::V5R1;
         let wallet_id = wallets::wallet_id(version, &Network::Testnet);
         let expected_wallet = TonWallet::new_with_params(version, key_pair, 0, wallet_id)
             .expect("wallet from mnemonic");
-        let expected = expected_wallet.address.to_base64_url_flags(false, true);
+        let expected = format_testnet_wallet_address(&expected_wallet.address);
 
         assert_eq!(actual, expected);
     }

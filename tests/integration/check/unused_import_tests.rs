@@ -1,7 +1,17 @@
-use crate::integration::check::{run_check_test_with_files, run_fix_test_with_files};
+use crate::integration::check::{run_rule_check_test_with_files, run_rule_fix_test_with_files};
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use function_name::named;
+
+const RULE_CODE: &str = "E006";
+
+fn run_check_test_with_files(group: &str, main_content: &str, files: &[(&str, &str)], name: &str) {
+    run_rule_check_test_with_files(group, RULE_CODE, main_content, files, name);
+}
+
+fn run_fix_test_with_files(before: &str, after: &str, files: &[(&str, &str)], name: &str) {
+    run_rule_fix_test_with_files(RULE_CODE, before, after, files, name);
+}
 
 const FUNCTIONS_FILE: &str = r#"
     fun fromFunction(): int {
@@ -261,6 +271,8 @@ fn test_check_unused_import_with_mappings() {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg(RULE_CODE)
         .run()
         .success()
         .assert_stderr_snapshot_matches(&format!(
@@ -289,7 +301,14 @@ fn test_fix_unused_import_with_mappings() {
         .build();
 
     project.acton().init().run().success();
-    project.acton().check().arg("--fix").run().success();
+    project
+        .acton()
+        .check()
+        .arg("--enable-only")
+        .arg(RULE_CODE)
+        .arg("--fix")
+        .run()
+        .success();
 
     let main_file = project.path().join("contracts/main.tolk");
     let actual = std::fs::read_to_string(&main_file)
@@ -349,6 +368,8 @@ fun sharedHelper(): int {
     project
         .acton()
         .check()
+        .arg("--enable-only")
+        .arg(RULE_CODE)
         .arg("--fix")
         .run()
         .success()

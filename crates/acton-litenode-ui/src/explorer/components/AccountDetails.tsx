@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Coins,
   Filter,
+  Image,
   MessageSquare,
   RefreshCw,
 } from "lucide-react"
@@ -23,22 +24,24 @@ import type React from "react"
 import {useMemo, useState, useEffect} from "react"
 import {useNavigate} from "react-router-dom"
 
-import type {FullAccountState, JettonMaster, JettonWallet, Transaction} from "../api/types"
+import type {FullAccountState, JettonMaster, JettonWallet, NftItem, Transaction} from "../api/types"
 import {TonClient} from "../api/client"
 
 import {AddressLabel} from "./AddressLabel"
 import {ContractCode} from "./ContractCode"
+import {Nfts} from "./Nfts"
 import {Tokens} from "./Tokens"
 import styles from "./AccountDetails.module.css"
-import {formatNano, formatTimeAgo, isSameAddress, parseAddress} from "./utils"
+import {formatNano, formatTimeAgo, hashToHex, isSameAddress, parseAddress} from "./utils"
 
-type Tabs = "history" | "contract" | "tokens" | "holders"
+type Tabs = "history" | "contract" | "tokens" | "nfts" | "holders"
 
 interface AccountDetailsProps {
   readonly transactions: Transaction[]
   readonly accountState: FullAccountState
   readonly ownerAddress: string
   readonly jettonWallets: JettonWallet[]
+  readonly nftItems: NftItem[]
   readonly jettonMaster?: JettonMaster
   readonly holders?: JettonWallet[]
   readonly client: TonClient
@@ -54,6 +57,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
   accountState,
   ownerAddress,
   jettonWallets,
+  nftItems,
   jettonMaster,
   holders,
   client,
@@ -70,6 +74,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
       (activeTabHash === "history" ||
         activeTabHash === "contract" ||
         activeTabHash === "tokens" ||
+        activeTabHash === "nfts" ||
         activeTabHash === "holders")
     ) {
       setActiveTab(activeTabHash as Tabs)
@@ -116,9 +121,13 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
             <Filter size={14} /> Holders
           </button>
         )}
-        <div className={styles.tab}>
-          <div className={styles.nftIcon} /> NFTs
-        </div>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === "nfts" ? styles.tabActive : ""}`}
+          onClick={() => handleTabClick("nfts")}
+        >
+          <Image size={14} /> NFTs
+        </button>
         <button
           type="button"
           className={`${styles.tab} ${activeTab === "contract" ? styles.tabActive : ""}`}
@@ -186,7 +195,9 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                     key={tx.hash}
                     className={`${styles.row} ${styles.clickableRow}`}
                     onClick={() => {
-                      void navigate(`/explorer/tx/${tx.hash}`)
+                      const txHash = hashToHex(tx.hash)
+                      if (!txHash) return
+                      void navigate(`/explorer/tx/${txHash}`)
                     }}
                   >
                     <TableCell className={styles.time}>{formatTimeAgo(tx.utime)}</TableCell>
@@ -257,6 +268,10 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
       ) : activeTab === "tokens" ? (
         <CardContent className={styles.tokensContent}>
           <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
+        </CardContent>
+      ) : activeTab === "nfts" ? (
+        <CardContent className={styles.tokensContent}>
+          <Nfts items={nftItems} onAddressClick={onAddressClick} />
         </CardContent>
       ) : activeTab === "holders" ? (
         <CardContent className={styles.historyContent}>

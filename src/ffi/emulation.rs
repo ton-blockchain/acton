@@ -1,9 +1,11 @@
 use crate::commands::common::error_fmt;
-use crate::context::{Context, KnownAddress, Wallet, to_cell};
+use crate::context::{
+    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, Wallet, to_cell,
+};
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
 use crate::ffi::assert::parse_search_params;
-use crate::formatter::FormatterContext;
+use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
 use anyhow::{anyhow, Context as AnyhowContext};
@@ -12,12 +14,15 @@ use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use rustc_hash::FxHashSet;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
+use ton::ton_core::cell::TonCell;
+use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
 use ton_api::{Network, TonApiClient, TonCenterTransaction};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -27,8 +32,6 @@ use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
 use ton_executor::message::{EmulationResult, RunTransactionArgs};
-use tonlib_core::cell::ArcCell as TonArcCell;
-use tonlib_core::tlb_types::tlb::TLB;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -39,10 +42,6 @@ use tycho_types::models::{
     LibDescr, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
-
-fn tycho_to_ton_cell(cell: &Cell) -> anyhow::Result<TonArcCell> {
-    TonArcCell::from_boc(&Boc::encode(cell)).map_err(Into::into)
-}
 
 extension!(build in (Context) with (path: String, name: String) using build_impl);
 fn build_impl(
@@ -72,6 +71,15 @@ fn build_impl(
         } else {
             anyhow::bail!(error_fmt::contract_not_found(ctx.env.config, &name));
         }
+    }
+
+    if !path.starts_with('@') && !Path::new(&path).is_absolute() {
+        path = ctx
+            .env
+            .project_root
+            .join(Path::new(&path))
+            .to_string_lossy()
+            .to_string();
     }
 
     if let Some(override_code) = ctx.env.build_override.get(id.as_str()) {
@@ -106,6 +114,7 @@ fn build_impl(
             .file_build_cache
             .get(&path, ctx.build.need_debug_info, 2, "1.3")
     {
+        let mappings = ctx.env.config.mappings();
         let elapsed = start_time.elapsed();
         info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
 
@@ -116,7 +125,8 @@ fn build_impl(
             &cached_entry.code_boc64,
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             cached_entry.source_map.clone().unwrap_or_default().into(),
-            Some(contract_abi(content, &path, &ctx.env.config.mappings).into()),
+            Some(contract_abi(content, &path, &mappings).into()),
+            cached_entry.abi.clone().map(Into::into),
         );
 
         let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
@@ -126,7 +136,8 @@ fn build_impl(
     }
 
     let compile_start = Instant::now();
-    let compiler = tolkc::Compiler::new(2).with_mappings(&ctx.env.config.mappings);
+    let mappings = ctx.env.config.mappings();
+    let compiler = tolkc::Compiler::new(2).with_mappings(&mappings);
     let result = compiler.compile(Path::new(&path), ctx.build.need_debug_info);
     let compile_time = compile_start.elapsed();
 
@@ -152,7 +163,8 @@ fn build_impl(
                 &success.code_boc64,
                 HashBytes::from_str(&success.code_hash_hex)?,
                 success.source_map.unwrap_or_default().into(),
-                Some(contract_abi(content, &path, &ctx.env.config.mappings).into()),
+                Some(contract_abi(content, &path, &mappings).into()),
+                success.abi.clone().map(Into::into),
             );
             let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
@@ -260,21 +272,70 @@ fn send_message_impl(
     let world_state = &mut ctx.chain.world_state;
 
     let emulations = if ctx.debug.is_enabled() {
-        send_message_debug(ctx, &msg, &libs, Some(src))?
+        send_message_debug(ctx, &msg, &libs, Some(src))
     } else {
-        emulator.send_message(world_state, msg, &libs, Some(src))?
-    };
+        emulator.send_message(world_state, msg, &libs, Some(src))
+    }
+    .context("Cannot send message")?;
 
     if let [SendMessageResult::Error(error), ..] = &emulations[..]
         && emulations.len() == 1
     {
+        ctx.chain
+            .emulations
+            .save_message(&ctx.env.running_id, emulations.clone());
+
         // TODO return error with type when unions are supported in ffi
         if is_external {
             stack.push(TupleItem::Null);
             return Ok(());
         }
-        ctx.asserts
-            .fail(format!("Cannot send message: {}", error.error));
+
+        anyhow::bail!("Cannot send message: {}", error.error)
+    }
+
+    let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
+        SendMessageResult::Success(res) => Some(res),
+        SendMessageResult::Error(_) => None,
+    });
+
+    let transaction_cells = successful_emulations
+        .filter_map(emulation_to_send_result)
+        .collect::<Vec<_>>();
+
+    ctx.chain
+        .emulations
+        .save_message(&ctx.env.running_id, emulations);
+    stack.push(TupleItem::big_array_from_items(transaction_cells));
+    Ok(())
+}
+
+extension!(run_tick_tock in (Context) with (is_tock: BigInt, on_account: StdAddr) using run_tick_tock_impl);
+fn run_tick_tock_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    is_tock: BigInt,
+    on_account: StdAddr,
+) -> anyhow::Result<()> {
+    let emulator = &ctx.chain.emulator;
+    let is_tock = is_tock != BigInt::ZERO;
+
+    let addr = IntAddr::Std(on_account.clone());
+    let libs = ctx.chain.build_libs(&addr);
+
+    // TODO: debug mode support for tick-tock (send_message_debug equivalent)
+    let emulations = emulator
+        .run_tick_tock(ctx.chain.world_state, &on_account, is_tock, &libs)
+        .context("Cannot run tick-tock transaction")?;
+
+    if let [SendMessageResult::Error(error), ..] = &emulations[..]
+        && emulations.len() == 1
+    {
+        ctx.chain
+            .emulations
+            .save_message(&ctx.env.running_id, emulations.clone());
+
+        anyhow::bail!("Cannot run tick-tock transaction: {}", error.error)
     }
 
     let successful_emulations = emulations.iter().filter_map(|emulation| match emulation {
@@ -327,6 +388,10 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
             ComputePhase::Executed(compute) => compute.gas_used.into(),
             _ => BigInt::ZERO,
         },
+        Ok(TxInfo::TickTock(info)) => match info.compute_phase {
+            ComputePhase::Executed(compute) => compute.gas_used.into(),
+            _ => BigInt::ZERO,
+        },
         _ => BigInt::ZERO,
     };
 
@@ -365,17 +430,13 @@ fn send_wallet_message(
     let client = TonApiClient::new(network.clone(), custom_networks, api_key.clone())?;
 
     let (seqno, need_state_init) = wallet.seqno(&client)?;
-    let message_ton = tycho_to_ton_cell(message)?;
+    let message_ton = TonCell::from_boc(Boc::encode(message))?;
     let external =
         wallet
             .wallet
-            .create_external_msg(expire_at, seqno, need_state_init, vec![message_ton])?;
+            .create_ext_in_msg(vec![message_ton], seqno, expire_at, need_state_init)?;
 
-    if api_key.is_none() && network != &Network::Custom("localnet".into()) {
-        std::thread::sleep(Duration::from_millis(1000)); // rate limit
-    }
-
-    client.send_boc(&external.to_boc_b64(false)?)?;
+    client.send_boc(&external.to_boc_base64()?)?;
 
     Ok(())
 }
@@ -527,6 +588,7 @@ fn send_message_debug(
         actions: result.actions,
         code,
         externals: vec![],
+        missing_libraries: FxHashSet::default(),
     };
 
     let mut externals: Vec<Cell> = vec![];
@@ -880,6 +942,12 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
+    let source_map = ctx
+        .build
+        .build_cache
+        .result_for_code(&Some(code))
+        .map(|res| res.1.source_map);
+
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
         .map(|t| Boc::encode_base64(&t))
@@ -889,18 +957,12 @@ fn run_get_method_impl(
         let step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
             .context("Cannot create get executor")?;
 
-        let source_map = ctx
-            .build
-            .build_cache
-            .result_for_code(&Some(code))
-            .map(|res| res.1.source_map);
-
         let dbg_ctx = ctx.debug.ctx();
         dbg_ctx
             .begin_thread(
                 2,
                 AnyExecutor::Get(step_executor.clone()),
-                source_map,
+                source_map.clone(),
                 "Send internal message".to_string(),
                 dbg_ctx.need_to_stop_child_thread_on_start(),
             )
@@ -953,13 +1015,19 @@ fn run_get_method_impl(
 
             if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
                 let get_method = ctx.env.abi.find_get_method_by_id(&id);
+
+                let id_presentation = format!("({id})");
+                let id_presentation = id_presentation.dimmed();
+
                 let get_method_presentation = if let Some(get_method) = get_method {
-                    format!("'{}' ({id})", get_method.name)
+                    format!("{} {id_presentation}", get_method.name.yellow())
+                } else if name.is_empty() {
+                    format!("'' {id_presentation}")
                 } else {
-                    format!("'{name}' ({id})")
+                    format!("{} {id_presentation}", name.yellow())
                 };
 
-                if result.vm_exit_code == 11 {
+                let suggested_name = if result.vm_exit_code == 11 {
                     // TODO: right now get methods may not include all get methods
                     let get_methods: Vec<&str> = ctx
                         .env
@@ -968,23 +1036,27 @@ fn run_get_method_impl(
                         .iter()
                         .map(|m| m.name.as_str())
                         .collect();
-                    let suggested_name = suggest_name(&name, &get_methods);
+                    suggest_name(&name, &get_methods).map(ToOwned::to_owned)
+                } else {
+                    None
+                };
 
-                    if let Some(suggested_name) = suggested_name {
-                        anyhow::bail!(
-                            "Cannot execute unknown get method {get_method_presentation}, did you mean '{suggested_name}'",
-                        );
-                    }
-                    anyhow::bail!("Cannot execute unknown get method {get_method_presentation}",);
-                } else if result.vm_exit_code == 2 {
-                    anyhow::bail!(
-                        "Get method {get_method_presentation} failed due to stack underflow. Make sure you passed all parameters to the get method.",
-                    );
-                }
-                anyhow::bail!(
-                    "Cannot execute get method {get_method_presentation}: exit code {}",
-                    FormatterContext::format_exit_code(result.vm_exit_code)
-                );
+                let location = source_map.as_ref().and_then(|map| {
+                    retrace::find_exception_info(&result.vm_log, map).and_then(|info| info.loc)
+                });
+
+                *ctx.asserts.assert_failure =
+                    Some(AssertFailure::GetMethod(GetMethodAssertFailure {
+                        get_method_presentation,
+                        vm_exit_code: result.vm_exit_code,
+                        suggested_name,
+                        vm_log: result.vm_log,
+                        source_map,
+                        location,
+                    }));
+
+                stack.push(TupleItem::Null);
+                return Ok(());
             }
 
             stack.push(TupleItem::TypedTuple {
@@ -1244,7 +1316,7 @@ fn wait_for_transaction_impl(
 
     let custom_networks = ctx.env.config.custom_networks();
     let api_key = ctx.env.api_key.clone();
-    let api_client = match TonApiClient::new(network.clone(), custom_networks, api_key.clone()) {
+    let api_client = match TonApiClient::new(network, custom_networks, api_key) {
         Ok(client) => client,
         Err(_) => {
             stack.push_bool(false);
@@ -1253,10 +1325,6 @@ fn wait_for_transaction_impl(
     };
 
     let ext_message_hash_bytes = ext_message_hash.as_slice();
-
-    if api_key.is_none() && network != Network::Custom("localnet".into()) {
-        std::thread::sleep(Duration::from_millis(1000)); // rate limit
-    }
 
     for attempt in 1..=attempts {
         if !quiet {
@@ -1313,7 +1381,22 @@ fn get_transaction_link(
     tx: TonCenterTransaction,
     hex: String,
 ) -> String {
-    let network_prefix = if ctx.network() == Network::Testnet {
+    let network = ctx.network();
+    match &network {
+        Network::Localnet => {
+            if let Some(url) = localnet_transaction_link(ctx, &hex) {
+                return url;
+            }
+        }
+        Network::Custom(network_name) => {
+            if let Some(url) = custom_network_transaction_link(ctx, network_name.as_ref(), &hex) {
+                return url;
+            }
+        }
+        Network::Mainnet | Network::Testnet => {}
+    }
+
+    let network_prefix = if network.uses_testnet_address_format() {
         "testnet."
     } else {
         ""
@@ -1333,6 +1416,55 @@ fn get_transaction_link(
         ),
         Explorer::Tonviewer => format!("https://{network_prefix}tonviewer.com/transaction/{hex}"),
     }
+}
+
+fn custom_network_transaction_link(
+    ctx: &Context,
+    network_name: &str,
+    tx_hash_hex: &str,
+) -> Option<String> {
+    let custom_networks = ctx.env.config.custom_networks();
+    let network_urls = custom_networks.get(network_name)?;
+    configured_network_transaction_link(network_urls, tx_hash_hex)
+}
+
+fn localnet_transaction_link(ctx: &Context, tx_hash_hex: &str) -> Option<String> {
+    let custom_networks = ctx.env.config.custom_networks();
+    let localnet_urls = custom_networks.get("localnet")?;
+    configured_network_transaction_link(localnet_urls, tx_hash_hex)
+}
+
+fn configured_network_transaction_link(
+    network_urls: &acton_config::config::CustomNetworkUrls,
+    tx_hash_hex: &str,
+) -> Option<String> {
+    if let Some(explorer_url) = network_urls.explorer_url.as_deref() {
+        return explorer_transaction_link(explorer_url, tx_hash_hex);
+    }
+
+    let mut explorer_base = reqwest::Url::parse(network_urls.v2_url.as_ref()).ok()?;
+    explorer_base.set_path("/explorer");
+    explorer_base.set_query(None);
+    explorer_base.set_fragment(None);
+
+    explorer_transaction_link(explorer_base.as_str(), tx_hash_hex)
+}
+
+fn explorer_transaction_link(explorer_base: &str, tx_hash_hex: &str) -> Option<String> {
+    let mut url = reqwest::Url::parse(explorer_base).ok()?;
+    let base_path = url.path().trim_end_matches('/');
+    let tx_base = if base_path.is_empty() {
+        "/tx".to_string()
+    } else if base_path.ends_with("/tx") {
+        base_path.to_string()
+    } else {
+        format!("{base_path}/tx")
+    };
+    let path = format!("{tx_base}/{tx_hash_hex}");
+    url.set_path(&path);
+    url.set_query(None);
+    url.set_fragment(None);
+    Some(url.to_string())
 }
 
 extension!(get_config in (Context) using get_config_impl);
@@ -1455,6 +1587,65 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         33 => get_shard_account : 1,
         34 => set_shard_account : 2,
         35 => save_trace_name : 2,
+        36 => run_tick_tock : 2,
         501 => call_tolk_function : 3,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[test]
+    fn configured_network_transaction_link_prefers_explorer_url() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: Some(Arc::from("https://explorer.example/explorer")),
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("explorer link should be built");
+        assert_eq!(url, "https://explorer.example/explorer/tx/abc123");
+    }
+
+    #[test]
+    fn configured_network_transaction_link_keeps_existing_tx_suffix() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: Some(Arc::from("https://explorer.example/explorer/tx/")),
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("explorer link should be built");
+        assert_eq!(url, "https://explorer.example/explorer/tx/abc123");
+    }
+
+    #[test]
+    fn configured_network_transaction_link_appends_tx_for_host_only_explorer() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: Some(Arc::from("http://localhost:3006")),
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("explorer link should be built");
+        assert_eq!(url, "http://localhost:3006/tx/abc123");
+    }
+
+    #[test]
+    fn configured_network_transaction_link_falls_back_to_v2() {
+        let urls = acton_config::config::CustomNetworkUrls {
+            v2_url: Arc::from("http://localhost:3010/api/v2"),
+            v3_url: None,
+            explorer_url: None,
+        };
+
+        let url = configured_network_transaction_link(&urls, "abc123")
+            .expect("fallback link should be built");
+        assert_eq!(url, "http://localhost:3010/explorer/tx/abc123");
+    }
 }

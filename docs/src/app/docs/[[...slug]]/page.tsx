@@ -33,7 +33,7 @@ export default async function Page(props: PageProps) {
         <LLMCopyButton content={llmText}/>
         <ViewOptions
           markdownUrl={`${page.url}.mdx`}
-          githubUrl={`https://github.com/ton-blockchain/emulator-rs/blob/main/docs2/content/docs/${page.path}`}
+          githubUrl={`https://github.com/ton-blockchain/emulator-rs/blob/main/docs/content/docs/${page.path}`}
         />
       </div>
       <DocsBody>

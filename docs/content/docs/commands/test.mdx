@@ -11,18 +11,18 @@ The `test` command runs your Tolk smart contract tests. It discovers and execute
 acton test
 ```
 
-This command will discover and run all test files in the current directory and subdirectories.
+This command discovers and runs all test files in project root and its subdirectories.
 
 ## Command Options
 
 ### Discovery Options
 
-| Option                 | Type      | Description                                                |
-|------------------------|-----------|------------------------------------------------------------|
-| `<PATH>`               | File path | Test file or directory to run (default: current directory) |
-| `--filter <PATTERN>`   | String    | Regex pattern to filter test names                         |
-| `--exclude <PATTERNS>` | Array     | Glob patterns to exclude test files                        |
-| `--include <PATTERNS>` | Array     | Glob patterns to include only test files                   |
+| Option                 | Type      | Description                                           |
+|------------------------|-----------|-------------------------------------------------------|
+| `<PATH>`               | File path | Test file or directory to run (default: project root) |
+| `--filter <PATTERN>`   | String    | Regex pattern to filter test names                    |
+| `--exclude <PATTERNS>` | Array     | Glob patterns to exclude test files                   |
+| `--include <PATTERNS>` | Array     | Glob patterns to include only test files              |
 
 ### Execution Options
 
@@ -32,9 +32,10 @@ This command will discover and run all test files in the current directory and s
 
 ### Reporter Options
 
-| Option                  | Type      | Description                                               |
-|-------------------------|-----------|-----------------------------------------------------------|
-| `--reporter <FORMATS>`  | Array     | Test output format(s)                                     |
+| Option                 | Type  | Description                                                                |
+|------------------------|-------|----------------------------------------------------------------------------|
+| `--reporter <FORMATS>` | Array | Test output format(s)                                                      |
+| `--show-bodies`        | Flag  | Show decoded message bodies in printed transaction trees when ABI is known |
 
 **Supported reporters:**
 - `console` — Detailed console output with code context (default)
@@ -58,14 +59,19 @@ This command will discover and run all test files in the current directory and s
 
 ### Profiling Options
 
-| Option                          | Type   | Description                                       |
-|---------------------------------|--------|---------------------------------------------------|
-| `--snapshot <FILE>`             | String | Create JSON snapshot of gas usage statistics      |
-| `--baseline-snapshot <FILE>`    | String | Compare gas usage with baseline snapshot file     |
+| Option                       | Type   | Description                                            |
+|------------------------------|--------|--------------------------------------------------------|
+| `--snapshot <FILE>`          | String | Create JSON snapshot of gas usage statistics           |
+| `--baseline-snapshot <FILE>` | String | Compare gas usage with baseline snapshot file          |
+| `--fail-on-diff`             | Flag   | Exit with non-zero code when compared snapshot differs |
 
 <Callout type="info">
 If both `--snapshot` and `--baseline-snapshot` are provided, Acton runs in
 comparison mode and does not overwrite the snapshot file.
+</Callout>
+
+<Callout type="info">
+`--fail-on-diff` requires `--baseline-snapshot`.
 </Callout>
 
 ### Mutation Testing Options
@@ -102,7 +108,7 @@ comparison mode and does not overwrite the snapshot file.
 ### Basic test execution
 
 ```bash
-# Run all tests in current directory
+# Run all tests in project root
 acton test
 
 # Run tests in specific directory
@@ -127,6 +133,9 @@ acton test --filter "test-integration.*"
 ```bash
 # Console output with TeamCity integration
 acton test --reporter console,teamcity
+
+# Show decoded message bodies in printed transaction trees
+acton test --show-bodies
 
 # Generate JUnit XML reports
 acton test --reporter junit --junit-path ./reports
@@ -153,6 +162,9 @@ acton test --snapshot .acton/gas-baseline.json
 
 # Compare current run with baseline snapshot
 acton test --baseline-snapshot .acton/gas-baseline.json
+
+# CI mode: fail build on benchmark drift
+acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff
 ```
 
 ### Debug mode
@@ -170,6 +182,16 @@ acton test --backtrace full
 Acton automatically discovers test files by:
 - Finding files ending with `.test.tolk`
 - Searching in the specified directory and subdirectories
+
+<Callout type="info">
+Path behavior:
+
+- If `<PATH>` is omitted, Acton discovers tests from project root.
+- Global project root/manifest resolution is described in
+  [`Project Root Resolution`](/docs/acton-toml/#project-root-resolution).
+- If `<PATH>` is provided and relative, it is resolved from your current working directory.
+- Use `--project-root` to run from another directory while keeping project-relative defaults in the target project.
+</Callout>
 
 ## Configuration
 

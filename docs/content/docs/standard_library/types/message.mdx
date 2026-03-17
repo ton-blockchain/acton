@@ -322,10 +322,7 @@ ext_out_msg_info$11 src:MsgAddressInt dest:MsgAddressExt
 ## `CommonMessageInfo`
 
 ```tolk
-type CommonMessageInfo =
-    | InternalMessage
-    | ExternalInMessageInfo
-    | ExternalOutMessageInfo
+type CommonMessageInfo = InternalMessage | ExternalInMessageInfo | ExternalOutMessageInfo
 ```
 
 Tagged union for the TL-B `CommonMsgInfo` constructors.
@@ -353,7 +350,7 @@ Generic message structure with configurable body and info types.
 `TInfo` defaults to [CommonMessageInfo](#commonmessageinfo), so when `Message` is loaded with default generic
 arguments, `info` is decoded as one of the `CommonMsgInfo` tagged variants above.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L247" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L244" />
 
 ## `Message<TBody, TInfo>.loadBody`
 
@@ -367,7 +364,7 @@ Decoding branch behavior:
 - `EitherLeft`: body is already in this cell and is returned directly.
 - `EitherRight`: body is loaded from referenced cell.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L259" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L256" />
 
 ## `implMsg`
 
@@ -375,13 +372,13 @@ Decoding branch behavior:
 struct implMsg
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L266" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L263" />
 
 ## `implMsg.loadOpcode`
 
 ```tolk
-fun implMsg.loadOpcode(body: slice, skipBounce: bool)
+fun implMsg.loadOpcode(body: slice, skipBounce: bool): int?
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L268" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/types/message.tolk#L265" />
 

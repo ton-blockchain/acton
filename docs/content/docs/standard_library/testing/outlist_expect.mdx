@@ -33,7 +33,7 @@ expect(msgBody.amount).toEqual(ton("10"));
 ## `Expectation<OutActionList>.toBeSendMessageAt`
 
 ```tolk
-fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int)
+fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void
 ```
 
 Expect the out action at the given index to be a send message that can be loaded as `MessageRelaxed<Msg>`.
@@ -65,13 +65,13 @@ Failure diagnostics:
 struct expectImpl
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L92" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L89" />
 
 ## `expectImpl.failToFindOutMsg`
 
 ```tolk
-fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string)
+fun expectImpl.failToFindOutMsg<Msg>(exitCode: int, location: string): never
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L94" />
+<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/testing/outlist_expect.tolk#L91" />
 

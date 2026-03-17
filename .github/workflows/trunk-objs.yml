@@ -1,0 +1,369 @@
+name: Release TON Objs
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+env:
+  TON_REPOSITORY: i582/ton
+
+  ENABLE_MIRRORING_RELEASE: 'true'
+  PUBLIC_ACTON_REPOSITORY: i582/acton-public
+
+jobs:
+  prepare:
+    name: Resolve TON Commit
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    outputs:
+      ton_commit: ${{ steps.ton-commit.outputs.commit }}
+
+    steps:
+      - name: Get TON commit hash
+        id: ton-commit
+        run: |
+          TON_COMMIT=$(gh api -H "Accept: application/vnd.github.sha" "repos/${TON_REPOSITORY}/commits/pmakhnev/acton")
+          echo "commit=$TON_COMMIT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build-objs-linux:
+    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
+    needs: [ prepare ]
+    strategy:
+      matrix:
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            os: linux
+            arch: x86_64
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
+            os: linux
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Restore TON objects archive cache
+        if: github.ref == 'refs/heads/master'
+        id: archive-cache
+        uses: actions/cache@v5
+        with:
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
+
+      - name: Install LLVM and Clang
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 16 clang
+          rm llvm.sh
+
+      - name: Install system dependencies
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config autoconf automake libssl-dev libtool zlib1g-dev libsecp256k1-dev libmicrohttpd-dev libsodium-dev liblz4-dev libjemalloc-dev ccache clang-16 llvm-16 libc++-16-dev libc++abi-16-dev
+          echo "/usr/lib/llvm-16/bin" >> "$GITHUB_PATH"
+
+      - name: Maximize Build Space
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: false
+          large-packages: false
+
+      - name: Clone TON repository
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          repository: ${{ env.TON_REPOSITORY }}
+          ref: ${{ needs.prepare.outputs.ton_commit }}
+          fetch-depth: 1
+          submodules: true
+          path: ton-repo
+
+      - name: Build TON static libraries
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        env:
+          CC: clang-16
+          CXX: clang++-16
+          AR: llvm-ar-16
+          RANLIB: llvm-ranlib-16
+        run: |
+          cd ton-repo
+          cp assembly/native/build-ubuntu-static.sh .
+          chmod +x build-ubuntu-static.sh
+          ./build-ubuntu-static.sh -a -c
+
+      - name: Show ccache stats
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: ccache -s
+
+      - name: Collect TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
+      - name: Generate TON artifacts lock file
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        env:
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        run: |
+          libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
+
+          jq -n \
+            --arg ton_commit "${TON_COMMIT}" \
+            --arg libemulator_sha256 "${libemulator_sha256}" \
+            --arg libtolk_sha256 "${libtolk_sha256}" \
+            '{
+              ton_commit: $ton_commit,
+              sha256_libemulator: $libemulator_sha256,
+              sha256_libtolk: $libtolk_sha256
+            }' > objs/ton-artifacts.lock
+
+      - name: Validate TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: |
+          ls -lh objs
+          test -f objs/libemulator.a
+          test -f objs/libtolk.a
+          test -f objs/ton-artifacts.lock
+          cat objs/ton-artifacts.lock
+
+      - name: Pack TON objects
+        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
+        env:
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        run: |
+          mkdir -p dist
+          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+            libemulator.a \
+            libtolk.a \
+            ton-artifacts.lock
+
+      - name: Upload TON objects artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+  build-objs-macos:
+    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
+    needs: [ prepare ]
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15-intel
+            os: macos
+            arch: x86_64
+          - runner: macos-15
+            os: macos
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Restore TON objects archive cache
+        if: github.ref == 'refs/heads/master'
+        id: archive-cache
+        uses: actions/cache@v5
+        with:
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
+
+      - name: Clone TON repository
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          repository: ${{ env.TON_REPOSITORY }}
+          ref: ${{ needs.prepare.outputs.ton_commit }}
+          fetch-depth: 1
+          submodules: true
+          path: ton-repo
+
+      - name: Build TON static libraries
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: |
+          cd ton-repo
+          cp assembly/native/build-macos-static.sh .
+          chmod +x build-macos-static.sh
+          ./build-macos-static.sh -a
+
+      - name: Collect TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p objs
+          cp ton-repo/artifacts/libemulator.a objs/
+          cp ton-repo/artifacts/libtolk.a objs/
+
+      - name: Generate TON artifacts lock file
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        env:
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        run: |
+          libemulator_sha256=$(shasum -a 256 objs/libemulator.a | awk '{ print $1 }')
+          libtolk_sha256=$(shasum -a 256 objs/libtolk.a | awk '{ print $1 }')
+
+          jq -n \
+            --arg ton_commit "${TON_COMMIT}" \
+            --arg libemulator_sha256 "${libemulator_sha256}" \
+            --arg libtolk_sha256 "${libtolk_sha256}" \
+            '{
+              ton_commit: $ton_commit,
+              sha256_libemulator: $libemulator_sha256,
+              sha256_libtolk: $libtolk_sha256
+            }' > objs/ton-artifacts.lock
+
+      - name: Validate TON objects
+        if: steps.archive-cache.outputs.cache-hit != 'true'
+        run: |
+          ls -lh objs
+          test -f objs/libemulator.a
+          test -f objs/libtolk.a
+          test -f objs/ton-artifacts.lock
+          cat objs/ton-artifacts.lock
+
+      - name: Pack TON objects
+        if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
+        env:
+          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        run: |
+          mkdir -p dist
+          tar -C objs -czf "dist/${ARCHIVE_NAME}" \
+            libemulator.a \
+            libtolk.a \
+            ton-artifacts.lock
+
+      - name: Upload TON objects artifact
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+  create-trunk-objs-release:
+    name: Create Trunk Objs Release
+    needs: [ prepare, build-objs-linux, build-objs-macos ]
+    runs-on: ubicloud-standard-2
+    if: github.ref == 'refs/heads/master'
+
+    permissions:
+      actions: write
+      contents: write
+
+    steps:
+      - name: Download TON objects artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ton-objs-*
+          path: dist
+          merge-multiple: true
+
+      - name: Delete download artifacts
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ github.token }}
+          # language=JavaScript
+          script: |
+            const {
+              data: artifacts,
+            } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+
+            if (artifacts.total_count === 0) {
+              core.warning('No downloadable artifacts to delete');
+              return;
+            } else {
+              core.info(`Found ${artifacts.total_count} artifacts to delete`);
+            }
+
+            for (const artifact of artifacts.artifacts) {
+              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+            }
+
+      - name: Delete previous trunk-objs release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete trunk-objs --repo "${GITHUB_REPOSITORY}" -y || true
+
+          gh api \
+            repos/${GITHUB_REPOSITORY}/git/refs/tags/trunk-objs \
+            -X DELETE || true
+
+      - name: Create trunk-objs release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        run: |
+          release_notes=$(cat <<EOF
+          Generated from TON commit: https://github.com/${TON_REPOSITORY}/commit/${TON_COMMIT}
+          EOF
+          )
+
+          gh release create trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            dist/*.tar.gz \
+            --title "Trunk Objs" \
+            --notes "${release_notes}" \
+            --target "${GITHUB_SHA}" \
+            --prerelease
+
+      - name: Delete previous trunk-objs release and tag (mirror)
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+        run: |
+          gh release delete trunk-objs --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+
+          gh api \
+            repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/trunk-objs \
+            -X DELETE || true
+
+      - name: Create trunk-objs release (mirror)
+        env:
+          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
+          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        run: |
+          release_notes=$(cat <<EOF
+          Generated from TON commit: https://github.com/${TON_REPOSITORY}/commit/${TON_COMMIT}
+          Source Acton commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
+          EOF
+          )
+
+          gh release create trunk-objs \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            dist/*.tar.gz \
+            --title "Trunk Objs" \
+            --notes "${release_notes}" \
+            --prerelease

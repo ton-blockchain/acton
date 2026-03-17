@@ -49,6 +49,7 @@ import "../../lib/testing/expect"
 import "../../lib/testing/transaction_expect"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
+import "../../lib/types/transaction"
 
 struct (0x70000001) TriggerExternal {
     id: uint32
@@ -222,6 +223,48 @@ get fun `test-send-external-repeatable`() {
 }
 "#,
         "send-external-repeatable",
+    );
+}
+
+#[test]
+fn send_external_returns_null_when_deployed_contract_has_too_low_balance() {
+    run_success_case(
+        "o-lib-api-send-external-low-balance-rejected",
+        r#"
+get fun `test-send-external-low-balance-rejected`() {
+    val (harness, _) = deployHarness();
+
+    val tinyBalanceSource = net.randomAddress("o_external_tiny_balance_source");
+    net.topUp(tinyBalanceSource, 1);
+
+    val harnessAcc = net.getAccount(harness.address);
+    val tinyBalanceAcc = net.getAccount(tinyBalanceSource);
+
+    expect(harnessAcc is AccountInfo).toBeTrue();
+    expect(tinyBalanceAcc is AccountInfo).toBeTrue();
+
+    if (harnessAcc is AccountInfo && tinyBalanceAcc is AccountInfo) {
+        val lowBalanceAcc = AccountInfo {
+            addr: harness.address,
+            storageStat: harnessAcc.storageStat,
+            storage: {
+                lastTransLt: harnessAcc.storage.lastTransLt,
+                balance: tinyBalanceAcc.storage.balance,
+                state: harnessAcc.storage.state,
+            },
+        };
+        net.setAccount(harness.address, lowBalanceAcc);
+    }
+
+    expect(net.balance(harness.address)).toEqual(1);
+
+    val txs = net.sendExternal(
+        createExternalMessage(harness.address, TriggerExternal { id: 6 }),
+    );
+    expect(txs == null).toBeTrue();
+}
+"#,
+        "send-external-low-balance-rejected",
     );
 }
 

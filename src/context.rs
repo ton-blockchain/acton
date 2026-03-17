@@ -4,10 +4,12 @@ use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
 use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tolkc::abi::ContractABI as CompilerContractABI;
+use ton::ton_wallet::TonWallet;
 use ton_abi::ContractAbi;
 use ton_api::{Network, TonApiClient};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
@@ -15,7 +17,6 @@ use ton_emulator::world_state::WorldState;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use ton_source_map::{SourceLocation, SourceMap};
-use tonlib_core::wallet::ton_wallet::TonWallet;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
@@ -45,6 +46,16 @@ impl AssertBinFailure {
 #[derive(Debug, Clone)]
 pub struct FailAssertFailure {
     pub message: Option<String>,
+    pub location: Option<SourceLocation>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GetMethodAssertFailure {
+    pub get_method_presentation: String,
+    pub vm_exit_code: i32,
+    pub suggested_name: Option<String>,
+    pub vm_log: Arc<str>,
+    pub source_map: Option<Arc<SourceMap>>,
     pub location: Option<SourceLocation>,
 }
 
@@ -84,6 +95,7 @@ pub struct WalletNotFoundFailure {
 pub enum AssertFailure {
     Bin(AssertBinFailure),
     Fail(FailAssertFailure),
+    GetMethod(GetMethodAssertFailure),
     TransactionNotFound(TransactionGenericAssertFailure),
     TransactionIsFound(TransactionGenericAssertFailure),
     WalletNotFound(WalletNotFoundFailure),
@@ -95,6 +107,7 @@ impl AssertFailure {
         match self {
             AssertFailure::Bin(arg) => arg.message.clone(),
             AssertFailure::Fail(arg) => arg.message.clone(),
+            AssertFailure::GetMethod(_) => None, // Formatted in FormatterContext
             AssertFailure::TransactionNotFound(arg) => arg.message.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.message.clone(),
             AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
@@ -106,6 +119,7 @@ impl AssertFailure {
         match self {
             AssertFailure::Bin(arg) => arg.location.clone(),
             AssertFailure::Fail(arg) => arg.location.clone(),
+            AssertFailure::GetMethod(arg) => arg.location.clone(),
             AssertFailure::TransactionNotFound(arg) => arg.location.clone(),
             AssertFailure::TransactionIsFound(arg) => arg.location.clone(),
             AssertFailure::WalletNotFound(arg) => arg.location.clone(),
@@ -132,6 +146,7 @@ impl BuildCache {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn memoize(
         &mut self,
         name: &str,
@@ -140,6 +155,7 @@ impl BuildCache {
         code_hash: HashBytes,
         source_map: Arc<SourceMap>,
         abi: Option<Arc<ContractAbi>>,
+        compiler_abi: Option<Arc<CompilerContractABI>>,
     ) {
         self.built.insert(
             path.to_owned(),
@@ -149,6 +165,7 @@ impl BuildCache {
                 code_hash,
                 source_map,
                 abi,
+                compiler_abi,
             },
         );
     }
@@ -171,6 +188,7 @@ pub struct CompilationResult {
     pub code_hash: HashBytes,
     pub source_map: Arc<SourceMap>,
     pub abi: Option<Arc<ContractAbi>>,
+    pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }
 
 #[derive(Debug, Clone)]
@@ -202,8 +220,18 @@ impl KnownAddresses {
 pub struct Emulations {
     pub name: String,
     pub messages: Vec<Vec<SendMessageResultSuccess>>,
+    pub failed_messages: Vec<Vec<FailedSendMessageResult>>,
     pub trace_names: FxHashMap<u64, String>,
     pub get_methods: Vec<GetMethodResultSuccess>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FailedSendMessageResult {
+    pub error: String,
+    pub vm_log: Option<String>,
+    pub vm_exit_code: Option<i64>,
+    pub executor_logs: Option<Arc<str>>,
+    pub missing_libraries: FxHashSet<String>,
 }
 
 impl Emulations {
@@ -258,6 +286,19 @@ impl EmulationsState {
             })
             .cloned()
             .collect::<Vec<_>>();
+        let failed_messages = message
+            .iter()
+            .filter_map(|m| match m {
+                SendMessageResult::Success(_) => None,
+                SendMessageResult::Error(error) => Some(FailedSendMessageResult {
+                    error: error.error.clone(),
+                    vm_log: error.vm_log.clone(),
+                    vm_exit_code: error.vm_exit_code,
+                    executor_logs: error.executor_logs.clone(),
+                    missing_libraries: error.missing_libraries.clone(),
+                }),
+            })
+            .collect::<Vec<_>>();
 
         let emulations = self
             .results
@@ -265,11 +306,13 @@ impl EmulationsState {
             .or_insert_with(|| Emulations {
                 name: env_name.to_owned(),
                 messages: vec![],
+                failed_messages: vec![],
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             });
 
         emulations.messages.push(successful_messages);
+        emulations.failed_messages.push(failed_messages);
     }
 
     pub fn save_get_method(&mut self, env_name: &str, get_method: GetMethodResultSuccess) {
@@ -278,6 +321,7 @@ impl EmulationsState {
             .or_insert_with(|| Emulations {
                 name: env_name.to_owned(),
                 messages: vec![],
+                failed_messages: vec![],
                 trace_names: FxHashMap::default(),
                 get_methods: vec![],
             })
@@ -321,6 +365,11 @@ impl EmulationsState {
     pub fn find_tx_executor_logs(&self, lt: u64) -> Option<&str> {
         self.find_tx_by_lt(lt).map(|res| res.executor_logs.as_ref())
     }
+
+    #[must_use]
+    pub fn find_tx_missing_libraries(&self, lt: u64) -> Option<&FxHashSet<String>> {
+        self.find_tx_by_lt(lt).map(|res| &res.missing_libraries)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -332,7 +381,7 @@ pub struct Wallet {
 
 impl Wallet {
     pub fn seqno(&self, client: &TonApiClient) -> anyhow::Result<(u32, bool)> {
-        client.get_wallet_seqno(&self.wallet.address.to_base64_url())
+        client.get_wallet_seqno(&self.wallet.address.to_base64(true, true, true))
     }
 
     #[must_use]
@@ -340,8 +389,8 @@ impl Wallet {
         StdAddr {
             anycast: None,
             address: HashBytes(
-                <[u8; 32]>::try_from(self.wallet.address.hash_part.as_slice())
-                    .expect("TonAddress hash part must be exactly 32 bytes"),
+                <[u8; 32]>::try_from(self.wallet.address.hash.as_slice())
+                    .expect("TonAddress hash must be exactly 32 bytes"),
             ),
             workchain: self.wallet.address.workchain as i8,
         }
@@ -350,7 +399,9 @@ impl Wallet {
 
 pub struct Env<'a> {
     pub config: &'a ActonConfig,
+    pub project_root: PathBuf,
     pub abi: Arc<ContractAbi>,
+    pub show_bodies: bool,
     pub default_log_level: ExecutorVerbosity,
     pub wallets: Option<&'a WalletsConfig>,
     pub open_wallets: BTreeMap<String, Wallet>,

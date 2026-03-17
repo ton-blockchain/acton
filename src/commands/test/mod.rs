@@ -24,7 +24,9 @@ use crate::ffi;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
-use acton_config::config::{ActonConfig, ContractDependency, DependencyKind};
+use acton_config::config::{
+    ActonConfig, ContractDependency, DependencyKind, project_root as configured_project_root,
+};
 use acton_config::test::{BacktraceMode, CoverageFormat, ReportFormat, TestConfig};
 use anyhow::anyhow;
 use dunce;
@@ -80,6 +82,7 @@ pub struct TestResult {
 #[derive(Debug)]
 pub struct TestRunner<'a> {
     config: TestConfig,
+    project_root: PathBuf,
     acton_config: ActonConfig,
     build_cache: BuildCache,
     file_build_cache: &'a mut FileBuildCache,
@@ -109,6 +112,7 @@ impl<'a> TestRunner<'a> {
         } else {
             DapTransport::dummy()
         };
+        let project_root = configured_project_root().to_path_buf();
 
         let mut ref_contracts = BTreeMap::new();
         if let Some(contracts) = acton_config.contracts() {
@@ -152,6 +156,7 @@ impl<'a> TestRunner<'a> {
 
         Self {
             config,
+            project_root,
             acton_config,
             build_cache: BuildCache::new(),
             file_build_cache: cache,
@@ -269,7 +274,9 @@ impl<'a> TestRunner<'a> {
         let mut ctx = Context {
             env: Env {
                 config: &self.acton_config,
+                project_root: self.project_root.clone(),
                 abi,
+                show_bodies: self.config.show_bodies,
                 default_log_level: verbosity,
                 wallets: self.acton_config.wallets.as_ref(),
                 open_wallets: Default::default(), // in tests, we never use real wallets
@@ -376,6 +383,9 @@ impl<'a> TestRunner<'a> {
                 )
             };
 
+        let mut captured_stdout = captured_stdout;
+        Self::append_debug_output(&mut captured_stdout, &result);
+
         Ok(TestResult {
             get_result: result,
             captured_stdout,
@@ -385,15 +395,46 @@ impl<'a> TestRunner<'a> {
             accounts: world_state.take_accounts(),
         })
     }
+
+    fn append_debug_output(stdout: &mut String, get_result: &GetMethodResult) {
+        let GetMethodResult::Success(result) = get_result else {
+            return;
+        };
+
+        let debug_output = result
+            .vm_log
+            .lines()
+            .filter_map(|line| line.strip_prefix("#DEBUG#:"))
+            .map(str::trim_start)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        if debug_output.is_empty() {
+            return;
+        }
+
+        if !stdout.is_empty() && !stdout.ends_with('\n') {
+            stdout.push('\n');
+        }
+        stdout.push_str(&debug_output);
+        stdout.push('\n');
+    }
 }
 
 pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()> {
-    // First we need to build all contracts and generate all dependency files with code
-    build_cmd(None, config.clear_cache, None, None, None, false)?;
+    let project_root = configured_project_root();
+    let mut config = config.clone();
+    resolve_test_output_paths_from_project_root(&mut config, project_root);
+
+    // First we need to build all contracts and generate all dependency files with code.
+    // Internal mutation child runs may skip this via environment variable.
+    if need_to_build() {
+        build_cmd(None, config.clear_cache, None, None, None, None, false)?;
+    }
     println!("     {} tests", "Running".green().bold());
 
-    // If path is omitted, default to current directory
-    let path = path.unwrap_or_else(|| ".".to_string());
+    // If path is omitted, default to project root.
+    let path = path.unwrap_or_else(|| project_root.to_string_lossy().to_string());
 
     if !fs::exists(&path).unwrap_or(false) {
         anyhow::bail!(error_fmt::file_not_found(&path));
@@ -416,10 +457,18 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
                 .to_string(),
         ]
     } else if metadata.is_dir() {
-        find_test_files_recursively(&path, &config.exclude_patterns, &config.include_patterns)?
-            .into_iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect()
+        let search_root = dunce::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
+        let project_root_abs =
+            dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
+        find_test_files_recursively(
+            &search_root,
+            &project_root_abs,
+            &config.exclude_patterns,
+            &config.include_patterns,
+        )?
+        .into_iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect()
     } else {
         anyhow::bail!("Path '{path}' is neither a file nor a directory");
     };
@@ -435,7 +484,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let reports_for_ui = ui_reporter.as_ref().map(UiReporter::get_reports_arc);
 
     let mut global_reporter = ReporterManager::new();
-    TestRunner::setup_reporters(&mut global_reporter, config, ui_reporter);
+    TestRunner::setup_reporters(&mut global_reporter, &config, ui_reporter);
     global_reporter.init()?;
     global_reporter.on_testing_started()?;
 
@@ -451,7 +500,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         config.clone(),
         &mut file_cache,
         &mut global_reporter,
-        build_overrides_for_mutations(config)?,
+        build_overrides_for_mutations(&config)?,
     );
 
     for (index, file) in test_files.iter().enumerate() {
@@ -527,6 +576,9 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         match profiling::collect_profile(&runner) {
             Ok(()) => {}
             Err(err) => {
+                if config.fail_on_diff {
+                    return Err(err);
+                }
                 eprintln!(
                     "{}: Cannot collect profiling result: {}",
                     "Error".red(),
@@ -541,9 +593,8 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     {
         let reports = reports.lock().expect("cannot lock mutex").clone();
         let trace_dir = config.save_test_trace.clone();
-        let project_root = std::env::current_dir().unwrap_or_default();
-        let project_root = dunce::canonicalize(project_root)
-            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_default())
+        let project_root = dunce::canonicalize(configured_project_root())
+            .unwrap_or_else(|_| configured_project_root().to_path_buf())
             .to_string_lossy()
             .to_string();
         let project_root = if project_root.ends_with(std::path::MAIN_SEPARATOR) {
@@ -576,6 +627,34 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     Ok(())
 }
 
+fn need_to_build() -> bool {
+    let Ok(value) = std::env::var("ACTON_INTERNAL_SKIP_BUILD") else {
+        return true;
+    };
+
+    value.trim() != "1"
+}
+
+fn resolve_test_output_paths_from_project_root(config: &mut TestConfig, project_root: &Path) {
+    config.save_test_trace = config
+        .save_test_trace
+        .as_deref()
+        .map(|path| resolve_project_relative_path(project_root, path));
+    config.junit_path = config
+        .junit_path
+        .as_deref()
+        .map(|path| resolve_project_relative_path(project_root, path));
+}
+
+fn resolve_project_relative_path(project_root: &Path, path: &str) -> String {
+    let path = Path::new(path);
+    if path.is_absolute() {
+        path.to_string_lossy().to_string()
+    } else {
+        project_root.join(path).to_string_lossy().to_string()
+    }
+}
+
 fn build_overrides_for_mutations(config: &TestConfig) -> anyhow::Result<BTreeMap<String, Cell>> {
     let mut mutation_overrides = BTreeMap::new();
 
@@ -593,7 +672,8 @@ fn build_overrides_for_mutations(config: &TestConfig) -> anyhow::Result<BTreeMap
 }
 
 pub fn find_test_files_recursively(
-    dir_path: &str,
+    dir_path: &Path,
+    project_root: &Path,
     exclude_patterns: &[String],
     include_patterns: &[String],
 ) -> anyhow::Result<Vec<PathBuf>> {
@@ -606,6 +686,8 @@ pub fn find_test_files_recursively(
         "**/.git/**",
         "**/target/**",
         "**/.acton/**",
+        "**/.codex/**",
+        "**/.claude/**",
     ] {
         exclude_builder.add(Glob::new(p)?);
     }
@@ -621,7 +703,7 @@ pub fn find_test_files_recursively(
         Some(include_builder.build()?)
     };
 
-    let root = Path::new(dir_path);
+    let root = dir_path;
 
     let it = WalkDir::new(root)
         .follow_links(false)
@@ -631,7 +713,7 @@ pub fn find_test_files_recursively(
                 return true;
             }
             let p = entry.path();
-            let rel = p.strip_prefix(root).unwrap_or(p);
+            let rel = p.strip_prefix(project_root).unwrap_or(p);
             !excludes.is_match(rel)
         });
 
@@ -649,7 +731,7 @@ pub fn find_test_files_recursively(
         if entry.file_type().is_file() {
             let path = entry.path();
 
-            let rel = path.strip_prefix(root).unwrap_or(path);
+            let rel = path.strip_prefix(project_root).unwrap_or(path);
 
             if let Some(name) = rel.file_name().and_then(|s| s.to_str()) {
                 if name.ends_with(".test.tolk.test.tolk") {
@@ -708,7 +790,8 @@ fn compile_test_file(
         ));
     }
 
-    let compiler = tolkc::Compiler::new(0).with_mappings(&acton_config.mappings);
+    let mappings = acton_config.mappings();
+    let compiler = tolkc::Compiler::new(0).with_mappings(&mappings);
     let compilation_result = compiler.compile(Path::new(file), need_debug_info);
     match &compilation_result {
         tolkc::CompilerResult::Success(result) => {
@@ -740,12 +823,13 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
 
     let executable_code = prepare_test_file(&file, &content);
     let tmp_test_filename = filepath.to_owned() + ".test.tolk";
+    let mappings = runner.acton_config.mappings();
 
     let abi = contract_abi_with_file(
         content.into(),
         filepath,
         &file,
-        &runner.acton_config.mappings,
+        &mappings,
         Some(&mut runner.abi_parse_cache),
     );
 
@@ -771,7 +855,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     let result = match compilation_result {
         tolkc::CompilerResult::Success(result) => result,
         tolkc::CompilerResult::Error(error) => {
-            let normalized_filepath = error.message.replace(&tmp_test_filename, filepath);
+            let normalized_filepath = error.message.replace(".test.tolk.test.tolk", ".test.tolk");
             let trimmed_message = normalized_filepath.trim();
             anyhow::bail!(trimmed_message.to_string())
         }
@@ -779,12 +863,14 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
     let source_map = result.source_map.unwrap_or_default();
+    let compiler_abi = result.abi.map(Arc::new);
     let stats = run_file_tests(
         runner,
         filepath,
         tests,
         &code_cell,
         Arc::new(abi),
+        compiler_abi,
         Arc::new(source_map),
     )?;
     Ok(stats)
@@ -796,6 +882,7 @@ fn run_file_tests(
     tests: Vec<TestDescriptor>,
     code: &Cell,
     abi: Arc<ContractAbi>,
+    compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
     source_map: Arc<SourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
@@ -824,6 +911,7 @@ fn run_file_tests(
     let mut failed = 0;
     let mut skipped = 0;
     let mut todo = 0;
+    let mappings = runner.acton_config.mappings();
 
     for test in &filtered_tests {
         let suite_name = extract_suite_name(&file_path);
@@ -843,7 +931,9 @@ fn run_file_tests(
             details: None,
             location: None,
             abi: abi.clone(),
+            compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
+            show_bodies: runner.config.show_bodies,
             backtrace: runner.config.backtrace,
             execution: None,
             trace_path: runner
@@ -962,6 +1052,7 @@ fn run_file_tests(
                 emulations: Cow::Borrowed(&runner.emulations),
                 known_addresses: Cow::Borrowed(&runner.known_addresses),
                 known_code_cells: Cow::Borrowed(&runner.known_code_cells),
+                show_bodies: runner.config.show_bodies,
                 has_wallets_config: false,
                 available_wallets: vec![],
                 backtrace: runner.config.backtrace,
@@ -972,6 +1063,15 @@ fn run_file_tests(
 
             if let Some(failure) = &assert_failure {
                 test_report.message = failure.message();
+                if test_report.message.is_none()
+                    && let AssertFailure::GetMethod(get_method_failure) = failure
+                {
+                    test_report.message = Some(FormatterContext::strip_ansi_text(
+                        &FormatterContext::format_get_method_assert_failure_title(
+                            get_method_failure,
+                        ),
+                    ));
+                }
                 test_report.details = failure.location().map(|l| l.format_full());
                 test_report.location = failure.location();
                 let detailed = formatter.format_detailed_assert_failure(failure, abi.clone());
@@ -1020,13 +1120,10 @@ fn run_file_tests(
                     *code.repr_hash(),
                     source_map.clone(),
                     Some(
-                        contract_abi(
-                            content,
-                            file_path.to_string_lossy().as_ref(),
-                            &runner.acton_config.mappings,
-                        )
-                        .into(),
+                        contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
+                            .into(),
                     ),
+                    None,
                 );
             }
         }

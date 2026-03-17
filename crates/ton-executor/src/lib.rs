@@ -19,14 +19,17 @@
 //! Most data (messages, account states, stacks) is exchanged as **Base64-encoded Bag of Cells (`BoC`)** strings.
 //!
 //! ### Concurrency and Thread Safety
-//! **Important:** The underlying C++ implementation relies on **global variables**.
-//! - Only one instance of any executor should be active at a time.
-//! - All operations must be performed within a **single thread**.
-//! - When running tests, use `cargo test -- --test-threads=1`.
+//! `message::Executor` and `get::GetExecutor` serialize native calls per instance,
+//! which makes them safe to move or share across threads. Calls on the same executor
+//! still execute one at a time.
+//!
+//! Step-by-step executors remain session-local and should not be shared across threads.
 //!
 //! ### Extension Methods
 //! All executors support registering custom extension methods (external opcodes) using
 //! `register_ext_method`. These are triggered by the `EXTCALL <ID>` instruction in the TVM.
+
+use ton_objs as _;
 
 mod common;
 mod config;

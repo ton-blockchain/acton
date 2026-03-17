@@ -14,16 +14,18 @@ use std::fs;
 use std::num::NonZeroU32;
 use std::path::PathBuf;
 use std::str::FromStr;
-use tonlib_core::TonAddress;
-use tonlib_core::wallet::mnemonic::WORDLIST_EN_SET;
-use tonlib_core::wallet::ton_wallet::TonWallet;
-use tonlib_core::wallet::versioned::{
-    DEFAULT_WALLET_ID, DEFAULT_WALLET_ID_V5R1, DEFAULT_WALLET_ID_V5R1_TESTNET,
+use ton::ton_core::types::TonAddress;
+use ton::ton_wallet::{
+    Mnemonic, TonWallet, WALLET_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT, WALLET_V5R1_ID_DEFAULT_TESTNET,
+    WORDLIST_EN_SET, WalletVersion,
 };
-use tonlib_core::wallet::wallet_version::WalletVersion;
 
 const KEYRING_SERVICE: &str = "ton.acton.wallet";
 const TEST_KEYRING_DIR_ENV: &str = "ACTON_TEST_KEYRING_DIR"; // integration tests only
+
+fn format_ton_address(address: &TonAddress, testnet: bool, bounceable: bool) -> String {
+    address.to_base64(!testnet, bounceable, true)
+}
 
 fn test_keyring_file_path(id: &str) -> Option<PathBuf> {
     let dir = std::env::var(TEST_KEYRING_DIR_ENV).ok()?;
@@ -162,7 +164,7 @@ pub fn open_wallets(
         let mnemonic_str = load_mnemonic(&wallet)
             .with_context(|| format!("No mnemonic found for '{name}' wallet"))?;
 
-        let mnemonic = tonlib_core::wallet::mnemonic::Mnemonic::from_str(&mnemonic_str, &None)?;
+        let mnemonic = Mnemonic::from_str(&mnemonic_str, None)?;
 
         let wallet_version = parse_wallet_version(&wallet.kind)?;
         let wallet_id = wallet_id(wallet_version, net);
@@ -180,7 +182,7 @@ pub fn open_wallets(
                     .address_mainnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.to_string())),
-                Network::Testnet => expected
+                Network::Testnet | Network::Localnet => expected
                     .address_testnet
                     .as_ref()
                     .map(|a| TonAddress::from_str(&a.to_string())),
@@ -191,18 +193,24 @@ pub fn open_wallets(
                 match expected_addr {
                     Ok(expected_addr) => {
                         if ton_wallet.address != expected_addr {
+                            let derived_address = ton_wallet.address;
+                            let derived_address = format_ton_address(
+                                &derived_address,
+                                net.uses_testnet_address_format(),
+                                false,
+                            );
                             anyhow::bail!(
                                 "Wallet address mismatch for '{name}' on '{net}':\n  Expected: {expected_addr}\n  Derived:  {}\n\nPossible causes:\n  - Wrong mnemonic/private key\n  - Incorrect 'kind' or 'workchain'\n  - Keys rotated but expected.address-{net} not updated",
-                                ton_wallet
-                                    .address
-                                    .to_base64_url_flags(true, net == &Network::Testnet),
+                                derived_address,
                             );
                         }
                     }
                     Err(err) => {
                         let expected_address = match net {
                             Network::Mainnet => expected.address_mainnet.as_deref(),
-                            Network::Testnet => expected.address_testnet.as_deref(),
+                            Network::Testnet | Network::Localnet => {
+                                expected.address_testnet.as_deref()
+                            }
                             _ => None,
                         }
                         .unwrap_or("<unknown>");
@@ -279,15 +287,15 @@ pub fn open_selected_wallets(
 }
 
 #[must_use]
-pub fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
+pub const fn wallet_id(wallet: WalletVersion, net: &Network) -> i32 {
     match wallet {
         WalletVersion::V5R1 => {
-            if net == &Network::Testnet {
-                return DEFAULT_WALLET_ID_V5R1_TESTNET;
+            if net.uses_testnet_address_format() {
+                return WALLET_V5R1_ID_DEFAULT_TESTNET;
             }
-            DEFAULT_WALLET_ID_V5R1
+            WALLET_V5R1_ID_DEFAULT
         }
-        _ => DEFAULT_WALLET_ID,
+        _ => WALLET_ID_DEFAULT,
     }
 }
 
@@ -303,11 +311,11 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
         "v4r1" => Ok(WalletVersion::V4R1),
         "v4r2" => Ok(WalletVersion::V4R2),
         "v5r1" => Ok(WalletVersion::V5R1),
-        "highloadv1r1" => Ok(WalletVersion::HighloadV1R1),
-        "highloadv1r2" => Ok(WalletVersion::HighloadV1R2),
-        "highloadv2" => Ok(WalletVersion::HighloadV2),
-        "highloadv2r1" => Ok(WalletVersion::HighloadV2R1),
-        "highloadv2r2" => Ok(WalletVersion::HighloadV2R2),
+        "highloadv1r1" => Ok(WalletVersion::HLV1R1),
+        "highloadv1r2" => Ok(WalletVersion::HLV1R2),
+        "highloadv2" => Ok(WalletVersion::HLV2),
+        "highloadv2r1" => Ok(WalletVersion::HLV2R1),
+        "highloadv2r2" => Ok(WalletVersion::HLV2R2),
         _ => Err(anyhow!(
             "Unsupported wallet kind: {kind}. Supported kinds: v1r1, v1r2, v1r3, v2r1, v2r2, v3r1, v3r2, v4r1, v4r2, v5r1, highloadv1r1, highloadv1r2, highloadv2, highloadv2r1, highloadv2r2"
         )),
@@ -315,7 +323,7 @@ fn parse_wallet_version(kind: &str) -> anyhow::Result<WalletVersion> {
 }
 
 pub fn new_mnemonic() -> anyhow::Result<Vec<String>> {
-    let wordlist: Vec<&str> = WORDLIST_EN_SET.keys().copied().collect();
+    let wordlist: Vec<&str> = WORDLIST_EN_SET.iter().copied().collect();
     let mut rng = rand::thread_rng();
     let mut indices = [0usize; 24];
     let mut joined = String::with_capacity(256);

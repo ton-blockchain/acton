@@ -1,11 +1,18 @@
-use crate::integration::check::run_simple_test;
+use crate::integration::check::run_rule_test;
 use function_name::named;
+
+fn run_message_should_be_named_test(content: &str, name: &str) {
+    run_rule_test("message_entity_naming", "E011", content, name);
+}
+
+fn run_create_message_inline_send_test(content: &str, name: &str) {
+    run_rule_test("message_entity_naming", "E012", content, name);
+}
 
 #[test]
 #[named]
 fn test_check_message_should_be_named() {
-    run_simple_test(
-        "message_entity_naming",
+    run_message_should_be_named_test(
         r#"
             fun onInternalMessage(in: InMessage) {
                 val msg = createMessage({
@@ -23,8 +30,7 @@ fn test_check_message_should_be_named() {
 #[test]
 #[named]
 fn test_check_message_should_be_named_skips_proper_name() {
-    run_simple_test(
-        "message_entity_naming",
+    run_message_should_be_named_test(
         r#"
             fun onInternalMessage(in: InMessage) {
                 val deployMessage = createMessage({
@@ -42,8 +48,7 @@ fn test_check_message_should_be_named_skips_proper_name() {
 #[test]
 #[named]
 fn test_check_create_message_inline_send() {
-    run_simple_test(
-        "message_entity_naming",
+    run_create_message_inline_send_test(
         r#"
             fun onInternalMessage(in: InMessage) {
                 createMessage({
@@ -60,8 +65,7 @@ fn test_check_create_message_inline_send() {
 #[test]
 #[named]
 fn test_check_create_message_inline_send_skips_other_factories() {
-    run_simple_test(
-        "message_entity_naming",
+    run_create_message_inline_send_test(
         r#"
             fun onInternalMessage(_: InMessage) {
                 createExternalLogMessage({

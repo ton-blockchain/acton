@@ -1,5 +1,5 @@
+use crate::pretty::RcDoc;
 use crate::{Context, common, exprs};
-use pretty::RcDoc;
 use tolk_syntax::{
     Assert, Block, CatchClause, DoWhile, ExprStmt, If, IfAlt, MatchStmt, Repeat, Return, Stmt,
     Throw, TryCatch, While,

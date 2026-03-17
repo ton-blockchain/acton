@@ -57,7 +57,7 @@ extension!(env_slice in (Context) with (name: String) using env_slice_impl);
 fn env_slice_impl(_ctx: &mut Context, stack: &mut Tuple, name: String) -> anyhow::Result<()> {
     match env::var(&name) {
         Ok(val) => {
-            stack.push_string(&val);
+            stack.push_string_slice(&val);
         }
         Err(_) => stack.push(TupleItem::Null),
     }

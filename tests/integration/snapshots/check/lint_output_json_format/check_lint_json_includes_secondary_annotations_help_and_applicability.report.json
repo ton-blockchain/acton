@@ -1,0 +1,80 @@
+{
+  "diagnostics": [
+    {
+      "annotations": [
+        {
+          "is_primary": true,
+          "message": "`_value` is marked as unused but used here",
+          "range": {
+            "end": {
+              "character": 22,
+              "line": 3
+            },
+            "start": {
+              "character": 16,
+              "line": 3
+            }
+          }
+        },
+        {
+          "is_primary": false,
+          "message": "declared with leading underscore here",
+          "range": {
+            "end": {
+              "character": 26,
+              "line": 2
+            },
+            "start": {
+              "character": 20,
+              "line": 2
+            }
+          }
+        }
+      ],
+      "code": "E010",
+      "file": "[ROOT]/contracts/main.tolk",
+      "fixes": [
+        {
+          "applicability": "auto",
+          "edits": [
+            {
+              "file": "[ROOT]/contracts/main.tolk",
+              "newText": "value",
+              "range": {
+                "end": {
+                  "character": 26,
+                  "line": 2
+                },
+                "start": {
+                  "character": 20,
+                  "line": 2
+                }
+              }
+            },
+            {
+              "file": "[ROOT]/contracts/main.tolk",
+              "newText": "value",
+              "range": {
+                "end": {
+                  "character": 22,
+                  "line": 3
+                },
+                "start": {
+                  "character": 16,
+                  "line": 3
+                }
+              }
+            }
+          ],
+          "message": "rename `_value` to `value`"
+        }
+      ],
+      "help": "remove leading underscore if this identifier should be used",
+      "message": "identifier marked as unused is used",
+      "name": "used-ignored-identifier",
+      "severity": "warning",
+      "source": "tolk"
+    }
+  ],
+  "success": true
+}

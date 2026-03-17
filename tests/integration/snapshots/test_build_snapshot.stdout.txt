@@ -1,6 +1,0 @@
-   Compiling contracts
-   Compiling child
-    Finished in [TIME]
-   Compiling parent
-    Finished in [TIME]
-    Finished in [TIME]

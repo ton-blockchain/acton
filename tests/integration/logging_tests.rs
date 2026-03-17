@@ -96,6 +96,28 @@ fn test_debug_log_defaults_to_home_dot_acton_logs() {
     );
 }
 
+#[cfg(not(target_os = "windows"))]
+#[test]
+fn test_debug_log_falls_back_to_project_root_when_home_missing() {
+    let project = ProjectBuilder::new("logging-fallback-project-root")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    project
+        .acton()
+        .env_remove("ACTON_LOG_DIR")
+        .env_remove("HOME")
+        .build()
+        .run()
+        .success();
+
+    let fallback_log = project.path().join(".acton").join("logs").join("debug.log");
+    assert!(
+        fallback_log.exists(),
+        "debug.log should be created in PROJECT_ROOT/.acton/logs when HOME is unavailable"
+    );
+}
+
 #[cfg(windows)]
 #[test]
 fn test_debug_log_defaults_to_user_profile_dot_acton_logs() {

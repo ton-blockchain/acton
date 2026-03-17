@@ -4,6 +4,7 @@ use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 #[cfg(feature = "only_ci")]
 use crate::support::snapshots::normalize_output;
+use base64::Engine;
 use serde_json::Value as JsonValue;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::net::TcpListener;
@@ -861,7 +862,7 @@ fn test_library_publish_happy_path_litenode_saves_local_metadata() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -885,7 +886,7 @@ fn test_library_publish_happy_path_litenode_saves_local_metadata() {
 
     let (library_id, library) = read_first_library_entry(&libraries_path);
     assert_eq!(library_id, "library_contract");
-    assert_eq!(library.network, "custom:localnet");
+    assert_eq!(library.network, "localnet");
     assert_eq!(library.hash.len(), 64);
     assert!(
         !library.account.is_empty(),
@@ -917,7 +918,7 @@ fn test_library_publish_happy_path_litenode_saves_global_metadata_with_flag() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -947,7 +948,7 @@ fn test_library_publish_happy_path_litenode_saves_global_metadata_with_flag() {
     );
 
     let (_, library) = read_first_library_entry(&global_path);
-    assert_eq!(library.network, "custom:localnet");
+    assert_eq!(library.network, "localnet");
     assert_eq!(library.hash.len(), 64);
 
     wait_for_library_in_api(&node, &library.hash, Duration::from_secs(12));
@@ -978,7 +979,7 @@ fn test_library_publish_interactive_save_location_defaults_to_local_litenode() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1028,7 +1029,7 @@ fn test_library_topup_happy_path_litenode_updates_last_topup_timestamp() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1088,7 +1089,7 @@ fn test_library_info_shows_balance_and_runway_on_litenode() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1137,7 +1138,7 @@ fn test_library_info_shows_runway_warning_when_exhausted_on_litenode() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1185,7 +1186,7 @@ fn test_library_fetch_json_with_output_behavior_is_stable_on_litenode() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1207,7 +1208,7 @@ fn test_library_fetch_json_with_output_behavior_is_stable_on_litenode() {
         .library()
         .fetch(&library.hash)
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--json")
         .arg("--output")
         .arg(output_file)
@@ -1249,7 +1250,7 @@ fn test_library_fetch_json_with_disasm_behavior_is_stable_on_litenode() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1270,7 +1271,7 @@ fn test_library_fetch_json_with_disasm_behavior_is_stable_on_litenode() {
         .library()
         .fetch(&library.hash)
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--json")
         .arg("--disasm")
         .arg("--api-key")
@@ -1318,6 +1319,7 @@ fn test_library_publish_custom_network_unknown_fails() {
 #[test]
 fn test_library_publish_custom_network_missing_v2_url_fails() {
     let project = ProjectBuilder::new("library-publish-custom-network-missing-v2").build();
+    write_deployer_wallets(project.path());
 
     let acton_toml_path = project.path().join("Acton.toml");
     let mut acton_toml =
@@ -1326,7 +1328,7 @@ fn test_library_publish_custom_network_missing_v2_url_fails() {
         r#"
 
 [networks.broken]
-v3-url = "http://127.0.0.1:1/api/v3"
+api = { v3 = "http://127.0.0.1:1/api/v3" }
 "#,
     );
     fs::write(&acton_toml_path, acton_toml).expect("failed to write malformed custom network");
@@ -1337,6 +1339,7 @@ v3-url = "http://127.0.0.1:1/api/v3"
         .publish()
         .with_code("te6cckEBAQEAAgAAAEysuc0=")
         .with_duration("1d")
+        .wallet("deployer")
         .arg("--amount")
         .arg("1")
         .arg("--yes")
@@ -1345,7 +1348,7 @@ v3-url = "http://127.0.0.1:1/api/v3"
         .arg("custom:broken")
         .run()
         .failure()
-        .assert_stderr_contains("v2-url");
+        .assert_stderr_contains("unknown custom network: broken");
 }
 
 #[cfg(unix)]
@@ -1372,7 +1375,7 @@ fn test_library_publish_interactive_selects_global_storage() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1427,7 +1430,7 @@ fn test_library_topup_reports_metadata_update_failure_after_successful_send() {
         .arg("--wallet")
         .arg("deployer")
         .arg("--net")
-        .arg("custom:localnet")
+        .arg("localnet")
         .arg("--duration")
         .arg("1y")
         .arg("--amount")
@@ -1500,7 +1503,7 @@ fn test_library_info_interactive_library_select() {
             .arg("--wallet")
             .arg("deployer")
             .arg("--net")
-            .arg("custom:localnet")
+            .arg("localnet")
             .arg("--duration")
             .arg("1y")
             .arg("--amount")
@@ -1551,7 +1554,7 @@ fn test_library_topup_interactive_library_and_wallet_select() {
             .arg("--wallet")
             .arg("deployer")
             .arg("--net")
-            .arg("custom:localnet")
+            .arg("localnet")
             .arg("--duration")
             .arg("1y")
             .arg("--amount")
@@ -2248,6 +2251,8 @@ fn test_library_publish_reports_send_boc_failure_and_skips_metadata_save() {
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_error_response("mock publish failure"),
+        toncenter_v2_send_boc_error_response("mock publish failure"),
+        toncenter_v2_send_boc_error_response("mock publish failure"),
     ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
 
@@ -2279,7 +2284,62 @@ fn test_library_publish_reports_send_boc_failure_and_skips_metadata_save() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected seqno + failing sendBoc");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 3 failing sendBoc retries"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_publish_retries_send_boc_and_succeeds_on_third_attempt() {
+    let project = ProjectBuilder::new("library-publish-send-boc-retry-success").build();
+    write_deployer_wallets(project.path());
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_error_response("transient publish failure"),
+        toncenter_v2_send_boc_error_response("transient publish failure"),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .publish()
+        .with_code("te6cckEBAQEAAgAAAEysuc0=")
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--local")
+        .run()
+        .success()
+        .assert_contains("Library info saved");
+
+    assert!(
+        project.path().join("libraries.toml").exists(),
+        "publish should save metadata after successful retry"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 2 failing sendBoc retries + final success"
+    );
+    assert_eq!(captured[0].path, "/jsonRPC");
+    for request in &captured[1..] {
+        assert_eq!(request.path, "/sendBoc");
+    }
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -2298,6 +2358,8 @@ fn test_library_topup_reports_send_boc_failure_and_keeps_timestamp_unchanged() {
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
         toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_error_response("mock topup failure"),
+        toncenter_v2_send_boc_error_response("mock topup failure"),
         toncenter_v2_send_boc_error_response("mock topup failure"),
     ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
@@ -2329,17 +2391,79 @@ fn test_library_topup_reports_send_boc_failure_and_keeps_timestamp_unchanged() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected seqno + failing sendBoc");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 3 failing sendBoc retries"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_topup_retries_send_boc_and_succeeds_on_third_attempt() {
+    let project = ProjectBuilder::new("library-topup-send-boc-retry-success").build();
+    write_deployer_wallets(project.path());
+    let libraries_path = project.path().join("libraries.toml");
+    write_library_metadata_file(
+        &libraries_path,
+        "my-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+    let (_, before_topup) = read_first_library_entry(&libraries_path);
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_error_response("transient topup failure"),
+        toncenter_v2_send_boc_error_response("transient topup failure"),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .library()
+        .arg("topup")
+        .arg("my-lib")
+        .arg("--wallet")
+        .arg("deployer")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .run()
+        .success()
+        .assert_contains("Top-up transaction sent successfully");
+
+    let (_, after_topup) = read_first_library_entry(&libraries_path);
+    assert_ne!(
+        before_topup.last_topup_timestamp, after_topup.last_topup_timestamp,
+        "metadata timestamp must be updated after successful retry"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        4,
+        "expected seqno + 2 failing sendBoc retries + final success"
+    );
+    assert_eq!(captured[0].path, "/jsonRPC");
+    for request in &captured[1..] {
+        assert_eq!(request.path, "/sendBoc");
+    }
 }
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_library_fetch_transport_error_reports_failure_in_plain_mode() {
     let project = ProjectBuilder::new("library-fetch-transport-error-plain").build();
-    let (mock_url, mock_handle, captured) =
-        spawn_toncenter_v2_mock(vec![toncenter_v2_get_libraries_error_response(
-            "mock fetch failure",
-        )]);
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+    ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
 
     project
@@ -2356,17 +2480,66 @@ fn test_library_fetch_transport_error_reports_failure_in_plain_mode() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected one getLibraries request");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected 3 getLibraries attempts with retry on server error"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_fetch_retries_get_libraries_and_succeeds_on_third_attempt() {
+    let project = ProjectBuilder::new("library-fetch-retry-success").build();
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_error_response("transient fetch failure"),
+        toncenter_v2_get_libraries_error_response("transient fetch failure"),
+        toncenter_v2_get_libraries_ok_response("te6cckEBAQEAAgAAAEysuc0="),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let output = project
+        .acton()
+        .library()
+        .fetch(LIB_HASH)
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--json")
+        .run()
+        .success();
+
+    let payload: JsonValue =
+        serde_json::from_str(&output.get_stdout()).expect("fetch --json must output JSON");
+    assert_eq!(payload["success"].as_bool(), Some(true));
+    assert!(
+        payload["code_boc64"].as_str().is_some(),
+        "expected code_boc64 field in fetch --json output after successful retry, got: {}",
+        output.get_stdout()
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected 2 failing getLibraries retries + final success"
+    );
+    for request in captured.iter() {
+        assert!(request.path.starts_with("/getLibraries?libraries="));
+    }
 }
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_library_fetch_transport_error_reports_json_envelope_in_json_mode() {
     let project = ProjectBuilder::new("library-fetch-transport-error-json").build();
-    let (mock_url, mock_handle, captured) =
-        spawn_toncenter_v2_mock(vec![toncenter_v2_get_libraries_error_response(
-            "mock fetch failure",
-        )]);
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+        toncenter_v2_get_libraries_error_response("mock fetch failure"),
+    ]);
     append_custom_network(project.path(), "mock-v2", &mock_url);
 
     let output = project
@@ -2395,7 +2568,11 @@ fn test_library_fetch_transport_error_reports_json_envelope_in_json_mode() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 1, "expected one getLibraries request");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected 3 getLibraries attempts with retry on server error"
+    );
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -2560,6 +2737,7 @@ fn write_deployer_wallets(project_path: &Path) {
     .expect("failed to write wallets.toml");
 }
 
+#[cfg(unix)]
 fn write_two_wallets(project_path: &Path) {
     fs::write(
         project_path.join("wallets.toml"),
@@ -2773,6 +2951,22 @@ fn toncenter_v2_get_libraries_error_response(error: &str) -> ToncenterV2MockResp
     }
 }
 
+fn toncenter_v2_get_libraries_ok_response(data: &str) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": {
+                "result": [{
+                    "found": true,
+                    "data": data
+                }]
+            }
+        })
+        .to_string(),
+    }
+}
+
 fn toncenter_v2_balance_ok_response(balance: &str) -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
@@ -2830,7 +3024,7 @@ fn append_custom_network(project_path: &Path, network_name: &str, v2_url: &str) 
         r#"
 
 [networks.{network_name}]
-v2-url = "{v2_url}"
+api = {{ v2 = "{v2_url}" }}
 "#
     ));
     fs::write(&acton_toml_path, acton_toml)
@@ -2855,7 +3049,7 @@ fn append_localnet_network(project_path: &Path, base_url: &str) {
         r#"
 
 [networks.localnet]
-v2-url = "{base_url}/api/v2"
+api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
     ));
     fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
@@ -2942,9 +3136,11 @@ fn wait_for_library_in_api(
             .pointer("/result/result")
             .and_then(JsonValue::as_array)
             .is_some_and(|items| {
-                items
-                    .iter()
-                    .any(|item| item.get("hash").and_then(JsonValue::as_str) == Some(hash))
+                items.iter().any(|item| {
+                    item.get("hash")
+                        .and_then(JsonValue::as_str)
+                        .is_some_and(|api_hash| hashes_equivalent(api_hash, hash))
+                })
             });
 
         if found {
@@ -2958,6 +3154,38 @@ fn wait_for_library_in_api(
         );
         thread::sleep(Duration::from_millis(200));
     }
+}
+
+fn hashes_equivalent(left: &str, right: &str) -> bool {
+    normalize_hash_to_bytes(left) == normalize_hash_to_bytes(right)
+}
+
+fn normalize_hash_to_bytes(hash: &str) -> Option<[u8; 32]> {
+    let trimmed = hash.trim();
+
+    if let Ok(bytes) = hex::decode(trimmed)
+        && bytes.len() == 32
+    {
+        let mut out = [0_u8; 32];
+        out.copy_from_slice(&bytes);
+        return Some(out);
+    }
+
+    for engine in [
+        &base64::engine::general_purpose::STANDARD,
+        &base64::engine::general_purpose::URL_SAFE,
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+    ] {
+        if let Ok(bytes) = engine.decode(trimmed)
+            && bytes.len() == 32
+        {
+            let mut out = [0_u8; 32];
+            out.copy_from_slice(&bytes);
+            return Some(out);
+        }
+    }
+
+    None
 }
 
 fn wait_until_address_state_active(

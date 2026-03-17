@@ -1,0 +1,9 @@
+  Installing standard library [ACTON_VERSION]
+map<int32, address> {
+    1: <value: invalid tag>,
+    2: <value: invalid tag>,
+}
+map<int32, cell> {
+    1: <value: cell underflow>,
+    2: <value: cell underflow>,
+}

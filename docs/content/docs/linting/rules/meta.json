@@ -30,6 +30,8 @@
     "e027-identical-conditional-branches",
     "e028-no-global-variables",
     "e029-incoming-messages-duplicate-opcode",
-    "s001-name-case-checker"
+    "e030-enum-cast-missing-safety-comment",
+    "s001-name-case-checker",
+    "s002-explicit-return-type"
   ]
 }

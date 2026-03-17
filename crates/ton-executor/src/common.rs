@@ -43,6 +43,15 @@ impl Serialize for ExecutorVerbosity {
 pub type ExtMethodCallback<Ctx = c_void> =
     unsafe extern "C" fn(ctx: *mut Ctx, stack: *const c_char) -> *const c_char;
 
+/// Callback type for missing global library notifications.
+///
+/// # Arguments
+///
+/// * `ctx` — User-defined context.
+/// * `hash` — Missing library hash as lowercase hex string (64 chars).
+pub type MissingLibraryCallback<Ctx = c_void> =
+    unsafe extern "C" fn(ctx: *mut Ctx, hash: *const c_char);
+
 pub const EXT_METHOD_STACK_ALL_ITEMS: u8 = u8::MAX;
 
 /// Base trait for all TON executors.

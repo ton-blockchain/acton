@@ -109,7 +109,7 @@ get fun `test-format-message`() {
         dest: kQC0663BO7-gCwST4bHolxt85JLRMaFVZgJfblE7oumFduR9 (counter),
         value: CurrencyCollection {
             grams: 1999900000,
-            other: null
+            other: map<int32, varuint32> {}
         },
         extraFlags: 0,
         fwdFee: 266669,
@@ -120,4 +120,11 @@ get fun `test-format-message`() {
     body: null
 }""");
     }
+}
+
+get fun `test-format-multiple-arguments-and-modifiers`() {
+    expect(format2("{} {:x}", "hex", 255)).toEqual("hex ff");
+    expect(format3("{} {} {:ton}", "value", 7, ton("1.5"))).toEqual("value 7 1.5 TON");
+    expect(format4("{{{}}} {} {} {}", 1, 2, 3, 4)).toEqual("{1} 2 3 4");
+    expect(format5("{} {} {} {} {}", 1, 2, 3, 4, 5)).toEqual("1 2 3 4 5");
 }

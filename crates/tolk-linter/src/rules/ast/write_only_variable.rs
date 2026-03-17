@@ -4,6 +4,7 @@ use crate::{Checker, FixAvailability};
 use tolk_analysis::UseFlags;
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::file_index::FileId;
+use tolk_resolver::resolve_index::LocalDefKind;
 
 /// ### What it does
 /// Checks for variables that are written to but never read.
@@ -29,6 +30,7 @@ use tolk_resolver::file_index::FileId;
 ///
 /// ### Behavior notes
 /// - Locals prefixed with `_` are ignored.
+/// - Mutable parameters (`mutate`) are ignored.
 /// - Variables with zero usages are handled by `unused-variable`.
 /// - This rule only reports variables with writes and no reads.
 ///   Operations that imply reads (for example `+=`) do not match this rule.
@@ -49,6 +51,15 @@ pub fn check_file(checker: &mut Checker, file_id: FileId) -> Option<()> {
     let use_facts = checker.use_facts(file_id)?;
 
     for local in &resolved_index.locals {
+        if matches!(
+            local.kind,
+            LocalDefKind::Param {
+                is_mutable: true,
+                ..
+            }
+        ) {
+            continue;
+        }
         if local.name.starts_with("_") {
             continue;
         }
