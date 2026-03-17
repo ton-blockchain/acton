@@ -10,6 +10,9 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.dist]
+dist = true
+
 [workspace]
 members = ["crates/*", "xtask"]
 
@@ -303,6 +306,10 @@ chrono = { workspace = true }
 inherits = "release"
 lto = "fat"
 codegen-units = 1
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release-size"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
