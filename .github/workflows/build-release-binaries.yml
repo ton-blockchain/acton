@@ -107,7 +107,6 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    if: fales
     name: Build macOS (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -119,6 +118,7 @@ jobs:
           - runner: macos-15
             os: macos
             arch: aarch64
+    if: false
     env:
       TARGET_NAME: ${{ matrix.os }}-${{ matrix.arch }}
 
