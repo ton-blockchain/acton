@@ -22,14 +22,14 @@ Documentation: https://i582.github.io/acton/docs/welcome
 ## Install
 
 The recommended way to get Acton today is to download a prebuilt binary from
-the latest release:
+release `v0.0.16`:
 
-| Platform | Architecture | Download                                                                                                        |
-|----------|--------------|-----------------------------------------------------------------------------------------------------------------|
-| macOS    | ARM64        | [acton-macos-aarch64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-macos-aarch64.tar.gz) |
-| macOS    | x86_64       | [acton-macos-x86_64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-macos-x86_64.tar.gz)   |
-| Linux    | x86_64       | [acton-linux-x86_64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-linux-x86_64.tar.gz)   |
-| Linux    | ARM64        | [acton-linux-aarch64.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-linux-aarch64.tar.gz) |
+| Platform | Architecture | Download                                                                                                                                 |
+|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| macOS    | ARM64        | [acton-aarch64-apple-darwin.tar.gz](https://github.com/i582/acton/releases/download/v0.0.16/acton-aarch64-apple-darwin.tar.gz)           |
+| macOS    | x86_64       | [acton-x86_64-apple-darwin.tar.gz](https://github.com/i582/acton/releases/download/v0.0.16/acton-x86_64-apple-darwin.tar.gz)             |
+| Linux    | x86_64       | [acton-x86_64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton/releases/download/v0.0.16/acton-x86_64-unknown-linux-gnu.tar.gz)   |
+| Linux    | ARM64        | [acton-aarch64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton/releases/download/v0.0.16/acton-aarch64-unknown-linux-gnu.tar.gz) |
 
 After extracting the archive, make sure `acton` is on your `PATH` and verify
 the installation:
