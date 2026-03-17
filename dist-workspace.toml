@@ -27,6 +27,7 @@ github-release = "announce"
 github-attestations = false
 # Which actions to run on pull requests
 pr-run-mode = "skip"
+post-announce-jobs = ["./publish-mirror"]
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
 # Whether to install an updater program
