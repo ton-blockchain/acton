@@ -30,6 +30,9 @@ jobs:
             arch: x86_64
     runs-on: ${{ matrix.runner }}
     if: true
+    env:
+      OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+      TARGET_NAME: ${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
 
     permissions:
       contents: read
@@ -57,14 +60,14 @@ jobs:
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
-          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
-          mkdir -p dist objs
+          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
+          mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
             --pattern "${ARCHIVE_NAME}" \
-            --dir dist
-          tar -C objs -xzf "dist/${ARCHIVE_NAME}"
+            --dir "${RUNNER_TEMP}"
+          tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
 
       - name: Install LLVM and Clang
         run: |
@@ -82,7 +85,7 @@ jobs:
           CXX: clang++-16
         run: |
           just build-ui
-          just build
+          cargo build --release --locked --target "${TARGET_NAME}" --bin acton
 
       - name: Add acton to PATH
         run: echo "${GITHUB_WORKSPACE}/target/release" >> "$GITHUB_PATH"
@@ -102,17 +105,17 @@ jobs:
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         run: |
-          tar -C target/release -czf target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz acton
-          shasum -a 256 target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz > target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+          tar -C target/release -czf target/release/acton-${{ env.TARGET_NAME }}.tar.gz acton
+          shasum -a 256 target/release/acton-${{ env.TARGET_NAME }}.tar.gz > target/release/acton-${{ env.TARGET_NAME }}.tar.gz.sha256
 
       - name: Upload trunk archive artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         uses: actions/upload-artifact@v7
         with:
-          name: acton-${{ matrix.os }}-${{ matrix.arch }}
+          name: acton-${{ env.TARGET_NAME }}
           path: |
-            target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
-            target/release/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+            target/release/acton-${{ env.TARGET_NAME }}.tar.gz
+            target/release/acton-${{ env.TARGET_NAME }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
 
