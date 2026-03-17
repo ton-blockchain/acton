@@ -98,7 +98,7 @@ jobs:
       - name: Upload Acton archive as artifact
         uses: actions/upload-artifact@v7
         with:
-          name: acton-${{ matrix.os }}-${{ matrix.arch }}
+          name: artifacts-${{ matrix.os }}-${{ matrix.arch }}
           path: |
             acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
             acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
@@ -180,7 +180,7 @@ jobs:
       - name: Upload Acton archive as artifact
         uses: actions/upload-artifact@v7
         with:
-          name: acton-${{ matrix.os }}-${{ matrix.arch }}
+          name: artifacts-${{ matrix.os }}-${{ matrix.arch }}
           path: |
             acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
             acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
