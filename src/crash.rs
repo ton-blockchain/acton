@@ -7,7 +7,7 @@ const ACTON_FATAL_CRASH_MESSAGE: &str = concat!(
     "Include the command you ran, the files or project involved, what Acton printed before the crash, and the steps to reproduce it.\n",
     "Check the Acton log file for more details: ~/.acton/logs/debug.log.\n",
     "If ACTON_LOG_DIR is set, check that directory instead.\n",
-    "Version: v",
+    "Version: ",
     env!("ACTON_LONG_VERSION"),
     "\n",
 );
