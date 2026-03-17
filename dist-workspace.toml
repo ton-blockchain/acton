@@ -23,8 +23,6 @@ local-artifacts-jobs = ["./build-release-binaries"]
 github-release = "announce"
 # Whether to enable GitHub Attestations
 github-attestations = false
-# Publish GitHub Releases to this repo instead
-github-releases-repo = "i582/acton-public"
 # Which actions to run on pull requests
 pr-run-mode = "skip"
 # Path that installers should place binaries in
