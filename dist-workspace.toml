@@ -17,6 +17,8 @@ targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-da
 auto-includes = false
 # Which phase dist should use to create the GitHub release
 github-release = "announce"
+# Whether to enable GitHub Attestations
+github-attestations = false
 # Publish GitHub Releases to this repo instead
 github-releases-repo = "i582/acton-public"
 # Which actions to run on pull requests
