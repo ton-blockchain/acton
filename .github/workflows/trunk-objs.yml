@@ -58,7 +58,9 @@ jobs:
         id: archive-cache
         uses: actions/cache@v5
         with:
-          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          path: |
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
           key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Install LLVM and Clang
@@ -155,13 +157,16 @@ jobs:
             libemulator.a \
             libtolk.a \
             ton-artifacts.lock
+          shasum -a 256 "dist/${ARCHIVE_NAME}" > "dist/${ARCHIVE_NAME}.sha256"
 
       - name: Upload TON objects artifact
         if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          path: |
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
 
@@ -188,7 +193,9 @@ jobs:
         id: archive-cache
         uses: actions/cache@v5
         with:
-          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          path: |
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
           key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Clone TON repository
@@ -254,13 +261,16 @@ jobs:
             libemulator.a \
             libtolk.a \
             ton-artifacts.lock
+          shasum -a 256 "dist/${ARCHIVE_NAME}" > "dist/${ARCHIVE_NAME}.sha256"
 
       - name: Upload TON objects artifact
         if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
           name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          path: |
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
 
@@ -334,7 +344,7 @@ jobs:
 
           gh release create trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
-            dist/*.tar.gz \
+            dist/* \
             --title "Trunk Objs" \
             --notes "${release_notes}" \
             --target "${GITHUB_SHA}" \
@@ -363,7 +373,7 @@ jobs:
 
           gh release create trunk-objs \
             --repo "${PUBLIC_ACTON_REPOSITORY}" \
-            dist/*.tar.gz \
+            dist/* \
             --title "Trunk Objs" \
             --notes "${release_notes}" \
             --prerelease

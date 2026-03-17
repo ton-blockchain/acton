@@ -106,7 +106,7 @@ jobs:
         run: |
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
-            --pattern "ton-objs-*.tar.gz" \
+            --pattern "ton-objs-*.tar.gz*" \
             --dir dist
 
       - name: Create GitHub release
