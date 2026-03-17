@@ -304,6 +304,11 @@ inherits = "release"
 lto = "fat"
 codegen-units = 1
 
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
 [workspace.lints.rust]
 unsafe_code = "deny"
 unreachable_pub = "warn"
