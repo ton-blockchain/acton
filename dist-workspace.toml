@@ -27,6 +27,8 @@ github-attestations = false
 pr-run-mode = "skip"
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
+# Where to host releases
+hosting = "github"
 # Whether to install an updater program
 install-updater = false
 # A URL to download artifacts from
