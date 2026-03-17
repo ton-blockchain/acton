@@ -11,7 +11,7 @@ const UNUSED_VARIABLE_CONTRACT: &str = r#"
 const USED_IGNORED_IDENTIFIER_CONTRACT: &str = r#"
             fun main() {
                 val _value = 1;
-                _value;
+                val _aa = _value;
             }
         "#;
 
