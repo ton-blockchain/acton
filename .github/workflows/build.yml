@@ -104,18 +104,27 @@ jobs:
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
+        shell: bash
+        # language=Bash
         run: |
-          tar -C target/release -czf target/release/acton-${{ env.TARGET_NAME }}.tar.gz acton
-          shasum -a 256 target/release/acton-${{ env.TARGET_NAME }}.tar.gz > target/release/acton-${{ env.TARGET_NAME }}.tar.gz.sha256
+          set -euo pipefail
+
+          ARTIFACTS_DIR="acton-${TARGET_NAME}"
+          ARCHIVE_NAME="${ARTIFACTS_DIR}.tar.gz"
+
+          mkdir -p "${ARTIFACTS_DIR}"
+          cp "target/${TARGET_NAME}/release/acton" "${ARTIFACTS_DIR}/acton"
+          tar -czvf "${ARCHIVE_NAME}" -C "${ARTIFACTS_DIR}" .
+          shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
 
       - name: Upload trunk archive artifact
         if: github.ref == 'refs/heads/master' && github.repository == 'i582/acton'
         uses: actions/upload-artifact@v7
         with:
-          name: acton-${{ env.TARGET_NAME }}
+          name: artifacts-${{ env.TARGET_NAME }}
           path: |
-            target/release/acton-${{ env.TARGET_NAME }}.tar.gz
-            target/release/acton-${{ env.TARGET_NAME }}.tar.gz.sha256
+            acton-${{ env.TARGET_NAME }}.tar.gz
+            acton-${{ env.TARGET_NAME }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
 
@@ -178,7 +187,7 @@ jobs:
       - name: Download trunk archives
         uses: actions/download-artifact@v8
         with:
-          pattern: acton-*
+          pattern: artifacts-*
           path: artifacts/
           merge-multiple: true
 
