@@ -170,7 +170,7 @@ impl ReleaseClient for GitHubClient {
             }
         }
 
-        bail!("Failed to fetch release info from GitHub");
+        bail!("Release not found");
     }
 
     fn list_releases(&self) -> Result<Vec<String>> {
