@@ -12,12 +12,15 @@ ci = "github"
 # The installers to generate for each app
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-  "aarch64-apple-darwin",
-  "aarch64-unknown-linux-gnu",
-  "x86_64-apple-darwin",
-  "x86_64-unknown-linux-gnu"
-]
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
+# Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
+auto-includes = false
+# Which phase dist should use to create the GitHub release
+github-release = "announce"
+# Publish GitHub Releases to this repo instead
+github-releases-repo = "i582/acton-public"
+# Which actions to run on pull requests
+pr-run-mode = "skip"
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
 # Whether to install an updater program
