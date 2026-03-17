@@ -22,22 +22,18 @@ Homebrew, or download single binary from releases.
 
 ## Installation
 
-<Callout type="warning">
-  Before public release this method is not working, please use [Direct Downloads](#direct-downloads)
-</Callout>
-
 <Tabs items={["macOS", "Linux"]}>
     <Tab value="macOS">
 
         ```bash
-        curl -fsSL https://raw.githubusercontent.com/i582/acton/main/install.sh | bash
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
         ```
 
     </Tab>
     <Tab value="Linux">
 
         ```bash
-        curl -fsSL https://raw.githubusercontent.com/i582/acton/main/install.sh | bash
+        curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
         ```
 
     </Tab>
@@ -100,13 +96,13 @@ You should see the version number of Acton.
 
 ## Direct Downloads
 
-To download Acton binaries directly, visit the [releases page on GitHub](https://github.com/i582/acton/releases) or use the latest release links below.
+To download Acton binaries directly, visit the [releases page on GitHub](https://github.com/i582/acton-public/releases) or use the latest release links below.
 
 <Cards cols={2}>
     <Card
         icon={<SiApple/>}
         title="macOS ARM64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-aarch64-apple-darwin.tar.gz"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-apple-darwin.tar.gz"
     >
         Apple Silicon (M1/M2/M3/etc.)
     </Card>
@@ -114,7 +110,7 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     <Card
         icon={<SiApple/>}
         title="macOS x64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-x86_64-apple-darwin.tar.gz"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-apple-darwin.tar.gz"
     >
         Intel Macs
     </Card>
@@ -122,14 +118,14 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
     <Card
         icon={<SiLinux/>}
         title="Linux x64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz"
     >
         Standard Linux x64 binary
     </Card>
     <Card
         icon={<SiLinux/>}
         title="Linux ARM64"
-        href="https://github.com/i582/acton/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz"
+        href="https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz"
     >
         Linux ARM64 binary
     </Card>

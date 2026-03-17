@@ -21,15 +21,20 @@ Documentation: https://i582.github.io/acton/docs/welcome
 
 ## Install
 
-The recommended way to get Acton today is to download a prebuilt binary from
-the latest release:
+The recommended way to get Acton today is to run the latest public installer:
 
-| Platform | Architecture | Download                                                                                                                                |
-|----------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| macOS    | ARM64        | [acton-aarch64-apple-darwin.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-aarch64-apple-darwin.tar.gz)           |
-| macOS    | x86_64       | [acton-x86_64-apple-darwin.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-x86_64-apple-darwin.tar.gz)             |
-| Linux    | x86_64       | [acton-x86_64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz)   |
-| Linux    | ARM64        | [acton-aarch64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz) |
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
+```
+
+If you prefer a manual download, use the latest public release:
+
+| Platform | Architecture | Download                                                                                                                                       |
+|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| macOS    | ARM64        | [acton-aarch64-apple-darwin.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-apple-darwin.tar.gz)           |
+| macOS    | x86_64       | [acton-x86_64-apple-darwin.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-apple-darwin.tar.gz)             |
+| Linux    | x86_64       | [acton-x86_64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-x86_64-unknown-linux-gnu.tar.gz)   |
+| Linux    | ARM64        | [acton-aarch64-unknown-linux-gnu.tar.gz](https://github.com/i582/acton-public/releases/latest/download/acton-aarch64-unknown-linux-gnu.tar.gz) |
 
 After extracting the archive, make sure `acton` is on your `PATH` and verify
 the installation:
