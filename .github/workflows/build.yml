@@ -81,7 +81,7 @@ jobs:
 
       - name: Build acton binary
         env:
-          ACTON_RELEASE_CHANNEL: ${{ github.ref == 'refs/heads/master' && github.repository == 'i582/acton' && 'trunk' || 'stable' }}
+          ACTON_RELEASE_CHANNEL: trunk
           CC: clang-16
           CXX: clang++-16
         run: |
