@@ -78,6 +78,10 @@ jobs:
 
   build-release-binaries:
     needs: [ check-versions ]
+
+    permissions:
+      contents: read
+
     uses: ./.github/workflows/build-release-binaries.yml
 
   create-release:
