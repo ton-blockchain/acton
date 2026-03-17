@@ -27,6 +27,8 @@ github-release = "announce"
 github-attestations = false
 # Which actions to run on pull requests
 pr-run-mode = "skip"
+# Post-announce jobs to run in CI
+post-announce-jobs = ["./public-mirror"]
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
 # Where to host releases
