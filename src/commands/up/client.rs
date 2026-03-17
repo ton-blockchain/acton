@@ -7,6 +7,8 @@ use serde::Deserialize;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
+const GITHUB_RELEASES_API_BASE: &str = "https://api.github.com/repos/i582/acton-public";
+
 #[derive(Deserialize, Debug, Clone)]
 pub(super) struct Release {
     pub tag_name: String,
@@ -52,19 +54,19 @@ impl ReleaseClient for GitHubClient {
             let normalized = v.trim();
             if normalized.eq_ignore_ascii_case("trunk") || normalized.eq_ignore_ascii_case("vtrunk")
             {
-                "https://api.github.com/repos/i582/acton/releases/tags/trunk".to_string()
+                format!("{GITHUB_RELEASES_API_BASE}/releases/tags/trunk")
             } else {
                 let tag = if normalized.starts_with('v') {
                     normalized.to_string()
                 } else {
                     format!("v{normalized}")
                 };
-                format!("https://api.github.com/repos/i582/acton/releases/tags/{tag}")
+                format!("{GITHUB_RELEASES_API_BASE}/releases/tags/{tag}")
             }
         } else if trunk {
-            "https://api.github.com/repos/i582/acton/releases/tags/trunk".to_string()
+            format!("{GITHUB_RELEASES_API_BASE}/releases/tags/trunk")
         } else {
-            "https://api.github.com/repos/i582/acton/releases/latest".to_string()
+            format!("{GITHUB_RELEASES_API_BASE}/releases/latest")
         };
 
         let mut req = self.client.get(&url).header(USER_AGENT, "acton-cli");
@@ -97,9 +99,8 @@ impl ReleaseClient for GitHubClient {
         let mut page = 1;
 
         loop {
-            let url = format!(
-                "https://api.github.com/repos/i582/acton/releases?per_page={per_page}&page={page}"
-            );
+            let url =
+                format!("{GITHUB_RELEASES_API_BASE}/releases?per_page={per_page}&page={page}");
 
             let mut req = self.client.get(&url).header(USER_AGENT, "acton-cli");
 
