@@ -14,6 +14,7 @@ concurrency:
 jobs:
   build-linux:
     name: Build Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
@@ -23,7 +24,6 @@ jobs:
           - runner: ubicloud-standard-4-arm-ubuntu-2204
             os: linux
             arch: aarch64
-    runs-on: ${{ matrix.runner }}
 
     permissions:
       contents: read
@@ -86,23 +86,25 @@ jobs:
           ./target/release-size/acton --help
 
       - name: Prepare Acton archive
-        if: github.event_name == 'push'
         env:
           ARCHIVE_NAME: acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
           mkdir -p dist
           tar -czf "dist/${ARCHIVE_NAME}" -C target/release-size acton
+          shasum -a 256 "dist/${ARCHIVE_NAME}" > "dist/${ARCHIVE_NAME}.sha256"
 
       - name: Upload Acton archive as artifact
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          path: |
+            dist/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+            dist/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 1
 
   build-macos:
     name: Build macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
@@ -112,7 +114,6 @@ jobs:
           - runner: macos-15
             os: macos
             arch: aarch64
-    runs-on: ${{ matrix.runner }}
 
     permissions:
       contents: read
@@ -165,17 +166,18 @@ jobs:
           ./target/release-size/acton --help
 
       - name: Prepare Acton archive
-        if: github.event_name == 'push'
         env:
           ARCHIVE_NAME: acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
         run: |
           mkdir -p dist
           tar -czf "dist/${ARCHIVE_NAME}" -C target/release-size acton
+          shasum -a 256 "dist/${ARCHIVE_NAME}" > "dist/${ARCHIVE_NAME}.sha256"
 
       - name: Upload Acton archive as artifact
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
           name: acton-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+          path: |
+            dist/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+            dist/acton-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
           retention-days: 1
