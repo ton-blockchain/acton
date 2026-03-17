@@ -7,7 +7,11 @@ on:
         required: true
         type: string
 
-permissions: { }
+permissions:
+  actions: read
+
+env:
+  PUBLIC_ACTON_REPOSITORY: i582/acton-public
 
 jobs:
   publish-mirror:
@@ -22,66 +26,23 @@ jobs:
       - name: Cleanup
         run: |
           rm -f artifacts/*-dist-manifest.json
-      - id: source-release
-        name: Read source release metadata
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: "${{ needs.plan.outputs.tag }}"
+      - id: release-metadata
+        name: Read release metadata from dist-manifest.json
+        # language=Bash
         run: |
-          set -euo pipefail
+          echo "artifacts uploaded and released successfully"
+          cat dist-manifest.json
+          echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
 
-          gh release view "${RELEASE_TAG}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --json name,body,isPrerelease \
-            > "$RUNNER_TEMP/source-release.json"
-
-          echo "title<<EOF" >> "$GITHUB_OUTPUT"
-          jq -r '.name' "$RUNNER_TEMP/source-release.json" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-          echo "prerelease=$(jq -r '.isPrerelease' "$RUNNER_TEMP/source-release.json")" >> "$GITHUB_OUTPUT"
-          jq -r '.body' "$RUNNER_TEMP/source-release.json" > "$RUNNER_TEMP/notes.txt"
       - name: Create mirror release
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
-          RELEASE_TAG: "${{ needs.plan.outputs.tag }}"
-          RELEASE_TITLE: "${{ steps.source-release.outputs.title }}"
-          RELEASE_PRERELEASE: "${{ steps.source-release.outputs.prerelease }}"
+          RELEASE_TAG: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_tag }}"
+          RELEASE_TITLE: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_title }}"
+          RELEASE_PRERELEASE: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_is_prerelease }}"
+        # language=Bash
         run: |
-          set -euo pipefail
+          # Write and read notes from a file to avoid quoting breaking things
+          echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
-          if gh release view "${RELEASE_TAG}" --repo "${PUBLIC_ACTON_REPOSITORY}" >/dev/null 2>&1; then
-            if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
-              gh release edit "${RELEASE_TAG}" \
-                --repo "${PUBLIC_ACTON_REPOSITORY}" \
-                --title "${RELEASE_TITLE}" \
-                --notes-file "$RUNNER_TEMP/notes.txt" \
-                --prerelease
-            else
-              gh release edit "${RELEASE_TAG}" \
-                --repo "${PUBLIC_ACTON_REPOSITORY}" \
-                --title "${RELEASE_TITLE}" \
-                --notes-file "$RUNNER_TEMP/notes.txt" \
-                --latest
-            fi
-          else
-            if [[ "${RELEASE_PRERELEASE}" == "true" ]]; then
-              gh release create "${RELEASE_TAG}" \
-                --repo "${PUBLIC_ACTON_REPOSITORY}" \
-                --title "${RELEASE_TITLE}" \
-                --notes-file "$RUNNER_TEMP/notes.txt" \
-                --prerelease
-            else
-              gh release create "${RELEASE_TAG}" \
-                --repo "${PUBLIC_ACTON_REPOSITORY}" \
-                --title "${RELEASE_TITLE}" \
-                --notes-file "$RUNNER_TEMP/notes.txt" \
-                --latest
-            fi
-          fi
-
-          gh release upload "${RELEASE_TAG}" \
-            --repo "${PUBLIC_ACTON_REPOSITORY}" \
-            --clobber \
-            artifacts/*
-
+          gh release create "$RELEASE_TAG" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
