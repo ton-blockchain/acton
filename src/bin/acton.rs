@@ -894,14 +894,7 @@ pub enum DocCommand {
 
 #[inline]
 const fn get_acton_version() -> &'static str {
-    concat!(
-        env!("CARGO_PKG_VERSION"),
-        " (",
-        env!("GIT_HASH"),
-        " ",
-        env!("BUILD_DATE"),
-        ")"
-    )
+    acton::build_info::LONG_VERSION
 }
 
 fn example_litenode_usage() -> StyledStr {
@@ -1805,7 +1798,7 @@ fn main() {
     CompleteEnv::with_factory(completion_command).complete();
 
     setup_panic!(
-        Metadata::new("Acton", env!("CARGO_PKG_VERSION"))
+        Metadata::new("Acton", acton::build_info::SHORT_VERSION)
             .authors("TON Core")
             .homepage("https://github.com/i582/acton")
     );

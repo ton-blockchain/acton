@@ -1,3 +1,4 @@
+use crate::build_info;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, LibrariesFile, WalletsFile, global_libraries_path, global_wallets_path,
@@ -24,6 +25,7 @@ struct DoctorPath {
 #[derive(Debug, Serialize)]
 struct DoctorVersions {
     acton: String,
+    release_channel: String,
     git_sha: String,
     build_date: String,
     target_triple: String,
@@ -374,7 +376,7 @@ fn inspect_stdlib(acton_dir: &Path, stdlib_path: &Path) -> DoctorStdlib {
         &stdlib_path.join("VERSION"),
     ]);
     let common_tolk = stdlib_path.join("common.tolk");
-    let expected_version = env!("CARGO_PKG_VERSION").to_string();
+    let expected_version = build_info::PACKAGE_VERSION.to_string();
     let status = if !stdlib_path.exists() {
         "missing"
     } else if !common_tolk.exists() {
@@ -469,11 +471,12 @@ fn collect_doctor_report() -> Result<DoctorReport> {
 
     Ok(DoctorReport {
         versions: DoctorVersions {
-            acton: env!("CARGO_PKG_VERSION").to_string(),
-            git_sha: env!("GIT_HASH").to_string(),
-            build_date: env!("BUILD_DATE").to_string(),
-            target_triple: env!("TARGET_TRIPLE").to_string(),
-            profile: env!("BUILD_PROFILE").to_string(),
+            acton: build_info::PACKAGE_VERSION.to_string(),
+            release_channel: build_info::RELEASE_CHANNEL.to_string(),
+            git_sha: build_info::GIT_HASH.to_string(),
+            build_date: build_info::BUILD_DATE.to_string(),
+            target_triple: build_info::TARGET_TRIPLE.to_string(),
+            profile: build_info::BUILD_PROFILE.to_string(),
             os: env::consts::OS.to_string(),
             arch: env::consts::ARCH.to_string(),
         },
@@ -592,6 +595,7 @@ fn print_report(report: &DoctorReport) {
 
     print_section("Versions");
     print_kv("acton", &report.versions.acton);
+    print_kv("channel", &report.versions.release_channel);
     print_kv("git_sha", &report.versions.git_sha);
     print_kv("build_date", &report.versions.build_date);
     print_kv("target", &report.versions.target_triple);

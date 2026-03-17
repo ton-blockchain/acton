@@ -4,6 +4,7 @@ mod workflow;
 #[cfg(test)]
 mod tests;
 
+use crate::build_info;
 use acton_config::color::OwoColorize;
 use anyhow::Result;
 use std::env;
@@ -22,10 +23,11 @@ pub fn up_cmd(
     let token = env::var("GITHUB_TOKEN").ok();
     let client = GitHubClient::new(token);
     let current_exe = env::current_exe()?;
-    let current_version_str = env!("CARGO_PKG_VERSION");
+    let current_version_str = build_info::PACKAGE_VERSION;
+    let current_is_trunk = build_info::is_trunk_build();
 
     if check {
-        let info = check_update(&client, current_version_str)?;
+        let info = check_update(&client, current_version_str, current_is_trunk)?;
         println!("{}", serde_json::to_string_pretty(&info)?);
         return Ok(());
     }
@@ -43,6 +45,7 @@ pub fn up_cmd(
         &client,
         &current_exe,
         current_version_str,
+        current_is_trunk,
         version,
         trunk,
         stable,

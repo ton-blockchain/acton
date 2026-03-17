@@ -20,6 +20,7 @@ fn test_update_stable_to_stable_upgrade() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -44,6 +45,7 @@ fn test_update_stable_already_latest() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -59,7 +61,7 @@ fn test_update_stable_already_latest() -> Result<()> {
 #[test]
 fn test_update_stable_from_trunk() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
-    let current_version = "trunk";
+    let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
     client.set_latest("0.2.0", MockReleaseClient::create_release_assets("0.2.0"));
@@ -68,6 +70,7 @@ fn test_update_stable_from_trunk() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         false,
         true,
@@ -85,7 +88,7 @@ fn test_update_stable_from_trunk() -> Result<()> {
 #[test]
 fn test_update_trunk_to_trunk() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
-    let current_version = "trunk";
+    let current_version = "0.1.0";
 
     let mut client = MockReleaseClient::new();
     client.set_trunk(MockReleaseClient::create_release_assets("trunk"));
@@ -94,6 +97,7 @@ fn test_update_trunk_to_trunk() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         true,
         false,
@@ -111,7 +115,7 @@ fn test_update_trunk_to_trunk() -> Result<()> {
 #[test]
 fn test_update_current_trunk_without_flags_keeps_trunk_channel() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
-    let current_version = "trunk";
+    let current_version = "0.8.0";
 
     let mut client = MockReleaseClient::new();
     client.set_latest("0.9.0", MockReleaseClient::create_release_assets("0.9.0"));
@@ -124,6 +128,7 @@ fn test_update_current_trunk_without_flags_keeps_trunk_channel() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         false,
         false,
@@ -150,6 +155,7 @@ fn test_downgrade() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         Some("0.2.0".to_owned()),
         false,
         false,
@@ -176,6 +182,7 @@ fn test_network_error() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -202,6 +209,7 @@ fn test_custom_version() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         Some("0.0.5".to_string()),
         false,
         false,
@@ -230,6 +238,7 @@ fn test_install_trunk_version_and_then_stable() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         true,
         false,
@@ -241,11 +250,12 @@ fn test_install_trunk_version_and_then_stable() -> Result<()> {
 
     assert_backup_created(&bin_path, current_version, "old_binary")?;
 
-    let current_version = "trunk";
+    let current_version = "0.1.0";
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         false,
         true,
@@ -272,6 +282,7 @@ fn test_install_versions() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         false,
@@ -291,6 +302,7 @@ fn test_install_versions() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         false,
@@ -319,6 +331,7 @@ fn test_install_trunk_versions() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         true,
         false,
@@ -333,11 +346,12 @@ fn test_install_trunk_versions() -> Result<()> {
         "trunk", "trunk-2",
     ));
 
-    let current_version = "trunk";
+    let current_version = "0.1.0";
     workflow::run_update(
         &client,
         &bin_path,
         current_version,
+        true,
         None,
         true,
         false,
@@ -364,6 +378,7 @@ fn test_backup_is_created_correctly() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -415,6 +430,7 @@ fn test_update_fails_without_checksum_asset() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,
@@ -441,6 +457,7 @@ fn test_update_fails_on_checksum_mismatch() -> Result<()> {
         &client,
         &bin_path,
         current_version,
+        false,
         None,
         false,
         true,

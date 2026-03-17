@@ -8,12 +8,8 @@ const ACTON_FATAL_CRASH_MESSAGE: &str = concat!(
     "Check the Acton log file for more details: ~/.acton/logs/debug.log.\n",
     "If ACTON_LOG_DIR is set, check that directory instead.\n",
     "Version: v",
-    env!("CARGO_PKG_VERSION"),
-    " (",
-    env!("GIT_HASH"),
-    " ",
-    env!("BUILD_DATE"),
-    ")\n",
+    env!("ACTON_LONG_VERSION"),
+    "\n",
 );
 
 pub fn install() -> Result<CrashHandler, Error> {

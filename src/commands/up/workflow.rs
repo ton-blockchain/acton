@@ -21,12 +21,12 @@ pub(super) struct UpdateInfo {
 pub(super) fn check_update<C: ReleaseClient>(
     client: &C,
     current_version_str: &str,
+    current_is_trunk: bool,
 ) -> Result<UpdateInfo> {
     let release = client.get_release(None, false)?;
     let latest_version = release.tag_name;
-    let is_trunk = current_version_str == "trunk";
 
-    let update_available = if is_trunk {
+    let update_available = if current_is_trunk {
         // don't report anything for trunk release user
         false
     } else {
@@ -48,10 +48,12 @@ pub(super) fn check_update<C: ReleaseClient>(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn run_update<C: ReleaseClient>(
     client: &C,
     current_exe: &Path,
     current_version_str: &str,
+    current_is_trunk: bool,
     version: Option<String>,
     trunk: bool,
     stable: bool,
@@ -60,8 +62,7 @@ pub(super) fn run_update<C: ReleaseClient>(
     check_homebrew(current_exe, yes)?;
 
     let current_version = Version::parse(current_version_str);
-    let use_trunk_release =
-        version.is_none() && !stable && (trunk || current_version_str == "trunk");
+    let use_trunk_release = version.is_none() && !stable && (trunk || current_is_trunk);
 
     let release = client.get_release(version.as_deref(), use_trunk_release)?;
 
@@ -76,8 +77,8 @@ pub(super) fn run_update<C: ReleaseClient>(
     } else if stable {
         let clean_tag = release.tag_name.trim_start_matches('v');
         if let Ok(target_version) = Version::parse(clean_tag) {
-            if current_version_str == "trunk" {
-                // when we use trunk and user provide `--stable`, update to latest stable version
+            if current_is_trunk {
+                // when we are on a trunk build and user provide `--stable`, update to latest stable version
                 println!(
                     "  {} stable version {} (current: trunk)",
                     "Installing".green().bold(),

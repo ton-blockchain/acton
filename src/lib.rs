@@ -1,3 +1,4 @@
+pub mod build_info;
 pub mod commands;
 pub mod context;
 pub mod crash;
