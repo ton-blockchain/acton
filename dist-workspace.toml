@@ -11,6 +11,8 @@ dist = false
 ci = "github"
 # The installers to generate for each app
 installers = ["shell"]
+# The archive format to use for non-windows builds (defaults .tar.xz)
+unix-archive = ".tar.gz"
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu"]
 # Whether to auto-include files like READMEs, LICENSEs, and CHANGELOGs (default true)
@@ -29,3 +31,5 @@ pr-run-mode = "skip"
 install-path = "~/.acton/bin"
 # Whether to install an updater program
 install-updater = false
+# A URL to download artifacts from
+simple-download-url = "https://github.com/i582/acton-public/releases/download/{tag}"
