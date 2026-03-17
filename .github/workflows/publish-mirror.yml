@@ -38,11 +38,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
           RELEASE_TAG: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_tag }}"
-          RELEASE_TITLE: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_title }}"
-          RELEASE_PRERELEASE: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_is_prerelease }}"
+          PRERELEASE_FLAG: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_is_prerelease && '--prerelease' || '' }}"
+          ANNOUNCEMENT_TITLE: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_title }}"
+          ANNOUNCEMENT_BODY: "${{ fromJson(steps.release-metadata.outputs.manifest).announcement_github_body }}"
         # language=Bash
         run: |
           # Write and read notes from a file to avoid quoting breaking things
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
-          gh release create "$RELEASE_TAG" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+          gh release create "$RELEASE_TAG" \
+            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            --title "$ANNOUNCEMENT_TITLE" \
+            --notes-file "$RUNNER_TEMP/notes.txt" \
+            artifacts/*
