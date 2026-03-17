@@ -18,7 +18,7 @@ env:
 jobs:
   prepare:
     name: Resolve TON Commit
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
 
     permissions:
       contents: read

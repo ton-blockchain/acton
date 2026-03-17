@@ -19,7 +19,7 @@ env:
 jobs:
   check-versions:
     name: Check Release Versions
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
 
     permissions:
       contents: read
@@ -250,7 +250,7 @@ jobs:
 
   create-release:
     needs: [ build-linux, build-macos ]
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     if: github.event_name == 'push'
 
     permissions:
