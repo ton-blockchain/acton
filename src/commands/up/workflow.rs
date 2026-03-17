@@ -327,13 +327,8 @@ fn install_binary(tarball_path: &Path, current_exe: &Path, current_version: &str
     let backup_path = bin_dir.join(&backup_name);
 
     // 1. Create backup by copying current binary
-    if let Err(e) = fs::copy(current_exe, &backup_path) {
-        eprintln!(
-            "Warning: Failed to create backup at {}: {}",
-            backup_path.display(),
-            e
-        );
-    }
+    fs::copy(current_exe, &backup_path)
+        .with_context(|| format!("Failed to create backup at {}", backup_path.display()))?;
 
     // 2. Prepare new binary in a temporary file in the same directory to ensure atomic rename
     let temp_file = tempfile::NamedTempFile::new_in(bin_dir)

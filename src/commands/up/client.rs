@@ -49,12 +49,18 @@ impl GitHubClient {
 impl ReleaseClient for GitHubClient {
     fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
         let url = if let Some(v) = version {
-            let tag = if v.starts_with('v') {
-                v.to_string()
+            let normalized = v.trim();
+            if normalized.eq_ignore_ascii_case("trunk") || normalized.eq_ignore_ascii_case("vtrunk")
+            {
+                "https://api.github.com/repos/i582/acton/releases/tags/trunk".to_string()
             } else {
-                format!("v{v}")
-            };
-            format!("https://api.github.com/repos/i582/acton/releases/tags/{tag}")
+                let tag = if normalized.starts_with('v') {
+                    normalized.to_string()
+                } else {
+                    format!("v{normalized}")
+                };
+                format!("https://api.github.com/repos/i582/acton/releases/tags/{tag}")
+            }
         } else if trunk {
             "https://api.github.com/repos/i582/acton/releases/tags/trunk".to_string()
         } else {
@@ -86,22 +92,45 @@ impl ReleaseClient for GitHubClient {
     }
 
     fn list_releases(&self) -> Result<Vec<String>> {
-        let url = "https://api.github.com/repos/i582/acton/releases";
+        let mut tags = Vec::new();
+        let per_page = 100;
+        let mut page = 1;
 
-        let mut req = self.client.get(url).header(USER_AGENT, "acton-cli");
+        loop {
+            let url = format!(
+                "https://api.github.com/repos/i582/acton/releases?per_page={per_page}&page={page}"
+            );
 
-        if let Some(token) = &self.token {
-            req = req.header("Authorization", format!("token {token}"));
+            let mut req = self.client.get(&url).header(USER_AGENT, "acton-cli");
+
+            if let Some(token) = &self.token {
+                req = req.header("Authorization", format!("token {token}"));
+            }
+
+            let resp = req.send().context("Failed to fetch releases from GitHub")?;
+
+            if !resp.status().is_success() {
+                bail!("GitHub API request failed: {}", resp.status());
+            }
+
+            let releases: Vec<Release> = resp.json().context("Failed to parse releases JSON")?;
+            if releases.is_empty() {
+                break;
+            }
+
+            for release in &releases {
+                if !tags.iter().any(|tag| tag == &release.tag_name) {
+                    tags.push(release.tag_name.clone());
+                }
+            }
+
+            if releases.len() < per_page {
+                break;
+            }
+            page += 1;
         }
 
-        let resp = req.send().context("Failed to fetch releases from GitHub")?;
-
-        if !resp.status().is_success() {
-            bail!("GitHub API request failed: {}", resp.status());
-        }
-
-        let releases: Vec<Release> = resp.json().context("Failed to parse releases JSON")?;
-        Ok(releases.into_iter().map(|r| r.tag_name).collect())
+        Ok(tags)
     }
 
     fn download_asset(&self, asset: &Asset) -> Result<PathBuf> {

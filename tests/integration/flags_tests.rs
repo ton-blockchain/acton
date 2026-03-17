@@ -1089,6 +1089,36 @@ fn test_fail_on_diff_without_baseline_is_rejected_by_cli() {
 }
 
 #[test]
+fn test_up_rejects_conflicting_flag_combinations() {
+    let project = ProjectBuilder::new("up-conflicting-flags").build();
+    let cases: &[(&[&str], &[&str])] = &[
+        (&["0.1.0", "--trunk"], &["[VERSION]", "--trunk"]),
+        (&["0.1.0", "--stable"], &["[VERSION]", "--stable"]),
+        (&["0.1.0", "--list"], &["[VERSION]", "--list"]),
+        (&["0.1.0", "--check"], &["[VERSION]", "--check"]),
+        (&["--trunk", "--stable"], &["--trunk", "--stable"]),
+        (&["--trunk", "--list"], &["--trunk", "--list"]),
+        (&["--trunk", "--check"], &["--trunk", "--check"]),
+        (&["--stable", "--list"], &["--stable", "--list"]),
+        (&["--stable", "--check"], &["--stable", "--check"]),
+        (&["--list", "--check"], &["--list", "--check"]),
+    ];
+
+    for (args, expected_needles) in cases {
+        let mut cmd = project.acton().arg("up");
+        for arg in *args {
+            cmd = cmd.arg(arg);
+        }
+
+        let output = cmd.run().failure();
+        output.assert_stderr_contains("cannot be used with");
+        for needle in *expected_needles {
+            output.assert_stderr_contains(needle);
+        }
+    }
+}
+
+#[test]
 fn test_manifest_path_fmt_works_from_nested_directory() {
     let project = ProjectBuilder::new("manifest-path-fmt-from-nested")
         .contract("simple", UNFORMATTED_FMT_TOLK)

@@ -662,15 +662,26 @@ enum Commands {
         after_help = example_up_usage()
     )]
     Up {
-        #[arg(help = "Specific version to install")]
+        #[arg(
+            help = "Specific version to install",
+            conflicts_with_all = ["trunk", "stable", "list", "check"]
+        )]
         version: Option<String>,
-        #[arg(long, help = "Install the most recent trunk release")]
+        #[arg(
+            long,
+            help = "Install the most recent trunk release",
+            conflicts_with_all = ["stable", "list", "check"]
+        )]
         trunk: bool,
-        #[arg(long, help = "Install the latest stable release")]
+        #[arg(
+            long,
+            help = "Install the latest stable release",
+            conflicts_with_all = ["list", "check"]
+        )]
         stable: bool,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
-        #[arg(long, help = "List available versions")]
+        #[arg(long, help = "List available versions", conflicts_with = "check")]
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
         check: bool,
