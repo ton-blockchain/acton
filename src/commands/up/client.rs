@@ -7,8 +7,6 @@ use serde::Deserialize;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-// Keep the legacy public mirror as a fallback so `acton up` can still resolve
-// older releases published before the repository move.
 const GITHUB_RELEASE_REPOSITORIES: [&str; 2] = ["ton-blockchain/acton", "i582/acton-public"];
 
 #[derive(Deserialize, Debug, Clone)]
