@@ -99,7 +99,7 @@ Example:
 ```bash
 mkdir -p dist objs
 ARCHIVE_NAME=ton-objs-linux-x86_64.tar.gz # change for your platform
-curl -fL "https://github.com/i582/acton/releases/latest/download/${ARCHIVE_NAME}" \
+curl -fL "https://github.com/ton-blockchain/acton/releases/latest/download/${ARCHIVE_NAME}" \
   -o "dist/${ARCHIVE_NAME}"
 tar -C objs -xzf "dist/${ARCHIVE_NAME}"
 

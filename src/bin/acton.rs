@@ -1811,7 +1811,7 @@ fn main() {
     setup_panic!(
         Metadata::new("Acton", acton::build_info::SHORT_VERSION)
             .authors("TON Core")
-            .homepage("https://github.com/i582/acton")
+            .homepage("https://github.com/ton-blockchain/acton")
     );
     let _crash_handler = acton::crash::install().map_err(|err| {
         eprintln!(

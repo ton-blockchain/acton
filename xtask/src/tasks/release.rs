@@ -10,7 +10,7 @@ use clap::Args;
 
 const DEFAULT_BRANCH_NAME: &str = "master";
 const ORIGIN_REMOTE_NAME: &str = "origin";
-const GITHUB_REPOSITORY_URL: &str = "https://github.com/i582/acton";
+const GITHUB_REPOSITORY_URL: &str = "https://github.com/ton-blockchain/acton";
 
 const ACTON_TOML_PATH: &str = "Acton.toml";
 const CARGO_TOML_PATH: &str = "Cargo.toml";

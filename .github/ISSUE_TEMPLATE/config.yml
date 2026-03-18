@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security vulnerability report
-    url: https://github.com/i582/acton/security/advisories/new
+    url: https://github.com/ton-blockchain/acton/security/advisories/new
     about: Please report suspected vulnerabilities privately through GitHub Security Advisories, not through public issues.

@@ -31,7 +31,7 @@ val randomBytes = crypto.getSecureRandomBytes(32);
 struct crypto
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L22" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L22" />
 
 ## `KeyPair`
 
@@ -49,7 +49,7 @@ The `publicKey` is the corresponding 256-bit Ed25519 public key.
 
 Both fields are plain `int` for compatibility with TVM builtins like [isSignatureValid](../../../tolk_standard_library/common/#issignaturevalid).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L30" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L30" />
 
 ## `Mnemonic`
 
@@ -57,7 +57,7 @@ Both fields are plain `int` for compatibility with TVM builtins like [isSignatur
 type Mnemonic = array<string>
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L36" />
 
 ## `crypto.createMnemonic`
 
@@ -76,7 +76,7 @@ val words = crypto.createMnemonic();
 // words is an array of 24 strings
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L48" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L48" />
 
 ## `Mnemonic.toKeyPair`
 
@@ -97,7 +97,7 @@ val kp = words.toKeyPair();
 // kp.publicKey  — 32-byte public key
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L64" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L64" />
 
 ## `crypto.sign`
 
@@ -117,7 +117,7 @@ val kp = words.toKeyPair();
 val signature = crypto.sign(kp.privateKey, myCell);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L80" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L80" />
 
 ## `crypto.rawSign`
 
@@ -137,7 +137,7 @@ val hash = myCell.hash();
 val signature = crypto.rawSign(kp.privateKey, hash);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L95" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L95" />
 
 ## `crypto.getSecureRandomBytes`
 
@@ -157,7 +157,7 @@ Example:
 val randomBytes = crypto.getSecureRandomBytes(32);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L110" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L110" />
 
 ## `crypto.getFastRandomBytes`
 
@@ -177,7 +177,7 @@ Example:
 val bytes = crypto.getFastRandomBytes(16, 42);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L128" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L128" />
 
 ## `crypto.generateKeyPair`
 
@@ -195,7 +195,7 @@ Example:
 val kp = crypto.generateKeyPair();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L157" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L157" />
 
 ## `crypto.seedToKeyPair`
 
@@ -212,5 +212,5 @@ Example:
 val kp = crypto.seedToKeyPair(mySeed);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/crypto/crypto.tolk#L170" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto/crypto.tolk#L170" />
 
