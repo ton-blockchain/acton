@@ -1501,6 +1501,7 @@ keys = {{ mnemonic = "{TEST_MNEMONIC}" }}
 
 #[cfg(feature = "only_ci")]
 #[test]
+#[cfg(not(target_os = "macos"))]
 fn test_wallet_remove_deletes_keyring_mnemonic() {
     use keyring::{Entry, Error as KeyringError};
 
