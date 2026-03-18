@@ -7,7 +7,7 @@ use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
 use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
-use acton::commands::func2tolk::func2tolk_cmd;
+use acton::commands::func2tolk::{default_func2tolk_version, func2tolk_cmd};
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
@@ -703,6 +703,12 @@ enum Commands {
         warnings_as_comments: bool,
         #[arg(long, help = "Don't transform snake_case to camelCase")]
         no_camel_case: bool,
+        #[arg(
+            long,
+            default_value = default_func2tolk_version(),
+            help = "Version of @ton/convert-func-to-tolk to use"
+        )]
+        version: String,
     },
     #[command(
         about = "Inspect resolved project environment",
@@ -1485,6 +1491,10 @@ fn example_func2tolk_usage() -> StyledStr {
                 "Convert without camelCase renaming",
                 "acton func2tolk jetton-minter.fc --no-camel-case",
             ),
+            (
+                "Use a specific converter version",
+                "acton func2tolk jetton-minter.fc --version 1.0.0",
+            ),
         ],
         "https://github.com/ton-blockchain/convert-func-to-tolk",
     )
@@ -2195,7 +2205,8 @@ fn main() {
             output,
             warnings_as_comments,
             no_camel_case,
-        } => func2tolk_cmd(path, output, warnings_as_comments, no_camel_case),
+            version,
+        } => func2tolk_cmd(path, output, warnings_as_comments, no_camel_case, version),
         Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());
