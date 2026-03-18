@@ -56,5 +56,5 @@ cargo xtask release --version 0.22.0
 ## After the push
 
 After the tag is pushed, the GitHub `Release` workflow builds release
-artifacts, creates the GitHub release in `ton-blockchain/acton`, and publishes
-a legacy mirror release for backwards compatibility.
+artifacts, creates the GitHub release, and publishes the mirrored release to
+`i582/acton-public`.
