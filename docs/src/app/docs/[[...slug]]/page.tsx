@@ -62,7 +62,7 @@ export async function generateMetadata(
   return {
     title: page.data.title,
     description: page.data.description,
-    metadataBase: new URL('https://ton-blockchain.github.io/acton'),
+    metadataBase: new URL('https://i582.github.io/acton'),
     openGraph: {
       images: getPageImage(page).url,
     },
