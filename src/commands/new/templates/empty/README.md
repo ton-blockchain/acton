@@ -78,8 +78,8 @@ The generated project includes `.github/workflows/ci.yml`, which runs:
 
 ## Documentation
 
-- Quickstart: https://ton-blockchain.github.io/acton/docs/quickstart
-- Testing: https://ton-blockchain.github.io/acton/docs/commands/test
-- Scripts and deployment: https://ton-blockchain.github.io/acton/docs/commands/script
-- Wrappers: https://ton-blockchain.github.io/acton/docs/commands/wrapper
-- Wallets: https://ton-blockchain.github.io/acton/docs/commands/wallet
+- Quickstart: https://i582.github.io/acton/docs/quickstart
+- Testing: https://i582.github.io/acton/docs/commands/test
+- Scripts and deployment: https://i582.github.io/acton/docs/commands/script
+- Wrappers: https://i582.github.io/acton/docs/commands/wrapper
+- Wallets: https://i582.github.io/acton/docs/commands/wallet

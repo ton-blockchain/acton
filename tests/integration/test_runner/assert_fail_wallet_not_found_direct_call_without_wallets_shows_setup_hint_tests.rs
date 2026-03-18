@@ -54,7 +54,7 @@ fn assert_fail_wallet_not_found_direct_call_without_wallets_shows_setup_hint() {
             "Wallet el_missing_wallet not found in wallets.toml or global.wallets.toml. Wallets are not configured yet.",
         )
         .assert_stderr_contains(
-            "See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information",
+            "See https://i582.github.io/acton/docs/setup-wallets/ for more information",
         )
         .assert_contains("at scripts/el_assert_fail_wallet_not_found.tolk:5:5");
 }

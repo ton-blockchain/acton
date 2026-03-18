@@ -159,7 +159,7 @@ keys = {{ mnemonic-env = \"WALLET_MNEMONIC\" }}
 [wallets.deployer.expected]
 address-testnet = \"<<ADDRESS>>\"
 
-See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information
+See https://i582.github.io/acton/docs/setup-wallets/ for more information
 ",
                 failure.wallet_name.yellow(),
                 "acton wallet new".green(),
@@ -1432,7 +1432,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
                 "vm.registerLibrary(code)".yellow(),
                 "setupTests()".yellow(),
             )));
-            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/advanced/libraries/".to_owned()));
+            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://i582.github.io/acton/docs/advanced/libraries/".to_owned()));
         }
 
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);

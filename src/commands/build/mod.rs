@@ -88,7 +88,7 @@ name = \"MyContract\"
 src = \"contracts/my-contract.tolk\"
 depends = []
 
-See https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
+See https://i582.github.io/acton/docs/build-system/configuration-reference/#contracts-section for more information"
                 );
         return Ok(());
     };
