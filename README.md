@@ -46,6 +46,15 @@ acton --version
 For more installation details, see the
 [installation guide](https://i582.github.io/acton/docs/installation).
 
+## Support policy
+
+Acton is currently distributed as a public beta. The stable release channel is
+the latest numbered GitHub release, and the first-class platform matrix is
+macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). `trunk` builds installed
+via `acton up --trunk`, native Windows usage, and other source-built targets
+are beta / best-effort surfaces for now. The full policy is documented at
+[Support policy](https://i582.github.io/acton/docs/miscellaneous/support-policy).
+
 ## From zero to testnet
 
 ```bash
