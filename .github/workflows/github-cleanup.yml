@@ -2,8 +2,8 @@ name: Cleanup Unused GitHub Actions Cache
 
 on:
   schedule:
-    # 00:00 Europe/Moscow (21:00 UTC)
-    - cron: "0 21 * * *"
+    # 00:00 Europe/Moscow every 3rd day of the month (21:00 UTC)
+    - cron: "0 21 */3 * *"
   workflow_dispatch:
     inputs:
       dry_run:
