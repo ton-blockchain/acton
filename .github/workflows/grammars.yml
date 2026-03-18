@@ -23,7 +23,7 @@ permissions: { }
 jobs:
   tree-sitter-grammars:
     name: Test tree-sitter-${{ matrix.language }} grammar
-    runs-on: ubuntu-22.04
+    runs-on: ubicloud-standard-4-ubuntu-2204
     strategy:
       fail-fast: false
       matrix:

@@ -18,10 +18,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: ubuntu-22.04
+          - runner: ubicloud-standard-4-ubuntu-2204
             os: linux
             arch: x86_64
-          - runner: ubuntu-22.04-arm
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
             os: linux
             arch: aarch64
     env:

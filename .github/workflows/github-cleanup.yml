@@ -31,7 +31,7 @@ permissions: { }
 jobs:
   cleanup-cache:
     name: Delete unused caches
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
 
     permissions:
       actions: write

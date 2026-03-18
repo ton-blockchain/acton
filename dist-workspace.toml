@@ -38,4 +38,4 @@ hosting = ["simple", "github"]
 simple-download-url = "https://github.com/i582/acton-public/releases/download/{tag}"
 
 [dist.github-custom-runners]
-global = "ubuntu-latest"
+global = "ubicloud-standard-2"

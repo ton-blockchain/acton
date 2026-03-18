@@ -27,7 +27,7 @@ jobs:
   cleanup-cache-ubicloud:
     name: Delete caches via Ubicloud xtask
     if: github.repository == 'ton-blockchain/acton'
-    runs-on: ubuntu-22.04
+    runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
       contents: read
