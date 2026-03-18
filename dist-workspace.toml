@@ -9,6 +9,8 @@ cargo-dist-version = "0.31.0"
 dist = false
 # CI backends to support
 ci = "github"
+# Keep our customized release workflow instead of forcing cargo-dist's stock CI output.
+allow-dirty = ["ci"]
 # The installers to generate for each app
 installers = ["shell"]
 # The archive format to use for non-windows builds (defaults .tar.xz)
