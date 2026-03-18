@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Acton — TON Development Toolkit',
     description: 'Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.',
-    url: 'ton-blockchain.github.io/acton',
+    url: 'i582.github.io/acton',
     locale: 'en_US',
     type: 'website',
   },
