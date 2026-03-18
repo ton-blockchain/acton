@@ -12,7 +12,7 @@ Please use GitHub's private vulnerability reporting flow for this
 repository via the repository's **Security** tab, then **Advisories**, then
 **Report a vulnerability** or use the direct link below:
 
-https://github.com/i582/acton/security/advisories/new
+https://github.com/ton-blockchain/acton/security/advisories/new
 
 When possible, include:
 

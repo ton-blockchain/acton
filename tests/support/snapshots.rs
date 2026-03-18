@@ -143,7 +143,10 @@ fn build_redactions(project_path: &Path) -> snapbox::Redactions {
         .insert("[ACTON_VERSION]", format!("v{current_version}"))
         .unwrap();
     redactions
-        .insert("[ACTON_DOCS_URL]", "https://i582.github.io/acton/docs")
+        .insert(
+            "[ACTON_DOCS_URL]",
+            "https://ton-blockchain.github.io/acton/docs",
+        )
         .unwrap();
 
     redactions

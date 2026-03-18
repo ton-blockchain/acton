@@ -54,4 +54,4 @@ Examples:
      # Save compiled Fift files to a custom directory
      acton build --output-fift build/fift
 
-For more information, see https://i582.github.io/acton/docs/build-system
+For more information, see https://ton-blockchain.github.io/acton/docs/build-system

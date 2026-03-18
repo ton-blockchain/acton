@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use tolk_linter::diagnostic::{Annotation, Applicability, Diagnostic, DiagnosticTag, Severity};
 use tolk_resolver::{FileDb, Span};
 
-const DOCS_BASE_URL: &str = "https://i582.github.io/acton/docs";
+const DOCS_BASE_URL: &str = "https://ton-blockchain.github.io/acton/docs";
 const SOURCE_ROOT_URI_BASE_ID: &str = "SRCROOT";
 
 pub(crate) fn write_report(

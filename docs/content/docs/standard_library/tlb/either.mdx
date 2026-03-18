@@ -32,7 +32,7 @@ fun branchScore(choice: Either<uint32, uint32>): int {
 type Either<X, Y> = EitherLeft<X> | EitherRight<Y>
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L19" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/either.tolk#L19" />
 
 ## `Either<X, Y>.left`
 
@@ -44,7 +44,7 @@ fun Either<X, Y>.left(value: X): EitherLeft<X>
 Left constructor.
 Encodes with tag bit `0` followed by `value`.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L23" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/either.tolk#L23" />
 
 ## `Either<X, Y>.right`
 
@@ -56,7 +56,7 @@ fun Either<X, Y>.right(value: Y): EitherRight<Y>
 Right constructor.
 Encodes with tag bit `1` followed by `value`.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L30" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/either.tolk#L30" />
 
 ## `EitherLeft`
 
@@ -68,7 +68,7 @@ struct (0b0) EitherLeft<X> {
 
 Left variant with explicit TLB tag `0b0`.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L36" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/either.tolk#L36" />
 
 ## `EitherRight`
 
@@ -80,5 +80,5 @@ struct (0b1) EitherRight<X> {
 
 Right variant with explicit TLB tag `0b1`.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/either.tolk#L41" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/either.tolk#L41" />
 

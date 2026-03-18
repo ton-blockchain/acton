@@ -16,7 +16,7 @@ This is similar to the Option type in other programming languages.
 type Maybe<X> = Value<X> | None
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L3" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/maybe.tolk#L3" />
 
 ## `None`
 
@@ -26,7 +26,7 @@ struct (0b0) None
 
 Represents the absence of a value.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L6" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/maybe.tolk#L6" />
 
 ## `Value`
 
@@ -39,7 +39,7 @@ struct (0b1) Value<X> {
 
 Represents a present value of type X.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L9" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/maybe.tolk#L9" />
 
 ## `Maybe<X>.none`
 
@@ -54,7 +54,7 @@ Example:
 val empty = Maybe<slice>.none();
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L20" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/maybe.tolk#L20" />
 
 ## `Maybe<X>.some`
 
@@ -69,7 +69,7 @@ Example:
 val present = Maybe.some(42);
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L30" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/maybe.tolk#L30" />
 
 ## `Maybe<X>.unwrap`
 
@@ -93,7 +93,7 @@ val maybeValue = Maybe.some(42);
 val value = maybeValue.unwrap(); // Returns 42
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L49" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/maybe.tolk#L49" />
 
 ## `Maybe<X>.unwrapOr`
 
@@ -112,5 +112,5 @@ val maybeValue = Maybe<slice>.none();
 val name = maybeValue.unwrapOr("default"); // Returns "default"
 ```
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/lib/tlb/maybe.tolk#L66" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/tlb/maybe.tolk#L66" />
 

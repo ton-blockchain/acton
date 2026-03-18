@@ -17,7 +17,7 @@ fun getTvmRegisterC3(): continuation
 Usually `c3` has a continuation initialized by the whole code of the contract. It is used for function calls.
 The primitive returns the current value of `c3`.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L6" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L6" />
 
 ## `setTvmRegisterC3`
 
@@ -30,7 +30,7 @@ Note that after execution of this primitive the current code
 (and the stack of recursive function calls) won't change,
 but any other function call will use a function from the new code.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L14" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L14" />
 
 ## `transformSliceToContinuation`
 
@@ -41,7 +41,7 @@ fun transformSliceToContinuation(s: slice): continuation
 
 Transforms a slice into a simple ordinary continuation, with `c.code = s` and an empty stack and savelist.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L18" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L18" />
 
 ## `T.stackMoveToTop`
 
@@ -52,7 +52,7 @@ fun T.stackMoveToTop(mutate self): void
 
 Moves a variable to the top of the stack.
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L23" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L23" />
 
 ## `VmExitCode`
 
@@ -96,5 +96,5 @@ Exit code 0 indicates normal (successful) execution of the action phase.
 TON Blockchain reserves exit code values from 0 to 127.
 For custom errors, use numbers from 128 to 1024 (above is not recommended due to extra asm instructions).
 
-<SourceCodeLink href="https://github.com/i582/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L38" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/tvm-lowlevel.tolk#L38" />
 

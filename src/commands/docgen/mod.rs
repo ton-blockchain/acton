@@ -14,7 +14,7 @@ const DEFAULT_STDLIB_OUT: &str = "docs/content/docs/standard_library";
 const DEFAULT_TOLK_STDLIB_OUT: &str = "docs/content/docs/tolk_standard_library";
 const DEFAULT_LINTER_OUT: &str = "docs/content/docs/linting/rules";
 const TOLK_STDLIB_SRC: &str = "crates/tolkc/assets/tolk-stdlib";
-const GITHUB_SOURCE_BASE: &str = "https://github.com/i582/acton/blob/master";
+const GITHUB_SOURCE_BASE: &str = "https://github.com/ton-blockchain/acton/blob/master";
 
 #[derive(Debug, Clone)]
 struct DocgenOutputPaths {

@@ -31,4 +31,4 @@ Commands:
   func2tolk        <PATH>              Convert FunC files to Tolk via @ton/convert-func-to-tolk
   completions      <SHELL>             Generate shell completions for selected shell
 
-Learn more about Acton:                https://i582.github.io/acton/docs/welcome
+Learn more about Acton:                https://ton-blockchain.github.io/acton/docs/welcome

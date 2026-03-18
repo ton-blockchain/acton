@@ -38,4 +38,4 @@ Global options:
   -h, --help                           Print help
   -V, --version                        Print version
 
-Learn more about Acton:                https://i582.github.io/acton/docs/welcome
+Learn more about Acton:                https://ton-blockchain.github.io/acton/docs/welcome

@@ -1010,7 +1010,7 @@ fn example_test_usage() -> StyledStr {
 
     let _ = write!(
         writer,
-        "\nFor more information, see https://i582.github.io/acton/docs/test-runner"
+        "\nFor more information, see https://ton-blockchain.github.io/acton/docs/test-runner"
     );
 
     writer
@@ -1169,7 +1169,7 @@ fn example_build_usage() -> StyledStr {
 
     let _ = write!(
         writer,
-        "\nFor more information, see https://i582.github.io/acton/docs/build-system"
+        "\nFor more information, see https://ton-blockchain.github.io/acton/docs/build-system"
     );
 
     writer
@@ -1219,7 +1219,7 @@ fn example_disasm_usage() -> StyledStr {
 
     let _ = write!(
         writer,
-        "\nFor more information, see https://i582.github.io/acton/docs/commands/disasm"
+        "\nFor more information, see https://ton-blockchain.github.io/acton/docs/commands/disasm"
     );
 
     writer
@@ -1262,7 +1262,7 @@ fn example_new_usage() -> StyledStr {
                 "acton new my-project --name \"My Project\" --description \"Cool description\" --template counter --license MIT",
             ),
         ],
-        "https://i582.github.io/acton/docs/commands/new",
+        "https://ton-blockchain.github.io/acton/docs/commands/new",
     )
 }
 
@@ -1294,7 +1294,7 @@ fn example_wallet_usage() -> StyledStr {
                 "acton wallet export-mnemonic my-wallet",
             ),
         ],
-        "https://i582.github.io/acton/docs/commands/wallet",
+        "https://ton-blockchain.github.io/acton/docs/commands/wallet",
     )
 }
 
@@ -1315,7 +1315,7 @@ fn example_wrapper_usage() -> StyledStr {
                 "acton wrapper minter --ts --output-dir wrappers",
             ),
         ],
-        "https://i582.github.io/acton/docs/test-runner/generating-wrappers",
+        "https://ton-blockchain.github.io/acton/docs/test-runner/generating-wrappers",
     )
 }
 
@@ -1335,7 +1335,7 @@ fn example_script_usage() -> StyledStr {
                 "acton script scripts/deploy.tolk --broadcast --net mainnet",
             ),
         ],
-        "https://i582.github.io/acton/docs/scripting",
+        "https://ton-blockchain.github.io/acton/docs/scripting",
     )
 }
 
@@ -1345,7 +1345,7 @@ fn example_run_usage() -> StyledStr {
             "Run a custom script named 'deploy' with arguments",
             "acton run deploy 1 2 3",
         )],
-        "https://i582.github.io/acton/docs/commands/run",
+        "https://ton-blockchain.github.io/acton/docs/commands/run",
     )
 }
 
@@ -1355,7 +1355,7 @@ fn example_compile_usage() -> StyledStr {
             "Compile a Tolk contract and save as BOC",
             "acton compile contracts/main.tolk --boc main.boc",
         )],
-        "https://i582.github.io/acton/docs/commands/compile",
+        "https://ton-blockchain.github.io/acton/docs/commands/compile",
     )
 }
 
@@ -1365,7 +1365,7 @@ fn example_verify_usage() -> StyledStr {
             "Verify a contract with a specific address",
             "acton verify minter --address UQA...wwM",
         )],
-        "https://i582.github.io/acton/docs/contract-verification",
+        "https://ton-blockchain.github.io/acton/docs/contract-verification",
     )
 }
 
@@ -1396,7 +1396,7 @@ fn example_library_usage() -> StyledStr {
                 "acton library topup my-lib --duration 1y",
             ),
         ],
-        "https://i582.github.io/acton/docs/advanced/libraries",
+        "https://ton-blockchain.github.io/acton/docs/advanced/libraries",
     )
 }
 
@@ -1407,7 +1407,7 @@ fn example_up_usage() -> StyledStr {
             ("Switch to the trunk release", "acton up --trunk"),
             ("List all available versions", "acton up --list"),
         ],
-        "https://i582.github.io/acton/docs/installation",
+        "https://ton-blockchain.github.io/acton/docs/installation",
     )
 }
 
@@ -1466,7 +1466,7 @@ fn example_completions_usage() -> StyledStr {
             ),
             ("Generate static Zsh completions", "acton completions zsh"),
         ],
-        "https://i582.github.io/acton/docs/commands/shell-completions",
+        "https://ton-blockchain.github.io/acton/docs/commands/shell-completions",
     )
 }
 
@@ -1670,7 +1670,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
 
     let _ = writeln!(
         writer,
-        "\n\nLearn more about Acton:                {cyan}https://i582.github.io/acton/docs/welcome{cyan:#}"
+        "\n\nLearn more about Acton:                {cyan}https://ton-blockchain.github.io/acton/docs/welcome{cyan:#}"
     );
 
     writer
@@ -1811,7 +1811,7 @@ fn main() {
     setup_panic!(
         Metadata::new("Acton", acton::build_info::SHORT_VERSION)
             .authors("TON Core")
-            .homepage("https://github.com/i582/acton")
+            .homepage("https://github.com/ton-blockchain/acton")
     );
     let _crash_handler = acton::crash::install().map_err(|err| {
         eprintln!(

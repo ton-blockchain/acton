@@ -834,7 +834,9 @@ fn test_wallet_airdrop_without_name_fails_when_no_wallets_config_interactive() {
 
     session.expect("No wallets configured in wallets.toml or global.wallets.toml.");
     session.expect("To add a wallet use acton wallet new");
-    session.expect("See https://i582.github.io/acton/docs/setup-wallets/ for more information");
+    session.expect(
+        "See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more information",
+    );
     session.expect(Eof);
 }
 

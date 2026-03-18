@@ -13,11 +13,11 @@ import {getIllustrationForFeature} from '@/components/FeatureIllustrations';
 export const metadata: Metadata = {
   title: 'Acton — TON Development Toolkit',
   description: 'Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.',
-  metadataBase: new URL('https://i582.github.io/acton'),
+  metadataBase: new URL('https://ton-blockchain.github.io/acton'),
   openGraph: {
     title: 'Acton — TON Development Toolkit',
     description: 'Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.',
-    url: 'i582.github.io/acton',
+    url: 'ton-blockchain.github.io/acton',
     locale: 'en_US',
     type: 'website',
   },
