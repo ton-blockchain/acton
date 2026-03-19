@@ -782,6 +782,24 @@ struct TestStats {
     todo: usize,
 }
 
+fn boc_bytes(cell: &Cell) -> Arc<[u8]> {
+    Arc::from(Boc::encode(cell.clone()))
+}
+
+fn decode_optional_boc_base64_bytes(
+    boc_b64: Option<&str>,
+    label: &str,
+) -> anyhow::Result<Option<Arc<[u8]>>> {
+    match boc_b64.filter(|boc| !boc.is_empty()) {
+        Some(boc_b64) => {
+            let cell = Boc::decode_base64(boc_b64)
+                .map_err(|e| anyhow!("{label} is not valid BoC: {e}"))?;
+            Ok(Some(boc_bytes(&cell)))
+        }
+        None => Ok(None),
+    }
+}
+
 fn compile_test_file(
     file_cache: &mut FileBuildCache,
     file: &str,
@@ -795,7 +813,9 @@ fn compile_test_file(
                 fift_code: cache_entry.fift_code,
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
+                debug_mark_base64: cache_entry.debug_mark_base64,
                 source_map: cache_entry.source_map,
+                new_source_map: cache_entry.new_source_map,
                 abi: cache_entry.abi,
             },
         ));
@@ -856,8 +876,10 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         &tmp_test_filename,
         need_debug_info,
         &runner.acton_config,
-    )?;
+    );
     let _ = fs::remove_file(&tmp_test_filename);
+    let compilation_result = compilation_result
+        .map_err(|err| anyhow!("Cannot compile test file '{filepath}': {err}"))?;
     debug!(
         "Test file '{filepath}' compilation time: {:?}",
         now.elapsed()
@@ -868,33 +890,44 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         tolkc::CompilerResult::Error(error) => {
             let normalized_filepath = error.message.replace(".test.tolk.test.tolk", ".test.tolk");
             let trimmed_message = normalized_filepath.trim();
-            anyhow::bail!(trimmed_message.to_string())
+            anyhow::bail!("Cannot compile test file '{filepath}': {trimmed_message}")
         }
     };
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
+    let code_boc = boc_bytes(&code_cell);
+    let marks_boc =
+        decode_optional_boc_base64_bytes(result.debug_mark_base64.as_deref(), "debug marks")?;
     let source_map = result.source_map.unwrap_or_default();
+    let new_source_map = result.new_source_map.unwrap_or_default();
     let compiler_abi = result.abi.map(Arc::new);
     let stats = run_file_tests(
         runner,
         filepath,
         tests,
         &code_cell,
+        code_boc,
+        marks_boc,
         Arc::new(abi),
         compiler_abi,
         Arc::new(source_map),
+        Arc::new(new_source_map),
     )?;
     Ok(stats)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_file_tests(
     runner: &mut TestRunner,
     file_path: &str,
     tests: Vec<TestDescriptor>,
     code: &Cell,
+    code_boc: Arc<[u8]>,
+    marks_boc: Option<Arc<[u8]>>,
     abi: Arc<ContractAbi>,
     compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
     source_map: Arc<SourceMap>,
+    new_source_map: Arc<tolkc::SourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
@@ -944,6 +977,9 @@ fn run_file_tests(
             abi: abi.clone(),
             compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
+            new_source_map: new_source_map.clone(),
+            code_boc: code_boc.clone(),
+            marks_boc: marks_boc.clone(),
             show_bodies: runner.config.show_bodies,
             backtrace: runner.config.backtrace,
             execution: None,
@@ -999,6 +1035,18 @@ fn run_file_tests(
             get_result,
             ..
         } = result;
+        let mut assert_failure = assert_failure;
+
+        if let (Some(AssertFailure::GetMethod(failure)), GetMethodResult::Success(result)) =
+            (&mut assert_failure, &get_result)
+        {
+            failure.caller_trace = crate::retrace::find_tolk_execution_trace(
+                &result.vm_log,
+                Some(&new_source_map),
+                code_boc.as_ref(),
+                marks_boc.as_deref(),
+            );
+        }
 
         let (exit_code, gas_used) = match &get_result {
             GetMethodResult::Success(result) => {
@@ -1132,12 +1180,16 @@ fn run_file_tests(
                 runner.emulations.save_get_method(&test.name, get_result);
                 // TODO: remove this memoize somehow
                 let content: Arc<str> = fs::read_to_string(&file_path).unwrap_or_default().into();
+                let code_boc64 = Boc::encode_base64(code);
                 runner.build_cache.memoize(
                     &test.name,
                     &file_path,
-                    &Boc::encode_base64(code),
+                    &code_boc64,
+                    code_boc.clone(),
+                    marks_boc.clone(),
                     *code.repr_hash(),
                     source_map.clone(),
+                    new_source_map.clone(),
                     Some(
                         contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
                             .into(),

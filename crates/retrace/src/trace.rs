@@ -235,7 +235,7 @@ impl TraceStep {
     /// }
     /// ```
     #[must_use]
-    pub fn stack(&'_ self) -> Option<Vec<VmStackValue<'_>>> {
+    pub fn stack(&'_ self) -> Option<Vec<VmStackValue>> {
         match self {
             TraceStep::Execute { stack, .. } => Some(VmStack::new(stack).parsed()),
             _ => None,

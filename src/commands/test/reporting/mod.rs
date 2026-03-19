@@ -72,6 +72,12 @@ pub struct TestReport {
     #[serde(skip)]
     pub source_map: Arc<SourceMap>,
     #[serde(skip)]
+    pub new_source_map: Arc<tolkc::SourceMap>,
+    #[serde(skip)]
+    pub code_boc: Arc<[u8]>,
+    #[serde(skip)]
+    pub marks_boc: Option<Arc<[u8]>>,
+    #[serde(skip)]
     pub show_bodies: bool,
     #[serde(skip)]
     pub backtrace: Option<BacktraceMode>,

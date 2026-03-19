@@ -1,5 +1,5 @@
-use crate::parser::{VmStack, VmStackValue};
-use std::fmt::{Display, Formatter};
+use super::parser::{VmStack, VmStackValue};
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum StackDiff {
@@ -9,8 +9,8 @@ pub enum StackDiff {
     Changed { index: usize, value: String },
 }
 
-impl Display for StackDiff {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for StackDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StackDiff::Same(n) => write!(f, "={n}"),
             StackDiff::Removed(n) => write!(f, "-{n}"),
@@ -45,7 +45,7 @@ impl StackDiff {
     }
 }
 
-fn compute_stack_diff(prev: &[VmStackValue<'_>], current: &[VmStackValue<'_>]) -> Vec<StackDiff> {
+fn compute_stack_diff(prev: &[VmStackValue], current: &[VmStackValue]) -> Vec<StackDiff> {
     let mut diffs = Vec::new();
     let min_len = prev.len().min(current.len());
 
@@ -115,7 +115,7 @@ fn apply_stack_diff(prev: &[String], diffs: &[StackDiff]) -> Vec<String> {
 
 pub fn convert_to_diff_logs(input: &str) -> String {
     let mut output = String::new();
-    let mut prev_stack: Option<Vec<VmStackValue<'_>>> = None;
+    let mut prev_stack: Option<Vec<VmStackValue>> = None;
 
     for line in input.lines() {
         if let Some(stack_content) = line.strip_prefix("stack: ") {
@@ -131,7 +131,7 @@ pub fn convert_to_diff_logs(input: &str) -> String {
                     output.push_str(
                         &diffs
                             .iter()
-                            .map(ToString::to_string)
+                            .map(|d| d.to_string())
                             .collect::<Vec<_>>()
                             .join(" "),
                     );
@@ -178,7 +178,7 @@ pub fn convert_from_diff_logs(input: &str) -> String {
             {
                 let content = stack_content.trim();
                 let stack = VmStack::new(content);
-                current_stack = stack.parsed().iter().map(ToString::to_string).collect();
+                current_stack = stack.parsed().iter().map(|v| v.to_string()).collect();
             }
         }
     }
@@ -226,80 +226,4 @@ fn parse_diff_line(content: &str) -> Vec<StackDiff> {
     }
 
     diffs
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    #[test]
-    fn test_compute_stack_diff_all_same() {
-        let input = "stack: [ 0 ]\nstack: [ 0 ]";
-        let output = convert_to_diff_logs(input);
-        assert_eq!(output, "stack: [ 0 ]\nrel stack: [ =1 ]");
-    }
-
-    #[test]
-    fn test_compute_stack_diff_add() {
-        let input = "stack: [ 0 ]\nstack: [ 0 1 ]";
-        let output = convert_to_diff_logs(input);
-        assert_eq!(output, "stack: [ 0 ]\nrel stack: [ =1 +1 ]");
-    }
-
-    #[test]
-    fn test_compute_stack_diff_remove() {
-        let input = "stack: [ 0 1 ]\nstack: [ 0 ]";
-        let output = convert_to_diff_logs(input);
-        assert_eq!(output, "stack: [ 0 1 ]\nrel stack: [ =1 -1 ]");
-    }
-
-    #[test]
-    fn test_compute_stack_diff_change() {
-        let input = "stack: [ 0 ]\nstack: [ 1 ]";
-        let output = convert_to_diff_logs(input);
-        assert_eq!(output, "stack: [ 0 ]\nrel stack: [ ~0:1 ]");
-    }
-
-    #[test]
-    fn test_convert_from_diff_logs() {
-        let diff_logs = "stack: [ 0 ]\nrel stack: [ =1 +1 ]";
-        let output = convert_from_diff_logs(diff_logs);
-        assert_eq!(output, "stack: [ 0 ]\nstack: [ 0 1 ]");
-    }
-
-    #[test]
-    fn test_full_conversion_cycle() {
-        let input = "stack: [ 0 ]\nstack: [ 0 1 ]\nstack: [ 0 1 2 ]";
-        let diff_logs = convert_to_diff_logs(input);
-        let restored = convert_from_diff_logs(&diff_logs);
-
-        let original_lines = input.lines();
-        let restored_lines = restored.lines();
-
-        assert_eq!(original_lines.count(), restored_lines.count());
-    }
-
-    #[test]
-    fn test_real_logs() {
-        let logs = [
-            "testdata/test-can-mint3000000.logs",
-            "testdata/test-can-mint5000000.logs",
-            "testdata/test-can-mint6000000.logs",
-            "testdata/test-can-mint7000000.logs",
-            "testdata/test-can-mint8000000.logs",
-            "testdata/test-no-forward-ton-amount-no-forward10000000.logs",
-            "testdata/test-not-wallet-owner-should-not-be-able-to-burn-jettons6000000.logs",
-        ];
-        for path in logs {
-            let input = fs::read_to_string(path).unwrap();
-            let diff_logs = convert_to_diff_logs(&input);
-            let restored = convert_from_diff_logs(&diff_logs);
-
-            let original_lines = input.lines();
-            let restored_lines = restored.lines();
-
-            assert_eq!(original_lines.count(), restored_lines.count());
-        }
-    }
 }

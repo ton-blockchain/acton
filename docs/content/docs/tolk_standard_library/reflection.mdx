@@ -82,25 +82,16 @@ Useful for debugging or when preparing stack contents for RUNVM.
 
 ```tolk
 @pure
-fun reflect.serializationPrefixOf<T>(): int
+fun reflect.serializationPrefixOf<T>(): (int, int)
 ```
 
 Returns serialization prefix of a struct.
-Example: for `struct (0xF0) AssetRegular { ... }` will return `240`.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L51" />
-
-## `reflect.serializationPrefixLenOf`
-
-```tolk
-@pure
-fun reflect.serializationPrefixLenOf<T>(): int
+Example: for `struct (0xF0) AssetRegular { ... }` will return `(240, 8)`.
+```
+reflect.serializationPrefixOf<AssetRegular>().1   // 8
 ```
 
-Returns serialization prefix length of a struct.
-Example: for `struct (0xF0) AssetRegular { ... }` will return `16`.
-
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L57" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L54" />
 
 ## `reflect.estimateSerializationOf`
 
@@ -116,7 +107,7 @@ Example:
 reflect.estimateSerializationOf<int8?>()     // (1 9 0 0)
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L67" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L64" />
 
 ## `SourceLocation`
 
@@ -131,7 +122,7 @@ struct SourceLocation {
 Source location information, resolved at compile time.
 See [reflect.sourceLocation](#reflectsourcelocation) for examples.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L73" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L70" />
 
 ## `reflect.sourceLocation`
 
@@ -159,7 +150,7 @@ fun demo() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L97" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L94" />
 
 ## `reflect.sourceLocationAsString`
 
@@ -172,5 +163,5 @@ Behaves like [reflect.sourceLocation](#reflectsourcelocation), but returns a str
 `fileName` contains the full (real) path of the source file.
 Being used as a default parameter value, captures the caller's location.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L104" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/reflection.tolk#L101" />
 

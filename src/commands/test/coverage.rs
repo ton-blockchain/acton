@@ -196,7 +196,7 @@ fn process_throw_instruction(
     let elements = VmStack::new(stack).parsed();
 
     if let [.., VmStackValue::Integer(value)] = &elements[..] {
-        let taken = value == &"0";
+        let taken = value == "0";
 
         for loc in &step.locs {
             let file = &loc.loc.file;

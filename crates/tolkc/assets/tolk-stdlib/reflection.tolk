@@ -47,15 +47,12 @@ fun reflect.stackSizeOfObject<T>(anyVariable: T): int
     builtin
 
 /// Returns serialization prefix of a struct.
-/// Example: for `struct (0xF0) AssetRegular { ... }` will return `240`.
+/// Example: for `struct (0xF0) AssetRegular { ... }` will return `(240, 8)`.
+/// ```
+/// reflect.serializationPrefixOf<AssetRegular>().1   // 8
+/// ```
 @pure
-fun reflect.serializationPrefixOf<T>(): int
-    builtin
-
-/// Returns serialization prefix length of a struct.
-/// Example: for `struct (0xF0) AssetRegular { ... }` will return `16`.
-@pure
-fun reflect.serializationPrefixLenOf<T>(): int
+fun reflect.serializationPrefixOf<T>(): (int, int)
     builtin
 
 /// Estimate serialization size of any type.

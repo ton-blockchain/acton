@@ -25,6 +25,7 @@ Example: "a" + (ref "bc" + (ref "d" + (ref ""))) has depth 3.
 
 ```tolk
 @pure
+@inline_ref
 fun string.calculateLength(self): int
 ```
 
@@ -37,6 +38,7 @@ Since strings are stored in snake format (chain of cells), this requires travers
 
 ```tolk
 @pure
+@inline_ref
 fun string.hash(self): uint256
 ```
 
@@ -45,7 +47,7 @@ The hash is the same regardless of snake layout:
 "abcd", "ab" + (ref "cd"), "a" + (ref "bcd" + (ref "")) all produce the same hash.
 Uses FNV-1a hashing with standard 128-bit parameters.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L40" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L41" />
 
 ## `string.equalTo`
 
@@ -57,7 +59,7 @@ fun string.equalTo(self, another: string): bool
 Compares two strings, considering snake cells.
 For example, "abcd" is equal to "ab" + (ref "cd") is equal to "a" + (ref "bc" + (ref "d")).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L60" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L62" />
 
 ## `int.toDecimalString`
 
@@ -68,7 +70,7 @@ fun int.toDecimalString(self): string
 Converts an integer to its decimal string representation.
 Returns a string (a TVM cell on a stack).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L71" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L73" />
 
 ## `StringBuilder`
 
@@ -85,7 +87,7 @@ var s = StringBuilder.create().append("Hello, ").append(userName).append("!").bu
 ```
 After this, `s` will be a chain of cells: "Hello, " + (ref userName + (ref "!"))
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L105" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L107" />
 
 ## `StringBuilder.create`
 
@@ -98,7 +100,7 @@ Creates an empty `StringBuilder`.
 var s = StringBuilder.create().append(...).build();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L113" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L115" />
 
 ## `StringBuilder.append`
 
@@ -108,22 +110,24 @@ fun StringBuilder.append(mutate self, s: string): self
 
 Appends a string to the builder. The string may itself be a snake chain.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L118" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L120" />
 
 ## `StringBuilder.appendInt`
 
 ```tolk
+@inline_ref
 fun StringBuilder.appendInt(mutate self, n: int): self
 ```
 
 Appends an integer as its decimal representation.
 For example, `sb.appendInt(-42)` appends "-42".
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L125" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L127" />
 
 ## `StringBuilder.build`
 
 ```tolk
+@inline_ref
 fun StringBuilder.build(self): string
 ```
 
@@ -131,5 +135,5 @@ Builds the final string by concatenating all appended parts into a snake chain.
 The result is a valid snake-format string where each cell contains data and optionally a ref to next.
 Throws an exception if `append()` was not called (a builder is empty).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L133" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolkc/assets/tolk-stdlib/strings.tolk#L136" />
 

@@ -521,7 +521,7 @@ fn parse_stack_args(args: Vec<String>) -> anyhow::Result<Tuple> {
     Ok(Tuple(items).unwrap_tuple())
 }
 
-fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<TupleItem> {
+fn convert_vm_value_to_tuple_item(value: VmStackValue) -> anyhow::Result<TupleItem> {
     match value {
         VmStackValue::Null => Ok(TupleItem::Null),
         VmStackValue::NaN => Ok(TupleItem::Nan),
@@ -548,12 +548,12 @@ fn convert_vm_value_to_tuple_item(value: VmStackValue<'_>) -> anyhow::Result<Tup
         VmStackValue::Continuation(_) => {
             Err(anyhow!("Continuation not supported in script arguments"))
         }
-        VmStackValue::String(s) => Ok(TupleItem::Cell(string_to_slice(s)?)),
+        VmStackValue::String(s) => Ok(TupleItem::Cell(string_to_slice(&s)?)),
         VmStackValue::Unknown => Err(anyhow!("Unknown stack value type")),
     }
 }
 
-fn convert_cell_like(cell_like: CellLike<'_>) -> anyhow::Result<Cell> {
+fn convert_cell_like(cell_like: CellLike) -> anyhow::Result<Cell> {
     match cell_like {
         CellLike::Cell(hex) => Ok(Boc::decode_hex(hex)?),
         CellLike::Builder(hex) => Ok(Boc::decode_hex(hex)?),

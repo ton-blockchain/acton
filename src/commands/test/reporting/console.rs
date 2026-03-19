@@ -7,7 +7,6 @@ use acton_config::color::OwoColorize;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
-use ton_source_map::SourceLocation;
 
 const CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT: i32 = 678;
 const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE: i32 = 679;
@@ -287,7 +286,7 @@ fn process_test_fail(
     }
 
     if exec.expected_exit_code == 0 {
-        process_nonzero_exit_code(test, result, result.vm_exit_code);
+        process_nonzero_exit_code(test, result, result.vm_exit_code, &fmt);
     }
 }
 
@@ -428,68 +427,102 @@ fn process_assert_failure(failure: &AssertFailure, test: &TestReport, fmt: &Form
     }
 }
 
-fn process_nonzero_exit_code(test: &TestReport, result: &GetMethodResultSuccess, exit_code: i32) {
+fn process_nonzero_exit_code(
+    test: &TestReport,
+    result: &GetMethodResultSuccess,
+    exit_code: i32,
+    fmt: &FormatterContext<'_>,
+) {
     println!(
         "    {} exit_code={}",
         "└─".dimmed(),
         exit_code.to_string().yellow()
     );
 
-    let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.source_map);
+    let exit_code_info = retrace::find_tolk_exception_info(
+        &result.vm_log,
+        Some(&test.new_source_map),
+        test.code_boc.as_ref(),
+        test.marks_boc.as_deref(),
+    );
+    let get_method_info = fmt.find_failed_get_method_exception(test);
+
+    let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+
+    if let Some(info) = &get_method_info {
+        let mut nested = vec![format!(
+            "at {}",
+            FormatterContext::format_tolk_location(&info.loc).dimmed()
+        )];
+        nested.extend(FormatterContext::format_tolk_backtrace(&info.backtrace));
+        groups.push(("Get method:".to_string(), nested));
+    }
 
     if let Some(info) = &exit_code_info {
-        if let Some(loc) = &info.loc {
-            println!(
-                "      {} at {}",
-                "├─".dimmed(),
-                format!(
-                    "{}:{}:{}",
-                    SourceLocation::normalize_path(&loc.file),
-                    loc.line + 1,
-                    loc.column + 2
-                )
-                .dimmed(),
-            );
-
-            let backtrace_lines = FormatterContext::format_backtrace(&info.backtrace);
-            for line in backtrace_lines {
-                println!("      {}     {}", "│".dimmed(), line);
+        if get_method_info.is_some() {
+            let mut nested = FormatterContext::format_tolk_backtrace(&info.backtrace);
+            if nested.is_empty() {
+                nested.push(format!(
+                    "at {}",
+                    FormatterContext::format_tolk_location(&info.loc).dimmed()
+                ));
             }
-        } else if test.backtrace.is_none() {
-            println!(
-                "      {} Re-run with {} to get more information",
-                "├─".dimmed(),
+            groups.push(("Called from:".to_string(), nested));
+        } else {
+            groups.push((
+                format!(
+                    "at {}",
+                    FormatterContext::format_tolk_location(&info.loc).dimmed()
+                ),
+                FormatterContext::format_tolk_backtrace(&info.backtrace),
+            ));
+        }
+    } else if test.backtrace.is_none() {
+        groups.push((
+            format!(
+                "Re-run with {} to get more information",
                 "--backtrace full".yellow()
-            );
-        }
-
-        if !info.description.is_empty() {
-            println!("      {} {}", "├─".dimmed(), info.description.dimmed());
-        }
+            ),
+            Vec::new(),
+        ));
     }
 
     if let Some(info) = exit_codes::find(exit_code) {
-        let should_show_fallback_description = exit_code_info
-            .as_ref()
-            .is_none_or(|exception| exception.description.is_empty());
-        if should_show_fallback_description {
-            // Don't show duplicate info
-            println!("      {} {}", "├─".dimmed(), info.description.dimmed());
-        }
-        println!("      {} Phase: {}", "└─".dimmed(), info.phase.dimmed());
+        groups.push((info.description.dimmed().to_string(), Vec::new()));
+        groups.push((format!("Phase: {}", info.phase.dimmed()), Vec::new()));
+    } else if let Some(info) = &exit_code_info {
+        let description = if info.description.is_empty() {
+            format!("uncaught exception {}", info.errno)
+        } else {
+            info.description.clone()
+        };
+        groups.push((description.dimmed().to_string(), Vec::new()));
     }
 
     // Special throw exit codes
     if exit_code == CANNOT_RUN_GET_METHOD_OD_UNDEPLOYED_CONTRACT {
-        println!(
-            "      {} Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
-            "└─".dimmed(),
-            "--fork-net".yellow(),
-        );
+        groups.push((
+            format!(
+                "Cannot run method of not deployed contract, make sure you're deployed contract first or passed {}",
+                "--fork-net".yellow()
+            ),
+            Vec::new(),
+        ));
     } else if exit_code == CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE {
-        println!(
-            "      {} Cannot run method of contract without code",
-            "└─".dimmed()
-        );
+        groups.push((
+            "Cannot run method of contract without code".to_string(),
+            Vec::new(),
+        ));
+    }
+
+    for (idx, (line, nested)) in groups.iter().enumerate() {
+        let is_last = idx + 1 == groups.len();
+        let branch = if is_last { "└─" } else { "├─" };
+        println!("      {} {}", branch.dimmed(), line);
+
+        let nested_branch = if is_last { " " } else { "│" };
+        for nested_line in nested {
+            println!("      {}     {}", nested_branch.dimmed(), nested_line);
+        }
     }
 }

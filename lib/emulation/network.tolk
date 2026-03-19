@@ -134,7 +134,7 @@ fun OutMessages.at<Msg>(self, index: int): MessageRelaxed<Msg> {
                 format4(
                     "Out message is not a `{}` (opcode: 0x{:x}), but `{}` (opcode: 0x{:x})",
                     reflect.typeNameOf<Msg>(),
-                    reflect.serializationPrefixOf<Msg>(),
+                    reflect.serializationPrefixOf<Msg>().0,
                     opcodeTypeName == null ? "" : opcodeTypeName,
                     opcode,
                 ),
@@ -1293,7 +1293,7 @@ fun tuple.fromTuple(data: tuple): tuple {
 }
 
 fun T.externalOutPrefix(): int {
-    return reflect.serializationPrefixOf<T>();
+    return reflect.serializationPrefixOf<T>().0;
 }
 
 fun unknown.externalOutPrefix(): int {
@@ -1301,7 +1301,7 @@ fun unknown.externalOutPrefix(): int {
 }
 
 fun T.externalOutPrefixLen(): int {
-    return reflect.serializationPrefixLenOf<T>();
+    return reflect.serializationPrefixOf<T>().1;
 }
 
 fun unknown.externalOutPrefixLen(): int {
@@ -1365,7 +1365,7 @@ fun impl.runGetMethodById<Ret, Args = tuple>(
 }
 
 fun T.getDeclaredPackPrefix2(): int {
-    return reflect.serializationPrefixOf<T>();
+    return reflect.serializationPrefixOf<T>().0;
 }
 
 fun unknown.getDeclaredPackPrefix2(): int {

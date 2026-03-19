@@ -45,6 +45,26 @@ use tycho_types::models::{
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
 
+fn boc_bytes(cell: &Cell) -> Arc<[u8]> {
+    Arc::from(Boc::encode(cell.clone()))
+}
+
+fn decode_boc_base64_bytes(boc_b64: &str, label: &str) -> anyhow::Result<Arc<[u8]>> {
+    let cell =
+        Boc::decode_base64(boc_b64).with_context(|| format!("Failed to decode {label} BoC"))?;
+    Ok(boc_bytes(&cell))
+}
+
+fn decode_optional_boc_base64_bytes(
+    boc_b64: Option<&str>,
+    label: &str,
+) -> anyhow::Result<Option<Arc<[u8]>>> {
+    match boc_b64.filter(|boc| !boc.is_empty()) {
+        Some(boc_b64) => decode_boc_base64_bytes(boc_b64, label).map(Some),
+        None => Ok(None),
+    }
+}
+
 extension!(build in (Context) with (path: String, name: String) using build_impl);
 fn build_impl(
     ctx: &mut Context,
@@ -120,19 +140,31 @@ fn build_impl(
         let elapsed = start_time.elapsed();
         info!("Build {path} from file cache (.acton/cache) in {elapsed:?}");
 
+        let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
+            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
+        let code_boc = boc_bytes(&code_cell);
+        let marks_boc = decode_optional_boc_base64_bytes(
+            cached_entry.debug_mark_base64.as_deref(),
+            "cached debug marks",
+        )?;
         let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
         ctx.build.build_cache.memoize(
             &name,
             Path::new(&path),
             &cached_entry.code_boc64,
+            code_boc,
+            marks_boc,
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             cached_entry.source_map.clone().unwrap_or_default().into(),
+            cached_entry
+                .new_source_map
+                .clone()
+                .unwrap_or_default()
+                .into(),
             Some(contract_abi(content, &path, &mappings).into()),
             cached_entry.abi.clone().map(Into::into),
         );
 
-        let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
-            .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
         stk.push(TupleItem::Cell(code_cell));
         return Ok(());
     }
@@ -159,18 +191,26 @@ fn build_impl(
             }
 
             let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
+            let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
+                anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
+            })?;
+            let code_boc = boc_bytes(&code_cell);
+            let marks_boc = decode_optional_boc_base64_bytes(
+                success.debug_mark_base64.as_deref(),
+                "compiled debug marks",
+            )?;
             ctx.build.build_cache.memoize(
                 &name,
                 Path::new(&path),
                 &success.code_boc64,
+                code_boc,
+                marks_boc,
                 HashBytes::from_str(&success.code_hash_hex)?,
                 success.source_map.unwrap_or_default().into(),
+                success.new_source_map.unwrap_or_default().into(),
                 Some(contract_abi(content, &path, &mappings).into()),
                 success.abi.clone().map(Into::into),
             );
-            let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
-                anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
-            })?;
             stk.push(TupleItem::Cell(code_cell));
         }
         tolkc::CompilerResult::Error(error) => {
@@ -1309,11 +1349,23 @@ fn run_get_method_impl(
         prev_blocks_info: None,
     };
 
-    let source_map = ctx
+    let compilation_result = ctx
         .build
         .build_cache
-        .result_for_code(&Some(code))
-        .map(|res| res.1.source_map);
+        .result_for_code(&Some(code.clone()))
+        .map(|(_, result)| result);
+    let source_map = compilation_result
+        .as_ref()
+        .map(|result| result.source_map.clone());
+    let new_source_map = compilation_result
+        .as_ref()
+        .map(|result| result.new_source_map.clone());
+    let marks_boc = compilation_result
+        .as_ref()
+        .and_then(|result| result.marks_boc.clone());
+    let code_boc = compilation_result
+        .as_ref()
+        .map_or_else(|| boc_bytes(&code), |result| result.code_boc.clone());
 
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
@@ -1408,9 +1460,13 @@ fn run_get_method_impl(
                     None
                 };
 
-                let location = source_map.as_ref().and_then(|map| {
-                    retrace::find_exception_info(&result.vm_log, map).and_then(|info| info.loc)
-                });
+                let location = retrace::find_tolk_exception_info(
+                    &result.vm_log,
+                    new_source_map.as_deref(),
+                    code_boc.as_ref(),
+                    marks_boc.as_deref(),
+                )
+                .map(|info| info.loc);
 
                 *ctx.asserts.assert_failure =
                     Some(AssertFailure::GetMethod(GetMethodAssertFailure {
@@ -1418,7 +1474,11 @@ fn run_get_method_impl(
                         vm_exit_code: result.vm_exit_code,
                         suggested_name,
                         vm_log: result.vm_log,
+                        code_boc,
+                        marks_boc,
                         source_map,
+                        new_source_map,
+                        caller_trace: None,
                         location,
                     }));
 

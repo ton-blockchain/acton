@@ -16,10 +16,12 @@ ton-objs = { workspace = true, features = ["tolk"] }
 ton-source-map = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_path_to_error = { workspace = true }
 include_dir = { workspace = true }
 rustc-hash = { workspace = true }
 dunce = { workspace = true }
 anyhow = { workspace = true }
+tycho-types = "0.3.1"
 
 [lints]
 workspace = true

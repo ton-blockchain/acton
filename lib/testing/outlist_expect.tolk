@@ -70,7 +70,7 @@ fun Expectation<OutActionList>.toBeSendMessageAt<Msg>(self, index: int): void {
                     format4(
                         "Out action is a send message, but it cannot be load as a `{}` (opcode: 0x{:x}) since body has opcode 0x{:x}{}",
                         reflect.typeNameOf<Msg>(),
-                        reflect.serializationPrefixOf<Msg>(),
+                        reflect.serializationPrefixOf<Msg>().0,
                         opcode,
                         opcodeTypeName == null ? "" : format1(" ({})", opcodeTypeName),
                     ),

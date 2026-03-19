@@ -33,7 +33,7 @@ type builder = builtin
 
 /// `continuation` is an "executable cell" representing executable TVM bytecode.
 /// They are used to manage execution flow in TVM programs and serve as
-/// the basis for function calls, exception handling, and control flow operations. 
+/// the basis for function calls, exception handling, and control flow operations.
 type continuation = builtin
 
 /// `address` represents a standard (internal) address: workchain + hash.
@@ -61,12 +61,12 @@ type never = builtin
 
 /// `int8`, `int32`, `int222`, etc. is "a fixed-width signed integer with N bits", N <= 257.
 /// Note: it's still `int` at runtime, you can assign "100500" to "int8":
-/// overflow will happen at serialization to a cell/builder, NOT at assignment. 
+/// overflow will happen at serialization to a cell/builder, NOT at assignment.
 type intN = builtin
 
 /// `uint32`, `uint64`, `uint111`, etc. is "a fixed-width unsigned integer with N bits", N <= 256.
 /// Note: it's still `int` at runtime, you can assign "100500" to "uint8":
-/// overflow will happen at serialization to a cell/builder, NOT at assignment. 
+/// overflow will happen at serialization to a cell/builder, NOT at assignment.
 type uintN = builtin
 
 /// `coins` is a special primitive representing "nanotoncoins". One TON = 10^9 nanotoncoins.
@@ -74,16 +74,16 @@ type uintN = builtin
 /// Arithmetic operations on `coins` degrade to 257-bit `int` type.
 type coins = builtin
 
-/// `varint16` is `int` at runtime, but serialized as "variadic signed int", -2^119 <= X < 2^119. 
+/// `varint16` is `int` at runtime, but serialized as "variadic signed int", -2^119 <= X < 2^119.
 type varint16 = builtin
 
-/// `varuint16` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^120. 
+/// `varuint16` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^120.
 type varuint16 = builtin
 
-/// `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247. 
+/// `varint32` is `int` at runtime, but serialized as "variadic signed int", -2^247 <= X < 2^247.
 type varint32 = builtin
 
-/// `varuint32` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^248. 
+/// `varuint32` is `int` at runtime, but serialized as "variadic unsigned int", 0 <= X < 2^248.
 type varuint32 = builtin
 
 /// `string` represents text data stored as a cell in snake format.
@@ -94,7 +94,7 @@ type varuint32 = builtin
 type string = builtin
 
 /// `bits256`, `bits111`, etc. is "a fixed-width slice with N bits and 0 refs", N <= 1023.
-/// Note: use `as` operator to convert `slice` to `bitsN`: `someSlice as bits256` 
+/// Note: use `as` operator to convert `slice` to `bitsN`: `someSlice as bits256`
 /// (manually writing `as` enforces you to think that this conversion is correct).
 /// Note: similar to `intN`, you can assign an invalid slice to `bitsN`,
 /// an error will be fired at serialization with [T.toCell] and similar, NOT at assignment.
@@ -140,7 +140,7 @@ type unknown = builtin
 /// // wrong:
 /// var elem = someTuple.get(0);    // unknown
 /// return elem + 123;              // error, can not apply `+`
-/// 
+///
 /// // correct:
 /// var elem = someTuple.get(0) as int;
 /// return elem + 123;
@@ -151,7 +151,7 @@ type tuple = array<unknown>
 /// `[1, [2, [3, null]]]` represents a list `[1, 2, 3]`.
 /// Unlike `array<T>`, it can represent a list longer than 255 elements,
 /// but it has access only to the frontmost element (head).
-/// 
+///
 /// To use lisp-style list, import the `@stdlib/lisp-lists` and call its methods.
 /// ```
 /// var list: lisp_list<int> = [];
@@ -197,14 +197,14 @@ struct Cell<T> {
  */
 
 /// Creates a TVM tuple with zero elements.
-/// Deprecated since Tolk v1.3. Use `[]` to get an empty array instead: 
+/// Deprecated since Tolk v1.3. Use `[]` to get an empty array instead:
 /// ```
 /// // old way, deprecated:
 /// var t = createEmptyTuple();
-/// 
+///
 /// // new way, preferred:
 /// var t = [];   // array<unknown>
-/// 
+///
 /// // create an empty typed array:
 /// var numbers: array<int> = [];
 /// ```
@@ -250,13 +250,13 @@ fun array<T>.last(self): T
 fun array<T>.pop(mutate self): T
     builtin
 
-/// Packs any object from a stack to a tuple. 
+/// Packs any object from a stack to a tuple.
 /// An object occupies N slots on a stack — the tuple will be of size N.
 /// It works identically as casting an object to `unknown`.
 /// Example:
 /// ```
 /// struct Point { x: int, y: int }
-/// 
+///
 /// var p: Point = { x: 1, y: 2 };
 /// var t = p.toTuple();     // [ 1 2 ]
 /// p = Point.fromTuple(t);  // back
@@ -373,7 +373,7 @@ fun contract.getOriginalBalanceWithExtraCurrencies(): [coins, ExtraCurrenciesMap
 fun contract.getData(): cell
     asm "c4 PUSH"
 
-/// Sets the persistent contract storage. 
+/// Sets the persistent contract storage.
 fun contract.setData(c: cell): void
     asm "c4 POP"
 
@@ -658,16 +658,16 @@ fun slice.hash(self): uint256
 fun builder.hash(self): uint256
     asm "HASHBU"
 
-/// Computes sha256 of the data bits of a slice (without refs). 
+/// Computes sha256 of the data bits of a slice (without refs).
 /// If the bit length is not divisible by eight, throws a cell underflow exception.
 @pure
 fun slice.bitsHash(self): uint256
     asm "SHA256U"
 
-/// Checks whether two cells are identical: have equal content ans refs of arbitrary depth.
-/// Actually, comparison is done by hashes.
+/// Checks whether two cells are equal by comparing their hashes.
+/// Used internally by the compiler for operators `==` and `!=` on cells.
 @pure
-fun cell.equalTo(self, another: cell): bool
+fun cell.hashEqual(self, another: cell): bool
     asm "HASHCU" "SWAP" "HASHCU" "EQUAL"
 
 /// Checks the Ed25519-`signature` of a `hash` (a 256-bit unsigned integer, usually computed as the hash of some data)
@@ -798,7 +798,7 @@ fun debug.dumpStack(): void
 /*
     Implementation of `map<K, V>` and methods over it.
 
-    Note: maps in TVM are called "dictionaries". They are stored as nested cells 
+    Note: maps in TVM are called "dictionaries". They are stored as nested cells
   (each value in a separate cell, probably with intermediate cells-nodes).
   Constructing even small dicts is gas-expensive, because cell creation costs a lot.
 
@@ -834,7 +834,7 @@ fun map<K, V>.toLowLevelDict(self): dict
     asm "NOP"
 
 /// Checks whether a map is empty (whether a cell is null).
-/// 
+///
 /// Note: a check `m == null` will not work, use `m.isEmpty()`.
 @pure
 fun map<K, V>.isEmpty(self): bool
@@ -901,7 +901,7 @@ fun map<K, V>.addIfNotExists(mutate self, key: K, value: V): bool
 fun map<K, V>.addOrGetExisting(mutate self, key: K, value: V): MapLookupResult<V>
     builtin
 
-/// Delete an element at the key. Returns whether an element was deleted. 
+/// Delete an element at the key. Returns whether an element was deleted.
 @pure
 fun map<K, V>.delete(mutate self, key: K): bool
     builtin
@@ -1410,7 +1410,7 @@ fun slice.isEndOfBits(self): bool
 fun slice.isEndOfRefs(self): bool
     asm "SREMPTY"
 
-/// Checks whether data parts of two slices coincide.
+/// Checks whether data parts of two slices coinside.
 @pure
 fun slice.bitsEqual(self, b: slice): bool
     asm "SDEQ"
@@ -1452,7 +1452,7 @@ fun address.getWorkchain(self): int8
 
 /// Creates a slice representing "none external address" (TL addr_none$00 — two zero bits).
 /// Note! Use this in combination with EXTERNAL addresses (e.g. for [createExternalLogMessage]).
-/// To represent "internal or none" address (which you most likely need to), 
+/// To represent "internal or none" address (which you most likely need to),
 /// use `address?` (nullable) and `null` accordingly.
 @pure
 fun createAddressNone(): any_address
@@ -1465,7 +1465,7 @@ fun any_address.isNone(self): bool
     asm "b{00} SDBEGINSQ" "NIP"
 
 /// Returns if "any address" is a standard (internal) address: workchain + hash.
-/// Then it can be safely cast to `address`. 
+/// Then it can be safely cast to `address`.
 /// In TL/B, it's addr_std$10.
 @pure
 fun any_address.isInternal(self): bool
@@ -1561,7 +1561,7 @@ fun reserveExtraCurrenciesOnBalance(nanoTonCoins: coins, extraAmount: dict, rese
     ```
  */
 
-/// mode = 0 is used for ordinary messages; the gas fees are deducted from the sending amount; action phases should NOT be ignored.
+/// mode = 0 is used for ordinary messages; the gas fees are deducted from the senging amount; action phaes should NOT be ignored.
 const SEND_MODE_REGULAR = 0
 /// +1 means that the sender wants to pay transfer fees separately.
 const SEND_MODE_PAY_FEES_SEPARATELY = 1
@@ -1583,7 +1583,7 @@ const SEND_MODE_ESTIMATE_FEE_ONLY = 1024
 
 /// `ExtraCurrenciesMap` represents a dictionary of "extra currencies" other than TON coin.
 /// They can be attached to a message (incoming and outgoing) and stored on contract's balance.
-/// It's a dictionary `[currencyID => amount]` (amount is like `coins`, but encoded with a high precision). 
+/// It's a dictionary `[currencyID => amount]` (amount is like `coins`, but encoded with a high precision).
 type ExtraCurrenciesMap = map<int32, varuint32>
 
 /// `ContractState` is "code + data" of a contract.
@@ -1615,7 +1615,7 @@ struct AddressShardingOptions {
 /// ```
 /// You just provide code+data, and the compiler automatically calculates the destination address,
 /// because in TON, the address of a contract, by definition, is a hash of its initial state.
-/// You can also use it without sending a message. 
+/// You can also use it without sending a message.
 /// See [AutoDeployAddress.calculateAddress].
 struct AutoDeployAddress {
     workchain: int8 = BASECHAIN
@@ -1663,10 +1663,10 @@ fun AutoDeployAddress.addressMatches(self, addr: address): bool
 ///     bounce: BounceMode.Only256BitsOfBody,
 ///     ...
 /// });
-/// 
+///
 /// fun onBouncedMessage(in: InMessageBounced) {
 ///     // in.bouncedBody is populated depending on BounceMode
-///     // for instance, "Only256BitsOfBody" means 
+///     // for instance, "Only256BitsOfBody" means
 ///     // "bounced prefix 0xFFFFFFFF" and 256 bits of data
 ///     in.bouncedBody.skipBouncedPrefix();
 ///     val originalOpcode = in.bouncedBody.loadUint(32);
@@ -1726,7 +1726,7 @@ fun createMessage<TBody>(options: CreateMessageOptions<TBody>): OutMessage
 /// It includes some "topic" (arbitrary number), that determines the format of the message body.
 /// For example, you emit "deposit event" (reserving topic "deposit" = 123):
 /// ```
-/// dest: ExtOutLogBucket { topic: 123 }, 
+/// dest: ExtOutLogBucket { topic: 123 },
 /// body: DepositData { ... }
 /// ```
 /// and external indexers can index your emitted logs by destination address without parsing body.
@@ -1882,7 +1882,7 @@ fun address.fromValidBuilder(b: builder): address
 ///     dest: (workchain, hash),   // a pair can be passed instead of `address`
 ///     ...                        // so, don't call this function in such a case
 /// ```
-fun address.fromWorkchainAndHash(workchain: int8, hash: uint256): address 
+fun address.fromWorkchainAndHash(workchain: int8, hash: uint256): address
     asm (hash workchain)
     "NEWC"
     "b{100} STSLICECONST"       // addr_std$10 + 0 (no anycast)
@@ -1926,7 +1926,7 @@ struct InMessage {
 /// ```
 /// fun onBouncedMessage(in: InMessageBounced) {
 ///     // in.bouncedBody is populated depending on BounceMode
-///     // for instance, "Only256BitsOfBody" means 
+///     // for instance, "Only256BitsOfBody" means
 ///     // "bounced prefix 0xFFFFFFFF" and 256 bits of data
 ///     in.bouncedBody.skipBouncedPrefix();
 ///     val originalOpcode = in.bouncedBody.loadUint(32);
@@ -1935,7 +1935,7 @@ struct InMessageBounced {
     senderAddress: address          // an internal address from which the message was bounced
     valueCoins: coins               // ton amount attached to a message
     valueExtra: ExtraCurrenciesMap  // extra currencies attached to a message
-    originalForwardFee: coins       // commission that the sender has paid to send this message
+    originalForwardFee: coins       // comission that the sender has payed to send this message
     createdLt: uint64               // logical time when a message was created (and bounced)
     createdAt: uint32               // unixtime when a message was created (and bounced)
     bouncedBody: slice              // populated depending on `BounceMode` for `createMessage`
@@ -1959,7 +1959,7 @@ struct (0xfffffffe) RichBounceBody {
     computePhase: RichBounceComputePhaseInfo?       // filled if compute phase executed
 }
 
-/// Describes compute phase details of a bounced message. 
+/// Describes compute phase details of a bounced message.
 struct RichBounceComputePhaseInfo {
     gasUsed: uint32
     vmSteps: uint32

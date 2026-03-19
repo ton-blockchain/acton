@@ -230,6 +230,13 @@ pub enum ABIConstValue {
     #[serde(rename = "shapedTuple")]
     ShapedTuple { items: Vec<ABIConstValue> },
 
+    #[serde(rename = "object")]
+    Object {
+        #[serde(rename = "structName")]
+        struct_name: String,
+        fields: Vec<ABIConstValue>,
+    },
+
     // C++: {"kind":"castTo","inner": <ConstVal>, "castTo": <TypeJSON>}
     #[serde(rename = "castTo")]
     CastTo {
@@ -335,6 +342,8 @@ pub enum ABIDeclaration {
 pub struct ABIFunctionParameter {
     pub name: String,
     pub ty: ABIType,
+    #[serde(rename = "defaultValue", skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<ABIConstValue>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub description: String,
 }
@@ -938,7 +947,7 @@ fn default_struct_value(
                 .iter()
                 .map(|field| {
                     let value = match &field.default_value {
-                        Some(default_value) => render_const_value(default_value),
+                        Some(default_value) => render_const_value(abi, default_value),
                         None => default_value_impl(abi, &field.ty, &BTreeMap::new(), visited_defs),
                     };
                     format!("{}: {}", field.name, value)
@@ -1039,7 +1048,7 @@ fn default_value_for_one_or_many(
     }
 }
 
-fn render_const_value(value: &ABIConstValue) -> String {
+fn render_const_value(abi: &ContractABI, value: &ABIConstValue) -> String {
     match value {
         ABIConstValue::Int { v } => v.clone(),
         ABIConstValue::Bool { v } => v.to_string(),
@@ -1056,7 +1065,7 @@ fn render_const_value(value: &ABIConstValue) -> String {
             "({})",
             items
                 .iter()
-                .map(render_const_value)
+                .map(|item| render_const_value(abi, item))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
@@ -1064,25 +1073,51 @@ fn render_const_value(value: &ABIConstValue) -> String {
             "[{}]",
             items
                 .iter()
-                .map(render_const_value)
+                .map(|item| render_const_value(abi, item))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        ABIConstValue::Object {
+            struct_name,
+            fields,
+        } => render_const_object_value(abi, struct_name, fields),
         ABIConstValue::CastTo { inner, cast_to } => format!(
             "({} as {})",
-            render_const_value(inner),
+            render_const_value(abi, inner),
             cast_to.render_type()
         ),
         ABIConstValue::Null => "null".to_owned(),
     }
 }
 
+fn render_const_object_value(
+    abi: &ContractABI,
+    struct_name: &str,
+    fields: &[ABIConstValue],
+) -> String {
+    let Some(struct_fields) = find_struct_decl(abi, struct_name) else {
+        return format!("{struct_name} {{}}");
+    };
+
+    let rendered_fields = struct_fields
+        .iter()
+        .zip(fields)
+        .map(|(field, value)| format!("{}: {}", field.name, render_const_value(abi, value)))
+        .collect::<Vec<_>>();
+
+    if rendered_fields.is_empty() {
+        format!("{struct_name} {{}}")
+    } else {
+        format!("{struct_name} {{ {} }}", rendered_fields.join(", "))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        ABIConstValue, ABIDeclaration, ABIEnumMember, ABIInternalMessage, ABIOpcode, ABIStorage,
-        ABIStructField, ABIThrownError, ABIThrownErrorKind, ABIType, ABIUnionVariant, ContractABI,
-        OneOrMany,
+        ABIConstValue, ABIDeclaration, ABIEnumMember, ABIGetMethod, ABIInternalMessage, ABIOpcode,
+        ABIStorage, ABIStructField, ABIThrownError, ABIThrownErrorKind, ABIType, ABIUnionVariant,
+        ContractABI, OneOrMany,
     };
 
     fn empty_abi() -> ContractABI {
@@ -1130,6 +1165,29 @@ mod tests {
         assert_eq!(error.kind, None);
         assert_eq!(error.const_name, "ERR_NOT_ENOUGH_TON");
         assert_eq!(error.err_code, 57);
+    }
+
+    #[test]
+    fn get_method_parameter_deserializes_default_value() {
+        let method: ABIGetMethod = serde_json::from_str(
+            r#"{
+                "tvmMethodId": 1,
+                "name": "foo",
+                "parameters": [{
+                    "name": "arg",
+                    "ty": {"kind":"int"},
+                    "defaultValue": {"kind":"int","v":"10"}
+                }],
+                "returnTy": {"kind":"int"}
+            }"#,
+        )
+        .expect("failed to deserialize get method with parameter default value");
+
+        assert_eq!(method.parameters.len(), 1);
+        assert!(matches!(
+            method.parameters[0].default_value,
+            Some(ABIConstValue::Int { ref v }) if v == "10"
+        ));
     }
 
     #[test]
@@ -1441,6 +1499,18 @@ mod tests {
                         description: String::new(),
                     },
                     ABIStructField {
+                        name: "nested".to_owned(),
+                        ty: ABIType::StructRef {
+                            struct_name: "Boxed".to_owned(),
+                            type_args: Vec::new(),
+                        },
+                        default_value: Some(ABIConstValue::Object {
+                            struct_name: "Boxed".to_owned(),
+                            fields: vec![ABIConstValue::Null],
+                        }),
+                        description: String::new(),
+                    },
+                    ABIStructField {
                         name: "opcode".to_owned(),
                         ty: ABIType::UintN { n: 32 },
                         default_value: Some(ABIConstValue::CastTo {
@@ -1462,7 +1532,7 @@ mod tests {
 
         assert_eq!(
             storage_default,
-            "Storage { owner: (0 as UserId), color: Color.Red, maybeItem: {}, opcode: (7 as uint32) }"
+            "Storage { owner: (0 as UserId), color: Color.Red, maybeItem: {}, nested: Boxed { item: null }, opcode: (7 as uint32) }"
         );
     }
 

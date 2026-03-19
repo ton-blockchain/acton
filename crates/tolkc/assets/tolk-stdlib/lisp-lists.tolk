@@ -100,34 +100,19 @@ fun lisp_list<T>.calculateConcatenation(self, other: lisp_list<T>): lisp_list<T>
     return reversed.calculateReversed();
 }
 
-/**
-    todo delete all of them or deprecate? if deprecate, what about "create" function?
- */
-
+/// Creates a lisp_list<T> with zero elements.
+/// Deprecated. Use `[]` syntax instead:
+/// ```
+/// // old way, deprecated:
+/// var list = createEmptyList<int>();
+///
+/// // new way, preferred:
+/// var t = lisp_list<int> [];
+/// ```
 @pure
-fun createEmptyList(): tuple
+@deprecated("use `[]` instead of `createEmptyList`")
+fun createEmptyList<T>(): lisp_list<T>
     asm "PUSHNULL"
-
-/// Adds an element to the beginning of lisp-style list.
-/// Note, that it does not mutate the list: instead, it returns a new one (it's a lisp pattern).
-@pure
-fun listPrepend<X>(head: X, tail: tuple?): tuple
-    asm "CONS"
-
-/// Extracts the head and the tail of lisp-style list.
-@pure
-fun listSplit<X>(list: tuple): (X, tuple?)
-    asm "UNCONS"
-
-/// Returns the head of lisp-style list.
-@pure
-fun listGetHead<X>(list: tuple): X
-    asm "CAR"
-
-/// Returns the tail of lisp-style list.
-@pure
-fun listGetTail(list: tuple): tuple?
-    asm "CDR"
 
 
 /// `lisp_list<T>` can be serialized if `T` is serializable. It's encoded as reversed snake refs:

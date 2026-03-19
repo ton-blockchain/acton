@@ -31,11 +31,12 @@
 /// ```
 
 import "@stdlib/reflection"
+import "assert"
+import "expect"
 import "../fmt"
 import "../emulation/network"
 import "../ffi/ffi"
-import "assert"
-import "expect"
+import "../types/big_array"
 
 /// Expect the transaction list to have a successful deploy transaction.
 ///
@@ -231,14 +232,10 @@ fun Expectation<SendResultList>.toHaveFailedTx<Msg = unknown>(
     }
     params.success = false;
     if (params.exitCode == null) {
-        Assert.fail(
-            "expect(<actual>).toHaveFailedTx(params) must have not null exitCode parameter in params",
-        );
+        Assert.fail("expect(<actual>).toHaveFailedTx(params) must have not null exitCode parameter in params");
     }
     if (params.exitCode == 0) {
-        Assert.fail(
-            "expect(<actual>).toHaveFailedTx(params) must have non zero exitCode parameter in params",
-        );
+        Assert.fail("expect(<actual>).toHaveFailedTx(params) must have non zero exitCode parameter in params");
     }
 
     val tx = ffi.findTransactionByParams(self.value, params.toTuple());
@@ -305,7 +302,7 @@ fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
             "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
             reflect.typeNameOf<Msg>(),
             reflect.typeNameOf<Msg>(),
-            reflect.serializationPrefixOf<Msg>(),
+            reflect.serializationPrefixOf<Msg>().0,
         ),
         self.location,
     );
@@ -329,7 +326,7 @@ fun Expectation<SendResult>.toConsumeLessThan(self, amount: int): void {
 }
 
 fun T.getDeclaredPackPrefix(): int {
-    return reflect.serializationPrefixOf<T>();
+    return reflect.serializationPrefixOf<T>().0;
 }
 
 fun unknown.getDeclaredPackPrefix(): int {
