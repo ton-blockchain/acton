@@ -1,12 +1,14 @@
 use std::env;
 
 use anyhow::{Result, bail};
+use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use clap::Args;
 
-use crate::modules::ubicloud::Ubicloud;
+use crate::modules::ubicloud::{GithubCacheEntry, Ubicloud};
 
 const DEFAULT_API_TOKEN_ENV: &str = "UBICLOUD_API_TOKEN";
-const DEFAULT_KEEP_COUNT: usize = 5;
+const LAST_ACCESSED_DELETE_AFTER_DAYS: i64 = 1;
+const CREATED_DELETE_AFTER_DAYS: i64 = 3;
 
 #[derive(Args)]
 pub(crate) struct UbicloudCleanupArgs {
@@ -27,17 +29,28 @@ pub(crate) struct UbicloudCleanupArgs {
     pub(crate) api_token: Option<String>,
 
     #[arg(
-        long = "keep",
-        value_name = "COUNT",
-        help = "Keep the last N cache entries from the current Ubicloud API response order. Defaults to 5; omitting --keep enables dry-run automatically"
-    )]
-    pub(crate) keep: Option<usize>,
-
-    #[arg(
         long = "dry-run",
         help = "Show which cache entries would be deleted without deleting them"
     )]
     pub(crate) dry_run: bool,
+
+    #[arg(
+        long = "last-accessed-days",
+        value_name = "DAYS",
+        default_value_t = LAST_ACCESSED_DELETE_AFTER_DAYS,
+        value_parser = clap::value_parser!(i64).range(1..),
+        help = "Delete entries if `last_accessed_at` is older than this many days"
+    )]
+    pub(crate) last_accessed_days: i64,
+
+    #[arg(
+        long = "created-days",
+        value_name = "DAYS",
+        default_value_t = CREATED_DELETE_AFTER_DAYS,
+        value_parser = clap::value_parser!(i64).range(1..),
+        help = "Delete entries if `last_accessed_at` is missing and `created_at` is older than this many days"
+    )]
+    pub(crate) created_days: i64,
 }
 
 pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
@@ -46,35 +59,33 @@ pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
         installation,
         repository,
         api_token,
-        keep,
         dry_run,
+        last_accessed_days,
+        created_days,
     } = args;
 
     let api_token = resolve_api_token(api_token.as_deref())?;
     let client = Ubicloud::new(api_token)?;
     let cache_entries = client.list_github_cache_entries(&project, &installation, &repository)?;
-    let keep_was_explicit = keep.is_some();
-    let keep = keep.unwrap_or(DEFAULT_KEEP_COUNT);
-    let dry_run = dry_run || !keep_was_explicit;
-
-    let split_index = cache_entries.items.len().saturating_sub(keep);
-    let (to_delete, to_keep) = cache_entries.items.split_at(split_index);
+    let now = Utc::now();
+    let (to_delete, to_keep): (Vec<GithubCacheEntry>, Vec<GithubCacheEntry>) = cache_entries
+        .items
+        .into_iter()
+        .partition(|entry| should_delete(entry, &now, last_accessed_days, created_days));
 
     print_prune_plan(
         &project,
         &installation,
         &repository,
-        keep,
         dry_run,
-        to_delete,
-        to_keep,
+        last_accessed_days,
+        created_days,
+        &to_delete,
+        &to_keep,
     );
 
     if dry_run {
         println!();
-        if !keep_was_explicit {
-            println!("Safety mode: --keep was not provided, so dry-run was enabled automatically.");
-        }
         println!("Dry run: no cache entries were deleted.");
         return Ok(());
     }
@@ -88,7 +99,7 @@ pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
     println!();
     println!("Deleting {} cache entries...", to_delete.len());
 
-    for entry in to_delete {
+    for entry in &to_delete {
         client.delete_github_cache_entry(&project, &installation, &repository, &entry.id)?;
         println!("Deleted {}  {}", entry.id, entry.key);
     }
@@ -126,13 +137,19 @@ fn print_prune_plan(
     project: &str,
     installation: &str,
     repository: &str,
-    keep: usize,
     dry_run: bool,
-    to_delete: &[crate::modules::ubicloud::GithubCacheEntry],
-    to_keep: &[crate::modules::ubicloud::GithubCacheEntry],
+    last_accessed_days: i64,
+    created_days: i64,
+    to_delete: &[GithubCacheEntry],
+    to_keep: &[GithubCacheEntry],
 ) {
     println!("Prune plan for {installation}/{repository} in project `{project}`");
-    println!("Keeping the last {keep} cache entries from the current Ubicloud API response order.");
+    println!(
+        "Delete cache entries with `last_accessed_at` older than {last_accessed_days} day(s)."
+    );
+    println!(
+        "If `last_accessed_at` is missing, delete cache entries with `created_at` older than {created_days} day(s)."
+    );
 
     println!();
     print_entries_table("Cache entries to keep", to_keep);
@@ -160,7 +177,7 @@ fn print_prune_plan(
     );
 }
 
-fn print_entries_table(title: &str, entries: &[crate::modules::ubicloud::GithubCacheEntry]) {
+fn print_entries_table(title: &str, entries: &[GithubCacheEntry]) {
     println!("{title}");
 
     if entries.is_empty() {
@@ -192,21 +209,64 @@ fn print_entries_table(title: &str, entries: &[crate::modules::ubicloud::GithubC
         .max()
         .unwrap_or(4)
         .max("Size".len());
+    let created_at_width = entries
+        .iter()
+        .map(|entry| format_timestamp(&entry.created_at))
+        .map(|value| value.len())
+        .max()
+        .unwrap_or(10)
+        .max("Created At".len());
+    let last_accessed_at_width = entries
+        .iter()
+        .map(|entry| format_optional_timestamp(entry.last_accessed_at.as_ref()))
+        .map(|value| value.len())
+        .max()
+        .unwrap_or(16)
+        .max("Last Accessed At".len());
 
     println!(
-        "{:<id_width$}  {:<installation_width$}  {:<repository_width$}  {:>size_width$}  Key",
-        "ID", "Installation", "Repository", "Size",
+        "{:<id_width$}  {:<installation_width$}  {:<repository_width$}  {:>size_width$}  {:<created_at_width$}  {:<last_accessed_at_width$}  Key",
+        "ID", "Installation", "Repository", "Size", "Created At", "Last Accessed At",
     );
 
     for entry in entries {
+        let created_at = format_timestamp(&entry.created_at);
+        let last_accessed_at = format_optional_timestamp(entry.last_accessed_at.as_ref());
         println!(
-            "{:<id_width$}  {:<installation_width$}  {:<repository_width$}  {:>size_width$}  {}",
+            "{:<id_width$}  {:<installation_width$}  {:<repository_width$}  {:>size_width$}  {:<created_at_width$}  {:<last_accessed_at_width$}  {}",
             entry.id,
             entry.installation_name,
             entry.repository_name,
             human_size(entry.size),
+            created_at,
+            last_accessed_at,
             entry.key,
         );
+    }
+}
+
+fn format_timestamp(timestamp: &DateTime<Utc>) -> String {
+    timestamp.to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+fn format_optional_timestamp(timestamp: Option<&DateTime<Utc>>) -> String {
+    timestamp
+        .map(format_timestamp)
+        .unwrap_or_else(|| "never".to_owned())
+}
+
+fn should_delete(
+    entry: &GithubCacheEntry,
+    now: &DateTime<Utc>,
+    last_accessed_days: i64,
+    created_days: i64,
+) -> bool {
+    let last_accessed_cutoff = now.to_owned() - Duration::days(last_accessed_days);
+    let created_cutoff = now.to_owned() - Duration::days(created_days);
+
+    match entry.last_accessed_at.as_ref() {
+        Some(last_accessed_at) => last_accessed_at < &last_accessed_cutoff,
+        None => entry.created_at < created_cutoff,
     }
 }
 

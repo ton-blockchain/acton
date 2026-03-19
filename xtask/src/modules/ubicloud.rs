@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
+use chrono::{DateTime, Utc};
 use reqwest::blocking::{Client, Response};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
@@ -162,4 +163,7 @@ pub(crate) struct GithubCacheEntry {
     pub(crate) id: String,
     pub(crate) key: String,
     pub(crate) size: u64,
+    pub(crate) created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub(crate) last_accessed_at: Option<DateTime<Utc>>,
 }
