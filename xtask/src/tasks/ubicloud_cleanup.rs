@@ -10,6 +10,11 @@ const DEFAULT_API_TOKEN_ENV: &str = "UBICLOUD_API_TOKEN";
 const LAST_ACCESSED_DELETE_AFTER_DAYS: i64 = 1;
 const CREATED_DELETE_AFTER_DAYS: i64 = 3;
 
+struct CleanupPolicy {
+    last_accessed_days: i64,
+    created_days: i64,
+}
+
 #[derive(Args)]
 pub(crate) struct UbicloudCleanupArgs {
     #[arg(long = "project", value_name = "PROJECT")]
@@ -66,20 +71,23 @@ pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
 
     let api_token = resolve_api_token(api_token.as_deref())?;
     let client = Ubicloud::new(api_token)?;
+    let policy = CleanupPolicy {
+        last_accessed_days,
+        created_days,
+    };
     let cache_entries = client.list_github_cache_entries(&project, &installation, &repository)?;
     let now = Utc::now();
     let (to_delete, to_keep): (Vec<GithubCacheEntry>, Vec<GithubCacheEntry>) = cache_entries
         .items
         .into_iter()
-        .partition(|entry| should_delete(entry, &now, last_accessed_days, created_days));
+        .partition(|entry| should_delete(entry, &now, &policy));
 
     print_prune_plan(
         &project,
         &installation,
         &repository,
         dry_run,
-        last_accessed_days,
-        created_days,
+        &policy,
         &to_delete,
         &to_keep,
     );
@@ -138,17 +146,18 @@ fn print_prune_plan(
     installation: &str,
     repository: &str,
     dry_run: bool,
-    last_accessed_days: i64,
-    created_days: i64,
+    policy: &CleanupPolicy,
     to_delete: &[GithubCacheEntry],
     to_keep: &[GithubCacheEntry],
 ) {
     println!("Prune plan for {installation}/{repository} in project `{project}`");
     println!(
-        "Delete cache entries with `last_accessed_at` older than {last_accessed_days} day(s)."
+        "Delete cache entries with `last_accessed_at` older than {} day(s).",
+        policy.last_accessed_days
     );
     println!(
-        "If `last_accessed_at` is missing, delete cache entries with `created_at` older than {created_days} day(s)."
+        "If `last_accessed_at` is missing, delete cache entries with `created_at` older than {} day(s).",
+        policy.created_days
     );
 
     println!();
@@ -255,14 +264,9 @@ fn format_optional_timestamp(timestamp: Option<&DateTime<Utc>>) -> String {
         .unwrap_or_else(|| "never".to_owned())
 }
 
-fn should_delete(
-    entry: &GithubCacheEntry,
-    now: &DateTime<Utc>,
-    last_accessed_days: i64,
-    created_days: i64,
-) -> bool {
-    let last_accessed_cutoff = now.to_owned() - Duration::days(last_accessed_days);
-    let created_cutoff = now.to_owned() - Duration::days(created_days);
+fn should_delete(entry: &GithubCacheEntry, now: &DateTime<Utc>, policy: &CleanupPolicy) -> bool {
+    let last_accessed_cutoff = now.to_owned() - Duration::days(policy.last_accessed_days);
+    let created_cutoff = now.to_owned() - Duration::days(policy.created_days);
 
     match entry.last_accessed_at.as_ref() {
         Some(last_accessed_at) => last_accessed_at < &last_accessed_cutoff,
