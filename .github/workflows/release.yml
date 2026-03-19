@@ -86,9 +86,14 @@ jobs:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
 
+  custom-verify-version:
+    uses: ./.github/workflows/verify-version.yml
+    secrets: inherit
+
   custom-build-release-binaries:
     needs:
       - plan
+      - custom-verify-version
     if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' }}
     uses: ./.github/workflows/build-release-binaries.yml
     with:

@@ -9,7 +9,7 @@ cargo-dist-version = "0.31.0"
 dist = false
 # CI backends to support
 ci = "github"
-# Keep our customized release workflow instead of forcing cargo-dist's stock CI output.
+# Skip checking whether the specified configuration files are up to date
 allow-dirty = ["ci"]
 # The installers to generate for each app
 installers = ["shell"]
@@ -29,6 +29,9 @@ github-release = "announce"
 github-attestations = false
 # Which actions to run on pull requests
 pr-run-mode = "skip"
+# Plan jobs to run in CI
+plan-jobs = ["./verify-version"]
+# Post-announce jobs to run in CI
 post-announce-jobs = ["./publish-mirror"]
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
