@@ -1,68 +1,89 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Acton Configuration Schema",
-  "description": "JSON schema for Acton.toml configuration file",
+  "title": "ActonConfig",
+  "description": "Configuration schema for `Acton.toml`.",
   "type": "object",
   "required": [
     "package"
   ],
   "properties": {
     "build": {
-      "description": "Default settings for the build command",
-      "allOf": [
+      "description": "Default settings for the build command.",
+      "anyOf": [
         {
           "$ref": "#/definitions/BuildSettings"
+        },
+        {
+          "type": "null"
         }
       ]
     },
     "contracts": {
-      "description": "Definition of contracts in the project",
-      "allOf": [
+      "description": "Definition of contracts in the project.",
+      "anyOf": [
         {
           "$ref": "#/definitions/ContractsConfig"
+        },
+        {
+          "type": "null"
         }
       ]
     },
     "fmt": {
-      "description": "Settings for the Tolk code formatter",
-      "allOf": [
+      "description": "Settings for the Tolk code formatter.",
+      "anyOf": [
         {
           "$ref": "#/definitions/FmtSettings"
+        },
+        {
+          "type": "null"
         }
       ]
     },
     "lint": {
-      "description": "Linter configuration for the project",
-      "allOf": [
+      "description": "Linter configuration for the project.",
+      "anyOf": [
         {
           "$ref": "#/definitions/LintConfig"
+        },
+        {
+          "type": "null"
         }
       ]
     },
     "litenode": {
-      "description": "Default settings for `acton litenode` commands",
-      "allOf": [
+      "description": "Default settings for `acton litenode` commands.",
+      "anyOf": [
         {
           "$ref": "#/definitions/LitenodeSettings"
+        },
+        {
+          "type": "null"
         }
       ]
     },
     "mappings": {
-      "description": "Path mappings for Tolk compiler imports, for example mapping `\"core\" = \"./foo/core\"` so imports can use `@core/...`",
-      "type": "object",
+      "description": "Path mappings for Tolk compiler imports, for example mapping `\"core\" = \"./foo/core\"` so imports can use `@core/...`.",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": {
         "type": "string"
       }
     },
     "networks": {
-      "description": "Custom network configurations",
-      "type": "object",
+      "description": "Custom network configurations.",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": {
         "$ref": "#/definitions/CustomNetworkConfig"
       }
     },
     "package": {
-      "description": "Package metadata for the Acton project",
+      "description": "Package metadata for the Acton project.",
       "allOf": [
         {
           "$ref": "#/definitions/PackageConfig"
@@ -70,35 +91,44 @@
       ]
     },
     "scripts": {
-      "description": "Custom scripts that can be run with `acton run`",
-      "type": "object",
+      "description": "Custom scripts that can be run with `acton run`.",
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": {
         "type": "string"
       }
     },
     "test": {
-      "description": "Default settings for the test runner",
-      "allOf": [
+      "description": "Default settings for the test runner.",
+      "anyOf": [
         {
           "$ref": "#/definitions/TestSettings"
+        },
+        {
+          "type": "null"
         }
       ]
     },
     "wrappers": {
-      "description": "Default settings for wrapper generation",
-      "allOf": [
+      "description": "Default settings for wrapper generation.",
+      "anyOf": [
         {
           "$ref": "#/definitions/WrappersConfig"
+        },
+        {
+          "type": "null"
         }
       ]
     }
   },
   "definitions": {
     "BacktraceMode": {
-      "description": "Backtrace verbosity for failed tests",
+      "description": "Backtrace verbosity for failed tests.",
       "oneOf": [
         {
-          "description": "Emit the full execution backtrace",
+          "description": "Emit the full execution backtrace.",
           "type": "string",
           "enum": [
             "full"
@@ -107,56 +137,65 @@
       ]
     },
     "BuildSettings": {
-      "description": "Default settings for the build command",
+      "description": "Default settings for the build command.",
       "type": "object",
       "properties": {
         "gen-dir": {
-          "description": "Directory where generated dependency files are saved",
-          "type": "string"
+          "description": "Directory where generated dependency files are saved.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "out-dir": {
-          "description": "Directory where JSON build artifacts are saved",
-          "type": "string"
+          "description": "Directory where JSON build artifacts are saved.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "output-fift": {
-          "description": "Directory where per-contract compiled Fift files are saved",
-          "type": "string"
+          "description": "Directory where per-contract compiled Fift files are saved.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "CheckOutputFormat": {
-      "description": "Output format for `acton check` diagnostics",
+      "description": "Output format for `acton check` diagnostics.",
       "oneOf": [
         {
-          "description": "Human-readable plain output",
+          "description": "Human-readable plain output.",
           "type": "string",
           "enum": [
             "plain"
           ]
         },
         {
-          "description": "Structured JSON output",
+          "description": "Structured JSON output.",
           "type": "string",
           "enum": [
             "json"
           ]
         },
         {
-          "description": "SARIF output for code scanning tools",
+          "description": "SARIF output for code scanning tools.",
           "type": "string",
           "enum": [
             "sarif"
           ]
         },
         {
-          "description": "GitHub workflow command output",
+          "description": "GitHub workflow command output.",
           "type": "string",
           "enum": [
             "github"
           ]
         },
         {
-          "description": "GitLab code quality output",
+          "description": "GitLab code quality output.",
           "type": "string",
           "enum": [
             "gitlab"
@@ -165,7 +204,7 @@
       ]
     },
     "ContractConfig": {
-      "description": "Definition of a contract in the project",
+      "description": "Definition of a contract in the project.",
       "type": "object",
       "required": [
         "name",
@@ -173,46 +212,55 @@
       ],
       "properties": {
         "depends": {
-          "description": "Dependencies of this contract",
-          "type": "array",
+          "description": "Dependencies of this contract.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "$ref": "#/definitions/ContractDependency"
           }
         },
         "name": {
-          "description": "Human-readable name of the contract",
+          "description": "Human-readable name of the contract.",
           "type": "string"
         },
         "output": {
-          "description": "Path where the compiled `.boc` should be saved",
-          "type": "string"
+          "description": "Path where the compiled `.boc` should be saved.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "src": {
-          "description": "Path to the contract source (`.tolk`) or precompiled (`.boc`) file",
+          "description": "Path to the contract source (`.tolk`) or precompiled (`.boc`) file.",
           "type": "string"
         }
       }
     },
     "ContractDependency": {
-      "description": "Dependency declaration for a contract",
+      "description": "Dependency declaration for a contract.",
       "anyOf": [
         {
-          "description": "Name of the contract to depend on in the simple form",
+          "description": "Name of the contract to depend on in the simple form.",
           "type": "string"
         },
         {
-          "description": "Detailed dependency configuration",
+          "description": "Detailed dependency configuration.",
           "type": "object",
           "required": [
             "name"
           ],
           "properties": {
             "function": {
-              "description": "Custom name for the generated code function",
-              "type": "string"
+              "description": "Custom name for the generated code function.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "kind": {
-              "description": "Dependency type",
+              "description": "Dependency type.",
               "default": "embed_code",
               "allOf": [
                 {
@@ -221,12 +269,15 @@
               ]
             },
             "name": {
-              "description": "Name of the contract to depend on",
+              "description": "Name of the contract to depend on.",
               "type": "string"
             },
             "path": {
-              "description": "Custom output path for the generated code file",
-              "type": "string"
+              "description": "Custom output path for the generated code file.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         }
@@ -239,17 +290,17 @@
       }
     },
     "CoverageFormat": {
-      "description": "Coverage output formats supported by `acton test`",
+      "description": "Coverage output formats supported by `acton test`.",
       "oneOf": [
         {
-          "description": "LCOV coverage report",
+          "description": "LCOV coverage report.",
           "type": "string",
           "enum": [
             "lcov"
           ]
         },
         {
-          "description": "Plain-text coverage summary",
+          "description": "Plain-text coverage summary.",
           "type": "string",
           "enum": [
             "text"
@@ -258,51 +309,63 @@
       ]
     },
     "CustomNetworkApiConfig": {
-      "description": "TonCenter API endpoints for a custom network",
+      "description": "TonCenter API endpoints for a custom network.",
       "type": "object",
       "properties": {
         "v2": {
-          "description": "The URL for the TonCenter API v2. For localnet this defaults to `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port",
-          "type": "string"
+          "description": "The URL for the TonCenter API v2. For localnet this defaults to `http://localhost:<litenode.port>/api/v2` with `5411` as the fallback port.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "v3": {
-          "description": "The URL for the TonCenter API v3. For localnet this defaults to `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port",
-          "type": "string"
+          "description": "The URL for the TonCenter API v3. For localnet this defaults to `http://localhost:<litenode.port>/api/v3` with `5411` as the fallback port.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
     },
     "CustomNetworkConfig": {
-      "description": "Custom network configuration",
+      "description": "Custom network configuration.",
       "type": "object",
       "properties": {
         "api": {
-          "description": "TonCenter API endpoints for this network",
-          "allOf": [
+          "description": "TonCenter API endpoints for this network.",
+          "anyOf": [
             {
               "$ref": "#/definitions/CustomNetworkApiConfig"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "explorer": {
-          "description": "Base URL used to build transaction links for this network. Acton appends `/tx/<hash>` automatically and derives links from `api.v2` when omitted",
-          "type": "string"
+          "description": "Base URL used to build transaction links for this network. Acton appends `/tx/<hash>` automatically and derives links from `api.v2` when omitted.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
     },
     "DependencyKind": {
-      "description": "How a compiled dependency is linked into a contract",
+      "description": "How a compiled dependency is linked into a contract.",
       "oneOf": [
         {
-          "description": "Embed dependency code directly into the output",
+          "description": "Embed dependency code directly into the output.",
           "type": "string",
           "enum": [
             "embed_code"
           ]
         },
         {
-          "description": "Reference the dependency as an on-chain library",
+          "description": "Reference the dependency as an on-chain library.",
           "type": "string",
           "enum": [
             "library_ref"
@@ -311,61 +374,77 @@
       ]
     },
     "FmtSettings": {
-      "description": "Settings for the Tolk code formatter",
+      "description": "Settings for the Tolk code formatter.",
       "type": "object",
       "properties": {
         "ignore": {
-          "description": "Glob patterns to ignore from formatting",
-          "type": "array",
+          "description": "Glob patterns to ignore from formatting.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
         },
         "separate-import-groups": {
-          "description": "Insert an empty line between import groups (`@stdlib`, `@acton`, `@<other>`, `../`, `./`)",
-          "default": false,
-          "type": "boolean"
+          "description": "Insert an empty line between import groups (`@stdlib`, `@acton`, `@<other>`, `../`, `./`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "width": {
-          "description": "Maximum line width for formatting",
-          "default": 100,
-          "type": "integer",
+          "description": "Maximum line width for formatting.",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint",
           "minimum": 0.0
         }
       }
     },
     "LintConfig": {
-      "description": "Linter configuration for the project",
+      "description": "Linter configuration for the project.",
       "type": "object",
       "properties": {
         "exclude": {
-          "description": "Glob patterns for files to exclude from lint diagnostics",
-          "type": "array",
+          "description": "Glob patterns for files to exclude from lint diagnostics.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
         },
         "max-warnings": {
-          "description": "Maximum allowed warning count before `acton check` exits with a non-zero code",
+          "description": "Maximum allowed warning count before `acton check` exits with a non-zero code.",
           "default": 18446744073709551615,
           "type": "integer",
           "format": "uint",
           "minimum": 0.0
         },
         "output-format": {
-          "description": "Output format for `acton check` diagnostics",
-          "allOf": [
+          "description": "Output format for `acton check` diagnostics.",
+          "anyOf": [
             {
               "$ref": "#/definitions/CheckOutputFormat"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "rules": {
-          "description": "Lint rules and contract-specific overrides",
-          "allOf": [
+          "description": "Lint rules and contract-specific overrides.",
+          "anyOf": [
             {
               "$ref": "#/definitions/LintRules"
+            },
+            {
+              "type": "null"
             }
           ]
         }
@@ -373,10 +452,10 @@
       "additionalProperties": true
     },
     "LintEntry": {
-      "description": "Lint rule configuration, either a global level or contract-specific overrides",
+      "description": "Lint rule configuration, either a global level or contract-specific overrides.",
       "anyOf": [
         {
-          "description": "Global lint level for a rule",
+          "description": "Global lint level for a rule.",
           "allOf": [
             {
               "$ref": "#/definitions/LintLevel"
@@ -384,7 +463,7 @@
           ]
         },
         {
-          "description": "Contract-specific lint overrides",
+          "description": "Contract-specific lint overrides.",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/definitions/LintLevel"
@@ -393,24 +472,24 @@
       ]
     },
     "LintLevel": {
-      "description": "Lint severity level",
+      "description": "Lint severity level.",
       "oneOf": [
         {
-          "description": "Disable the rule",
+          "description": "Disable the rule.",
           "type": "string",
           "enum": [
             "allow"
           ]
         },
         {
-          "description": "Emit warnings for the rule",
+          "description": "Emit warnings for the rule.",
           "type": "string",
           "enum": [
             "warn"
           ]
         },
         {
-          "description": "Treat the rule as an error",
+          "description": "Treat the rule as an error.",
           "type": "string",
           "enum": [
             "deny"
@@ -425,53 +504,69 @@
       }
     },
     "LitenodeSettings": {
-      "description": "Default settings for `acton litenode` commands",
+      "description": "Default settings for `acton litenode` commands.",
       "type": "object",
       "properties": {
         "accounts": {
-          "description": "Wallet names from `[wallets]` that are automatically funded and deployed on `acton litenode start`",
-          "type": "array",
+          "description": "Wallet names from `[wallets]` that are automatically funded and deployed on `acton litenode start`.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
         },
         "fork-block-number": {
-          "description": "Block sequence number used by `acton litenode start` when forking from historical state",
-          "type": "integer",
+          "description": "Block sequence number used by `acton litenode start` when forking from historical state.",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint64",
           "minimum": 0.0
         },
         "fork-net": {
-          "description": "Network to fork from used by `acton litenode start`",
-          "allOf": [
+          "description": "Network to fork from used by `acton litenode start`.",
+          "anyOf": [
             {
               "$ref": "#/definitions/Network"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "port": {
-          "description": "Litenode port used by `acton litenode` commands",
-          "default": 3000,
-          "type": "integer",
+          "description": "Litenode port used by `acton litenode` commands.",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint16",
-          "maximum": 65535.0,
           "minimum": 0.0
         },
         "rate-limit": {
-          "description": "Maximum number of API requests per second served by LiteNode `/api` endpoints",
-          "type": "integer",
+          "description": "Maximum number of API requests per second served by LiteNode `/api` endpoints.",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint32",
           "minimum": 0.0
         }
       }
     },
     "MutationConfig": {
-      "description": "Configuration for mutation testing",
+      "description": "Configuration for mutation testing.",
       "type": "object",
       "properties": {
         "disable-rules": {
-          "description": "List of mutation rules to disable",
-          "type": "array",
+          "description": "List of mutation rules to disable.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
@@ -503,7 +598,7 @@
       ]
     },
     "PackageConfig": {
-      "description": "Package metadata for the Acton project",
+      "description": "Package metadata for the Acton project.",
       "type": "object",
       "required": [
         "description",
@@ -512,53 +607,59 @@
       ],
       "properties": {
         "description": {
-          "description": "A short description of the project",
+          "description": "A short description of the project.",
           "type": "string"
         },
         "license": {
-          "description": "The project's license identifier",
-          "type": "string"
+          "description": "The project's license identifier.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "name": {
-          "description": "The name of the project",
+          "description": "The name of the project.",
           "type": "string"
         },
         "repository": {
-          "description": "The URL of the project's repository",
-          "type": "string"
+          "description": "The URL of the project's repository.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "version": {
-          "description": "The current version of the project",
+          "description": "The current version of the project.",
           "type": "string"
         }
       }
     },
     "ReportFormat": {
-      "description": "Output formats supported by `acton test`",
+      "description": "Output formats supported by `acton test`.",
       "oneOf": [
         {
-          "description": "Human-readable console output",
+          "description": "Human-readable console output.",
           "type": "string",
           "enum": [
             "console"
           ]
         },
         {
-          "description": "TeamCity service messages",
+          "description": "TeamCity service messages.",
           "type": "string",
           "enum": [
             "teamcity"
           ]
         },
         {
-          "description": "JUnit XML report",
+          "description": "JUnit XML report.",
           "type": "string",
           "enum": [
             "junit"
           ]
         },
         {
-          "description": "Compact dot-progress output",
+          "description": "Compact dot-progress output.",
           "type": "string",
           "enum": [
             "dot"
@@ -567,172 +668,246 @@
       ]
     },
     "TestSettings": {
-      "description": "Default settings for the test runner",
+      "description": "Default settings for the test runner.",
       "type": "object",
       "properties": {
         "api-key": {
-          "description": "API key for the network provider when forking",
-          "type": "string"
+          "description": "API key for the network provider when forking.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "backtrace": {
-          "description": "Enable stack traces for failed tests",
-          "allOf": [
+          "description": "Enable stack traces for failed tests.",
+          "anyOf": [
             {
               "$ref": "#/definitions/BacktraceMode"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "coverage": {
-          "description": "Enable code coverage reporting",
-          "type": "boolean"
+          "description": "Enable code coverage reporting.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "coverage-file": {
-          "description": "Path to save the coverage report",
-          "type": "string"
+          "description": "Path to save the coverage report.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "coverage-format": {
-          "description": "Format for coverage reports",
-          "default": "lcov",
-          "allOf": [
+          "description": "Format for coverage reports.",
+          "anyOf": [
             {
               "$ref": "#/definitions/CoverageFormat"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "debug": {
-          "description": "Enable debug mode for tests",
-          "type": "boolean"
+          "description": "Enable debug mode for tests.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "debug-port": {
-          "description": "Port for the debug server",
-          "default": 12345,
-          "type": "integer",
+          "description": "Port for the debug server.",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint16",
-          "maximum": 65535.0,
           "minimum": 0.0
         },
         "exclude": {
-          "description": "Glob patterns to exclude from testing",
-          "type": "array",
+          "description": "Glob patterns to exclude from testing.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
         },
         "fail-fast": {
-          "description": "Stop test execution after the first failure",
-          "type": "boolean"
+          "description": "Stop test execution after the first failure.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "fail-on-diff": {
-          "description": "Exit with a non-zero code when profiling differs from baseline",
-          "type": "boolean"
+          "description": "Exit with a non-zero code when profiling differs from baseline.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "filter": {
-          "description": "Regex pattern to filter test names",
-          "type": "string"
+          "description": "Regex pattern to filter test names.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "fork-block-number": {
-          "description": "Specific block number to fork from",
-          "type": "integer",
+          "description": "Specific block number to fork from.",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint64",
           "minimum": 0.0
         },
         "fork-net": {
-          "description": "Network to fork for testing",
-          "allOf": [
+          "description": "Network to fork for testing.",
+          "anyOf": [
             {
               "$ref": "#/definitions/Network"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "include": {
-          "description": "Glob patterns to include in testing",
-          "type": "array",
+          "description": "Glob patterns to include in testing.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string"
           }
         },
         "junit-merge": {
-          "description": "Merge all test suites into a single JUnit file",
-          "type": "boolean"
+          "description": "Merge all test suites into a single JUnit file.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "junit-path": {
-          "description": "Directory for JUnit XML reports",
-          "type": "string"
+          "description": "Directory for JUnit XML reports.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "mutation": {
-          "description": "Configuration for mutation testing",
-          "allOf": [
+          "description": "Configuration for mutation testing.",
+          "anyOf": [
             {
               "$ref": "#/definitions/MutationConfig"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "reporter": {
-          "description": "List of test reporters to use",
-          "type": "array",
+          "description": "List of test reporters to use.",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "$ref": "#/definitions/ReportFormat"
           }
         },
         "ui": {
-          "description": "Enable the test UI server",
-          "type": "boolean"
+          "description": "Enable the test UI server.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "ui-port": {
-          "description": "Port for the test UI server",
-          "type": "integer",
+          "description": "Port for the test UI server.",
+          "type": [
+            "integer",
+            "null"
+          ],
           "format": "uint16",
-          "maximum": 65535.0,
           "minimum": 0.0
         }
       },
       "additionalProperties": true
     },
     "TolkWrapperSettings": {
-      "description": "Default settings for Tolk wrapper generation",
+      "description": "Default settings for Tolk wrapper generation.",
       "type": "object",
       "properties": {
         "generate-test": {
-          "description": "Generate a Tolk test stub by default for `acton wrapper`",
-          "type": "boolean"
+          "description": "Generate a Tolk test stub by default for `acton wrapper`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "output-dir": {
-          "description": "Directory where `acton wrapper` writes generated Tolk wrappers by default",
-          "type": "string"
+          "description": "Directory where `acton wrapper` writes generated Tolk wrappers by default.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "test-output-dir": {
-          "description": "Directory where generated Tolk test stubs are written by default",
-          "type": "string"
+          "description": "Directory where generated Tolk test stubs are written by default.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "TypescriptWrapperSettings": {
-      "description": "Default settings for TypeScript wrapper generation",
+      "description": "Default settings for TypeScript wrapper generation.",
       "type": "object",
       "properties": {
         "output-dir": {
-          "description": "Directory where `acton wrapper --ts` writes generated TypeScript wrappers by default",
-          "type": "string"
+          "description": "Directory where `acton wrapper --ts` writes generated TypeScript wrappers by default.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
     "WrappersConfig": {
-      "description": "Default settings for wrapper generation",
+      "description": "Default settings for wrapper generation.",
       "type": "object",
       "properties": {
         "tolk": {
-          "description": "Default settings for Tolk wrapper generation",
-          "allOf": [
+          "description": "Default settings for Tolk wrapper generation.",
+          "anyOf": [
             {
               "$ref": "#/definitions/TolkWrapperSettings"
+            },
+            {
+              "type": "null"
             }
           ]
         },
         "typescript": {
-          "description": "Default settings for TypeScript wrapper generation",
-          "allOf": [
+          "description": "Default settings for TypeScript wrapper generation.",
+          "anyOf": [
             {
               "$ref": "#/definitions/TypescriptWrapperSettings"
+            },
+            {
+              "type": "null"
             }
           ]
         }

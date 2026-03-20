@@ -6,7 +6,7 @@ use anyhow::{Context, Result, bail};
 use clap::Args;
 use schemars::r#gen::SchemaSettings;
 
-const DEFAULT_OUTPUT_PATH: &str = "acton-new.schema.json";
+const DEFAULT_OUTPUT_PATH: &str = "acton.schema.json";
 
 #[derive(Args)]
 pub(crate) struct SchemaArgs {
