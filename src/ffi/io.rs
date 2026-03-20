@@ -1,8 +1,10 @@
 use crate::context::Context;
+use crate::formatter::FormatterContext;
 use anyhow::bail;
 use inquire::{Confirm, Select, Text};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use std::borrow::Cow;
 use std::io::{IsTerminal, stdin};
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
@@ -17,8 +19,10 @@ fn println_impl(
 ) -> anyhow::Result<()> {
     let typed_arg = arg.unwrap_single().to_typed(&type_name);
 
-    let formatter = crate::formatter::FormatterContext::from_context(ctx);
-    let formatted = formatter.format_with_color(&typed_arg);
+    let formatted = {
+        let formatter = formatter_from_owned_context(ctx);
+        formatter.format_with_color(&typed_arg)
+    };
 
     if ctx.io.capture_output {
         ctx.io.stdout_buffer.push_str(&formatted);
@@ -239,17 +243,13 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
     Ok(tokens)
 }
 
-fn format_default(
-    formatter: &crate::formatter::FormatterContext<'_>,
-    type_name: &str,
-    arg: TupleItem,
-) -> String {
+fn format_default(formatter: &FormatterContext<'_>, type_name: &str, arg: TupleItem) -> String {
     let typed_arg = arg.to_typed(type_name);
     formatter.format(&typed_arg)
 }
 
 fn format_single_arg(
-    formatter: &crate::formatter::FormatterContext<'_>,
+    formatter: &FormatterContext<'_>,
     kind: PlaceholderKind,
     type_name: &str,
     arg: TupleItem,
@@ -286,7 +286,7 @@ fn format_args(
     let tokens = parse_format(&fmt)?;
     let mut out = String::with_capacity(fmt.len());
     let mut args_iter = args.into_iter();
-    let formatter = crate::formatter::FormatterContext::from_context(ctx);
+    let formatter = formatter_from_owned_context(ctx);
 
     for token in tokens {
         match token {
@@ -303,6 +303,24 @@ fn format_args(
     }
 
     Ok(out)
+}
+
+fn formatter_from_owned_context(ctx: &Context<'_>) -> FormatterContext<'static> {
+    FormatterContext {
+        contract_abi: ctx.env.abi.clone(),
+        accounts: Cow::Owned(ctx.chain.world_state.get_accounts().clone()),
+        build_cache: Cow::Owned(ctx.build.build_cache.clone()),
+        emulations: Cow::Owned(ctx.chain.emulations.clone()),
+        known_addresses: Cow::Owned(ctx.build.known_addresses.clone()),
+        known_code_cells: Cow::Owned(ctx.build.known_code_cells.clone()),
+        show_bodies: ctx.env.show_bodies,
+        has_wallets_config: ctx.env.wallets.is_some(),
+        available_wallets: ctx.env.open_wallets.keys().cloned().collect(),
+        backtrace: ctx.build.backtrace,
+        fork_net: ctx.env.fork_net.clone(),
+        network: ctx.network.clone(),
+        api_key: ctx.env.api_key.clone().map(Cow::Owned),
+    }
 }
 
 extension!(prompt in (Context) with (placeholder: String, message: String) using prompt_impl);

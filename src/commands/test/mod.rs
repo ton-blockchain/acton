@@ -334,7 +334,7 @@ impl<'a> TestRunner<'a> {
 
                 executor.prepare(test.id, &stack)?;
 
-                ctx.debug.ctx().process_incoming_requests(true)?;
+                ctx.debug.process_incoming_requests(true)?;
 
                 let get_result = executor.finish(&params.code)?;
 

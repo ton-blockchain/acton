@@ -310,7 +310,7 @@ fn execute_script<'a>(
 
     executor.prepare(0, &stack)?;
 
-    ctx.debug.ctx().process_incoming_requests(true)?;
+    ctx.debug.process_incoming_requests(true)?;
 
     let result = executor.finish(&params.code)?;
     let Context { io, .. } = ctx;

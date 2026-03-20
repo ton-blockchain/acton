@@ -5,6 +5,7 @@ use crate::context::{
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
+use crate::debugger::session::ChildDebugContextSpec;
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::ffi::assert::parse_search_params;
 use crate::retrace;
@@ -46,6 +47,31 @@ use tycho_types::models::{
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
 
+fn run_nested_executor_until_finished(
+    ctx: &mut Context,
+    child_debug_started: bool,
+    child_step_mode: StepMode,
+    mut direct_step: impl FnMut() -> bool,
+) -> anyhow::Result<()> {
+    if child_debug_started {
+        ctx.debug.step(child_step_mode);
+
+        if !ctx.debug.active_context_is_terminated() {
+            ctx.debug
+                .process_incoming_requests(false)
+                .context("Cannot process nested debug requests")?;
+        }
+
+        anyhow::ensure!(
+            ctx.debug.active_context_is_terminated(),
+            "Nested debug context did not finish before finalization"
+        );
+    } else {
+        while !direct_step() {}
+    }
+
+    Ok(())
+}
 extension!(build in (Context) with (path: String, name: String) using build_impl);
 fn build_impl(
     ctx: &mut Context,
@@ -857,24 +883,17 @@ fn send_message_debug(
     let code = Emulator::get_code_cell(&msg, &dest_account);
 
     let step_executor = StepExecutor::new().expect("Failed to create executor");
-    let source_map = ctx
+    let compilation_result = ctx
         .build
         .build_cache
         .result_for_code(&code)
-        .map(|res| res.1.source_map);
-
-    let need_to_stop_on_entry = ctx.debug.ctx().need_to_stop_child_thread_on_start();
-
-    ctx.debug
-        .ctx()
-        .begin_thread(
-            2,
-            AnyExecutor::Message(step_executor.clone()),
-            source_map,
-            "Send internal message".to_string(),
-            need_to_stop_on_entry,
-        )
-        .expect("Cannot send response");
+        .map(|(_, result)| result);
+    let legacy_source_map = compilation_result
+        .as_ref()
+        .map(|result| result.source_map.clone());
+    let tolk_source_map = compilation_result
+        .as_ref()
+        .map(|result| result.tolk_source_map.clone());
 
     let msg_cell = Emulator::patch_message(
         ctx.chain.world_state.get_config(),
@@ -903,42 +922,52 @@ fn send_message_debug(
         "Failed to prepare Emulator in debug mode"
     );
     if prepare_result.skipped {
-        // Since compute phase is skipped, we don't need to run anything
-        ctx.debug
-            .ctx()
-            .finish_thread(2)
-            .context("Cannot send response")?;
         return Ok(vec![]);
     }
 
-    // Step to update internal state
-    if need_to_stop_on_entry {
-        ctx.debug.ctx().step(StepMode::StepIn);
-    } else {
-        ctx.debug.ctx().step(StepMode::Continue);
-    }
+    let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
+    let child_debug_started = ctx
+        .debug
+        .begin_child_context(ChildDebugContextSpec {
+            thread_id: 2,
+            name: "Send internal message".to_string(),
+            executor: AnyExecutor::Message(step_executor.clone()),
+            legacy_source_map,
+            tolk_source_map,
+            stop_on_entry: need_to_stop_on_entry,
+        })
+        .context("Cannot start nested debug context")?;
 
-    if !ctx.debug.ctx().stepper.is_terminated() {
-        // Process requests only if we have something to execute and generates a requests
-        ctx.debug
-            .ctx()
-            .process_incoming_requests(false)
-            .context("Cannot send response")?;
-    }
+    let child_step_mode = if need_to_stop_on_entry {
+        StepMode::StepIn
+    } else if ctx.debug.performing_step() == Some(StepMode::ContinueWithoutBreakpoints) {
+        StepMode::ContinueWithoutBreakpoints
+    } else {
+        StepMode::Continue
+    };
+    run_nested_executor_until_finished(ctx, child_debug_started, child_step_mode, || {
+        step_executor.step()
+    })
+    .context("Cannot finish nested message execution")?;
 
     let result = step_executor
         .finish_transaction()
         .context("Cannot finish transaction")?;
 
-    ctx.debug
-        .ctx()
-        .finish_thread(2)
-        .context("Cannot send response")?;
+    if child_debug_started {
+        ctx.debug
+            .finish_child_context(2)
+            .context("Cannot finish nested debug context")?;
 
-    if ctx.debug.ctx().performing_step != Some(StepMode::Continue) {
-        // When we step out from nested message/get method, send stop message to client to
-        // stop on a line after send/call get method
-        ctx.debug.ctx().step(StepMode::StepIn);
+        if !matches!(
+            ctx.debug.performing_step(),
+            Some(StepMode::Continue | StepMode::ContinueWithoutBreakpoints)
+        ) {
+            // When we step out from nested message/get method, stop on a line after send/call.
+            ctx.debug
+                .advance_parent_after_child_return()
+                .context("Cannot resume parent after nested debug context")?;
+        }
     }
 
     let result = match result {
@@ -1327,7 +1356,7 @@ fn run_get_method_impl(
         .build_cache
         .result_for_code(&Some(code))
         .map(|(_, result)| result);
-    let source_map = compilation_result
+    let legacy_source_map = compilation_result
         .as_ref()
         .map(|result| result.source_map.clone());
     let tolk_source_map = compilation_result
@@ -1343,46 +1372,56 @@ fn run_get_method_impl(
     let result = if ctx.debug.is_enabled() {
         let step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
             .context("Cannot create get executor")?;
-
-        let dbg_ctx = ctx.debug.ctx();
-        dbg_ctx
-            .begin_thread(
-                2,
-                AnyExecutor::Get(step_executor.clone()),
-                source_map,
-                "Send internal message".to_string(),
-                dbg_ctx.need_to_stop_child_thread_on_start(),
-            )
-            .context("Cannot send response")?;
-
         step_executor
             .prepare(method_id, &args_b64)
             .context("Cannot prepare get method")?;
 
-        // Step to update internal state
-        if dbg_ctx.need_to_stop_child_thread_on_start() {
-            dbg_ctx.step(StepMode::StepIn);
+        let need_to_stop_on_entry = ctx.debug.need_to_stop_child_thread_on_start();
+        let child_debug_started = ctx
+            .debug
+            .begin_child_context(ChildDebugContextSpec {
+                thread_id: 2,
+                name: "Run get method".to_string(),
+                executor: AnyExecutor::Get(step_executor.clone()),
+                legacy_source_map: legacy_source_map.clone(),
+                tolk_source_map: Some(tolk_source_map.clone()),
+                stop_on_entry: need_to_stop_on_entry,
+            })
+            .context("Cannot send response")?;
+
+        let child_step_mode = if need_to_stop_on_entry {
+            StepMode::StepIn
+        } else if ctx.debug.performing_step() == Some(StepMode::ContinueWithoutBreakpoints) {
+            StepMode::ContinueWithoutBreakpoints
         } else {
-            dbg_ctx.step(StepMode::Continue);
-        }
+            StepMode::Continue
+        };
+        run_nested_executor_until_finished(ctx, child_debug_started, child_step_mode, || {
+            step_executor.step()
+        })
+        .context("Cannot finish nested get method execution")?;
 
-        if !dbg_ctx.stepper.is_terminated() {
-            dbg_ctx
-                .process_incoming_requests(false)
-                .context("Cannot send response")?;
-        }
-
-        dbg_ctx.finish_thread(2).context("Cannot send response")?;
-
-        if dbg_ctx.performing_step != Some(StepMode::Continue) {
-            // When we step out from nested message/get method, send stop message to client to
-            // stop on a line after send/call get method
-            dbg_ctx.step(StepMode::StepIn);
-        }
-
-        step_executor
+        let result = step_executor
             .finish(&params.code)
-            .context("Cannot run get method")?
+            .context("Cannot run get method")?;
+
+        if child_debug_started {
+            ctx.debug
+                .finish_child_context(2)
+                .context("Cannot send response")?;
+
+            if !matches!(
+                ctx.debug.performing_step(),
+                Some(StepMode::Continue | StepMode::ContinueWithoutBreakpoints)
+            ) {
+                // When we step out from nested message/get method, stop on a line after call.
+                ctx.debug
+                    .advance_parent_after_child_return()
+                    .context("Cannot resume parent after nested debug context")?;
+            }
+        }
+
+        result
     } else {
         let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
         executor

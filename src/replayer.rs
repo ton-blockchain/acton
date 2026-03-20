@@ -1,14 +1,19 @@
-// TolkReplayer — walks through TVM execution log step by step,
+// TolkReplayer — walks through TVM runtime state step by step,
 // applying debug marks to reconstruct source-level state:
 // which function we're in, what variables are on the stack,
 // what source line corresponds to the current instruction.
 
+#![allow(clippy::unwrap_used)]
+
+use crate::debugger::any_executor::AnyExecutor;
 use crate::types_render::{RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack};
 use std::collections::{HashMap, HashSet, VecDeque};
 use tolkc::debug_marks_dict::DebugMarksDict;
 use tolkc::source_map::{DebugMark, SourceMap, SrcRange};
 use tolkc::types_kernel::Ty;
-use vmlogs::parser::{VmLine, VmStackValue};
+use tvmffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::Boc;
+use vmlogs::parser::{CellLike, CellSlice, VmLine, VmStackValue};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,6 +29,52 @@ pub enum StepMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeBackendKind {
+    VmLogs,
+    LiveVm,
+}
+
+/// Explicit gaps of the current live-VM backend compared to replaying VM logs.
+/// These are surfaced on the replayer so callers can branch on degraded behavior,
+/// and so the missing executor API is documented in code rather than implied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeCapabilityGap {
+    InstructionEvents,
+    ExceptionEvents,
+    LogCompatibleStackValues,
+}
+
+impl RuntimeCapabilityGap {
+    pub const fn impact(self) -> &'static str {
+        match self {
+            RuntimeCapabilityGap::InstructionEvents => {
+                "EachAsmInstruction parity is incomplete; PUSHCONT/IFRET-specific control-flow handling stays best-effort"
+            }
+            RuntimeCapabilityGap::ExceptionEvents => {
+                "exception breakpoints and caught-vs-uncaught detection are unavailable on live VM"
+            }
+            RuntimeCapabilityGap::LogCompatibleStackValues => {
+                "locals and stack rendering are best-effort; slices/continuations/log-shape stack values are lossy"
+            }
+        }
+    }
+
+    pub const fn required_executor_api(self) -> &'static str {
+        match self {
+            RuntimeCapabilityGap::InstructionEvents => {
+                "step executor should expose before/after-step instruction metadata, ideally including opcode/instruction name"
+            }
+            RuntimeCapabilityGap::ExceptionEvents => {
+                "step executor should expose exception events or last-step exception status with caught/uncaught information"
+            }
+            RuntimeCapabilityGap::LogCompatibleStackValues => {
+                "step executor should expose structured stack items with exact kinds, slice windows, continuation values and stable stack ordering"
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExceptionBreakMode {
     Never,
     Uncaught,
@@ -38,9 +89,11 @@ pub struct ExceptionInfo {
 
 #[derive(Debug, Clone)]
 pub struct CallFrameInfo {
+    pub f_idx: usize,
     pub f_name: String,
     pub is_inlined: bool,
     pub is_builtin: bool,
+    pub definition_loc: Option<SrcRange>,
     pub call_site_loc: Option<SrcRange>,
 }
 
@@ -48,6 +101,30 @@ pub struct CallFrameInfo {
 pub struct LocalVarRendered {
     pub var_name: String,
     pub value: RenderedValue,
+}
+
+/// Low-level runtime events consumed by `TolkReplayer`.
+/// Debug-mark expansion stays in the replayer, which keeps source reconstruction
+/// shared between the VM-log and live-VM backends.
+#[derive(Debug, Clone)]
+pub enum RuntimeEvent {
+    Position { cell_hash: String, offset: i32 },
+    Stack { values: Vec<VmStackValue> },
+    BeforeInstruction,
+    AfterInstruction { instr_name: String },
+    ImplicitJmpRef,
+    Exception { errno: String },
+    ExceptionHandler { errno: String },
+}
+
+pub trait RuntimeEventSource {
+    fn next_event(&mut self) -> Option<RuntimeEvent>;
+    fn is_exhausted(&self) -> bool;
+    fn backend_kind(&self) -> RuntimeBackendKind;
+
+    fn capability_gaps(&self) -> &'static [RuntimeCapabilityGap] {
+        &[]
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -173,9 +250,190 @@ fn convert_vm_lines(parsed: &[Result<VmLine<'_>, String>]) -> Vec<OwnedVmLine> {
 // (cell_hash, offset) -> sorted vec of mark_id into source_map.debug_marks
 type MarksLookup = HashMap<(String, i32), Vec<usize>>;
 
+pub struct VmLogRuntimeEventSource {
+    vm_lines: Vec<OwnedVmLine>,
+    cur_vm_line_idx: usize,
+    pending_events: VecDeque<RuntimeEvent>,
+}
+
+impl VmLogRuntimeEventSource {
+    pub fn new(vm_lines: &[Result<VmLine<'_>, String>]) -> Self {
+        Self {
+            vm_lines: convert_vm_lines(vm_lines),
+            cur_vm_line_idx: 0,
+            pending_events: VecDeque::new(),
+        }
+    }
+}
+
+impl RuntimeEventSource for VmLogRuntimeEventSource {
+    fn next_event(&mut self) -> Option<RuntimeEvent> {
+        if let Some(event) = self.pending_events.pop_front() {
+            return Some(event);
+        }
+
+        #[allow(clippy::never_loop)]
+        while self.cur_vm_line_idx < self.vm_lines.len() {
+            let idx = self.cur_vm_line_idx;
+            self.cur_vm_line_idx += 1;
+
+            match &self.vm_lines[idx] {
+                OwnedVmLine::Stack { tvm_stack_values } => {
+                    return Some(RuntimeEvent::Stack {
+                        values: tvm_stack_values.clone(),
+                    });
+                }
+                OwnedVmLine::Loc { cell_hash, offset } => {
+                    return Some(RuntimeEvent::Position {
+                        cell_hash: cell_hash.clone(),
+                        offset: *offset,
+                    });
+                }
+                OwnedVmLine::Execute { instr_name } => {
+                    if instr_name == "implicit JMPREF" {
+                        return Some(RuntimeEvent::ImplicitJmpRef);
+                    }
+                    self.pending_events
+                        .push_back(RuntimeEvent::AfterInstruction {
+                            instr_name: instr_name.clone(),
+                        });
+                    return Some(RuntimeEvent::BeforeInstruction);
+                }
+                OwnedVmLine::Exception { errno } => {
+                    return Some(RuntimeEvent::Exception {
+                        errno: errno.clone(),
+                    });
+                }
+                OwnedVmLine::ExceptionHandler { errno } => {
+                    return Some(RuntimeEvent::ExceptionHandler {
+                        errno: errno.clone(),
+                    });
+                }
+            }
+        }
+
+        None
+    }
+
+    fn is_exhausted(&self) -> bool {
+        self.cur_vm_line_idx >= self.vm_lines.len() && self.pending_events.is_empty()
+    }
+
+    fn backend_kind(&self) -> RuntimeBackendKind {
+        RuntimeBackendKind::VmLogs
+    }
+}
+
+const LIVE_VM_CAPABILITY_GAPS: &[RuntimeCapabilityGap] = &[
+    RuntimeCapabilityGap::InstructionEvents,
+    RuntimeCapabilityGap::ExceptionEvents,
+    RuntimeCapabilityGap::LogCompatibleStackValues,
+];
+
+pub struct LiveVmRuntimeEventSource {
+    executor: AnyExecutor,
+    terminated: bool,
+    pending_events: VecDeque<RuntimeEvent>,
+}
+
+impl LiveVmRuntimeEventSource {
+    pub const fn new(executor: AnyExecutor) -> Self {
+        Self {
+            executor,
+            terminated: false,
+            pending_events: VecDeque::new(),
+        }
+    }
+}
+
+impl RuntimeEventSource for LiveVmRuntimeEventSource {
+    fn next_event(&mut self) -> Option<RuntimeEvent> {
+        if let Some(event) = self.pending_events.pop_front() {
+            return Some(event);
+        }
+
+        if self.terminated {
+            return None;
+        }
+
+        // Live SBS execution currently only exposes "step, then inspect current state".
+        // The missing executor API is recorded via `capability_gaps()`:
+        // - no before/after instruction metadata;
+        // - no exception callbacks/status;
+        // - stack snapshot is tuple-shaped, not VM-log compatible.
+        let is_end = self.executor.step();
+
+        if let Some(values) = live_vm_stack_values(&self.executor) {
+            self.pending_events
+                .push_back(RuntimeEvent::Stack { values });
+        }
+        if let Some((cell_hash, offset)) = live_vm_code_pos(&self.executor) {
+            self.pending_events
+                .push_back(RuntimeEvent::Position { cell_hash, offset });
+        }
+
+        self.terminated = is_end;
+        self.pending_events.pop_front()
+    }
+
+    fn is_exhausted(&self) -> bool {
+        self.terminated && self.pending_events.is_empty()
+    }
+
+    fn backend_kind(&self) -> RuntimeBackendKind {
+        RuntimeBackendKind::LiveVm
+    }
+
+    fn capability_gaps(&self) -> &'static [RuntimeCapabilityGap] {
+        LIVE_VM_CAPABILITY_GAPS
+    }
+}
+
+fn live_vm_code_pos(executor: &AnyExecutor) -> Option<(String, i32)> {
+    let pos = executor.get_code_pos();
+    let (hash, offset) = pos.split_once(':')?;
+    let offset = offset.parse::<i32>().ok()?;
+    Some((hash.to_string(), offset))
+}
+
+fn live_vm_stack_values(executor: &AnyExecutor) -> Option<Vec<VmStackValue>> {
+    let stack = executor.get_stack();
+    let stack_cell = Boc::decode_base64(&stack).ok()?;
+    let stack_tuple = Tuple::deserialize(&stack_cell).ok()?;
+    Some(
+        stack_tuple
+            .iter()
+            .map(tuple_item_to_vm_stack_value)
+            .collect(),
+    )
+}
+
+fn tuple_item_to_vm_stack_value(item: &TupleItem) -> VmStackValue {
+    match item {
+        TupleItem::Null => VmStackValue::Null,
+        TupleItem::Int(v) => VmStackValue::Integer(v.to_string()),
+        TupleItem::Nan => VmStackValue::NaN,
+        TupleItem::Cell(cell) => VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(cell))),
+        // `get_stack()` exposes a whole cell for slice values, but not the exact viewed
+        // bit/ref window from VM logs, so range information is intentionally left absent.
+        TupleItem::Slice(cell) => VmStackValue::CellSlice(CellSlice {
+            value: Boc::encode_hex(cell),
+            bits: None,
+            refs: None,
+        }),
+        TupleItem::Builder(cell) => VmStackValue::Builder(Boc::encode_hex(cell)),
+        TupleItem::Tuple(items) => {
+            VmStackValue::Tuple(items.iter().map(tuple_item_to_vm_stack_value).collect())
+        }
+        TupleItem::TypedTuple { inner, .. } => {
+            VmStackValue::Tuple(inner.iter().map(tuple_item_to_vm_stack_value).collect())
+        }
+    }
+}
+
 /// Tick — atomic unit of work for the replayer.
 ///
-/// The tick stream is lazily built from VM log lines and debug marks.
+/// The tick stream is lazily built from runtime events and debug marks.
 /// Stored as Replayer::pending_ticks (the "current position" of the replayer).
 /// Returned by step_verbose() for logging/monitoring.
 #[derive(Debug, Clone)]
@@ -249,11 +507,9 @@ pub struct TolkReplayer {
     source_map: SourceMap,
     // (cell_hash, offset) → mark_id mapping built from Fift debug marks dictionary
     marks_lookup: MarksLookup,
-
-    // TVM execution log (cell hashes and offsets, stack values, executed asm instructions)
-    vm_lines: Vec<OwnedVmLine>,
-    // cursor inside TVM execution log, it's parsed top-down, "replaying" execution trace
-    cur_vm_line_idx: usize,
+    // Pull-based runtime backend. It can be fed either by parsed VM logs
+    // or by a live SBS executor.
+    runtime_source: Box<dyn RuntimeEventSource>,
 
     // source location where execution last stopped (file, line, column)
     current_loc: SrcRange,
@@ -267,7 +523,7 @@ pub struct TolkReplayer {
     // glob_name → (ty_idx, captured TVM values) for globals that have been SET
     global_var_values: HashMap<String, (usize, Vec<VmStackValue>)>,
 
-    // raw TVM stack (updated from STACK lines in the VM log);
+    // raw TVM stack (updated from runtime stack events);
     // global (not per-context) because TvmStackValues tick arrives before PushFrame
     tvm_stack_values: Vec<VmStackValue>,
 
@@ -306,6 +562,38 @@ impl TolkReplayer {
         marks_dict: &DebugMarksDict,
         vm_lines: &[Result<VmLine<'_>, String>],
     ) -> Self {
+        Self::new_with_runtime_source(
+            source_map,
+            marks_dict,
+            VmLogRuntimeEventSource::new(vm_lines),
+        )
+    }
+
+    pub fn new_live_vm(
+        source_map: SourceMap,
+        marks_dict: &DebugMarksDict,
+        executor: AnyExecutor,
+    ) -> Self {
+        Self::new_with_runtime_source(
+            source_map,
+            marks_dict,
+            LiveVmRuntimeEventSource::new(executor),
+        )
+    }
+
+    pub fn new_with_runtime_source(
+        source_map: SourceMap,
+        marks_dict: &DebugMarksDict,
+        runtime_source: impl RuntimeEventSource + 'static,
+    ) -> Self {
+        Self::new_with_boxed_runtime_source(source_map, marks_dict, Box::new(runtime_source))
+    }
+
+    fn new_with_boxed_runtime_source(
+        source_map: SourceMap,
+        marks_dict: &DebugMarksDict,
+        runtime_source: Box<dyn RuntimeEventSource>,
+    ) -> Self {
         let mut lookup = MarksLookup::new();
         for (cell_hash, entries) in marks_dict {
             for &(offset, mark_id) in entries {
@@ -319,8 +607,7 @@ impl TolkReplayer {
         TolkReplayer {
             source_map,
             marks_lookup: lookup,
-            vm_lines: convert_vm_lines(vm_lines),
-            cur_vm_line_idx: 0,
+            runtime_source,
             call_stack: Vec::new(),
             current_loc: SrcRange(vec![0, 0, 0, 0, 0]),
             exec_stack: vec![NoinlineExecState::new()],
@@ -342,17 +629,24 @@ impl TolkReplayer {
     /// line >= it that has a debug mark (LOC, inlined ENTER_FUN, or LEAVE_FUN),
     /// so breakpoints on optimized-away lines shift to the next stoppable line.
     pub fn set_breakpoints(&mut self, file_id: usize, lines: &[usize]) {
-        let valid_lines = self.source_map.stoppable_lines_for_file(file_id);
-
         self.breakpoints.retain(|&(fid, _)| fid != file_id);
-        for &line in lines {
-            let resolved = valid_lines
-                .iter()
-                .find(|&&vl| vl >= line)
-                .copied()
-                .unwrap_or(line);
+        for resolved in self.resolve_breakpoint_lines(file_id, lines) {
             self.breakpoints.insert((file_id, resolved));
         }
+    }
+
+    pub fn resolve_breakpoint_lines(&self, file_id: usize, lines: &[usize]) -> Vec<usize> {
+        let valid_lines = self.source_map.stoppable_lines_for_file(file_id);
+        lines
+            .iter()
+            .map(|&line| {
+                valid_lines
+                    .iter()
+                    .find(|&&vl| vl >= line)
+                    .copied()
+                    .unwrap_or(line)
+            })
+            .collect()
     }
 
     pub fn clear_all_breakpoints(&mut self) {
@@ -367,11 +661,19 @@ impl TolkReplayer {
         self.last_exception.as_ref()
     }
 
+    pub fn runtime_backend_kind(&self) -> RuntimeBackendKind {
+        self.runtime_source.backend_kind()
+    }
+
+    pub fn runtime_capability_gaps(&self) -> &'static [RuntimeCapabilityGap] {
+        self.runtime_source.capability_gaps()
+    }
+
     pub fn is_finished(&self) -> bool {
         if self.last_exception.is_some() {
             return false;
         }
-        self.cur_vm_line_idx >= self.vm_lines.len() && self.pending_ticks.is_empty()
+        self.runtime_source.is_exhausted() && self.pending_ticks.is_empty()
     }
 
     pub fn current_file_id(&self) -> usize {
@@ -398,9 +700,14 @@ impl TolkReplayer {
         self.call_stack
             .iter()
             .map(|f| CallFrameInfo {
+                f_idx: f.f_idx,
                 f_name: f.f_name.clone(),
                 is_inlined: f.is_inlined,
                 is_builtin: f.is_builtin,
+                definition_loc: self
+                    .source_map
+                    .get_function_by_idx(f.f_idx)
+                    .map(|fun| fun.ident_loc.clone()),
                 call_site_loc: f.call_site_loc.clone(),
             })
             .collect()
@@ -498,26 +805,21 @@ impl TolkReplayer {
             .collect()
     }
 
-    /// Pull the next tick from the pending queue, or lazily expand VM log lines
-    /// into ticks. Returns None when the VM log is exhausted.
+    /// Pull the next tick from the pending queue, or lazily expand runtime events
+    /// into ticks. Returns None when the selected runtime backend is exhausted.
     fn next_tick(&mut self) -> Option<Tick> {
         if let Some(tick) = self.pending_ticks.pop_front() {
             return Some(tick);
         }
 
-        while self.cur_vm_line_idx < self.vm_lines.len() {
-            let idx = self.cur_vm_line_idx;
-            self.cur_vm_line_idx += 1;
-
-            match &self.vm_lines[idx] {
-                OwnedVmLine::Stack { tvm_stack_values } => {
-                    return Some(Tick::TvmStackValues {
-                        values: tvm_stack_values.clone(),
-                    });
+        while let Some(event) = self.runtime_source.next_event() {
+            match event {
+                RuntimeEvent::Stack { values } => {
+                    return Some(Tick::TvmStackValues { values });
                 }
-                OwnedVmLine::Loc { cell_hash, offset } => {
+                RuntimeEvent::Position { cell_hash, offset } => {
                     if !self.prev_was_pushcont {
-                        let key = (cell_hash.clone(), *offset);
+                        let key = (cell_hash, offset);
                         if let Some(mark_indices) = self.marks_lookup.get(&key) {
                             let indices = mark_indices.clone();
                             for mark_id in indices {
@@ -531,24 +833,20 @@ impl TolkReplayer {
                         }
                     }
                 }
-                OwnedVmLine::Execute { instr_name } => {
-                    if instr_name == "implicit JMPREF" {
-                        return Some(Tick::TvmImplicitJmpRef);
-                    }
-                    self.pending_ticks.push_back(Tick::TvmAfterExecute {
-                        instr_name: instr_name.clone(),
-                    });
+                RuntimeEvent::BeforeInstruction => {
                     return Some(Tick::TvmBeforeExecute);
                 }
-                OwnedVmLine::Exception { errno } => {
-                    return Some(Tick::TvmException {
-                        errno: errno.clone(),
-                    });
+                RuntimeEvent::AfterInstruction { instr_name } => {
+                    return Some(Tick::TvmAfterExecute { instr_name });
                 }
-                OwnedVmLine::ExceptionHandler { errno } => {
-                    return Some(Tick::TvmExceptionHandler {
-                        errno: errno.clone(),
-                    });
+                RuntimeEvent::ImplicitJmpRef => {
+                    return Some(Tick::TvmImplicitJmpRef);
+                }
+                RuntimeEvent::Exception { errno } => {
+                    return Some(Tick::TvmException { errno });
+                }
+                RuntimeEvent::ExceptionHandler { errno } => {
+                    return Some(Tick::TvmExceptionHandler { errno });
                 }
             }
         }
@@ -767,11 +1065,11 @@ impl TolkReplayer {
             }
             Tick::TvmStackValues { values } => {
                 self.clear_caught_exception();
-                self.tvm_stack_values = values;
-                let exec = self.exec_stack.last_mut().expect(
-                    "replayer invariant: exec_stack must contain the active execution state",
-                );
-                exec.accumulated_needs_reset = true;
+                self.tvm_stack_values = values.clone();
+
+                if let Some(exec) = self.exec_stack.last_mut() {
+                    exec.accumulated_needs_reset = true;
+                }
             }
             Tick::TvmBeforeExecute => {
                 // stop before execution, not after (see below)
@@ -818,18 +1116,20 @@ impl TolkReplayer {
                 is_lazy,
                 ..
             } => {
-                let frame = self.call_stack.last_mut().expect("no last frame");
-                let new_var = LocalVarInScope {
-                    name: var_name.clone(),
-                    ty_idx,
-                    ir_slots: ir_slots.clone(),
-                    is_lazy,
-                };
-                let vars = frame.current_vars_mut();
-                if let Some(existing) = vars.iter_mut().find(|v| v.name == var_name) {
-                    existing.ir_slots = ir_slots;
-                } else {
-                    vars.push(new_var);
+                if let Some(frame) = self.call_stack.last_mut() {
+                    // .expect("no last frame");
+                    let new_var = LocalVarInScope {
+                        name: var_name.clone(),
+                        ty_idx,
+                        ir_slots: ir_slots.clone(),
+                        is_lazy,
+                    };
+                    let vars = frame.current_vars_mut();
+                    if let Some(existing) = vars.iter_mut().find(|v| v.name == var_name) {
+                        existing.ir_slots = ir_slots;
+                    } else {
+                        vars.push(new_var);
+                    }
                 }
             }
             Tick::SmartCast {
@@ -837,18 +1137,20 @@ impl TolkReplayer {
                 ty_idx,
                 ir_slots,
             } => {
-                let frame = self.call_stack.last_mut().expect("no last frame");
-                let found = frame
-                    .scope_stack
-                    .iter_mut()
-                    .rev()
-                    .flat_map(|s| s.variables.iter_mut())
-                    .chain(frame.variables.iter_mut())
-                    .find(|v| v.name == var_name);
-                if let Some(existing) = found {
-                    existing.ty_idx = ty_idx;
-                    existing.ir_slots = ir_slots;
-                    // if a variable's type is narrowed, a compiler will also report de-cast later
+                if let Some(frame) = self.call_stack.last_mut() {
+                    // let frame = self.call_stack.last_mut().expect("no last frame");
+                    let found = frame
+                        .scope_stack
+                        .iter_mut()
+                        .rev()
+                        .flat_map(|s| s.variables.iter_mut())
+                        .chain(frame.variables.iter_mut())
+                        .find(|v| v.name == var_name);
+                    if let Some(existing) = found {
+                        existing.ty_idx = ty_idx;
+                        existing.ir_slots = ir_slots;
+                        // if a variable's type is narrowed, a compiler will also report de-cast later
+                    }
                 }
             }
             Tick::SetGlob {
@@ -871,15 +1173,20 @@ impl TolkReplayer {
                 self.global_var_values.insert(glob_name, (ty_idx, captured));
             }
             Tick::ScopeStart { range } => {
-                let frame = self.call_stack.last_mut().expect("no last frame");
-                frame.scope_stack.push(LexicalScope {
-                    range,
-                    variables: Vec::new(),
-                });
+                if let Some(frame) = self.call_stack.last_mut() {
+                    // .expect("no last frame");
+
+                    frame.scope_stack.push(LexicalScope {
+                        range,
+                        variables: Vec::new(),
+                    });
+                }
             }
             Tick::ScopeEnd => {
-                let frame = self.call_stack.last_mut().expect("no last frame");
-                frame.scope_stack.pop();
+                if let Some(frame) = self.call_stack.last_mut() {
+                    // .expect("no last frame");
+                    frame.scope_stack.pop();
+                }
             }
         }
         false

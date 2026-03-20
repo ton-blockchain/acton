@@ -1,5 +1,6 @@
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::dap::{DapMessage, DapTransport};
+use crate::debugger::session::{ChildDebugContextSpec, DebugSession};
 use crate::formatter::FormatterContext;
 use anyhow::anyhow;
 use dap::events::{Event, StoppedEventBody, ThreadEventBody};
@@ -1017,6 +1018,48 @@ impl DebugContext {
                 None => return true,
             }
         }
+    }
+}
+
+impl DebugSession for DebugContext {
+    fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
+        DebugContext::process_incoming_requests(self, terminate_at_end)
+    }
+
+    fn need_to_stop_child_thread_on_start(&self) -> bool {
+        DebugContext::need_to_stop_child_thread_on_start(self)
+    }
+
+    fn begin_child_context(&mut self, spec: ChildDebugContextSpec) -> anyhow::Result<bool> {
+        self.begin_thread(
+            spec.thread_id,
+            spec.executor,
+            spec.legacy_source_map,
+            spec.name,
+            spec.stop_on_entry,
+        )?;
+        Ok(true)
+    }
+
+    fn finish_child_context(&mut self, thread_id: i64) -> anyhow::Result<()> {
+        self.finish_thread(thread_id)
+    }
+
+    fn step(&mut self, mode: StepMode) -> bool {
+        DebugContext::step(self, mode)
+    }
+
+    fn active_context_is_terminated(&self) -> bool {
+        self.stepper.is_terminated()
+    }
+
+    fn performing_step(&self) -> Option<StepMode> {
+        self.performing_step
+    }
+
+    fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
+        self.step(StepMode::StepIn);
+        Ok(())
     }
 }
 

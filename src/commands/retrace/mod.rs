@@ -2,6 +2,7 @@ mod dap;
 
 use crate::commands::common::error_fmt;
 use crate::formatter::FormatterContext;
+use crate::replayer::TolkReplayer;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
@@ -113,6 +114,11 @@ pub fn retrace_cmd(
         anyhow::bail!("Failed to retrace transaction in any network: {e}");
     }
     anyhow::bail!("Failed to retrace transaction");
+}
+
+#[allow(dead_code)]
+pub(crate) fn serve_prepared_retrace_dap(replayer: TolkReplayer, port: u16) -> anyhow::Result<()> {
+    dap::serve_retrace_dap(replayer, port).map_err(|err| anyhow!(err.to_string()))
 }
 
 fn print_retrace_result(

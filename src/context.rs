@@ -1,4 +1,5 @@
-use crate::debugger::debug_context::DebugContext;
+use crate::debugger::debug_context::StepMode;
+use crate::debugger::session::{ChildDebugContextSpec, DebugSession};
 use crate::file_build_cache::FileBuildCache;
 use acton_config::config;
 use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig};
@@ -638,7 +639,7 @@ pub struct BuildContext<'a> {
 
 pub enum DebugCtx<'a> {
     Disabled,
-    Enabled { inner: &'a mut DebugContext },
+    Enabled { inner: &'a mut dyn DebugSession },
 }
 
 impl Context<'_> {
@@ -713,7 +714,7 @@ impl ChainContext<'_> {
 }
 
 impl<'a> DebugCtx<'a> {
-    pub const fn new(inner: &'a mut DebugContext) -> DebugCtx<'a> {
+    pub const fn new(inner: &'a mut dyn DebugSession) -> DebugCtx<'a> {
         DebugCtx::Enabled { inner }
     }
 
@@ -722,13 +723,48 @@ impl<'a> DebugCtx<'a> {
         matches!(self, DebugCtx::Enabled { .. })
     }
 
-    pub fn ctx(&mut self) -> &mut DebugContext {
+    fn session(&mut self) -> &mut dyn DebugSession {
         match self {
-            DebugCtx::Enabled { inner: ctx, .. } => ctx,
+            DebugCtx::Enabled { inner: ctx, .. } => *ctx,
             DebugCtx::Disabled => {
                 panic!("Debug context accessed from non debug context");
             }
         }
+    }
+
+    pub fn process_incoming_requests(&mut self, terminate_at_end: bool) -> anyhow::Result<()> {
+        self.session().process_incoming_requests(terminate_at_end)
+    }
+
+    #[must_use]
+    pub fn need_to_stop_child_thread_on_start(&mut self) -> bool {
+        self.session().need_to_stop_child_thread_on_start()
+    }
+
+    pub fn begin_child_context(&mut self, spec: ChildDebugContextSpec) -> anyhow::Result<bool> {
+        self.session().begin_child_context(spec)
+    }
+
+    pub fn finish_child_context(&mut self, thread_id: i64) -> anyhow::Result<()> {
+        self.session().finish_child_context(thread_id)
+    }
+
+    pub fn step(&mut self, mode: StepMode) -> bool {
+        self.session().step(mode)
+    }
+
+    #[must_use]
+    pub fn active_context_is_terminated(&mut self) -> bool {
+        self.session().active_context_is_terminated()
+    }
+
+    #[must_use]
+    pub fn performing_step(&mut self) -> Option<StepMode> {
+        self.session().performing_step()
+    }
+
+    pub fn advance_parent_after_child_return(&mut self) -> anyhow::Result<()> {
+        self.session().advance_parent_after_child_return()
     }
 }
 

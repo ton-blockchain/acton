@@ -72,6 +72,22 @@ impl SourceMap {
         }
     }
 
+    pub fn innermost_function_at(&self, file_id: usize, line: usize) -> Option<&FunctionInfo> {
+        self.functions
+            .iter()
+            .filter(|function| {
+                function.ident_loc.file_id() == file_id
+                    && line >= function.ident_loc.start_line()
+                    && line <= function.end_loc.end_line()
+            })
+            .min_by_key(|function| {
+                function
+                    .end_loc
+                    .end_line()
+                    .saturating_sub(function.ident_loc.start_line())
+            })
+    }
+
     pub fn get_struct(&self, name: &str) -> &AbiStruct {
         self.structs
             .get(name)

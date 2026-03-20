@@ -4,7 +4,7 @@ use crate::context::{
     EmulationsState, Env, IoContext, KnownAddresses,
 };
 use crate::debugger::any_executor::AnyExecutor;
-use crate::debugger::debug_context::DebugContext;
+use crate::debugger::replayer_session::ReplayerDebugSession;
 use crate::exit_codes;
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
@@ -36,7 +36,6 @@ use ton_emulator::world_state::{
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::{DEFAULT_CONFIG, ExecutorVerbosity};
-use ton_source_map::SourceMap;
 use tvmffi::serde::serialize_tuple;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -153,7 +152,6 @@ fn run_script_file(
         tolkc::CompilerResult::Success(result) => {
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
             let data_cell = CellBuilder::new().build()?;
-            let source_map = Arc::new(result.source_map.unwrap_or_default());
             let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
                 result.new_source_map.unwrap_or_default(),
                 &code_cell,
@@ -165,7 +163,6 @@ fn run_script_file(
                 &data_cell,
                 stack,
                 Arc::new(abi),
-                source_map,
                 tolk_source_map,
                 debug,
                 backtrace,
@@ -198,7 +195,6 @@ fn execute_script(
     data_cell: &Cell,
     stack: Tuple,
     abi: Arc<ContractAbi>,
-    source_map: Arc<SourceMap>,
     tolk_source_map: Arc<TolkSourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
@@ -304,26 +300,28 @@ fn execute_script(
     };
 
     if debug {
-        let stack = Boc::encode_base64(serialize_tuple(&stack)?);
-        let mut executor = StepGetExecutor::new(&stack, &params, Some(DEFAULT_CONFIG))?;
+        let stack_b64 = Boc::encode_base64(serialize_tuple(&stack)?);
+        let mut executor = StepGetExecutor::new(&stack_b64, &params, Some(DEFAULT_CONFIG))?;
         ffi::register(&mut executor, &mut ctx);
 
         let listener = debug_listener
             .ok_or_else(|| anyhow!("internal error: debug listener was not reserved"))?;
         let transport = crate::debugger::dap::start_dap_server_with_listener(listener)?;
+        executor.prepare(0, &stack_b64)?;
+        executor.prepare(0, &stack_b64)?;
+        let marks_dict = tolk_source_map.marks_dict.as_ref().ok_or_else(|| {
+            anyhow!("Compiler did not return debug info for script debug session")
+        })?;
 
-        let mut dbg_ctx = DebugContext::new(
-            transport,
+        let replayer = crate::replayer::TolkReplayer::new_live_vm(
+            tolk_source_map.source_map.clone(),
+            marks_dict,
             AnyExecutor::Get(executor.clone()),
-            source_map,
-            "main".into(),
         );
 
-        ctx.debug = DebugCtx::new(&mut dbg_ctx);
-
-        executor.prepare(0, &stack)?;
-
-        ctx.debug.ctx().process_incoming_requests(true)?;
+        let mut dbg_session = ReplayerDebugSession::new(transport, replayer, "main".into());
+        ctx.debug = DebugCtx::new(&mut dbg_session);
+        ctx.debug.process_incoming_requests(true)?;
 
         let result = executor.finish(&params.code)?;
         print_script_result(
@@ -351,7 +349,7 @@ fn execute_script(
     Ok(())
 }
 
-fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
+fn print_script_result<'a>(ctx: &'a Context<'a>, result: ScriptResult) {
     match &result.result {
         GetMethodResult::Success(success_result) => {
             let exit_code = success_result.vm_exit_code;
@@ -398,8 +396,8 @@ fn print_script_result(ctx: &Context<'_>, result: ScriptResult) {
     }
 }
 
-fn print_nonzero_script_exit_code(
-    ctx: &Context<'_>,
+fn print_nonzero_script_exit_code<'a>(
+    ctx: &'a Context<'a>,
     result: &GetMethodResultSuccess,
     script_result: &ScriptResult,
     exit_code: i32,
@@ -419,8 +417,8 @@ fn print_nonzero_script_exit_code(
     }
 }
 
-fn format_nonzero_script_exit_code_details(
-    ctx: &Context<'_>,
+fn format_nonzero_script_exit_code_details<'a>(
+    ctx: &'a Context<'a>,
     result: &GetMethodResultSuccess,
     script_result: &ScriptResult,
     exit_code: i32,
