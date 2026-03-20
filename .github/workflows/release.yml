@@ -210,7 +210,7 @@ jobs:
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' }}
+    if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release.result == 'success' }}
     runs-on: "ubicloud-standard-2"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
