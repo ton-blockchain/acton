@@ -192,11 +192,21 @@ jobs:
           name: artifacts-dist-manifest
           path: dist-manifest.json
 
+  custom-check-release:
+    needs:
+      - plan
+      - build-global-artifacts
+    uses: ./.github/workflows/check-release.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+
   # Create a GitHub Release while uploading all files to it
   announce:
     needs:
       - plan
       - host
+      - custom-check-release
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!

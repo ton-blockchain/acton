@@ -33,6 +33,8 @@ pr-run-mode = "skip"
 plan-jobs = ["./verify-version"]
 # Post-announce jobs to run in CI
 post-announce-jobs = ["./publish-mirror"]
+# Host jobs to run in CI
+host-jobs = ["./check-release"]
 # Path that installers should place binaries in
 install-path = "~/.acton/bin"
 # Whether to install an updater program

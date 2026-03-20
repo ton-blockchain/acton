@@ -1,0 +1,90 @@
+name: Check Release
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  check-artifact:
+    name: Check release artifact (${{ matrix.target_name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubicloud-standard-4-ubuntu-2204
+            target_name: x86_64-unknown-linux-gnu
+          - runner: ubicloud-standard-4-arm-ubuntu-2204
+            target_name: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target_name: x86_64-apple-darwin
+          - runner: macos-15
+            target_name: aarch64-apple-darwin
+    env:
+      TARGET_NAME: ${{ matrix.target_name }}
+      PROJECT_NAME: release-check-${{ matrix.target_name }}
+      PROJECT_DIR: ${{ runner.temp }}/release-check-${{ matrix.target_name }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download Acton archive artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: artifacts-${{ env.TARGET_NAME }}
+          path: ${{ runner.temp }}/release-artifact
+
+      - name: Unpack Acton archive
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        # language=Bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p acton-bin
+          tar -C acton-bin -xzf "release-artifact/acton-${TARGET_NAME}.tar.gz"
+          chmod +x acton-bin/acton
+          echo "${PWD}/acton-bin" >> "$GITHUB_PATH"
+
+      - name: Verify Acton version
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          acton --version
+
+      - name: Create counter project
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          acton new "${PROJECT_NAME}" \
+            --template counter \
+            --name "release-check" \
+            --description "Release artifact smoke test" \
+            --license MIT
+
+      - name: Build counter project
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          acton build
+
+      - name: Test counter project
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          acton test
+
+      - name: Check counter project
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          acton check
+
+      - name: Format counter project
+        shell: bash
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          acton fmt
