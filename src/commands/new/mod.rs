@@ -4,14 +4,17 @@ use acton_config::color::OwoColorize;
 use acton_config::config::{
     ActonConfig, ContractConfig, ContractsConfig, default_project_mappings,
 };
-use inquire::{Select, Text};
+use anyhow::{Context, anyhow};
+use inquire::{Confirm, Select, Text};
+use serde_json::{Map as JsonMap, Value as JsonValue};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Write;
+use std::io::{IsTerminal, Write, stdin, stdout};
 use std::path::Path;
 
 mod licenses;
 mod template;
+use template::ProjectLayout;
 pub use template::ProjectTemplate;
 
 const BASE_GITIGNORE: &str = "
@@ -20,6 +23,7 @@ const BASE_GITIGNORE: &str = "
 
 # Build directory
 build/
+dist/
 
 .DS_Store
 node_modules/
@@ -92,6 +96,7 @@ pub fn new_cmd(
     description: Option<String>,
     template: Option<ProjectTemplate>,
     license: Option<String>,
+    app: bool,
 ) -> anyhow::Result<()> {
     let project_path = if path == "." {
         std::env::current_dir()?
@@ -149,6 +154,14 @@ pub fn new_cmd(
             .0
     };
 
+    let include_app = resolve_include_app(template, app)?;
+    let scaffold = template::project_scaffold(template, include_app).ok_or_else(|| {
+        anyhow!(
+            "Template {} does not include a TypeScript app scaffold",
+            template.to_string().cyan()
+        )
+    })?;
+
     let license_options = vec![
         "MIT",
         "Apache-2.0",
@@ -183,52 +196,19 @@ pub fn new_cmd(
     std::env::set_current_dir(&project_path)?;
 
     // use `.` since we explicitly change current dir to project dir
-    template::create_project_from_template(template, Path::new("."))?;
+    template::create_project_from_scaffold(scaffold, Path::new("."))?;
 
     let mut contracts = BTreeMap::new();
-    match template {
-        ProjectTemplate::Empty => {
-            contracts.insert(
-                "empty".to_owned(),
-                ContractConfig {
-                    name: "Empty".to_owned(),
-                    src: "contracts/contract.tolk".to_owned(),
-                    depends: Some(vec![]),
-                    output: None,
-                },
-            );
-        }
-        ProjectTemplate::Counter => {
-            contracts.insert(
-                "counter".to_owned(),
-                ContractConfig {
-                    name: "Counter".to_owned(),
-                    src: "contracts/counter.tolk".to_owned(),
-                    depends: Some(vec![]),
-                    output: None,
-                },
-            );
-        }
-        ProjectTemplate::Jetton => {
-            contracts.insert(
-                "jetton_minter".to_owned(),
-                ContractConfig {
-                    name: "JettonMinter".to_owned(),
-                    src: "contracts/jetton-minter-contract.tolk".to_owned(),
-                    depends: Some(vec![]),
-                    output: None,
-                },
-            );
-            contracts.insert(
-                "jetton_wallet".to_owned(),
-                ContractConfig {
-                    name: "JettonWallet".to_owned(),
-                    src: "contracts/jetton-wallet-contract.tolk".to_owned(),
-                    depends: Some(vec![]),
-                    output: None,
-                },
-            );
-        }
+    for contract in scaffold.contracts() {
+        contracts.insert(
+            contract.id.to_owned(),
+            ContractConfig {
+                name: contract.name.to_owned(),
+                src: contract.src.to_owned(),
+                depends: Some(vec![]),
+                output: None,
+            },
+        );
     }
 
     config.contracts = Some(ContractsConfig { contracts });
@@ -238,16 +218,23 @@ pub fn new_cmd(
     let mut scripts = BTreeMap::new();
     scripts.insert(
         "deploy-emulation".to_owned(),
-        "acton script scripts/deploy.tolk".to_owned(),
+        format!("acton script {}", scaffold.layout().deploy_script_path()),
     );
     scripts.insert(
         "deploy-testnet".to_owned(),
-        "acton script scripts/deploy.tolk --broadcast --net testnet".to_owned(),
+        format!(
+            "acton script {} --broadcast --net testnet",
+            scaffold.layout().deploy_script_path()
+        ),
     );
     config.scripts = Some(scripts);
-    config.mappings = Some(default_project_mappings());
+    config.mappings = Some(project_mappings(scaffold.layout()));
 
     config.save()?;
+
+    if scaffold.layout().includes_typescript_app() {
+        update_npm_package_metadata(&project_name)?;
+    }
 
     stdlib::ensure_latest(Path::new("."))?;
 
@@ -298,6 +285,13 @@ pub fn new_cmd(
         "Template:".bright_black(),
         template.to_string().cyan()
     );
+    if scaffold.layout().includes_typescript_app() {
+        println!(
+            "  {} {}",
+            "TypeScript app:".bright_black(),
+            "included".cyan()
+        );
+    }
     println!("  {} {}", "License:".bright_black(), license.cyan());
     println!();
     println!("Created {} with project configuration", "Acton.toml".cyan());
@@ -310,8 +304,270 @@ pub fn new_cmd(
     println!("  {} build", "acton".bold());
     println!("  {}", "# Run tests".dimmed());
     println!("  {} test", "acton".bold());
+    if scaffold.layout().includes_typescript_app() {
+        println!("  {}", "# Install app dependencies".dimmed());
+        println!("  npm install");
+        println!("  {}", "# Start the TypeScript app".dimmed());
+        println!("  npm run dev");
+    }
 
     Ok(())
+}
+
+fn resolve_include_app(template: ProjectTemplate, app: bool) -> anyhow::Result<bool> {
+    if app {
+        if !template::template_supports_app(template) {
+            anyhow::bail!(
+                "Template {} does not include a TypeScript app scaffold",
+                template.to_string().cyan()
+            );
+        }
+
+        return Ok(true);
+    }
+
+    if !template::template_supports_app(template) {
+        return Ok(false);
+    }
+
+    if stdin().is_terminal() && stdout().is_terminal() {
+        Confirm::new("Include the TypeScript app scaffold?")
+            .with_default(false)
+            .prompt()
+            .map_err(Into::into)
+    } else {
+        Ok(false)
+    }
+}
+
+fn project_mappings(layout: ProjectLayout) -> BTreeMap<String, String> {
+    if !layout.includes_typescript_app() {
+        return default_project_mappings();
+    }
+
+    let mut mappings = default_project_mappings();
+    mappings.insert(
+        "contracts".to_owned(),
+        layout.contracts_mapping().to_owned(),
+    );
+    mappings.insert("tests".to_owned(), layout.tests_mapping().to_owned());
+    mappings.insert("wrappers".to_owned(), layout.wrappers_mapping().to_owned());
+    mappings
+}
+
+fn update_npm_package_metadata(project_name: &str) -> anyhow::Result<()> {
+    let normalized_name = normalize_npm_package_name(project_name);
+    let has_workspaces = update_package_json_name(&normalized_name)?;
+    update_package_lock_name(&normalized_name, has_workspaces)?;
+    Ok(())
+}
+
+fn update_package_json_name(normalized_name: &str) -> anyhow::Result<bool> {
+    let package_json_path = Path::new("package.json");
+
+    if !package_json_path.exists() {
+        return Ok(false);
+    }
+
+    let content = fs::read_to_string(package_json_path)
+        .with_context(|| format!("Failed to read {}", package_json_path.display()))?;
+    let mut package_json: JsonValue = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", package_json_path.display()))?;
+    let has_workspaces = matches!(
+        &package_json,
+        JsonValue::Object(object) if object.contains_key("workspaces")
+    );
+
+    if matches!(package_json, JsonValue::Object(_))
+        && let Some(updated_content) =
+            replace_top_level_json_string_field(&content, "name", normalized_name)
+    {
+        fs::write(package_json_path, updated_content)
+            .with_context(|| format!("Failed to write {}", package_json_path.display()))?;
+        return Ok(has_workspaces);
+    }
+
+    match &mut package_json {
+        JsonValue::Object(object) => {
+            object.insert(
+                "name".to_owned(),
+                JsonValue::String(normalized_name.to_owned()),
+            );
+        }
+        _ => {
+            let mut object = JsonMap::new();
+            object.insert(
+                "name".to_owned(),
+                JsonValue::String(normalized_name.to_owned()),
+            );
+            package_json = JsonValue::Object(object);
+        }
+    }
+
+    let formatted =
+        serde_json::to_string_pretty(&package_json).context("Failed to serialize package.json")?;
+    fs::write(package_json_path, format!("{formatted}\n"))
+        .with_context(|| format!("Failed to write {}", package_json_path.display()))?;
+    Ok(has_workspaces)
+}
+
+fn replace_top_level_json_string_field(content: &str, field: &str, value: &str) -> Option<String> {
+    let bytes = content.as_bytes();
+    let field_literal = serde_json::to_string(field).ok()?;
+    let replacement_literal = serde_json::to_string(value).ok()?;
+    let mut index = 0;
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            index += 1;
+            continue;
+        }
+
+        match byte {
+            b'"' => {
+                if depth == 1 && bytes[index..].starts_with(field_literal.as_bytes()) {
+                    let key_end = index + field_literal.len();
+                    let mut value_start = key_end;
+
+                    while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
+                        value_start += 1;
+                    }
+
+                    if bytes.get(value_start) != Some(&b':') {
+                        in_string = true;
+                        index += 1;
+                        continue;
+                    }
+
+                    value_start += 1;
+                    while value_start < bytes.len() && bytes[value_start].is_ascii_whitespace() {
+                        value_start += 1;
+                    }
+
+                    if bytes.get(value_start) != Some(&b'"') {
+                        return None;
+                    }
+
+                    let value_end = find_json_string_end(bytes, value_start)?;
+                    let mut updated = String::with_capacity(
+                        content.len() + replacement_literal.len() - (value_end - value_start),
+                    );
+                    updated.push_str(&content[..value_start]);
+                    updated.push_str(&replacement_literal);
+                    updated.push_str(&content[value_end..]);
+                    return Some(updated);
+                }
+
+                in_string = true;
+            }
+            b'{' | b'[' => depth += 1,
+            b'}' | b']' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+
+        index += 1;
+    }
+
+    None
+}
+
+fn find_json_string_end(bytes: &[u8], start_quote: usize) -> Option<usize> {
+    let mut index = start_quote + 1;
+    let mut escaped = false;
+
+    while index < bytes.len() {
+        let byte = bytes[index];
+
+        if escaped {
+            escaped = false;
+        } else if byte == b'\\' {
+            escaped = true;
+        } else if byte == b'"' {
+            return Some(index + 1);
+        }
+
+        index += 1;
+    }
+
+    None
+}
+
+fn update_package_lock_name(normalized_name: &str, has_workspaces: bool) -> anyhow::Result<()> {
+    let package_lock_path = Path::new("package-lock.json");
+
+    if !package_lock_path.exists() {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(package_lock_path)
+        .with_context(|| format!("Failed to read {}", package_lock_path.display()))?;
+    let mut package_lock: JsonValue = serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", package_lock_path.display()))?;
+
+    let JsonValue::Object(root) = &mut package_lock else {
+        anyhow::bail!("{} must contain a JSON object", package_lock_path.display());
+    };
+
+    root.insert(
+        "name".to_owned(),
+        JsonValue::String(normalized_name.to_owned()),
+    );
+
+    if let Some(packages) = root.get_mut("packages").and_then(JsonValue::as_object_mut) {
+        if let Some(root_package) = packages.get_mut("").and_then(JsonValue::as_object_mut) {
+            root_package.insert(
+                "name".to_owned(),
+                JsonValue::String(normalized_name.to_owned()),
+            );
+        }
+
+        if !has_workspaces {
+            packages.retain(|path, _| path.is_empty() || path.starts_with("node_modules"));
+        }
+    }
+
+    let formatted =
+        serde_json::to_string_pretty(&package_lock).context("Failed to serialize package-lock")?;
+    fs::write(package_lock_path, format!("{formatted}\n"))
+        .with_context(|| format!("Failed to write {}", package_lock_path.display()))?;
+    Ok(())
+}
+
+fn normalize_npm_package_name(project_name: &str) -> String {
+    let mut normalized = String::new();
+    let mut last_was_separator = false;
+
+    for ch in project_name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            normalized.push(ch.to_ascii_lowercase());
+            last_was_separator = false;
+        } else if !last_was_separator && !normalized.is_empty() {
+            normalized.push('-');
+            last_was_separator = true;
+        }
+    }
+
+    while normalized.ends_with('-') {
+        normalized.pop();
+    }
+
+    if normalized.is_empty() {
+        "acton-app".to_owned()
+    } else {
+        normalized
+    }
 }
 
 fn get_git_user_name() -> Option<String> {
@@ -340,7 +596,7 @@ fn is_git_available() -> bool {
 
 fn initialize_git_repository() -> anyhow::Result<()> {
     print!("{} ", ">".green().bold());
-    std::io::stdout().flush()?;
+    stdout().flush()?;
     std::process::Command::new("git")
         .arg("init")
         .status()?

@@ -17,13 +17,14 @@ This command creates a new project in the specified directory. If the directory 
 
 ## Command Options
 
-| Option               | Type   | Description                                                           |
-|----------------------|--------|-----------------------------------------------------------------------|
-| `<PATH>`             | String | Directory to create the project in (use `.` for current directory)    |
-| `--name <NAME>`      | String | Project name (defaults to directory name)                             |
-| `--desc <DESC>`      | String | Project description                                                   |
-| `--template <NAME>`  | String | Project template to use (empty, counter, jetton)                      |
-| `--license <LICENSE>`| String | Project license (MIT, Apache-2.0, etc.)                               |
+| Option                | Type   | Description                                                        |
+|-----------------------|--------|--------------------------------------------------------------------|
+| `<PATH>`              | String | Directory to create the project in (use `.` for current directory) |
+| `--name <NAME>`       | String | Project name (defaults to directory name)                          |
+| `--desc <DESC>`       | String | Project description                                                |
+| `--template <NAME>`   | String | Project template to use (empty, counter, jetton)                   |
+| `--license <LICENSE>` | String | Project license (MIT, Apache-2.0, etc.)                            |
+| `--app`               | Bool   | Include the template's TypeScript app scaffold when available      |
 
 ## Interactive Mode
 
@@ -35,7 +36,13 @@ $ acton new my-project
 ? Description: A TON blockchain project
 ? Template: counter
 ? License: MIT
+? Include the TypeScript app scaffold? No
 ```
+
+If the selected template supports a TypeScript app scaffold and you do not pass
+`--app`, Acton asks whether you want to include it. In non-interactive
+environments, the app scaffold is not included unless you pass `--app`
+explicitly.
 
 ## Examples
 
@@ -59,6 +66,9 @@ acton new my-project --template empty --license MIT
 
 # Create a Jetton project with description
 acton new token-project --template jetton --desc "My Awesome Token"
+
+# Create the counter template with the TypeScript app scaffold
+acton new counter-dapp --template counter --app
 ```
 
 ## Templates
@@ -68,12 +78,14 @@ Acton provides several built-in templates:
 | Template | Description |
 |----------|-------------|
 | `empty`  | Minimal structure with a single empty contract. Best for experienced users. |
-| `counter`| Simple counter contract with tests and deployment script. Good for learning. |
+| `counter`| Simple counter contract with tests and deployment script. Good for learning. Supports an optional TypeScript app scaffold via `--app`. |
 | `jetton` | Complete Jetton (token) implementation with Minter and Wallet contracts. |
 
 ## Project Structure
 
-A newly created project contains the following structure:
+### Contract-only layout
+
+A standard project contains the following structure:
 
 <Files>
   <Folder name=".acton" defaultOpen>
@@ -102,7 +114,59 @@ A newly created project contains the following structure:
 - **`LICENSE`**: License file
 - **`.gitignore`**: Git configuration
 
+### Counter Template With `--app`
+
+When you run `acton new <PATH> --template counter --app`, Acton generates a
+split contract + frontend project:
+
+<Files>
+  <Folder name=".acton" defaultOpen>
+    <File name="tolk-stdlib/" />
+    <File name="..." />
+  </Folder>
+  <Folder name="contracts" defaultOpen>
+    <Folder name="src" defaultOpen>
+      <File name="counter.tolk" />
+      <File name="types.tolk" />
+    </Folder>
+    <Folder name="tests" defaultOpen>
+      <File name="counter.test.tolk" />
+      <Folder name="wrappers">
+        <File name="Counter.tolk" />
+      </Folder>
+    </Folder>
+    <Folder name="scripts" defaultOpen>
+      <File name="deploy.tolk" />
+    </Folder>
+  </Folder>
+  <Folder name="app" defaultOpen>
+    <File name="src/App.tsx" />
+    <File name="..." />
+  </Folder>
+  <Folder name="wrappers" defaultOpen>
+    <File name="Counter.ts" />
+  </Folder>
+  <File name="package.json" />
+  <File name="package-lock.json" />
+  <File name="Acton.toml" />
+  <File name="LICENSE" />
+  <File name=".gitignore" />
+</Files>
+
+- **`contracts/src/`**: Tolk contract sources and shared types
+- **`contracts/tests/`**: Tolk tests and generated Tolk wrappers
+- **`contracts/scripts/`**: Deployment and utility scripts for the contracts
+- **`wrappers/`**: Generated TypeScript wrappers used by the app
+- **`app/`**: React + Vite frontend
+- **`package.json` / `package-lock.json`**: Frontend toolchain and pinned npm dependencies
+
+After creation, install frontend dependencies with:
+
+```bash
+npm install
+```
+
 ## Learn More
 
-- [Project Initialization Guide](/docs/init-project/) — Detailed walkthrough of project creation
-- [Project Configuration](/docs/build-system/configuration-reference/) — Learn about `Acton.toml`
+- [Project Initialization Guide](/docs/project-init) — Detailed walkthrough of project creation
+- [Project Configuration](/docs/build-system/configuration-reference) — Learn about `Acton.toml`

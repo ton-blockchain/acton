@@ -102,6 +102,11 @@ enum Commands {
         template: Option<ProjectTemplate>,
         #[arg(long, help = "License")]
         license: Option<String>,
+        #[arg(
+            long,
+            help = "Include the template's TypeScript app scaffold when available"
+        )]
+        app: bool,
     },
     #[command(
         about = "Manage wallets",
@@ -1267,6 +1272,10 @@ fn example_new_usage() -> StyledStr {
                 "Create a project non-interactively with all metadata",
                 "acton new my-project --name \"My Project\" --description \"Cool description\" --template counter --license MIT",
             ),
+            (
+                "Create a counter project with the TypeScript app scaffold",
+                "acton new my-project --template counter --app",
+            ),
         ],
         "https://i582.github.io/acton/docs/commands/new",
     )
@@ -1867,7 +1876,8 @@ fn main() {
             description,
             template,
             license,
-        } => new_cmd(&path, name, description, template, license),
+            app,
+        } => new_cmd(&path, name, description, template, license, app),
         Commands::Test {
             path,
             filter,

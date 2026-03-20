@@ -1,0 +1,27 @@
+[package]
+name = "interactive-counter"
+description = "interactive description"
+version = "0.1.0"
+license = "MIT"
+
+[contracts.counter]
+name = "Counter"
+src = "contracts/counter.tolk"
+depends = []
+
+[test]
+
+[fmt]
+width = 100
+ignore = []
+
+[scripts]
+deploy-emulation = "acton script scripts/deploy.tolk"
+deploy-testnet = "acton script scripts/deploy.tolk --broadcast --net testnet"
+
+[mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "tests/wrappers"
