@@ -660,6 +660,16 @@ enum Commands {
         verbose: bool,
         #[arg(long, help = "Directory to save VM and executor logs")]
         logs_dir: Option<String>,
+        #[arg(
+            long,
+            help = "Contract name from Acton.toml used to build a source-level trace for the transaction"
+        )]
+        contract: Option<String>,
+        #[arg(
+            long,
+            help = "Expose the retraced execution as a DAP server on the given TCP port; requires --contract"
+        )]
+        dap_port: Option<u16>,
     },
     #[command(
         about = "Manage TON libraries",
@@ -1554,7 +1564,9 @@ fn main() {
             api_key,
             verbose,
             logs_dir,
-        } => retrace_cmd(hash, net, api_key, verbose, logs_dir),
+            contract,
+            dap_port,
+        } => retrace_cmd(hash, net, api_key, verbose, logs_dir, contract, dap_port),
         Commands::Wrapper {
             contract_id,
             output: wrapper_output,

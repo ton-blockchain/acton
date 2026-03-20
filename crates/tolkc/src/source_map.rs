@@ -3,7 +3,7 @@
 // that map IR variables and stack positions back to the original Tolk source.
 
 use crate::types_kernel::Ty;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
@@ -14,7 +14,7 @@ use std::path::Path;
 
 type BigintAsString = String;
 
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Debug, Default)]
 pub struct SourceMap {
     files: Vec<SrcFileInfo>,
     declarations: Vec<Declaration>,
@@ -37,22 +37,24 @@ impl SourceMap {
     }
 
     pub fn from_json_str(json: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut sm: SourceMap = serde_json::from_str(json)?;
-        sm.index_declarations();
-        Ok(sm)
+        Ok(serde_json::from_str(json)?)
     }
 
     fn index_declarations(&mut self) {
-        for decl in std::mem::take(&mut self.declarations) {
+        self.structs.clear();
+        self.aliases.clear();
+        self.enums.clear();
+
+        for decl in &self.declarations {
             match decl {
                 Declaration::Struct(s) => {
-                    self.structs.insert(s.name.clone(), s);
+                    self.structs.insert(s.name.clone(), s.clone());
                 }
                 Declaration::Alias(a) => {
-                    self.aliases.insert(a.name.clone(), a);
+                    self.aliases.insert(a.name.clone(), a.clone());
                 }
                 Declaration::Enum(e) => {
-                    self.enums.insert(e.name.clone(), e);
+                    self.enums.insert(e.name.clone(), e.clone());
                 }
             }
         }
@@ -161,6 +163,41 @@ impl SourceMap {
 
     pub const fn is_empty(&self) -> bool {
         self.debug_marks.is_empty()
+    }
+}
+
+#[derive(Deserialize)]
+struct SourceMapDe {
+    #[serde(default)]
+    files: Vec<SrcFileInfo>,
+    #[serde(default)]
+    declarations: Vec<Declaration>,
+    #[serde(default)]
+    unique_ty: Vec<UniqueTy>,
+    #[serde(default)]
+    functions: Vec<FunctionInfo>,
+    #[serde(default)]
+    debug_marks: Vec<DebugMark>,
+}
+
+impl<'de> Deserialize<'de> for SourceMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = SourceMapDe::deserialize(deserializer)?;
+        let mut sm = SourceMap {
+            files: raw.files,
+            declarations: raw.declarations,
+            unique_ty: raw.unique_ty,
+            functions: raw.functions,
+            debug_marks: raw.debug_marks,
+            structs: HashMap::new(),
+            aliases: HashMap::new(),
+            enums: HashMap::new(),
+        };
+        sm.index_declarations();
+        Ok(sm)
     }
 }
 
@@ -284,6 +321,75 @@ pub struct EnumMemberInfo {
 pub struct UniqueTy {
     pub ty_idx: usize,
     pub ty: Ty,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SourceMap;
+
+    const SAMPLE_SOURCE_MAP_JSON: &str = r#"{
+        "files": [],
+        "declarations": [
+            {
+                "kind": "struct",
+                "name": "MintNewJettons",
+                "ident_loc": [0, 1, 1, 1, 1],
+                "type_params": null,
+                "prefix": null,
+                "fields": [
+                    {
+                        "name": "queryId",
+                        "ty": { "kind": "uintN", "n": 64 }
+                    }
+                ]
+            },
+            {
+                "kind": "alias",
+                "name": "AllowedMessageToMinter",
+                "ident_loc": [0, 1, 1, 1, 1],
+                "target_ty": { "kind": "StructRef", "structName": "MintNewJettons", "typeArgs": null },
+                "type_params": null
+            },
+            {
+                "kind": "enum",
+                "name": "BounceMode",
+                "ident_loc": [0, 1, 1, 1, 1],
+                "encoded_as": { "kind": "uintN", "n": 2 },
+                "members": [
+                    { "name": "NoBounce", "value": "0" }
+                ]
+            }
+        ],
+        "unique_ty": [],
+        "functions": [],
+        "debug_marks": []
+    }"#;
+
+    #[test]
+    fn serde_deserialize_indexes_declarations() {
+        let source_map: SourceMap = serde_json::from_str(SAMPLE_SOURCE_MAP_JSON).unwrap();
+
+        assert_eq!(source_map.get_struct("MintNewJettons").fields.len(), 1);
+        assert_eq!(
+            source_map.get_alias("AllowedMessageToMinter").name,
+            "AllowedMessageToMinter"
+        );
+        assert_eq!(source_map.get_enum("BounceMode").members.len(), 1);
+    }
+
+    #[test]
+    fn serde_roundtrip_preserves_declarations() {
+        let source_map: SourceMap = serde_json::from_str(SAMPLE_SOURCE_MAP_JSON).unwrap();
+        let roundtrip: SourceMap =
+            serde_json::from_str(&serde_json::to_string(&source_map).unwrap()).unwrap();
+
+        assert_eq!(roundtrip.get_struct("MintNewJettons").fields.len(), 1);
+        assert_eq!(
+            roundtrip.get_alias("AllowedMessageToMinter").name,
+            "AllowedMessageToMinter"
+        );
+        assert_eq!(roundtrip.get_enum("BounceMode").members.len(), 1);
+    }
 }
 
 // ---------------------------------------------------------------------------

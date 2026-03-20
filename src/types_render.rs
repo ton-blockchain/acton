@@ -263,6 +263,33 @@ fn bits_to_hex(nibbles: &[u8], start: usize, end: usize) -> String {
     hex
 }
 
+fn resolve_alias_target(symbols: &SourceMap, alias_name: &str, type_args: Option<&[Ty]>) -> Ty {
+    let alias_ref = symbols.get_alias(alias_name);
+    match type_args {
+        Some(type_args) => instantiate_generics(
+            &alias_ref.target_ty,
+            alias_ref.type_params.as_deref().unwrap_or(&[]),
+            type_args,
+        ),
+        None => alias_ref.target_ty.clone(),
+    }
+}
+
+fn render_named_type(name: &str, type_args: Option<&[Ty]>) -> String {
+    match type_args {
+        None => name.to_string(),
+        Some(type_args) => format!(
+            "{}<{}>",
+            name,
+            type_args
+                .iter()
+                .map(|ty| ty.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    }
+}
+
 fn hex_to_nibbles(hex: &str) -> Vec<u8> {
     hex.chars()
         .filter_map(|c| c.to_digit(16).map(|d| d as u8))
@@ -575,18 +602,7 @@ fn debug_format(
             type_args,
         } => {
             let struct_ref = symbols.get_struct(struct_name);
-            let struct_name = match type_args {
-                None => struct_name.clone(),
-                Some(type_args) => format!(
-                    "{}<{}>",
-                    struct_name,
-                    type_args
-                        .iter()
-                        .map(|ty| ty.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
-            };
+            let struct_name = render_named_type(struct_name, type_args.as_deref());
             let mut fields: Vec<(String, RenderedValue)> = Vec::new();
             for f in &struct_ref.fields {
                 let field_val = match type_args {
@@ -611,20 +627,12 @@ fn debug_format(
         Ty::AliasRef {
             alias_name,
             type_args,
-        } => {
-            let alias_ref = symbols.get_alias(alias_name);
-            match type_args {
-                Some(type_args) => {
-                    let target_ty = instantiate_generics(
-                        &alias_ref.target_ty,
-                        alias_ref.type_params.as_deref().unwrap_or(&[]),
-                        type_args,
-                    );
-                    debug_format(symbols, r, &target_ty, false)
-                }
-                None => debug_format(symbols, r, &alias_ref.target_ty, false),
-            }
-        }
+        } => debug_format(
+            symbols,
+            r,
+            &resolve_alias_target(symbols, alias_name, type_args.as_deref()),
+            false,
+        ),
 
         Ty::EnumRef { enum_name } => match r.read_slot() {
             SlotValue::Live(VmStackValue::Integer(s)) => {
@@ -739,15 +747,7 @@ pub fn debug_format_lazy(
             alias_name,
             type_args,
         } => {
-            let alias_ref = symbols.get_alias(alias_name);
-            let resolved = match type_args {
-                Some(type_args) => instantiate_generics(
-                    &alias_ref.target_ty,
-                    alias_ref.type_params.as_deref().unwrap_or(&[]),
-                    type_args,
-                ),
-                None => alias_ref.target_ty.clone(),
-            };
+            let resolved = resolve_alias_target(symbols, alias_name, type_args.as_deref());
             if matches!(&resolved, Ty::Union { .. }) {
                 return RenderedValue::LazyUnresolved {
                     type_name: alias_name.clone(),
@@ -787,7 +787,10 @@ pub fn debug_format_lazy(
                 offset += f_width;
             }
             RenderedValue::Struct {
-                type_name: format!("{struct_name} (lazy)"),
+                type_name: format!(
+                    "{} (lazy)",
+                    render_named_type(struct_name, type_args.as_deref())
+                ),
                 fields,
             }
         }
