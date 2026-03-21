@@ -13,7 +13,6 @@ Commands:
   fmt              [PATHS...]          Format Tolk source files
 
   wallet           <COMMAND>           Manage wallets
-  hooks            <COMMAND>           Manage git hooks for the current project
   verify           [CONTRACT_ID]       Verify contract source code on verifier.ton.org
   library          <COMMAND>           Manage TON libraries
   litenode         <COMMAND>           Manage lightweight TON node
@@ -28,6 +27,7 @@ Commands:
   ls                                   Run LSP server for the TON languages and technologies
   up                                   Manage Acton versions
   help             [COMMAND]           Print this message or the help of the given subcommand(s)
+  hooks            <COMMAND>           Manage git hooks for the current project
   doctor                               Inspect resolved project environment
   func2tolk        <PATH>              Convert FunC files to Tolk via @ton/convert-func-to-tolk
   completions      <SHELL>             Generate shell completions for selected shell
