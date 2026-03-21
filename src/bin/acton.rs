@@ -119,7 +119,6 @@ enum Commands {
     },
     #[command(
         about = "Manage git hooks for the current project",
-        after_help = example_hooks_usage()
     )]
     Hooks {
         #[command(subcommand)]
@@ -1319,18 +1318,6 @@ fn example_wallet_usage() -> StyledStr {
             ),
         ],
         "https://ton-blockchain.github.io/acton/docs/commands/wallet",
-    )
-}
-
-fn example_hooks_usage() -> StyledStr {
-    format_examples(
-        &[
-            ("Create hook scaffold interactively", "acton hooks new"),
-            ("Set git core.hooksPath to .githooks", "acton hooks install"),
-            ("Check git core.hooksPath", "acton hooks status"),
-            ("Unset git core.hooksPath", "acton hooks uninstall"),
-        ],
-        "",
     )
 }
 
