@@ -33,9 +33,9 @@ acton fmt --check
 
 #### Options
 
-| Option                      | Type   | Description                      |
-|-----------------------------|--------|----------------------------------|
-| `--template <empty\|ready>` | String | Hook scaffold template to create |
+| Option                        | Type   | Description                      |
+|-------------------------------|--------|----------------------------------|
+| `--template <empty\|default>` | String | Hook scaffold template to create |
 
 #### Examples
 
@@ -46,8 +46,8 @@ acton hooks new
 # Create an empty pre-commit hook
 acton hooks new --template empty
 
-# Create a ready-made pre-commit hook
-acton hooks new --template ready
+# Create a default-made pre-commit hook
+acton hooks new --template default
 ```
 
 <Callout type="warn">
@@ -125,7 +125,7 @@ Git hooks uninstalled successfully
 ## Recommended Workflow
 
 ```bash
-acton hooks new --template ready
+acton hooks new --template default
 acton hooks install
 acton hooks status
 ```

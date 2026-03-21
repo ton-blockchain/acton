@@ -6,7 +6,7 @@ use std::path::Path;
 const DEFAULT_HOOKS_PATH: &str = ".githooks";
 const GIT_HOOKS_PATH_KEY: &str = "core.hooksPath";
 const PRE_COMMIT_HOOK_FILE: &str = "pre-commit";
-const READY_PRE_COMMIT_HOOK: &str = include_str!("templates/.githooks/pre-commit");
+const DEFAULT_PRE_COMMIT_HOOK: &str = include_str!("templates/.githooks/pre-commit");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum)]
 pub enum HooksTemplate {
@@ -108,7 +108,7 @@ fn create_hooks_scaffold(template: HooksTemplate) -> anyhow::Result<()> {
             write_pre_commit_hook(hooks_dir, "")?;
         }
         HooksTemplate::Default => {
-            write_pre_commit_hook(hooks_dir, READY_PRE_COMMIT_HOOK)?;
+            write_pre_commit_hook(hooks_dir, DEFAULT_PRE_COMMIT_HOOK)?;
         }
     }
 

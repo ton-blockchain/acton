@@ -1,2 +1,0 @@
-Created ready hooks scaffold in .githooks
-Run `acton hooks install` to enable it.

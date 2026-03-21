@@ -52,8 +52,8 @@ fn test_hooks_new_empty_non_interactive() {
 }
 
 #[test]
-fn test_hooks_new_ready_non_interactive() {
-    let project = ProjectBuilder::new("hooks-new-ready").build();
+fn test_hooks_new_default_non_interactive() {
+    let project = ProjectBuilder::new("hooks-new-default").build();
 
     let output = project
         .acton()
@@ -61,14 +61,14 @@ fn test_hooks_new_ready_non_interactive() {
         .arg("hooks")
         .arg("new")
         .arg("--template")
-        .arg("ready")
+        .arg("default")
         .run()
         .success();
 
-    output.assert_snapshot_matches("integration/snapshots/hooks/test_hooks_new_ready.stdout.txt");
+    output.assert_snapshot_matches("integration/snapshots/hooks/test_hooks_new_default.stdout.txt");
     output.assert_file_snapshot_matches(
         ".githooks/pre-commit",
-        "integration/snapshots/hooks/test_hooks_new_ready.pre-commit.txt",
+        "integration/snapshots/hooks/test_hooks_new_default.pre-commit.txt",
     );
 }
 
@@ -110,7 +110,7 @@ fn test_hooks_new_fails_when_githooks_exists() {
         .arg("hooks")
         .arg("new")
         .arg("--template")
-        .arg("ready")
+        .arg("default")
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
@@ -211,7 +211,7 @@ fn test_hooks_new_marks_pre_commit_executable() {
         .arg("hooks")
         .arg("new")
         .arg("--template")
-        .arg("ready")
+        .arg("default")
         .run()
         .success();
 
