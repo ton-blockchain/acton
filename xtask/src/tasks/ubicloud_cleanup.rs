@@ -77,10 +77,7 @@ pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
     };
     let cache_entries = client.list_github_cache_entries(&project, &installation, &repository)?;
     let now = Utc::now();
-    let (to_delete, to_keep): (Vec<GithubCacheEntry>, Vec<GithubCacheEntry>) = cache_entries
-        .items
-        .into_iter()
-        .partition(|entry| should_delete(entry, &now, &policy));
+    let (to_delete, to_keep) = plan_cache_cleanup(cache_entries.items, &now, &policy);
 
     print_prune_plan(
         &project,
@@ -158,6 +155,9 @@ fn print_prune_plan(
     println!(
         "If `last_accessed_at` is missing, delete cache entries with `created_at` older than {} day(s).",
         policy.created_days
+    );
+    println!(
+        "If deleting would leave 0 cache entries with a real `last_accessed_at`, keep entries whose `last_accessed_at` is not `never`."
     );
 
     println!();
@@ -272,6 +272,28 @@ fn should_delete(entry: &GithubCacheEntry, now: &DateTime<Utc>, policy: &Cleanup
         Some(last_accessed_at) => last_accessed_at < &last_accessed_cutoff,
         None => entry.created_at < created_cutoff,
     }
+}
+
+fn plan_cache_cleanup(
+    entries: Vec<GithubCacheEntry>,
+    now: &DateTime<Utc>,
+    policy: &CleanupPolicy,
+) -> (Vec<GithubCacheEntry>, Vec<GithubCacheEntry>) {
+    let (to_delete, to_keep): (Vec<GithubCacheEntry>, Vec<GithubCacheEntry>) = entries
+        .into_iter()
+        .partition(|entry| should_delete(entry, now, policy));
+
+    if to_keep.iter().any(|entry| entry.last_accessed_at.is_some()) {
+        return (to_delete, to_keep);
+    }
+
+    let (protected_entries, to_delete): (Vec<GithubCacheEntry>, Vec<GithubCacheEntry>) = to_delete
+        .into_iter()
+        .partition(|entry| entry.last_accessed_at.is_some());
+
+    let to_keep = to_keep.into_iter().chain(protected_entries).collect();
+
+    (to_delete, to_keep)
 }
 
 fn human_size(bytes: u64) -> String {
