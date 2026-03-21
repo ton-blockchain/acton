@@ -1,1 +1,1 @@
-git core.hooksPath is set to .githooks
+Git hooks are installed

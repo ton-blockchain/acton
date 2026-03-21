@@ -172,25 +172,18 @@ fn hooks_status_cmd() -> anyhow::Result<()> {
         let hooks_path = stdout.trim();
 
         if hooks_path == DEFAULT_HOOKS_PATH {
-            println!(
-                "git {} is set to {}",
-                GIT_HOOKS_PATH_KEY, DEFAULT_HOOKS_PATH
-            );
-            return Ok(());
+            println!("Git hooks are installed");
+        } else {
+            println!("Git hooks are not installed");
         }
-
-        anyhow::bail!(
-            "git {} is set to {}, expected {}",
-            GIT_HOOKS_PATH_KEY,
-            hooks_path,
-            DEFAULT_HOOKS_PATH
-        );
+        return Ok(());
     }
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stderr = stderr.trim();
     if output.status.code() == Some(1) && stderr.is_empty() {
-        anyhow::bail!("git {} is not set", GIT_HOOKS_PATH_KEY);
+        println!("Git hooks are not installed");
+        return Ok(());
     }
 
     if stderr.is_empty() {

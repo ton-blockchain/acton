@@ -1,1 +1,0 @@
-Error: git core.hooksPath is not set

@@ -1551,7 +1551,6 @@ fn root_help(show_global_options: bool) -> StyledStr {
     ];
     let blockchain_commands = vec![
         ("wallet", "<COMMAND>"),
-        ("hooks", "<COMMAND>"),
         ("verify", "[CONTRACT_ID]"),
         ("library", "<COMMAND>"),
         ("litenode", "<COMMAND>"),
@@ -1568,6 +1567,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("ls", ""),
         ("up", ""),
         ("help", "[COMMAND]"),
+        ("hooks", "<COMMAND>"),
         ("doctor", ""),
         ("func2tolk", "<PATH>"),
         ("completions", "<SHELL>"),
@@ -1879,7 +1879,6 @@ fn main() {
     let result = match command {
         Commands::Init => init_cmd(),
         Commands::Wallet { command } => wallet_cmd(command),
-        Commands::Hooks { command } => hooks_cmd(command),
         Commands::New {
             path,
             name,
@@ -2227,6 +2226,7 @@ fn main() {
             no_camel_case,
             version,
         } => func2tolk_cmd(path, output, warnings_as_comments, no_camel_case, version),
+        Commands::Hooks { command } => hooks_cmd(command),
         Commands::Doctor => doctor_cmd(),
         Commands::Completions { shell } => {
             clap_complete::generate(shell, &mut Cli::command(), "acton", &mut std::io::stdout());

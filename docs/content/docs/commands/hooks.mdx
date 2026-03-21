@@ -81,23 +81,23 @@ Git hooks installed successfully from .githooks
 
 ### `acton hooks status`
 
-Checks whether the current Git repository already points `core.hooksPath` to
+Reports whether the current Git repository already points `core.hooksPath` to
 `.githooks`:
 
 ```bash
 acton hooks status
 ```
 
-Possible outcomes:
-
-- success if `git config --get core.hooksPath` returns `.githooks`
-- error if `core.hooksPath` is unset
-- error if `core.hooksPath` points to a different directory
-
-Example success output:
+Possible outputs:
 
 ```text
-git core.hooksPath is set to .githooks
+Git hooks are installed
+```
+
+or:
+
+```text
+Git hooks are not installed
 ```
 
 ---

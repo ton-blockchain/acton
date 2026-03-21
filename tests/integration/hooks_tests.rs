@@ -165,9 +165,9 @@ fn test_hooks_install_status_uninstall_flow() {
         .arg("hooks")
         .arg("status")
         .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/hooks/test_hooks_status_unset.stderr.txt",
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_status_not_installed.stdout.txt",
         );
 }
 
@@ -192,9 +192,9 @@ fn test_hooks_status_reports_mismatch() {
         .arg("hooks")
         .arg("status")
         .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/hooks/test_hooks_status_mismatch.stderr.txt",
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_status_not_installed.stdout.txt",
         );
 }
 
