@@ -184,7 +184,7 @@ jobs:
             os: apple-darwin
             arch: aarch64
     runs-on: ${{ matrix.runner }}
-    if: github.ref == 'refs/heads/master' && false
+    if: true
     env:
       OBJS_NAME: ton-objs-macos-${{ matrix.arch }}
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.os }}
@@ -277,7 +277,7 @@ jobs:
 
   create-trunk-release:
     name: Create Trunk Release
-    needs: [ build-linux ]
+    needs: [ build-linux, build-macos ]
     runs-on: ubicloud-standard-2
     if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
 
