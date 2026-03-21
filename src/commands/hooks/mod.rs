@@ -11,21 +11,21 @@ const READY_PRE_COMMIT_HOOK: &str = include_str!("templates/.githooks/pre-commit
 #[derive(Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum)]
 pub enum HooksTemplate {
     Empty,
-    Ready,
+    Default,
 }
 
 impl HooksTemplate {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Empty => "empty",
-            Self::Ready => "ready",
+            Self::Default => "default",
         }
     }
 
     const fn description(self) -> &'static str {
         match self {
             Self::Empty => "Create .githooks with an empty pre-commit hook",
-            Self::Ready => "Create .githooks with a starter pre-commit hook",
+            Self::Default => "Create .githooks with a starter pre-commit hook",
         }
     }
 }
@@ -77,7 +77,7 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
             "Hooks template:",
             vec![
                 HooksTemplateSelectItem(HooksTemplate::Empty),
-                HooksTemplateSelectItem(HooksTemplate::Ready),
+                HooksTemplateSelectItem(HooksTemplate::Default),
             ],
         )
         .with_starting_cursor(0)
@@ -107,7 +107,7 @@ fn create_hooks_scaffold(template: HooksTemplate) -> anyhow::Result<()> {
         HooksTemplate::Empty => {
             write_pre_commit_hook(hooks_dir, "")?;
         }
-        HooksTemplate::Ready => {
+        HooksTemplate::Default => {
             write_pre_commit_hook(hooks_dir, READY_PRE_COMMIT_HOOK)?;
         }
     }
