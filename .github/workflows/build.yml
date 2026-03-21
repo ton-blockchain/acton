@@ -307,7 +307,7 @@ jobs:
 
   create-trunk-release:
     name: Create Trunk Release
-    needs: [ build-linux, lint, ui, build-macos ]
+    needs: [ build-linux, build-macos, lint, ui ]
     runs-on: ubicloud-standard-2
     if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
 
