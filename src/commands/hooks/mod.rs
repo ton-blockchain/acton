@@ -9,6 +9,7 @@ const DEFAULT_HOOKS_PATH: &str = ".githooks";
 const GIT_HOOKS_PATH_KEY: &str = "core.hooksPath";
 const PRE_COMMIT_HOOK_FILE: &str = "pre-commit";
 const DEFAULT_PRE_COMMIT_HOOK: &str = include_str!("templates/.githooks/pre-commit");
+const HOOKS_UNINSTALL_HINT: &str = "Run `acton hooks uninstall` first.";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum)]
 pub enum HooksTemplate {
@@ -72,6 +73,14 @@ pub fn hooks_cmd(command: HooksCommand) -> anyhow::Result<()> {
 }
 
 fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
+    if has_local_git_repository()
+        && let Some(hooks_path) = local_hooks_path()?
+    {
+        anyhow::bail!(
+            "git {GIT_HOOKS_PATH_KEY} is already set to {hooks_path}. {HOOKS_UNINSTALL_HINT}"
+        );
+    }
+
     let template = if let Some(template) = template {
         template
     } else {
@@ -99,6 +108,10 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
 
 fn hooks_dir() -> PathBuf {
     configured_project_root().join(DEFAULT_HOOKS_PATH)
+}
+
+fn has_local_git_repository() -> bool {
+    configured_project_root().join(".git").exists()
 }
 
 fn create_hooks_scaffold(template: HooksTemplate) -> anyhow::Result<()> {
@@ -145,9 +158,42 @@ fn git_config_output(args: &[&str]) -> anyhow::Result<Output> {
         .map_err(|err| anyhow::anyhow!("Failed to execute git config command: {err}"))
 }
 
-fn hooks_install_cmd() -> anyhow::Result<()> {
+fn local_hooks_path() -> anyhow::Result<Option<String>> {
     let output = git_config_output(&["--get", GIT_HOOKS_PATH_KEY])?;
 
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Ok(Some(stdout.trim().to_owned()));
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr.trim();
+    if output.status.code() == Some(1) && stderr.is_empty() {
+        return Ok(None);
+    }
+
+    if stderr.is_empty() {
+        anyhow::bail!(
+            "Failed to get git hooks path (exit code: {:?})",
+            output.status.code()
+        );
+    }
+
+    anyhow::bail!("Failed to get git hooks path: {stderr}");
+}
+
+fn hooks_install_cmd() -> anyhow::Result<()> {
+    if let Some(hooks_path) = local_hooks_path()? {
+        if hooks_path == DEFAULT_HOOKS_PATH {
+            anyhow::bail!("Git hooks are already installed. {HOOKS_UNINSTALL_HINT}");
+        }
+
+        anyhow::bail!(
+            "git {GIT_HOOKS_PATH_KEY} is already set to {hooks_path}. {HOOKS_UNINSTALL_HINT}"
+        );
+    }
+
+    let output = git_config_output(&[GIT_HOOKS_PATH_KEY, DEFAULT_HOOKS_PATH])?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stderr = stderr.trim();
@@ -174,35 +220,16 @@ fn hooks_install_cmd() -> anyhow::Result<()> {
 }
 
 fn hooks_status_cmd() -> anyhow::Result<()> {
-    let output = git_config_output(&["--get", GIT_HOOKS_PATH_KEY])?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let hooks_path = stdout.trim();
-
-        if hooks_path == DEFAULT_HOOKS_PATH {
+    match local_hooks_path()? {
+        Some(hooks_path) if hooks_path == DEFAULT_HOOKS_PATH => {
             println!("Git hooks are installed");
-        } else {
+        }
+        Some(_) | None => {
             println!("Git hooks are not installed");
         }
-        return Ok(());
     }
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stderr = stderr.trim();
-    if output.status.code() == Some(1) && stderr.is_empty() {
-        println!("Git hooks are not installed");
-        return Ok(());
-    }
-
-    if stderr.is_empty() {
-        anyhow::bail!(
-            "Failed to get git hooks path (exit code: {:?})",
-            output.status.code()
-        );
-    }
-
-    anyhow::bail!("Failed to get git hooks path: {stderr}");
+    Ok(())
 }
 
 fn hooks_uninstall_cmd() -> anyhow::Result<()> {

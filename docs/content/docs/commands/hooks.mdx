@@ -19,6 +19,9 @@ Creates a `.githooks/` scaffold in the resolved project root.
 acton hooks new
 ```
 
+If local Git hooks are already configured for the repository, `acton hooks new`
+fails and asks you to run `acton hooks uninstall` first.
+
 If `--template` is omitted, Acton opens an interactive selector with two
 options:
 
@@ -78,6 +81,9 @@ On success, Acton prints:
 Git hooks installed successfully from .githooks
 ```
 
+If `core.hooksPath` is already set locally for this repository, `acton hooks install`
+fails and asks you to run `acton hooks uninstall` first.
+
 ---
 
 ### `acton hooks status`
@@ -100,6 +106,9 @@ or:
 ```text
 Git hooks are not installed
 ```
+
+`status` checks the repository's local Git config only. Global or system
+`core.hooksPath` values do not count as installed for the current project.
 
 ---
 

@@ -39,6 +39,30 @@ fn sibling_dir(project_root: &Path, name: &str) -> PathBuf {
     path
 }
 
+fn git_config_set(project_root: &Path, key: &str, value: &str) {
+    let output = git(project_root, &["config", "--local", key, value]);
+    assert!(
+        output.status.success(),
+        "git config failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn git_config_set_file(config_path: &Path, key: &str, value: &str) {
+    let output = Command::new("git")
+        .args(["config", "--file"])
+        .arg(config_path)
+        .arg(key)
+        .arg(value)
+        .output()
+        .unwrap_or_else(|err| panic!("failed to run git config --file {:?}: {err}", config_path));
+    assert!(
+        output.status.success(),
+        "git config --file failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 #[test]
 fn test_hooks_new_empty_non_interactive() {
     let project = ProjectBuilder::new("hooks-new-empty").build();
@@ -83,11 +107,11 @@ fn test_hooks_new_default_non_interactive() {
 
 #[cfg(unix)]
 #[test]
-fn test_hooks_new_interactive_defaults_to_empty() {
+fn test_hooks_new_interactive_defaults_to_default() {
     use expectrl::Eof;
     use std::time::Duration;
 
-    let project = ProjectBuilder::new("hooks-new-interactive-empty").build();
+    let project = ProjectBuilder::new("hooks-new-interactive-default").build();
     let mut session = project
         .acton()
         .current_dir(project.path())
@@ -97,13 +121,13 @@ fn test_hooks_new_interactive_defaults_to_empty() {
         .set_expect_timeout(Some(Duration::from_secs(10)));
 
     session.expect("Hooks template:");
-    session.send_line("", "failed to select default empty hooks template");
-    session.expect("Created empty hooks scaffold in .githooks");
+    session.send_line("", "failed to select default hooks template");
+    session.expect("Created default hooks scaffold in .githooks");
     session.expect(Eof);
 
     session.assert_file_snapshot_matches(
         ".githooks/pre-commit",
-        "integration/snapshots/hooks/test_hooks_new_empty.pre-commit.txt",
+        "integration/snapshots/hooks/test_hooks_new_default.pre-commit.txt",
     );
 }
 
@@ -123,6 +147,25 @@ fn test_hooks_new_fails_when_githooks_exists() {
         .run()
         .failure()
         .assert_stderr_contains("Error: .githooks already exists");
+}
+
+#[test]
+fn test_hooks_new_fails_when_local_hooks_are_already_configured() {
+    let project = ProjectBuilder::new("hooks-new-existing-local-hooks").build();
+    init_git_repo(project.path());
+    git_config_set(project.path(), "core.hooksPath", "custom-hooks");
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("new")
+        .arg("--template")
+        .arg("default")
+        .run()
+        .failure()
+        .assert_stderr_contains("git core.hooksPath is already set to custom-hooks.")
+        .assert_stderr_contains("Run `acton hooks uninstall` first.");
 }
 
 #[test]
@@ -207,6 +250,25 @@ fn test_hooks_install_status_uninstall_flow() {
 }
 
 #[test]
+fn test_hooks_install_fails_when_local_hooks_are_already_configured() {
+    let project = ProjectBuilder::new("hooks-install-existing-local-hooks")
+        .raw_file(".githooks/pre-commit", "#!/bin/sh\n")
+        .build();
+    init_git_repo(project.path());
+    git_config_set(project.path(), "core.hooksPath", "custom-hooks");
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("install")
+        .run()
+        .failure()
+        .assert_stderr_contains("git core.hooksPath is already set to custom-hooks.")
+        .assert_stderr_contains("Run `acton hooks uninstall` first.");
+}
+
+#[test]
 fn test_hooks_commands_use_project_root_flag_outside_project_root() {
     let project = ProjectBuilder::new("hooks-project-root-flag")
         .raw_file(".githooks/pre-commit", "#!/bin/sh\n")
@@ -274,19 +336,34 @@ fn test_hooks_commands_use_project_root_flag_outside_project_root() {
 fn test_hooks_status_reports_mismatch() {
     let project = ProjectBuilder::new("hooks-status-mismatch").build();
     init_git_repo(project.path());
-
-    let output = git(
-        project.path(),
-        &["config", "core.hooksPath", "custom-hooks"],
-    );
-    assert!(
-        output.status.success(),
-        "git config failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    git_config_set(project.path(), "core.hooksPath", "custom-hooks");
 
     project
         .acton()
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("status")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_status_not_installed.stdout.txt",
+        );
+}
+
+#[test]
+fn test_hooks_status_ignores_global_hooks_path() {
+    let project = ProjectBuilder::new("hooks-status-global-only").build();
+    init_git_repo(project.path());
+
+    let home = tempfile::TempDir::new().expect("failed to create temp HOME");
+    let global_config = home.path().join(".gitconfig");
+    git_config_set_file(&global_config, "core.hooksPath", ".githooks");
+    let global_config = global_config.to_string_lossy().to_string();
+
+    project
+        .acton()
+        .env("GIT_CONFIG_GLOBAL", &global_config)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
         .current_dir(project.path())
         .arg("hooks")
         .arg("status")
