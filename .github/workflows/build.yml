@@ -175,6 +175,36 @@ jobs:
         run: |
           just check-ci
 
+  ui:
+    name: UI
+    strategy: *runner_linux_strategy
+    runs-on: ${{ matrix.runner }}
+    if: true
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out Acton repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@d6e286fa45544157a02d45a43742857ebbc25d12 # v2.68.16
+        with:
+          tool: just
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@ecf28ddc73e819eb6fa29df6b34ef8921c743461 # v2.1.3
+
+      - name: Install UI dependencies
+        run: bun install
+
+      - name: Run UI checks
+        run: |
+          just check-ui-ci
+
   build-macos:
     name: Build (${{ matrix.os }}-${{ matrix.arch }})
     strategy: &runner_macos_strategy
@@ -277,7 +307,7 @@ jobs:
 
   create-trunk-release:
     name: Create Trunk Release
-    needs: [ build-linux, build-macos ]
+    needs: [ build-linux, lint, ui, build-macos ]
     runs-on: ubicloud-standard-2
     if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
 

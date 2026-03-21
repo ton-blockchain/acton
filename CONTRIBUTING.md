@@ -221,9 +221,11 @@ UI:
 
 ```bash
 just fmt-ui
+just check-ui-ci
 just check-ui
 ```
 
+`just check-ui-ci` matches the non-mutating UI check used in CI.
 `just check-ui` runs `lint:fix` and may modify files.
 Run it until no further changes are produced, then stage updated files.
 
@@ -302,7 +304,13 @@ yarn build
 
 ## Tree-sitter workflows
 
-If your PR changes `crates/tree-sitter-tolk` grammar/parser artifacts:
+If your PR changes any `crates/tree-sitter-*` grammar/parser artifacts:
+
+```bash
+just test-tree-sitter-all
+```
+
+For quick Tolk-only iteration:
 
 ```bash
 just test-tree-sitter
@@ -321,10 +329,10 @@ Use this as a quick local matrix before pushing:
 | Change type                                                                                        | Required local checks                                                                                      |
 |----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
 | Rust-only code                                                                                     | `just check`                                                                                               |
-| UI code (`crates/acton-*-ui`, root `package.json`)                                                 | `just check` + `just build-ui` + `just check-ui`                                                           |
+| UI code (`crates/acton-*-ui`, root `package.json`)                                                 | `just check` + `just build-ui` + `just check-ui-ci` + `just check-ui`                                      |
 | Standard library / docgen inputs (`lib/`, `crates/tolkc/assets/tolk-stdlib`, linter rule metadata) | `just check` + `acton docgen` and commit generated docs                                                    |
 | Docs site content/config (`docs/`)                                                                 | `cd docs && yarn install --immutable && yarn build`                                                        |
-| Tree-sitter grammar (`crates/tree-sitter-tolk`)                                                    | `just check` + `just test-tree-sitter` (and `just update-test-tree-sitter` when needed)                    |
+| Tree-sitter grammar (`crates/tree-sitter-*`)                                                       | `just check` + `just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
 | Release preparation (maintainers)                                                                  | Follow [RELEASING.md](RELEASING.md)                                                                        |
 
 ## PR requirements
@@ -335,8 +343,7 @@ Every pull request must pass all checks from:
 just check
 ```
 
-This command runs `fmt-check`, `clippy`, `typos`, and `test`.
-It also runs `check-deps` to detect unused Rust dependencies.
+This command runs Rust formatting, docgen, dependency, lint, schema, and test checks.
 `typos` uses `_typos.toml` excludes for `docs/` and selected generated or imported trees.
 
 If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-litenode-ui`,
@@ -345,6 +352,7 @@ run:
 
 ```bash
 just build-ui
+just check-ui-ci
 just check-ui
 ```
 
