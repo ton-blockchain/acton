@@ -25,7 +25,7 @@ jobs:
     strategy: &runner_linux_strategy
       matrix:
         include:
-          - runner: ubicloud-standard-4-ubuntu-2204
+          - runner: ubicloud-standard-8-ubuntu-2204
             os: linux
             arch: x86_64
     runs-on: ${{ matrix.runner }}
