@@ -1,7 +1,9 @@
+use acton_config::config::project_root as configured_project_root;
 use clap::Subcommand;
 use inquire::Select;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::Output;
 
 const DEFAULT_HOOKS_PATH: &str = ".githooks";
 const GIT_HOOKS_PATH_KEY: &str = "core.hooksPath";
@@ -95,20 +97,24 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn hooks_dir() -> PathBuf {
+    configured_project_root().join(DEFAULT_HOOKS_PATH)
+}
+
 fn create_hooks_scaffold(template: HooksTemplate) -> anyhow::Result<()> {
-    let hooks_dir = Path::new(DEFAULT_HOOKS_PATH);
+    let hooks_dir = hooks_dir();
     if hooks_dir.exists() {
-        anyhow::bail!("{} already exists", hooks_dir.display());
+        anyhow::bail!("{DEFAULT_HOOKS_PATH} already exists");
     }
 
-    fs::create_dir_all(hooks_dir)?;
+    fs::create_dir_all(&hooks_dir)?;
 
     match template {
         HooksTemplate::Empty => {
-            write_pre_commit_hook(hooks_dir, "")?;
+            write_pre_commit_hook(&hooks_dir, "")?;
         }
         HooksTemplate::Default => {
-            write_pre_commit_hook(hooks_dir, DEFAULT_PRE_COMMIT_HOOK)?;
+            write_pre_commit_hook(&hooks_dir, DEFAULT_PRE_COMMIT_HOOK)?;
         }
     }
 
@@ -130,11 +136,16 @@ fn write_pre_commit_hook(hooks_dir: &Path, contents: &str) -> anyhow::Result<()>
     Ok(())
 }
 
-fn hooks_install_cmd() -> anyhow::Result<()> {
-    let output = std::process::Command::new("git")
-        .args(["config", GIT_HOOKS_PATH_KEY, DEFAULT_HOOKS_PATH])
+fn git_config_output(args: &[&str]) -> anyhow::Result<Output> {
+    std::process::Command::new("git")
+        .args(args)
+        .current_dir(configured_project_root())
         .output()
-        .map_err(|err| anyhow::anyhow!("Failed to execute git config command: {err}"))?;
+        .map_err(|err| anyhow::anyhow!("Failed to execute git config command: {err}"))
+}
+
+fn hooks_install_cmd() -> anyhow::Result<()> {
+    let output = git_config_output(&["config", GIT_HOOKS_PATH_KEY, DEFAULT_HOOKS_PATH])?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -162,10 +173,7 @@ fn hooks_install_cmd() -> anyhow::Result<()> {
 }
 
 fn hooks_status_cmd() -> anyhow::Result<()> {
-    let output = std::process::Command::new("git")
-        .args(["config", "--get", GIT_HOOKS_PATH_KEY])
-        .output()
-        .map_err(|err| anyhow::anyhow!("Failed to execute git config command: {err}"))?;
+    let output = git_config_output(&["config", "--get", GIT_HOOKS_PATH_KEY])?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -197,10 +205,7 @@ fn hooks_status_cmd() -> anyhow::Result<()> {
 }
 
 fn hooks_uninstall_cmd() -> anyhow::Result<()> {
-    let output = std::process::Command::new("git")
-        .args(["config", "--unset", GIT_HOOKS_PATH_KEY])
-        .output()
-        .map_err(|err| anyhow::anyhow!("Failed to execute git config command: {err}"))?;
+    let output = git_config_output(&["config", "--unset", GIT_HOOKS_PATH_KEY])?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

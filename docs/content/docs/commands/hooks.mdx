@@ -7,13 +7,13 @@ import { Callout } from 'fumadocs-ui/components/callout';
 
 The `hooks` command helps you manage project-local Git hooks through Git's
 `core.hooksPath` setting. Acton expects hooks to live in `.githooks/` in the
-current project.
+resolved project root.
 
 ## Commands
 
 ### `acton hooks new`
 
-Creates a `.githooks/` scaffold in the current project.
+Creates a `.githooks/` scaffold in the resolved project root.
 
 ```bash
 acton hooks new
@@ -27,6 +27,7 @@ options:
 
 ```sh
 #!/bin/sh
+set -e
 acton check
 acton fmt --check
 ```
@@ -59,7 +60,7 @@ existing hooks.
 
 ### `acton hooks install`
 
-Configures the current Git repository to use `.githooks/`:
+Configures the Git repository for the resolved project root to use `.githooks/`:
 
 ```bash
 acton hooks install
@@ -81,8 +82,8 @@ Git hooks installed successfully from .githooks
 
 ### `acton hooks status`
 
-Reports whether the current Git repository already points `core.hooksPath` to
-`.githooks`:
+Reports whether the Git repository for the resolved project root already points
+`core.hooksPath` to `.githooks`:
 
 ```bash
 acton hooks status
@@ -104,7 +105,8 @@ Git hooks are not installed
 
 ### `acton hooks uninstall`
 
-Removes the `core.hooksPath` override from the current Git repository:
+Removes the `core.hooksPath` override from the Git repository for the resolved
+project root:
 
 ```bash
 acton hooks uninstall
