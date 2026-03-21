@@ -354,5 +354,8 @@ profile_rules = ["tolk-linter/profile_rules"] # for acton check
 profiling = ["ton-ls/profiling"]
 only_ci = []
 
+[lib]
+doctest = false
+
 #[profile.release]
 #debug = "full"

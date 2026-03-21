@@ -38,3 +38,6 @@ log = { workspace = true }
 expect-test = { workspace = true }
 function_name = { workspace = true }
 tokio = { workspace = true }
+
+[lib]
+doctest = false

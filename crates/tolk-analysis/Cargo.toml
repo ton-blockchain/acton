@@ -20,3 +20,7 @@ bitflags = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+test = false
+doctest = false
