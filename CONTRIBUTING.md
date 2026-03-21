@@ -221,7 +221,6 @@ UI:
 
 ```bash
 just fmt-ui
-just check-ui-ci
 just check-ui
 ```
 
@@ -329,7 +328,7 @@ Use this as a quick local matrix before pushing:
 | Change type                                                                                        | Required local checks                                                                                      |
 |----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
 | Rust-only code                                                                                     | `just check`                                                                                               |
-| UI code (`crates/acton-*-ui`, root `package.json`)                                                 | `just check` + `just build-ui` + `just check-ui-ci` + `just check-ui`                                      |
+| UI code (`crates/acton-*-ui`, root `package.json`)                                                 | `just check` + `just build-ui` + `just check-ui`                                                           |
 | Standard library / docgen inputs (`lib/`, `crates/tolkc/assets/tolk-stdlib`, linter rule metadata) | `just check` + `acton docgen` and commit generated docs                                                    |
 | Docs site content/config (`docs/`)                                                                 | `cd docs && yarn install --immutable && yarn build`                                                        |
 | Tree-sitter grammar (`crates/tree-sitter-*`)                                                       | `just check` + `just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
@@ -352,7 +351,6 @@ run:
 
 ```bash
 just build-ui
-just check-ui-ci
 just check-ui
 ```
 

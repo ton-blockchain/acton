@@ -176,7 +176,7 @@ jobs:
           just check-ci
 
   ui:
-    name: UI
+    name: UI (${{ matrix.os }}-${{ matrix.arch }})
     strategy: *runner_linux_strategy
     runs-on: ${{ matrix.runner }}
     if: true
