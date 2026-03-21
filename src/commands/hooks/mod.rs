@@ -78,8 +78,8 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
         Select::new(
             "Hooks template:",
             vec![
-                HooksTemplateSelectItem(HooksTemplate::Empty),
                 HooksTemplateSelectItem(HooksTemplate::Default),
+                HooksTemplateSelectItem(HooksTemplate::Empty),
             ],
         )
         .with_starting_cursor(0)
