@@ -146,7 +146,8 @@ fn test_hooks_new_fails_when_githooks_exists() {
         .arg("default")
         .run()
         .failure()
-        .assert_stderr_contains("Error: .githooks already exists");
+        .assert_stderr_contains(".githooks/pre-commit")
+        .assert_stderr_contains("Delete it before running `acton hooks new`.");
 }
 
 #[test]

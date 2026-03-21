@@ -81,6 +81,13 @@ fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
         );
     }
 
+    if let Some(pre_commit_path) = scaffold_pre_commit_path() {
+        anyhow::bail!(
+            "Found existing pre-commit hook at {}. Delete it before running `acton hooks new`.",
+            pre_commit_path.display()
+        );
+    }
+
     let template = if let Some(template) = template {
         template
     } else {
@@ -110,15 +117,21 @@ fn hooks_dir() -> PathBuf {
     configured_project_root().join(DEFAULT_HOOKS_PATH)
 }
 
+fn scaffold_pre_commit_path() -> Option<PathBuf> {
+    let pre_commit_path = hooks_dir().join(PRE_COMMIT_HOOK_FILE);
+    if pre_commit_path.exists() {
+        Some(pre_commit_path)
+    } else {
+        None
+    }
+}
+
 fn has_local_git_repository() -> bool {
     configured_project_root().join(".git").exists()
 }
 
 fn create_hooks_scaffold(template: HooksTemplate) -> anyhow::Result<()> {
     let hooks_dir = hooks_dir();
-    if hooks_dir.exists() {
-        anyhow::bail!("{DEFAULT_HOOKS_PATH} already exists");
-    }
 
     fs::create_dir_all(&hooks_dir)?;
 

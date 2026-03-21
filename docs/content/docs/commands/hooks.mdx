@@ -56,7 +56,8 @@ acton hooks new --template default
 
 <Callout type="warn">
 If `.githooks/` already exists, `acton hooks new` fails instead of overwriting
-existing hooks.
+existing hooks. If `.githooks/pre-commit` already exists, delete that file
+before running `acton hooks new`.
 </Callout>
 
 ---
