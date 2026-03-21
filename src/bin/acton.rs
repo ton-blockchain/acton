@@ -117,9 +117,7 @@ enum Commands {
         #[command(subcommand)]
         command: WalletCommand,
     },
-    #[command(
-        about = "Manage git hooks for the current project",
-    )]
+    #[command(about = "Manage git hooks for the current project")]
     Hooks {
         #[command(subcommand)]
         command: HooksCommand,
