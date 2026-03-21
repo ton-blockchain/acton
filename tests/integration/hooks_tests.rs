@@ -146,8 +146,9 @@ fn test_hooks_new_fails_when_githooks_exists() {
         .arg("default")
         .run()
         .failure()
-        .assert_stderr_contains(".githooks/pre-commit")
-        .assert_stderr_contains("Delete it before running `acton hooks new`.");
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_new_existing_pre_commit.stderr.txt",
+        );
 }
 
 #[test]
@@ -165,8 +166,9 @@ fn test_hooks_new_fails_when_local_hooks_are_already_configured() {
         .arg("default")
         .run()
         .failure()
-        .assert_stderr_contains("git core.hooksPath is already set to custom-hooks.")
-        .assert_stderr_contains("Run `acton hooks uninstall` first.");
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_new_existing_local_hooks.stderr.txt",
+        );
 }
 
 #[test]
@@ -265,8 +267,9 @@ fn test_hooks_install_fails_when_local_hooks_are_already_configured() {
         .arg("install")
         .run()
         .failure()
-        .assert_stderr_contains("git core.hooksPath is already set to custom-hooks.")
-        .assert_stderr_contains("Run `acton hooks uninstall` first.");
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_install_existing_local_hooks.stderr.txt",
+        );
 }
 
 #[test]
