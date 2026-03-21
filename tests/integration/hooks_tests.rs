@@ -22,7 +22,7 @@ fn init_git_repo(project_root: &Path) {
 }
 
 fn git_config_get(project_root: &Path, key: &str) -> Option<String> {
-    let output = git(project_root, &["config", "--get", key]);
+    let output = git(project_root, &["config", "--local", "--get", key]);
     if output.status.success() {
         Some(String::from_utf8_lossy(&output.stdout).trim().to_owned())
     } else {

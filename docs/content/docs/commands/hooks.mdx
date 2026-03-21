@@ -69,7 +69,7 @@ acton hooks install
 Internally this runs:
 
 ```bash
-git config core.hooksPath .githooks
+git config --local core.hooksPath .githooks
 ```
 
 On success, Acton prints:
@@ -115,7 +115,7 @@ acton hooks uninstall
 Internally this runs:
 
 ```bash
-git config --unset core.hooksPath
+git config --local --unset core.hooksPath
 ```
 
 On success, Acton prints:

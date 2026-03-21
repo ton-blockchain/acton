@@ -138,6 +138,7 @@ fn write_pre_commit_hook(hooks_dir: &Path, contents: &str) -> anyhow::Result<()>
 
 fn git_config_output(args: &[&str]) -> anyhow::Result<Output> {
     std::process::Command::new("git")
+        .args(["config", "--local"])
         .args(args)
         .current_dir(configured_project_root())
         .output()
@@ -145,7 +146,7 @@ fn git_config_output(args: &[&str]) -> anyhow::Result<Output> {
 }
 
 fn hooks_install_cmd() -> anyhow::Result<()> {
-    let output = git_config_output(&["config", GIT_HOOKS_PATH_KEY, DEFAULT_HOOKS_PATH])?;
+    let output = git_config_output(&["--get", GIT_HOOKS_PATH_KEY])?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -173,7 +174,7 @@ fn hooks_install_cmd() -> anyhow::Result<()> {
 }
 
 fn hooks_status_cmd() -> anyhow::Result<()> {
-    let output = git_config_output(&["config", "--get", GIT_HOOKS_PATH_KEY])?;
+    let output = git_config_output(&["--get", GIT_HOOKS_PATH_KEY])?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -205,7 +206,7 @@ fn hooks_status_cmd() -> anyhow::Result<()> {
 }
 
 fn hooks_uninstall_cmd() -> anyhow::Result<()> {
-    let output = git_config_output(&["config", "--unset", GIT_HOOKS_PATH_KEY])?;
+    let output = git_config_output(&["--unset", GIT_HOOKS_PATH_KEY])?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
