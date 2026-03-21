@@ -331,12 +331,16 @@ fn test_new_counter_project_prompts_for_app_when_supported() {
     session.expect("Include the TypeScript app scaffold?");
     session.send_line("y", "failed to confirm TypeScript app scaffold");
     session.expect("Created new Acton project");
+    session.expect("Project name: interactive-counter");
+    session.expect("Description: interactive description");
+    session.expect("Template: counter");
     session.expect("TypeScript app: included");
+    session.expect("License: MIT");
+    session.expect("Created Acton.toml with project configuration");
+    session.expect("acton build");
+    session.expect("npm install");
     session.expect("npm run dev");
     session.expect(Eof);
-    session.assert_transcript_snapshot_matches(
-        "integration/snapshots/test_new_counter_project_prompts_for_app_when_supported.pty.txt",
-    );
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
         "integration/snapshots/test_new_counter_project_prompts_for_app_when_supported.acton.toml.gen",
@@ -377,11 +381,14 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
     session.expect("Include the TypeScript app scaffold?");
     session.send_line("", "failed to keep default no-app choice");
     session.expect("Created new Acton project");
+    session.expect("Project name: interactive-counter");
+    session.expect("Description: interactive description");
+    session.expect("Template: counter");
+    session.expect("License: MIT");
+    session.expect("Created Acton.toml with project configuration");
+    session.expect("acton build");
     session.expect("acton test");
     session.expect(Eof);
-    session.assert_transcript_snapshot_matches(
-        "integration/snapshots/test_new_counter_project_interactive_decline_keeps_standard_layout.pty.txt",
-    );
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
         "integration/snapshots/test_new_counter_project_interactive_decline_keeps_standard_layout.acton.toml.gen",

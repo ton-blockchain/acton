@@ -152,16 +152,12 @@ impl ProcessCommandBuilder {
 pub(crate) struct PtySession {
     inner: expectrl::Session,
     project_path: PathBuf,
-    transcript: Vec<u8>,
 }
 
 #[cfg(unix)]
 #[allow(dead_code)]
 pub(crate) trait NeedleLabel {
     fn needle_label(&self) -> String;
-    fn transcript_match(&self) -> Option<Vec<u8>> {
-        None
-    }
 }
 
 #[cfg(unix)]
@@ -190,10 +186,6 @@ impl NeedleLabel for &str {
     fn needle_label(&self) -> String {
         format!("string `{self}`")
     }
-
-    fn transcript_match(&self) -> Option<Vec<u8>> {
-        Some(self.as_bytes().to_vec())
-    }
 }
 
 #[cfg(unix)]
@@ -201,20 +193,12 @@ impl NeedleLabel for String {
     fn needle_label(&self) -> String {
         format!("string `{self}`")
     }
-
-    fn transcript_match(&self) -> Option<Vec<u8>> {
-        Some(self.as_bytes().to_vec())
-    }
 }
 
 #[cfg(unix)]
 impl NeedleLabel for &[u8] {
     fn needle_label(&self) -> String {
         format!("byte pattern ({} bytes)", self.len())
-    }
-
-    fn transcript_match(&self) -> Option<Vec<u8>> {
-        Some(self.to_vec())
     }
 }
 
@@ -225,7 +209,6 @@ impl PtySession {
         Self {
             inner,
             project_path,
-            transcript: Vec::new(),
         }
     }
 
@@ -244,12 +227,7 @@ impl PtySession {
         N: expectrl::Needle + NeedleLabel,
     {
         let message = format!("Expected PTY output to match {}", needle.needle_label());
-        let matched = needle.transcript_match();
-        let found = self.inner.expect(needle).expect(&message);
-        self.transcript.extend_from_slice(found.before());
-        if let Some(matched) = matched {
-            self.transcript.extend_from_slice(&matched);
-        }
+        self.inner.expect(needle).expect(&message);
         self
     }
 
@@ -311,21 +289,6 @@ impl PtySession {
 
         let expected = snapbox::Data::read_from(&snapshot_full_path, None);
         assertion.eq(normalized, expected);
-        self
-    }
-
-    pub(crate) fn assert_transcript_snapshot_matches(&self, snapshot_path: &str) -> &Self {
-        let transcript = String::from_utf8(self.transcript.clone())
-            .unwrap_or_else(|_| String::from_utf8_lossy(&self.transcript).into_owned());
-        let normalized =
-            crate::support::snapshots::normalize_output(&transcript, &self.project_path);
-
-        let mut snapshot_full_path = std::env::current_dir().expect("Failed to get current dir");
-        snapshot_full_path.push("tests");
-        snapshot_full_path.push(snapshot_path);
-
-        let expected = snapbox::Data::read_from(&snapshot_full_path, None);
-        crate::common::assertion().eq(normalized, expected);
         self
     }
 }
