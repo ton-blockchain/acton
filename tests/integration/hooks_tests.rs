@@ -139,6 +139,7 @@ fn test_hooks_new_fails_when_githooks_exists() {
 
     project
         .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
         .current_dir(project.path())
         .arg("hooks")
         .arg("new")
@@ -159,6 +160,7 @@ fn test_hooks_new_fails_when_local_hooks_are_already_configured() {
 
     project
         .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
         .current_dir(project.path())
         .arg("hooks")
         .arg("new")
@@ -253,6 +255,24 @@ fn test_hooks_install_status_uninstall_flow() {
 }
 
 #[test]
+fn test_hooks_install_fails_when_githooks_is_missing() {
+    let project = ProjectBuilder::new("hooks-install-missing-githooks").build();
+    init_git_repo(project.path());
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("install")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_install_missing_githooks.stderr.txt",
+        );
+}
+
+#[test]
 fn test_hooks_install_fails_when_local_hooks_are_already_configured() {
     let project = ProjectBuilder::new("hooks-install-existing-local-hooks")
         .raw_file(".githooks/pre-commit", "#!/bin/sh\n")
@@ -262,6 +282,7 @@ fn test_hooks_install_fails_when_local_hooks_are_already_configured() {
 
     project
         .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
         .current_dir(project.path())
         .arg("hooks")
         .arg("install")

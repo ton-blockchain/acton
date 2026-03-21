@@ -1,0 +1,1 @@
+Error: git core.hooksPath is already set to custom-hooks. Run `acton hooks uninstall` first.

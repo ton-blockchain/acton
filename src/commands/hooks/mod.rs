@@ -10,6 +10,7 @@ const GIT_HOOKS_PATH_KEY: &str = "core.hooksPath";
 const PRE_COMMIT_HOOK_FILE: &str = "pre-commit";
 const DEFAULT_PRE_COMMIT_HOOK: &str = include_str!("templates/.githooks/pre-commit");
 const HOOKS_UNINSTALL_HINT: &str = "Run `acton hooks uninstall` first.";
+const HOOKS_NEW_HINT: &str = "Run `acton hooks new` first.";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, clap::ValueEnum)]
 pub enum HooksTemplate {
@@ -196,6 +197,13 @@ fn local_hooks_path() -> anyhow::Result<Option<String>> {
 }
 
 fn hooks_install_cmd() -> anyhow::Result<()> {
+    if !hooks_dir().is_dir() {
+        anyhow::bail!(
+            "Hooks directory {} does not exist. {HOOKS_NEW_HINT}",
+            DEFAULT_HOOKS_PATH
+        );
+    }
+
     if let Some(hooks_path) = local_hooks_path()? {
         if hooks_path == DEFAULT_HOOKS_PATH {
             anyhow::bail!("Git hooks are already installed. {HOOKS_UNINSTALL_HINT}");

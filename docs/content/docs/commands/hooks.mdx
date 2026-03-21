@@ -85,6 +85,9 @@ Git hooks installed successfully from .githooks
 If `core.hooksPath` is already set locally for this repository, `acton hooks install`
 fails and asks you to run `acton hooks uninstall` first.
 
+If `.githooks/` does not exist yet, `acton hooks install` fails and asks you to
+run `acton hooks new` first.
+
 ---
 
 ### `acton hooks status`
