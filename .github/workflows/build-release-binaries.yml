@@ -8,7 +8,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-release-binaries-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

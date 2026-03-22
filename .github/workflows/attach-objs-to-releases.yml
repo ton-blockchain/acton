@@ -8,7 +8,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: attach-objs-to-releases-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: { }
