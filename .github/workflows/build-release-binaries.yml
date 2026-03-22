@@ -11,6 +11,8 @@ concurrency:
   group: build-release-binaries-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: { }
+
 jobs:
   build-linux:
     name: Build Linux (${{ matrix.arch }})

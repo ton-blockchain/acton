@@ -10,6 +10,8 @@ on:
 env:
   PUBLIC_ACTON_REPOSITORY: i582/acton-public
 
+permissions: { }
+
 jobs:
   publish-mirror:
     runs-on: ubicloud-standard-2-ubuntu-2204
