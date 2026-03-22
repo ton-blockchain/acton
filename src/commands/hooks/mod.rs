@@ -74,9 +74,13 @@ pub fn hooks_cmd(command: HooksCommand) -> anyhow::Result<()> {
 }
 
 fn hooks_new_cmd(template: Option<HooksTemplate>) -> anyhow::Result<()> {
-    if has_local_git_repository()
-        && let Some(hooks_path) = local_hooks_path()?
-    {
+    if !has_local_git_repository() {
+        anyhow::bail!(
+            "Hooks scaffold can only be created in a project root containing .git. Run `git init` first."
+        );
+    }
+
+    if let Some(hooks_path) = local_hooks_path()? {
         anyhow::bail!(
             "git {GIT_HOOKS_PATH_KEY} is already set to {hooks_path}. {HOOKS_UNINSTALL_HINT}"
         );

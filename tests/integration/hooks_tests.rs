@@ -66,6 +66,7 @@ fn git_config_set_file(config_path: &Path, key: &str, value: &str) {
 #[test]
 fn test_hooks_new_empty_non_interactive() {
     let project = ProjectBuilder::new("hooks-new-empty").build();
+    init_git_repo(project.path());
 
     let output = project
         .acton()
@@ -87,6 +88,7 @@ fn test_hooks_new_empty_non_interactive() {
 #[test]
 fn test_hooks_new_default_non_interactive() {
     let project = ProjectBuilder::new("hooks-new-default").build();
+    init_git_repo(project.path());
 
     let output = project
         .acton()
@@ -112,6 +114,7 @@ fn test_hooks_new_interactive_defaults_to_default() {
     use std::time::Duration;
 
     let project = ProjectBuilder::new("hooks-new-interactive-default").build();
+    init_git_repo(project.path());
     let mut session = project
         .acton()
         .current_dir(project.path())
@@ -136,6 +139,7 @@ fn test_hooks_new_fails_when_githooks_exists() {
     let project = ProjectBuilder::new("hooks-new-existing")
         .raw_file(".githooks/pre-commit", "#!/bin/sh\n")
         .build();
+    init_git_repo(project.path());
 
     project
         .acton()
@@ -174,8 +178,53 @@ fn test_hooks_new_fails_when_local_hooks_are_already_configured() {
 }
 
 #[test]
+fn test_hooks_new_fails_without_local_git_directory() {
+    let project = ProjectBuilder::new("hooks-new-missing-local-git").build();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("new")
+        .arg("--template")
+        .arg("default")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_new_missing_local_git_dir.stderr.txt",
+        );
+}
+
+#[test]
+fn test_hooks_new_fails_when_parent_git_repo_exists_without_local_git_directory() {
+    let project = ProjectBuilder::new("hooks-new-parent-existing-local-hooks").build();
+    let outer_repo = project
+        .path()
+        .parent()
+        .expect("project should have a parent directory");
+    init_git_repo(outer_repo);
+    git_config_set(outer_repo, "core.hooksPath", "custom-hooks");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .current_dir(project.path())
+        .arg("hooks")
+        .arg("new")
+        .arg("--template")
+        .arg("default")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/hooks/test_hooks_new_missing_local_git_dir.stderr.txt",
+        );
+}
+
+#[test]
 fn test_hooks_new_uses_auto_detected_project_root_from_nested_directory() {
     let project = ProjectBuilder::new("hooks-new-nested-auto-detect").build();
+    init_git_repo(project.path());
     let nested_dir = project.path().join("nested/deeper");
     fs::create_dir_all(&nested_dir).expect("failed to create nested directory");
 
@@ -405,6 +454,7 @@ fn test_hooks_new_marks_pre_commit_executable() {
     use std::os::unix::fs::PermissionsExt;
 
     let project = ProjectBuilder::new("hooks-new-executable").build();
+    init_git_repo(project.path());
 
     project
         .acton()
