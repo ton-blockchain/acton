@@ -1,0 +1,42 @@
+name: "Attach TON Objs to releases"
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  attach-objs:
+    name: Attach TON Objs to releases
+    runs-on: ubicloud-standard-2
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download TON objects release archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download trunk-objs \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "ton-objs-*.tar.gz*" \
+            --dir .
+
+      - name: Upload TON objects archives as artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: artifacts-ton-objs
+          path: |
+            ton-objs-*.tar.gz
+            ton-objs-*.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error
