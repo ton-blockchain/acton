@@ -16,6 +16,7 @@ struct Cli {
 enum CliCommand {
     Hello,
     UbicloudCleanup(tasks::ubicloud_cleanup::UbicloudCleanupArgs),
+    Retag(tasks::retag::RetagArgs),
     Release(tasks::release::ReleaseArgs),
     Schema(tasks::schema::SchemaArgs),
     SyncArtifactsManifest,
@@ -27,6 +28,7 @@ fn main() -> Result<()> {
     match args.command {
         CliCommand::Hello => tasks::hello::run(),
         CliCommand::UbicloudCleanup(args) => tasks::ubicloud_cleanup::run(args),
+        CliCommand::Retag(args) => tasks::retag::run(args),
         CliCommand::Release(args) => tasks::release::run(args),
         CliCommand::Schema(args) => tasks::schema::run(args),
         CliCommand::SyncArtifactsManifest => tasks::sync_artifacts_manifest::run(),

@@ -26,6 +26,18 @@ Example:
 cargo xtask release --version 0.22.0
 ```
 
+## Retag command
+
+Use the retag `xtask` when a numbered release tag needs to be moved to the
+current release state by creating an empty retry commit without changing the
+project version:
+
+```bash
+cargo xtask retag --version 0.22.0
+```
+
+`--version` accepts `X.Y.Z` and `retag` derives the release tag as `vX.Y.Z`.
+
 ## Prerequisites
 
 - `gh` CLI installed and authenticated: `gh auth status`
@@ -59,3 +71,9 @@ cargo xtask release --version 0.22.0
 After the tag is pushed, the GitHub `Release` workflow builds release
 artifacts, creates the GitHub release, and publishes the mirrored release to
 `i582/acton-public`.
+
+The retag workflow creates an empty commit on top of `master`, deletes the
+existing tag in `origin`, recreates the tag on that retry commit, and pushes
+both `master` and the tag, so it requires explicit confirmation and only runs
+when the tag already exists in `origin` and local `master` exactly matches
+`origin/master`.
