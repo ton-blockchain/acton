@@ -46,7 +46,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.runner }}
+          key: ${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install Rust
@@ -147,7 +147,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.runner }}
+          key: ${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install Rust
@@ -231,7 +231,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.runner }}
+          key: ${{ runner.os }}-${{ runner.arch }}
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install Rust
@@ -308,7 +308,7 @@ jobs:
   create-trunk-release:
     name: Create Trunk Release
     needs: [ build-linux, build-macos, lint, ui ]
-    runs-on: ubicloud-standard-2
+    runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
 
     permissions:

@@ -18,7 +18,7 @@ env:
 jobs:
   prepare:
     name: Resolve TON Commit
-    runs-on: ubicloud-standard-2
+    runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
       contents: read
@@ -277,7 +277,7 @@ jobs:
   create-trunk-objs-release:
     name: Create Trunk Objs Release
     needs: [ prepare, build-objs-linux ]
-    runs-on: ubicloud-standard-2
+    runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master'
 
     permissions:

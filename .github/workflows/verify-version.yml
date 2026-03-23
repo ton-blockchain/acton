@@ -12,7 +12,7 @@ permissions: { }
 jobs:
   check-versions:
     name: Check Release Versions
-    runs-on: ubicloud-standard-2
+    runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
       contents: read

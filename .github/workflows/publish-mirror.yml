@@ -12,7 +12,7 @@ env:
 
 jobs:
   publish-mirror:
-    runs-on: ubicloud-standard-2
+    runs-on: ubicloud-standard-2-ubuntu-2204
     steps:
       - name: "Download GitHub Artifacts"
         uses: actions/download-artifact@v7

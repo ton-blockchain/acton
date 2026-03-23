@@ -40,7 +40,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.runner }}
+          key: ${{ runner.os }}-${{ runner.arch }}
           save-if: false
           lookup-only: true
 
@@ -140,7 +140,7 @@ jobs:
       - name: Cache Cargo
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
-          key: ${{ matrix.runner }}
+          key: ${{ runner.os }}-${{ runner.arch }}
           save-if: false
           lookup-only: true
 
