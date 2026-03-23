@@ -1,0 +1,10 @@
+# Tracked revision data for native TON archives in `objs/`.
+# `build.rs` watches this file with `cargo:rerun-if-changed`, so bump the
+# revision and refresh the SHA-256 values whenever `libemulator.a` or
+# `libtolk.a` is refreshed.
+
+artifact_set_revision = 1
+
+[sha256]
+libemulator = "31cdb08f264f07ba36740c013129aaf62be2ff7f973ee0b5543fdb46d6161afc"
+libtolk = "25a3087477d628c00cfd11e37772e102861caec5f4f3bf24ab6cf5513ee91f54"

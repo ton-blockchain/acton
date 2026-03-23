@@ -109,7 +109,10 @@ cargo build
 ```
 
 The extracted archive already contains `libemulator.a` and `libtolk.a` at the
-archive root, so unpacking it into `objs/` is enough.
+archive root, so unpacking it into `objs/` is enough. If you refresh these
+archives later, also bump `artifact_set_revision` and refresh the `sha256`
+entries in `crates/ton-objs/artifacts_manifest.toml` so Cargo invalidates
+`ton-objs` and validates the new archives.
 
 ### Option 2: build TON artifacts manually
 
@@ -143,6 +146,9 @@ Then copy the generated archives into Acton and build the project:
 mkdir -p objs
 cp ton-repo/artifacts/libemulator.a objs/
 cp ton-repo/artifacts/libtolk.a objs/
+# edit crates/ton-objs/artifacts_manifest.toml:
+# - increment `artifact_set_revision`
+# - update `sha256.libemulator` / `sha256.libtolk`
 
 just build-ui
 
