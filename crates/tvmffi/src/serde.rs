@@ -1,5 +1,5 @@
-use crate::stack::{Tuple, TupleItem};
-use anyhow::{anyhow, Error};
+use crate::stack::{ContData, Tuple, TupleItem};
+use anyhow::anyhow;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
@@ -40,19 +40,10 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
             builder.store_uint(0, 7)?;
             builder.store_bigint(value, 257, true)?;
         }
-        TupleItem::Cont(cell) => {
-            // TODO support continuation
-            // tag
-            builder.store_small_uint(0, 2)?;
-            // nargs
-            builder.store_uint(0, 1)?;
-            // stack
-            builder.store_uint(0, 1)?;
-            // savelist
-            builder.store_uint(0, 1)?;
-            // cp
-            builder.store_bit(true)?;
-            builder.store_uint(0, 16)?;
+        TupleItem::Cont(cont) => {
+            // vm_stk_cont#06 cont:VmCont = VmStackValue;
+            builder.store_small_uint(0x06, 8)?;
+            serialize_vm_cont(builder, cont)?;
         }
         TupleItem::Nan => {
             builder.store_small_uint(0x02, 8)?;
@@ -141,6 +132,275 @@ pub fn parse_vm_cell_slice(parser: &mut CellSlice<'_>) -> Result<Cell, anyhow::E
     Ok(final_cell)
 }
 
+/// Parse VmStack from a cell slice.
+///
+/// ```text
+/// vm_stack#_ depth:(## 24) stack:(VmStackList depth) = VmStack;
+/// vm_stk_cons#_ {n:#} rest:^(VmStackList n) tos:VmStackValue = VmStackList (n + 1);
+/// vm_stk_nil#_ = VmStackList 0;
+/// ```
+fn parse_vm_stack(parser: &mut CellSlice<'_>) -> Result<Tuple, anyhow::Error> {
+    let size = parser.load_uint(24)? as usize;
+    if size == 0 {
+        return Ok(Tuple::empty());
+    }
+
+    let mut result: Vec<TupleItem> = Vec::with_capacity(size);
+
+    // First entry: rest reference + tos inline in current parser
+    let next_ref = parser.load_reference_cloned()?;
+    let item = parse_tuple_item(parser)?;
+    result.insert(0, item);
+
+    // Remaining entries from referenced cells
+    let mut cur_cell = next_ref;
+    for _ in 1..size {
+        let mut cs = cur_cell.as_slice_allow_exotic();
+        let nr = cs.load_reference_cloned()?;
+        let item = parse_tuple_item(&mut cs)?;
+        result.insert(0, item);
+        cur_cell = nr;
+    }
+
+    Ok(Tuple(result))
+}
+
+/// Serialize VmStack into a cell builder.
+fn serialize_vm_stack(builder: &mut CellBuilder, stack: &Tuple) -> anyhow::Result<()> {
+    builder.store_uint(stack.len() as u64, 24)?;
+    serialize_tuple_tail(&stack.0, builder)
+}
+
+/// Parsed VmControlData fields.
+struct VmControlData {
+    stack: Option<Tuple>,
+    savelist: Option<Cell>,
+}
+
+/// Parse VmControlData, returning the captured stack and save list.
+///
+/// ```text
+/// vm_ctl_data$_ nargs:(Maybe uint13) stack:(Maybe VmStack)
+///               save:VmSaveList cp:(Maybe int16) = VmControlData;
+/// _ cregs:(HashmapE 4 VmStackValue) = VmSaveList;
+/// ```
+fn parse_vm_control_data(parser: &mut CellSlice<'_>) -> Result<VmControlData, anyhow::Error> {
+    // nargs:(Maybe uint13)
+    if parser.load_bit()? {
+        parser.load_uint(13)?;
+    }
+
+    // stack:(Maybe VmStack)
+    let stack = if parser.load_bit()? {
+        Some(parse_vm_stack(parser)?)
+    } else {
+        None
+    };
+
+    // save:VmSaveList = HashmapE 4 VmStackValue
+    let savelist = if parser.load_bit()? {
+        Some(parser.load_reference_cloned()?)
+    } else {
+        None
+    };
+
+    // cp:(Maybe int16)
+    if parser.load_bit()? {
+        parser.load_uint(16)?;
+    }
+
+    Ok(VmControlData { stack, savelist })
+}
+
+/// Parse a VmCont from a cell slice.
+///
+/// Supports all TLB-defined continuation variants:
+/// ```text
+/// vmc_std$00          cdata:VmControlData code:VmCellSlice = VmCont;
+/// vmc_envelope$01     cdata:VmControlData next:^VmCont = VmCont;
+/// vmc_quit$1000       exit_code:int32 = VmCont;
+/// vmc_quit_exc$1001   = VmCont;
+/// vmc_repeat$10100    count:uint63 body:^VmCont after:^VmCont = VmCont;
+/// vmc_until$110000    body:^VmCont after:^VmCont = VmCont;
+/// vmc_again$110001    body:^VmCont = VmCont;
+/// vmc_while_cond$110010 cond:^VmCont body:^VmCont after:^VmCont = VmCont;
+/// vmc_while_body$110011 cond:^VmCont body:^VmCont after:^VmCont = VmCont;
+/// vmc_pushint$1111    value:int32 next:^VmCont = VmCont;
+/// ```
+fn parse_vm_cont(parser: &mut CellSlice<'_>) -> Result<ContData, anyhow::Error> {
+    let first_bit = parser.load_bit()?;
+
+    if !first_bit {
+        // Tags starting with 0: vmc_std (00) or vmc_envelope (01)
+        let second_bit = parser.load_bit()?;
+
+        if !second_bit {
+            // vmc_std$00 cdata:VmControlData code:VmCellSlice
+            let cdata = parse_vm_control_data(parser)?;
+            let code = parse_vm_cell_slice(parser)?;
+            Ok(ContData {
+                code,
+                stack: cdata.stack,
+                savelist: cdata.savelist,
+            })
+        } else {
+            // vmc_envelope$01 cdata:VmControlData next:^VmCont
+            let cdata = parse_vm_control_data(parser)?;
+            let next = parser.load_reference_cloned()?;
+            let mut next_parser = next.as_slice_allow_exotic();
+            let inner = parse_vm_cont(&mut next_parser)?;
+            Ok(ContData {
+                code: inner.code,
+                stack: cdata.stack.or(inner.stack),
+                savelist: cdata.savelist.or(inner.savelist),
+            })
+        }
+    } else {
+        // Tags starting with 1
+        let second_bit = parser.load_bit()?;
+
+        if !second_bit {
+            // Tags starting with 10
+            let third_bit = parser.load_bit()?;
+
+            if !third_bit {
+                // Tags starting with 100
+                let fourth_bit = parser.load_bit()?;
+
+                if !fourth_bit {
+                    // vmc_quit$1000 exit_code:int32
+                    parser.load_uint(32)?;
+                    Ok(ContData::default())
+                } else {
+                    // vmc_quit_exc$1001
+                    Ok(ContData::default())
+                }
+            } else {
+                // Tags starting with 101
+                let fourth_bit = parser.load_bit()?;
+
+                if !fourth_bit {
+                    // vmc_repeat$10100 count:uint63 body:^VmCont after:^VmCont
+                    let fifth_bit = parser.load_bit()?;
+                    if fifth_bit {
+                        return Err(anyhow!("Unsupported VmCont tag starting with 10101"));
+                    }
+                    parser.load_uint(63)?; // count
+                    let body = parser.load_reference_cloned()?;
+                    parser.load_reference_cloned()?; // after
+                    let mut bp = body.as_slice_allow_exotic();
+                    parse_vm_cont(&mut bp)
+                } else {
+                    Err(anyhow!("Unsupported VmCont tag starting with 1011"))
+                }
+            }
+        } else {
+            // Tags starting with 11
+            let third_bit = parser.load_bit()?;
+
+            if !third_bit {
+                // Tags starting with 110
+                let fourth_bit = parser.load_bit()?;
+
+                if !fourth_bit {
+                    // Tags starting with 1100
+                    let sub_tag = parser.load_uint(2)?;
+                    match sub_tag {
+                        0b00 => {
+                            // vmc_until$110000 body:^VmCont after:^VmCont
+                            let body = parser.load_reference_cloned()?;
+                            parser.load_reference_cloned()?; // after
+                            let mut bp = body.as_slice_allow_exotic();
+                            parse_vm_cont(&mut bp)
+                        }
+                        0b01 => {
+                            // vmc_again$110001 body:^VmCont
+                            let body = parser.load_reference_cloned()?;
+                            let mut bp = body.as_slice_allow_exotic();
+                            parse_vm_cont(&mut bp)
+                        }
+                        0b10 => {
+                            // vmc_while_cond$110010 cond:^VmCont body:^VmCont after:^VmCont
+                            parser.load_reference_cloned()?; // cond
+                            let body = parser.load_reference_cloned()?;
+                            parser.load_reference_cloned()?; // after
+                            let mut bp = body.as_slice_allow_exotic();
+                            parse_vm_cont(&mut bp)
+                        }
+                        0b11 => {
+                            // vmc_while_body$110011 cond:^VmCont body:^VmCont after:^VmCont
+                            parser.load_reference_cloned()?; // cond
+                            let body = parser.load_reference_cloned()?;
+                            parser.load_reference_cloned()?; // after
+                            let mut bp = body.as_slice_allow_exotic();
+                            parse_vm_cont(&mut bp)
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    // Tags starting with 1101 — undefined
+                    Err(anyhow!("Unsupported VmCont tag starting with 1101"))
+                }
+            } else {
+                // Tags starting with 111
+                let fourth_bit = parser.load_bit()?;
+
+                if fourth_bit {
+                    // vmc_pushint$1111 value:int32 next:^VmCont
+                    parser.load_uint(32)?; // value
+                    let next = parser.load_reference_cloned()?;
+                    let mut np = next.as_slice_allow_exotic();
+                    parse_vm_cont(&mut np)
+                } else {
+                    // Tags starting with 1110 — undefined
+                    Err(anyhow!("Unsupported VmCont tag starting with 1110"))
+                }
+            }
+        }
+    }
+}
+
+/// Serialize a VmCont as vmc_std into a cell builder.
+///
+/// Always serializes as `vmc_std$00` with VmControlData and VmCellSlice.
+fn serialize_vm_cont(builder: &mut CellBuilder, cont: &ContData) -> anyhow::Result<()> {
+    // vmc_std$00
+    builder.store_uint(0b00, 2)?;
+
+    // VmControlData:
+    // nargs:(Maybe uint13) — absent
+    builder.store_bit(false)?;
+
+    // stack:(Maybe VmStack)
+    if let Some(stack) = &cont.stack {
+        builder.store_bit(true)?;
+        serialize_vm_stack(builder, stack)?;
+    } else {
+        builder.store_bit(false)?;
+    }
+
+    // save:VmSaveList = HashmapE 4 VmStackValue
+    if let Some(savelist) = &cont.savelist {
+        builder.store_bit(true)?;
+        builder.store_reference(savelist.clone())?;
+    } else {
+        builder.store_bit(false)?;
+    }
+
+    // cp:(Maybe int16) — absent
+    builder.store_bit(false)?;
+
+    // code:VmCellSlice
+    let code = &cont.code;
+    builder.store_uint(0, 10)?; // st_bits
+    builder.store_uint(code.bit_len() as u64, 10)?; // end_bits
+    builder.store_uint(0, 3)?; // st_ref
+    builder.store_uint(code.reference_count() as u64, 3)?; // end_ref
+    builder.store_reference(code.clone())?;
+
+    Ok(())
+}
+
 /// Parse a tuple item from a cell parser
 pub fn parse_tuple_item(parser: &mut CellSlice<'_>) -> Result<TupleItem, anyhow::Error> {
     let kind = parser.load_small_uint(8)?;
@@ -204,30 +464,8 @@ pub fn parse_tuple_item(parser: &mut CellSlice<'_>) -> Result<TupleItem, anyhow:
             Ok(TupleItem::Tuple(Tuple(items)))
         }
         6 => {
-            // TODO: fully support continuation
-            let tag = parser.load_uint(2)?;
-            if(tag != 0) {
-                return Err(anyhow!("Unsupported continuation tag: {tag}"));
-            }
-            let mut nargs = 0;
-            if(parser.load_bit()?) {
-                nargs = parser.load_uint(13)?;
-            }
-
-            if(parser.load_bit()?) {
-                return Err(anyhow!("cont_std with Stack is not supported"));
-            }
-
-            if(parser.load_bit()?) {
-                return Err(anyhow!("cont_std with Savelist is not supported"));
-            }
-
-            let mut cp = 0;
-            if(parser.load_bit()?) {
-                cp = parser.load_uint(16)?;
-            }
-
-            let cont = parse_vm_cell_slice(parser)?;
+            // vm_stk_cont#06 cont:VmCont = VmStackValue;
+            let cont = parse_vm_cont(parser)?;
             Ok(TupleItem::Cont(cont))
         }
         _ => Err(anyhow!("Unsupported stack item kind: {kind}")),

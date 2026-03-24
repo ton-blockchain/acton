@@ -103,6 +103,42 @@ impl PartialEq for Tuple {
     }
 }
 
+/// Parsed data from a TVM continuation (VmCont).
+///
+/// Stores the code cell, optionally the captured stack, and the save list from VmControlData.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContData {
+    /// The code cell (VmCellSlice) of the continuation.
+    pub code: Cell,
+    /// The captured stack from VmControlData (set by SETCONTARGS).
+    pub stack: Option<Tuple>,
+    /// The save list (VmSaveList) — maps register indices to saved VmStackValues.
+    /// Stored as raw hashmap cell for round-trip serialization.
+    /// Key registers: c0 = return cont, c1 = alt return cont (RETALT), etc.
+    pub savelist: Option<Cell>,
+}
+
+impl ContData {
+    /// Create a ContData with just a code cell and no captured stack.
+    pub fn from_code(code: Cell) -> Self {
+        Self {
+            code,
+            stack: None,
+            savelist: None,
+        }
+    }
+}
+
+impl Default for ContData {
+    fn default() -> Self {
+        Self {
+            code: Cell::default(),
+            stack: None,
+            savelist: None,
+        }
+    }
+}
+
 /// Represents a stack value in TVM
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TupleItem {
@@ -110,7 +146,7 @@ pub enum TupleItem {
     Null,
     Int(BigInt),
     Nan,
-    Cont(Cell),
+    Cont(ContData),
     Cell(Cell),
     Slice(Cell),
     Builder(Cell),

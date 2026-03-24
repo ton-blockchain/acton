@@ -8,7 +8,7 @@ use crate::ffi::assert::parse_search_params;
 use crate::retrace;
 use acton_config::color::OwoColorize;
 use acton_config::config::Explorer;
-use anyhow::{anyhow, Context as AnyhowContext};
+use anyhow::{Context as AnyhowContext};
 use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use log::{debug, info, warn};
@@ -953,11 +953,14 @@ fn run_get_method_impl(
         .map(|t| Boc::encode_base64(&t))
         .context("Cannot serialize tuple")?;
 
+    eprintln!("[DBG] run_get_method_impl: debug_enabled={}", ctx.debug.is_enabled());
     let result = if ctx.debug.is_enabled() {
+        eprintln!("[DBG] using step executor (debug mode)");
         let step_executor = StepGetExecutor::new(&args_b64, &params, Some(&config_b64))
             .context("Cannot create get executor")?;
 
         let dbg_ctx = ctx.debug.ctx();
+        eprintln!("[DBG] begin_thread...");
         dbg_ctx
             .begin_thread(
                 2,
@@ -968,39 +971,47 @@ fn run_get_method_impl(
             )
             .context("Cannot send response")?;
 
+        eprintln!("[DBG] prepare...");
         step_executor
             .prepare(method_id, &args_b64)
             .context("Cannot prepare get method")?;
 
         // Step to update internal state
+        eprintln!("[DBG] stepping (need_to_stop={})...", dbg_ctx.need_to_stop_child_thread_on_start());
         if dbg_ctx.need_to_stop_child_thread_on_start() {
             dbg_ctx.step(StepMode::StepIn);
         } else {
             dbg_ctx.step(StepMode::Continue);
         }
 
+        eprintln!("[DBG] stepper terminated={}", dbg_ctx.stepper.is_terminated());
         if !dbg_ctx.stepper.is_terminated() {
+            eprintln!("[DBG] process_incoming_requests...");
             dbg_ctx
                 .process_incoming_requests(false)
                 .context("Cannot send response")?;
         }
 
+        eprintln!("[DBG] finish_thread...");
         dbg_ctx.finish_thread(2).context("Cannot send response")?;
 
         if dbg_ctx.performing_step != Some(StepMode::Continue) {
-            // When we step out from nested message/get method, send stop message to client to
-            // stop on a line after send/call get method
             dbg_ctx.step(StepMode::StepIn);
         }
 
+        eprintln!("[DBG] finish...");
         step_executor
             .finish(&params.code)
             .context("Cannot run get method")?
     } else {
+        eprintln!("[DBG] using normal executor");
         let executor = GetExecutor::new(&params).context("Cannot create get executor")?;
-        executor
+        eprintln!("[DBG] run_get_method...");
+        let r = executor
             .run_get_method(&args_b64, &params, Some(&config_b64))
-            .context("Cannot run get method")?
+            .context("Cannot run get method")?;
+        eprintln!("[DBG] run_get_method done");
+        r
     };
 
     match result {
@@ -1537,24 +1548,46 @@ fn set_shard_account_impl(
     Ok(())
 }
 
-extension!(call_tolk_function in (Context) with (function: TupleItem, arg: TupleItem, addr: StdAddr) using call_tolk_function_impl);
+extension!(call_tolk_function in (Context) with (addr: StdAddr, arg: TupleItem, function: TupleItem) using call_tolk_function_impl);
 fn call_tolk_function_impl(
     ctx: &mut Context,
     stack: &mut Tuple,
-    function: TupleItem,
-    args: TupleItem,
     addr: StdAddr,
+    args: TupleItem,
+    function: TupleItem,
 ) -> anyhow::Result<()> {
+    eprintln!("[DBG] call_tolk_function_impl entered");
+    eprintln!("[DBG] function type: {:?}", std::mem::discriminant(&function));
+    eprintln!("[DBG] args type: {:?}", std::mem::discriminant(&args));
+
     let cont = match function {
         TupleItem::Cont(cont) => cont,
         _ => anyhow::bail!("Expected Cont, got {:?}", function),
     };
-    let args_stack = match args {
+    eprintln!("[DBG] cont.code bit_len={}, has captured_stack={}", cont.code.bit_len(), cont.stack.is_some());
+    if let Some(ref s) = cont.stack {
+        eprintln!("[DBG] captured_stack len={}, items: {:?}", s.len(), s.0.iter().map(|i| std::mem::discriminant(i)).collect::<Vec<_>>());
+    }
+
+    let mut args_stack = match args {
         TupleItem::Tuple(args_stack) => args_stack,
         _ => anyhow::bail!("Expected Tuple, got {:?}", args),
     };
+    eprintln!("[DBG] args_stack len={}", args_stack.len());
 
-    run_get_method_impl(ctx, stack, args_stack, "int".parse()?, "inner-get-method".parse()?, BigInt::from(0), cont, addr)
+    // Prepend the continuation's captured stack (from SETCONTARGS) to the args.
+    // When TVM executes a continuation, captured values are placed below the current stack.
+    if let Some(captured) = &cont.stack {
+        let mut combined = captured.0.clone();
+        combined.append(&mut args_stack.0);
+        args_stack = Tuple(combined);
+    }
+    eprintln!("[DBG] final args_stack len={}", args_stack.len());
+    eprintln!("[DBG] calling run_get_method_impl...");
+
+    let result = run_get_method_impl(ctx, stack, args_stack, "int".parse()?, "inner-get-method".parse()?, BigInt::from(0), cont.code, addr);
+    eprintln!("[DBG] run_get_method_impl returned: {:?}", result.as_ref().map(|_| "ok"));
+    result
 }
 
 pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {

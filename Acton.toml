@@ -20,7 +20,10 @@ src = ".jetton/contracts/jetton-wallet-contract.tolk"
 depends = []
 
 [test]
-include = ["tests/acton-stdlib/**", ".jetton/**"]
+include = [
+    "tests/acton-stdlib/**",
+    ".jetton/**",
+]
 fail-on-diff = false
 
 [test.mutation]
@@ -29,9 +32,14 @@ fail-on-diff = false
 port = 3010
 accounts = ["local-wallet"]
 
-[networks.localnet]
-api = { v2 = "http://localhost:3010/api/v2", v3 = "http://localhost:3010/api/v3" }
-
 [mappings]
 acton = ".acton"
+contracts = "contracts"
+gen = "gen"
 local-acton = "lib"
+tests = "tests"
+wrappers = "tests/wrappers"
+
+[networks.localnet.api]
+v2 = "http://localhost:3010/api/v2"
+v3 = "http://localhost:3010/api/v3"
