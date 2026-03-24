@@ -18,6 +18,7 @@ enum CliCommand {
     UbicloudCleanup(tasks::ubicloud_cleanup::UbicloudCleanupArgs),
     Release(tasks::release::ReleaseArgs),
     Schema(tasks::schema::SchemaArgs),
+    SyncArtifactsManifest,
 }
 
 fn main() -> Result<()> {
@@ -28,5 +29,6 @@ fn main() -> Result<()> {
         CliCommand::UbicloudCleanup(args) => tasks::ubicloud_cleanup::run(args),
         CliCommand::Release(args) => tasks::release::run(args),
         CliCommand::Schema(args) => tasks::schema::run(args),
+        CliCommand::SyncArtifactsManifest => tasks::sync_artifacts_manifest::run(),
     }
 }

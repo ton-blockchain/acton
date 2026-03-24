@@ -53,6 +53,26 @@ impl Github {
         Ok(())
     }
 
+    pub(crate) fn download_release_asset(&self, tag: &str, asset_name: &str) -> Result<Vec<u8>> {
+        let output = self
+            .command_output(&[
+                "release",
+                "download",
+                tag,
+                "--pattern",
+                asset_name,
+                "--output",
+                "-",
+            ])
+            .with_context(|| {
+                format!(
+                    "failed to download asset `{asset_name}` from release `{tag}` in the current repository"
+                )
+            })?;
+
+        Ok(output.stdout)
+    }
+
     fn ensure_workflow_runs_succeeded(&self, run: &WorkflowRun) -> Result<()> {
         let workflow_name = run.workflow_name.as_deref().unwrap_or("<unnamed workflow>");
 
