@@ -36,18 +36,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
   build-objs-linux:
-    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
+    name: Prepare TON objects (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     needs: [ prepare ]
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - runner: ubicloud-standard-8-ubuntu-2204
-            os: linux
             arch: x86_64
+            vendor: unknown
+            sys: linux
+            abi: gnu
           - runner: ubicloud-standard-8-arm-ubuntu-2204
-            os: linux
             arch: aarch64
-    runs-on: ${{ matrix.runner }}
+            vendor: unknown
+            sys: linux
+            abi: gnu
+    env:
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
     permissions:
       contents: read
@@ -59,9 +65,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
-          key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
+          key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Install LLVM and Clang
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -124,16 +130,19 @@ jobs:
         if: steps.archive-cache.outputs.cache-hit != 'true'
         env:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        # language=Bash
         run: |
           libemulator_sha256=$(sha256sum objs/libemulator.a | awk '{ print $1 }')
           libtolk_sha256=$(sha256sum objs/libtolk.a | awk '{ print $1 }')
 
           jq -n \
             --arg ton_commit "${TON_COMMIT}" \
+            --arg rust_target "${TARGET_NAME}" \
             --arg libemulator_sha256 "${libemulator_sha256}" \
             --arg libtolk_sha256 "${libtolk_sha256}" \
             '{
               ton_commit: $ton_commit,
+              rust_target: $rust_target,
               sha256_libemulator: $libemulator_sha256,
               sha256_libtolk: $libtolk_sha256
             }' > objs/ton-artifacts.lock
@@ -149,9 +158,10 @@ jobs:
 
       - name: Pack TON objects
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
-        env:
-          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        # language=Bash
         run: |
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+
           mkdir -p dist
           tar -C objs -czf "dist/${ARCHIVE_NAME}" \
             libemulator.a \
@@ -163,26 +173,30 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
-          name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+          name: ton-objs-${{ env.TARGET_NAME }}
           path: |
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
           retention-days: 1
           if-no-files-found: error
 
   build-objs-macos:
-    name: Prepare TON objects (${{ matrix.os }}-${{ matrix.arch }})
+    name: Prepare TON objects (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
     needs: [ prepare ]
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - runner: macos-15-intel
-            os: macos
             arch: x86_64
+            vendor: apple
+            sys: darwin
           - runner: macos-15
-            os: macos
             arch: aarch64
-    runs-on: ${{ matrix.runner }}
+            vendor: apple
+            sys: darwin
+    env:
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
     permissions:
       contents: read
@@ -194,9 +208,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
-          key: ton-objs-${{ matrix.os }}-${{ matrix.arch }}-${{ needs.prepare.outputs.ton_commit }}
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
+          key: ton-objs-${{ env.TARGET_NAME }}-${{ needs.prepare.outputs.ton_commit }}
 
       - name: Clone TON repository
         if: steps.archive-cache.outputs.cache-hit != 'true'
@@ -228,16 +242,19 @@ jobs:
         if: steps.archive-cache.outputs.cache-hit != 'true'
         env:
           TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
+        # language=Bash
         run: |
           libemulator_sha256=$(shasum -a 256 objs/libemulator.a | awk '{ print $1 }')
           libtolk_sha256=$(shasum -a 256 objs/libtolk.a | awk '{ print $1 }')
 
           jq -n \
             --arg ton_commit "${TON_COMMIT}" \
+            --arg rust_target "${TARGET_NAME}" \
             --arg libemulator_sha256 "${libemulator_sha256}" \
             --arg libtolk_sha256 "${libtolk_sha256}" \
             '{
               ton_commit: $ton_commit,
+              rust_target: $rust_target,
               sha256_libemulator: $libemulator_sha256,
               sha256_libtolk: $libtolk_sha256
             }' > objs/ton-artifacts.lock
@@ -253,9 +270,10 @@ jobs:
 
       - name: Pack TON objects
         if: github.ref == 'refs/heads/master' && steps.archive-cache.outputs.cache-hit != 'true'
-        env:
-          ARCHIVE_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
+        # language=Bash
         run: |
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
+
           mkdir -p dist
           tar -C objs -czf "dist/${ARCHIVE_NAME}" \
             libemulator.a \
@@ -267,16 +285,70 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v7
         with:
-          name: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+          name: ton-objs-${{ env.TARGET_NAME }}
           path: |
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
-            dist/ton-objs-${{ matrix.os }}-${{ matrix.arch }}.tar.gz.sha256
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz
+            dist/ton-objs-${{ env.TARGET_NAME }}.tar.gz.sha256
+          retention-days: 1
+          if-no-files-found: error
+
+
+  generate-trunk-objs-manifest:
+    name: Generate Trunk Objs Manifest
+    needs: [ build-objs-linux, build-objs-macos ]
+    runs-on: ubicloud-standard-2-ubuntu-2204
+    if: github.ref == 'refs/heads/master'
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Download TON objects artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ton-objs-*
+          path: dist
+          merge-multiple: true
+
+      - name: Extract TON artifacts manifests from archives
+        # language=Bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          for archive in dist/ton-objs-*.tar.gz; do
+            json_name="$(basename "${archive%.tar.gz}.json")"
+            json_path="release-assets/${json_name}"
+            tar -xOf "${archive}" ton-artifacts.lock > "${json_path}"
+            test -s "${json_path}"
+          done
+
+      - name: Generate TON artifacts manifest
+        run: |
+          node .github/scripts/generate-artifacts-manifest.mjs \
+            release-assets \
+            dist/artifacts_manifest.toml
+
+          test -s dist/artifacts_manifest.toml
+          cat dist/artifacts_manifest.toml
+
+      - name: Upload TON artifacts manifest
+        uses: actions/upload-artifact@v7
+        with:
+          name: ton-objs-manifest
+          path: dist/artifacts_manifest.toml
           retention-days: 1
           if-no-files-found: error
 
   create-trunk-objs-release:
     name: Create Trunk Objs Release
-    needs: [ prepare, build-objs-linux ]
+    needs: [ prepare, generate-trunk-objs-manifest ]
     runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master'
 

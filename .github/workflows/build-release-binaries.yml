@@ -25,7 +25,7 @@ jobs:
             os: linux
             arch: aarch64
     env:
-      OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+      OBJS_NAME: ton-objs-${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
       TARGET_NAME: ${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
 
     permissions:
@@ -125,7 +125,7 @@ jobs:
             os: apple-darwin
             arch: aarch64
     env:
-      OBJS_NAME: ton-objs-macos-${{ matrix.arch }}
+      OBJS_NAME: ton-objs-${{ matrix.arch }}-${{ matrix.os }}
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.os }}
 
     permissions:

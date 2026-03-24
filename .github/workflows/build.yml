@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     if: true
     env:
-      OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+      OBJS_NAME: ton-objs-${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
       TARGET_NAME: ${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
 
     permissions:
@@ -161,7 +161,7 @@ jobs:
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
-          OBJS_NAME: ton-objs-${{ matrix.os }}-${{ matrix.arch }}
+          OBJS_NAME: ton-objs-${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
         run: |
           ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
           mkdir -p objs
@@ -216,7 +216,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     if: github.ref == 'refs/heads/master'
     env:
-      OBJS_NAME: ton-objs-macos-${{ matrix.arch }}
+      OBJS_NAME: ton-objs-${{ matrix.arch }}-${{ matrix.os }}
       TARGET_NAME: ${{ matrix.arch }}-${{ matrix.os }}
 
     permissions:
