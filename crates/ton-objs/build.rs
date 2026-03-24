@@ -33,6 +33,10 @@ fn feature_enabled(name: &str) -> bool {
     env::var_os(format!("CARGO_FEATURE_{name}")).is_some()
 }
 
+fn target_manifest_key() -> String {
+    env::var("TARGET").expect("TARGET env variable not set")
+}
+
 fn manifest_dir() -> PathBuf {
     env::var_os("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
@@ -104,17 +108,36 @@ fn load_lib_sha256_from_manifest(manifest_path: &Path, lib_name: &str) -> String
     let value: Value = toml::from_str(&contents)
         .unwrap_or_else(|err| panic!("failed to parse {}: {err}", manifest_path.display()));
 
-    let sha256 = value
+    let target_key = target_manifest_key();
+
+    let target = value
+        .get("target")
+        .and_then(Value::as_table)
+        .and_then(|targets| targets.get(&target_key))
+        .and_then(Value::as_table)
+        .unwrap_or_else(|| {
+            panic!(
+                "missing table `target.{target_key}` in {}",
+                manifest_path.display()
+            )
+        });
+
+    let sha256 = target
         .get("sha256")
         .and_then(Value::as_table)
-        .unwrap_or_else(|| panic!("missing table `sha256` in {}", manifest_path.display()));
+        .unwrap_or_else(|| {
+            panic!(
+                "missing table `target.{target_key}.sha256` in {}",
+                manifest_path.display()
+            )
+        });
 
     let value = sha256
         .get(lib_name)
         .and_then(Value::as_str)
         .unwrap_or_else(|| {
             panic!(
-                "missing string `sha256.{lib_name}` in {}",
+                "missing string `target.{target_key}.sha256.{lib_name}` in {}",
                 manifest_path.display()
             )
         })
