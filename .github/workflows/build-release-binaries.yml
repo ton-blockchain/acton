@@ -15,20 +15,23 @@ permissions: { }
 
 jobs:
   build-linux:
-    name: Build Linux (${{ matrix.arch }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - runner: ubicloud-standard-8-ubuntu-2204
-            os: linux
             arch: x86_64
+            vendor: unknown
+            sys: linux
+            abi: gnu
           - runner: ubicloud-standard-8-arm-ubuntu-2204
-            os: linux
             arch: aarch64
+            vendor: unknown
+            sys: linux
+            abi: gnu
     env:
-      OBJS_NAME: ton-objs-${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
-      TARGET_NAME: ${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
     permissions:
       contents: read
@@ -65,7 +68,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
@@ -115,20 +118,21 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    name: Build macOS (${{ matrix.arch }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
           - runner: macos-15-intel
-            os: apple-darwin
             arch: x86_64
+            vendor: apple
+            sys: darwin
           - runner: macos-15
-            os: apple-darwin
             arch: aarch64
+            vendor: apple
+            sys: darwin
     env:
-      OBJS_NAME: ton-objs-${{ matrix.arch }}-${{ matrix.os }}
-      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.os }}
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
     permissions:
       contents: read
@@ -158,7 +162,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \

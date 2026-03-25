@@ -21,18 +21,19 @@ env:
 
 jobs:
   build-linux:
-    name: Build (${{ matrix.os }}-${{ matrix.arch }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}${{ matrix.abi && format('-{0}', matrix.abi) || '' }})
     strategy: &runner_linux_strategy
       matrix:
         include:
           - runner: ubicloud-standard-8-ubuntu-2204
-            os: linux
             arch: x86_64
+            vendor: unknown
+            sys: linux
+            abi: gnu
     runs-on: ${{ matrix.runner }}
     if: true
     env:
-      OBJS_NAME: ton-objs-${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
-      TARGET_NAME: ${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
     permissions:
       contents: read
@@ -61,7 +62,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
@@ -130,10 +131,12 @@ jobs:
           if-no-files-found: error
 
   lint:
-    name: Lint (${{ matrix.os }}-${{ matrix.arch }})
+    name: Lint Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }})
     strategy: *runner_linux_strategy
     runs-on: ${{ matrix.runner }}
     if: true
+    env:
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}-${{ matrix.abi }}
 
     permissions:
       contents: read
@@ -161,9 +164,8 @@ jobs:
       - name: Download TON objects archive
         env:
           GH_TOKEN: ${{ github.token }}
-          OBJS_NAME: ton-objs-${{ matrix.arch }}-unknown-${{ matrix.os }}-gnu
         run: |
-          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
@@ -176,7 +178,7 @@ jobs:
           just check-ci
 
   ui:
-    name: UI (${{ matrix.os }}-${{ matrix.arch }})
+    name: UI (${{ matrix.sys }}-${{ matrix.arch }})
     strategy: *runner_linux_strategy
     runs-on: ${{ matrix.runner }}
     if: true
@@ -206,18 +208,18 @@ jobs:
           just check-ui-ci
 
   build-macos:
-    name: Build (${{ matrix.os }}-${{ matrix.arch }})
+    name: Build Acton (${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }})
     strategy: &runner_macos_strategy
       matrix:
         include:
           - runner: macos-15
-            os: apple-darwin
             arch: aarch64
+            vendor: apple
+            sys: darwin
     runs-on: ${{ matrix.runner }}
     if: github.ref == 'refs/heads/master'
     env:
-      OBJS_NAME: ton-objs-${{ matrix.arch }}-${{ matrix.os }}
-      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.os }}
+      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
 
     permissions:
       contents: read
@@ -246,7 +248,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ARCHIVE_NAME="${OBJS_NAME}.tar.gz"
+          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
           mkdir -p objs
           gh release download trunk-objs \
             --repo "${GITHUB_REPOSITORY}" \
