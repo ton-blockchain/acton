@@ -3,9 +3,12 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 use toml::Value;
 
+const DISABLE_ARCHIVE_SHA_VERIFY_ENV: &str = "TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY";
+
 fn main() {
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_EMULATOR");
     println!("cargo:rerun-if-env-changed=CARGO_FEATURE_TOLK");
+    println!("cargo:rerun-if-env-changed={DISABLE_ARCHIVE_SHA_VERIFY_ENV}");
 
     let manifest_path = artifacts_manifest_path();
     println!("cargo:rerun-if-changed={}", manifest_path.display());
@@ -19,13 +22,19 @@ fn main() {
     let objs_dir = objs_dir();
     println!("cargo:rustc-link-search=native={}", objs_dir.display());
 
+    let should_verify_archive_sha = archive_sha_verification_enabled();
     if link_emulator {
-        link_static_archive(&objs_dir, &manifest_path, "emulator");
+        link_static_archive(
+            &objs_dir,
+            &manifest_path,
+            "emulator",
+            should_verify_archive_sha,
+        );
         link_emulator_deps();
     }
 
     if link_tolk {
-        link_static_archive(&objs_dir, &manifest_path, "tolk");
+        link_static_archive(&objs_dir, &manifest_path, "tolk", should_verify_archive_sha);
     }
 }
 
@@ -51,8 +60,15 @@ fn objs_dir() -> PathBuf {
     manifest_dir().join("..").join("..").join("objs")
 }
 
-fn link_static_archive(objs_dir: &Path, manifest_path: &Path, lib_name: &str) {
-    verify_archive_sha(objs_dir, manifest_path, lib_name);
+fn link_static_archive(
+    objs_dir: &Path,
+    manifest_path: &Path,
+    lib_name: &str,
+    should_verify_archive_sha: bool,
+) {
+    if should_verify_archive_sha {
+        verify_archive_sha(objs_dir, manifest_path, lib_name);
+    }
 
     println!("cargo:rustc-link-lib=static={lib_name}");
 }
@@ -80,6 +96,14 @@ fn get_lib_filename(lib_name: &str) -> String {
         Some("msvc") => format!("{lib_name}.lib"),
         _ => format!("lib{lib_name}.a"),
     }
+}
+
+fn archive_sha_verification_enabled() -> bool {
+    let Some(env) = env::var_os(DISABLE_ARCHIVE_SHA_VERIFY_ENV) else {
+        return true;
+    };
+
+    env == "0" || env == "false"
 }
 
 fn verify_archive_sha(objs_dir: &Path, manifest_path: &Path, lib_name: &str) {
