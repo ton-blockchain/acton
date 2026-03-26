@@ -170,6 +170,18 @@ SUBCOMMANDS
           If the wallet uses keyring storage, Acton also removes the mnemonic
           from the secure store.
 
+RESOLUTION RULES
+       o  wallet definitions are merged from global.wallets.toml first and then
+          local wallets.toml
+
+       o  when both files define the same wallet name, the local entry wins
+
+       o  commands that need a wallet auto-select it only when exactly one
+          merged wallet is available
+
+       o  otherwise Acton prompts on a TTY; in non-interactive contexts,
+          provide the wallet name explicitly
+
 NEW AND IMPORT WORKFLOW
        wallet new and wallet import share the same storage choices and most of
        the same prompts.
@@ -203,6 +215,9 @@ LISTING, SIGNING, AND EXPORT
 
        o  wallet sign auto-detects hex and base64 input, preferring hex when a
           payload could be interpreted as both
+
+       o  surrounding stdin whitespace is trimmed before decoding the message
+          body
 
        o  wallet export-mnemonic is interactive-only and asks for confirmation
           before showing the mnemonic
@@ -238,8 +253,9 @@ STORAGE
 
        o  globally in global.wallets.toml
 
-       o  with mnemonic values in plain text, secure keyring storage,
-          environment variables, or external files depending on configuration
+       o  with mnemonic values in plain text (mnemonic), secure keyring storage
+          (mnemonic-keyring), environment variables (mnemonic-env), or external
+          files (mnemonic-file) depending on configuration
 
        For local wallets, keyring IDs usually include a project prefix. For
        global wallets, the keyring ID usually matches the wallet name.
@@ -250,6 +266,13 @@ SECURITY
        o  plain-text mnemonic storage is for development only
 
        o  do not commit wallet files with real secrets to version control
+
+EXIT STATUS
+       o  0: The selected wallet subcommand completed successfully.
+
+       o  1: Input validation failed, a required wallet could not be resolved,
+          a prompt could not run non-interactively, secure storage failed, or a
+          network call such as balance lookup or faucet funding failed.
 
 DISPLAY OPTIONS
        --color when
@@ -287,6 +310,10 @@ EXAMPLES
 
               acton wallet airdrop deployer --net testnet
               acton wallet airdrop deployer --net localnet
+
+       5. Sign an external body read from stdin:
+
+              cat body.boc.base64 | acton wallet sign deployer
 
 SEE ALSO
        o  acton help litenode

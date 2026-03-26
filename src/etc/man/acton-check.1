@@ -101,6 +101,36 @@ default \fBplain\fR
 .RS 4
 \h'-04'\(bu\h'+03'single\-file mode relaxes \fBE014 (acton\-import\-in\-contract)\fR
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'targets ending with \fB\&.tolk\fR are treated as file paths; other targets are
+resolved as contract IDs from \fBActon.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'use an explicit \fB\&.tolk\fR path such as \fB\&./contracts/counter.tolk\fR when a name
+could be mistaken for a contract ID
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'inline suppressions use \fB// acton\-disable\-next\-line E001,S001\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-fix\fR applies only linter\-provided fixes; diagnostics without a safe fix
+remain in the report
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: No lint errors were reported, warning thresholds were respected, and any
+requested autofixes completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Lint errors were found, warning limits were exceeded, autofix failed, or
+configuration/target resolution failed.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -149,6 +179,26 @@ acton check \-\-output\-format sarif \-\-output\-file .acton/reports/lint.sarif
 .RS 4
 .nf
 acton check \-\-enable\-only E001,S001
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Emit GitHub Actions annotations in CI:
+.sp
+.RS 4
+.nf
+acton check \-\-output\-format github
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Apply local autofixes where available:
+.sp
+.RS 4
+.nf
+acton check \-\-fix
 .fi
 .RE
 .RE

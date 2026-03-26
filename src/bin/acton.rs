@@ -1192,6 +1192,11 @@ fn root_help(show_global_options: bool) -> StyledStr {
         }
     }
 
+    let _ = write!(
+        writer,
+        "\n\nUse {cyan}acton help <command>{cyan:#} for detailed manuals with behavior, config, and examples."
+    );
+
     let _ = writeln!(
         writer,
         "\n\nLearn more about Acton:                {cyan}https://ton-blockchain.github.io/acton/docs/welcome{cyan:#}"

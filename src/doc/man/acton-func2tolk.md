@@ -63,6 +63,8 @@ This command requires:
 
 Acton uses a temporary npm cache directory for each invocation.
 
+That means converter downloads are not reused across runs.
+
 ## PROCESS MODEL
 
 Acton runs:
@@ -73,6 +75,15 @@ npx --yes @ton/convert-func-to-tolk@<version> ...
 
 If the converter exits non-zero, `acton func2tolk` fails with the same outcome
 reported as an Acton error.
+
+If `_path_` is a directory, file naming and directory traversal are delegated
+to the upstream converter. `--output` is forwarded directly to that tool.
+
+## EXIT STATUS
+
+- `0`: Conversion completed successfully, including runs that produced warnings.
+- `1`: `npx` or the converter could not be started, conversion failed, or the
+  requested output could not be written by the converter.
 
 ## EXAMPLES
 
@@ -98,6 +109,12 @@ reported as an Acton error.
 
    ```bash
    acton func2tolk jetton-minter.fc --version 1.0.0
+   ```
+
+5. Convert into an explicit output file:
+
+   ```bash
+   acton func2tolk jetton-minter.fc --output jetton-minter.tolk
    ```
 
 ## SEE ALSO

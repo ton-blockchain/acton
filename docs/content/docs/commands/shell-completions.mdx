@@ -21,6 +21,13 @@ Acton also supports dynamic completions through the `COMPLETE=<shell> acton`
 mechanism. Dynamic completions are usually more powerful because they can use
 project context such as contract and script names.
 
+## QUICK START
+
+- for dynamic completions, prefer `COMPLETE=<shell> acton`
+- for a static script without editing shell startup files yet, run
+  `acton completions <shell>` and inspect the output first
+- regenerate static completion files after upgrading Acton
+
 ## OPTIONS
 
 ### Completion Options
@@ -53,7 +60,7 @@ Possible values: `auto`, `always`, `never`
 Accepted as a global Acton option for CLI consistency.
 
 This command does not require an existing project manifest for its primary
-workflow.
+workflow. It remains mutually exclusive with `--project-root`.
 
 
 #### `--project-root` _path_
@@ -61,7 +68,7 @@ workflow.
 Accepted as a global Acton option for CLI consistency.
 
 This command does not require an existing project root for its primary
-workflow.
+workflow. It remains mutually exclusive with `--manifest-path`.
 
 
 
@@ -183,6 +190,11 @@ You should see command names and flag suggestions from the selected shell.
 - if PowerShell completions do not persist, verify that the generated script is
   loaded from `$PROFILE`
 
+## EXIT STATUS
+
+- `0`: The completion script was generated successfully.
+- `1`: The shell value was unsupported or output could not be written.
+
 ## EXAMPLES
 
 1. Generate a static Zsh script:
@@ -195,6 +207,12 @@ You should see command names and flag suggestions from the selected shell.
 
    ```bash
    source <(COMPLETE=bash acton)
+   ```
+
+3. Inspect generated output without installing it:
+
+   ```bash
+   acton completions zsh | head
    ```
 
 ## SEE ALSO

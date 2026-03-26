@@ -210,6 +210,26 @@ Emit JSON output.
 .sp
 If the wallet uses keyring storage, Acton also removes the mnemonic from the
 secure store.
+.SH "RESOLUTION RULES"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'wallet definitions are merged from \fBglobal.wallets.toml\fR first and then
+local \fBwallets.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when both files define the same wallet name, the local entry wins
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'commands that need a wallet auto\-select it only when exactly one merged
+wallet is available
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'otherwise Acton prompts on a TTY; in non\-interactive contexts, provide the
+wallet name explicitly
+.RE
 .SH "NEW AND IMPORT WORKFLOW"
 \fBwallet new\fR and \fBwallet import\fR share the same storage choices and most of the
 same prompts.
@@ -262,6 +282,10 @@ could be interpreted as both
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'surrounding stdin whitespace is trimmed before decoding the message body
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fBwallet export\-mnemonic\fR is interactive\-only and asks for confirmation before
 showing the mnemonic
 .RE
@@ -310,8 +334,9 @@ Wallets can be stored:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'with mnemonic values in plain text, secure keyring storage, environment
-variables, or external files depending on configuration
+\h'-04'\(bu\h'+03'with mnemonic values in plain text (\fBmnemonic\fR), secure keyring storage
+(\fBmnemonic\-keyring\fR), environment variables (\fBmnemonic\-env\fR), or external
+files (\fBmnemonic\-file\fR) depending on configuration
 .RE
 .sp
 For local wallets, keyring IDs usually include a project prefix. For global
@@ -328,6 +353,17 @@ wallets, the keyring ID usually matches the wallet name.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'do not commit wallet files with real secrets to version control
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The selected wallet subcommand completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Input validation failed, a required wallet could not be resolved, a
+prompt could not run non\-interactively, secure storage failed, or a network
+call such as balance lookup or faucet funding failed.
 .RE
 .SH "DISPLAY OPTIONS"
 .sp
@@ -393,6 +429,16 @@ acton wallet list \-\-balance
 .nf
 acton wallet airdrop deployer \-\-net testnet
 acton wallet airdrop deployer \-\-net localnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Sign an external body read from stdin:
+.sp
+.RS 4
+.nf
+cat body.boc.base64 | acton wallet sign deployer
 .fi
 .RE
 .RE

@@ -23,6 +23,16 @@ If `Acton.toml` does not exist, the command scans `.tolk` files in the current
 directory tree and auto-registers files that define `onInternalMessage` as
 contract entry files.
 
+## IDEMPOTENCY
+
+`acton init` is safe to run repeatedly.
+
+- it never replaces an existing `Acton.toml`
+- it backfills default `mappings` only when they are missing
+- it appends missing `.gitignore` patterns without deleting existing ones
+- it refreshes `.acton/tolk-stdlib`
+- it re-attempts global wallet and library symlinks on each run
+
 ## DISPLAY OPTIONS
 
 {{> options-display }}
@@ -39,6 +49,17 @@ contract entry files.
 - `.gitignore`
 - `.acton/`
 - local symlinks for `global.wallets.toml` and `global.libraries.toml`
+
+When `Acton.toml` is created from scratch, it starts from Acton's default
+project config and may include:
+
+- `[package]` metadata
+- `[fmt]` defaults
+- discovered `[contracts]`
+- default `[mappings]`
+
+When `Acton.toml` already exists, `acton init` only backfills missing default
+`[mappings]` entries.
 
 When patching `.gitignore`, Acton adds groups for:
 
@@ -61,6 +82,22 @@ When generating a new `Acton.toml`, contract discovery:
 `acton init` ensures that the bundled Tolk standard library is installed into
 `.acton/tolk-stdlib`.
 
+If symlinks for global wallets or libraries cannot be created, Acton prints a
+warning and still completes initialization. This is relevant on systems where
+symlink creation is restricted.
+
+## SIDE EFFECTS
+
+`acton init` writes or patches local project files and may create local
+symlinks to global overlay files. It does not modify Git config and does not
+remove existing user content from `Acton.toml` or `.gitignore`.
+
+## EXIT STATUS
+
+- `0`: Initialization completed successfully, including no-op repeat runs.
+- `1`: Manifest parsing, contract discovery, stdlib installation, or filesystem
+  updates failed.
+
 ## EXAMPLES
 
 1. Initialize Acton support in an existing repository:
@@ -70,6 +107,12 @@ When generating a new `Acton.toml`, contract discovery:
    ```
 
 2. Regenerate default mappings in an existing `Acton.toml`:
+
+   ```bash
+   acton init
+   ```
+
+3. Re-run safely after adding more contracts:
 
    ```bash
    acton init

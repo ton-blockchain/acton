@@ -12,6 +12,19 @@ DESCRIPTION
        Library metadata can also be stored locally in libraries.toml or
        globally in global.libraries.toml for later inspection and maintenance.
 
+LIFECYCLE
+       A typical library workflow is:
+
+       1. publish a contract or code cell
+
+       2. save metadata locally or globally for later lookup
+
+       3. inspect runtime state with info
+
+       4. fetch the code again for inspection or backup
+
+       5. topup the library account when more storage time is needed
+
 SUBCOMMANDS
    acton library publish
        Publish a contract or arbitrary code as a library.
@@ -154,6 +167,26 @@ PROJECT OPTIONS
 
            This conflicts with --manifest-path.
 
+RESOLUTION RULES
+       o  library metadata is merged from global.libraries.toml first and then
+          local libraries.toml
+
+       o  when both files define the same library name, the local entry wins on
+          lookup
+
+       o  when saving new metadata into a file that already contains the
+          requested library ID, Acton appends -1, -2, and so on to keep the
+          existing record
+
+       o  if neither --local nor --global is passed to publish, Acton prompts
+          for the destination file
+
+AMOUNT ESTIMATION
+       For publish and topup, --duration is used to estimate the required TON
+       amount from the library size and storage duration.
+
+       If --amount is passed, it overrides that estimate completely.
+
 METADATA FILES
        Saved library metadata typically includes:
 
@@ -175,6 +208,22 @@ METADATA FILES
 
        o  code size in bits and cells
 
+FETCH OUTPUT
+       o  without --output, fetched code is printed to stdout
+
+       o  with --output path.boc, Acton writes binary BoC
+
+       o  with --output to any other path, Acton writes base64 text
+
+       o  with --disasm, stdout and file output are always disassembly text
+
+EXIT STATUS
+       o  0: The selected library subcommand completed successfully.
+
+       o  1: Contract or wallet resolution failed, chain access failed,
+          metadata could not be written, or publish/top-up transaction
+          preparation or submission failed.
+
 EXAMPLES
        1. Publish a contract as a library:
 
@@ -191,6 +240,10 @@ EXAMPLES
        4. Top up a library for one year:
 
               acton library topup math --duration 1y
+
+       5. Fetch raw code into a BoC file:
+
+              acton library fetch <HASH> --output build/math-lib.boc
 
 SEE ALSO
        o  Libraries guide

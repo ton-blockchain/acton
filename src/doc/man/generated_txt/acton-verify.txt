@@ -78,6 +78,17 @@ PROCESS
 
        5. optionally sending the final verification transaction
 
+PREREQUISITES
+       o  a .tolk contract source in the current project
+
+       o  a supported verifier network: testnet or mainnet
+
+       o  verifier backend availability for the selected network
+
+       o  a configured wallet, funded when not using --dry-run
+
+       o  reproducible compiler settings that match the deployed contract
+
 REQUIREMENTS AND LIMITATIONS
        o  only .tolk sources can be verified
 
@@ -89,6 +100,20 @@ REQUIREMENTS AND LIMITATIONS
 
        o  if a contract with the same code hash is already verified, the
           backend may skip the final transaction
+
+DRY RUN
+       --dry-run still compiles the contract, uploads sources to the verifier
+       backend, and collects the required signatures. It skips only the final
+       blockchain transaction.
+
+EXIT STATUS
+       o  0: Verification completed successfully, including successful dry runs
+          and flows where the backend decides that no final transaction is
+          needed.
+
+       o  1: Compilation failed, the verifier backend rejected the request, not
+          enough signatures could be collected, wallet resolution failed, or
+          the final blockchain transaction could not be sent.
 
 EXAMPLES
        1. Verify on testnet:
@@ -106,6 +131,10 @@ EXAMPLES
        4. Test the flow without sending the final transaction:
 
               acton verify counter --address EQDt7LL... --dry-run
+
+       5. Verify with an explicit compiler version:
+
+              acton verify counter --address EQDt7LL... --compiler-version 1.1.0
 
 SEE ALSO
        o  Contract verification guide

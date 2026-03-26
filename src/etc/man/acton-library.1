@@ -12,6 +12,28 @@ Publish, fetch, inspect, and top up on\-chain TON libraries.
 .sp
 Library metadata can also be stored locally in \fBlibraries.toml\fR or globally in
 \fBglobal.libraries.toml\fR for later inspection and maintenance.
+.SH "LIFECYCLE"
+A typical library workflow is:
+.sp
+.RS 4
+\h'-04' 1.\h'+01'\fBpublish\fR a contract or code cell
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'save metadata locally or globally for later lookup
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'inspect runtime state with \fBinfo\fR
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'\fBfetch\fR the code again for inspection or backup
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'\fBtopup\fR the library account when more storage time is needed
+.RE
 .SH "SUBCOMMANDS"
 .SS "acton library publish"
 Publish a contract or arbitrary code as a library.
@@ -199,6 +221,31 @@ defaults.
 .sp
 This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
+.SH "RESOLUTION RULES"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'library metadata is merged from \fBglobal.libraries.toml\fR first and then local
+\fBlibraries.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when both files define the same library name, the local entry wins on lookup
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when saving new metadata into a file that already contains the requested
+library ID, Acton appends \fB\-1\fR, \fB\-2\fR, and so on to keep the existing record
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if neither \fB\-\-local\fR nor \fB\-\-global\fR is passed to \fBpublish\fR, Acton prompts for
+the destination file
+.RE
+.SH "AMOUNT ESTIMATION"
+For \fBpublish\fR and \fBtopup\fR, \fB\-\-duration\fR is used to estimate the required TON
+amount from the library size and storage duration.
+.sp
+If \fB\-\-amount\fR is passed, it overrides that estimate completely.
 .SH "METADATA FILES"
 Saved library metadata typically includes:
 .sp
@@ -236,6 +283,34 @@ Saved library metadata typically includes:
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'code size in bits and cells
+.RE
+.SH "FETCH OUTPUT"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'without \fB\-\-output\fR, fetched code is printed to stdout
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-output path.boc\fR, Acton writes binary BoC
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-output\fR to any other path, Acton writes base64 text
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-disasm\fR, stdout and file output are always disassembly text
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The selected library subcommand completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Contract or wallet resolution failed, chain access failed, metadata
+could not be written, or publish/top\-up transaction preparation or submission
+failed.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -275,6 +350,16 @@ acton library fetch <HASH> \-\-disasm
 .RS 4
 .nf
 acton library topup math \-\-duration 1y
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Fetch raw code into a BoC file:
+.sp
+.RS 4
+.nf
+acton library fetch <HASH> \-\-output build/math\-lib.boc
 .fi
 .RE
 .RE

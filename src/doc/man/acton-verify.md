@@ -83,6 +83,14 @@ Verification usually consists of:
 4. collecting the required signatures
 5. optionally sending the final verification transaction
 
+## PREREQUISITES
+
+- a `.tolk` contract source in the current project
+- a supported verifier network: `testnet` or `mainnet`
+- verifier backend availability for the selected network
+- a configured wallet, funded when not using `--dry-run`
+- reproducible compiler settings that match the deployed contract
+
 ## REQUIREMENTS AND LIMITATIONS
 
 - only `.tolk` sources can be verified
@@ -91,6 +99,20 @@ Verification usually consists of:
 - verification requires a funded wallet when not using `--dry-run`
 - if a contract with the same code hash is already verified, the backend may
   skip the final transaction
+
+## DRY RUN
+
+`--dry-run` still compiles the contract, uploads sources to the verifier
+backend, and collects the required signatures. It skips only the final
+blockchain transaction.
+
+## EXIT STATUS
+
+- `0`: Verification completed successfully, including successful dry runs and
+  flows where the backend decides that no final transaction is needed.
+- `1`: Compilation failed, the verifier backend rejected the request, not
+  enough signatures could be collected, wallet resolution failed, or the final
+  blockchain transaction could not be sent.
 
 ## EXAMPLES
 
@@ -116,6 +138,12 @@ Verification usually consists of:
 
    ```bash
    acton verify counter --address EQDt7LL... --dry-run
+   ```
+
+5. Verify with an explicit compiler version:
+
+   ```bash
+   acton verify counter --address EQDt7LL... --compiler-version 1.1.0
    ```
 
 ## SEE ALSO

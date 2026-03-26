@@ -55,6 +55,8 @@ Disable language-server logging setup.
   first accepted TCP connection
 - if `--port` is omitted and `--stdio` is not passed, Acton defaults to stdio
 - if `--stdio` is used, the server reads from stdin and writes to stdout
+- the TCP mode is single-client; after that client disconnects, the server
+  exits
 
 ## LOGGING
 
@@ -66,6 +68,8 @@ The default log path is:
 .acton/tolk-language-server.log
 ```
 
+Parent directories for a custom `--log-file` are created automatically.
+
 ## PROJECT CONTEXT
 
 Before starting the server, Acton:
@@ -73,6 +77,12 @@ Before starting the server, Acton:
 - resolves the project root and manifest path
 - loads `mappings` from `Acton.toml` when present
 - preloads `.acton/tolk-stdlib/common.tolk`
+
+## EXIT STATUS
+
+- `0`: The language server started successfully and served its session.
+- `1`: Startup failed because transport binding, stdlib loading, manifest
+  resolution, or log-file setup failed.
 
 ## EXAMPLES
 

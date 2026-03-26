@@ -42,6 +42,9 @@ acton fmt \-\-check
 .fi
 .RE
 .sp
+The generated hook script uses \fB/bin/sh\fR, so the default template assumes a
+POSIX\-like shell environment.
+.sp
 If \fB\&.githooks/\fR already exists or local hooks are already configured, the
 command fails instead of overwriting existing hooks.
 .sp
@@ -101,6 +104,17 @@ If no local override is configured, the command succeeds and reports that hooks
 are not installed.
 .sp
 On success, Acton reports that Git hooks were uninstalled.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The selected hooks subcommand completed successfully, including no\-op
+uninstall when no local override is present.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The project was not a local Git repository, hooks were already
+configured in an incompatible way, or Git config or filesystem updates failed.
+.RE
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -133,6 +147,15 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 acton hooks new \-\-template default
 acton hooks install
 acton hooks status
+.fi
+.RE
+.sp
+To refresh hooks after manually editing \fB\&.githooks/\fR, rerun:
+.sp
+.RS 4
+.nf
+acton hooks uninstall
+acton hooks install
 .fi
 .RE
 .SH "SEE ALSO"

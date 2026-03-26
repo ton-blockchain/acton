@@ -68,7 +68,7 @@ CONFIGURATION
        You can store defaults in Acton.toml:
 
            [litenode]
-           port = 3000
+           port = 5411
            fork-net = "testnet"
            fork-block-number = 55000000
            accounts = ["deployer", "user"]
@@ -76,12 +76,38 @@ CONFIGURATION
 
        CLI flags override config values for the current invocation.
 
-NOTES
+RUNTIME MODEL
        o  fork mode allows local development against remote chain state
+
+       o  acton litenode start runs in the foreground until the process is
+          stopped
+
+       o  in TCP mode, Acton accepts a single client connection and then serves
+          that session until the client disconnects
+
+       o  when --port and [litenode].port are both absent, the current runtime
+          fallback is 5411
 
        o  --rate-limit applies to /api/* endpoints, not admin endpoints
 
        o  --dump-state writes a snapshot during graceful shutdown
+
+PERSISTENCE
+       o  --db-path enables persistent SQLite-backed node state across runs
+
+       o  --load-state initializes state from a JSON snapshot and cannot be
+          combined with --db-path
+
+       o  --dump-state exports a JSON snapshot on shutdown
+
+       o  when --db-path is not used, node state is ephemeral unless loaded or
+          dumped
+
+EXIT STATUS
+       o  0: The selected LiteNode subcommand completed successfully.
+
+       o  1: Startup failed because port binding, state loading, remote fork
+          initialization, or faucet handling failed.
 
 DISPLAY OPTIONS
        --color when
@@ -118,6 +144,10 @@ EXAMPLES
        4. Airdrop local funds:
 
               acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 25
+
+       5. Start a local integration node with pre-funded accounts:
+
+              acton litenode start --accounts deployer,user --db-path .acton/localnet.db
 
 SEE ALSO
        o  acton help wallet

@@ -20,6 +20,28 @@ patches in default mappings when they are missing.
 If \fBActon.toml\fR does not exist, the command scans \fB\&.tolk\fR files in the current
 directory tree and auto\-registers files that define \fBonInternalMessage\fR as
 contract entry files.
+.SH "IDEMPOTENCY"
+\fBacton init\fR is safe to run repeatedly.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'it never replaces an existing \fBActon.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'it backfills default \fBmappings\fR only when they are missing
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'it appends missing \fB\&.gitignore\fR patterns without deleting existing ones
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'it refreshes \fB\&.acton/tolk\-stdlib\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'it re\-attempts global wallet and library symlinks on each run
+.RE
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -35,7 +57,7 @@ Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project manifest for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
 .RE
 .sp
 \fB\-\-project\-root\fR \fIpath\fR
@@ -43,7 +65,7 @@ workflow.
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project root for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "GENERATED AND PATCHED FILES"
 \fBacton init\fR can create or update:
@@ -63,6 +85,28 @@ workflow.
 .RS 4
 \h'-04'\(bu\h'+03'local symlinks for \fBglobal.wallets.toml\fR and \fBglobal.libraries.toml\fR
 .RE
+.sp
+When \fBActon.toml\fR is created from scratch, it starts from Acton\[cq]s default
+project config and may include:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB[package]\fR metadata
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB[fmt]\fR defaults
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'discovered \fB[contracts]\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'default \fB[mappings]\fR
+.RE
+.sp
+When \fBActon.toml\fR already exists, \fBacton init\fR only backfills missing default
+\fB[mappings]\fR entries.
 .sp
 When patching \fB\&.gitignore\fR, Acton adds groups for:
 .sp
@@ -99,6 +143,24 @@ and \fB\&.acton\fR
 .SH "STANDARD LIBRARY"
 \fBacton init\fR ensures that the bundled Tolk standard library is installed into
 \fB\&.acton/tolk\-stdlib\fR\&.
+.sp
+If symlinks for global wallets or libraries cannot be created, Acton prints a
+warning and still completes initialization. This is relevant on systems where
+symlink creation is restricted.
+.SH "SIDE EFFECTS"
+\fBacton init\fR writes or patches local project files and may create local
+symlinks to global overlay files. It does not modify Git config and does not
+remove existing user content from \fBActon.toml\fR or \fB\&.gitignore\fR\&.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Initialization completed successfully, including no\-op repeat runs.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Manifest parsing, contract discovery, stdlib installation, or filesystem
+updates failed.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -113,6 +175,16 @@ acton init
 .sp
 .RS 4
 \h'-04' 2.\h'+01'Regenerate default mappings in an existing \fBActon.toml\fR:
+.sp
+.RS 4
+.nf
+acton init
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Re\-run safely after adding more contracts:
 .sp
 .RS 4
 .nf

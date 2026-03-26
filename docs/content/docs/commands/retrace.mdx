@@ -105,6 +105,15 @@ The command prints:
 - decoded outgoing actions
 - additional full VM and executor logs when `--logs-dir` is used
 
+When `--logs-dir` is set, Acton creates the target directory and writes
+`vm.log` plus `executor.log` there.
+
+## EXIT STATUS
+
+- `0`: The transaction was fetched and replayed successfully.
+- `1`: The transaction could not be found, network lookup failed, replay data
+  was incomplete, or local log files could not be written.
+
 ## EXAMPLES
 
 1. Retrace with automatic network fallback:

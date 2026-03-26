@@ -108,6 +108,16 @@ The stdlib section reports whether \fB\&.acton/tolk\-stdlib\fR is:
 .RS 4
 \h'-04'\(bu\h'+03'\fBunknown\-version\fR
 .RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The diagnostic report was produced successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Environment inspection failed before the report could be completed, for
+example because path resolution or manifest loading failed unexpectedly.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -126,6 +136,16 @@ acton doctor
 .RS 4
 .nf
 acton \-\-project\-root ../my\-project doctor
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Capture environment details before filing a bug:
+.sp
+.RS 4
+.nf
+acton doctor
 .fi
 .RE
 .RE

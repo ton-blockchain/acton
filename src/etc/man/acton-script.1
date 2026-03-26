@@ -132,6 +132,35 @@ A Tolk script defines a \fBmain()\fR function and runs as an isolated execution.
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-broadcast\fR sends real transactions using configured wallets
 .RE
+.sp
+Wallet names referenced by the script are resolved from the merged wallet
+configuration, with local \fBwallets.toml\fR entries overriding
+\fBglobal.wallets.toml\fR on name conflicts.
+.SH "ARGUMENT FORWARDING"
+Arguments after \fB_path_\fR are passed through to the script runtime.
+.sp
+If a forwarded argument could be mistaken for an Acton flag, insert \fB\-\-\fR before
+the script arguments:
+.sp
+.RS 4
+.nf
+acton script scripts/query.tolk \-\- \-\-net\-like\-value
+.fi
+.RE
+.SH "SIDE EFFECTS"
+\fBacton script\fR always compiles and executes the selected script. With
+\fB\-\-broadcast\fR, it can send real blockchain transactions; without
+\fB\-\-broadcast\fR, execution stays local even when \fB\-\-fork\-net\fR is used.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The script completed successfully, including successful broadcast flows.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Script execution failed, broadcast submission failed, or remote network
+access such as fork\-state resolution failed.
+.RE
 .SH "SAFE EXECUTION ORDER"
 When a script can affect on\-chain state, the usual safe sequence is:
 .sp
@@ -178,6 +207,16 @@ acton script scripts/deploy.tolk \-\-broadcast \-\-net testnet
 .RS 4
 .nf
 acton script query.tolk \-\-fork\-net mainnet \-\-api\-key YOUR_API_KEY
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Broadcast a deploy flow and print explorer links:
+.sp
+.RS 4
+.nf
+acton script scripts/deploy.tolk \-\-broadcast \-\-net testnet \-\-explorer tonviewer
 .fi
 .RE
 .RE

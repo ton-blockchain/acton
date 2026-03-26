@@ -113,10 +113,20 @@ OUTPUTS
 
        o  a DOT dependency graph file when --graph is passed
 
+       Existing output files at those paths are replaced with freshly generated
+       artifacts.
+
+SIDE EFFECTS
+       acton build writes artifacts, cache entries, and optional graph output
+       under the resolved project root. If one contract fails after earlier
+       contracts were built successfully, the successful artifacts remain on
+       disk.
+
 EXIT STATUS
        o  0: The command completed without compilation failures.
 
-       o  1: The command failed or at least one contract failed to build.
+       o  1: The command failed because compilation, artifact writing, or
+          dependency resolution failed for at least one requested contract.
 
 EXAMPLES
        1. Build every configured contract:

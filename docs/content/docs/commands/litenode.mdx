@@ -112,7 +112,7 @@ You can store defaults in `Acton.toml`:
 
 ```toml
 [litenode]
-port = 3000
+port = 5411
 fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
@@ -121,11 +121,30 @@ rate-limit = 1
 
 CLI flags override config values for the current invocation.
 
-## NOTES
+## RUNTIME MODEL
 
 - fork mode allows local development against remote chain state
+- `acton litenode start` runs in the foreground until the process is stopped
+- in TCP mode, Acton accepts a single client connection and then serves that
+  session until the client disconnects
+- when `--port` and `[litenode].port` are both absent, the current runtime
+  fallback is `5411`
 - `--rate-limit` applies to `/api/*` endpoints, not admin endpoints
 - `--dump-state` writes a snapshot during graceful shutdown
+
+## PERSISTENCE
+
+- `--db-path` enables persistent SQLite-backed node state across runs
+- `--load-state` initializes state from a JSON snapshot and cannot be combined
+  with `--db-path`
+- `--dump-state` exports a JSON snapshot on shutdown
+- when `--db-path` is not used, node state is ephemeral unless loaded or dumped
+
+## EXIT STATUS
+
+- `0`: The selected LiteNode subcommand completed successfully.
+- `1`: Startup failed because port binding, state loading, remote fork
+  initialization, or faucet handling failed.
 
 ## DISPLAY OPTIONS
 
@@ -182,6 +201,12 @@ This conflicts with `--manifest-path`.
 
    ```bash
    acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 25
+   ```
+
+5. Start a local integration node with pre-funded accounts:
+
+   ```bash
+   acton litenode start --accounts deployer,user --db-path .acton/localnet.db
    ```
 
 ## SEE ALSO

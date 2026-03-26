@@ -157,6 +157,22 @@ DISCOVERY
        o  Relative _path_ values are resolved from the current working
           directory
 
+REPORTING AND ARTIFACTS
+       o  --reporter on the CLI overrides [test].reporter for the current run
+
+       o  --ui adds the browser UI in addition to text reporters
+
+       o  --junit-path matters when the JUnit reporter is enabled; the default
+          output directory is test-results
+
+       o  --coverage-file matters only with --coverage; without an explicit
+          path, Acton writes lcov.info for lcov and coverage.txt for text
+
+       o  --save-test-trace without a value writes traces to .acton/traces
+
+       o  gas snapshot files are written only to the explicit paths passed to
+          --snapshot or --baseline-snapshot
+
 CONFIGURATION
        Defaults can be configured in Acton.toml:
 
@@ -178,6 +194,18 @@ NOTES
        o  The UI and trace export features are useful for debugging failing
           tests and inspecting transaction trees
 
+       o  --fork-net keeps execution local while resolving blockchain state
+          remotely
+
+EXIT STATUS
+       o  0: All selected tests passed, or a non-mutating reporting mode
+          completed successfully.
+
+       o  1: At least one test failed, profiling drift was detected with
+          --fail-on-diff, no tests matched after filtering, or infrastructure
+          such as compilation, trace export, UI startup, or remote-state
+          resolution failed.
+
 EXAMPLES
        1. Run all tests:
 
@@ -198,6 +226,14 @@ EXAMPLES
        5. Run mutation testing for one contract:
 
               acton test --mutate --mutate-contract wallet
+
+       6. Debug a forked-state failure with traces and the UI:
+
+              acton test tests/wallet.test.tolk --fork-net testnet --fork-block-number 55000000 --save-test-trace --ui
+
+       7. Enforce a gas baseline in CI:
+
+              acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff --reporter console,junit
 
 SEE ALSO
        o  acton help wrapper

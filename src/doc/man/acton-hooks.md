@@ -49,6 +49,9 @@ acton check
 acton fmt --check
 ```
 
+The generated hook script uses `/bin/sh`, so the default template assumes a
+POSIX-like shell environment.
+
 If `.githooks/` already exists or local hooks are already configured, the
 command fails instead of overwriting existing hooks.
 
@@ -110,6 +113,13 @@ are not installed.
 
 On success, Acton reports that Git hooks were uninstalled.
 
+## EXIT STATUS
+
+- `0`: The selected hooks subcommand completed successfully, including no-op
+  uninstall when no local override is present.
+- `1`: The project was not a local Git repository, hooks were already
+  configured in an incompatible way, or Git config or filesystem updates failed.
+
 ## DISPLAY OPTIONS
 
 {{> options-display }}
@@ -124,6 +134,13 @@ On success, Acton reports that Git hooks were uninstalled.
 acton hooks new --template default
 acton hooks install
 acton hooks status
+```
+
+To refresh hooks after manually editing `.githooks/`, rerun:
+
+```bash
+acton hooks uninstall
+acton hooks install
 ```
 
 ## SEE ALSO

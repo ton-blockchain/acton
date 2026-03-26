@@ -75,6 +75,13 @@ STDLIB HEALTH
 
        o  unknown-version
 
+EXIT STATUS
+       o  0: The diagnostic report was produced successfully.
+
+       o  1: Environment inspection failed before the report could be
+          completed, for example because path resolution or manifest loading
+          failed unexpectedly.
+
 EXAMPLES
        1. Show diagnostics for the current project:
 
@@ -83,6 +90,10 @@ EXAMPLES
        2. Inspect another project root explicitly:
 
               acton --project-root ../my-project doctor
+
+       3. Capture environment details before filing a bug:
+
+              acton doctor
 
 SEE ALSO
        o  acton help init

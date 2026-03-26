@@ -56,7 +56,7 @@ Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project manifest for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
 .RE
 .sp
 \fB\-\-project\-root\fR \fIpath\fR
@@ -64,7 +64,7 @@ workflow.
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project root for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "REQUIREMENTS"
 This command requires:
@@ -82,6 +82,8 @@ This command requires:
 .RE
 .sp
 Acton uses a temporary npm cache directory for each invocation.
+.sp
+That means converter downloads are not reused across runs.
 .SH "PROCESS MODEL"
 Acton runs:
 .sp
@@ -93,6 +95,19 @@ npx \-\-yes @ton/convert\-func\-to\-tolk@<version> ...
 .sp
 If the converter exits non\-zero, \fBacton func2tolk\fR fails with the same outcome
 reported as an Acton error.
+.sp
+If \fB_path_\fR is a directory, file naming and directory traversal are delegated
+to the upstream converter. \fB\-\-output\fR is forwarded directly to that tool.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Conversion completed successfully, including runs that produced warnings.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: \fBnpx\fR or the converter could not be started, conversion failed, or the
+requested output could not be written by the converter.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -131,6 +146,16 @@ acton func2tolk jetton\-minter.fc \-\-no\-camel\-case
 .RS 4
 .nf
 acton func2tolk jetton\-minter.fc \-\-version 1.0.0
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Convert into an explicit output file:
+.sp
+.RS 4
+.nf
+acton func2tolk jetton\-minter.fc \-\-output jetton\-minter.tolk
 .fi
 .RE
 .RE

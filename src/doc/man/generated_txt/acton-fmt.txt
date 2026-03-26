@@ -52,7 +52,16 @@ BEHAVIOR
        o  Built-in ignore globs always apply, including node_modules, .git,
           target, and .acton
 
+       o  explicit file arguments are formatted even if they would match
+          [fmt].ignore
+
+       o  directory traversal applies [fmt].ignore and built-in excludes to
+          relative and absolute paths
+
        o  Syntax errors are reported as diagnostics and cause a non-zero exit
+
+       o  --check prints a unified diff with three lines of context for each
+          changed file
 
 CONFIGURATION
        acton fmt reads defaults from [fmt] in Acton.toml:
@@ -87,6 +96,13 @@ IMPORT SORTING
 
        Within each group, imports are sorted lexicographically.
 
+EXIT STATUS
+       o  0: All requested files were formatted successfully, or --check found
+          no formatting differences.
+
+       o  1: Files needed formatting in --check mode, syntax errors prevented
+          formatting, or path resolution failed.
+
 EXAMPLES
        1. Format all Tolk files in the project:
 
@@ -103,6 +119,10 @@ EXAMPLES
        4. Run against another project root:
 
               acton --project-root ../my-project fmt --check
+
+       5. Check import grouping after enabling blank lines between groups:
+
+              acton fmt contracts/main.tolk --check
 
 SEE ALSO
        o  acton help check

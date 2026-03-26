@@ -14,6 +14,10 @@ Show help for the Acton CLI.
 
 Without an argument, `acton help` prints the root command overview.
 
+For detailed manuals, prefer `acton help <command>`. Generated manuals document
+behavior, configuration, side effects, and examples in more detail than short
+flag help.
+
 With a command name, Acton first tries to render a generated command manual
 from the bundled `txt` and `man` artifacts. If no generated manual exists,
 Acton falls back to clap long help for that subcommand.
@@ -41,13 +45,21 @@ Command to show help for.
 
 {{> options-project-pass-through }}
 
-## BEHAVIOR
+## PAGER AND FALLBACK
 
 - when output is a terminal, `acton help <command>` prefers rendering through
   `man`, then `less`, then `more`
 - when output is not a terminal, Acton writes the generated plain-text manual
   directly to standard output
+- piping or redirecting output disables pager rendering automatically
+- when no generated manual exists for a command, Acton falls back to clap long
+  help, which is typically shorter and flag-focused
 - `acton help` itself does not require a project to exist
+
+## EXIT STATUS
+
+- `0`: Help was printed successfully.
+- `1`: The requested command was unknown or help rendering failed.
 
 ## EXAMPLES
 
@@ -67,6 +79,12 @@ Command to show help for.
 
    ```bash
    acton help not-a-command
+   ```
+
+4. Search within a manual without invoking the pager:
+
+   ```bash
+   acton help build | rg "EXIT STATUS|EXAMPLES"
    ```
 
 ## SEE ALSO

@@ -111,9 +111,38 @@ When \fB\-\-address\fR is used, Acton fetches code from the selected network.
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR resolves library references when possible
 .RE
+.SH "INPUT PRECEDENCE"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBBOC_FILE\fR and \fB\-\-string\fR are mutually exclusive
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-address\fR is used only when neither a file nor \fB\-\-string\fR is provided
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-follow\-libraries\fR only replaces the input when the fetched code is a
+single library reference and the library lookup succeeds
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if library lookup fails, Acton warns and disassembles the original code
+.RE
 .SH "SOURCE MAPS"
 If you compiled a contract with \fBacton compile \-\-source\-map\fR, you can pass that
 source map here to annotate the disassembly with original Tolk locations.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Disassembly completed successfully, including runs with unresolved
+library references that were left as warnings.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: BoC input was invalid, a blockchain fetch failed, source\-map loading
+failed, or the output file could not be written.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -152,6 +181,16 @@ acton disasm \-\-address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM \-\-ne
 .RS 4
 .nf
 acton disasm contract.boc \-\-show\-hashes \-\-show\-offsets \-\-source\-map contract.json
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Inspect deployed code together with hashes:
+.sp
+.RS 4
+.nf
+acton disasm \-\-address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM \-\-show\-hashes \-\-net testnet
 .fi
 .RE
 .RE

@@ -72,6 +72,24 @@ BEHAVIOR
 
        o  single-file mode relaxes E014 (acton-import-in-contract)
 
+       o  targets ending with .tolk are treated as file paths; other targets
+          are resolved as contract IDs from Acton.toml
+
+       o  use an explicit .tolk path such as ./contracts/counter.tolk when a
+          name could be mistaken for a contract ID
+
+       o  inline suppressions use // acton-disable-next-line E001,S001
+
+       o  --fix applies only linter-provided fixes; diagnostics without a safe
+          fix remain in the report
+
+EXIT STATUS
+       o  0: No lint errors were reported, warning thresholds were respected,
+          and any requested autofixes completed successfully.
+
+       o  1: Lint errors were found, warning limits were exceeded, autofix
+          failed, or configuration/target resolution failed.
+
 EXAMPLES
        1. Check the whole project:
 
@@ -92,6 +110,14 @@ EXAMPLES
        5. Run only selected rules:
 
               acton check --enable-only E001,S001
+
+       6. Emit GitHub Actions annotations in CI:
+
+              acton check --output-format github
+
+       7. Apply local autofixes where available:
+
+              acton check --fix
 
 SEE ALSO
        o  acton help fmt

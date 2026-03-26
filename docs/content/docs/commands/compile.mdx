@@ -104,6 +104,10 @@ This conflicts with `--manifest-path`.
 Without file-output flags, `acton compile` prints compilation information to
 standard output.
 
+`--json` and `--base64-only` change only the stdout format. File-output flags
+such as `--boc`, `--fift`, `--source-map`, and `--abi` can be combined with
+either stdout mode.
+
 Depending on the selected options, Acton can also write:
 
 - a binary BoC file via `--boc`
@@ -111,12 +115,22 @@ Depending on the selected options, Acton can also write:
 - a source map via `--source-map`
 - an ABI file via `--abi`
 
+`--source-map` enables debug-oriented compilation output. If the compiler does
+not emit a contract ABI for the input file, `--abi` does not create an ABI
+artifact.
+
 ## CACHE
 
 Acton uses a compilation cache to speed up repeated runs.
 
 - Use `--clear-cache` to force recompilation.
 - Cache entries are invalidated automatically when source inputs change.
+
+## EXIT STATUS
+
+- `0`: Compilation completed successfully, including runs that emitted warnings.
+- `1`: Compilation failed, cache setup failed, input validation failed, or an
+  output artifact could not be written.
 
 ## EXAMPLES
 
@@ -142,6 +156,12 @@ Acton uses a compilation cache to speed up repeated runs.
 
    ```bash
    acton compile contracts/main.tolk --json
+   ```
+
+5. Generate artifacts for source-correlated disassembly:
+
+   ```bash
+   acton compile contracts/main.tolk --boc build/main.boc --source-map build/main.map.json
    ```
 
 ## SEE ALSO

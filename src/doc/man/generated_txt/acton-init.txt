@@ -21,6 +21,19 @@ DESCRIPTION
        current directory tree and auto-registers files that define
        onInternalMessage as contract entry files.
 
+IDEMPOTENCY
+       acton init is safe to run repeatedly.
+
+       o  it never replaces an existing Acton.toml
+
+       o  it backfills default mappings only when they are missing
+
+       o  it appends missing .gitignore patterns without deleting existing ones
+
+       o  it refreshes .acton/tolk-stdlib
+
+       o  it re-attempts global wallet and library symlinks on each run
+
 DISPLAY OPTIONS
        --color when
            Control when to use colored output.
@@ -32,13 +45,14 @@ PROJECT OPTIONS
            Accepted as a global Acton option for CLI consistency.
 
            This command does not require an existing project manifest for its
-           primary workflow.
+           primary workflow. It remains mutually exclusive with --project-root.
 
        --project-root path
            Accepted as a global Acton option for CLI consistency.
 
            This command does not require an existing project root for its
-           primary workflow.
+           primary workflow. It remains mutually exclusive with
+           --manifest-path.
 
 GENERATED AND PATCHED FILES
        acton init can create or update:
@@ -50,6 +64,20 @@ GENERATED AND PATCHED FILES
        o  .acton/
 
        o  local symlinks for global.wallets.toml and global.libraries.toml
+
+       When Acton.toml is created from scratch, it starts from Acton’s
+       default project config and may include:
+
+       o  [package] metadata
+
+       o  [fmt] defaults
+
+       o  discovered [contracts]
+
+       o  default [mappings]
+
+       When Acton.toml already exists, acton init only backfills missing
+       default [mappings] entries.
 
        When patching .gitignore, Acton adds groups for:
 
@@ -76,12 +104,32 @@ STANDARD LIBRARY
        acton init ensures that the bundled Tolk standard library is installed
        into .acton/tolk-stdlib.
 
+       If symlinks for global wallets or libraries cannot be created, Acton
+       prints a warning and still completes initialization. This is relevant on
+       systems where symlink creation is restricted.
+
+SIDE EFFECTS
+       acton init writes or patches local project files and may create local
+       symlinks to global overlay files. It does not modify Git config and does
+       not remove existing user content from Acton.toml or .gitignore.
+
+EXIT STATUS
+       o  0: Initialization completed successfully, including no-op repeat
+          runs.
+
+       o  1: Manifest parsing, contract discovery, stdlib installation, or
+          filesystem updates failed.
+
 EXAMPLES
        1. Initialize Acton support in an existing repository:
 
               acton init
 
        2. Regenerate default mappings in an existing Acton.toml:
+
+              acton init
+
+       3. Re-run safely after adding more contracts:
 
               acton init
 

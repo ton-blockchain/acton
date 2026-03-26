@@ -53,6 +53,21 @@ SUBCOMMANDS
 
           o  JSON mode returns query/matches objects
 
+TOPICS
+       Currently available documentation namespaces:
+
+       o  tvm
+
+       Additional namespaces may be added in future releases; acton doc tvm is
+       the current built-in reference surface.
+
+EXIT STATUS
+       o  0: The requested documentation was printed successfully, including
+          empty fuzzy-search result sets.
+
+       o  1: The namespace was unknown, arguments were invalid, or rendering
+          failed.
+
 DISPLAY OPTIONS
        --color when
            Control when to use colored output.
@@ -64,13 +79,14 @@ PROJECT OPTIONS
            Accepted as a global Acton option for CLI consistency.
 
            This command does not require an existing project manifest for its
-           primary workflow.
+           primary workflow. It remains mutually exclusive with --project-root.
 
        --project-root path
            Accepted as a global Acton option for CLI consistency.
 
            This command does not require an existing project root for its
-           primary workflow.
+           primary workflow. It remains mutually exclusive with
+           --manifest-path.
 
 EXAMPLES
        1. Exact lookup:
@@ -86,6 +102,11 @@ EXAMPLES
 
               acton doc tvm SENRAWMSG --find
               acton doc tvm outcomng --find --description
+
+       4. Compare exact lookup with fuzzy search:
+
+              acton doc tvm SENDRAWMSG
+              acton doc tvm SENRAWMSG --find
 
 SEE ALSO
        o  CLI docs lookup guide

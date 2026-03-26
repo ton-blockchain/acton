@@ -17,8 +17,12 @@ selected template scaffold, writes starter project files such as `Acton.toml`,
 `.env`, `.editorconfig`, and `.gitignore`, installs the bundled standard
 library, and optionally initializes Git hooks and `AGENTS.md` guidance.
 
-If `_path_` already exists as a directory, `acton new` fails and explains how
-to create a project in the current directory with `acton new .` instead.
+If `_path_` already exists as a directory, `acton new` fails instead of trying
+to merge into that directory, even when it is empty. To scaffold into the
+current directory explicitly, run `acton new .` for that case.
+
+`acton new` does not run `git init`. It only writes files that work in a new or
+already-versioned repository.
 
 ## OPTIONS
 
@@ -38,20 +42,34 @@ to create a project in the current directory with `acton new .` instead.
 
 ### empty
 
-Minimal project skeleton with a starter contract, wrapper, tests, deployment
-script, and CI workflow.
+Minimal project skeleton with:
+
+- one starter contract
+- generated wrapper and tests
+- deployment script
+- CI workflow
+- optional `AGENTS.md`
 
 ### counter
 
-Counter contract template with tests, wrapper, deployment script, and CI
-workflow.
+Counter contract template with:
+
+- one contract, wrapper, and tests
+- deployment script
+- CI workflow
+- optional `AGENTS.md`
 
 This template also supports the optional TypeScript app layout with `--app`.
 
 ### jetton
 
-Jetton minter and wallet template with wrappers, tests, deployment script, and
-CI workflow.
+Jetton minter and wallet template with:
+
+- multi-contract scaffold
+- wrappers and tests
+- deployment script
+- CI workflow
+- optional `AGENTS.md`
 
 ## INTERACTIVE MODE
 
@@ -67,7 +85,8 @@ terminal, `acton new` prompts for:
 - whether to include `AGENTS.md`
 
 In non-interactive mode, optional features stay disabled unless their flags are
-passed explicitly.
+passed explicitly. For CI or scripts, pass `--name`, `--description`,
+`--template`, and `--license` if you want to avoid prompts entirely.
 
 ## FILES
 
@@ -89,7 +108,20 @@ Depending on the selected template and options, Acton may also generate:
 - `.githooks/pre-commit` for `--hooks`
 - `AGENTS.md` for `--agents`
 
-{{> section-exit-status }}
+## SIDE EFFECTS
+
+`acton new` creates or overwrites files only inside the new project directory.
+It also installs `.acton/tolk-stdlib` there and may create `.githooks/` plus
+an `AGENTS.md` file when requested.
+
+The command does not initialize a Git repository, does not commit files, and
+does not modify parent directories.
+
+## EXIT STATUS
+
+- `0`: The project scaffold was created successfully.
+- `1`: Project creation failed because the target path already existed, a
+  prompt could not be completed, or a filesystem/setup step failed.
 
 ## EXAMPLES
 
@@ -115,6 +147,12 @@ Depending on the selected template and options, Acton may also generate:
 
    ```bash
    acton new my-project --template empty --agents
+   ```
+
+5. Create a project in the current directory:
+
+   ```bash
+   acton new . --template empty --name "My Project" --description "A TON blockchain project" --license MIT
    ```
 
 ## SEE ALSO

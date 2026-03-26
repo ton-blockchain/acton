@@ -70,6 +70,20 @@ Print an explanation for a lint rule.
   default `plain`
 - `--output-file` is not valid with `plain` format
 - single-file mode relaxes `E014 (acton-import-in-contract)`
+- targets ending with `.tolk` are treated as file paths; other targets are
+  resolved as contract IDs from `Acton.toml`
+- use an explicit `.tolk` path such as `./contracts/counter.tolk` when a name
+  could be mistaken for a contract ID
+- inline suppressions use `// acton-disable-next-line E001,S001`
+- `--fix` applies only linter-provided fixes; diagnostics without a safe fix
+  remain in the report
+
+## EXIT STATUS
+
+- `0`: No lint errors were reported, warning thresholds were respected, and any
+  requested autofixes completed successfully.
+- `1`: Lint errors were found, warning limits were exceeded, autofix failed, or
+  configuration/target resolution failed.
 
 ## EXAMPLES
 
@@ -101,6 +115,18 @@ Print an explanation for a lint rule.
 
    ```bash
    acton check --enable-only E001,S001
+   ```
+
+6. Emit GitHub Actions annotations in CI:
+
+   ```bash
+   acton check --output-format github
+   ```
+
+7. Apply local autofixes where available:
+
+   ```bash
+   acton check --fix
    ```
 
 ## SEE ALSO

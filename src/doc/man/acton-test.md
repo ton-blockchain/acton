@@ -224,6 +224,18 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 - If `_path_` is a directory, search is recursive
 - Relative `_path_` values are resolved from the current working directory
 
+## REPORTING AND ARTIFACTS
+
+- `--reporter` on the CLI overrides `[test].reporter` for the current run
+- `--ui` adds the browser UI in addition to text reporters
+- `--junit-path` matters when the JUnit reporter is enabled; the default output
+  directory is `test-results`
+- `--coverage-file` matters only with `--coverage`; without an explicit path,
+  Acton writes `lcov.info` for `lcov` and `coverage.txt` for `text`
+- `--save-test-trace` without a value writes traces to `.acton/traces`
+- gas snapshot files are written only to the explicit paths passed to
+  `--snapshot` or `--baseline-snapshot`
+
 ## CONFIGURATION
 
 Defaults can be configured in `Acton.toml`:
@@ -246,6 +258,15 @@ CLI flags override config values for the current invocation.
 - `--fail-on-diff` requires `--baseline-snapshot`
 - The UI and trace export features are useful for debugging failing tests and
   inspecting transaction trees
+- `--fork-net` keeps execution local while resolving blockchain state remotely
+
+## EXIT STATUS
+
+- `0`: All selected tests passed, or a non-mutating reporting mode completed
+  successfully.
+- `1`: At least one test failed, profiling drift was detected with
+  `--fail-on-diff`, no tests matched after filtering, or infrastructure such as
+  compilation, trace export, UI startup, or remote-state resolution failed.
 
 ## EXAMPLES
 
@@ -277,6 +298,18 @@ CLI flags override config values for the current invocation.
 
    ```bash
    acton test --mutate --mutate-contract wallet
+   ```
+
+6. Debug a forked-state failure with traces and the UI:
+
+   ```bash
+   acton test tests/wallet.test.tolk --fork-net testnet --fork-block-number 55000000 --save-test-trace --ui
+   ```
+
+7. Enforce a gas baseline in CI:
+
+   ```bash
+   acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff --reporter console,junit
    ```
 
 ## SEE ALSO

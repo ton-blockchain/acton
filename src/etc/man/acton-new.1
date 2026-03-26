@@ -15,8 +15,12 @@ selected template scaffold, writes starter project files such as \fBActon.toml\f
 \fB\&.env\fR, \fB\&.editorconfig\fR, and \fB\&.gitignore\fR, installs the bundled standard
 library, and optionally initializes Git hooks and \fBAGENTS.md\fR guidance.
 .sp
-If \fB_path_\fR already exists as a directory, \fBacton new\fR fails and explains how
-to create a project in the current directory with \fBacton new .\fR instead.
+If \fB_path_\fR already exists as a directory, \fBacton new\fR fails instead of trying
+to merge into that directory, even when it is empty. To scaffold into the
+current directory explicitly, run \fBacton new .\fR for that case.
+.sp
+\fBacton new\fR does not run \fBgit init\fR\&. It only writes files that work in a new or
+already\-versioned repository.
 .SH "OPTIONS"
 .SS "New Options"
 .sp
@@ -100,7 +104,8 @@ Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
 Accepted as a global Acton option for CLI consistency.
 .sp
 \fBacton new\fR creates a project and does not require an existing \fBActon.toml\fR\&.
-The command does not resolve a project manifest before running.
+The command does not resolve a project manifest before running, and this option
+remains mutually exclusive with \fB\-\-project\-root\fR\&.
 .RE
 .sp
 \fB\-\-project\-root\fR \fIpath\fR
@@ -108,20 +113,74 @@ The command does not resolve a project manifest before running.
 Accepted as a global Acton option for CLI consistency.
 .sp
 \fBacton new\fR creates a project and does not require an existing project root.
-The command does not resolve a project root before running.
+The command does not resolve a project root before running, and this option
+remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "TEMPLATES"
 .SS "empty"
-Minimal project skeleton with a starter contract, wrapper, tests, deployment
-script, and CI workflow.
+Minimal project skeleton with:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'one starter contract
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'generated wrapper and tests
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'deployment script
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'CI workflow
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'optional \fBAGENTS.md\fR
+.RE
 .SS "counter"
-Counter contract template with tests, wrapper, deployment script, and CI
-workflow.
+Counter contract template with:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'one contract, wrapper, and tests
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'deployment script
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'CI workflow
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'optional \fBAGENTS.md\fR
+.RE
 .sp
 This template also supports the optional TypeScript app layout with \fB\-\-app\fR\&.
 .SS "jetton"
-Jetton minter and wallet template with wrappers, tests, deployment script, and
-CI workflow.
+Jetton minter and wallet template with:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'multi\-contract scaffold
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'wrappers and tests
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'deployment script
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'CI workflow
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'optional \fBAGENTS.md\fR
+.RE
 .SH "INTERACTIVE MODE"
 When enough information is missing and standard input/output are connected to a
 terminal, \fBacton new\fR prompts for:
@@ -155,7 +214,8 @@ terminal, \fBacton new\fR prompts for:
 .RE
 .sp
 In non\-interactive mode, optional features stay disabled unless their flags are
-passed explicitly.
+passed explicitly. For CI or scripts, pass \fB\-\-name\fR, \fB\-\-description\fR,
+\fB\-\-template\fR, and \fB\-\-license\fR if you want to avoid prompts entirely.
 .SH "FILES"
 The generated project always includes:
 .sp
@@ -208,14 +268,22 @@ Depending on the selected template and options, Acton may also generate:
 .RS 4
 \h'-04'\(bu\h'+03'\fBAGENTS.md\fR for \fB\-\-agents\fR
 .RE
+.SH "SIDE EFFECTS"
+\fBacton new\fR creates or overwrites files only inside the new project directory.
+It also installs \fB\&.acton/tolk\-stdlib\fR there and may create \fB\&.githooks/\fR plus
+an \fBAGENTS.md\fR file when requested.
+.sp
+The command does not initialize a Git repository, does not commit files, and
+does not modify parent directories.
 .SH "EXIT STATUS"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB0\fR: The project was created successfully.
+\h'-04'\(bu\h'+03'\fB0\fR: The project scaffold was created successfully.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB1\fR: The command failed.
+\h'-04'\(bu\h'+03'\fB1\fR: Project creation failed because the target path already existed, a
+prompt could not be completed, or a filesystem/setup step failed.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -255,6 +323,16 @@ acton new my\-project \-\-template counter \-\-app
 .RS 4
 .nf
 acton new my\-project \-\-template empty \-\-agents
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Create a project in the current directory:
+.sp
+.RS 4
+.nf
+acton new . \-\-template empty \-\-name "My Project" \-\-description "A TON blockchain project" \-\-license MIT
 .fi
 .RE
 .RE

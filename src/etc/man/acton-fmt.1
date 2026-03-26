@@ -70,7 +70,21 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'explicit file arguments are formatted even if they would match \fB[fmt].ignore\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'directory traversal applies \fB[fmt].ignore\fR and built\-in excludes to relative
+and absolute paths
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'Syntax errors are reported as diagnostics and cause a non\-zero exit
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-check\fR prints a unified diff with three lines of context for each changed
+file
 .RE
 .SH "CONFIGURATION"
 \fBacton fmt\fR reads defaults from \fB[fmt]\fR in \fBActon.toml\fR:
@@ -125,6 +139,17 @@ Imports are sorted by group in this order:
 .RE
 .sp
 Within each group, imports are sorted lexicographically.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: All requested files were formatted successfully, or \fB\-\-check\fR found no
+formatting differences.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Files needed formatting in \fB\-\-check\fR mode, syntax errors prevented
+formatting, or path resolution failed.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -163,6 +188,16 @@ acton fmt \-\-check
 .RS 4
 .nf
 acton \-\-project\-root ../my\-project fmt \-\-check
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Check import grouping after enabling blank lines between groups:
+.sp
+.RS 4
+.nf
+acton fmt contracts/main.tolk \-\-check
 .fi
 .RE
 .RE

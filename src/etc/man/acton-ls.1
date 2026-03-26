@@ -75,6 +75,11 @@ first accepted TCP connection
 .RS 4
 \h'-04'\(bu\h'+03'if \fB\-\-stdio\fR is used, the server reads from stdin and writes to stdout
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the TCP mode is single\-client; after that client disconnects, the server
+exits
+.RE
 .SH "LOGGING"
 Unless \fB\-\-no\-log\fR is passed, the server configures file logging.
 .sp
@@ -85,6 +90,8 @@ The default log path is:
 \&.acton/tolk\-language\-server.log
 .fi
 .RE
+.sp
+Parent directories for a custom \fB\-\-log\-file\fR are created automatically.
 .SH "PROJECT CONTEXT"
 Before starting the server, Acton:
 .sp
@@ -98,6 +105,16 @@ Before starting the server, Acton:
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'preloads \fB\&.acton/tolk\-stdlib/common.tolk\fR
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The language server started successfully and served its session.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Startup failed because transport binding, stdlib loading, manifest
+resolution, or log\-file setup failed.
 .RE
 .SH "EXAMPLES"
 .sp

@@ -74,6 +74,8 @@ When installing a release, Acton:
 - unpacks the archive
 - replaces the current `acton` binary
 
+`acton up --list` is read-only and skips download or replacement.
+
 ## HOME BREW INSTALLATIONS
 
 If the current binary path looks like a Homebrew installation, Acton warns and
@@ -85,6 +87,12 @@ brew upgrade acton
 
 Without `--yes`, Acton asks whether to continue with the built-in updater.
 
+## INTERACTIVITY
+
+- `--yes` suppresses confirmation prompts for non-interactive use
+- Homebrew-style installs prompt before replacement unless `--yes` is passed
+- up-to-date checks and `--list` can succeed without making local changes
+
 ## CHANNEL SELECTION
 
 - `acton up` on a stable build updates to the latest stable release
@@ -93,6 +101,13 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
 - `acton up --trunk` switches to the trunk channel
 - `acton up <version>` installs the explicit version even if it is older or
   newer than the current one
+
+## EXIT STATUS
+
+- `0`: The requested release information was listed, Acton was already up to
+  date, or the selected version was installed successfully.
+- `1`: Release lookup failed, checksum verification failed, archive replacement
+  failed, or the update was cancelled or could not be confirmed.
 
 ## EXAMPLES
 
@@ -118,6 +133,12 @@ Without `--yes`, Acton asks whether to continue with the built-in updater.
 
    ```bash
    acton up --list
+   ```
+
+5. Update non-interactively in CI or bootstrap scripts:
+
+   ```bash
+   acton up --stable -y
    ```
 
 ## SEE ALSO

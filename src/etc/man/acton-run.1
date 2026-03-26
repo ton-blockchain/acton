@@ -69,7 +69,8 @@ command
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'if the script exits non\-zero, \fBacton run\fR exits with the same code
+\h'-04'\(bu\h'+03'if the script exits non\-zero, \fBacton run\fR exits non\-zero and includes the
+nested exit code in the error message
 .RE
 .sp
 .RS 4
@@ -78,6 +79,34 @@ command
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'on Windows scripts are executed via \fBcmd /C\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'scripts run with the resolved project root as the working directory
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'stdin, stdout, stderr, and environment variables are inherited
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'use \fB\-\-\fR before forwarded arguments that look like Acton flags
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Acton does not guard against recursive script aliases; avoid scripts that
+call themselves through \fBacton run\fR
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The configured script finished successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The script was missing, the shell could not start it, or the nested
+command exited non\-zero. The nested command\[cq]s exit code is reported in the
+error message.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -107,6 +136,16 @@ acton run deploy \-\- \-\-net mainnet
 .RS 4
 .nf
 acton run custom\-task
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Wrap \fBacton script\fR behind a project alias:
+.sp
+.RS 4
+.nf
+acton run deploy \-\- \-\-net testnet
 .fi
 .RE
 .RE

@@ -106,6 +106,19 @@ The command prints:
 .RS 4
 \h'-04'\(bu\h'+03'additional full VM and executor logs when \fB\-\-logs\-dir\fR is used
 .RE
+.sp
+When \fB\-\-logs\-dir\fR is set, Acton creates the target directory and writes
+\fBvm.log\fR plus \fBexecutor.log\fR there.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The transaction was fetched and replayed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The transaction could not be found, network lookup failed, replay data
+was incomplete, or local log files could not be written.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4

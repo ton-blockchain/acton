@@ -15,9 +15,12 @@ DESCRIPTION
        standard library, and optionally initializes Git hooks and AGENTS.md
        guidance.
 
-       If _path_ already exists as a directory, acton new fails and explains
-       how to create a project in the current directory with acton new .
-       instead.
+       If _path_ already exists as a directory, acton new fails instead of
+       trying to merge into that directory, even when it is empty. To scaffold
+       into the current directory explicitly, run acton new . for that case.
+
+       acton new does not run git init. It only writes files that work in a new
+       or already-versioned repository.
 
 OPTIONS
    New Options
@@ -87,29 +90,56 @@ OPTIONS
 
            acton new creates a project and does not require an existing
            Acton.toml. The command does not resolve a project manifest before
-           running.
+           running, and this option remains mutually exclusive with
+           --project-root.
 
        --project-root path
            Accepted as a global Acton option for CLI consistency.
 
            acton new creates a project and does not require an existing project
-           root. The command does not resolve a project root before running.
+           root. The command does not resolve a project root before running,
+           and this option remains mutually exclusive with --manifest-path.
 
 TEMPLATES
    empty
-       Minimal project skeleton with a starter contract, wrapper, tests,
-       deployment script, and CI workflow.
+       Minimal project skeleton with:
+
+       o  one starter contract
+
+       o  generated wrapper and tests
+
+       o  deployment script
+
+       o  CI workflow
+
+       o  optional AGENTS.md
 
    counter
-       Counter contract template with tests, wrapper, deployment script, and CI
-       workflow.
+       Counter contract template with:
+
+       o  one contract, wrapper, and tests
+
+       o  deployment script
+
+       o  CI workflow
+
+       o  optional AGENTS.md
 
        This template also supports the optional TypeScript app layout with
        --app.
 
    jetton
-       Jetton minter and wallet template with wrappers, tests, deployment
-       script, and CI workflow.
+       Jetton minter and wallet template with:
+
+       o  multi-contract scaffold
+
+       o  wrappers and tests
+
+       o  deployment script
+
+       o  CI workflow
+
+       o  optional AGENTS.md
 
 INTERACTIVE MODE
        When enough information is missing and standard input/output are
@@ -131,7 +161,9 @@ INTERACTIVE MODE
        o  whether to include AGENTS.md
 
        In non-interactive mode, optional features stay disabled unless their
-       flags are passed explicitly.
+       flags are passed explicitly. For CI or scripts, pass --name,
+       --description, --template, and --license if you want to avoid prompts
+       entirely.
 
 FILES
        The generated project always includes:
@@ -162,10 +194,19 @@ FILES
 
        o  AGENTS.md for --agents
 
-EXIT STATUS
-       o  0: The project was created successfully.
+SIDE EFFECTS
+       acton new creates or overwrites files only inside the new project
+       directory. It also installs .acton/tolk-stdlib there and may create
+       .githooks/ plus an AGENTS.md file when requested.
 
-       o  1: The command failed.
+       The command does not initialize a Git repository, does not commit files,
+       and does not modify parent directories.
+
+EXIT STATUS
+       o  0: The project scaffold was created successfully.
+
+       o  1: Project creation failed because the target path already existed, a
+          prompt could not be completed, or a filesystem/setup step failed.
 
 EXAMPLES
        1. Create a new project in my-project:
@@ -183,6 +224,10 @@ EXAMPLES
        4. Create a project and include AGENTS.md guidance:
 
               acton new my-project --template empty --agents
+
+       5. Create a project in the current directory:
+
+              acton new . --template empty --name "My Project" --description "A TON blockchain project" --license MIT
 
 SEE ALSO
        o  acton help init

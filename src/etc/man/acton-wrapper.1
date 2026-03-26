@@ -17,6 +17,9 @@ message helpers, and generated get\-method bindings.
 .sp
 The command can also generate a stub test file or emit a TypeScript wrapper for
 frontend and tooling integrations.
+.sp
+\fBacton wrapper\fR compiles the selected contract directly. A prior \fBacton build\fR
+run is not required.
 .SH "OPTIONS"
 .SS "Wrapper Options"
 .sp
@@ -109,6 +112,21 @@ Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 .sp
 If \fBincomingMessages\fR is missing, message\-sending helpers are not generated. If
 \fBstorage\fR is missing, storage helpers fall back to an untyped initializer.
+.SH "TYPESCRIPT GENERATION"
+\fBacton wrapper \-\-ts\fR shells out to \fBnpx gen\-typescript\-from\-tolk\-dev\fR\&.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Node.js, npm, and \fBnpx\fR must be available in \fBPATH\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'existing wrapper files at the target path are overwritten
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-ts\fR cannot be combined with \fB\-\-test\fR, \fB\-\-test\-output\fR, or
+\fB\-\-test\-output\-dir\fR
+.RE
 .SH "CONFIGURATION"
 Project\-wide defaults can be configured in \fBActon.toml\fR:
 .sp
@@ -125,6 +143,16 @@ output\-dir = "wrappers"
 .RE
 .sp
 CLI flags override config values for the current invocation.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Wrapper generation completed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The contract could not be found or compiled, ABI data was missing, the
+TypeScript generator could not run, or an output file could not be written.
+.RE
 .SH "EXAMPLES"
 .sp
 .RS 4
@@ -165,6 +193,16 @@ acton wrapper counter \-\-ts
 acton wrapper counter \-\-output\-dir tests/generated
 acton wrapper counter \-\-test \-\-test\-output\-dir tests/generated
 acton wrapper counter \-\-ts \-\-output\-dir wrappers
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Generate a frontend\-oriented TypeScript wrapper layout:
+.sp
+.RS 4
+.nf
+acton wrapper counter \-\-ts \-\-output\-dir app/src/wrappers
 .fi
 .RE
 .RE

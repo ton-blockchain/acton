@@ -12,6 +12,10 @@ Show help for the Acton CLI.
 .sp
 Without an argument, \fBacton help\fR prints the root command overview.
 .sp
+For detailed manuals, prefer \fBacton help <command>\fR\&. Generated manuals document
+behavior, configuration, side effects, and examples in more detail than short
+flag help.
+.sp
 With a command name, Acton first tries to render a generated command manual
 from the bundled \fBtxt\fR and \fBman\fR artifacts. If no generated manual exists,
 Acton falls back to clap long help for that subcommand.
@@ -40,7 +44,7 @@ Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project manifest for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
 .RE
 .sp
 \fB\-\-project\-root\fR \fIpath\fR
@@ -48,9 +52,9 @@ workflow.
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project root for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RE
-.SH "BEHAVIOR"
+.SH "PAGER AND FALLBACK"
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'when output is a terminal, \fBacton help <command>\fR prefers rendering through
@@ -63,7 +67,25 @@ directly to standard output
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'piping or redirecting output disables pager rendering automatically
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when no generated manual exists for a command, Acton falls back to clap long
+help, which is typically shorter and flag\-focused
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fBacton help\fR itself does not require a project to exist
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Help was printed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The requested command was unknown or help rendering failed.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -93,6 +115,16 @@ acton help build
 .RS 4
 .nf
 acton help not\-a\-command
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Search within a manual without invoking the pager:
+.sp
+.RS 4
+.nf
+acton help build | rg "EXIT STATUS|EXAMPLES"
 .fi
 .RE
 .RE

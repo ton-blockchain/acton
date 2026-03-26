@@ -52,11 +52,28 @@ BEHAVIOR
        o  extra arguments passed after the script name are appended to the
           configured command
 
-       o  if the script exits non-zero, acton run exits with the same code
+       o  if the script exits non-zero, acton run exits non-zero and includes
+          the nested exit code in the error message
 
        o  on Unix-like systems scripts are executed via sh -c
 
        o  on Windows scripts are executed via cmd /C
+
+       o  scripts run with the resolved project root as the working directory
+
+       o  stdin, stdout, stderr, and environment variables are inherited
+
+       o  use -- before forwarded arguments that look like Acton flags
+
+       o  Acton does not guard against recursive script aliases; avoid scripts
+          that call themselves through acton run
+
+EXIT STATUS
+       o  0: The configured script finished successfully.
+
+       o  1: The script was missing, the shell could not start it, or the
+          nested command exited non-zero. The nested command’s exit code is
+          reported in the error message.
 
 EXAMPLES
        1. Run a configured script:
@@ -70,6 +87,10 @@ EXAMPLES
        3. Run a custom shell task:
 
               acton run custom-task
+
+       4. Wrap acton script behind a project alias:
+
+              acton run deploy -- --net testnet
 
 SEE ALSO
        o  acton help script

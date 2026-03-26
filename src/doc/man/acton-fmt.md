@@ -50,7 +50,12 @@ In this mode Acton prints diffs for mismatches and exits non-zero.
 - Directory traversal is recursive
 - Built-in ignore globs always apply, including `node_modules`, `.git`,
   `target`, and `.acton`
+- explicit file arguments are formatted even if they would match `[fmt].ignore`
+- directory traversal applies `[fmt].ignore` and built-in excludes to relative
+  and absolute paths
 - Syntax errors are reported as diagnostics and cause a non-zero exit
+- `--check` prints a unified diff with three lines of context for each changed
+  file
 
 ## CONFIGURATION
 
@@ -82,6 +87,13 @@ Imports are sorted by group in this order:
 
 Within each group, imports are sorted lexicographically.
 
+## EXIT STATUS
+
+- `0`: All requested files were formatted successfully, or `--check` found no
+  formatting differences.
+- `1`: Files needed formatting in `--check` mode, syntax errors prevented
+  formatting, or path resolution failed.
+
 ## EXAMPLES
 
 1. Format all Tolk files in the project:
@@ -106,6 +118,12 @@ Within each group, imports are sorted lexicographically.
 
    ```bash
    acton --project-root ../my-project fmt --check
+   ```
+
+5. Check import grouping after enabling blank lines between groups:
+
+   ```bash
+   acton fmt contracts/main.tolk --check
    ```
 
 ## SEE ALSO

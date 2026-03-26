@@ -20,6 +20,16 @@ Publish, fetch, inspect, and top up on-chain TON libraries.
 Library metadata can also be stored locally in `libraries.toml` or globally in
 `global.libraries.toml` for later inspection and maintenance.
 
+## LIFECYCLE
+
+A typical library workflow is:
+
+1. `publish` a contract or code cell
+2. save metadata locally or globally for later lookup
+3. inspect runtime state with `info`
+4. `fetch` the code again for inspection or backup
+5. `topup` the library account when more storage time is needed
+
 ## SUBCOMMANDS
 
 ### acton library publish
@@ -242,6 +252,23 @@ This conflicts with `--manifest-path`.
 
 
 
+## RESOLUTION RULES
+
+- library metadata is merged from `global.libraries.toml` first and then local
+  `libraries.toml`
+- when both files define the same library name, the local entry wins on lookup
+- when saving new metadata into a file that already contains the requested
+  library ID, Acton appends `-1`, `-2`, and so on to keep the existing record
+- if neither `--local` nor `--global` is passed to `publish`, Acton prompts for
+  the destination file
+
+## AMOUNT ESTIMATION
+
+For `publish` and `topup`, `--duration` is used to estimate the required TON
+amount from the library size and storage duration.
+
+If `--amount` is passed, it overrides that estimate completely.
+
 ## METADATA FILES
 
 Saved library metadata typically includes:
@@ -255,6 +282,20 @@ Saved library metadata typically includes:
 - publication timestamp
 - last top-up timestamp
 - code size in bits and cells
+
+## FETCH OUTPUT
+
+- without `--output`, fetched code is printed to stdout
+- with `--output path.boc`, Acton writes binary BoC
+- with `--output` to any other path, Acton writes base64 text
+- with `--disasm`, stdout and file output are always disassembly text
+
+## EXIT STATUS
+
+- `0`: The selected library subcommand completed successfully.
+- `1`: Contract or wallet resolution failed, chain access failed, metadata
+  could not be written, or publish/top-up transaction preparation or submission
+  failed.
 
 ## EXAMPLES
 
@@ -280,6 +321,12 @@ Saved library metadata typically includes:
 
    ```bash
    acton library topup math --duration 1y
+   ```
+
+5. Fetch raw code into a BoC file:
+
+   ```bash
+   acton library fetch <HASH> --output build/math-lib.boc
    ```
 
 ## SEE ALSO

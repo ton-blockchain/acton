@@ -144,6 +144,13 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .RS 4
 \h'-04'\(bu\h'+03'a DOT dependency graph file when \fB\-\-graph\fR is passed
 .RE
+.sp
+Existing output files at those paths are replaced with freshly generated
+artifacts.
+.SH "SIDE EFFECTS"
+\fBacton build\fR writes artifacts, cache entries, and optional graph output under
+the resolved project root. If one contract fails after earlier contracts were
+built successfully, the successful artifacts remain on disk.
 .SH "EXIT STATUS"
 .sp
 .RS 4
@@ -151,7 +158,8 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB1\fR: The command failed or at least one contract failed to build.
+\h'-04'\(bu\h'+03'\fB1\fR: The command failed because compilation, artifact writing, or dependency
+resolution failed for at least one requested contract.
 .RE
 .SH "EXAMPLES"
 .sp

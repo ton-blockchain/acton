@@ -17,6 +17,9 @@ DESCRIPTION
        The command can also generate a stub test file or emit a TypeScript
        wrapper for frontend and tooling integrations.
 
+       acton wrapper compiles the selected contract directly. A prior acton
+       build run is not required.
+
 OPTIONS
    Wrapper Options
        contract-id
@@ -87,6 +90,16 @@ ABI REQUIREMENTS
        generated. If storage is missing, storage helpers fall back to an
        untyped initializer.
 
+TYPESCRIPT GENERATION
+       acton wrapper --ts shells out to npx gen-typescript-from-tolk-dev.
+
+       o  Node.js, npm, and npx must be available in PATH
+
+       o  existing wrapper files at the target path are overwritten
+
+       o  --ts cannot be combined with --test, --test-output, or
+          --test-output-dir
+
 CONFIGURATION
        Project-wide defaults can be configured in Acton.toml:
 
@@ -99,6 +112,13 @@ CONFIGURATION
            output-dir = "wrappers"
 
        CLI flags override config values for the current invocation.
+
+EXIT STATUS
+       o  0: Wrapper generation completed successfully.
+
+       o  1: The contract could not be found or compiled, ABI data was missing,
+          the TypeScript generator could not run, or an output file could not
+          be written.
 
 EXAMPLES
        1. Generate the default Tolk wrapper:
@@ -118,6 +138,10 @@ EXAMPLES
               acton wrapper counter --output-dir tests/generated
               acton wrapper counter --test --test-output-dir tests/generated
               acton wrapper counter --ts --output-dir wrappers
+
+       5. Generate a frontend-oriented TypeScript wrapper layout:
+
+              acton wrapper counter --ts --output-dir app/src/wrappers
 
 SEE ALSO
        o  acton help build

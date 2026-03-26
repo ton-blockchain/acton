@@ -25,6 +25,9 @@ message helpers, and generated get-method bindings.
 The command can also generate a stub test file or emit a TypeScript wrapper for
 frontend and tooling integrations.
 
+`acton wrapper` compiles the selected contract directly. A prior `acton build`
+run is not required.
+
 ## OPTIONS
 
 ### Wrapper Options
@@ -127,6 +130,15 @@ Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
 If `incomingMessages` is missing, message-sending helpers are not generated. If
 `storage` is missing, storage helpers fall back to an untyped initializer.
 
+## TYPESCRIPT GENERATION
+
+`acton wrapper --ts` shells out to `npx gen-typescript-from-tolk-dev`.
+
+- Node.js, npm, and `npx` must be available in `PATH`
+- existing wrapper files at the target path are overwritten
+- `--ts` cannot be combined with `--test`, `--test-output`, or
+  `--test-output-dir`
+
 ## CONFIGURATION
 
 Project-wide defaults can be configured in `Acton.toml`:
@@ -142,6 +154,12 @@ output-dir = "wrappers"
 ```
 
 CLI flags override config values for the current invocation.
+
+## EXIT STATUS
+
+- `0`: Wrapper generation completed successfully.
+- `1`: The contract could not be found or compiled, ABI data was missing, the
+  TypeScript generator could not run, or an output file could not be written.
 
 ## EXAMPLES
 
@@ -169,6 +187,12 @@ CLI flags override config values for the current invocation.
    acton wrapper counter --output-dir tests/generated
    acton wrapper counter --test --test-output-dir tests/generated
    acton wrapper counter --ts --output-dir wrappers
+   ```
+
+5. Generate a frontend-oriented TypeScript wrapper layout:
+
+   ```bash
+   acton wrapper counter --ts --output-dir app/src/wrappers
    ```
 
 ## SEE ALSO

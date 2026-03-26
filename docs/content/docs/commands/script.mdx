@@ -156,6 +156,33 @@ A Tolk script defines a `main()` function and runs as an isolated execution.
 - `--fork-net` keeps execution local but resolves remote state
 - `--broadcast` sends real transactions using configured wallets
 
+Wallet names referenced by the script are resolved from the merged wallet
+configuration, with local `wallets.toml` entries overriding
+`global.wallets.toml` on name conflicts.
+
+## ARGUMENT FORWARDING
+
+Arguments after `_path_` are passed through to the script runtime.
+
+If a forwarded argument could be mistaken for an Acton flag, insert `--` before
+the script arguments:
+
+```bash
+acton script scripts/query.tolk -- --net-like-value
+```
+
+## SIDE EFFECTS
+
+`acton script` always compiles and executes the selected script. With
+`--broadcast`, it can send real blockchain transactions; without
+`--broadcast`, execution stays local even when `--fork-net` is used.
+
+## EXIT STATUS
+
+- `0`: The script completed successfully, including successful broadcast flows.
+- `1`: Script execution failed, broadcast submission failed, or remote network
+  access such as fork-state resolution failed.
+
 ## SAFE EXECUTION ORDER
 
 When a script can affect on-chain state, the usual safe sequence is:
@@ -183,6 +210,12 @@ When a script can affect on-chain state, the usual safe sequence is:
 
    ```bash
    acton script query.tolk --fork-net mainnet --api-key YOUR_API_KEY
+   ```
+
+4. Broadcast a deploy flow and print explorer links:
+
+   ```bash
+   acton script scripts/deploy.tolk --broadcast --net testnet --explorer tonviewer
    ```
 
 ## SEE ALSO

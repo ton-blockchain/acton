@@ -63,6 +63,21 @@ With `--find`, each argument is treated as a search query.
 - `--description` also matches instruction descriptions, tags, and operands
 - JSON mode returns query/matches objects
 
+## TOPICS
+
+Currently available documentation namespaces:
+
+- `tvm`
+
+Additional namespaces may be added in future releases; `acton doc tvm` is the
+current built-in reference surface.
+
+## EXIT STATUS
+
+- `0`: The requested documentation was printed successfully, including empty
+  fuzzy-search result sets.
+- `1`: The namespace was unknown, arguments were invalid, or rendering failed.
+
 ## DISPLAY OPTIONS
 
 {{> options-display }}
@@ -91,6 +106,13 @@ With `--find`, each argument is treated as a search query.
    ```bash
    acton doc tvm SENRAWMSG --find
    acton doc tvm outcomng --find --description
+   ```
+
+4. Compare exact lookup with fuzzy search:
+
+   ```bash
+   acton doc tvm SENDRAWMSG
+   acton doc tvm SENRAWMSG --find
    ```
 
 ## SEE ALSO

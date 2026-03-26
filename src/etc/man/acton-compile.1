@@ -85,6 +85,10 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 Without file\-output flags, \fBacton compile\fR prints compilation information to
 standard output.
 .sp
+\fB\-\-json\fR and \fB\-\-base64\-only\fR change only the stdout format. File\-output flags
+such as \fB\-\-boc\fR, \fB\-\-fift\fR, \fB\-\-source\-map\fR, and \fB\-\-abi\fR can be combined with
+either stdout mode.
+.sp
 Depending on the selected options, Acton can also write:
 .sp
 .RS 4
@@ -102,6 +106,10 @@ Depending on the selected options, Acton can also write:
 .RS 4
 \h'-04'\(bu\h'+03'an ABI file via \fB\-\-abi\fR
 .RE
+.sp
+\fB\-\-source\-map\fR enables debug\-oriented compilation output. If the compiler does
+not emit a contract ABI for the input file, \fB\-\-abi\fR does not create an ABI
+artifact.
 .SH "CACHE"
 Acton uses a compilation cache to speed up repeated runs.
 .sp
@@ -111,6 +119,16 @@ Acton uses a compilation cache to speed up repeated runs.
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'Cache entries are invalidated automatically when source inputs change.
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: Compilation completed successfully, including runs that emitted warnings.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Compilation failed, cache setup failed, input validation failed, or an
+output artifact could not be written.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -150,6 +168,16 @@ acton compile contracts/main.tolk \-\-source\-map main.map.json \-\-abi main.abi
 .RS 4
 .nf
 acton compile contracts/main.tolk \-\-json
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Generate artifacts for source\-correlated disassembly:
+.sp
+.RS 4
+.nf
+acton compile contracts/main.tolk \-\-boc build/main.boc \-\-source\-map build/main.map.json
 .fi
 .RE
 .RE

@@ -58,7 +58,7 @@ Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project manifest for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
 .RE
 .sp
 \fB\-\-project\-root\fR \fIpath\fR
@@ -66,7 +66,7 @@ workflow.
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project root for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "RELEASE SOURCES"
 Acton queries GitHub release metadata and assets from:
@@ -102,6 +102,8 @@ When installing a release, Acton:
 .RS 4
 \h'-04'\(bu\h'+03'replaces the current \fBacton\fR binary
 .RE
+.sp
+\fBacton up \-\-list\fR is read\-only and skips download or replacement.
 .SH "HOME BREW INSTALLATIONS"
 If the current binary path looks like a Homebrew installation, Acton warns and
 recommends using:
@@ -113,6 +115,19 @@ brew upgrade acton
 .RE
 .sp
 Without \fB\-\-yes\fR, Acton asks whether to continue with the built\-in updater.
+.SH "INTERACTIVITY"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-yes\fR suppresses confirmation prompts for non\-interactive use
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'Homebrew\-style installs prompt before replacement unless \fB\-\-yes\fR is passed
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'up\-to\-date checks and \fB\-\-list\fR can succeed without making local changes
+.RE
 .SH "CHANNEL SELECTION"
 .sp
 .RS 4
@@ -134,6 +149,17 @@ Without \fB\-\-yes\fR, Acton asks whether to continue with the built\-in updater
 .RS 4
 \h'-04'\(bu\h'+03'\fBacton up <version>\fR installs the explicit version even if it is older or
 newer than the current one
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The requested release information was listed, Acton was already up to
+date, or the selected version was installed successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: Release lookup failed, checksum verification failed, archive replacement
+failed, or the update was cancelled or could not be confirmed.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -173,6 +199,16 @@ acton up 0.1.0
 .RS 4
 .nf
 acton up \-\-list
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Update non\-interactively in CI or bootstrap scripts:
+.sp
+.RS 4
+.nf
+acton up \-\-stable \-y
 .fi
 .RE
 .RE

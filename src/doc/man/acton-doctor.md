@@ -58,6 +58,12 @@ The stdlib section reports whether `.acton/tolk-stdlib` is:
 - `outdated`
 - `unknown-version`
 
+## EXIT STATUS
+
+- `0`: The diagnostic report was produced successfully.
+- `1`: Environment inspection failed before the report could be completed, for
+  example because path resolution or manifest loading failed unexpectedly.
+
 ## EXAMPLES
 
 1. Show diagnostics for the current project:
@@ -70,6 +76,12 @@ The stdlib section reports whether `.acton/tolk-stdlib` is:
 
    ```bash
    acton --project-root ../my-project doctor
+   ```
+
+3. Capture environment details before filing a bug:
+
+   ```bash
+   acton doctor
    ```
 
 ## SEE ALSO

@@ -4,14 +4,16 @@
 Accepted as a global Acton option for CLI consistency.
 
 `acton new` creates a project and does not require an existing `Acton.toml`.
-The command does not resolve a project manifest before running.
+The command does not resolve a project manifest before running, and this option
+remains mutually exclusive with `--project-root`.
 {{/option}}
 
 {{#option "`--project-root` _path_" }}
 Accepted as a global Acton option for CLI consistency.
 
 `acton new` creates a project and does not require an existing project root.
-The command does not resolve a project root before running.
+The command does not resolve a project root before running, and this option
+remains mutually exclusive with `--manifest-path`.
 {{/option}}
 
 {{/options}}

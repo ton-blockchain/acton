@@ -68,6 +68,25 @@ With \fB\-\-find\fR, each argument is treated as a search query.
 .RS 4
 \h'-04'\(bu\h'+03'JSON mode returns query/matches objects
 .RE
+.SH "TOPICS"
+Currently available documentation namespaces:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBtvm\fR
+.RE
+.sp
+Additional namespaces may be added in future releases; \fBacton doc tvm\fR is the
+current built\-in reference surface.
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The requested documentation was printed successfully, including empty
+fuzzy\-search result sets.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The namespace was unknown, arguments were invalid, or rendering failed.
+.RE
 .SH "DISPLAY OPTIONS"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -83,7 +102,7 @@ Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project manifest for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-project\-root\fR\&.
 .RE
 .sp
 \fB\-\-project\-root\fR \fIpath\fR
@@ -91,7 +110,7 @@ workflow.
 Accepted as a global Acton option for CLI consistency.
 .sp
 This command does not require an existing project root for its primary
-workflow.
+workflow. It remains mutually exclusive with \fB\-\-manifest\-path\fR\&.
 .RE
 .SH "EXAMPLES"
 .sp
@@ -123,6 +142,17 @@ acton doc tvm SENDRAWMSG \-\-json
 .nf
 acton doc tvm SENRAWMSG \-\-find
 acton doc tvm outcomng \-\-find \-\-description
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Compare exact lookup with fuzzy search:
+.sp
+.RS 4
+.nf
+acton doc tvm SENDRAWMSG
+acton doc tvm SENRAWMSG \-\-find
 .fi
 .RE
 .RE

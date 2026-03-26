@@ -87,10 +87,25 @@ When `--address` is used, Acton fetches code from the selected network.
 - `--api-key` helps avoid TonCenter rate limits
 - `--follow-libraries` resolves library references when possible
 
+## INPUT PRECEDENCE
+
+- `BOC_FILE` and `--string` are mutually exclusive
+- `--address` is used only when neither a file nor `--string` is provided
+- `--follow-libraries` only replaces the input when the fetched code is a
+  single library reference and the library lookup succeeds
+- if library lookup fails, Acton warns and disassembles the original code
+
 ## SOURCE MAPS
 
 If you compiled a contract with `acton compile --source-map`, you can pass that
 source map here to annotate the disassembly with original Tolk locations.
+
+## EXIT STATUS
+
+- `0`: Disassembly completed successfully, including runs with unresolved
+  library references that were left as warnings.
+- `1`: BoC input was invalid, a blockchain fetch failed, source-map loading
+  failed, or the output file could not be written.
 
 ## EXAMPLES
 
@@ -116,6 +131,12 @@ source map here to annotate the disassembly with original Tolk locations.
 
    ```bash
    acton disasm contract.boc --show-hashes --show-offsets --source-map contract.json
+   ```
+
+5. Inspect deployed code together with hashes:
+
+   ```bash
+   acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --show-hashes --net testnet
    ```
 
 ## SEE ALSO
