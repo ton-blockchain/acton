@@ -30,7 +30,7 @@ permissions: { }
 
 jobs:
   cleanup-cache:
-    name: Delete caches via GitHub xtask
+    name: Delete caches
     if: github.repository == 'ton-blockchain/acton'
     runs-on: ubicloud-standard-2-ubuntu-2204
 

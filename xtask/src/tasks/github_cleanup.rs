@@ -14,13 +14,13 @@ pub(crate) fn run(args: GithubCleanupArgs) -> Result<()> {
     let GithubCleanupArgs { cleanup } = args;
 
     let github = Github::new();
-    let entries = github
+    let cache_entries = github
         .list_cache_entries()?
         .into_iter()
         .map(to_actions_cache_entry)
         .collect();
 
-    run_cache_cleanup(cleanup, entries, |entry| {
+    run_cache_cleanup(cleanup, cache_entries, |entry| {
         github.delete_cache_entry(&entry.id)
     })
 }

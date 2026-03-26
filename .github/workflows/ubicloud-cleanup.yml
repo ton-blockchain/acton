@@ -1,4 +1,4 @@
-name: Cleanup Ubicloud GitHub Actions Cache
+name: Cleanup Ubicloud Actions Cache
 
 on:
   schedule:
@@ -29,8 +29,8 @@ concurrency:
 permissions: { }
 
 jobs:
-  cleanup-cache-ubicloud:
-    name: Delete caches via Ubicloud xtask
+  cleanup-cache:
+    name: Delete caches
     if: github.repository == 'ton-blockchain/acton'
     runs-on: ubicloud-standard-2-ubuntu-2204
 

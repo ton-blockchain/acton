@@ -40,8 +40,8 @@ pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
     } = args;
 
     let api_token = resolve_api_token(api_token.as_deref())?;
-    let client = Ubicloud::new(api_token)?;
-    let cache_entries = client
+    let ubicloud = Ubicloud::new(api_token)?;
+    let cache_entries = ubicloud
         .list_github_cache_entries(&project, &installation, &repository)?
         .items
         .into_iter()
@@ -49,7 +49,7 @@ pub(crate) fn run(args: UbicloudCleanupArgs) -> Result<()> {
         .collect();
 
     run_cache_cleanup(cleanup, cache_entries, |entry| {
-        client.delete_github_cache_entry(&project, &installation, &repository, &entry.id)
+        ubicloud.delete_github_cache_entry(&project, &installation, &repository, &entry.id)
     })
 }
 

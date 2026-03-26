@@ -1,6 +1,10 @@
+use std::env;
+
 use anyhow::Result;
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use clap::Args;
+
+const CI_ENV: &str = "CI";
 
 pub(crate) const DEFAULT_LAST_ACCESSED_DELETE_AFTER_DAYS: i64 = 1;
 pub(crate) const DEFAULT_CREATED_DELETE_AFTER_DAYS: i64 = 3;
@@ -9,9 +13,12 @@ pub(crate) const DEFAULT_CREATED_DELETE_AFTER_DAYS: i64 = 3;
 pub(crate) struct CacheCleanupOptions {
     #[arg(
         long = "dry-run",
-        help = "Show which cache entries would be deleted without deleting them"
+        num_args = 0..=1,
+        default_missing_value = "true",
+        value_name = "BOOL",
+        help = "Show which cache entries would be deleted without deleting them. Defaults to `true` outside CI and `false` in CI when omitted"
     )]
-    pub(crate) dry_run: bool,
+    pub(crate) dry_run: Option<bool>,
 
     #[arg(
         long = "last-accessed-days",
@@ -66,9 +73,18 @@ where
     let now = Utc::now();
     let (to_delete, to_keep) = plan_cache_cleanup(entries, &now, &policy);
 
-    print_prune_plan(options.dry_run, &policy, &to_delete, &to_keep);
+    let is_ci = env::var(CI_ENV) == Ok("true".to_string());
+    let dry_run = options.dry_run.unwrap_or(!is_ci);
+    if options.dry_run.is_none() && !is_ci {
+        println!(
+            "Warning: `--dry-run` was not provided and `CI` is not `true`, so `dry-run=true` is used by default."
+        );
+        println!();
+    }
 
-    if options.dry_run {
+    print_prune_plan(dry_run, &policy, &to_delete, &to_keep);
+
+    if dry_run {
         println!();
         println!("Dry run: no cache entries were deleted.");
         return Ok(());

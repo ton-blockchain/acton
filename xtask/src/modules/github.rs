@@ -199,7 +199,7 @@ struct WorkflowRun {
     status: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GithubCacheEntry {
     pub(crate) id: u64,
