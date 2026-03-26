@@ -10,7 +10,7 @@ on:
         description: Preview cache cleanup without deleting anything
         required: false
         type: boolean
-        default: false
+        default: true
       last_accessed_days:
         description: Delete entries if last_accessed_at is older than this many days
         required: false
