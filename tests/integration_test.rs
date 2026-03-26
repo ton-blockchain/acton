@@ -6,6 +6,34 @@ mod integration;
 mod support;
 
 use common::ActonCommandExt;
+use std::process::Command;
+
+const MANUAL_COMMANDS: &[&str] = &[
+    "init",
+    "new",
+    "build",
+    "help",
+    "hooks",
+    "compile",
+    "wrapper",
+    "disasm",
+    "fmt",
+    "retrace",
+    "test",
+    "check",
+    "script",
+    "run",
+    "verify",
+    "library",
+    "wallet",
+    "litenode",
+    "doc",
+    "ls",
+    "up",
+    "doctor",
+    "func2tolk",
+    "completions",
+];
 
 #[test]
 fn test_acton_help_long_flag() {
@@ -78,4 +106,52 @@ fn test_acton_help_new() {
         .success()
         .stdout_eq(snapbox::file!["snapshots/help_new/stdout.txt"])
         .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
+fn test_manual_commands_short_help_points_to_detailed_help() {
+    for command in MANUAL_COMMANDS {
+        let output = Command::new(common::acton_exe())
+            .args(["--color", "never", command, "--help"])
+            .output()
+            .unwrap_or_else(|err| panic!("failed to run acton {command} --help: {err}"));
+
+        assert!(
+            output.status.success(),
+            "acton {command} --help failed:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+
+        let stdout = common::strip_ansi(&String::from_utf8_lossy(&output.stdout));
+        let expected = format!("Run 'acton help {command}' for more detailed information.");
+        assert!(
+            stdout.contains(&expected),
+            "acton {command} --help did not contain detailed help pointer.\nExpected: {expected}\nActual stdout:\n{stdout}",
+        );
+    }
+}
+
+#[test]
+fn test_manual_commands_detailed_help_is_available() {
+    for command in MANUAL_COMMANDS {
+        let output = Command::new(common::acton_exe())
+            .args(["--color", "never", "help", command])
+            .output()
+            .unwrap_or_else(|err| panic!("failed to run acton help {command}: {err}"));
+
+        assert!(
+            output.status.success(),
+            "acton help {command} failed:\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+
+        let stdout = common::strip_ansi(&String::from_utf8_lossy(&output.stdout));
+        let expected = format!("ACTON-{}(1)", command.to_ascii_uppercase());
+        assert!(
+            stdout.contains(&expected),
+            "acton help {command} did not render the generated manual.\nExpected to find: {expected}\nActual stdout:\n{stdout}",
+        );
+    }
 }

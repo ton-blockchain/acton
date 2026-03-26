@@ -1,0 +1,111 @@
+'\" t
+.TH "ACTON\-HELP" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-help \[em] Show root help or detailed help for a specific command
+.SH "SYNOPSIS"
+\fBacton help\fR [\fIoptions\fR] [\fIcommand\fR]
+.SH "DESCRIPTION"
+Show help for the Acton CLI.
+.sp
+Without an argument, \fBacton help\fR prints the root command overview.
+.sp
+With a command name, Acton first tries to render a generated command manual
+from the bundled \fBtxt\fR and \fBman\fR artifacts. If no generated manual exists,
+Acton falls back to clap long help for that subcommand.
+.sp
+If the command name is unknown, Acton reports an error and may suggest a
+similar command name.
+.SH "OPTIONS"
+.SS "Help Options"
+.sp
+\fIcommand\fR
+.RS 4
+Command to show help for.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project manifest for its primary
+workflow.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+This command does not require an existing project root for its primary
+workflow.
+.RE
+.SH "BEHAVIOR"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when output is a terminal, \fBacton help <command>\fR prefers rendering through
+\fBman\fR, then \fBless\fR, then \fBmore\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when output is not a terminal, Acton writes the generated plain\-text manual
+directly to standard output
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help\fR itself does not require a project to exist
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Show the root command overview:
+.sp
+.RS 4
+.nf
+acton help
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Show the generated manual for \fBbuild\fR:
+.sp
+.RS 4
+.nf
+acton help build
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Show help for an unknown command:
+.sp
+.RS 4
+.nf
+acton help not\-a\-command
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton \-\-help\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help new\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fICommands overview\fR <https://ton\-blockchain.github.io/acton/docs/commands>
+.RE

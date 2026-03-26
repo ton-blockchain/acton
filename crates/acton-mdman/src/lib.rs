@@ -3,6 +3,15 @@
 //! > This crate is maintained by the Cargo team, primarily for use by Cargo
 //! > and not intended for external use (except as a transitive dependency). This
 //! > crate may make major changes to its APIs or be deprecated without warning.
+// Vendored from Cargo's mdman. Keep upstream diffs minimal and exempt this
+// crate from the workspace-wide clippy policy.
+#![allow(
+    clippy::all,
+    clippy::cargo,
+    clippy::nursery,
+    clippy::pedantic,
+    clippy::restriction
+)]
 
 use anyhow::{Context, Error, bail};
 use pulldown_cmark::{CowStr, Event, LinkType, Options, Parser, Tag, TagEnd};

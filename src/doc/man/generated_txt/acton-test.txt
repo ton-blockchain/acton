@@ -1,0 +1,207 @@
+ACTON-TEST(1)
+
+NAME
+       acton-test — Discover and run Tolk smart contract tests
+
+SYNOPSIS
+       acton test [options] [path]
+
+DESCRIPTION
+       Discover and execute tests from .test.tolk files.
+
+       The test runner supports filtering, multiple reporters, coverage
+       collection, gas snapshots, mutation testing, trace export, remote-state
+       fork mode, and a browser UI for exploring results.
+
+OPTIONS
+   Discovery Options
+       path
+           Test file or directory to run.
+
+           If omitted, Acton discovers tests from the resolved project root.
+
+       -f, --filter pattern
+           Filter tests by regular expression.
+
+       --exclude glob
+           Exclude test files or directories matching a glob pattern.
+
+           May be passed multiple times.
+
+       --include glob
+           Include only test files or directories matching a glob pattern.
+
+           May be passed multiple times.
+
+   Execution Options
+       --fail-fast
+           Stop after the first failing test.
+
+   Debugging Options
+       --debug
+           Enable debug mode.
+
+       --debug-port port
+           Debug server port.
+
+       --backtrace level
+           Enable execution backtraces.
+
+           Currently supported value: full.
+
+   Coverage Options
+       --coverage
+           Generate a coverage profile.
+
+       --coverage-format format
+           Coverage output format.
+
+           Possible values: lcov, text
+
+       --coverage-file path
+           Output file for the coverage report.
+
+   Profiling Options
+       --snapshot path
+           Write gas usage statistics to a JSON snapshot file.
+
+       --baseline-snapshot path
+           Compare gas usage with a baseline snapshot.
+
+       --fail-on-diff
+           Exit non-zero when the current run differs from the baseline
+           snapshot.
+
+           Requires --baseline-snapshot.
+
+   Reporting Options
+       --reporter format[,format…]_
+           Report format list.
+
+           Possible values: console, teamcity, junit, dot
+
+       --show-bodies
+           Show decoded message bodies in printed transaction trees when ABI is
+           known.
+
+       --junit-path path
+           Output directory for JUnit XML reports.
+
+       --junit-merge
+           Merge all test suites into a single JUnit XML file.
+
+       --ui
+           Open test results in a browser UI.
+
+       --ui-port port
+           Port for the browser UI server.
+
+   Cache Options
+       --clear-cache
+           Clear the compilation cache before running tests.
+
+   Remote Options
+       --fork-net network
+           Fork remote blockchain state for account resolution.
+
+       --fork-block-number seqno
+           Historical block sequence number to fork from.
+
+       --api-key key
+           TonCenter API key for blockchain queries.
+
+   Tracing Options
+       --save-test-trace [dir]
+           Save transaction traces to a directory.
+
+           If passed without a value, Acton uses .acton/traces.
+
+   Mutation Testing Options
+       --mutate
+           Run tests in mutation testing mode.
+
+       --mutate-contract contract-id
+           Contract ID to mutate during mutation testing.
+
+       --disable-rule rule
+           Disable a specific mutation rule.
+
+           May be passed multiple times.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+DISCOVERY
+       Acton discovers tests by finding files that end with .test.tolk.
+
+       o  If _path_ is omitted, discovery starts at the resolved project root
+
+       o  If _path_ is a directory, search is recursive
+
+       o  Relative _path_ values are resolved from the current working
+          directory
+
+CONFIGURATION
+       Defaults can be configured in Acton.toml:
+
+           [test]
+           reporter = ["console"]
+           coverage = true
+           filter = "test-.*"
+           junit-path = "reports"
+           junit-merge = false
+
+       CLI flags override config values for the current invocation.
+
+NOTES
+       o  If both --snapshot and --baseline-snapshot are provided, Acton runs
+          in comparison mode and does not overwrite the snapshot file
+
+       o  --fail-on-diff requires --baseline-snapshot
+
+       o  The UI and trace export features are useful for debugging failing
+          tests and inspecting transaction trees
+
+EXAMPLES
+       1. Run all tests:
+
+              acton test
+
+       2. Filter tests by name:
+
+              acton test --filter "wallet.*"
+
+       3. Generate coverage and JUnit output:
+
+              acton test --coverage --coverage-format lcov --reporter junit --junit-path test-results
+
+       4. Compare gas usage against a baseline:
+
+              acton test --baseline-snapshot .acton/gas-baseline.json --fail-on-diff
+
+       5. Run mutation testing for one contract:
+
+              acton test --mutate --mutate-contract wallet
+
+SEE ALSO
+       o  acton help wrapper
+
+       o  Test runner guide
+          <https://ton-blockchain.github.io/acton/docs/test-runner>
+

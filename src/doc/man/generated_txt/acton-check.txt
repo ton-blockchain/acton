@@ -1,0 +1,103 @@
+ACTON-CHECK(1)
+
+NAME
+       acton-check — Lint Tolk contracts and files
+
+SYNOPSIS
+       acton check [options] [target]
+
+DESCRIPTION
+       Run the Tolk linter on the whole project, a specific contract ID from
+       Acton.toml, or a single .tolk file.
+
+       By default, Acton checks contracts from Acton.toml together with
+       workspace test files. The command also supports machine-readable output
+       formats and rule explanations.
+
+OPTIONS
+   Check Options
+       target
+           Contract ID from Acton.toml or path to a .tolk file.
+
+       --fix
+           Apply available fixes automatically.
+
+           Works only in plain output mode.
+
+       --output-format format
+           Output format for diagnostics.
+
+           Possible values: plain, json, sarif, github, gitlab
+
+       --output-file path
+           Write output to a file instead of standard output.
+
+       --enable-only code[,code…]_
+           Enable only selected lint rules, for example E001,S001.
+
+       --explain code
+           Print an explanation for a lint rule.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+BEHAVIOR
+       o  --fix applies edits only in plain output mode
+
+       o  non-plain output formats report diagnostics without rewriting source
+          files
+
+       o  github emits GitHub Actions workflow annotations
+
+       o  output format resolution is: CLI flag, then [lint].output-format,
+          then default plain
+
+       o  --output-file is not valid with plain format
+
+       o  single-file mode relaxes E014 (acton-import-in-contract)
+
+EXAMPLES
+       1. Check the whole project:
+
+              acton check
+
+       2. Check a specific contract by ID:
+
+              acton check counter
+
+       3. Check one file:
+
+              acton check counter.tolk
+
+       4. Emit SARIF to a file:
+
+              acton check --output-format sarif --output-file .acton/reports/lint.sarif
+
+       5. Run only selected rules:
+
+              acton check --enable-only E001,S001
+
+SEE ALSO
+       o  acton help fmt
+
+       o  Linting guide <https://ton-blockchain.github.io/acton/docs/linting>
+
+       o  Linter rules
+          <https://ton-blockchain.github.io/acton/docs/linting/rules>
+

@@ -1,0 +1,141 @@
+'\" t
+.TH "ACTON\-LS" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-ls \[em] Run the Acton language server
+.SH "SYNOPSIS"
+\fBacton ls\fR [\fIoptions\fR]
+.SH "DESCRIPTION"
+Start the language server used for TON language tooling.
+.sp
+The server boots with the resolved project root, loads path mappings from
+\fBActon.toml\fR when available, initializes the bundled standard library from
+\fB\&.acton/tolk\-stdlib\fR, and serves requests either over stdio or a local TCP
+socket.
+.SH "OPTIONS"
+.SS "LSP Options"
+.sp
+\fB\-\-port\fR \fIport\fR
+.RS 4
+Listen on \fB127.0.0.1:<port>\fR and accept a TCP client.
+.RE
+.sp
+\fB\-\-stdio\fR
+.RS 4
+Use stdio transport.
+.RE
+.sp
+\fB\-\-log\-file\fR \fIpath\fR
+.RS 4
+Write language\-server logs to a custom file.
+.RE
+.sp
+\fB\-\-no\-log\fR
+.RS 4
+Disable language\-server logging setup.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "TRANSPORT"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB\-\-port\fR is provided, Acton binds to \fB127.0.0.1:<port>\fR and serves the
+first accepted TCP connection
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB\-\-port\fR is omitted and \fB\-\-stdio\fR is not passed, Acton defaults to stdio
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB\-\-stdio\fR is used, the server reads from stdin and writes to stdout
+.RE
+.SH "LOGGING"
+Unless \fB\-\-no\-log\fR is passed, the server configures file logging.
+.sp
+The default log path is:
+.sp
+.RS 4
+.nf
+\&.acton/tolk\-language\-server.log
+.fi
+.RE
+.SH "PROJECT CONTEXT"
+Before starting the server, Acton:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'resolves the project root and manifest path
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'loads \fBmappings\fR from \fBActon.toml\fR when present
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'preloads \fB\&.acton/tolk\-stdlib/common.tolk\fR
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Run the language server over stdio:
+.sp
+.RS 4
+.nf
+acton ls \-\-stdio
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Listen on a TCP port:
+.sp
+.RS 4
+.nf
+acton ls \-\-port 9273
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Use a custom log file:
+.sp
+.RS 4
+.nf
+acton ls \-\-port 9273 \-\-log\-file logs/tolk\-ls.log
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help doctor\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIActon documentation\fR <https://ton\-blockchain.github.io/acton/docs/welcome>
+.RE

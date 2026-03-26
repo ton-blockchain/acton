@@ -1,0 +1,127 @@
+ACTON-LITENODE(1)
+
+NAME
+       acton-litenode — Manage Acton’s lightweight local TON node
+
+SYNOPSIS
+       acton litenode [options] command
+
+DESCRIPTION
+       Manage the local development node used for TON-compatible local
+       execution, forked-state development, and faucet-based local funding.
+
+SUBCOMMANDS
+   acton litenode start
+       Start the lightweight TON node.
+
+      Synopsis
+          acton litenode start [options]
+
+      Options
+          --port port
+              LiteNode server port.
+
+          --fork-net network
+              Remote network to use for forked account resolution.
+
+          --fork-block-number seqno
+              Historical block sequence number to fork from.
+
+          --accounts name[,name…]_
+              Wallet names to auto-fund and deploy on startup.
+
+          --api-key key
+              TonCenter API key for remote blockchain queries.
+
+          --db-path path
+              Path to a SQLite database for persistent node state.
+
+          --rate-limit rps
+              Maximum /api requests per second to simulate provider rate
+              limits.
+
+          --load-state path
+              Load LiteNode state from a JSON snapshot before startup.
+
+          --dump-state path
+              Dump LiteNode state to a JSON snapshot on shutdown.
+
+          --load-state and --db-path cannot be used together in the same run.
+
+   acton litenode airdrop
+       Send TON from the local faucet to an address.
+
+      Synopsis
+          acton litenode airdrop [options] address
+
+      Options
+          address
+              Recipient address.
+
+          -a, --amount ton
+              Amount of TON to request.
+
+          -p, --port port
+              LiteNode server port.
+
+CONFIGURATION
+       You can store defaults in Acton.toml:
+
+           [litenode]
+           port = 3000
+           fork-net = "testnet"
+           fork-block-number = 55000000
+           accounts = ["deployer", "user"]
+           rate-limit = 1
+
+       CLI flags override config values for the current invocation.
+
+NOTES
+       o  fork mode allows local development against remote chain state
+
+       o  --rate-limit applies to /api/* endpoints, not admin endpoints
+
+       o  --dump-state writes a snapshot during graceful shutdown
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+EXAMPLES
+       1. Start with defaults:
+
+              acton litenode start
+
+       2. Fork from testnet at a historical block:
+
+              acton litenode start --fork-net testnet --fork-block-number 55000000
+
+       3. Load and dump JSON state snapshots:
+
+              acton litenode start --load-state snapshots/localnet.json --dump-state snapshots/localnet.json
+
+       4. Airdrop local funds:
+
+              acton litenode airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --amount 25
+
+SEE ALSO
+       o  acton help wallet
+
+       o  Local development node guide
+          <https://ton-blockchain.github.io/acton/docs/local-development-node>
+

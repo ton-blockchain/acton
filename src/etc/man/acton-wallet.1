@@ -1,0 +1,411 @@
+'\" t
+.TH "ACTON\-WALLET" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-wallet \[em] Create, import, inspect, and use development wallets
+.SH "SYNOPSIS"
+\fBacton wallet\fR [\fIoptions\fR] \fIcommand\fR
+.SH "DESCRIPTION"
+Manage wallets used for Acton development workflows.
+.sp
+The wallet subsystem can create new wallets, import mnemonic\-based wallets,
+list available wallets, export mnemonics interactively, sign external message
+bodies, request faucet funds, and remove stored wallet entries.
+.sp
+Wallets created by this workflow are intended for development and testing. The
+default network context is testnet.
+.SH "SUBCOMMANDS"
+.SS "acton wallet new"
+Generate a new wallet.
+.SS "Synopsis"
+\fBacton wallet new\fR [\fIoptions\fR]
+.SS "Options"
+.sp
+\fB\-\-name\fR \fIname\fR
+.RS 4
+Wallet name.
+.sp
+If omitted, Acton prompts for it.
+.RE
+.sp
+\fB\-\-version\fR \fIversion\fR
+.RS 4
+Wallet version.
+.sp
+If omitted, Acton prompts for it.
+.RE
+.sp
+\fB\-\-local\fR
+.RS 4
+Save the wallet to local \fBwallets.toml\fR\&.
+.RE
+.sp
+\fB\-\-global\fR
+.RS 4
+Save the wallet to global \fBglobal.wallets.toml\fR\&.
+.RE
+.sp
+\fB\-\-secure\fR [\fBtrue\fR|\fBfalse\fR]
+.RS 4
+Use a secure native store for mnemonic storage when available.
+.RE
+.sp
+\fB\-\-airdrop\fR
+.RS 4
+Request testnet TON after wallet creation.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON output.
+.RE
+.sp
+Wallet names are normalized to lowercase, spaces become \fB\-\fR, and unsupported
+characters are removed.
+.SS "acton wallet import"
+Import an existing mnemonic\-based wallet.
+.SS "Synopsis"
+\fBacton wallet import\fR [\fIoptions\fR] [\fImnemonics\fR\[u2026]]
+.SS "Options"
+.sp
+\fImnemonics\fR\[u2026]
+.RS 4
+Mnemonic words for the wallet.
+.sp
+If omitted, Acton prompts interactively.
+.RE
+.sp
+\fB\-\-name\fR \fIname\fR
+.RS 4
+Wallet name.
+.RE
+.sp
+\fB\-\-version\fR \fIversion\fR
+.RS 4
+Wallet version.
+.RE
+.sp
+\fB\-\-local\fR
+.RS 4
+Save the wallet to local \fBwallets.toml\fR\&.
+.RE
+.sp
+\fB\-\-global\fR
+.RS 4
+Save the wallet to global \fBglobal.wallets.toml\fR\&.
+.RE
+.sp
+\fB\-\-secure\fR [\fBtrue\fR|\fBfalse\fR]
+.RS 4
+Use a secure native store for mnemonic storage when available.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON output.
+.RE
+.SS "acton wallet list"
+List configured wallets.
+.SS "Options"
+.sp
+\fB\-b\fR, \fB\-\-balance\fR
+.RS 4
+Fetch and print wallet balances.
+.RE
+.sp
+\fB\-\-api\-key\fR \fIkey\fR
+.RS 4
+TonCenter API key for balance lookups.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON output.
+.RE
+.SS "acton wallet export-mnemonic"
+Export a wallet mnemonic with interactive confirmation.
+.SS "Synopsis"
+\fBacton wallet export\-mnemonic\fR [\fIoptions\fR] [\fIname\fR]
+.sp
+This command is interactive\-only and asks for confirmation before showing the
+mnemonic.
+.SS "acton wallet sign"
+Sign an external message body with the selected wallet.
+.SS "Synopsis"
+\fBacton wallet sign\fR [\fIoptions\fR] [\fIname\fR]
+.SS "Options"
+.sp
+\fIname\fR
+.RS 4
+Wallet name.
+.RE
+.sp
+\fB\-\-body\fR \fIboc\fR
+.RS 4
+External body BoC to sign in hex or base64.
+.sp
+If omitted, Acton reads from stdin or prompts interactively.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON output.
+.RE
+.sp
+Output is always a signed external\-body BoC in hex.
+.SS "acton wallet airdrop"
+Request faucet funds for a wallet.
+.SS "Synopsis"
+\fBacton wallet airdrop\fR [\fIoptions\fR] [\fIname\fR]
+.SS "Options"
+.sp
+\fIname\fR
+.RS 4
+Wallet name.
+.sp
+If omitted, Acton auto\-selects or prompts.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Airdrop backend.
+.sp
+Possible values: \fBtestnet\fR, \fBlocalnet\fR
+.RE
+.sp
+\fB\-\-faucet\-url\fR \fIurl\fR
+.RS 4
+Custom faucet URL for the testnet backend.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON output.
+.RE
+.sp
+With \fB\-\-net localnet\fR, Acton uses the local LiteNode faucet instead of the
+testnet PoW flow.
+.SS "acton wallet remove"
+Remove a wallet from configuration.
+.SS "Synopsis"
+\fBacton wallet remove\fR [\fIoptions\fR] [\fIname\fR]
+.SS "Options"
+.sp
+\fIname\fR
+.RS 4
+Wallet name.
+.RE
+.sp
+\fB\-y\fR, \fB\-\-yes\fR
+.RS 4
+Skip the confirmation prompt.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Emit JSON output.
+.RE
+.sp
+If the wallet uses keyring storage, Acton also removes the mnemonic from the
+secure store.
+.SH "NEW AND IMPORT WORKFLOW"
+\fBwallet new\fR and \fBwallet import\fR share the same storage choices and most of the
+same prompts.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB\-\-name\fR is omitted, Acton prompts for the wallet name
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB\-\-version\fR is omitted, Acton prompts for the wallet version
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'local wallets are stored in project \fBwallets.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'global wallets are stored in \fBglobal.wallets.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'common wallet versions include \fBv5r1\fR, \fBv4r2\fR, \fBv3r2\fR, and highload variants
+.RE
+.sp
+When secure native storage is available, Acton prefers storing mnemonics in the
+system keyring instead of plain\-text config.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB\-\-secure=true\fR is requested explicitly but secure storage is unavailable,
+the command fails
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if secure storage is unavailable and \fB\-\-secure\fR is omitted, Acton falls back
+to plain\-text config
+.RE
+.sp
+When \fBwallet new\fR is used interactively without \fB\-\-airdrop\fR, Acton can offer to
+request testnet funds automatically after creating the wallet.
+.SH "LISTING, SIGNING, AND EXPORT"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBwallet list \-\-balance\fR resolves balances through TonCenter and also respects
+the \fBTONCENTER_API_KEY\fR environment variable
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBwallet sign\fR auto\-detects hex and base64 input, preferring hex when a payload
+could be interpreted as both
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBwallet export\-mnemonic\fR is interactive\-only and asks for confirmation before
+showing the mnemonic
+.RE
+.SH "AIRDROP DETAILS"
+For \fBwallet airdrop\fR, the selected backend depends on \fB\-\-net\fR\&.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBtestnet\fR requests a PoW challenge from the faucet, solves it locally, and
+submits a claim
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBlocalnet\fR sends a fixed faucet transfer through LiteNode
+.RE
+.sp
+\fB\-\-faucet\-url\fR is only valid for \fBtestnet\fR, must use \fBhttp\fR or \fBhttps\fR, and may
+not include query parameters or fragments.
+.sp
+When \fB\-\-json\fR is used, successful responses include the wallet address and may
+also include PoW metadata such as difficulty, nonce, and solve time for the
+testnet flow.
+.SH "REMOVAL NOTES"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if both local and global wallets share the same name, local config takes
+precedence when removing
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'in non\-interactive mode, \fBwallet remove\fR requires \fB\-y\fR or \fB\-\-yes\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'removing a wallet from config does not delete external files or environment
+variables referenced through other mnemonic sources
+.RE
+.SH "STORAGE"
+Wallets can be stored:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'locally in project \fBwallets.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'globally in \fBglobal.wallets.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with mnemonic values in plain text, secure keyring storage, environment
+variables, or external files depending on configuration
+.RE
+.sp
+For local wallets, keyring IDs usually include a project prefix. For global
+wallets, the keyring ID usually matches the wallet name.
+.SH "SECURITY"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'secure keyring storage is recommended when available
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'plain\-text mnemonic storage is for development only
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'do not commit wallet files with real secrets to version control
+.RE
+.SH "DISPLAY OPTIONS"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SH "PROJECT OPTIONS"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Create a local deployer wallet:
+.sp
+.RS 4
+.nf
+acton wallet new \-\-name deployer \-\-version v5r1 \-\-local
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Import an existing mnemonic:
+.sp
+.RS 4
+.nf
+acton wallet import \-\-name deployer \-\-local "word1 word2 ... word24"
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Show balances:
+.sp
+.RS 4
+.nf
+acton wallet list \-\-balance
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Request faucet funds:
+.sp
+.RS 4
+.nf
+acton wallet airdrop deployer \-\-net testnet
+acton wallet airdrop deployer \-\-net localnet
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help litenode\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIWallet command guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/wallet>
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIWallet setup guide\fR <https://ton\-blockchain.github.io/acton/docs/setup\-wallets>
+.RE

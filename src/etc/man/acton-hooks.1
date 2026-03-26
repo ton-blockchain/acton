@@ -1,0 +1,146 @@
+'\" t
+.TH "ACTON\-HOOKS" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-hooks \[em] Scaffold and manage project\-local Git hooks
+.SH "SYNOPSIS"
+\fBacton hooks\fR [\fIoptions\fR] \fIcommand\fR
+.SH "DESCRIPTION"
+Manage project\-local Git hooks through Git\[cq]s \fBcore.hooksPath\fR mechanism.
+.sp
+Acton expects hooks to live in \fB\&.githooks/\fR inside the resolved project root.
+The \fBhooks\fR command can create the scaffold, install the Git config override,
+check whether it is active, and remove it again.
+.SH "SUBCOMMANDS"
+.SS "acton hooks new"
+Create a \fB\&.githooks/\fR scaffold in the resolved project root.
+.sp
+If \fB\-\-template\fR is omitted, Acton opens an interactive selector.
+.sp
+This command only works when the resolved project root already contains a local
+\fB\&.git\fR directory.
+.SS "Options"
+.sp
+\fB\-\-template\fR \fItemplate\fR
+.RS 4
+Hook scaffold template to create.
+.sp
+Possible values: \fBempty\fR, \fBdefault\fR
+.RE
+.sp
+The \fBdefault\fR template creates \fB\&.githooks/pre\-commit\fR with a starter hook that
+runs:
+.sp
+.RS 4
+.nf
+#!/bin/sh
+set \-e
+acton check
+acton fmt \-\-check
+.fi
+.RE
+.sp
+If \fB\&.githooks/\fR already exists or local hooks are already configured, the
+command fails instead of overwriting existing hooks.
+.sp
+If local Git hooks are already configured for the repository, Acton asks you to
+run \fBacton hooks uninstall\fR first.
+.SS "Examples"
+.sp
+.RS 4
+.nf
+acton hooks new
+acton hooks new \-\-template empty
+acton hooks new \-\-template default
+.fi
+.RE
+.SS "acton hooks install"
+Set the repository\[cq]s local \fBcore.hooksPath\fR to \fB\&.githooks\fR\&.
+.sp
+This only works when the resolved project root contains a local \fB\&.git\fR
+directory and \fB\&.githooks/\fR already exists.
+.sp
+Internally, this is equivalent to:
+.sp
+.RS 4
+.nf
+git config \-\-local core.hooksPath .githooks
+.fi
+.RE
+.sp
+If \fBcore.hooksPath\fR is already set locally for the repository, including to an
+equivalent path like \fB\&./.githooks\fR, the command fails and asks you to uninstall
+the existing override first.
+.sp
+If \fB\&.githooks/\fR does not exist yet, run \fBacton hooks new\fR before installing.
+.sp
+On success, Acton reports that Git hooks were installed from \fB\&.githooks\fR\&.
+.SS "acton hooks status"
+Check whether the repository\[cq]s local Git config already points \fBcore.hooksPath\fR
+to \fB\&.githooks\fR\&.
+.sp
+Equivalent local paths that resolve to the same hooks directory count as
+installed.
+.sp
+\fBstatus\fR checks the repository\[cq]s local Git config only. Global or system
+\fBcore.hooksPath\fR values do not count as installed for the current project.
+.SS "acton hooks uninstall"
+Remove the repository\-local \fBcore.hooksPath\fR override.
+.sp
+Internally, this is equivalent to:
+.sp
+.RS 4
+.nf
+git config \-\-local \-\-unset\-all core.hooksPath
+.fi
+.RE
+.sp
+If no local override is configured, the command succeeds and reports that hooks
+are not installed.
+.sp
+On success, Acton reports that Git hooks were uninstalled.
+.SH "DISPLAY OPTIONS"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SH "PROJECT OPTIONS"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "RECOMMENDED WORKFLOW"
+.sp
+.RS 4
+.nf
+acton hooks new \-\-template default
+acton hooks install
+acton hooks status
+.fi
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help new\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIHooks command guide\fR <https://ton\-blockchain.github.io/acton/docs/commands/hooks>
+.RE

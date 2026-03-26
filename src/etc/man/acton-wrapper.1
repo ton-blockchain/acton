@@ -1,0 +1,183 @@
+'\" t
+.TH "ACTON\-WRAPPER" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-wrapper \[em] Generate Tolk or TypeScript wrappers for a contract
+.SH "SYNOPSIS"
+\fBacton wrapper\fR [\fIoptions\fR] \fIcontract\-id\fR
+.SH "DESCRIPTION"
+Generate a wrapper for the contract identified by \fB_contract\-id_\fR from
+\fBActon.toml\fR\&.
+.sp
+Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
+contract header is the source of truth for typed storage accessors, incoming
+message helpers, and generated get\-method bindings.
+.sp
+The command can also generate a stub test file or emit a TypeScript wrapper for
+frontend and tooling integrations.
+.SH "OPTIONS"
+.SS "Wrapper Options"
+.sp
+\fIcontract\-id\fR
+.RS 4
+Contract ID from \fBActon.toml\fR to generate the wrapper for.
+.RE
+.sp
+\fB\-o\fR, \fB\-\-output\fR \fIpath\fR
+.RS 4
+Write the generated wrapper to an exact path.
+.sp
+Conflicts with \fB\-\-output\-dir\fR\&.
+.RE
+.sp
+\fB\-\-output\-dir\fR \fIdir\fR
+.RS 4
+Write the generated wrapper to a directory and let Acton choose the file name.
+.sp
+Conflicts with \fB\-\-output\fR\&.
+.RE
+.SS "Test Stub Options"
+.sp
+\fB\-t\fR, \fB\-\-test\fR
+.RS 4
+Generate a stub test file together with the wrapper.
+.RE
+.sp
+\fB\-\-test\-output\fR \fIpath\fR
+.RS 4
+Write the generated test file to an exact path.
+.sp
+Requires \fB\-\-test\fR\&.
+.RE
+.sp
+\fB\-\-test\-output\-dir\fR \fIdir\fR
+.RS 4
+Write the generated test file to a directory and let Acton choose the file
+name.
+.sp
+Requires \fB\-\-test\fR and conflicts with \fB\-\-test\-output\fR\&.
+.RE
+.SS "TypeScript Options"
+.sp
+\fB\-\-ts\fR
+.RS 4
+Generate a TypeScript wrapper through \fBgen\-typescript\-from\-tolk\fR\&.
+.sp
+Conflicts with test stub generation.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Path to the \fBActon.toml\fR file to use for this invocation.
+.sp
+Use this when running the command outside the project directory or when the
+manifest lives at a non\-default location.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Path to the project root to use for configuration discovery and relative
+defaults.
+.sp
+This conflicts with \fB\-\-manifest\-path\fR\&.
+.RE
+.SH "ABI REQUIREMENTS"
+Wrapper generation depends on the contract ABI exposed by the Tolk compiler.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBstorage: ...\fR enables typed storage helpers such as \fBfromStorage\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBincomingMessages: ...\fR enables \fBsend{Message}\fR helpers
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'declared get methods are emitted as wrapper methods
+.RE
+.sp
+If \fBincomingMessages\fR is missing, message\-sending helpers are not generated. If
+\fBstorage\fR is missing, storage helpers fall back to an untyped initializer.
+.SH "CONFIGURATION"
+Project\-wide defaults can be configured in \fBActon.toml\fR:
+.sp
+.RS 4
+.nf
+[wrappers.tolk]
+output\-dir = "tests/wrappers"
+generate\-test = true
+test\-output\-dir = "tests"
+
+[wrappers.typescript]
+output\-dir = "wrappers"
+.fi
+.RE
+.sp
+CLI flags override config values for the current invocation.
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Generate the default Tolk wrapper:
+.sp
+.RS 4
+.nf
+acton wrapper counter
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Generate a wrapper and stub test:
+.sp
+.RS 4
+.nf
+acton wrapper counter \-\-test
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Generate a TypeScript wrapper:
+.sp
+.RS 4
+.nf
+acton wrapper counter \-\-ts
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Generate into custom locations:
+.sp
+.RS 4
+.nf
+acton wrapper counter \-\-output\-dir tests/generated
+acton wrapper counter \-\-test \-\-test\-output\-dir tests/generated
+acton wrapper counter \-\-ts \-\-output\-dir wrappers
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help build\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help test\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIGenerating wrappers guide\fR <https://ton\-blockchain.github.io/acton/docs/test\-runner/generating\-wrappers>
+.RE

@@ -1,0 +1,299 @@
+ACTON-WALLET(1)
+
+NAME
+       acton-wallet — Create, import, inspect, and use development wallets
+
+SYNOPSIS
+       acton wallet [options] command
+
+DESCRIPTION
+       Manage wallets used for Acton development workflows.
+
+       The wallet subsystem can create new wallets, import mnemonic-based
+       wallets, list available wallets, export mnemonics interactively, sign
+       external message bodies, request faucet funds, and remove stored wallet
+       entries.
+
+       Wallets created by this workflow are intended for development and
+       testing. The default network context is testnet.
+
+SUBCOMMANDS
+   acton wallet new
+       Generate a new wallet.
+
+      Synopsis
+          acton wallet new [options]
+
+      Options
+          --name name
+              Wallet name.
+
+              If omitted, Acton prompts for it.
+
+          --version version
+              Wallet version.
+
+              If omitted, Acton prompts for it.
+
+          --local
+              Save the wallet to local wallets.toml.
+
+          --global
+              Save the wallet to global global.wallets.toml.
+
+          --secure [true|false]
+              Use a secure native store for mnemonic storage when available.
+
+          --airdrop
+              Request testnet TON after wallet creation.
+
+          --json
+              Emit JSON output.
+
+          Wallet names are normalized to lowercase, spaces become -, and
+          unsupported characters are removed.
+
+   acton wallet import
+       Import an existing mnemonic-based wallet.
+
+      Synopsis
+          acton wallet import [options] [mnemonics…]
+
+      Options
+          mnemonics…
+              Mnemonic words for the wallet.
+
+              If omitted, Acton prompts interactively.
+
+          --name name
+              Wallet name.
+
+          --version version
+              Wallet version.
+
+          --local
+              Save the wallet to local wallets.toml.
+
+          --global
+              Save the wallet to global global.wallets.toml.
+
+          --secure [true|false]
+              Use a secure native store for mnemonic storage when available.
+
+          --json
+              Emit JSON output.
+
+   acton wallet list
+       List configured wallets.
+
+      Options
+          -b, --balance
+              Fetch and print wallet balances.
+
+          --api-key key
+              TonCenter API key for balance lookups.
+
+          --json
+              Emit JSON output.
+
+   acton wallet export-mnemonic
+       Export a wallet mnemonic with interactive confirmation.
+
+      Synopsis
+          acton wallet export-mnemonic [options] [name]
+
+          This command is interactive-only and asks for confirmation before
+          showing the mnemonic.
+
+   acton wallet sign
+       Sign an external message body with the selected wallet.
+
+      Synopsis
+          acton wallet sign [options] [name]
+
+      Options
+          name
+              Wallet name.
+
+          --body boc
+              External body BoC to sign in hex or base64.
+
+              If omitted, Acton reads from stdin or prompts interactively.
+
+          --json
+              Emit JSON output.
+
+          Output is always a signed external-body BoC in hex.
+
+   acton wallet airdrop
+       Request faucet funds for a wallet.
+
+      Synopsis
+          acton wallet airdrop [options] [name]
+
+      Options
+          name
+              Wallet name.
+
+              If omitted, Acton auto-selects or prompts.
+
+          --net network
+              Airdrop backend.
+
+              Possible values: testnet, localnet
+
+          --faucet-url url
+              Custom faucet URL for the testnet backend.
+
+          --json
+              Emit JSON output.
+
+          With --net localnet, Acton uses the local LiteNode faucet instead of
+          the testnet PoW flow.
+
+   acton wallet remove
+       Remove a wallet from configuration.
+
+      Synopsis
+          acton wallet remove [options] [name]
+
+      Options
+          name
+              Wallet name.
+
+          -y, --yes
+              Skip the confirmation prompt.
+
+          --json
+              Emit JSON output.
+
+          If the wallet uses keyring storage, Acton also removes the mnemonic
+          from the secure store.
+
+NEW AND IMPORT WORKFLOW
+       wallet new and wallet import share the same storage choices and most of
+       the same prompts.
+
+       o  if --name is omitted, Acton prompts for the wallet name
+
+       o  if --version is omitted, Acton prompts for the wallet version
+
+       o  local wallets are stored in project wallets.toml
+
+       o  global wallets are stored in global.wallets.toml
+
+       o  common wallet versions include v5r1, v4r2, v3r2, and highload
+          variants
+
+       When secure native storage is available, Acton prefers storing mnemonics
+       in the system keyring instead of plain-text config.
+
+       o  if --secure=true is requested explicitly but secure storage is
+          unavailable, the command fails
+
+       o  if secure storage is unavailable and --secure is omitted, Acton falls
+          back to plain-text config
+
+       When wallet new is used interactively without --airdrop, Acton can offer
+       to request testnet funds automatically after creating the wallet.
+
+LISTING, SIGNING, AND EXPORT
+       o  wallet list --balance resolves balances through TonCenter and also
+          respects the TONCENTER_API_KEY environment variable
+
+       o  wallet sign auto-detects hex and base64 input, preferring hex when a
+          payload could be interpreted as both
+
+       o  wallet export-mnemonic is interactive-only and asks for confirmation
+          before showing the mnemonic
+
+AIRDROP DETAILS
+       For wallet airdrop, the selected backend depends on --net.
+
+       o  testnet requests a PoW challenge from the faucet, solves it locally,
+          and submits a claim
+
+       o  localnet sends a fixed faucet transfer through LiteNode
+
+       --faucet-url is only valid for testnet, must use http or https, and may
+       not include query parameters or fragments.
+
+       When --json is used, successful responses include the wallet address and
+       may also include PoW metadata such as difficulty, nonce, and solve time
+       for the testnet flow.
+
+REMOVAL NOTES
+       o  if both local and global wallets share the same name, local config
+          takes precedence when removing
+
+       o  in non-interactive mode, wallet remove requires -y or --yes
+
+       o  removing a wallet from config does not delete external files or
+          environment variables referenced through other mnemonic sources
+
+STORAGE
+       Wallets can be stored:
+
+       o  locally in project wallets.toml
+
+       o  globally in global.wallets.toml
+
+       o  with mnemonic values in plain text, secure keyring storage,
+          environment variables, or external files depending on configuration
+
+       For local wallets, keyring IDs usually include a project prefix. For
+       global wallets, the keyring ID usually matches the wallet name.
+
+SECURITY
+       o  secure keyring storage is recommended when available
+
+       o  plain-text mnemonic storage is for development only
+
+       o  do not commit wallet files with real secrets to version control
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+EXAMPLES
+       1. Create a local deployer wallet:
+
+              acton wallet new --name deployer --version v5r1 --local
+
+       2. Import an existing mnemonic:
+
+              acton wallet import --name deployer --local "word1 word2 ... word24"
+
+       3. Show balances:
+
+              acton wallet list --balance
+
+       4. Request faucet funds:
+
+              acton wallet airdrop deployer --net testnet
+              acton wallet airdrop deployer --net localnet
+
+SEE ALSO
+       o  acton help litenode
+
+       o  Wallet command guide
+          <https://ton-blockchain.github.io/acton/docs/commands/wallet>
+
+       o  Wallet setup guide
+          <https://ton-blockchain.github.io/acton/docs/setup-wallets>
+

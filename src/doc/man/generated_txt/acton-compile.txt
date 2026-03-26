@@ -1,0 +1,111 @@
+ACTON-COMPILE(1)
+
+NAME
+       acton-compile — Compile a Tolk file into TVM code and related
+       artifacts
+
+SYNOPSIS
+       acton compile [options] path
+
+DESCRIPTION
+       Compile a single .tolk source file with the Tolk compiler and print the
+       resulting code information or write artifacts to files.
+
+       This command is useful for inspecting compiler output, producing
+       standalone BoC files, generating source maps for debugging, and
+       exporting ABI or Fift output without running the full project build
+       pipeline.
+
+OPTIONS
+   Compile Options
+       path
+           Path to the Tolk source file to compile.
+
+       --json
+           Print the compilation result as structured JSON.
+
+       --base64-only
+           Print only the compiled code as base64.
+
+       --boc path
+           Write the compiled code to a binary BoC file.
+
+       --fift path
+           Write the generated Fift representation to a file.
+
+       --source-map path
+           Write a source map file and enable debug-oriented compilation
+           output.
+
+       --abi path
+           Write the emitted contract ABI to a file.
+
+       --clear-cache
+           Clear the compilation cache before compiling.
+
+   Display Options
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+   Project Options
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+OUTPUT
+       Without file-output flags, acton compile prints compilation information
+       to standard output.
+
+       Depending on the selected options, Acton can also write:
+
+       o  a binary BoC file via --boc
+
+       o  a Fift file via --fift
+
+       o  a source map via --source-map
+
+       o  an ABI file via --abi
+
+CACHE
+       Acton uses a compilation cache to speed up repeated runs.
+
+       o  Use --clear-cache to force recompilation.
+
+       o  Cache entries are invalidated automatically when source inputs
+          change.
+
+EXAMPLES
+       1. Compile a Tolk file and print the result:
+
+              acton compile contracts/main.tolk
+
+       2. Save the compiled code to a BoC file:
+
+              acton compile contracts/main.tolk --boc main.boc
+
+       3. Emit source map and ABI artifacts:
+
+              acton compile contracts/main.tolk --source-map main.map.json --abi main.abi.json
+
+       4. Print machine-readable JSON:
+
+              acton compile contracts/main.tolk --json
+
+SEE ALSO
+       o  acton help build
+
+       o  acton help disasm
+
+       o  Build system configuration reference
+          <https://ton-blockchain.github.io/acton/docs/build-system/configuration-reference>
+

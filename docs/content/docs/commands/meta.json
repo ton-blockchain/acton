@@ -1,7 +1,9 @@
 {
   "pages": [
+    "init",
     "new",
     "build",
+    "help",
     "hooks",
     "compile",
     "wrapper",
@@ -17,6 +19,10 @@
     "wallet",
     "litenode",
     "doc",
+    "ls",
+    "up",
+    "doctor",
+    "func2tolk",
     "shell-completions"
   ]
 }

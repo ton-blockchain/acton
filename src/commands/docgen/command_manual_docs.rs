@@ -59,7 +59,10 @@ mod tests {
 
     #[test]
     fn docs_page_includes_frontmatter_and_notice() {
-        let spec = &COMMAND_MANUALS[0];
+        let spec = COMMAND_MANUALS
+            .iter()
+            .find(|spec| spec.command == "new")
+            .expect("new command manual spec");
         let rendered = render_docs_page(spec, "# acton-new(1)\n\n## NAME\n");
         assert!(rendered.contains("title: \"acton new\""));
         assert!(rendered.contains("description: \"Reference manual for the acton new command\""));
