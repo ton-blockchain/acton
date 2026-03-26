@@ -53,6 +53,8 @@ jobs:
         run: rustup toolchain install
 
       - name: Run GitHub cache cleanup xtask
+        env:
+          GH_TOKEN: ${{ github.token }}
         # language=Bash
         run: |
           args=(
