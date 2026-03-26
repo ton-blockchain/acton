@@ -1,0 +1,9 @@
+  Installing standard library [ACTON_VERSION]
+Script finished with [EXIT_STATUS] 2
+at scripts/exit_2_backtrace[LINE]
+Backtrace:
+  __throw   at scripts/exit_2_backtrace[LINE]
+  explode   at scripts/exit_2_backtrace[LINE]
+  nested    at scripts/exit_2_backtrace[LINE]
+Description: Stack underflow
+Phase: Compute phase

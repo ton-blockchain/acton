@@ -785,6 +785,40 @@ fn test_script_known_exit_code_shows_description_and_phase() {
         );
 }
 
+#[test]
+fn test_script_known_exit_code_shows_backtrace_with_full_mode() {
+    let project = ProjectBuilder::new("script-known-exit-backtrace")
+        .script_file(
+            "exit_2_backtrace",
+            r#"
+            import "../../lib/io"
+
+            fun explode() {
+                throw 2
+            }
+
+            fun nested() {
+                explode();
+            }
+
+            fun main() {
+                nested();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/exit_2_backtrace.tolk")
+        .with_backtrace("full")
+        .run()
+        .code(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_known_exit_code_shows_backtrace_with_full_mode.stdout.txt",
+        );
+}
+
 // ========================================
 // Snapshot Tests
 // ========================================

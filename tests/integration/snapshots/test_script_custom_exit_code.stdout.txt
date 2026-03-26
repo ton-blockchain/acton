@@ -1,3 +1,4 @@
   Installing standard library [ACTON_VERSION]
 Exiting with code 777
 Script finished with [EXIT_STATUS] 777
+Re-run with --backtrace full to get more information

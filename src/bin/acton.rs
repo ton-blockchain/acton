@@ -384,6 +384,8 @@ enum Commands {
         // Debugging
         #[arg(long, help = "Enable debug mode", help_heading = "Debugging")]
         debug: bool,
+        #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
+        backtrace: Option<BacktraceMode>,
         #[arg(
             long,
             help = "Debug server port",
@@ -1994,6 +1996,7 @@ fn main() {
             path,
             args,
             debug,
+            backtrace,
             debug_port,
             clear_cache,
             fork_net,
@@ -2007,6 +2010,7 @@ fn main() {
             &path,
             args,
             debug,
+            backtrace,
             debug_port,
             clear_cache,
             fork_net,
