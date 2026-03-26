@@ -1,0 +1,48 @@
+Create a new project in a specified directory. This will create a new directory with a basic project template.
+
+Usage: acton new [OPTIONS] <PATH>
+
+Arguments:
+  <PATH>
+          Directory to create the project in (use '.' for the current directory)
+
+Options:
+      --color <WHEN>
+          Control when to use colored output
+          
+          [default: auto]
+          [possible values: auto, always, never]
+
+      --name <NAME>
+          Project name
+
+      --description <DESCRIPTION>
+          Project description
+
+      --manifest-path <PATH>
+          Path to Acton.toml
+
+      --project-root <PATH>
+          Path to project root
+
+      --template <TEMPLATE>
+          Project template
+          
+          [possible values: empty, counter, jetton]
+
+      --license <LICENSE>
+          License
+
+      --app
+          Include the template's TypeScript app scaffold when available
+
+      --hooks
+          Create and install the default project-local Git hooks
+
+      --agents
+          Include an AGENTS.md file with coding-agent guidance
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+Run 'acton help new' for more detailed information.

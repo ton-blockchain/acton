@@ -26,7 +26,7 @@ acton build [OPTIONS] [CONTRACT]
 | Flag                  | Description                                                                                                                                                  |
 |-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `--clear-cache`       | Clear the compilation cache before building. Forces recompilation of all contracts regardless of cache state                                                 |
-| `--graph [PATH]`      | Generate a dependency graph in DOT format. Defaults to `deps.dot`                                                                                            |
+| `--graph <PATH>`      | Generate a dependency graph in DOT format at the specified path.                                                                                             |
 | `--out-dir [DIR]`     | Directory to save build artifacts. Defaults to `build/`                                                                                                      |
 | `--gen-dir [DIR]`     | Directory to save generated dependency files (`<dependency>_code.tolk`). Defaults to `gen/`                                                                  |
 | `--output-fift [DIR]` | Directory to save compiled Fift files (`<contract>.fif`) for `.tolk` sources. Precompiled `.boc` entries are skipped. If omitted, no Fift files are written. |
@@ -42,9 +42,6 @@ acton build counter
 
 # Clear cache and rebuild everything
 acton build --clear-cache
-
-# Build and generate dependency graph
-acton build --graph
 
 # Build with custom graph path
 acton build --graph diagrams/dependencies.dot

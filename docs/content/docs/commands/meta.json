@@ -1,6 +1,7 @@
 {
   "pages": [
     "new",
+    "build",
     "hooks",
     "compile",
     "wrapper",

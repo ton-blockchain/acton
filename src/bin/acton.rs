@@ -8,6 +8,7 @@ use acton::commands::docgen::docgen_cmd;
 use acton::commands::doctor::doctor_cmd;
 use acton::commands::fmt::fmt_cmd;
 use acton::commands::func2tolk::{default_func2tolk_version, func2tolk_cmd};
+use acton::commands::help::print_command_manual;
 use acton::commands::hooks::{HooksCommand, hooks_cmd};
 use acton::commands::init::init_cmd;
 use acton::commands::internal::internal_register_contract;
@@ -49,7 +50,8 @@ use ton_source_map::SourceMap;
 #[derive(Parser)]
 #[command(
     name = "acton",
-    version = get_acton_version()
+    version = get_acton_version(),
+    disable_help_subcommand = true
 )]
 #[command(about = "TON blockchain development tool")]
 #[command(color = ColorChoice::Auto)]
@@ -90,7 +92,7 @@ enum Commands {
     #[command(
         about = "Create a new project in a specified directory",
         long_about = "Create a new project in a specified directory. This will create a new directory with a basic project template.",
-        after_help = example_new_usage()
+        after_help = detailed_help_pointer("new")
     )]
     New {
         #[arg(help = "Directory to create the project in (use '.' for the current directory)")]
@@ -112,6 +114,11 @@ enum Commands {
         hooks: bool,
         #[arg(long, help = "Include an AGENTS.md file with coding-agent guidance")]
         agents: bool,
+    },
+    #[command(about = "Print this message or the help of the given subcommand(s)")]
+    Help {
+        #[arg(help = "Command to get help for")]
+        command: Option<String>,
     },
     #[command(
         about = "Manage wallets",
@@ -457,7 +464,7 @@ enum Commands {
     },
     #[command(
         about = "Build the specified contract or all contracts",
-        after_help = example_build_usage()
+        after_help = detailed_help_pointer("build")
     )]
     Build {
         #[arg(help = "Contract ID to build (defaults to all if not specified)", value_name = "CONTRACT_ID", add = ArgValueCompleter::new(complete_contracts))]
@@ -1088,116 +1095,6 @@ fn load_config_for_completion() -> Option<ActonConfig> {
     None
 }
 
-fn example_build_usage() -> StyledStr {
-    use std::fmt::Write as _;
-
-    let mut writer = StyledStr::new();
-    let styled = Styles::styled();
-
-    let dim = |text: &str| text.dimmed().to_string();
-    let green = |text: &str| text.green().to_string();
-
-    let config_example = [
-        format!("{}contracts.wallet{}", dim("["), dim("]")),
-        format!("     name{}{}", dim(" = "), green("\"Wallet Contract\"")),
-        format!(
-            "     src{}{}",
-            dim(" = "),
-            green("\"contracts/wallet.tolk\"")
-        ),
-        format!("     output{}{}", dim(" = "), green("\"wallet.boc\"")),
-        format!(
-            "     depends{}{}{}{}",
-            dim(" = "),
-            dim("["),
-            green("\"child\""),
-            dim("]")
-        ),
-        format!(
-            "     {}",
-            dim("# or as library with custom function name and output path")
-        ),
-        format!("     depends{}{}", dim(" = "), dim("[")),
-        format!(
-            "       {} name{}{}{} kind{}{}{} function{}{}{} path{}{} {}",
-            dim("{"),
-            dim(" = "),
-            green("\"child\""),
-            dim(","),
-            dim(" = "),
-            green("\"library_ref\""),
-            dim(","),
-            dim(" = "),
-            green("\"getChildCode\""),
-            dim(","),
-            dim(" = "),
-            green("\"child_dep.tolk\""),
-            dim("}")
-        ),
-        format!("     {}", dim("]")),
-    ]
-    .join("\n");
-
-    let build_config_example = [
-        format!("{}build{}", dim("["), dim("]")),
-        format!("     out-dir{}{}", dim(" = "), green("\"build\"")),
-        format!("     gen-dir{}{}", dim(" = "), green("\"gen\"")),
-        format!("     output-fift{}{}", dim(" = "), green("\"build/fift\"")),
-    ]
-    .join("\n");
-
-    let build_examples = Vec::from([
-        ("Build all contracts", "acton build"),
-        ("Build specific contract", "acton build wallet"),
-        (
-            "Build contracts with fresh cache",
-            "acton build --clear-cache",
-        ),
-        (
-            "Generate dependency graph as DOT file",
-            "acton build --graph deps.dot",
-        ),
-        (
-            "Save generated dependency files to a custom directory",
-            "acton build --gen-dir build/gen",
-        ),
-        (
-            "Save compiled Fift files to a custom directory",
-            "acton build --output-fift build/fift",
-        ),
-    ]);
-
-    let header = styled.get_header();
-    let named = Style::new().dimmed();
-    let literal = styled.get_literal();
-
-    let _ = write!(writer, "{header}Configuration:{header:#}");
-    let _ = write!(
-        writer,
-        "\n     {named}# Configure contracts in Acton.toml{named:#}"
-    );
-    let _ = write!(writer, "\n     {config_example}");
-    let _ = write!(
-        writer,
-        "\n\n     {named}# Optional build output settings{named:#}"
-    );
-    let _ = write!(writer, "\n     {build_config_example}");
-    let _ = write!(writer, "\n\n{header}Examples:{header:#}");
-
-    const USAGE_SEP: &str = "\n     ";
-    for (name, value) in &build_examples {
-        let _ = write!(writer, "{USAGE_SEP}{named}# {name}{named:#}");
-        let _ = writeln!(writer, "{USAGE_SEP}{literal}{value}{literal:#}");
-    }
-
-    let _ = write!(
-        writer,
-        "\nFor more information, see https://ton-blockchain.github.io/acton/docs/build-system"
-    );
-
-    writer
-}
-
 fn example_disasm_usage() -> StyledStr {
     use std::fmt::Write as _;
 
@@ -1273,28 +1170,17 @@ fn format_examples(examples: &[(&str, &str)], link: &str) -> StyledStr {
     writer
 }
 
-fn example_new_usage() -> StyledStr {
-    format_examples(
-        &[
-            (
-                "Create a new project named my-project",
-                "acton new my-project",
-            ),
-            (
-                "Create a project non-interactively with all metadata",
-                "acton new my-project --name \"My Project\" --description \"Cool description\" --template counter --license MIT",
-            ),
-            (
-                "Create a counter project with the TypeScript app scaffold",
-                "acton new my-project --template counter --app",
-            ),
-            (
-                "Create a project with AGENTS.md guidance for coding agents",
-                "acton new my-project --template empty --agents",
-            ),
-        ],
-        "https://ton-blockchain.github.io/acton/docs/commands/new",
-    )
+fn detailed_help_pointer(command: &str) -> StyledStr {
+    use std::fmt::Write as _;
+
+    let mut writer = StyledStr::new();
+    let styles = Styles::styled();
+    let literal = styles.get_literal();
+    let _ = write!(
+        writer,
+        "Run '{literal}acton help {command}{literal:#}' for more detailed information."
+    );
+    writer
 }
 
 fn example_wallet_usage() -> StyledStr {
@@ -1726,6 +1612,48 @@ fn root_help_has_explicit_help_flag() -> bool {
         .any(|arg| arg == "-h" || arg == "--help")
 }
 
+fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
+    match command.as_deref() {
+        None => {
+            cli_command(true).print_help()?;
+            println!();
+            Ok(())
+        }
+        Some(command) => {
+            if print_command_manual(command)? {
+                return Ok(());
+            }
+
+            let mut cli = Cli::command();
+            cli.build();
+            if let Some(subcommand) = cli.find_subcommand_mut(command) {
+                subcommand.print_long_help()?;
+                println!();
+                return Ok(());
+            }
+
+            let mut message = format!("no such command: `{command}`");
+            if let Some((suggestion, _)) = cli
+                .get_subcommands()
+                .map(|subcommand| subcommand.get_name())
+                .filter(|name| *name != "help")
+                .map(|name| (name, strsim::jaro_winkler(command, name)))
+                .filter(|(_, score)| *score >= 0.80)
+                .max_by(|left, right| left.1.total_cmp(&right.1))
+            {
+                message.push_str(&format!(
+                    "\n\nhelp: a command with a similar name exists: `{suggestion}`"
+                ));
+            }
+            message.push_str("\n\nhelp: view all commands with `acton --help`");
+
+            Cli::command()
+                .error(clap::error::ErrorKind::InvalidSubcommand, message)
+                .exit();
+        }
+    }
+}
+
 fn find_manifest_in_ancestors(start_dir: &Path) -> Option<PathBuf> {
     let git_boundary = start_dir
         .ancestors()
@@ -1868,14 +1796,16 @@ fn main() {
     };
     init_color_mode(color);
 
-    if !matches!(command, Commands::Init | Commands::New { .. })
-        && let Err(err) = configure_project_roots(manifest_path, project_root)
+    if !matches!(
+        command,
+        Commands::Init | Commands::New { .. } | Commands::Help { .. }
+    ) && let Err(err) = configure_project_roots(manifest_path, project_root)
     {
         eprintln!("{} {}", "Error:".red(), err);
         process::exit(1);
     }
 
-    if !matches!(command, Commands::Ls { .. })
+    if !matches!(command, Commands::Ls { .. } | Commands::Help { .. })
         && let Err(err) = setup_logging()
     {
         eprintln!(
@@ -1886,6 +1816,7 @@ fn main() {
 
     let result = match command {
         Commands::Init => init_cmd(),
+        Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
         Commands::New {
             path,

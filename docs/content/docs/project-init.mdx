@@ -8,6 +8,10 @@ import { File, Folder, Files } from 'fumadocs-ui/components/files';
 
 The `acton new` command is the starting point for any new Tolk project. It sets up the project structure, standard library, and configuration, and allows you to start from a pre-built template.
 
+This page focuses on the guided setup flow and the generated project layouts.
+For the complete flag-by-flag reference, see
+[`acton new`](/docs/commands/new).
+
 ## Usage
 
 To create a new project, run:
@@ -31,6 +35,8 @@ If you don't provide additional flags, Acton will guide you through an interacti
 3.  **Template**: Choose a starting template (see [Templates](#templates) below).
 4.  **License**: Select an open-source license (MIT, Apache-2.0, etc.).
 5.  **TypeScript app scaffold**: For supported templates, choose whether to include the app.
+6.  **Git hooks**: If `git` is available, choose whether to install the default project-local hooks.
+7.  **`AGENTS.md` guidance**: Choose whether to include the template's coding-agent guidance file.
 
 Example interaction:
 
@@ -41,11 +47,23 @@ $ acton new my-project
 ? Template: counter
 ? License: MIT
 ? Include the TypeScript app scaffold? No
+? Install the default Git hooks? No
+? Include AGENTS.md guidance? Yes
 ```
 
 If a template supports a UI scaffold, you can skip that prompt by passing
 `--app`. In non-interactive mode, Acton keeps the contract-only layout unless
 you pass `--app` explicitly.
+
+If `git` is available, you can skip the hooks prompt with `--hooks`. When
+enabled, Acton creates `.githooks/pre-commit` and configures the repository's
+local `core.hooksPath` to `.githooks`. For ongoing hook management after
+project creation, see [`acton hooks`](/docs/commands/hooks).
+
+You can skip the coding-agent prompt with `--agents`. When enabled, Acton
+copies the selected template's `AGENTS.md` into the generated project root. In
+non-interactive mode, both hooks and `AGENTS.md` stay disabled unless their
+flags are passed explicitly.
 
 ## Templates
 
@@ -75,7 +93,7 @@ A comprehensive example of a [Jetton](https://docs.ton.org/develop/dapps/asset-p
 
 ### Contract-only layout
 
-After initialization, a standard project has the following structure:
+A typical contract-only template project starts with the following structure:
 
 <Files>
   <Folder name=".acton" defaultOpen>
@@ -94,13 +112,10 @@ After initialization, a standard project has the following structure:
       <File name="Contract.tolk" />
     </Folder>
   </Folder>
-  <Folder name="build">
-    <File name="contract.pkg" />
-  </Folder>
   <File name="Acton.toml" />
   <File name=".env" />
-  <File name="wallets.toml (created when you add local wallets)" />
-  <File name="global.wallets.toml (optional symlink to global wallets)" />
+  <File name=".editorconfig" />
+  <File name="README.md" />
   <File name="LICENSE" />
   <File name=".gitignore" />
 </Files>
@@ -112,11 +127,19 @@ After initialization, a standard project has the following structure:
 - **`scripts/`**: Contains auxiliary Tolk scripts for deployment, administration, and interaction with your contracts.
 - **`tests/`**: Contains your unit and integration tests.
 - **`tests/wrappers/`**: Contains contract wrappers that provide an interface for testing your contracts.
-- **`build/`**: (Generated) This folder is created when you run `acton build`. It contains the compiled bytecode (BOC files) and other build artifacts.
 - **`Acton.toml`**: The main configuration file for your project. It defines your package metadata, contracts, and dependencies.
 - **`.env`**: Local environment variables template (includes commented `TONCENTER_API_KEY` hint).
-- **`wallets.toml`**: Project-specific wallet configurations (added to `.gitignore`), created when you add local wallets.
-- **`global.wallets.toml`**: Optional symbolic link to global wallets, created when global wallets file exists.
+- **`.editorconfig`**: Shared formatting defaults for the generated project.
+- **`README.md`**: Template-specific onboarding notes and common commands for the generated project.
+
+Acton can add more files after project creation or when you opt in:
+
+- **`build/`**: Generated when you run `acton build`. It contains compiled build artifacts.
+- **`wallets.toml`**: Project-specific wallet configurations, created when you add local wallets.
+- **`global.wallets.toml`**: Optional symbolic link to global wallets, created when a global wallets file exists.
+- **`.githooks/pre-commit`**: Added when you pass `--hooks` or confirm the hooks prompt.
+- **`AGENTS.md`**: Added when you pass `--agents` or confirm the coding-agent prompt.
+- **`.github/workflows/ci.yml`**: Included by the built-in templates for CI checks.
 
 ### Counter Template With `--app`
 
@@ -154,6 +177,8 @@ changes to keep contracts and frontend separate:
   <File name="package-lock.json" />
   <File name="Acton.toml" />
   <File name=".env" />
+  <File name=".editorconfig" />
+  <File name="README.md" />
   <File name="LICENSE" />
   <File name=".gitignore" />
 </Files>
@@ -164,6 +189,7 @@ changes to keep contracts and frontend separate:
 - **`wrappers/`**: Generated TypeScript wrappers consumed by the frontend.
 - **`app/`**: React + Vite application.
 - **`package.json` / `package-lock.json`**: Frontend scripts and pinned npm dependencies.
+- **`README.md`**: Setup notes for the split contract + app layout.
 
 Install frontend dependencies after project creation with:
 
@@ -200,10 +226,19 @@ Learn more about [Acton Manifest](/docs/acton-toml/).
 
 ## Next Steps
 
-Once your project is created, navigate into the directory and try running the build and tests:
+Once your project is created, navigate into the directory and try running the
+build and tests:
 
 ```bash
 cd my-project
 acton build
 acton test
+```
+
+If you created the `counter --app` layout, install frontend dependencies and
+start the app toolchain too:
+
+```bash
+npm ci
+npm run dev
 ```

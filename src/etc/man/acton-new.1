@@ -1,0 +1,273 @@
+'\" t
+.TH "ACTON\-NEW" "1"
+.nh
+.ad l
+.ss \n[.ss] 0
+.SH "NAME"
+acton\-new \[em] Create a new Acton project
+.SH "SYNOPSIS"
+\fBacton new\fR [\fIoptions\fR] \fIpath\fR
+.SH "DESCRIPTION"
+Create a new Acton project in the given directory.
+.sp
+The command creates the target directory if it does not exist, copies the
+selected template scaffold, writes starter project files such as \fBActon.toml\fR,
+\fB\&.env\fR, \fB\&.editorconfig\fR, and \fB\&.gitignore\fR, installs the bundled standard
+library, and optionally initializes Git hooks and \fBAGENTS.md\fR guidance.
+.sp
+If \fB_path_\fR already exists as a directory, \fBacton new\fR fails and explains how
+to create a project in the current directory with \fBacton new .\fR instead.
+.SH "OPTIONS"
+.SS "New Options"
+.sp
+\fIpath\fR
+.RS 4
+Directory to create the project in. Use \fB\&.\fR to create a new project in the
+current directory.
+.RE
+.sp
+\fB\-\-name\fR \fIname\fR
+.RS 4
+Project name. If not provided, interactive mode prompts for it and defaults to
+the target directory name.
+.RE
+.sp
+\fB\-\-description\fR \fIdescription\fR
+.RS 4
+Project description written to \fBActon.toml\fR\&. If not provided, interactive mode
+prompts for it and defaults to \fBA TON blockchain project\fR\&.
+.RE
+.sp
+\fB\-\-template\fR \fItemplate\fR
+.RS 4
+Project template to use.
+.sp
+Possible values: \fBempty\fR, \fBcounter\fR, \fBjetton\fR
+.sp
+If not provided, interactive mode prompts for the template.
+.RE
+.sp
+\fB\-\-license\fR \fIlicense\fR
+.RS 4
+License identifier to place into \fBActon.toml\fR and use for the generated
+\fBLICENSE\fR file when Acton has a built\-in template for that license.
+.sp
+If not provided, interactive mode prompts for it.
+.RE
+.sp
+\fB\-\-app\fR
+.RS 4
+Include the template\[cq]s TypeScript app scaffold when available.
+.sp
+At the moment only the \fBcounter\fR template supports the app layout. If you pass
+\fB\-\-app\fR for a template that does not support it, \fBacton new\fR fails.
+.sp
+If the selected template supports the app layout and \fB\-\-app\fR is not provided,
+interactive mode prompts for this choice. Non\-interactive mode leaves the app
+layout disabled unless \fB\-\-app\fR is passed explicitly.
+.RE
+.sp
+\fB\-\-hooks\fR
+.RS 4
+Create and install the default project\-local Git hooks.
+.sp
+If \fBgit\fR is available and \fB\-\-hooks\fR is not provided, interactive mode prompts
+for this choice. Non\-interactive mode leaves hooks disabled unless \fB\-\-hooks\fR
+is passed explicitly.
+.RE
+.sp
+\fB\-\-agents\fR
+.RS 4
+Include an \fBAGENTS.md\fR file with coding\-agent guidance from the selected
+template.
+.sp
+If \fB\-\-agents\fR is not provided, interactive mode prompts for this choice.
+Non\-interactive mode leaves \fBAGENTS.md\fR disabled unless \fB\-\-agents\fR is passed
+explicitly.
+.RE
+.SS "Display Options"
+.sp
+\fB\-\-color\fR \fIwhen\fR
+.RS 4
+Control when to use colored output.
+.sp
+Possible values: \fBauto\fR, \fBalways\fR, \fBnever\fR
+.RE
+.SS "Project Options"
+.sp
+\fB\-\-manifest\-path\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+\fBacton new\fR creates a project and does not require an existing \fBActon.toml\fR\&.
+The command does not resolve a project manifest before running.
+.RE
+.sp
+\fB\-\-project\-root\fR \fIpath\fR
+.RS 4
+Accepted as a global Acton option for CLI consistency.
+.sp
+\fBacton new\fR creates a project and does not require an existing project root.
+The command does not resolve a project root before running.
+.RE
+.SH "TEMPLATES"
+.SS "empty"
+Minimal project skeleton with a starter contract, wrapper, tests, deployment
+script, and CI workflow.
+.SS "counter"
+Counter contract template with tests, wrapper, deployment script, and CI
+workflow.
+.sp
+This template also supports the optional TypeScript app layout with \fB\-\-app\fR\&.
+.SS "jetton"
+Jetton minter and wallet template with wrappers, tests, deployment script, and
+CI workflow.
+.SH "INTERACTIVE MODE"
+When enough information is missing and standard input/output are connected to a
+terminal, \fBacton new\fR prompts for:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'project name
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'description
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'template
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'license
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'whether to include the TypeScript app layout when the template supports it
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'whether to install the default Git hooks when \fBgit\fR is available
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'whether to include \fBAGENTS.md\fR
+.RE
+.sp
+In non\-interactive mode, optional features stay disabled unless their flags are
+passed explicitly.
+.SH "FILES"
+The generated project always includes:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBActon.toml\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\&.acton/\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\&.env\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\&.editorconfig\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\&.gitignore\fR
+.RE
+.sp
+Depending on the selected template and options, Acton may also generate:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'contract sources
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'tests
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'wrappers
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'deployment scripts
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'frontend files for \fB\-\-app\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\&.githooks/pre\-commit\fR for \fB\-\-hooks\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBAGENTS.md\fR for \fB\-\-agents\fR
+.RE
+.SH "EXIT STATUS"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB0\fR: The project was created successfully.
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB1\fR: The command failed.
+.RE
+.SH "EXAMPLES"
+.sp
+.RS 4
+\h'-04' 1.\h'+01'Create a new project in \fBmy\-project\fR:
+.sp
+.RS 4
+.nf
+acton new my\-project
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 2.\h'+01'Create a non\-interactive counter project with explicit metadata:
+.sp
+.RS 4
+.nf
+acton new my\-project \-\-name "My Project" \-\-description "Cool description" \-\-template counter \-\-license MIT
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Create the counter template with the TypeScript app layout:
+.sp
+.RS 4
+.nf
+acton new my\-project \-\-template counter \-\-app
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Create a project and include \fBAGENTS.md\fR guidance:
+.sp
+.RS 4
+.nf
+acton new my\-project \-\-template empty \-\-agents
+.fi
+.RE
+.RE
+.SH "SEE ALSO"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBacton help init\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIProject initialization guide\fR <https://ton\-blockchain.github.io/acton/docs/project\-init>
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fIBuild system configuration reference\fR <https://ton\-blockchain.github.io/acton/docs/build\-system/configuration\-reference>
+.RE

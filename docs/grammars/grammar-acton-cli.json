@@ -78,7 +78,7 @@
     "wizardPrompts": {
       "patterns": [
         {
-          "match": "^(\\s*)(\\?)(\\s+)([^:]+:)(\\s*)(.*)$",
+          "match": "^(\\s*)(\\?)(\\s+)(.+?(?::|\\?))(\\s*)(.*)$",
           "captures": {
             "2": {
               "name": "entity.name.function.acton-cli"

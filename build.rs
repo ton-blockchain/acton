@@ -1,10 +1,14 @@
 use chrono::Utc;
 use std::env;
+use std::ffi::OsStr;
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=ACTON_RELEASE_CHANNEL");
 
+    compress_man();
     let pkg_version = env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION must be set");
 
     let output = Command::new("git")
@@ -44,4 +48,38 @@ fn main() {
     };
     println!("cargo:rustc-env=ACTON_SHORT_VERSION={short_version}");
     println!("cargo:rustc-env=ACTON_LONG_VERSION={short_version} ({git_hash} {build_date})");
+}
+
+fn compress_man() {
+    let out_path = Path::new(&env::var("OUT_DIR").expect("OUT_DIR must be set")).join("man.tgz");
+    let dst = fs::File::create(out_path).expect("failed to create manual archive");
+    let encoder = flate2::GzBuilder::new()
+        .filename("man.tar")
+        .write(dst, flate2::Compression::best());
+    let mut ar = tar::Builder::new(encoder);
+    ar.mode(tar::HeaderMode::Deterministic);
+
+    let mut add_files = |dir: &Path, extension: &OsStr| {
+        let mut files = fs::read_dir(dir)
+            .unwrap_or_else(|err| panic!("failed to read {}: {err}", dir.display()))
+            .map(|entry| entry.expect("failed to read manual entry").path())
+            .collect::<Vec<_>>();
+        files.sort();
+
+        for path in files {
+            if path.extension() != Some(extension) {
+                continue;
+            }
+
+            println!("cargo:rerun-if-changed={}", path.display());
+            ar.append_path_with_name(&path, path.file_name().expect("manual file name"))
+                .expect("failed to append manual file");
+        }
+    };
+
+    add_files(Path::new("src/etc/man"), OsStr::new("1"));
+    add_files(Path::new("src/doc/man/generated_txt"), OsStr::new("txt"));
+
+    let encoder = ar.into_inner().expect("failed to finish tar archive");
+    encoder.finish().expect("failed to finish manual archive");
 }

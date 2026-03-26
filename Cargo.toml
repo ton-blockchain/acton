@@ -35,6 +35,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
+acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolkc = { path = "crates/tolkc" }
 ton-abi = { path = "crates/ton-abi" }
@@ -70,6 +71,9 @@ tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
 tree-sitter-fift = { path = "crates/tree-sitter-fift" }
 tree-sitter-tlb = { path = "crates/tree-sitter-tlb" }
 tree-sitter-toml-ng = "0.7.0"
+handlebars = { version = "6.4.0", features = ["dir_source"] }
+pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
+url = "2.5.7"
 
 # remote crates
 rusqlite = { version = "0.31", features = ["bundled"] }
@@ -188,6 +192,7 @@ cc = "1.2"
 [dependencies]
 # local crates
 acton-config = { workspace = true }
+acton-mdman = { workspace = true }
 tolkc = { workspace = true }
 ton-abi = { workspace = true }
 ton-emulator = { workspace = true }
@@ -301,6 +306,8 @@ owo-colors = { workspace = true } # overall coloring
 
 [build-dependencies]
 chrono = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
 
 # save ~15% of size (29mb -> 23mb), but very slow to compile/link
 [profile.release-size]
