@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
@@ -71,6 +72,22 @@ impl Github {
             })?;
 
         Ok(output.stdout)
+    }
+
+    pub(crate) fn list_cache_entries(&self) -> Result<Vec<GithubCacheEntry>> {
+        self.json_output(&[
+            "cache",
+            "list",
+            "--limit",
+            "1000",
+            "--json",
+            "id,key,sizeInBytes,createdAt,lastAccessedAt,ref",
+        ])
+    }
+
+    pub(crate) fn delete_cache_entry(&self, cache_entry_id: &str) -> Result<()> {
+        self.command_output(&["cache", "delete", cache_entry_id])
+            .map(|_| ())
     }
 
     pub(crate) fn ensure_release_does_not_exist(&self, tag: &str) -> Result<()> {
@@ -180,6 +197,16 @@ struct WorkflowRun {
     workflow_name: Option<String>,
     conclusion: Option<String>,
     status: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GithubCacheEntry {
+    pub(crate) id: u64,
+    pub(crate) key: String,
+    pub(crate) size_in_bytes: u64,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) last_accessed_at: Option<DateTime<Utc>>,
 }
 
 fn find_latest_workflow_run_for_ref<'a>(

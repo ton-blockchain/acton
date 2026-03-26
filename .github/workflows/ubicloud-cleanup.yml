@@ -1,4 +1,4 @@
-name: Cleanup Ubicloud GitHub Cache
+name: Cleanup Ubicloud GitHub Actions Cache
 
 on:
   schedule:
@@ -38,8 +38,6 @@ jobs:
       contents: read
 
     env:
-      UBICLOUD_API_TOKEN: ${{ secrets.UBI_TOKEN }}
-      UBICLOUD_PROJECT_ID: pj3hr0c5d1ny7mx25m3tch57hn
       XTASK_DRY_RUN: ${{ inputs.dry_run }}
       XTASK_LAST_ACCESSED_DAYS: ${{ inputs.last_accessed_days }}
       XTASK_CREATED_DAYS: ${{ inputs.created_days }}
@@ -55,6 +53,8 @@ jobs:
 
       - name: Run Ubicloud cache cleanup xtask
         env:
+          UBICLOUD_API_TOKEN: ${{ secrets.UBI_TOKEN }}
+          UBICLOUD_PROJECT_ID: pj3hr0c5d1ny7mx25m3tch57hn
           GITHUB_INSTALLATION: ${{ github.repository_owner }}
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
         # language=Bash
