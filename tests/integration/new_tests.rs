@@ -47,6 +47,126 @@ fn setup_real_npm_toolchain(project_root: &Path) -> (String, PathBuf) {
 }
 
 #[cfg(unix)]
+fn setup_fake_git_stage_failure_toolchain(project_root: &Path) -> String {
+    const GIT_STAGE_FAILURE_SHIM: &str = r#"#!/bin/sh
+set -eu
+
+case "${1:-}" in
+  --version)
+    printf '%s\n' 'git version 2.42.0'
+    exit 0
+    ;;
+  config)
+    if [ "${2:-}" = "--get" ] && [ "${3:-}" = "user.name" ]; then
+      printf '%s\n' 'Test User'
+      exit 0
+    fi
+    exit 1
+    ;;
+  init)
+    /bin/mkdir -p .git
+    exit 0
+    ;;
+  add)
+    printf '%s\n' 'simulated git add failure' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected fake git invocation: %s\n' "$*" >&2
+    exit 1
+    ;;
+esac
+"#;
+
+    let bin_dir = project_root.join("fake-git-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+
+    let git_path = bin_dir.join("git");
+    fs::write(&git_path, GIT_STAGE_FAILURE_SHIM).unwrap();
+    make_executable(&git_path);
+
+    bin_dir.display().to_string()
+}
+
+#[cfg(unix)]
+fn setup_fake_git_init_failure_toolchain(project_root: &Path) -> String {
+    const GIT_INIT_FAILURE_SHIM: &str = r#"#!/bin/sh
+set -eu
+
+case "${1:-}" in
+  --version)
+    printf '%s\n' 'git version 2.42.0'
+    exit 0
+    ;;
+  config)
+    if [ "${2:-}" = "--get" ] && [ "${3:-}" = "user.name" ]; then
+      printf '%s\n' 'Test User'
+      exit 0
+    fi
+    exit 1
+    ;;
+  init)
+    printf '%s\n' 'simulated git init failure' >&2
+    exit 1
+    ;;
+  *)
+    printf 'unexpected fake git invocation: %s\n' "$*" >&2
+    exit 1
+    ;;
+esac
+"#;
+
+    let bin_dir = project_root.join("fake-git-init-failure-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+
+    let git_path = bin_dir.join("git");
+    fs::write(&git_path, GIT_INIT_FAILURE_SHIM).unwrap();
+    make_executable(&git_path);
+
+    bin_dir.display().to_string()
+}
+
+#[cfg(unix)]
+fn setup_fake_git_without_user_name_toolchain(project_root: &Path) -> String {
+    const GIT_NO_USER_NAME_SHIM: &str = r#"#!/bin/sh
+set -eu
+
+case "${1:-}" in
+  --version)
+    printf '%s\n' 'git version 2.42.0'
+    exit 0
+    ;;
+  config)
+    if [ "${2:-}" = "--get" ] && [ "${3:-}" = "user.name" ]; then
+      exit 1
+    fi
+    exit 1
+    ;;
+  init)
+    /bin/mkdir -p .git
+    exit 0
+    ;;
+  add)
+    exit 0
+    ;;
+  *)
+    printf 'unexpected fake git invocation: %s\n' "$*" >&2
+    exit 1
+    ;;
+esac
+"#;
+
+    let bin_dir = project_root.join("fake-git-no-user-bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+
+    let git_path = bin_dir.join("git");
+    fs::write(&git_path, GIT_NO_USER_NAME_SHIM).unwrap();
+    make_executable(&git_path);
+
+    bin_dir.display().to_string()
+}
+
+#[cfg(unix)]
 fn run_npm_command(
     project_dir: &Path,
     path_env: &str,
@@ -523,6 +643,147 @@ fn test_new_empty_project_prompts_for_hooks() {
 
 #[cfg(unix)]
 #[test]
+fn test_new_empty_project_full_interactive_flow_without_flags() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-empty-full-interactive")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Project name:");
+    session.send_line("interactive-empty", "failed to enter project name");
+    session.expect("Description:");
+    session.send_line(
+        "interactive empty description",
+        "failed to enter project description",
+    );
+    session.expect("Template:");
+    session.send_line("", "failed to accept default template");
+    session.expect("Install the default Git hooks?");
+    session.send_line("", "failed to keep default no-hooks choice");
+    session.expect("Include AGENTS.md guidance for coding agents?");
+    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("License:");
+    session.send_line("", "failed to accept default license");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-empty");
+    session.expect("Description: interactive empty description");
+    session.expect("Template: empty");
+    session.expect("License: MIT");
+    session.expect("acton build");
+    session.expect("acton test");
+    session.expect(Eof);
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = fs::read_to_string(project_dir.join("Acton.toml")).unwrap();
+    assert!(acton_toml.contains(r#"name = "interactive-empty""#));
+    assert!(acton_toml.contains(r#"description = "interactive empty description""#));
+    assert!(acton_toml.contains(r#"license = "MIT""#));
+    assert!(project_dir.join("LICENSE").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_empty_project_interactive_prompts_accept_default_name_and_description() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-empty-default-interactive")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Project name:");
+    session.send_line("", "failed to accept default project name");
+    session.expect("Description:");
+    session.send_line("", "failed to accept default description");
+    session.expect("Template:");
+    session.send_line("", "failed to accept default template");
+    session.expect("Install the default Git hooks?");
+    session.send_line("", "failed to keep default no-hooks choice");
+    session.expect("Include AGENTS.md guidance for coding agents?");
+    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("License:");
+    session.send_line("", "failed to accept default license");
+    session.expect("Created new Acton project");
+    session.expect("Project name: foobar");
+    session.expect("Description: A TON blockchain project");
+    session.expect("Template: empty");
+    session.expect("License: MIT");
+    session.expect(Eof);
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = fs::read_to_string(project_dir.join("Acton.toml")).unwrap();
+    assert!(acton_toml.contains(r#"name = "foobar""#));
+    assert!(acton_toml.contains(r#"description = "A TON blockchain project""#));
+    assert!(acton_toml.contains(r#"license = "MIT""#));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_counter_project_can_be_selected_interactively() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-counter-template-interactive")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("interactive-selected-counter")
+        .arg("--description")
+        .arg("interactive selected counter description")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Template:");
+    session
+        .send("\u{1b}[B")
+        .expect("failed to navigate to counter template");
+    session.send_line("", "failed to select counter template");
+    session.expect("Include the TypeScript app scaffold?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Install the default Git hooks?");
+    session.send_line("", "failed to keep default no-hooks choice");
+    session.expect("Include AGENTS.md guidance for coding agents?");
+    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("Created new Acton project");
+    session.expect("Project name: interactive-selected-counter");
+    session.expect("Description: interactive selected counter description");
+    session.expect("Template: counter");
+    session.expect("License: MIT");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "foobar/Acton.toml",
+        "integration/snapshots/test_new_counter_project_can_be_selected_interactively.acton.toml.gen",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(project_dir.join("contracts/counter.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+    assert!(!project_dir.join("AGENTS.md").exists());
+}
+
+#[cfg(unix)]
+#[test]
 fn test_new_counter_project_prompts_for_app_when_supported() {
     use expectrl::Eof;
 
@@ -669,6 +930,53 @@ fn test_new_empty_project_prompts_for_agents() {
         "foobar/AGENTS.md",
         "integration/snapshots/test_new_empty_project_with_agents_flag.agents.md.gen",
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_empty_project_accepts_other_license_interactively() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-empty-other-license")
+        .without_acton_toml()
+        .build();
+
+    let mut session = project
+        .acton()
+        .env("PATH", "")
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("other-license-project")
+        .arg("--description")
+        .arg("other license description")
+        .arg("--template")
+        .arg("empty")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include AGENTS.md guidance for coding agents?");
+    session.send_line("", "failed to keep default no-agents choice");
+    session.expect("License:");
+    for _ in 0..6 {
+        session
+            .send("\u{1b}[B")
+            .expect("failed to navigate to Other license option");
+    }
+    session.send_line("", "failed to select Other license option");
+    session.expect("Enter license:");
+    session.send_line("Custom-Proprietary", "failed to enter custom license");
+    session.expect("Created new Acton project");
+    session.expect("Project name: other-license-project");
+    session.expect("Description: other license description");
+    session.expect("Template: empty");
+    session.expect("License: Custom-Proprietary");
+    session.expect(Eof);
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = fs::read_to_string(project_dir.join("Acton.toml")).unwrap();
+    assert!(acton_toml.contains(r#"license = "Custom-Proprietary""#));
+    assert!(!project_dir.join("LICENSE").exists());
 }
 
 #[cfg(unix)]
@@ -863,6 +1171,175 @@ fn test_new_empty_project_in_existed_directory_with_acton_toml() {
 }
 
 #[test]
+fn test_new_empty_project_in_current_directory() {
+    let project = ProjectBuilder::new("new-current-directory")
+        .without_acton_toml()
+        .build();
+    let current_dir = project.path().join("current-dir-project");
+    fs::create_dir_all(&current_dir).unwrap();
+
+    let output = project
+        .acton()
+        .current_dir(&current_dir)
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("dot-project")
+        .arg("--description")
+        .arg("dot description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Created new Acton project")
+        .assert_contains("Project name: dot-project")
+        .assert_contains("Description: dot description")
+        .assert_contains("Template: empty")
+        .assert_contains("License: MIT");
+
+    let acton_toml = current_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "dot-project""#));
+    assert!(content.contains(r#"description = "dot description""#));
+    assert!(content.contains(r#"license = "MIT""#));
+    assert!(current_dir.join("contracts").exists());
+    assert!(current_dir.join("tests").exists());
+    assert!(current_dir.join("LICENSE").exists());
+    assert!(current_dir.join(".git").exists());
+}
+
+#[test]
+fn test_new_empty_project_in_non_empty_current_directory() {
+    let project = ProjectBuilder::new("new-non-empty-current-directory")
+        .without_acton_toml()
+        .build();
+    let current_dir = project.path().join("non-empty-current-dir-project");
+    fs::create_dir_all(&current_dir).unwrap();
+
+    let existing_file = current_dir.join("notes.txt");
+    fs::write(&existing_file, "keep me").unwrap();
+
+    let output = project
+        .acton()
+        .current_dir(&current_dir)
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("non-empty-dot-project")
+        .arg("--description")
+        .arg("non empty dot description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_new_empty_project_in_non_empty_current_directory.stdout.txt",
+        )
+        .assert_contains("Project name: non-empty-dot-project");
+
+    let acton_toml = current_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "non-empty-dot-project""#));
+    assert!(content.contains(r#"description = "non empty dot description""#));
+    assert!(content.contains(r#"license = "MIT""#));
+    assert_eq!(fs::read_to_string(&existing_file).unwrap(), "keep me");
+    assert!(current_dir.join("contracts").exists());
+    assert!(current_dir.join("tests").exists());
+    assert!(current_dir.join("LICENSE").exists());
+    assert!(current_dir.join(".git").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_project_leaves_partial_scaffold_when_git_add_fails() {
+    let project = ProjectBuilder::new("new-git-stage-failure")
+        .without_acton_toml()
+        .build();
+    let fake_path = setup_fake_git_stage_failure_toolchain(project.path());
+    let project_dir = project.path().join("partial-project");
+
+    project
+        .acton()
+        .env("PATH", &fake_path)
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg("partial-project")
+        .arg("--description")
+        .arg("partial description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .failure()
+        .assert_stderr_contains("Failed to add files to git repository");
+
+    let acton_toml = project_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "partial-project""#));
+    assert!(content.contains(r#"description = "partial description""#));
+    assert!(content.contains(r#"license = "MIT""#));
+    assert!(project_dir.join("contracts").exists());
+    assert!(project_dir.join("tests").exists());
+    assert!(project_dir.join(".gitignore").exists());
+    assert!(project_dir.join(".env").exists());
+    assert!(project_dir.join(".editorconfig").exists());
+    assert!(project_dir.join(".git").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_project_fails_when_git_init_fails() {
+    let project = ProjectBuilder::new("new-git-init-failure")
+        .without_acton_toml()
+        .build();
+    let fake_path = setup_fake_git_init_failure_toolchain(project.path());
+    let project_dir = project.path().join("foobar");
+    let log_dir = project.path().join(".logs");
+
+    let output = project
+        .acton()
+        .env("PATH", &fake_path)
+        .env("ACTON_LOG_DIR", log_dir.to_str().unwrap())
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg("git-init-failure-project")
+        .arg("--description")
+        .arg("git init failure description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .failure();
+
+    output
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test_new_project_fails_when_git_init_fails.stderr.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/Acton.toml",
+            "integration/snapshots/test_new_project_fails_when_git_init_fails.acton.toml.gen",
+        );
+    assert!(project_dir.join("contracts").exists());
+    assert!(project_dir.join("tests").exists());
+    assert!(project_dir.join(".gitignore").exists());
+    assert!(project_dir.join(".env").exists());
+    assert!(project_dir.join(".editorconfig").exists());
+    assert!(!project_dir.join(".git").exists());
+}
+
+#[test]
 fn test_new_project_with_git_initialization() {
     let project = ProjectBuilder::new("new-git").without_acton_toml().build();
 
@@ -890,6 +1367,107 @@ fn test_new_project_with_git_initialization() {
 
     let project_dir = project.path().join("test-git-project");
     assert!(project_dir.join(".git").exists());
+}
+
+#[test]
+fn test_new_project_warns_when_git_is_unavailable_but_still_succeeds() {
+    let project = ProjectBuilder::new("new-without-git")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .env("PATH", "")
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("no-git-project")
+        .arg("--description")
+        .arg("no git description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/test_new_project_warns_when_git_is_unavailable_but_still_succeeds.stdout.txt",
+    );
+
+    let project_dir = project.path().join("foobar");
+    assert!(!project_dir.join(".git").exists());
+    assert!(project_dir.join("Acton.toml").exists());
+}
+
+#[test]
+fn test_new_project_symlinks_global_libraries() {
+    let project = ProjectBuilder::new("new-symlink-libraries")
+        .without_acton_toml()
+        .build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+    let home_path = home_temp.path();
+
+    let global_libraries_dir = home_path.join(".config").join("acton").join("libraries");
+    fs::create_dir_all(&global_libraries_dir).unwrap();
+    let global_config = global_libraries_dir.join("global.libraries.toml");
+    fs::write(
+        &global_config,
+        "[libraries.demo]\nhash = \"abcd\"\ncode = \"te6ccgEBAQEAAgAAAA==\"\n",
+    )
+    .unwrap();
+
+    project
+        .acton()
+        .env("HOME", home_path.to_str().unwrap())
+        .arg("new")
+        .arg(&project.path().join("my-project").display().to_string())
+        .arg("--name")
+        .arg("symlink-project")
+        .arg("--description")
+        .arg("test")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    let symlink = project
+        .path()
+        .join("my-project")
+        .join("global.libraries.toml");
+    assert!(symlink.exists());
+}
+
+#[test]
+fn test_new_project_uses_acton_user_when_git_user_name_is_missing() {
+    let project = ProjectBuilder::new("new-git-no-user")
+        .without_acton_toml()
+        .build();
+    let fake_path = setup_fake_git_without_user_name_toolchain(project.path());
+    let project_dir = project.path().join("foobar");
+    let current_year = chrono::Local::now().format("%Y").to_string();
+
+    project
+        .acton()
+        .env("PATH", &fake_path)
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg("fallback-author-project")
+        .arg("--description")
+        .arg("fallback author description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    let license = fs::read_to_string(project_dir.join("LICENSE")).unwrap();
+    assert!(license.contains("MIT License"));
+    assert!(license.contains(&format!("Copyright (c) {current_year} Acton User")));
 }
 
 #[test]

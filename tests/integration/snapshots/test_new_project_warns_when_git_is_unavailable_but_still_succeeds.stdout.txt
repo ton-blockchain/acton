@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+  Warning: git command not found, skipping git repository initialization
+✓ Created new Acton project
+  Project name: no-git-project
+  Description: no git description
+  Template: empty
+  License: MIT
+
+Created Acton.toml with project configuration
+
+Next steps:
+
+  # Navigate to project
+  cd [ROOT]/foobar
+  # Build your contract
+  acton build
+  # Run tests
+  acton test

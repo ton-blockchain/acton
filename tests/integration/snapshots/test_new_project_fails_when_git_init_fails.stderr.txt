@@ -1,0 +1,2 @@
+simulated git init failure
+Error: Failed to initialize git repository

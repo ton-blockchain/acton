@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+> Initialized empty Git repository in [ROOT]/non-empty-current-dir-project/.git/
+✓ Created new Acton project
+  Project name: non-empty-dot-project
+  Description: non empty dot description
+  Template: empty
+  License: MIT
+
+Created Acton.toml with project configuration
+
+Next steps:
+
+  # Navigate to project
+  cd [ROOT]/non-empty-current-dir-project
+  # Build your contract
+  acton build
+  # Run tests
+  acton test
