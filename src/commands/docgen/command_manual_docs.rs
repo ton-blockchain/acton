@@ -36,6 +36,7 @@ fn generate_single_command_manual_doc(
 
 fn render_docs_page(spec: &CommandManualSpec, body: &str) -> String {
     let body = strip_leading_h1(body);
+    let body = strip_leading_section(body, "NAME");
     format!(
         "---\ntitle: {:?}\ndescription: {:?}\n---\n\n{GENERATED_NOTICE}{body}",
         spec.docs_title, spec.docs_description
@@ -52,9 +53,21 @@ fn strip_leading_h1(body: &str) -> &str {
     rest.trim_start_matches('\n')
 }
 
+fn strip_leading_section<'a>(body: &'a str, title: &str) -> &'a str {
+    let heading = format!("## {title}\n");
+    let Some(rest) = body.strip_prefix(&heading) else {
+        return body;
+    };
+
+    match rest.find("\n## ") {
+        Some(next_section_idx) => rest[next_section_idx + 1..].trim_start_matches('\n'),
+        None => "",
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{GENERATED_NOTICE, render_docs_page};
+    use super::{GENERATED_NOTICE, render_docs_page, strip_leading_section};
     use crate::commands::docgen::command_manuals::COMMAND_MANUALS;
 
     #[test]
@@ -63,11 +76,25 @@ mod tests {
             .iter()
             .find(|spec| spec.command == "new")
             .expect("new command manual spec");
-        let rendered = render_docs_page(spec, "# acton-new(1)\n\n## NAME\n");
+        let rendered = render_docs_page(
+            spec,
+            "# acton-new(1)\n\n## NAME\n\nacton-new --- Create a new Acton project\n\n## DESCRIPTION\n\nBody.\n",
+        );
         assert!(rendered.contains("title: \"acton new\""));
         assert!(rendered.contains("description: \"Reference manual for the acton new command\""));
         assert!(rendered.contains(GENERATED_NOTICE.trim_end()));
         assert!(!rendered.contains("# acton-new(1)"));
-        assert!(rendered.ends_with("## NAME\n"));
+        assert!(!rendered.contains("## NAME\n"));
+        assert!(rendered.ends_with("## DESCRIPTION\n\nBody.\n"));
+    }
+
+    #[test]
+    fn strip_leading_section_removes_only_the_first_matching_section() {
+        let body = "## NAME\n\nIntro.\n\n## DESCRIPTION\n\nBody.\n\n## SEE ALSO\n\nMore.\n";
+
+        assert_eq!(
+            strip_leading_section(body, "NAME"),
+            "## DESCRIPTION\n\nBody.\n\n## SEE ALSO\n\nMore.\n"
+        );
     }
 }
