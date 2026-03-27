@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
-use std::io::{IsTerminal, stdin, stdout};
+use std::io::{IsTerminal, Read, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -205,7 +205,7 @@ pub enum WalletCommand {
         #[arg(
             long,
             alias = "message",
-            help = "External body BoC to sign in hex or base64. If omitted, reads from stdin or prompts interactively"
+            help = "External body BoC to sign in hex or base64. If omitted, reads from stdin when piped or prompts interactively"
         )]
         body: Option<String>,
         #[arg(long, help = "Output result as JSON")]
@@ -762,9 +762,20 @@ fn read_sign_body(body: Option<String>) -> anyhow::Result<String> {
         return Ok(body);
     }
 
+    if !stdin().is_terminal() {
+        let mut input = stdin();
+        return read_sign_body_from_reader(&mut input).context("Failed to read body from stdin");
+    }
+
     Text::new("External body BoC (hex/base64) to sign:")
         .prompt()
         .context("Failed to read body")
+}
+
+fn read_sign_body_from_reader(reader: &mut impl Read) -> anyhow::Result<String> {
+    let mut body = String::new();
+    reader.read_to_string(&mut body)?;
+    Ok(body)
 }
 
 fn decode_sign_input(body: &str) -> anyhow::Result<(TonCell, SignMessageFormat)> {
@@ -1787,6 +1798,16 @@ mod wallet_name_tests {
     }
 
     #[test]
+    fn test_decode_sign_input_trims_surrounding_whitespace() {
+        let cell = TonCell::empty().clone();
+        let body_b64 = cell.to_boc_base64().expect("must encode base64 boc");
+        let padded = format!(" \n{body_b64}\t");
+        let (decoded, format) = decode_sign_input(&padded).expect("must decode trimmed input");
+        assert_eq!(decoded, cell);
+        assert_eq!(format, SignMessageFormat::Base64);
+    }
+
+    #[test]
     fn test_decode_sign_input_empty() {
         let err = decode_sign_input("").expect_err("must fail for empty payload");
         assert!(
@@ -1803,6 +1824,14 @@ mod wallet_name_tests {
                 .contains("Body must be a valid BoC encoded as hex or base64"),
             "unexpected error: {err}"
         );
+    }
+
+    #[allow(clippy::string_lit_as_bytes)]
+    #[test]
+    fn test_read_sign_body_from_reader() {
+        let mut reader = "te6ccgEBAQEAAgAAAA==\n".as_bytes();
+        let body = read_sign_body_from_reader(&mut reader).expect("must read piped body");
+        assert_eq!(body, "te6ccgEBAQEAAgAAAA==\n");
     }
 
     #[test]

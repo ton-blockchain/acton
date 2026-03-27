@@ -39,4 +39,6 @@ Global options:
   -h, --help                           Print help
   -V, --version                        Print version
 
+Use acton help <command> for detailed manuals with behavior, config, and examples.
+
 Learn more about Acton:                https://ton-blockchain.github.io/acton/docs/welcome

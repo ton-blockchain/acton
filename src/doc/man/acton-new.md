@@ -18,11 +18,13 @@ selected template scaffold, writes starter project files such as `Acton.toml`,
 library, and optionally initializes Git hooks and `AGENTS.md` guidance.
 
 If `_path_` already exists as a directory, `acton new` fails instead of trying
-to merge into that directory, even when it is empty. To scaffold into the
-current directory explicitly, run `acton new .` for that case.
+to merge into that directory, even when it is empty. `acton new .` is the
+explicit exception: it scaffolds into the current directory and may overwrite
+existing files whose paths collide with the selected template.
 
 If `git` is available in `PATH`, `acton new` runs `git init` in the project
-directory and stages the generated files with `git add .`.
+directory and then runs `git add .`, which stages all current-directory
+changes, not only files created by the scaffold.
 
 The command does not create an initial commit.
 
@@ -132,10 +134,14 @@ npm install
 
 ## SIDE EFFECTS
 
-`acton new` creates or overwrites files only inside the new project directory.
+`acton new` writes only inside the chosen target directory. When `_path_` is
+`.`, that means the current directory itself, and existing files with the same
+paths as template files can be overwritten.
+
 It also installs `.acton/tolk-stdlib` there, may create `.githooks/` plus an
 `AGENTS.md` file when requested, and, when `git` is available, initializes the
-project repository and stages the generated files.
+project repository and runs `git add .`, which stages all current-directory
+contents.
 
 The command does not create a commit and does not modify parent directories.
 

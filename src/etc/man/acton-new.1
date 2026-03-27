@@ -16,11 +16,13 @@ selected template scaffold, writes starter project files such as \fBActon.toml\f
 library, and optionally initializes Git hooks and \fBAGENTS.md\fR guidance.
 .sp
 If \fB_path_\fR already exists as a directory, \fBacton new\fR fails instead of trying
-to merge into that directory, even when it is empty. To scaffold into the
-current directory explicitly, run \fBacton new .\fR for that case.
+to merge into that directory, even when it is empty. \fBacton new .\fR is the
+explicit exception: it scaffolds into the current directory and may overwrite
+existing files whose paths collide with the selected template.
 .sp
 If \fBgit\fR is available in \fBPATH\fR, \fBacton new\fR runs \fBgit init\fR in the project
-directory and stages the generated files with \fBgit add .\fR\&.
+directory and then runs \fBgit add .\fR, which stages all current\-directory
+changes, not only files created by the scaffold.
 .sp
 The command does not create an initial commit.
 .SH "OPTIONS"
@@ -308,10 +310,14 @@ npm install
 .fi
 .RE
 .SH "SIDE EFFECTS"
-\fBacton new\fR creates or overwrites files only inside the new project directory.
+\fBacton new\fR writes only inside the chosen target directory. When \fB_path_\fR is
+\fB\&.\fR, that means the current directory itself, and existing files with the same
+paths as template files can be overwritten.
+.sp
 It also installs \fB\&.acton/tolk\-stdlib\fR there, may create \fB\&.githooks/\fR plus an
 \fBAGENTS.md\fR file when requested, and, when \fBgit\fR is available, initializes the
-project repository and stages the generated files.
+project repository and runs \fBgit add .\fR, which stages all current\-directory
+contents.
 .sp
 The command does not create a commit and does not modify parent directories.
 .SH "EXIT STATUS"

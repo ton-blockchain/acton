@@ -63,7 +63,8 @@ BEHAVIOR
 
        o  stdin, stdout, stderr, and environment variables are inherited
 
-       o  use -- before forwarded arguments that look like Acton flags
+       o  arguments after _script_ are forwarded even when they start with -;
+          use -- only as an optional visual separator if you prefer
 
        o  Acton does not guard against recursive script aliases; avoid scripts
           that call themselves through acton run
@@ -82,13 +83,13 @@ EXAMPLES
 
        2. Append extra arguments:
 
-              acton run deploy -- --net mainnet
+              acton run deploy --net mainnet
 
        3. Run a custom shell task:
 
               acton run custom-task
 
-       4. Wrap acton script behind a project alias:
+       4. Use -- as an explicit separator if you prefer:
 
               acton run deploy -- --net testnet
 

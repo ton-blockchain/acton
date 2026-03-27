@@ -53,7 +53,7 @@ OPTIONS
 
    TypeScript Options
        --ts
-           Generate a TypeScript wrapper through gen-typescript-from-tolk-dev.
+           Generate a TypeScript wrapper through gen-typescript-from-tolk.
 
            Conflicts with test stub generation.
 

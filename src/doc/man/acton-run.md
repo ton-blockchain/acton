@@ -61,7 +61,8 @@ custom-task = "echo 'Running custom task...'"
 - on Windows scripts are executed via `cmd /C`
 - scripts run with the resolved project root as the working directory
 - stdin, stdout, stderr, and environment variables are inherited
-- use `--` before forwarded arguments that look like Acton flags
+- arguments after `_script_` are forwarded even when they start with `-`; use
+  `--` only as an optional visual separator if you prefer
 - Acton does not guard against recursive script aliases; avoid scripts that
   call themselves through `acton run`
 
@@ -83,7 +84,7 @@ custom-task = "echo 'Running custom task...'"
 2. Append extra arguments:
 
    ```bash
-   acton run deploy -- --net mainnet
+   acton run deploy --net mainnet
    ```
 
 3. Run a custom shell task:
@@ -92,7 +93,7 @@ custom-task = "echo 'Running custom task...'"
    acton run custom-task
    ```
 
-4. Wrap `acton script` behind a project alias:
+4. Use `--` as an explicit separator if you prefer:
 
    ```bash
    acton run deploy -- --net testnet

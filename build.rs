@@ -60,6 +60,8 @@ fn compress_man() {
     ar.mode(tar::HeaderMode::Deterministic);
 
     let mut add_files = |dir: &Path, extension: &OsStr| {
+        println!("cargo:rerun-if-changed={}", dir.display());
+
         let mut files = fs::read_dir(dir)
             .unwrap_or_else(|err| panic!("failed to read {}: {err}", dir.display()))
             .map(|entry| entry.expect("failed to read manual entry").path())

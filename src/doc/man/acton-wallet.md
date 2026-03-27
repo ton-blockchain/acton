@@ -166,7 +166,8 @@ Wallet name.
 {{#option "`--body`, `--message` _boc_" }}
 External body BoC to sign in hex or base64.
 
-If omitted, Acton reads from stdin or prompts interactively.
+If omitted, Acton reads from stdin when stdin is piped; otherwise it prompts
+interactively.
 {{/option}}
 
 {{#option "`--json`" }}
@@ -175,7 +176,8 @@ Emit JSON output.
 
 {{/options}}
 
-Output is always a signed external-body BoC in hex.
+Without `--json`, Acton prints the signed external-body BoC in hex. With
+`--json`, it prints a JSON object containing the signed hex body.
 
 ### acton wallet airdrop
 

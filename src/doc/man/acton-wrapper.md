@@ -75,7 +75,7 @@ Requires `--test` and conflicts with `--test-output`.
 {{#options}}
 
 {{#option "`--ts`" }}
-Generate a TypeScript wrapper through `gen-typescript-from-tolk-dev`.
+Generate a TypeScript wrapper through `gen-typescript-from-tolk`.
 
 Conflicts with test stub generation.
 {{/option}}

@@ -61,7 +61,7 @@ pub fn disasm_cmd(
             hex::encode(binary_data)
         }
     } else if let Some(addr) = address {
-        let fetched = remote::fetch_contract_boc(network.clone(), &addr, api_key.as_deref())?;
+        let fetched = remote::fetch_contract_boc(network, &addr, api_key.as_deref())?;
         resolved_network = Some(fetched.network);
         fetched.boc
     } else {
