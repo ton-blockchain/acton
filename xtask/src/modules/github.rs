@@ -1,6 +1,7 @@
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
@@ -37,7 +38,7 @@ impl Github {
         let failures = runs
             .iter()
             .filter_map(|run| {
-                self.ensure_workflow_runs_succeeded(run)
+                self.ensure_workflow_run_completed_with_conclusion(run, branch, "success")
                     .err()
                     .map(|error| error.to_string())
             })
@@ -73,15 +74,85 @@ impl Github {
         Ok(output.stdout)
     }
 
-    fn ensure_workflow_runs_succeeded(&self, run: &WorkflowRun) -> Result<()> {
+    pub(crate) fn list_cache_entries(&self) -> Result<Vec<GithubCacheEntry>> {
+        self.json_output(&[
+            "cache",
+            "list",
+            "--limit",
+            "1000",
+            "--json",
+            "id,key,sizeInBytes,createdAt,lastAccessedAt,ref",
+        ])
+    }
+
+    pub(crate) fn delete_cache_entry(&self, cache_entry_id: &str) -> Result<()> {
+        self.command_output(&["cache", "delete", cache_entry_id])
+            .map(|_| ())
+    }
+
+    pub(crate) fn ensure_release_does_not_exist(&self, tag: &str) -> Result<()> {
+        let output = Command::new("gh")
+            .args(["release", "view", tag])
+            .output()
+            .with_context(|| format!("failed to run gh release view {tag}"))?;
+
+        if output.status.success() {
+            bail!("GitHub release `{tag}` already exists");
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        if stderr.contains("release not found")
+            || stderr.contains("HTTP 404")
+            || stderr.contains("Not Found")
+        {
+            return Ok(());
+        }
+
+        bail!(
+            "gh release view {tag} failed with status {}: {}",
+            output.status,
+            stderr
+        );
+    }
+
+    pub(crate) fn ensure_latest_release_workflow_failed(&self, tag: &str) -> Result<()> {
+        let runs = self.json_output::<Vec<WorkflowRun>>(&[
+            "run",
+            "list",
+            "--workflow",
+            "Release",
+            "--event",
+            "push",
+            "--limit",
+            "100",
+            "--json",
+            "headBranch,startedAt,workflowName,status,conclusion",
+        ])?;
+
+        let Some(run) = find_latest_workflow_run_for_ref(&runs, tag) else {
+            bail!("no GitHub Actions `Release` run found for tag `{tag}`");
+        };
+
+        self.ensure_workflow_run_completed_with_conclusion(run, tag, "failure")
+    }
+
+    fn ensure_workflow_run_completed_with_conclusion(
+        &self,
+        run: &WorkflowRun,
+        ref_name: &str,
+        expected_conclusion: &str,
+    ) -> Result<()> {
         let workflow_name = run.workflow_name.as_deref().unwrap_or("<unnamed workflow>");
 
         if run.status != "completed" {
-            bail!("workflow `{workflow_name}` is not completed");
+            bail!("workflow `{workflow_name}` for ref `{ref_name}` is not completed");
         }
 
-        if run.conclusion.as_deref() != Some("success") {
-            bail!("workflow `{workflow_name}` did not succeed");
+        let actual_conclusion = run.conclusion.as_deref().unwrap_or("<none>");
+        if actual_conclusion != expected_conclusion {
+            bail!(
+                "workflow `{workflow_name}` for ref `{ref_name}` concluded with `{actual_conclusion}` instead of `{expected_conclusion}`"
+            );
         }
 
         Ok(())
@@ -121,7 +192,29 @@ impl Github {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkflowRun {
+    head_branch: Option<String>,
+    started_at: Option<String>,
     workflow_name: Option<String>,
     conclusion: Option<String>,
     status: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GithubCacheEntry {
+    pub(crate) id: u64,
+    pub(crate) key: String,
+    pub(crate) size_in_bytes: u64,
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) last_accessed_at: Option<DateTime<Utc>>,
+}
+
+fn find_latest_workflow_run_for_ref<'a>(
+    runs: &'a [WorkflowRun],
+    ref_name: &str,
+) -> Option<&'a WorkflowRun> {
+    runs.iter()
+        .filter(|run| run.head_branch.as_deref() == Some(ref_name))
+        .filter(|run| run.started_at.is_some())
+        .max_by_key(|run| run.started_at.as_deref())
 }

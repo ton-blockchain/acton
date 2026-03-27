@@ -24,12 +24,31 @@ impl Git {
             .is_empty())
     }
 
-    pub(crate) fn commit_count_between(&self, from: &str, to: &str) -> Result<usize> {
-        let count = self.output(&["rev-list", "--count", &format!("{from}..{to}")])?;
+    pub(crate) fn commit_count_between(&self, left: &str, right: &str) -> Result<(usize, usize)> {
+        let counts = self.output(&[
+            "rev-list",
+            "--left-right",
+            "--count",
+            &format!("{left}...{right}"),
+        ])?;
 
-        count
+        let mut parts = counts.split_whitespace();
+        let left = parts
+            .next()
+            .context("missing left rev-list count")?
             .parse::<usize>()
-            .context("failed to parse git commit count")
+            .context("failed to parse left rev-list count")?;
+        let right = parts
+            .next()
+            .context("missing right rev-list count")?
+            .parse::<usize>()
+            .context("failed to parse right rev-list count")?;
+
+        if parts.next().is_some() {
+            bail!("unexpected extra rev-list count output: `{counts}`");
+        }
+
+        Ok((left, right))
     }
 
     pub(crate) fn remote_tag_exists(&self, remote: &str, name: &str) -> Result<bool> {
@@ -38,6 +57,10 @@ impl Git {
         Ok(!self
             .output(&["ls-remote", "--tags", remote, &tag_ref])?
             .is_empty())
+    }
+
+    pub(crate) fn local_tag_exists(&self, name: &str) -> Result<bool> {
+        Ok(!self.output(&["tag", "--list", name])?.is_empty())
     }
 
     pub(crate) fn fetch_branch(&self, remote: &str, branch: &str) -> Result<()> {
@@ -53,8 +76,14 @@ impl Git {
         self.output(&args).map(|_| ())
     }
 
-    pub(crate) fn commit(&self, message: &str) -> Result<()> {
-        self.output(&["commit", "-m", message]).map(|_| ())
+    pub(crate) fn commit(&self, message: &str, args: &[&str]) -> Result<()> {
+        let mut command_args = Vec::with_capacity(3 + args.len());
+        command_args.push("commit");
+        command_args.extend_from_slice(args);
+        command_args.push("-m");
+        command_args.push(message);
+
+        self.output(&command_args).map(|_| ())
     }
 
     pub(crate) fn show_commit_numstat(&self, rev: &str) -> Result<String> {
@@ -65,6 +94,10 @@ impl Git {
         self.output(&["tag", name]).map(|_| ())
     }
 
+    pub(crate) fn delete_tag(&self, name: &str) -> Result<()> {
+        self.output(&["tag", "--delete", name]).map(|_| ())
+    }
+
     pub(crate) fn push_refs(&self, remote: &str, refs: &[&str]) -> Result<()> {
         let mut args = Vec::with_capacity(2 + refs.len());
         args.push("push");
@@ -72,6 +105,10 @@ impl Git {
         args.extend_from_slice(refs);
 
         self.output(&args).map(|_| ())
+    }
+
+    pub(crate) fn delete_remote_tag(&self, remote: &str, name: &str) -> Result<()> {
+        self.output(&["push", remote, "--delete", name]).map(|_| ())
     }
 
     fn output(&self, args: &[&str]) -> Result<String> {
