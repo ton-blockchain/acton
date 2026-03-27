@@ -4,7 +4,7 @@
 .ad l
 .ss \n[.ss] 0
 .SH "NAME"
-acton\-help \[em] Show root help or detailed help for a specific command
+acton\-help \[em] Show root help or detailed help for a specific top\-level command
 .SH "SYNOPSIS"
 \fBacton help\fR [\fIoptions\fR] [\fIcommand\fR]
 .SH "DESCRIPTION"
@@ -12,13 +12,19 @@ Show help for the Acton CLI.
 .sp
 Without an argument, \fBacton help\fR prints the root command overview.
 .sp
-For detailed manuals, prefer \fBacton help <command>\fR\&. Generated manuals document
-behavior, configuration, side effects, and examples in more detail than short
-flag help.
+For detailed manuals, prefer \fBacton help <command>\fR for top\-level commands.
+Generated manuals document behavior, configuration, side effects, and examples
+in more detail than short flag help.
 .sp
 With a command name, Acton first tries to render a generated command manual
 from the bundled \fBtxt\fR and \fBman\fR artifacts. If no generated manual exists,
 Acton falls back to clap long help for that subcommand.
+.sp
+Nested command paths such as \fBwallet list\fR are not currently accepted by
+\fBacton help\fR\&. In practice, top\-level manuals such as \fBacton help wallet\fR and
+\fBacton help library\fR already include the nested subcommands under that command.
+Use clap help directly only when you need the exact nested help view, for
+example \fBacton wallet list \-\-help\fR\&.
 .sp
 If the command name is unknown, Acton reports an error and may suggest a
 similar command name.
@@ -27,7 +33,11 @@ similar command name.
 .sp
 \fIcommand\fR
 .RS 4
-Command to show help for.
+Top\-level command to show help for.
+.sp
+Top\-level manuals usually include summaries of nested subcommands.
+.sp
+Nested command paths are not currently supported.
 .RE
 .SS "Display Options"
 .sp
@@ -71,8 +81,8 @@ directly to standard output
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'when no generated manual exists for a command, Acton falls back to clap long
-help, which is typically shorter and flag\-focused
+\h'-04'\(bu\h'+03'when no generated manual exists for a top\-level command, Acton falls back to
+clap long help, which is typically shorter and flag\-focused
 .RE
 .sp
 .RS 4
@@ -110,7 +120,27 @@ acton help build
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'Show help for an unknown command:
+\h'-04' 3.\h'+01'Inspect nested wallet subcommands through the top\-level manual:
+.sp
+.RS 4
+.nf
+acton help wallet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 4.\h'+01'Show the exact clap help for a nested subcommand:
+.sp
+.RS 4
+.nf
+acton wallet list \-\-help
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Show help for an unknown command:
 .sp
 .RS 4
 .nf
@@ -120,7 +150,7 @@ acton help not\-a\-command
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'Search within a manual without invoking the pager:
+\h'-04' 6.\h'+01'Search within a manual without invoking the pager:
 .sp
 .RS 4
 .nf

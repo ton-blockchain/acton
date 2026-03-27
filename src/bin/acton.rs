@@ -117,11 +117,11 @@ enum Commands {
         agents: bool,
     },
     #[command(
-        about = "Print this message or the help of the given subcommand(s)",
+        about = "Print this message or the help of a given top-level command",
         after_help = detailed_help_pointer("help")
     )]
     Help {
-        #[arg(help = "Command to get help for")]
+        #[arg(help = "Top-level command to get help for")]
         command: Option<String>,
     },
     #[command(

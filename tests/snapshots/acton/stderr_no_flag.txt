@@ -26,7 +26,7 @@ Commands:
 
   ls                                   Run LSP server for the TON languages and technologies
   up                                   Manage Acton versions
-  help             [COMMAND]           Print this message or the help of the given subcommand(s)
+  help             [COMMAND]           Print this message or the help of a given top-level command
   hooks            <COMMAND>           Manage git hooks for the current project
   doctor                               Inspect resolved project environment
   func2tolk        <PATH>              Convert FunC files to Tolk via @ton/convert-func-to-tolk
