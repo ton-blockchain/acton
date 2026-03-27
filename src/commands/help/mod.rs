@@ -80,7 +80,7 @@ fn write_and_spawn(name: &str, contents: &[u8], command: &str) -> Result<bool> {
         .status();
 
     match status {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
+        Ok(status) if status.success() => Ok(true),
+        Ok(_) | Err(_) => Ok(false),
     }
 }

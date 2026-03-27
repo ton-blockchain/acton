@@ -6,7 +6,7 @@ mod integration;
 mod support;
 
 use common::ActonCommandExt;
-use std::process::Command;
+use std::{fs, process::Command};
 
 const MANUAL_COMMANDS: &[&str] = &[
     "init",
@@ -109,6 +109,17 @@ fn test_acton_help_new() {
 }
 
 #[test]
+fn test_acton_help_verify() {
+    snapbox::cmd::Command::acton_ui()
+        .arg("help")
+        .arg("verify")
+        .assert()
+        .success()
+        .stdout_eq(snapbox::file!["snapshots/help_verify/stdout.txt"])
+        .stderr_eq(snapbox::str![""]);
+}
+
+#[test]
 fn test_manual_commands_short_help_points_to_detailed_help() {
     for command in MANUAL_COMMANDS {
         let output = Command::new(common::acton_exe())
@@ -152,6 +163,29 @@ fn test_manual_commands_detailed_help_is_available() {
         assert!(
             stdout.contains(&expected),
             "acton help {command} did not render the generated manual.\nExpected to find: {expected}\nActual stdout:\n{stdout}",
+        );
+    }
+}
+
+#[test]
+fn test_commands_index_links_all_documented_command_pages() {
+    #[derive(serde::Deserialize)]
+    struct CommandsMeta {
+        pages: Vec<String>,
+    }
+
+    let meta = fs::read_to_string("docs/content/docs/commands/meta.json")
+        .expect("failed to read commands meta.json");
+    let meta: CommandsMeta =
+        serde_json::from_str(&meta).expect("failed to parse commands meta.json");
+    let index = fs::read_to_string("docs/content/docs/commands/index.mdx")
+        .expect("failed to read commands index.mdx");
+
+    for page in meta.pages {
+        let href = format!("href=\"/docs/commands/{page}\"");
+        assert!(
+            index.contains(&href),
+            "commands index is missing a card for {page} ({href})"
         );
     }
 }

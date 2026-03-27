@@ -34,11 +34,16 @@ If omitted, Acton prompts for it.
 \fB\-\-wallet\fR \fIwallet\fR
 .RS 4
 Wallet to use for the verification transaction.
+.sp
+If omitted, Acton auto\-selects the only configured wallet or prompts when
+multiple wallets are available.
 .RE
 .sp
 \fB\-\-compiler\-version\fR \fIversion\fR
 .RS 4
 Tolk compiler version to request on the verifier side.
+.sp
+Currently defaults to \fB1.1.0\fR\&.
 .RE
 .sp
 \fB\-\-dry\-run\fR
@@ -49,6 +54,8 @@ Run verification without submitting the final blockchain transaction.
 \fB\-\-api\-key\fR \fIkey\fR
 .RS 4
 TonCenter API key for blockchain queries.
+.sp
+Also read from \fBTONCENTER_API_KEY\fR\&.
 .RE
 .SS "Network Options"
 .sp
@@ -126,6 +133,25 @@ Verification usually consists of:
 .RS 4
 \h'-04'\(bu\h'+03'reproducible compiler settings that match the deployed contract
 .RE
+.SH "CONTRACT AND WALLET SELECTION"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB_contract\-id_\fR is omitted and exactly one contract is configured, Acton
+selects it automatically
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if multiple contracts are configured, Acton prompts for the contract
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if \fB\-\-wallet\fR is omitted and exactly one wallet is configured, Acton selects
+it automatically
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if multiple wallets are configured, Acton prompts for the wallet
+.RE
 .SH "REQUIREMENTS AND LIMITATIONS"
 .sp
 .RS 4
@@ -147,6 +173,21 @@ Verification usually consists of:
 .RS 4
 \h'-04'\(bu\h'+03'if a contract with the same code hash is already verified, the backend may
 skip the final transaction
+.RE
+.SH "COST AND BACKEND NOTES"
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'when \fB\-\-dry\-run\fR is not used, the final verification transaction sends
+\fB0.1 TON\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if the verifier backend reports that the contract is already verified, Acton
+exits successfully without sending another transaction
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'on successful verification, Acton prints a verifier link for the contract
 .RE
 .SH "DRY RUN"
 \fB\-\-dry\-run\fR still compiles the contract, uploads sources to the verifier

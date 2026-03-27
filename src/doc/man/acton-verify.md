@@ -37,10 +37,15 @@ If omitted, Acton prompts for it.
 
 {{#option "`--wallet` _wallet_" }}
 Wallet to use for the verification transaction.
+
+If omitted, Acton auto-selects the only configured wallet or prompts when
+multiple wallets are available.
 {{/option}}
 
 {{#option "`--compiler-version` _version_" }}
 Tolk compiler version to request on the verifier side.
+
+Currently defaults to `1.1.0`.
 {{/option}}
 
 {{#option "`--dry-run`" }}
@@ -49,6 +54,8 @@ Run verification without submitting the final blockchain transaction.
 
 {{#option "`--api-key` _key_" }}
 TonCenter API key for blockchain queries.
+
+Also read from `TONCENTER_API_KEY`.
 {{/option}}
 
 {{/options}}
@@ -91,6 +98,15 @@ Verification usually consists of:
 - a configured wallet, funded when not using `--dry-run`
 - reproducible compiler settings that match the deployed contract
 
+## CONTRACT AND WALLET SELECTION
+
+- if `_contract-id_` is omitted and exactly one contract is configured, Acton
+  selects it automatically
+- if multiple contracts are configured, Acton prompts for the contract
+- if `--wallet` is omitted and exactly one wallet is configured, Acton selects
+  it automatically
+- if multiple wallets are configured, Acton prompts for the wallet
+
 ## REQUIREMENTS AND LIMITATIONS
 
 - only `.tolk` sources can be verified
@@ -99,6 +115,14 @@ Verification usually consists of:
 - verification requires a funded wallet when not using `--dry-run`
 - if a contract with the same code hash is already verified, the backend may
   skip the final transaction
+
+## COST AND BACKEND NOTES
+
+- when `--dry-run` is not used, the final verification transaction sends
+  `0.1 TON`
+- if the verifier backend reports that the contract is already verified, Acton
+  exits successfully without sending another transaction
+- on successful verification, Acton prints a verifier link for the contract
 
 ## DRY RUN
 

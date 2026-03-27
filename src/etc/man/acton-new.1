@@ -19,8 +19,10 @@ If \fB_path_\fR already exists as a directory, \fBacton new\fR fails instead of 
 to merge into that directory, even when it is empty. To scaffold into the
 current directory explicitly, run \fBacton new .\fR for that case.
 .sp
-\fBacton new\fR does not run \fBgit init\fR\&. It only writes files that work in a new or
-already\-versioned repository.
+If \fBgit\fR is available in \fBPATH\fR, \fBacton new\fR runs \fBgit init\fR in the project
+directory and stages the generated files with \fBgit add .\fR\&.
+.sp
+The command does not create an initial commit.
 .SH "OPTIONS"
 .SS "New Options"
 .sp
@@ -159,6 +161,9 @@ Counter contract template with:
 .RE
 .sp
 This template also supports the optional TypeScript app layout with \fB\-\-app\fR\&.
+.sp
+With \fB\-\-app\fR, Acton also creates a Vite\-based React app, a generated
+TypeScript wrapper, and top\-level npm metadata files.
 .SS "jetton"
 Jetton minter and wallet template with:
 .sp
@@ -268,13 +273,47 @@ Depending on the selected template and options, Acton may also generate:
 .RS 4
 \h'-04'\(bu\h'+03'\fBAGENTS.md\fR for \fB\-\-agents\fR
 .RE
+.SH "COUNTER APP LAYOUT"
+When \fBacton new \-\-template counter \-\-app\fR is used, the project includes:
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcontracts/src\fR for contract sources and shared Tolk types
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcontracts/tests\fR for tests and generated Tolk wrappers
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcontracts/scripts\fR for deployment and utility scripts
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBwrappers/\fR for the generated TypeScript wrapper used by the app
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBapp/\fR for the React + Vite frontend
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'top\-level \fBpackage.json\fR and \fBpackage\-lock.json\fR for the frontend toolchain
+.RE
+.sp
+Before running frontend commands, install the app dependencies:
+.sp
+.RS 4
+.nf
+npm install
+.fi
+.RE
 .SH "SIDE EFFECTS"
 \fBacton new\fR creates or overwrites files only inside the new project directory.
-It also installs \fB\&.acton/tolk\-stdlib\fR there and may create \fB\&.githooks/\fR plus
-an \fBAGENTS.md\fR file when requested.
+It also installs \fB\&.acton/tolk\-stdlib\fR there, may create \fB\&.githooks/\fR plus an
+\fBAGENTS.md\fR file when requested, and, when \fBgit\fR is available, initializes the
+project repository and stages the generated files.
 .sp
-The command does not initialize a Git repository, does not commit files, and
-does not modify parent directories.
+The command does not create a commit and does not modify parent directories.
 .SH "EXIT STATUS"
 .sp
 .RS 4

@@ -30,8 +30,13 @@ OPTIONS
        --wallet wallet
            Wallet to use for the verification transaction.
 
+           If omitted, Acton auto-selects the only configured wallet or prompts
+           when multiple wallets are available.
+
        --compiler-version version
            Tolk compiler version to request on the verifier side.
+
+           Currently defaults to 1.1.0.
 
        --dry-run
            Run verification without submitting the final blockchain
@@ -39,6 +44,8 @@ OPTIONS
 
        --api-key key
            TonCenter API key for blockchain queries.
+
+           Also read from TONCENTER_API_KEY.
 
    Network Options
        --net network
@@ -89,6 +96,17 @@ PREREQUISITES
 
        o  reproducible compiler settings that match the deployed contract
 
+CONTRACT AND WALLET SELECTION
+       o  if _contract-id_ is omitted and exactly one contract is configured,
+          Acton selects it automatically
+
+       o  if multiple contracts are configured, Acton prompts for the contract
+
+       o  if --wallet is omitted and exactly one wallet is configured, Acton
+          selects it automatically
+
+       o  if multiple wallets are configured, Acton prompts for the wallet
+
 REQUIREMENTS AND LIMITATIONS
        o  only .tolk sources can be verified
 
@@ -100,6 +118,17 @@ REQUIREMENTS AND LIMITATIONS
 
        o  if a contract with the same code hash is already verified, the
           backend may skip the final transaction
+
+COST AND BACKEND NOTES
+       o  when --dry-run is not used, the final verification transaction sends
+          0.1 TON
+
+       o  if the verifier backend reports that the contract is already
+          verified, Acton exits successfully without sending another
+          transaction
+
+       o  on successful verification, Acton prints a verifier link for the
+          contract
 
 DRY RUN
        --dry-run still compiles the contract, uploads sources to the verifier

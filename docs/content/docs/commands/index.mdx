@@ -30,8 +30,20 @@ acton --manifest-path ../my-project/Acton.toml wallet new --local
 ```
 
 <Cards>
+    <Card href="/docs/commands/init" title="Initialize Current Directory">
+        Add an Acton scaffold to an existing directory without creating a new
+        project folder
+    </Card>
     <Card href="/docs/commands/new" title="Creating projects">
         Learn how to initialize new Acton projects using the new command
+    </Card>
+    <Card href="/docs/commands/build" title="Building Contracts">
+        Compile configured contracts, emit artifacts, and inspect dependency
+        outputs
+    </Card>
+    <Card href="/docs/commands/help" title="Using Help and Manuals">
+        Open root help, detailed command manuals, and pager-backed CLI
+        reference docs
     </Card>
     <Card href="/docs/commands/hooks" title="Managing Git Hooks">
         Scaffold project hooks, check Git hook status, and enable or disable
@@ -40,6 +52,10 @@ acton --manifest-path ../my-project/Acton.toml wallet new --local
     <Card href="/docs/commands/compile" title="Compiling Tolk smart contracts">
         Learn how to use the compile command to build Tolk source code into TVM
         bitcode
+    </Card>
+    <Card href="/docs/commands/wrapper" title="Generating Wrappers">
+        Produce Tolk or TypeScript wrappers and optional test stubs from
+        contract ABI
     </Card>
     <Card href="/docs/commands/fmt" title="Formatting Tolk files">
         Learn how to use the fmt command to format `.tolk` files consistently
@@ -67,6 +83,10 @@ acton --manifest-path ../my-project/Acton.toml wallet new --local
         Learn how to use the script command to execute standalone Tolk files for
         experimentation, deployment, and blockchain interaction
     </Card>
+    <Card href="/docs/commands/run" title="Running Named Scripts">
+        Execute script entries declared in `Acton.toml` with pass-through
+        arguments
+    </Card>
     <Card href="/docs/commands/verify"
           title="Verifying smart contract source code">
         Learn how to use the verify command to validate that deployed smart
@@ -83,6 +103,21 @@ acton --manifest-path ../my-project/Acton.toml wallet new --local
     <Card href="/docs/commands/litenode" title="Local Development Node">
         Learn how to start local node, fork remote state, and fund addresses
         with built-in faucet
+    </Card>
+    <Card href="/docs/commands/ls" title="Language Server">
+        Start the Acton language server over stdio or TCP for editor
+        integrations
+    </Card>
+    <Card href="/docs/commands/up" title="Managing Acton Versions">
+        List, inspect, and install stable or trunk Acton releases
+    </Card>
+    <Card href="/docs/commands/doctor" title="Inspecting Project Environment">
+        Print resolved project, manifest, toolchain, and environment details
+        for troubleshooting
+    </Card>
+    <Card href="/docs/commands/func2tolk" title="Converting FunC to Tolk">
+        Translate `.fc` and `.func` sources with the bundled conversion
+        workflow
     </Card>
     <Card href="/docs/commands/shell-completions" title="Shell Completions">
         Learn how to enable autocompletion for the acton CLI in your shell

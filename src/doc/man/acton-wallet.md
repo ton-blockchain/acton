@@ -163,7 +163,7 @@ Sign an external message body with the selected wallet.
 Wallet name.
 {{/option}}
 
-{{#option "`--body` _boc_" }}
+{{#option "`--body`, `--message` _boc_" }}
 External body BoC to sign in hex or base64.
 
 If omitted, Acton reads from stdin or prompts interactively.

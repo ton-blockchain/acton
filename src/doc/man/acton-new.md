@@ -21,8 +21,10 @@ If `_path_` already exists as a directory, `acton new` fails instead of trying
 to merge into that directory, even when it is empty. To scaffold into the
 current directory explicitly, run `acton new .` for that case.
 
-`acton new` does not run `git init`. It only writes files that work in a new or
-already-versioned repository.
+If `git` is available in `PATH`, `acton new` runs `git init` in the project
+directory and stages the generated files with `git add .`.
+
+The command does not create an initial commit.
 
 ## OPTIONS
 
@@ -60,6 +62,9 @@ Counter contract template with:
 - optional `AGENTS.md`
 
 This template also supports the optional TypeScript app layout with `--app`.
+
+With `--app`, Acton also creates a Vite-based React app, a generated
+TypeScript wrapper, and top-level npm metadata files.
 
 ### jetton
 
@@ -108,14 +113,31 @@ Depending on the selected template and options, Acton may also generate:
 - `.githooks/pre-commit` for `--hooks`
 - `AGENTS.md` for `--agents`
 
+## COUNTER APP LAYOUT
+
+When `acton new --template counter --app` is used, the project includes:
+
+- `contracts/src` for contract sources and shared Tolk types
+- `contracts/tests` for tests and generated Tolk wrappers
+- `contracts/scripts` for deployment and utility scripts
+- `wrappers/` for the generated TypeScript wrapper used by the app
+- `app/` for the React + Vite frontend
+- top-level `package.json` and `package-lock.json` for the frontend toolchain
+
+Before running frontend commands, install the app dependencies:
+
+```bash
+npm install
+```
+
 ## SIDE EFFECTS
 
 `acton new` creates or overwrites files only inside the new project directory.
-It also installs `.acton/tolk-stdlib` there and may create `.githooks/` plus
-an `AGENTS.md` file when requested.
+It also installs `.acton/tolk-stdlib` there, may create `.githooks/` plus an
+`AGENTS.md` file when requested, and, when `git` is available, initializes the
+project repository and stages the generated files.
 
-The command does not initialize a Git repository, does not commit files, and
-does not modify parent directories.
+The command does not create a commit and does not modify parent directories.
 
 ## EXIT STATUS
 
