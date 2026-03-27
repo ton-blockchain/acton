@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use reqwest::blocking::{Client, Response};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, de::DeserializeOwned};
 
 const BASE_URL: &str = "https://api.ubicloud.com";
 const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
@@ -150,16 +150,13 @@ struct UbicloudError {
     type_: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub(crate) struct GithubCacheEntries {
-    pub(crate) count: usize,
     pub(crate) items: Vec<GithubCacheEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub(crate) struct GithubCacheEntry {
-    pub(crate) installation_name: String,
-    pub(crate) repository_name: String,
     pub(crate) id: String,
     pub(crate) key: String,
     pub(crate) size: u64,
