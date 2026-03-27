@@ -85,9 +85,12 @@ This conflicts with \fB\-\-manifest\-path\fR\&.
 Without file\-output flags, \fBacton compile\fR prints compilation information to
 standard output.
 .sp
-\fB\-\-json\fR and \fB\-\-base64\-only\fR change only the stdout format. File\-output flags
-such as \fB\-\-boc\fR, \fB\-\-fift\fR, \fB\-\-source\-map\fR, and \fB\-\-abi\fR can be combined with
-either stdout mode.
+\fB\-\-json\fR and \fB\-\-base64\-only\fR change the stdout format when stdout output is
+still enabled. File\-output flags such as \fB\-\-fift\fR, \fB\-\-source\-map\fR, and \fB\-\-abi\fR
+can be combined with either stdout mode.
+.sp
+\fB\-\-boc\fR is special: Acton writes the binary BoC file and returns successfully
+without printing the usual stdout payload.
 .sp
 Depending on the selected options, Acton can also write:
 .sp

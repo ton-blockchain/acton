@@ -840,7 +840,7 @@ pub enum LitenodeCommand {
         #[arg(
             long,
             short,
-            help = "LiteNode server port (default: [litenode].port or 3000)"
+            help = "LiteNode server port (default: [litenode].port or 5411)"
         )]
         port: Option<u16>,
     },

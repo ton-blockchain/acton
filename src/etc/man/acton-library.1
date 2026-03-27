@@ -134,7 +134,9 @@ TonCenter API key for blockchain interactions.
 .sp
 \fB\-\-json\fR
 .RS 4
-Emit JSON output.
+Emit JSON output for raw library fetches.
+.sp
+If \fB\-\-disasm\fR is also passed, Acton prints disassembly text instead.
 .RE
 .SS "acton library info"
 Show information about a deployed library.
@@ -300,6 +302,15 @@ Saved library metadata typically includes:
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'with \fB\-\-disasm\fR, stdout and file output are always disassembly text
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'with \fB\-\-json\fR, Acton prints JSON to stdout and does not also write \fB\-\-output\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'if both \fB\-\-json\fR and \fB\-\-disasm\fR are passed, disassembly text takes
+precedence over JSON on successful runs
 .RE
 .SH "EXIT STATUS"
 .sp

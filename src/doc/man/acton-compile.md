@@ -70,9 +70,12 @@ Clear the compilation cache before compiling.
 Without file-output flags, `acton compile` prints compilation information to
 standard output.
 
-`--json` and `--base64-only` change only the stdout format. File-output flags
-such as `--boc`, `--fift`, `--source-map`, and `--abi` can be combined with
-either stdout mode.
+`--json` and `--base64-only` change the stdout format when stdout output is
+still enabled. File-output flags such as `--fift`, `--source-map`, and `--abi`
+can be combined with either stdout mode.
+
+`--boc` is special: Acton writes the binary BoC file and returns successfully
+without printing the usual stdout payload.
 
 Depending on the selected options, Acton can also write:
 

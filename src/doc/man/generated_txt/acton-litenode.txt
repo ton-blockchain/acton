@@ -82,8 +82,11 @@ RUNTIME MODEL
        o  acton litenode start runs in the foreground until the process is
           stopped
 
-       o  in TCP mode, Acton accepts a single client connection and then serves
-          that session until the client disconnects
+       o  Acton starts an HTTP server on localhost:<port> for LiteNode API and
+          admin endpoints
+
+       o  the server keeps running until the process is stopped, for example
+          with Ctrl+C
 
        o  when --port and [litenode].port are both absent, the current runtime
           fallback is 5411

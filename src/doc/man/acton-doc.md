@@ -23,7 +23,7 @@ Lookup TVM instructions by exact name or fuzzy search query.
 
 #### Synopsis
 
-`acton doc tvm` [_options_] [_instruction_...]
+`acton doc tvm` [_options_] _instruction_...
 
 #### Options
 
@@ -56,12 +56,15 @@ Without `--find`, each argument is treated as an instruction name.
 - name matching is case-insensitive
 - `-` and `#` are normalized for convenience
 - JSON mode always returns an array of instruction objects
+- at least one instruction name is required
 
 With `--find`, each argument is treated as a search query.
 
 - fuzzy matching uses instruction names by default
 - `--description` also matches instruction descriptions, tags, and operands
 - JSON mode returns query/matches objects
+- at least one query is required
+- queries with no matches return an error instead of an empty result set
 
 ## TOPICS
 
@@ -74,8 +77,7 @@ current built-in reference surface.
 
 ## EXIT STATUS
 
-- `0`: The requested documentation was printed successfully, including empty
-  fuzzy-search result sets.
+- `0`: The requested documentation was printed successfully.
 - `1`: The namespace was unknown, arguments were invalid, or rendering failed.
 
 ## DISPLAY OPTIONS

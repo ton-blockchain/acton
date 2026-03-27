@@ -1,3 +1,8 @@
 * text=auto eol=lf
 
 acton.schema.json linguist-generated=true text=auto eol=lf
+
+# Generated CLI command docs from `acton docgen`
+docs/content/docs/commands/*.mdx linguist-generated text=auto eol=lf
+src/doc/man/generated_txt/*.txt linguist-generated text=auto eol=lf
+src/etc/man/*.1 linguist-generated text=auto eol=lf

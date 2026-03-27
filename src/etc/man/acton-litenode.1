@@ -109,8 +109,13 @@ CLI flags override config values for the current invocation.
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'in TCP mode, Acton accepts a single client connection and then serves that
-session until the client disconnects
+\h'-04'\(bu\h'+03'Acton starts an HTTP server on \fBlocalhost:<port>\fR for LiteNode API and admin
+endpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the server keeps running until the process is stopped, for example with
+\fBCtrl+C\fR
 .RE
 .sp
 .RS 4

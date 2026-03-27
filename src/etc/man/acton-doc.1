@@ -16,7 +16,7 @@ subcommand.
 .SS "acton doc tvm"
 Lookup TVM instructions by exact name or fuzzy search query.
 .SS "Synopsis"
-\fBacton doc tvm\fR [\fIoptions\fR] [\fIinstruction\fR\[u2026]]
+\fBacton doc tvm\fR [\fIoptions\fR] \fIinstruction\fR\[u2026]
 .SS "Options"
 .sp
 \fIinstruction\fR\[u2026]
@@ -55,6 +55,10 @@ Without \fB\-\-find\fR, each argument is treated as an instruction name.
 \h'-04'\(bu\h'+03'JSON mode always returns an array of instruction objects
 .RE
 .sp
+.RS 4
+\h'-04'\(bu\h'+03'at least one instruction name is required
+.RE
+.sp
 With \fB\-\-find\fR, each argument is treated as a search query.
 .sp
 .RS 4
@@ -68,6 +72,14 @@ With \fB\-\-find\fR, each argument is treated as a search query.
 .RS 4
 \h'-04'\(bu\h'+03'JSON mode returns query/matches objects
 .RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'at least one query is required
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'queries with no matches return an error instead of an empty result set
+.RE
 .SH "TOPICS"
 Currently available documentation namespaces:
 .sp
@@ -80,8 +92,7 @@ current built\-in reference surface.
 .SH "EXIT STATUS"
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB0\fR: The requested documentation was printed successfully, including empty
-fuzzy\-search result sets.
+\h'-04'\(bu\h'+03'\fB0\fR: The requested documentation was printed successfully.
 .RE
 .sp
 .RS 4

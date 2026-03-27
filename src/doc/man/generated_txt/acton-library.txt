@@ -98,7 +98,10 @@ SUBCOMMANDS
               TonCenter API key for blockchain interactions.
 
           --json
-              Emit JSON output.
+              Emit JSON output for raw library fetches.
+
+              If --disasm is also passed, Acton prints disassembly text
+              instead.
 
    acton library info
        Show information about a deployed library.
@@ -216,6 +219,12 @@ FETCH OUTPUT
        o  with --output to any other path, Acton writes base64 text
 
        o  with --disasm, stdout and file output are always disassembly text
+
+       o  with --json, Acton prints JSON to stdout and does not also write
+          --output
+
+       o  if both --json and --disasm are passed, disassembly text takes
+          precedence over JSON on successful runs
 
 EXIT STATUS
        o  0: The selected library subcommand completed successfully.

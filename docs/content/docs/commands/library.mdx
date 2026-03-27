@@ -254,7 +254,9 @@ TonCenter API key for blockchain interactions.
 
 </CommandOptionTitle>
 
-Emit JSON output.
+Emit JSON output for raw library fetches.
+
+If `--disasm` is also passed, Acton prints disassembly text instead.
 
 </CommandOption>
 
@@ -492,6 +494,9 @@ Saved library metadata typically includes:
 - with `--output path.boc`, Acton writes binary BoC
 - with `--output` to any other path, Acton writes base64 text
 - with `--disasm`, stdout and file output are always disassembly text
+- with `--json`, Acton prints JSON to stdout and does not also write `--output`
+- if both `--json` and `--disasm` are passed, disassembly text takes
+  precedence over JSON on successful runs
 
 ## EXIT STATUS
 

@@ -17,7 +17,7 @@ SUBCOMMANDS
        Lookup TVM instructions by exact name or fuzzy search query.
 
       Synopsis
-          acton doc tvm [options] [instruction…]
+          acton doc tvm [options] instruction…
 
       Options
           instruction…
@@ -44,6 +44,8 @@ SUBCOMMANDS
 
           o  JSON mode always returns an array of instruction objects
 
+          o  at least one instruction name is required
+
           With --find, each argument is treated as a search query.
 
           o  fuzzy matching uses instruction names by default
@@ -52,6 +54,11 @@ SUBCOMMANDS
              operands
 
           o  JSON mode returns query/matches objects
+
+          o  at least one query is required
+
+          o  queries with no matches return an error instead of an empty result
+             set
 
 TOPICS
        Currently available documentation namespaces:
@@ -62,8 +69,7 @@ TOPICS
        the current built-in reference surface.
 
 EXIT STATUS
-       o  0: The requested documentation was printed successfully, including
-          empty fuzzy-search result sets.
+       o  0: The requested documentation was printed successfully.
 
        o  1: The namespace was unknown, arguments were invalid, or rendering
           failed.
