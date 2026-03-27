@@ -8,6 +8,31 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [0.1.2] - 27.03.2026
+
+Acton 0.1.2 improves project scaffolding, script diagnostics, and secure wallet storage,
+while tightening release maintenance workflows and TON objs artifact validation.
+
+### Added
+
+- Added `acton new --agents` to include template-specific `AGENTS.md` guidance for coding agents, with matching interactive prompts in project creation flows.
+- Added richer `acton script` failure diagnostics, including exit code descriptions and phases, plus source backtraces when re-run with `--backtrace full`.
+
+### Changed
+
+- Changed secure wallet storage to keep per-scope mnemonic bundles in the native keychain, so multiple secure wallets in one local or global scope can share a single keychain entry and be updated or removed independently.
+- Changed TON objs archive validation to use the checked-in `artifacts_manifest.toml`, with `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY=1` available as an escape hatch for local archive refresh workflows.
+
+### Fixed
+
+- Fixed the `jetton` starter template for the latest Tolk 1.3 syntax and corrected its generated `deploy.tolk` script.
+- Fixed a dependency security issue by bumping `tar` to `0.4.45`.
+
+### Upgrade Notes
+
+- If you use secure wallets backed by the native keychain, re-import or recreate them after upgrading so Acton can rewrite the stored mnemonic data in the new bundled format.
+- If your CI uses the GitHub Action, update workflow references to `ton-blockchain/setup-acton`.
+
 ## [0.1.1] - 22.03.2026
 
 Added TON objs files to releases.
