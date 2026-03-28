@@ -7,9 +7,11 @@ use acton_config::config::{
 use anyhow::Result;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::OpenOptions;
 use std::io::Write as _;
+use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::{env, fs};
@@ -796,22 +798,73 @@ fn send_doctor_api_request(
     .send()
 }
 
-fn run_doctor_api_check(target: DoctorApiTarget) -> DoctorApiCheck {
-    let started = Instant::now();
-    let client = reqwest::blocking::Client::builder()
+fn build_doctor_api_client() -> Result<reqwest::blocking::Client, reqwest::Error> {
+    // `doctor` is best-effort diagnostics: prefer direct requests over
+    // reqwest system-proxy autodiscovery, which can panic in restricted
+    // macOS environments instead of returning a recoverable transport error.
+    reqwest::blocking::Client::builder()
+        .no_proxy()
         .connect_timeout(DOCTOR_API_CONNECT_TIMEOUT)
         .timeout(DOCTOR_API_REQUEST_TIMEOUT)
-        .build();
+        .build()
+}
+
+fn doctor_api_panic_message(payload: &(dyn Any + Send)) -> String {
+    if let Some(message) = payload.downcast_ref::<&str>() {
+        (*message).to_string()
+    } else if let Some(message) = payload.downcast_ref::<String>() {
+        message.clone()
+    } else {
+        "unknown panic payload".to_string()
+    }
+}
+
+fn doctor_api_transport_error(error: impl std::fmt::Display) -> String {
+    format!("request failed before receiving an HTTP response from this environment: {error}")
+}
+
+fn panic_doctor_api_check(
+    target: DoctorApiTarget,
+    started: Instant,
+    payload: Box<dyn Any + Send>,
+) -> DoctorApiCheck {
+    DoctorApiCheck {
+        name: target.name,
+        method: target.method.as_str().to_string(),
+        url: target.display_url,
+        ok: false,
+        status_code: None,
+        duration_ms: started.elapsed().as_millis(),
+        error: Some(format!(
+            "API check panicked before receiving an HTTP response from this environment: {}",
+            doctor_api_panic_message(payload.as_ref())
+        )),
+    }
+}
+
+fn run_doctor_api_check_with<F>(target: DoctorApiTarget, execute: F) -> DoctorApiCheck
+where
+    F: FnOnce(&DoctorApiTarget, Instant) -> DoctorApiCheck,
+{
+    let started = Instant::now();
+    match std::panic::catch_unwind(AssertUnwindSafe(|| execute(&target, started))) {
+        Ok(check) => check,
+        Err(payload) => panic_doctor_api_check(target, started, payload),
+    }
+}
+
+fn run_doctor_api_check_inner(target: &DoctorApiTarget, started: Instant) -> DoctorApiCheck {
+    let client = build_doctor_api_client();
 
     let (ok, status_code, error) = match client {
-        Ok(client) => match send_doctor_api_request(&client, &target) {
+        Ok(client) => match send_doctor_api_request(&client, target) {
             Ok(response) => {
                 let mut status = response.status().as_u16();
                 if status == 429
                     && let Some(retry_delay) = target.retry_on_429_after
                 {
                     std::thread::sleep(retry_delay);
-                    match send_doctor_api_request(&client, &target) {
+                    match send_doctor_api_request(&client, target) {
                         Ok(retry_response) => {
                             status = retry_response.status().as_u16();
                             (
@@ -820,7 +873,7 @@ fn run_doctor_api_check(target: DoctorApiTarget) -> DoctorApiCheck {
                                 (status != 200).then(|| format!("HTTP {status}")),
                             )
                         }
-                        Err(err) => (false, None, Some(err.to_string())),
+                        Err(err) => (false, None, Some(doctor_api_transport_error(err))),
                     }
                 } else {
                     (
@@ -830,22 +883,26 @@ fn run_doctor_api_check(target: DoctorApiTarget) -> DoctorApiCheck {
                     )
                 }
             }
-            Err(err) => (false, None, Some(err.to_string())),
+            Err(err) => (false, None, Some(doctor_api_transport_error(err))),
         },
-        Err(err) => (false, None, Some(err.to_string())),
+        Err(err) => (false, None, Some(doctor_api_transport_error(err))),
     };
 
     let duration_ms = started.elapsed().as_millis();
 
     DoctorApiCheck {
-        name: target.name,
+        name: target.name.clone(),
         method: target.method.as_str().to_string(),
-        url: target.display_url,
+        url: target.display_url.clone(),
         ok,
         status_code,
         duration_ms,
         error,
     }
+}
+
+fn run_doctor_api_check(target: DoctorApiTarget) -> DoctorApiCheck {
+    run_doctor_api_check_with(target, run_doctor_api_check_inner)
 }
 
 fn run_doctor_api_group(group: Vec<(usize, DoctorApiTarget)>) -> Vec<(usize, DoctorApiCheck)> {
@@ -947,6 +1004,26 @@ fn print_section(title: &str) {
 fn print_kv(label: &str, value: impl AsRef<str>) {
     let key = format!("{label}:");
     println!("{} {}", format!("{key:<17}").bold(), value.as_ref());
+}
+
+fn doctor_api_environment_note(report: &DoctorApiChecks) -> Option<String> {
+    let transport_failures = report
+        .checks
+        .iter()
+        .filter(|check| !check.ok && check.status_code.is_none())
+        .count();
+
+    if transport_failures == 0 {
+        None
+    } else if transport_failures == report.total && report.total > 0 {
+        Some(
+            "API health could not be verified from this environment; all outbound checks failed before any HTTP response. This does not prove the APIs are down.".to_string(),
+        )
+    } else {
+        Some(format!(
+            "{transport_failures} endpoint(s) could not be verified from this environment because the request failed before any HTTP response."
+        ))
+    }
 }
 
 fn print_path(label: &str, value: &DoctorPath) {
@@ -1264,6 +1341,9 @@ fn print_report(report: &DoctorReport) {
 
 fn print_api_checks(report: &DoctorApiChecks) {
     print_kv("healthy", format!("{}/{}", report.healthy, report.total));
+    if let Some(note) = doctor_api_environment_note(report) {
+        print_kv("note", note);
+    }
 
     for check in &report.checks {
         let status = if check.ok {
@@ -1275,7 +1355,7 @@ fn print_api_checks(report: &DoctorApiChecks) {
                 check.duration_ms
             )
         } else {
-            format!("{} [{} ms]", "unreachable".bright_red(), check.duration_ms)
+            format!("{} [{} ms]", "unverified".yellow(), check.duration_ms)
         };
 
         print_kv(
