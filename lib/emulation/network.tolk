@@ -466,6 +466,8 @@ fun net.send(from: address, message: OutMessage): SendResultList {
 ///
 /// This API is emulation-only and is intended for programmable partial execution workflows
 /// such as large cascades and interleaving multiple message chains.
+///
+/// Step-by-step execution is not available in broadcast mode or test-runner debug mode.
 fun net.sendIter(from: address, message: OutMessage): TxCursor {
     return TxCursor {
         id: ffi.startMessageIter(message.messageCell, from.toCell()),

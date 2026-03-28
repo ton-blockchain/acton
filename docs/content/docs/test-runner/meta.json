@@ -6,6 +6,7 @@
     "test-attributes",
     "test-configuration",
     "world-state-snapshots",
+    "step-by-step-execution",
     "gas-profiling-with-snapshots",
     "fork-testing",
     "code-coverage",
