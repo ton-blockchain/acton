@@ -8,6 +8,30 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [0.1.3] - 28.03.2026
+
+Acton 0.1.3 expands built-in command manuals and diagnostics, improves Linux
+binary compatibility on older CPUs, refreshes TON objs metadata, and hardens
+CLI workflows with broader integration coverage.
+
+### Added
+
+- Added long-form built-in manuals for top-level commands via `acton help <command>`.
+- Added bundled plain-text manual artifacts generated from the CLI definitions.
+- Added bundled manpage artifacts generated from the CLI definitions.
+- Added API reachability checks to `acton doctor` for common Acton backends.
+- Added native `.a` library version reporting to `acton doctor`.
+- Added embedded TON commit hash and date reporting for native libraries in `acton doctor`.
+
+### Changed
+
+- Changed Linux TON objs builds to avoid `-march=native`, improving compatibility on older CPUs.
+- Refreshed the checked-in TON objs artifact manifest to the latest upstream snapshot.
+
+### Fixed
+
+- Fixed incorrect flag references in the quickstart and test-runner documentation.
+
 ## [0.1.2] - 27.03.2026
 
 Acton 0.1.2 improves project scaffolding, script diagnostics, and secure wallet storage,
