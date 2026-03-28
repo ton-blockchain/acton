@@ -278,6 +278,7 @@ fn execute_script<'a>(
             emulator: &mut emulator,
             emulations: &mut emulations,
         },
+        message_iters: Default::default(),
         build: BuildContext {
             build_cache: &mut build_cache,
             file_build_cache: &mut file_build_cache,

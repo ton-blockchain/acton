@@ -182,6 +182,56 @@ fun SendResultList.at(self, index: int): SendResult {
     return self.get(index);
 }
 
+/// Opaque cursor for step-by-step transaction execution.
+///
+/// Use [net.sendIter] to create it, then drain it in parts with [TxCursor.executeN],
+/// [TxCursor.executeTill], or [TxCursor.executeFrom].
+struct TxCursor {
+    id: int
+}
+
+/// Returns `true` when the cursor has no more pending transactions to execute.
+fun TxCursor.isDone(self): bool {
+    return ffi.isMessageIterDone(self.id);
+}
+
+/// Discards any remaining pending transactions for this cursor.
+fun TxCursor.close(self): void {
+    ffi.closeMessageIter(self.id);
+}
+
+/// Executes up to [n] transactions from the cursor and returns only this executed segment.
+///
+/// This is useful when you need to inspect the first few hops of a long chain without
+/// draining the whole queue.
+fun TxCursor.executeN(self, n: int): SendResultList {
+    return ffi.executeMessageIterN(self.id, n);
+}
+
+/// Executes transactions until one of them matches [params], then returns the executed segment.
+///
+/// The matching transaction is included in the returned list. If no matching transaction is found
+/// before the queue is exhausted, this function fails the test.
+fun TxCursor.executeTill<Msg = unknown>(self, params: SearchParams = {}): SendResultList {
+    val declaredPrefix = Msg.getDeclaredPackPrefix2();
+    if (declaredPrefix != -1) {
+        params.opcode = declaredPrefix;
+    }
+
+    val txs = ffi.executeMessageIterTill(self.id, params.toTuple());
+    if (txs == null) {
+        Assert.fail("executeTill() did not find a matching transaction before queue exhaustion");
+        throw 567;
+    }
+
+    return txs;
+}
+
+/// Executes all remaining pending transactions and returns only this executed segment.
+fun TxCursor.executeFrom(self): SendResultList {
+    return ffi.executeMessageIterFrom(self.id);
+}
+
 /// Wait for the transaction to be applied on the blockchain.
 ///
 /// This method is useful when broadcasting transactions to the real network.
@@ -407,6 +457,19 @@ fun net.send(from: address, message: OutMessage): SendResultList {
         throw 100;
     }
     return rawRes;
+}
+
+/// Start step-by-step execution for a message sent from [from].
+///
+/// In contrast to [net.send], this method does not execute the whole transaction chain eagerly.
+/// Instead it returns a cursor that can be advanced in batches.
+///
+/// This API is emulation-only and is intended for programmable partial execution workflows
+/// such as large cascades and interleaving multiple message chains.
+fun net.sendIter(from: address, message: OutMessage): TxCursor {
+    return TxCursor {
+        id: ffi.startMessageIter(message.messageCell, from.toCell()),
+    };
 }
 
 /// Send a single message from a specified address.
@@ -1342,3 +1405,9 @@ fun ffi.saveTraceName(txs: SendResultList, name: string): void asm "35 EXTCALL";
 fun ffi.runTickTock(onAccount: address, isTock: bool): SendResultList asm "36 EXTCALL";
 fun ffi.saveWorldStateSnapshot(path: string): bool asm "37 EXTCALL";
 fun ffi.loadWorldStateSnapshot(path: string): bool asm "38 EXTCALL";
+fun ffi.startMessageIter(msg: cell, from: cell): int asm "39 EXTCALL";
+fun ffi.executeMessageIterN(cursorId: int, n: int): SendResultList asm "40 EXTCALL";
+fun ffi.executeMessageIterTill(cursorId: int, params: tuple): SendResultList? asm "41 EXTCALL";
+fun ffi.executeMessageIterFrom(cursorId: int): SendResultList asm "42 EXTCALL";
+fun ffi.isMessageIterDone(cursorId: int): bool asm "43 EXTCALL";
+fun ffi.closeMessageIter(cursorId: int): void asm "44 EXTCALL";

@@ -300,6 +300,7 @@ impl<'a> TestRunner<'a> {
                 emulator: &mut emulator,
                 emulations: &mut self.emulations,
             },
+            message_iters: Default::default(),
             build: BuildContext {
                 build_cache: &mut self.build_cache,
                 file_build_cache: self.file_build_cache,

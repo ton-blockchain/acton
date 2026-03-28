@@ -6,6 +6,7 @@ use acton_config::test::BacktraceMode;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tolkc::abi::ContractABI as CompilerContractABI;
@@ -372,6 +373,96 @@ impl EmulationsState {
     }
 }
 
+pub struct PendingMessageStep {
+    pub message: Cell,
+    pub from: Option<IntAddr>,
+    pub parent_lt: Option<u64>,
+}
+
+pub struct MessageCursor {
+    pending: VecDeque<PendingMessageStep>,
+    libs: Dict<HashBytes, LibDescr>,
+}
+
+pub struct MessageIterState {
+    next_id: u64,
+    cursors: FxHashMap<u64, MessageCursor>,
+}
+
+impl Default for MessageIterState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MessageIterState {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            next_id: 1,
+            cursors: FxHashMap::default(),
+        }
+    }
+
+    #[must_use]
+    pub fn insert_message_cursor(
+        &mut self,
+        message: Cell,
+        from: Option<IntAddr>,
+        libs: Dict<HashBytes, LibDescr>,
+    ) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+
+        self.cursors.insert(
+            id,
+            MessageCursor {
+                pending: VecDeque::from([PendingMessageStep {
+                    message,
+                    from,
+                    parent_lt: None,
+                }]),
+                libs,
+            },
+        );
+
+        id
+    }
+
+    #[must_use]
+    pub fn contains(&self, id: u64) -> bool {
+        self.cursors.contains_key(&id)
+    }
+
+    #[must_use]
+    pub fn is_done(&self, id: u64) -> bool {
+        self.cursors
+            .get(&id)
+            .is_none_or(|cursor| cursor.pending.is_empty())
+    }
+
+    pub fn pop_next(&mut self, id: u64) -> Option<(PendingMessageStep, Dict<HashBytes, LibDescr>)> {
+        let cursor = self.cursors.get_mut(&id)?;
+        let pending = cursor.pending.pop_front()?;
+        Some((pending, cursor.libs.clone()))
+    }
+
+    pub fn push_child_message(&mut self, id: u64, message: Cell, parent_lt: u64) -> Option<()> {
+        let cursor = self.cursors.get_mut(&id)?;
+        cursor.pending.push_back(PendingMessageStep {
+            message,
+            from: None,
+            parent_lt: Some(parent_lt),
+        });
+        Some(())
+    }
+
+    #[must_use]
+    pub fn close(&mut self, id: u64) -> bool {
+        self.cursors.remove(&id).is_some()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Wallet {
     pub name: String,
@@ -418,6 +509,7 @@ pub struct Context<'a> {
     pub io: IoContext,
     pub asserts: AssertsContext<'a>,
     pub chain: ChainContext<'a>,
+    pub message_iters: MessageIterState,
     pub build: BuildContext<'a>,
     pub debug: DebugCtx<'a>,
     pub is_broadcasting: bool,

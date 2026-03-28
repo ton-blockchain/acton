@@ -5,6 +5,7 @@ mod api_fmt_env_tests;
 mod api_map_tests;
 mod api_matchers_tests;
 mod api_register_code_cell_tests;
+mod api_send_iter_tests;
 mod api_send_single_tests;
 mod api_transaction_matchers_tests;
 mod api_wallet_mode_tests;

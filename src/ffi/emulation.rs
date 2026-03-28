@@ -1,6 +1,7 @@
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, Wallet, to_cell,
+    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, TransactionNotFoundParams,
+    Wallet, to_cell,
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
@@ -39,7 +40,7 @@ use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Lazy, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{
     AccountState, AccountStatus, ComputePhase, ComputePhaseSkipReason, HashUpdate, IntAddr,
-    LibDescr, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
+    LibDescr, Message, MsgInfo, OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo,
     ShardAccount, SkippedComputePhase, StdAddr, StdAddrFormat, Transaction, TxInfo,
 };
 
@@ -417,6 +418,299 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
     ])))
 }
 
+struct SearchMatcher {
+    params: TransactionNotFoundParams,
+    requires_internal_in_msg: bool,
+    expected_body_hash: Option<HashBytes>,
+}
+
+#[allow(clippy::large_enum_variant)]
+enum IterationStop {
+    Steps(usize),
+    UntilMatch(SearchMatcher),
+    Exhausted,
+}
+
+fn send_results_to_tuple_items(emulations: &[SendMessageResult]) -> Vec<TupleItem> {
+    emulations
+        .iter()
+        .filter_map(|emulation| match emulation {
+            SendMessageResult::Success(res) => Some(res),
+            SendMessageResult::Error(_) => None,
+        })
+        .filter_map(emulation_to_send_result)
+        .collect::<Vec<_>>()
+}
+
+fn save_send_results(ctx: &mut Context, emulations: &[SendMessageResult]) {
+    if emulations.is_empty() {
+        return;
+    }
+
+    ctx.chain
+        .emulations
+        .save_message(&ctx.env.running_id, emulations.to_vec());
+}
+
+fn push_successful_send_results(stack: &mut Tuple, emulations: &[SendMessageResult]) {
+    stack.push(TupleItem::big_array_from_items(
+        send_results_to_tuple_items(emulations),
+    ));
+}
+
+fn build_search_matcher(params: &Tuple) -> Option<SearchMatcher> {
+    let params = parse_search_params(params)?;
+    let requires_internal_in_msg = params.opcode.is_some()
+        || params.bounced.is_some()
+        || params.bounce.is_some()
+        || params.value.is_some()
+        || params.from.is_some()
+        || params.to.is_some();
+    let expected_body_hash = params.body.as_ref().map(|body| body.repr_hash()).copied();
+
+    Some(SearchMatcher {
+        params,
+        requires_internal_in_msg,
+        expected_body_hash,
+    })
+}
+
+fn transaction_matches_search(tx: &Transaction, matcher: &SearchMatcher) -> bool {
+    let params = &matcher.params;
+
+    if let Some(expected_deploy) = params.deploy {
+        let is_deploy =
+            tx.orig_status == AccountStatus::NotExists && tx.end_status == AccountStatus::Active;
+        if expected_deploy != is_deploy {
+            return false;
+        }
+    }
+
+    let in_msg = tx.load_in_msg();
+    if let Ok(Some(in_msg)) = &in_msg
+        && let MsgInfo::Int(info) = &in_msg.info
+    {
+        if let Some(expected_opcode) = &params.opcode {
+            let mut slice = in_msg.body;
+            let Ok(opcode) = slice.load_u32() else {
+                return false;
+            };
+            if *expected_opcode != opcode {
+                if params.bounced == Some(true) {
+                    let Ok(bounced_opcode) = slice.load_u32() else {
+                        return false;
+                    };
+                    if *expected_opcode != bounced_opcode {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        if let Some(expected_bounced) = &params.bounced
+            && *expected_bounced != info.bounced
+        {
+            return false;
+        }
+
+        if let Some(expected_bounce) = &params.bounce
+            && *expected_bounce != info.bounce
+        {
+            return false;
+        }
+
+        if let Some(expected_value) = &params.value
+            && (*expected_value) != info.value.tokens.into()
+        {
+            return false;
+        }
+
+        if let Some(expected_from_addr) = &params.from
+            && (*expected_from_addr) != info.src
+        {
+            return false;
+        }
+
+        if let Some(expected_to_addr) = &params.to
+            && (*expected_to_addr) != info.dst
+        {
+            return false;
+        }
+
+        if let Some(expected_hash) = matcher.expected_body_hash.as_ref() {
+            let body_cell = to_cell(&in_msg.body);
+            let actual_hash = body_cell.repr_hash();
+            if expected_hash != actual_hash {
+                return false;
+            }
+        }
+    } else if matcher.requires_internal_in_msg {
+        return false;
+    }
+
+    let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
+        return false;
+    };
+
+    if let Some(expected_compute_skipped) = params.compute_phase_skipped {
+        let is_skipped = matches!(info.compute_phase, ComputePhase::Skipped(_));
+        if expected_compute_skipped != is_skipped {
+            return false;
+        }
+    }
+
+    if let Some(expected_aborted) = params.aborted
+        && expected_aborted != info.aborted
+    {
+        return false;
+    }
+
+    if let Some(expected_action_exit_code) = params.action_exit_code {
+        if let Some(action_phase) = &info.action_phase {
+            if action_phase.result_code != expected_action_exit_code {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    if let ComputePhase::Executed(compute) = &info.compute_phase
+        && let Some(expected_exit_code) = params.exit_code
+        && compute.exit_code != expected_exit_code as i32
+    {
+        return false;
+    }
+
+    if let Some(expected_success) = params.success {
+        let action_phase_success = if let Some(action_phase) = &info.action_phase {
+            action_phase.success
+        } else {
+            false
+        };
+
+        if let ComputePhase::Executed(compute) = &info.compute_phase
+            && (action_phase_success && compute.success) != expected_success
+        {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn backfill_batch_child_transactions(results: &mut [SendMessageResult]) {
+    let mut children_by_parent = HashMap::<u64, Vec<u64>>::new();
+
+    for result in results.iter() {
+        let SendMessageResult::Success(result) = result else {
+            continue;
+        };
+
+        if let Some(parent_lt) = result.parent_transaction {
+            children_by_parent
+                .entry(parent_lt)
+                .or_default()
+                .push(result.transaction.lt);
+        }
+    }
+
+    for result in results.iter_mut() {
+        let SendMessageResult::Success(result) = result else {
+            continue;
+        };
+
+        result.child_transactions = children_by_parent
+            .remove(&result.transaction.lt)
+            .unwrap_or_default();
+    }
+}
+
+fn execute_message_iter_batch(
+    ctx: &mut Context,
+    cursor_id: u64,
+    stop: IterationStop,
+) -> anyhow::Result<(Vec<SendMessageResult>, bool)> {
+    if ctx.is_broadcasting {
+        anyhow::bail!("net.sendIter() is available only in emulation mode")
+    }
+
+    if ctx.debug.is_enabled() {
+        anyhow::bail!("Step-by-step execution is not supported in debug mode yet")
+    }
+
+    if !ctx.message_iters.contains(cursor_id) {
+        return Ok((Vec::new(), false));
+    }
+
+    let mut executed = 0usize;
+    let mut matched = false;
+    let mut results = Vec::new();
+
+    loop {
+        match &stop {
+            IterationStop::Steps(limit) if executed >= *limit => break,
+            IterationStop::Steps(_) | IterationStop::UntilMatch(_) | IterationStop::Exhausted => {}
+        }
+
+        let Some((pending, libs)) = ctx.message_iters.pop_next(cursor_id) else {
+            break;
+        };
+
+        let mut result = ctx
+            .chain
+            .emulator
+            .send_transaction(ctx.chain.world_state, pending.message, &libs, pending.from)
+            .context("Cannot execute step-by-step transaction")?;
+
+        if let SendMessageResult::Success(step) = &mut result {
+            step.parent_transaction = pending.parent_lt;
+            let tx_lt = step.transaction.lt;
+            let out_messages = step.out_messages.clone();
+            let mut externals = Vec::new();
+
+            for out_msg_cell in out_messages {
+                let Ok(out_msg) = out_msg_cell.parse::<Message<'_>>() else {
+                    continue;
+                };
+
+                match out_msg.info {
+                    MsgInfo::ExtOut(_) => externals.push(out_msg_cell),
+                    MsgInfo::Int(_) => {
+                        let _ =
+                            ctx.message_iters
+                                .push_child_message(cursor_id, out_msg_cell, tx_lt);
+                    }
+                    MsgInfo::ExtIn(_) => {}
+                }
+            }
+
+            step.externals = externals;
+
+            if let IterationStop::UntilMatch(matcher) = &stop
+                && transaction_matches_search(&step.transaction, matcher)
+            {
+                matched = true;
+            }
+        } else {
+            let _ = ctx.message_iters.close(cursor_id);
+        }
+
+        executed += 1;
+        let should_stop = matched;
+        results.push(result);
+
+        if should_stop {
+            break;
+        }
+    }
+
+    backfill_batch_child_transactions(&mut results);
+    Ok((results, matched))
+}
+
 fn send_wallet_message(
     message: &Cell,
     wallet: Wallet,
@@ -670,6 +964,124 @@ fn send_single_message_impl(
     Ok(())
 }
 
+extension!(start_message_iter in (Context) with (src: IntAddr, msg: Cell) using start_message_iter_impl);
+fn start_message_iter_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    src: IntAddr,
+    msg: Cell,
+) -> anyhow::Result<()> {
+    let libs = ctx.chain.build_libs(&src);
+    let cursor_id = ctx
+        .message_iters
+        .insert_message_cursor(msg, Some(src), libs);
+    stack.push(TupleItem::Int(BigInt::from(cursor_id)));
+    Ok(())
+}
+
+extension!(execute_message_iter_n in (Context) with (count: BigInt, cursor_id: BigInt) using execute_message_iter_n_impl);
+fn execute_message_iter_n_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    count: BigInt,
+    cursor_id: BigInt,
+) -> anyhow::Result<()> {
+    let cursor_id = cursor_id
+        .to_u64()
+        .context("Transaction iterator id does not fit into u64")?;
+    let count = count.to_usize().unwrap_or(0);
+    let (results, _) = execute_message_iter_batch(ctx, cursor_id, IterationStop::Steps(count))?;
+
+    if let [SendMessageResult::Error(error)] = &results[..] {
+        save_send_results(ctx, &results);
+        anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
+    }
+
+    save_send_results(ctx, &results);
+    push_successful_send_results(stack, &results);
+    Ok(())
+}
+
+extension!(execute_message_iter_till in (Context) with (params: Tuple, cursor_id: BigInt) using execute_message_iter_till_impl);
+fn execute_message_iter_till_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    params: Tuple,
+    cursor_id: BigInt,
+) -> anyhow::Result<()> {
+    let cursor_id = cursor_id
+        .to_u64()
+        .context("Transaction iterator id does not fit into u64")?;
+    let Some(matcher) = build_search_matcher(&params) else {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    };
+
+    let (results, matched) =
+        execute_message_iter_batch(ctx, cursor_id, IterationStop::UntilMatch(matcher))?;
+
+    if let [SendMessageResult::Error(error)] = &results[..] {
+        save_send_results(ctx, &results);
+        anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
+    }
+
+    save_send_results(ctx, &results);
+    if !matched {
+        stack.push(TupleItem::Null);
+        return Ok(());
+    }
+
+    push_successful_send_results(stack, &results);
+    Ok(())
+}
+
+extension!(execute_message_iter_from in (Context) with (cursor_id: BigInt) using execute_message_iter_from_impl);
+fn execute_message_iter_from_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    cursor_id: BigInt,
+) -> anyhow::Result<()> {
+    let cursor_id = cursor_id
+        .to_u64()
+        .context("Transaction iterator id does not fit into u64")?;
+    let (results, _) = execute_message_iter_batch(ctx, cursor_id, IterationStop::Exhausted)?;
+
+    if let [SendMessageResult::Error(error)] = &results[..] {
+        save_send_results(ctx, &results);
+        anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
+    }
+
+    save_send_results(ctx, &results);
+    push_successful_send_results(stack, &results);
+    Ok(())
+}
+
+extension!(is_message_iter_done in (Context) with (cursor_id: BigInt) using is_message_iter_done_impl);
+fn is_message_iter_done_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    cursor_id: BigInt,
+) -> anyhow::Result<()> {
+    let cursor_id = cursor_id
+        .to_u64()
+        .context("Transaction iterator id does not fit into u64")?;
+    stack.push_bool(ctx.message_iters.is_done(cursor_id));
+    Ok(())
+}
+
+extension!(close_message_iter in (Context) with (cursor_id: BigInt) using close_message_iter_impl);
+fn close_message_iter_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    cursor_id: BigInt,
+) -> anyhow::Result<()> {
+    let cursor_id = cursor_id
+        .to_u64()
+        .context("Transaction iterator id does not fit into u64")?;
+    let _ = ctx.message_iters.close(cursor_id);
+    Ok(())
+}
+
 fn root_lt_from_send_results(txs: &[TupleItem]) -> Option<u64> {
     let first = txs.first()?;
     let TupleItem::Tuple(send_result) = first else {
@@ -711,19 +1123,10 @@ fn find_transaction_by_params_impl(
         return Ok(());
     }
 
-    let params = if let Some(value) = parse_search_params(&params) {
-        value
-    } else {
+    let Some(matcher) = build_search_matcher(&params) else {
         stack.push(TupleItem::Null);
         return Ok(());
     };
-    let requires_internal_in_msg = params.opcode.is_some()
-        || params.bounced.is_some()
-        || params.bounce.is_some()
-        || params.value.is_some()
-        || params.from.is_some()
-        || params.to.is_some();
-    let expected_body_hash = params.body.as_ref().map(|body| body.repr_hash());
 
     let mut found = txs
         .iter()
@@ -735,147 +1138,7 @@ fn find_transaction_by_params_impl(
             _ => None,
         })
         .filter_map(|cell| Some((cell.parse::<Transaction>().ok()?, cell)))
-        .filter(|(tx, _)| {
-            if let Some(expected_deploy) = params.deploy {
-                let is_deploy = tx.orig_status == AccountStatus::NotExists
-                    && tx.end_status == AccountStatus::Active;
-                if expected_deploy != is_deploy {
-                    // Deploy flag mismatch
-                    return false;
-                }
-            }
-
-            let in_msg = tx.load_in_msg();
-            if let Ok(Some(in_msg)) = &in_msg
-                && let MsgInfo::Int(info) = &in_msg.info
-            {
-                if let Some(expected_opcode) = &params.opcode {
-                    let mut slice = in_msg.body;
-                    let Ok(opcode) = slice.load_u32() else {
-                        // No opcode at all
-                        return false;
-                    };
-                    if *expected_opcode != opcode {
-                        if params.bounced == Some(true) {
-                            // if bounced, try to match opcode after 0xFFFFFFFF
-                            let Ok(bounced_opcode) = slice.load_u32() else {
-                                // No bounced opcode at all
-                                return false;
-                            };
-                            if *expected_opcode != bounced_opcode {
-                                // Bounced opcode mismatch
-                                return false;
-                            }
-                        } else {
-                            // Opcode mismatch
-                            return false;
-                        }
-                    }
-                }
-
-                if let Some(expected_bounced) = &params.bounced
-                    && *expected_bounced != info.bounced
-                {
-                    // Bounced value mismatch
-                    return false;
-                }
-
-                if let Some(expected_bounce) = &params.bounce
-                    && *expected_bounce != info.bounce
-                {
-                    // Bounce value mismatch
-                    return false;
-                }
-
-                if let Some(expected_value) = &params.value
-                    && (*expected_value) != info.value.tokens.into()
-                {
-                    // Message value mismatch
-                    return false;
-                }
-
-                if let Some(expected_from_addr) = &params.from
-                    && (*expected_from_addr) != info.src
-                {
-                    // Source address mismatch
-                    return false;
-                }
-
-                if let Some(expected_to_addr) = &params.to
-                    && (*expected_to_addr) != info.dst
-                {
-                    // Destination address mismatch
-                    return false;
-                }
-
-                if let Some(expected_hash) = expected_body_hash.as_ref() {
-                    let body_cell = to_cell(&in_msg.body);
-                    let actual_hash = body_cell.repr_hash();
-                    if expected_hash != &actual_hash {
-                        // Message body hash mismatch
-                        return false;
-                    }
-                }
-            } else if requires_internal_in_msg {
-                return false;
-            }
-
-            let Ok(TxInfo::Ordinary(info)) = tx.load_info() else {
-                return false;
-            };
-
-            if let Some(expected_compute_skipped) = params.compute_phase_skipped {
-                let is_skipped = matches!(info.compute_phase, ComputePhase::Skipped(_));
-                if expected_compute_skipped != is_skipped {
-                    // Compute phase skipped mismatch
-                    return false;
-                }
-            }
-
-            if let Some(expected_aborted) = params.aborted
-                && expected_aborted != info.aborted
-            {
-                // Aborted mismatch
-                return false;
-            }
-
-            if let Some(expected_action_exit_code) = params.action_exit_code {
-                if let Some(action_phase) = &info.action_phase {
-                    if action_phase.result_code != expected_action_exit_code {
-                        // Action exit code mismatch
-                        return false;
-                    }
-                } else {
-                    // Action phase is missing but expected
-                    return false;
-                }
-            }
-
-            if let ComputePhase::Executed(compute) = &info.compute_phase
-                && let Some(expected_exit_code) = params.exit_code
-                && compute.exit_code != expected_exit_code as i32
-            {
-                // Exit code mismatch
-                return false;
-            }
-
-            if let Some(expected_success) = params.success {
-                let action_phase_success = if let Some(action_phase) = &info.action_phase {
-                    action_phase.success
-                } else {
-                    false // np action phase, no success
-                };
-
-                if let ComputePhase::Executed(compute) = &info.compute_phase
-                    && (action_phase_success && compute.success) != expected_success
-                {
-                    // Success mismatch
-                    return false;
-                }
-            }
-
-            true
-        });
+        .filter(|(tx, _)| transaction_matches_search(tx, &matcher));
 
     let Some((_, first)) = found.next() else {
         // No transaction found
@@ -1599,6 +1862,12 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         36 => run_tick_tock : 2,
         37 => save_world_state_snapshot : 1,
         38 => load_world_state_snapshot : 1,
+        39 => start_message_iter : 2,
+        40 => execute_message_iter_n : 2,
+        41 => execute_message_iter_till : 2,
+        42 => execute_message_iter_from : 1,
+        43 => is_message_iter_done : 1,
+        44 => close_message_iter : 1,
     });
 }
 
