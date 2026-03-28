@@ -135,6 +135,37 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
+const LIBRARY_CHILD_CONTRACT: &str = r#"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const LIBRARY_SPAWNER_CONTRACT: &str = r#"
+import "../gen/lib_code.tolk"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val childInit = ContractState {
+        code: libCompiledCode(),
+        data: createEmptyCell(),
+    };
+
+    createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: {
+            stateInit: childInit,
+        },
+        body: beginCell().storeUint(777, 32).endCell(),
+    }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 const ROUTER_CONTRACT: &str = r#"
 import "messages"
 
@@ -693,6 +724,80 @@ get fun `test-send-iter-collects-externals`() {
 "#,
         "send_iter_collects_external_messages_and_keeps_internal_tail_queued",
     );
+}
+
+#[test]
+fn send_iter_uses_live_registered_libraries_for_resumed_steps() {
+    ProjectBuilder::new("n-lib-api-send-iter-live-libraries")
+        .contract("lib", LIBRARY_CHILD_CONTRACT)
+        .contract_with_detailed_deps(
+            "spawner",
+            LIBRARY_SPAWNER_CONTRACT,
+            vec![("lib", Some("library_ref"), None, None)],
+        )
+        .test_file(
+            "test",
+            r#"
+import "../../lib/build/build"
+import "../../lib/emulation/network"
+import "../../lib/testing/expect"
+import "../../lib/testing/transaction_expect"
+import "../../lib/vm/vm"
+import "../gen/lib_code.tolk"
+
+get fun `test-send-iter-live-libraries`() {
+    val sender = net.treasury("sender");
+
+    val spawnerInit = ContractState {
+        code: build("spawner"),
+        data: createEmptyCell(),
+    };
+    val spawnerAddress = AutoDeployAddress { stateInit: spawnerInit }.calculateAddress();
+
+    val childInit = ContractState {
+        code: libCompiledCode(),
+        data: createEmptyCell(),
+    };
+    val childAddress = AutoDeployAddress { stateInit: childInit }.calculateAddress();
+
+    expect(net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: spawnerInit },
+    }))).toHaveSuccessfulDeploy({ to: spawnerAddress });
+
+    val iter = net.sendIter(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.5"),
+        dest: spawnerAddress,
+        body: beginCell().storeUint(1, 32).endCell(),
+    }));
+
+    val first = iter.executeN(1);
+    expect(first).toHaveLength(1);
+    expect(first).toHaveSuccessfulTx({
+        from: sender.address,
+        to: spawnerAddress,
+    });
+
+    vm.registerLibrary(build("lib"));
+
+    val tail = iter.executeFrom();
+    expect(tail).toHaveLength(1);
+    expect(tail).toHaveSuccessfulDeploy({ to: childAddress });
+    expect(iter.isDone()).toBeTrue();
+}
+"#,
+        )
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_send_iter/send_iter_uses_live_registered_libraries_for_resumed_steps.stdout.txt",
+        );
 }
 
 #[test]

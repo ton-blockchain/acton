@@ -452,6 +452,36 @@ fn save_send_results(ctx: &mut Context, emulations: &[SendMessageResult]) {
         .save_message(&ctx.env.running_id, emulations.to_vec());
 }
 
+fn save_message_iter_results(ctx: &mut Context, cursor_id: u64, emulations: &[SendMessageResult]) {
+    if emulations.is_empty() {
+        return;
+    }
+
+    let trace_index = match ctx.message_iters.trace_index(cursor_id) {
+        Some(trace_index) => trace_index,
+        None => {
+            save_send_results(ctx, emulations);
+            return;
+        }
+    };
+
+    let saved_trace_index = match trace_index {
+        Some(trace_index) => ctx.chain.emulations.append_message_to_trace(
+            &ctx.env.running_id,
+            trace_index,
+            emulations.to_vec(),
+        ),
+        None => ctx
+            .chain
+            .emulations
+            .save_message(&ctx.env.running_id, emulations.to_vec()),
+    };
+
+    let _ = ctx
+        .message_iters
+        .set_trace_index(cursor_id, saved_trace_index);
+}
+
 fn push_successful_send_results(stack: &mut Tuple, emulations: &[SendMessageResult]) {
     stack.push(TupleItem::big_array_from_items(
         send_results_to_tuple_items(emulations),
@@ -655,9 +685,10 @@ fn execute_message_iter_batch(
             IterationStop::Steps(_) | IterationStop::UntilMatch(_) | IterationStop::Exhausted => {}
         }
 
-        let Some((pending, libs)) = ctx.message_iters.pop_next(cursor_id) else {
+        let Some((pending, libs_owner)) = ctx.message_iters.pop_next(cursor_id) else {
             break;
         };
+        let libs = ctx.chain.build_libs_with_hash_owner(&libs_owner);
 
         let mut result = ctx
             .chain
@@ -695,7 +726,7 @@ fn execute_message_iter_batch(
                 matched = true;
             }
         } else {
-            let _ = ctx.message_iters.close(cursor_id);
+            let _ = ctx.message_iters.mark_done(cursor_id);
         }
 
         executed += 1;
@@ -971,10 +1002,11 @@ fn start_message_iter_impl(
     src: IntAddr,
     msg: Cell,
 ) -> anyhow::Result<()> {
-    let libs = ctx.chain.build_libs(&src);
+    let std_address = src.as_std().context("Var addresses are not supported")?;
+    let libs_owner = std_address.address;
     let cursor_id = ctx
         .message_iters
-        .insert_message_cursor(msg, Some(src), libs);
+        .insert_message_cursor(msg, Some(src), libs_owner);
     stack.push(TupleItem::Int(BigInt::from(cursor_id)));
     Ok(())
 }
@@ -993,11 +1025,11 @@ fn execute_message_iter_n_impl(
     let (results, _) = execute_message_iter_batch(ctx, cursor_id, IterationStop::Steps(count))?;
 
     if let [SendMessageResult::Error(error)] = &results[..] {
-        save_send_results(ctx, &results);
+        save_message_iter_results(ctx, cursor_id, &results);
         anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
     }
 
-    save_send_results(ctx, &results);
+    save_message_iter_results(ctx, cursor_id, &results);
     push_successful_send_results(stack, &results);
     Ok(())
 }
@@ -1021,11 +1053,11 @@ fn execute_message_iter_till_impl(
         execute_message_iter_batch(ctx, cursor_id, IterationStop::UntilMatch(matcher))?;
 
     if let [SendMessageResult::Error(error)] = &results[..] {
-        save_send_results(ctx, &results);
+        save_message_iter_results(ctx, cursor_id, &results);
         anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
     }
 
-    save_send_results(ctx, &results);
+    save_message_iter_results(ctx, cursor_id, &results);
     if !matched {
         stack.push(TupleItem::Null);
         return Ok(());
@@ -1047,11 +1079,11 @@ fn execute_message_iter_from_impl(
     let (results, _) = execute_message_iter_batch(ctx, cursor_id, IterationStop::Exhausted)?;
 
     if let [SendMessageResult::Error(error)] = &results[..] {
-        save_send_results(ctx, &results);
+        save_message_iter_results(ctx, cursor_id, &results);
         anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
     }
 
-    save_send_results(ctx, &results);
+    save_message_iter_results(ctx, cursor_id, &results);
     push_successful_send_results(stack, &results);
     Ok(())
 }

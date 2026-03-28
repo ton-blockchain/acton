@@ -278,42 +278,35 @@ impl EmulationsState {
         self.results.values().flat_map(|res| &res.get_methods)
     }
 
-    pub fn save_message(&mut self, env_name: &str, message: Vec<SendMessageResult>) {
-        let successful_messages = message
-            .iter()
-            .filter_map(|m| match m {
-                SendMessageResult::Success(m) => Some(m),
-                SendMessageResult::Error(_) => None,
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-        let failed_messages = message
-            .iter()
-            .filter_map(|m| match m {
-                SendMessageResult::Success(_) => None,
-                SendMessageResult::Error(error) => Some(FailedSendMessageResult {
-                    error: error.error.clone(),
-                    vm_log: error.vm_log.clone(),
-                    vm_exit_code: error.vm_exit_code,
-                    executor_logs: error.executor_logs.clone(),
-                    missing_libraries: error.missing_libraries.clone(),
-                }),
-            })
-            .collect::<Vec<_>>();
-
-        let emulations = self
-            .results
-            .entry(env_name.to_owned())
-            .or_insert_with(|| Emulations {
-                name: env_name.to_owned(),
-                messages: vec![],
-                failed_messages: vec![],
-                trace_names: FxHashMap::default(),
-                get_methods: vec![],
-            });
-
+    pub fn save_message(&mut self, env_name: &str, message: Vec<SendMessageResult>) -> usize {
+        let (successful_messages, failed_messages) = split_send_message_results(&message);
+        let emulations = self.emulations_mut(env_name);
         emulations.messages.push(successful_messages);
         emulations.failed_messages.push(failed_messages);
+        emulations.messages.len() - 1
+    }
+
+    pub fn append_message_to_trace(
+        &mut self,
+        env_name: &str,
+        trace_index: usize,
+        message: Vec<SendMessageResult>,
+    ) -> usize {
+        let (successful_messages, failed_messages) = split_send_message_results(&message);
+        let emulations = self.emulations_mut(env_name);
+
+        if trace_index >= emulations.messages.len()
+            || trace_index >= emulations.failed_messages.len()
+        {
+            emulations.messages.push(successful_messages);
+            emulations.failed_messages.push(failed_messages);
+            return emulations.messages.len() - 1;
+        }
+
+        emulations.messages[trace_index].extend(successful_messages);
+        emulations.failed_messages[trace_index].extend(failed_messages);
+        recompute_trace_child_transactions(&mut emulations.messages[trace_index]);
+        trace_index
     }
 
     pub fn save_get_method(&mut self, env_name: &str, get_method: GetMethodResultSuccess) {
@@ -330,12 +323,19 @@ impl EmulationsState {
             .push(get_method);
     }
 
-    pub fn save_trace_name(&mut self, env_name: &str, root_lt: u64, trace_name: String) {
+    pub fn save_trace_name(&mut self, env_name: &str, lt: u64, trace_name: String) {
         let Some(emulations) = self.results.get_mut(env_name) else {
             return;
         };
 
-        emulations.trace_names.insert(root_lt, trace_name);
+        let trace_root_lt = emulations
+            .messages
+            .iter()
+            .find(|trace| trace.iter().any(|tx| tx.transaction.lt == lt))
+            .and_then(|trace| trace.first().map(|tx| tx.transaction.lt))
+            .unwrap_or(lt);
+
+        emulations.trace_names.insert(trace_root_lt, trace_name);
     }
 
     #[must_use]
@@ -371,6 +371,65 @@ impl EmulationsState {
     pub fn find_tx_missing_libraries(&self, lt: u64) -> Option<&FxHashSet<String>> {
         self.find_tx_by_lt(lt).map(|res| &res.missing_libraries)
     }
+
+    fn emulations_mut(&mut self, env_name: &str) -> &mut Emulations {
+        self.results
+            .entry(env_name.to_owned())
+            .or_insert_with(|| Emulations {
+                name: env_name.to_owned(),
+                messages: vec![],
+                failed_messages: vec![],
+                trace_names: FxHashMap::default(),
+                get_methods: vec![],
+            })
+    }
+}
+
+fn split_send_message_results(
+    message: &[SendMessageResult],
+) -> (Vec<SendMessageResultSuccess>, Vec<FailedSendMessageResult>) {
+    let successful_messages = message
+        .iter()
+        .filter_map(|m| match m {
+            SendMessageResult::Success(m) => Some(m),
+            SendMessageResult::Error(_) => None,
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let failed_messages = message
+        .iter()
+        .filter_map(|m| match m {
+            SendMessageResult::Success(_) => None,
+            SendMessageResult::Error(error) => Some(FailedSendMessageResult {
+                error: error.error.clone(),
+                vm_log: error.vm_log.clone(),
+                vm_exit_code: error.vm_exit_code,
+                executor_logs: error.executor_logs.clone(),
+                missing_libraries: error.missing_libraries.clone(),
+            }),
+        })
+        .collect::<Vec<_>>();
+
+    (successful_messages, failed_messages)
+}
+
+fn recompute_trace_child_transactions(trace: &mut [SendMessageResultSuccess]) {
+    let mut children_by_parent = FxHashMap::<u64, Vec<u64>>::default();
+
+    for result in trace.iter() {
+        if let Some(parent_lt) = result.parent_transaction {
+            children_by_parent
+                .entry(parent_lt)
+                .or_default()
+                .push(result.transaction.lt);
+        }
+    }
+
+    for result in trace.iter_mut() {
+        result.child_transactions = children_by_parent
+            .remove(&result.transaction.lt)
+            .unwrap_or_default();
+    }
 }
 
 pub struct PendingMessageStep {
@@ -381,7 +440,8 @@ pub struct PendingMessageStep {
 
 pub struct MessageCursor {
     pending: VecDeque<PendingMessageStep>,
-    libs: Dict<HashBytes, LibDescr>,
+    libs_owner: HashBytes,
+    trace_index: Option<usize>,
 }
 
 pub struct MessageIterState {
@@ -409,7 +469,7 @@ impl MessageIterState {
         &mut self,
         message: Cell,
         from: Option<IntAddr>,
-        libs: Dict<HashBytes, LibDescr>,
+        libs_owner: HashBytes,
     ) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
@@ -422,7 +482,8 @@ impl MessageIterState {
                     from,
                     parent_lt: None,
                 }]),
-                libs,
+                libs_owner,
+                trace_index: None,
             },
         );
 
@@ -441,10 +502,10 @@ impl MessageIterState {
             .is_none_or(|cursor| cursor.pending.is_empty())
     }
 
-    pub fn pop_next(&mut self, id: u64) -> Option<(PendingMessageStep, Dict<HashBytes, LibDescr>)> {
+    pub fn pop_next(&mut self, id: u64) -> Option<(PendingMessageStep, HashBytes)> {
         let cursor = self.cursors.get_mut(&id)?;
         let pending = cursor.pending.pop_front()?;
-        Some((pending, cursor.libs.clone()))
+        Some((pending, cursor.libs_owner))
     }
 
     pub fn push_child_message(&mut self, id: u64, message: Cell, parent_lt: u64) -> Option<()> {
@@ -454,6 +515,23 @@ impl MessageIterState {
             from: None,
             parent_lt: Some(parent_lt),
         });
+        Some(())
+    }
+
+    pub fn mark_done(&mut self, id: u64) -> Option<()> {
+        let cursor = self.cursors.get_mut(&id)?;
+        cursor.pending.clear();
+        Some(())
+    }
+
+    #[must_use]
+    pub fn trace_index(&self, id: u64) -> Option<Option<usize>> {
+        self.cursors.get(&id).map(|cursor| cursor.trace_index)
+    }
+
+    pub fn set_trace_index(&mut self, id: u64, trace_index: usize) -> Option<()> {
+        let cursor = self.cursors.get_mut(&id)?;
+        cursor.trace_index = Some(trace_index);
         Some(())
     }
 

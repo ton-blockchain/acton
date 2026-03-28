@@ -4,7 +4,7 @@ import "network"
 /// Utilities for naming and organizing traces produced in tests.
 struct tracing
 
-/// Save a custom name for a trace chain produced by [net.send].
+/// Save a custom name for a trace chain produced by [net.send] or [net.sendIter].
 ///
 /// The custom name is used in the Test UI and gas/fee profiling reports.
 ///
