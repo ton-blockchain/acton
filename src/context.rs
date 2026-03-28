@@ -432,6 +432,7 @@ fn recompute_trace_child_transactions(trace: &mut [SendMessageResultSuccess]) {
     }
 }
 
+#[derive(Clone)]
 pub struct PendingMessageStep {
     pub message: Cell,
     pub from: Option<IntAddr>,
@@ -502,10 +503,16 @@ impl MessageIterState {
             .is_none_or(|cursor| cursor.pending.is_empty())
     }
 
-    pub fn pop_next(&mut self, id: u64) -> Option<(PendingMessageStep, HashBytes)> {
-        let cursor = self.cursors.get_mut(&id)?;
-        let pending = cursor.pending.pop_front()?;
+    pub fn peek_next(&self, id: u64) -> Option<(PendingMessageStep, HashBytes)> {
+        let cursor = self.cursors.get(&id)?;
+        let pending = cursor.pending.front()?.clone();
         Some((pending, cursor.libs_owner))
+    }
+
+    pub fn advance(&mut self, id: u64) -> Option<()> {
+        let cursor = self.cursors.get_mut(&id)?;
+        cursor.pending.pop_front()?;
+        Some(())
     }
 
     pub fn push_child_message(&mut self, id: u64, message: Cell, parent_lt: u64) -> Option<()> {
@@ -515,12 +522,6 @@ impl MessageIterState {
             from: None,
             parent_lt: Some(parent_lt),
         });
-        Some(())
-    }
-
-    pub fn mark_done(&mut self, id: u64) -> Option<()> {
-        let cursor = self.cursors.get_mut(&id)?;
-        cursor.pending.clear();
         Some(())
     }
 
@@ -538,6 +539,15 @@ impl MessageIterState {
     #[must_use]
     pub fn close(&mut self, id: u64) -> bool {
         self.cursors.remove(&id).is_some()
+    }
+
+    #[must_use]
+    pub fn close_if_done(&mut self, id: u64) -> bool {
+        if self.is_done(id) {
+            return self.close(id);
+        }
+
+        false
     }
 }
 
@@ -722,4 +732,75 @@ pub(crate) fn to_cell<T: Store + ?Sized>(obj: &T) -> Cell {
     obj.store_into(&mut builder, Cell::empty_context())
         .expect("Failed to store data into cell builder");
     builder.build().expect("Failed to build cell from builder")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dummy_hash(byte: u8) -> HashBytes {
+        HashBytes([byte; 32])
+    }
+
+    #[test]
+    fn message_iter_peek_does_not_consume_until_advanced() {
+        let mut state = MessageIterState::new();
+        let root = Cell::default();
+        let cursor_id = state.insert_message_cursor(root.clone(), None, dummy_hash(1));
+
+        let (first_peek, first_owner) = state.peek_next(cursor_id).expect("cursor must be present");
+        assert_eq!(first_owner, dummy_hash(1));
+        assert_eq!(first_peek.parent_lt, None);
+        assert_eq!(first_peek.message, root);
+        assert!(!state.is_done(cursor_id));
+
+        let (second_peek, second_owner) = state.peek_next(cursor_id).expect("peek must be stable");
+        assert_eq!(second_owner, dummy_hash(1));
+        assert_eq!(second_peek.parent_lt, None);
+        assert_eq!(second_peek.message, root);
+
+        state
+            .advance(cursor_id)
+            .expect("advance must consume the step");
+        assert!(state.is_done(cursor_id));
+    }
+
+    #[test]
+    fn message_iter_close_if_done_removes_exhausted_cursor() {
+        let mut state = MessageIterState::new();
+        let cursor_id = state.insert_message_cursor(Cell::default(), None, dummy_hash(2));
+
+        assert!(state.contains(cursor_id));
+        assert!(!state.close_if_done(cursor_id));
+        assert!(state.contains(cursor_id));
+
+        state
+            .advance(cursor_id)
+            .expect("advance must drain the only step");
+        assert!(state.close_if_done(cursor_id));
+        assert!(!state.contains(cursor_id));
+        assert!(state.is_done(cursor_id));
+    }
+
+    #[test]
+    fn message_iter_accepts_children_after_root_step_is_consumed() {
+        let mut state = MessageIterState::new();
+        let child = Cell::default();
+        let cursor_id = state.insert_message_cursor(Cell::default(), None, dummy_hash(3));
+
+        state.advance(cursor_id).expect("advance must consume root");
+        assert!(state.is_done(cursor_id));
+
+        state
+            .push_child_message(cursor_id, child.clone(), 777)
+            .expect("cursor should accept child messages while still open");
+
+        let (pending, owner) = state
+            .peek_next(cursor_id)
+            .expect("child must become pending");
+        assert_eq!(owner, dummy_hash(3));
+        assert_eq!(pending.parent_lt, Some(777));
+        assert_eq!(pending.message, child);
+        assert!(!state.is_done(cursor_id));
+    }
 }

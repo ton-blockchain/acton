@@ -1,7 +1,7 @@
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, TransactionNotFoundParams,
-    Wallet, to_cell,
+    AssertFailure, Context, GetMethodAssertFailure, KnownAddress, MessageIterState,
+    PendingMessageStep, TransactionNotFoundParams, Wallet, to_cell,
 };
 use crate::debugger::any_executor::AnyExecutor;
 use crate::debugger::debug_context::StepMode;
@@ -431,6 +431,12 @@ enum IterationStop {
     Exhausted,
 }
 
+struct MessageIterBatch {
+    results: Vec<SendMessageResult>,
+    matched: bool,
+    hard_error: Option<anyhow::Error>,
+}
+
 fn send_results_to_tuple_items(emulations: &[SendMessageResult]) -> Vec<TupleItem> {
     emulations
         .iter()
@@ -480,6 +486,15 @@ fn save_message_iter_results(ctx: &mut Context, cursor_id: u64, emulations: &[Se
     let _ = ctx
         .message_iters
         .set_trace_index(cursor_id, saved_trace_index);
+}
+
+fn finish_message_iter_results(
+    ctx: &mut Context,
+    cursor_id: u64,
+    emulations: &[SendMessageResult],
+) {
+    save_message_iter_results(ctx, cursor_id, emulations);
+    let _ = ctx.message_iters.close_if_done(cursor_id);
 }
 
 fn push_successful_send_results(stack: &mut Tuple, emulations: &[SendMessageResult]) {
@@ -658,21 +673,21 @@ fn backfill_batch_child_transactions(results: &mut [SendMessageResult]) {
     }
 }
 
-fn execute_message_iter_batch(
-    ctx: &mut Context,
+fn execute_message_iter_batch_with<F>(
+    message_iters: &mut MessageIterState,
     cursor_id: u64,
     stop: IterationStop,
-) -> anyhow::Result<(Vec<SendMessageResult>, bool)> {
-    if ctx.is_broadcasting {
-        anyhow::bail!("net.sendIter() is available only in emulation mode")
-    }
-
-    if ctx.debug.is_enabled() {
-        anyhow::bail!("Step-by-step execution is not supported in debug mode yet")
-    }
-
-    if !ctx.message_iters.contains(cursor_id) {
-        return Ok((Vec::new(), false));
+    mut execute_step: F,
+) -> anyhow::Result<MessageIterBatch>
+where
+    F: FnMut(PendingMessageStep, HashBytes) -> anyhow::Result<SendMessageResult>,
+{
+    if !message_iters.contains(cursor_id) {
+        return Ok(MessageIterBatch {
+            results: Vec::new(),
+            matched: false,
+            hard_error: None,
+        });
     }
 
     let mut executed = 0usize;
@@ -685,16 +700,23 @@ fn execute_message_iter_batch(
             IterationStop::Steps(_) | IterationStop::UntilMatch(_) | IterationStop::Exhausted => {}
         }
 
-        let Some((pending, libs_owner)) = ctx.message_iters.pop_next(cursor_id) else {
+        let Some((pending, libs_owner)) = message_iters.peek_next(cursor_id) else {
             break;
         };
-        let libs = ctx.chain.build_libs_with_hash_owner(&libs_owner);
 
-        let mut result = ctx
-            .chain
-            .emulator
-            .send_transaction(ctx.chain.world_state, pending.message, &libs, pending.from)
-            .context("Cannot execute step-by-step transaction")?;
+        let mut result = match execute_step(pending.clone(), libs_owner) {
+            Ok(result) => result,
+            Err(error) if results.is_empty() => return Err(error),
+            Err(error) => {
+                backfill_batch_child_transactions(&mut results);
+                return Ok(MessageIterBatch {
+                    results,
+                    matched,
+                    hard_error: Some(error),
+                });
+            }
+        };
+        let _ = message_iters.advance(cursor_id);
 
         if let SendMessageResult::Success(step) = &mut result {
             step.parent_transaction = pending.parent_lt;
@@ -710,9 +732,7 @@ fn execute_message_iter_batch(
                 match out_msg.info {
                     MsgInfo::ExtOut(_) => externals.push(out_msg_cell),
                     MsgInfo::Int(_) => {
-                        let _ =
-                            ctx.message_iters
-                                .push_child_message(cursor_id, out_msg_cell, tx_lt);
+                        let _ = message_iters.push_child_message(cursor_id, out_msg_cell, tx_lt);
                     }
                     MsgInfo::ExtIn(_) => {}
                 }
@@ -725,8 +745,6 @@ fn execute_message_iter_batch(
             {
                 matched = true;
             }
-        } else {
-            let _ = ctx.message_iters.mark_done(cursor_id);
         }
 
         executed += 1;
@@ -739,7 +757,39 @@ fn execute_message_iter_batch(
     }
 
     backfill_batch_child_transactions(&mut results);
-    Ok((results, matched))
+    Ok(MessageIterBatch {
+        results,
+        matched,
+        hard_error: None,
+    })
+}
+
+fn execute_message_iter_batch(
+    ctx: &mut Context,
+    cursor_id: u64,
+    stop: IterationStop,
+) -> anyhow::Result<MessageIterBatch> {
+    if ctx.is_broadcasting {
+        anyhow::bail!("net.sendIter() is available only in emulation mode")
+    }
+
+    if ctx.debug.is_enabled() {
+        anyhow::bail!("Step-by-step execution is not supported in debug mode yet")
+    }
+
+    let chain = &mut ctx.chain;
+    execute_message_iter_batch_with(
+        &mut ctx.message_iters,
+        cursor_id,
+        stop,
+        |pending, libs_owner| {
+            let libs = chain.build_libs_with_hash_owner(&libs_owner);
+            chain
+                .emulator
+                .send_transaction(chain.world_state, pending.message, &libs, pending.from)
+                .context("Cannot execute step-by-step transaction")
+        },
+    )
 }
 
 fn send_wallet_message(
@@ -1002,6 +1052,14 @@ fn start_message_iter_impl(
     src: IntAddr,
     msg: Cell,
 ) -> anyhow::Result<()> {
+    if ctx.is_broadcasting {
+        anyhow::bail!("net.sendIter() is available only in emulation mode")
+    }
+
+    if ctx.debug.is_enabled() {
+        anyhow::bail!("Step-by-step execution is not supported in debug mode yet")
+    }
+
     let std_address = src.as_std().context("Var addresses are not supported")?;
     let libs_owner = std_address.address;
     let cursor_id = ctx
@@ -1022,15 +1080,18 @@ fn execute_message_iter_n_impl(
         .to_u64()
         .context("Transaction iterator id does not fit into u64")?;
     let count = count.to_usize().unwrap_or(0);
-    let (results, _) = execute_message_iter_batch(ctx, cursor_id, IterationStop::Steps(count))?;
+    let batch = execute_message_iter_batch(ctx, cursor_id, IterationStop::Steps(count))?;
 
-    if let [SendMessageResult::Error(error)] = &results[..] {
-        save_message_iter_results(ctx, cursor_id, &results);
+    finish_message_iter_results(ctx, cursor_id, &batch.results);
+    if let Some(error) = batch.hard_error {
+        return Err(error);
+    }
+
+    if let [SendMessageResult::Error(error)] = &batch.results[..] {
         anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
     }
 
-    save_message_iter_results(ctx, cursor_id, &results);
-    push_successful_send_results(stack, &results);
+    push_successful_send_results(stack, &batch.results);
     Ok(())
 }
 
@@ -1049,21 +1110,23 @@ fn execute_message_iter_till_impl(
         return Ok(());
     };
 
-    let (results, matched) =
-        execute_message_iter_batch(ctx, cursor_id, IterationStop::UntilMatch(matcher))?;
+    let batch = execute_message_iter_batch(ctx, cursor_id, IterationStop::UntilMatch(matcher))?;
 
-    if let [SendMessageResult::Error(error)] = &results[..] {
-        save_message_iter_results(ctx, cursor_id, &results);
+    finish_message_iter_results(ctx, cursor_id, &batch.results);
+    if let Some(error) = batch.hard_error {
+        return Err(error);
+    }
+
+    if let [SendMessageResult::Error(error)] = &batch.results[..] {
         anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
     }
 
-    save_message_iter_results(ctx, cursor_id, &results);
-    if !matched {
+    if !batch.matched {
         stack.push(TupleItem::Null);
         return Ok(());
     }
 
-    push_successful_send_results(stack, &results);
+    push_successful_send_results(stack, &batch.results);
     Ok(())
 }
 
@@ -1076,15 +1139,18 @@ fn execute_message_iter_from_impl(
     let cursor_id = cursor_id
         .to_u64()
         .context("Transaction iterator id does not fit into u64")?;
-    let (results, _) = execute_message_iter_batch(ctx, cursor_id, IterationStop::Exhausted)?;
+    let batch = execute_message_iter_batch(ctx, cursor_id, IterationStop::Exhausted)?;
 
-    if let [SendMessageResult::Error(error)] = &results[..] {
-        save_message_iter_results(ctx, cursor_id, &results);
+    finish_message_iter_results(ctx, cursor_id, &batch.results);
+    if let Some(error) = batch.hard_error {
+        return Err(error);
+    }
+
+    if let [SendMessageResult::Error(error)] = &batch.results[..] {
         anyhow::bail!("Cannot execute transaction iterator step: {}", error.error);
     }
 
-    save_message_iter_results(ctx, cursor_id, &results);
-    push_successful_send_results(stack, &results);
+    push_successful_send_results(stack, &batch.results);
     Ok(())
 }
 
@@ -1906,7 +1972,79 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
     use std::sync::Arc;
+
+    fn test_hash(byte: u8) -> HashBytes {
+        HashBytes([byte; 32])
+    }
+
+    fn test_transaction(lt: u64) -> Transaction {
+        Transaction {
+            account: Default::default(),
+            lt,
+            prev_trans_hash: Default::default(),
+            prev_trans_lt: 0,
+            now: 0,
+            out_msg_count: Default::default(),
+            orig_status: AccountStatus::Uninit,
+            end_status: AccountStatus::Uninit,
+            in_msg: None,
+            out_msgs: Default::default(),
+            total_fees: Default::default(),
+            state_update: Lazy::new(&HashUpdate {
+                old: Default::default(),
+                new: Default::default(),
+            })
+            .expect("Invalid state update"),
+            info: Lazy::new(&TxInfo::Ordinary(OrdinaryTxInfo {
+                credit_first: false,
+                storage_phase: None,
+                credit_phase: None,
+                compute_phase: ComputePhase::Skipped(SkippedComputePhase {
+                    reason: ComputePhaseSkipReason::NoState,
+                }),
+                action_phase: None,
+                aborted: false,
+                bounce_phase: None,
+                destroyed: false,
+            }))
+            .expect("Invalid transaction info"),
+        }
+    }
+
+    fn test_success(lt: u64) -> SendMessageResult {
+        let empty_shard_account = ShardAccount {
+            account: Lazy::new(&OptionalAccount(None)).expect("empty optional account"),
+            last_trans_hash: HashBytes::ZERO,
+            last_trans_lt: 0,
+        };
+        SendMessageResult::Success(SendMessageResultSuccess {
+            raw_transaction: Arc::from(format!("tx-{lt}")),
+            transaction: test_transaction(lt),
+            parent_transaction: None,
+            child_transactions: vec![],
+            shard_account_before: empty_shard_account.clone(),
+            shard_account: empty_shard_account,
+            out_messages: vec![],
+            vm_log: Arc::default(),
+            executor_logs: Arc::default(),
+            actions: None,
+            code: None,
+            externals: vec![],
+            missing_libraries: FxHashSet::default(),
+        })
+    }
+
+    fn test_error(message: &str) -> SendMessageResult {
+        SendMessageResult::Error(ton_executor::message::RunTransactionResultError {
+            error: message.to_string(),
+            vm_log: None,
+            vm_exit_code: None,
+            executor_logs: None,
+            missing_libraries: FxHashSet::default(),
+        })
+    }
 
     #[test]
     fn configured_network_transaction_link_prefers_explorer_url() {
@@ -1958,5 +2096,92 @@ mod tests {
         let url = configured_network_transaction_link(&urls, "abc123")
             .expect("fallback link should be built");
         assert_eq!(url, "http://localhost:3010/explorer/tx/abc123");
+    }
+
+    #[test]
+    fn step_batch_keeps_later_siblings_after_error_result() {
+        let mut message_iters = MessageIterState::new();
+        let cursor_id = message_iters.insert_message_cursor(Cell::default(), None, test_hash(1));
+        message_iters
+            .advance(cursor_id)
+            .expect("root step must be consumed");
+        message_iters
+            .push_child_message(cursor_id, Cell::default(), 100)
+            .expect("first child must be queued");
+        message_iters
+            .push_child_message(cursor_id, Cell::default(), 100)
+            .expect("second child must be queued");
+
+        let mut calls = 0usize;
+        let batch = execute_message_iter_batch_with(
+            &mut message_iters,
+            cursor_id,
+            IterationStop::Exhausted,
+            |_pending, _| {
+                calls += 1;
+                Ok(if calls == 1 {
+                    test_error("first child error")
+                } else {
+                    test_success(202)
+                })
+            },
+        )
+        .expect("batch execution should succeed");
+
+        assert!(batch.hard_error.is_none());
+        assert_eq!(batch.results.len(), 2);
+        assert!(matches!(batch.results[0], SendMessageResult::Error(_)));
+        assert!(matches!(batch.results[1], SendMessageResult::Success(_)));
+        assert!(message_iters.is_done(cursor_id));
+    }
+
+    #[test]
+    fn step_batch_preserves_pending_step_on_hard_error_after_partial_progress() {
+        let mut message_iters = MessageIterState::new();
+        let cursor_id = message_iters.insert_message_cursor(Cell::default(), None, test_hash(2));
+        message_iters
+            .advance(cursor_id)
+            .expect("root step must be consumed");
+        let second_child = Cell::default();
+        message_iters
+            .push_child_message(cursor_id, Cell::default(), 200)
+            .expect("first child must be queued");
+        message_iters
+            .push_child_message(cursor_id, second_child.clone(), 200)
+            .expect("second child must be queued");
+
+        let mut calls = 0usize;
+        let batch = execute_message_iter_batch_with(
+            &mut message_iters,
+            cursor_id,
+            IterationStop::Exhausted,
+            |_pending, _| {
+                calls += 1;
+                if calls == 1 {
+                    Ok(test_success(303))
+                } else {
+                    Err(anyhow!("hard step failure"))
+                }
+            },
+        )
+        .expect("partial progress should be returned instead of dropped");
+
+        assert_eq!(batch.results.len(), 1);
+        assert!(matches!(batch.results[0], SendMessageResult::Success(_)));
+        assert_eq!(
+            batch
+                .hard_error
+                .expect("hard error must be preserved")
+                .to_string(),
+            "hard step failure"
+        );
+
+        let (pending, owner) = message_iters
+            .peek_next(cursor_id)
+            .expect("failed step must stay pending for retry");
+        assert_eq!(owner, test_hash(2));
+        assert_eq!(pending.parent_lt, Some(200));
+        assert_eq!(pending.message, second_child);
+        assert!(!message_iters.is_done(cursor_id));
     }
 }

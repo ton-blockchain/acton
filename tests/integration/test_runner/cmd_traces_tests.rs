@@ -2,6 +2,8 @@ use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use std::fs;
 use std::path::PathBuf;
+use tycho_types::boc::Boc;
+use tycho_types::models::{IntAddr, MsgInfo, Transaction};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -118,6 +120,31 @@ fn read_json_from_project(
         .unwrap_or_else(|e| panic!("Failed to read JSON file {}: {}", full_path.display(), e));
     serde_json::from_str(&content)
         .unwrap_or_else(|e| panic!("Failed to parse JSON file {}: {}", full_path.display(), e))
+}
+
+fn trace_root_wallet_name(
+    trace_json: &serde_json::Value,
+    trace_chain: &serde_json::Value,
+) -> Option<String> {
+    let raw_transaction =
+        trace_chain["transactions"].as_array()?.first()?["raw_transaction"].as_str()?;
+    let transaction = Boc::decode_base64(raw_transaction)
+        .ok()?
+        .parse::<Transaction>()
+        .ok()?;
+    let in_msg = transaction.load_in_msg().ok()??;
+    let MsgInfo::Int(info) = in_msg.info else {
+        return None;
+    };
+    let IntAddr::Std(src) = info.src else {
+        return None;
+    };
+    let src_key = src.display_base64_url(true).to_string();
+
+    trace_json["wallets"]
+        .get(&src_key)?
+        .as_str()
+        .map(ToString::to_string)
 }
 
 fn assert_trace_json_contract(
@@ -432,6 +459,26 @@ fn save_test_trace_keeps_custom_trace_names() {
         trace_names.contains(&"ping-counter"),
         "Expected custom name `ping-counter` in trace names: {trace_names:?}"
     );
+
+    let deploy_trace = traces
+        .iter()
+        .find(|trace| trace["name"].as_str() == Some("deploy-counter"))
+        .unwrap_or_else(|| panic!("Missing deploy-counter trace in custom names trace json"));
+    assert_eq!(
+        trace_root_wallet_name(&trace, deploy_trace).as_deref(),
+        Some("deployer"),
+        "deploy-counter must stay attached to the deploy chain"
+    );
+
+    let ping_trace = traces
+        .iter()
+        .find(|trace| trace["name"].as_str() == Some("ping-counter"))
+        .unwrap_or_else(|| panic!("Missing ping-counter trace in custom names trace json"));
+    assert_eq!(
+        trace_root_wallet_name(&trace, ping_trace).as_deref(),
+        Some("sender"),
+        "ping-counter must stay attached to the ping chain"
+    );
 }
 
 #[test]
@@ -629,14 +676,14 @@ fn profiling_snapshot_merges_step_execution_batches_into_single_named_trace_chai
                     to: forwarderAddress,
                 });
 
+                tracing.save(first, "step-forward-trace");
+
                 val tail = iter.executeFrom();
                 expect(tail).toHaveLength(1);
                 expect(tail).toHaveSuccessfulTx<Notify>({
                     from: forwarderAddress,
                     to: receiverAddress,
                 });
-
-                tracing.save(tail, "step-forward-trace");
             }
             "#,
         )

@@ -861,6 +861,32 @@ get fun `test-send-iter-close-after-partial-execution`() {
 }
 
 #[test]
+fn send_iter_rejects_broadcast_mode_before_cursor_creation() {
+    run_send_iter_failure(
+        "n-lib-api-send-iter-broadcast-reject",
+        r#"
+get fun `test-send-iter-rejects-broadcast-mode`() {
+    val sender = net.treasury("sender");
+    val receiverInit = ContractState {
+        code: build("receiver"),
+        data: createEmptyCell(),
+    };
+    val receiverAddress = AutoDeployAddress { stateInit: receiverInit }.calculateAddress();
+
+    net.enableBroadcast();
+
+    net.sendIter(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.5"),
+        dest: receiverAddress,
+    }));
+}
+"#,
+        "send_iter_rejects_broadcast_mode_before_cursor_creation",
+    );
+}
+
+#[test]
 fn send_iter_invalid_message_reports_parse_error_before_execution() {
     run_send_iter_failure(
         "n-lib-api-send-iter-invalid-message",
