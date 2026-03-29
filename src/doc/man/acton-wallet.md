@@ -61,6 +61,14 @@ Use a secure native store for mnemonic storage when available.
 Request testnet TON after wallet creation.
 {{/option}}
 
+{{#option "`--faucet-url` _url_" }}
+Faucet URL for automatic testnet airdrop.
+{{/option}}
+
+{{#option "`--no-wait-airdrop`" }}
+Do not wait for testnet funds to appear after a successful automatic airdrop.
+{{/option}}
+
 {{#option "`--json`" }}
 Emit JSON output.
 {{/option}}
@@ -207,6 +215,10 @@ Possible values: `testnet`, `localnet`
 Custom faucet URL for the testnet backend.
 {{/option}}
 
+{{#option "`--no-wait-airdrop`" }}
+Do not wait for testnet funds to appear after a successful testnet airdrop.
+{{/option}}
+
 {{#option "`--json`" }}
 Emit JSON output.
 {{/option}}
@@ -276,6 +288,9 @@ system keyring instead of plain-text config.
 
 When `wallet new` is used interactively without `--airdrop`, Acton can offer to
 request testnet funds automatically after creating the wallet.
+After an interactive auto-airdrop succeeds, Acton briefly waits for the balance
+to appear on testnet and lets you skip that wait by pressing `Enter`, unless
+`--no-wait-airdrop` is passed.
 
 ## LISTING, SIGNING, AND EXPORT
 
@@ -294,6 +309,10 @@ For `wallet airdrop`, the selected backend depends on `--net`.
 - `testnet` requests a PoW challenge from the faucet, solves it locally, and
   submits a claim
 - `localnet` sends a fixed faucet transfer through LiteNode
+
+After a successful interactive testnet `wallet airdrop`, Acton briefly waits
+for the balance to appear and lets you skip that wait by pressing `Enter`,
+unless `--no-wait-airdrop` is passed.
 
 `--faucet-url` is only valid for `testnet`, must use `http` or `https`, and may
 not include query parameters or fragments.

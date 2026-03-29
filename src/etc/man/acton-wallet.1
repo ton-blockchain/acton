@@ -57,6 +57,16 @@ Use a secure native store for mnemonic storage when available.
 Request testnet TON after wallet creation.
 .RE
 .sp
+\fB\-\-faucet\-url\fR \fIurl\fR
+.RS 4
+Faucet URL for automatic testnet airdrop.
+.RE
+.sp
+\fB\-\-no\-wait\-airdrop\fR
+.RS 4
+Do not wait for testnet funds to appear after a successful automatic airdrop.
+.RE
+.sp
 \fB\-\-json\fR
 .RS 4
 Emit JSON output.
@@ -182,6 +192,11 @@ Possible values: \fBtestnet\fR, \fBlocalnet\fR
 Custom faucet URL for the testnet backend.
 .RE
 .sp
+\fB\-\-no\-wait\-airdrop\fR
+.RS 4
+Do not wait for testnet funds to appear after a successful testnet airdrop.
+.RE
+.sp
 \fB\-\-json\fR
 .RS 4
 Emit JSON output.
@@ -271,6 +286,9 @@ to plain\-text config
 .sp
 When \fBwallet new\fR is used interactively without \fB\-\-airdrop\fR, Acton can offer to
 request testnet funds automatically after creating the wallet.
+After an interactive auto\-airdrop succeeds, Acton briefly waits for the balance
+to appear on testnet and lets you skip that wait by pressing \fBEnter\fR, unless
+\fB\-\-no\-wait\-airdrop\fR is passed.
 .SH "LISTING, SIGNING, AND EXPORT"
 .sp
 .RS 4
@@ -302,6 +320,10 @@ submits a claim
 .RS 4
 \h'-04'\(bu\h'+03'\fBlocalnet\fR sends a fixed faucet transfer through LiteNode
 .RE
+.sp
+After a successful interactive testnet \fBwallet airdrop\fR, Acton briefly waits
+for the balance to appear and lets you skip that wait by pressing \fBEnter\fR,
+unless \fB\-\-no\-wait\-airdrop\fR is passed.
 .sp
 \fB\-\-faucet\-url\fR is only valid for \fBtestnet\fR, must use \fBhttp\fR or \fBhttps\fR, and may
 not include query parameters or fragments.

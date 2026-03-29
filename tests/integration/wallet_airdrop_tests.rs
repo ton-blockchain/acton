@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 const TEST_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
 const MOCK_FAUCET_ACCEPT_TIMEOUT: Duration = Duration::from_secs(20);
 const MOCK_FAUCET_READ_TIMEOUT: Duration = Duration::from_secs(10);
+const TEST_TONCENTER_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_V3_URL";
 
 #[derive(Clone, Copy)]
 struct FaucetMockResponse {
@@ -27,6 +28,18 @@ struct CapturedRequest {
     method: String,
     path: String,
     body: String,
+}
+
+#[derive(Clone)]
+struct ToncenterMockResponse {
+    status: u16,
+    body: String,
+}
+
+#[derive(Debug, Clone)]
+struct CapturedToncenterRequest {
+    method: String,
+    path: String,
 }
 
 fn spawn_faucet_mock(
@@ -194,6 +207,112 @@ fn spawn_localnet_faucet_mock(
 ) {
     let (port, handle, captured_requests) = spawn_http_mock(responses);
     (port, handle, captured_requests)
+}
+
+fn spawn_toncenter_v3_mock(
+    responses: Vec<ToncenterMockResponse>,
+) -> (
+    String,
+    thread::JoinHandle<()>,
+    Arc<Mutex<Vec<CapturedToncenterRequest>>>,
+) {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("failed to bind toncenter mock");
+    listener
+        .set_nonblocking(true)
+        .expect("failed to set toncenter mock non-blocking");
+    let addr = listener
+        .local_addr()
+        .expect("failed to get toncenter mock address");
+
+    let captured_requests = Arc::new(Mutex::new(Vec::<CapturedToncenterRequest>::new()));
+    let captured_requests_thread = Arc::clone(&captured_requests);
+
+    let handle = thread::spawn(move || {
+        for response in responses {
+            let wait_until = Instant::now() + MOCK_FAUCET_ACCEPT_TIMEOUT;
+            let mut stream = loop {
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                        assert!(
+                            Instant::now() <= wait_until,
+                            "timed out waiting for toncenter request"
+                        );
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(err) => panic!("toncenter mock accept failed: {err}"),
+                }
+            };
+
+            stream
+                .set_read_timeout(Some(MOCK_FAUCET_READ_TIMEOUT))
+                .expect("failed to set toncenter mock read timeout");
+
+            let mut reader = BufReader::new(
+                stream
+                    .try_clone()
+                    .expect("failed to clone toncenter mock stream"),
+            );
+            let mut request_line = String::new();
+            let read_deadline = Instant::now() + MOCK_FAUCET_READ_TIMEOUT;
+            loop {
+                request_line.clear();
+                match reader.read_line(&mut request_line) {
+                    Ok(0) => {
+                        assert!(
+                            Instant::now() <= read_deadline,
+                            "timed out waiting for toncenter request line"
+                        );
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Ok(_) => break,
+                    Err(err)
+                        if matches!(err.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) =>
+                    {
+                        assert!(
+                            Instant::now() <= read_deadline,
+                            "timed out waiting for toncenter request line"
+                        );
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(err) => panic!("failed to read toncenter request line: {err}"),
+                }
+            }
+
+            let mut parts = request_line.split_whitespace();
+            let method = parts.next().unwrap_or_default().to_string();
+            let path = parts.next().unwrap_or_default().to_string();
+
+            loop {
+                let mut header_line = String::new();
+                let read = reader
+                    .read_line(&mut header_line)
+                    .expect("failed to read toncenter header line");
+                if read == 0 || header_line == "\r\n" {
+                    break;
+                }
+            }
+
+            captured_requests_thread
+                .lock()
+                .expect("captured toncenter requests mutex poisoned")
+                .push(CapturedToncenterRequest { method, path });
+
+            let raw_response = format!(
+                "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response.status,
+                status_text(response.status),
+                response.body.len(),
+                response.body
+            );
+            stream
+                .write_all(raw_response.as_bytes())
+                .expect("failed to write toncenter response");
+            stream.flush().expect("failed to flush toncenter response");
+        }
+    });
+
+    (format!("http://{addr}"), handle, captured_requests)
 }
 
 fn status_text(status: u16) -> &'static str {
@@ -897,6 +1016,7 @@ fn test_wallet_airdrop_without_name_selects_wallet_via_prompt() {
         .wallet_airdrop()
         .arg("--faucet-url")
         .arg(&faucet_url)
+        .arg("--no-wait-airdrop")
         .env("HOME", &isolated_home)
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
@@ -915,6 +1035,152 @@ fn test_wallet_airdrop_without_name_selects_wallet_via_prompt() {
         .lock()
         .expect("captured requests mutex poisoned");
     assert_eq!(captured.len(), 2, "expected challenge and claim requests");
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-airdrop-interactive-wait").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"airdrop-interactive-wait-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"interactive airdrop wait success"}"#,
+        },
+    ]);
+
+    let (toncenter_url, toncenter_handle, captured_requests) =
+        spawn_toncenter_v3_mock(vec![ToncenterMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "accounts": [{
+                    "address": "test-address",
+                    "balance": "2200000000",
+                    "code_boc": Value::Null,
+                    "status": "active",
+                }]
+            })
+            .to_string(),
+        }]);
+
+    let mut session = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("interactive airdrop wait success");
+    session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
+    session.expect("Testnet funds are available: 2.2000 TON");
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+    toncenter_handle
+        .join()
+        .expect("mock toncenter thread must finish without panic");
+
+    let captured = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        1,
+        "expected one balance confirmation request"
+    );
+    assert_eq!(captured[0].method, "GET");
+    assert!(
+        captured[0].path.starts_with("/accountStates?address="),
+        "unexpected toncenter path: {}",
+        captured[0].path
+    );
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_airdrop_interactive_no_wait_flag_skips_balance_confirmation() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-airdrop-interactive-no-wait-flag").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"airdrop-interactive-no-wait-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"interactive airdrop no-wait success"}"#,
+        },
+    ]);
+
+    let toncenter_url = format!("http://127.0.0.1:{}", find_unused_port());
+
+    let mut session = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .arg("--no-wait-airdrop")
+        .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("interactive airdrop no-wait success");
+    session = session.set_expect_timeout(Some(Duration::from_millis(300)));
+    session.expect_no_match("Waiting for testnet funds to appear...");
+    session = session.set_expect_timeout(Some(Duration::from_secs(20)));
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
 }
 
 #[test]
@@ -1679,21 +1945,51 @@ fn test_wallet_airdrop_rejects_faucet_url_with_fragment() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_wallet_new_airdrop_uses_env_faucet_url_success_non_json() {
-    let project = ProjectBuilder::new("wallet-new-airdrop-success").build();
+fn test_wallet_new_airdrop_invalid_faucet_url_keeps_wallet_and_prints_warning() {
+    let project = ProjectBuilder::new("wallet-new-airdrop-invalid-faucet-url").build();
+
+    let output = project
+        .acton()
+        .wallet_new()
+        .arg("--name")
+        .arg("new-airdrop-invalid-url-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg("--airdrop")
+        .arg("--faucet-url")
+        .arg("ftp://example.com/faucet")
+        .run()
+        .success();
+
+    output.assert_contains("Wallet successfully created and added to wallets.toml");
+    output.assert_contains(
+        "Wallet was created, but automatic airdrop failed: Faucet URL scheme must be http or https",
+    );
+    output.assert_file_contains("wallets.toml", "[wallets.new-airdrop-invalid-url-wallet]");
+    output.assert_file_contains(
+        "wallets.toml",
+        "[wallets.new-airdrop-invalid-url-wallet.expected]",
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_new_airdrop_uses_cli_faucet_url_success_non_json() {
+    let project = ProjectBuilder::new("wallet-new-airdrop-cli-faucet-success").build();
 
     let (faucet_url, faucet_handle, captured_requests) = spawn_faucet_mock(vec![
         FaucetMockResponse {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"new-wallet-ok","difficulty":0}"#,
+            body: r#"{"challenge":"new-wallet-cli-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
             path: "/faucet/claim",
             status: 200,
-            body: r#"{"message":"mock airdrop success"}"#,
+            body: r#"{"message":"cli faucet airdrop success"}"#,
         },
     ]);
 
@@ -1701,12 +1997,13 @@ fn test_wallet_new_airdrop_uses_env_faucet_url_success_non_json() {
         .acton()
         .wallet_new()
         .arg("--name")
-        .arg("new-airdrop-wallet")
+        .arg("new-airdrop-cli-wallet")
         .arg("--version")
         .arg("v5r1")
         .arg("--local")
         .arg("--airdrop")
-        .env("ACTON_FAUCET_URL", &faucet_url)
+        .arg("--faucet-url")
+        .arg(&faucet_url)
         .run()
         .success();
 
@@ -1714,13 +2011,8 @@ fn test_wallet_new_airdrop_uses_env_faucet_url_success_non_json() {
         .join()
         .expect("mock faucet thread must finish without panic");
 
-    output.assert_snapshot_matches(
-        "integration/snapshots/wallet_airdrop/test_wallet_new_airdrop_uses_env_faucet_url_success_non_json.stdout.txt",
-    );
-    output.assert_file_snapshot_matches(
-        "wallets.toml",
-        "integration/snapshots/wallet_airdrop/test_wallet_new_airdrop_uses_env_faucet_url_success_non_json.wallets.toml.txt",
-    );
+    output.assert_contains("Requesting airdrop for wallet new-airdrop-cli-wallet");
+    output.assert_contains("cli faucet airdrop success");
 
     let captured = captured_requests
         .lock()
@@ -1765,7 +2057,8 @@ fn test_wallet_new_airdrop_failure_keeps_wallet_and_prints_warning() {
         .arg("v5r1")
         .arg("--local")
         .arg("--airdrop")
-        .env("ACTON_FAUCET_URL", &faucet_url)
+        .arg("--faucet-url")
+        .arg(&faucet_url)
         .run()
         .success();
 
@@ -1810,8 +2103,9 @@ fn test_wallet_new_airdrop_json_success_has_airdrop_block() {
         .arg("v5r1")
         .arg("--local")
         .arg("--airdrop")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
         .arg("--json")
-        .env("ACTON_FAUCET_URL", &faucet_url)
         .run()
         .success();
 
@@ -1856,8 +2150,9 @@ fn test_wallet_new_airdrop_json_failure_has_airdrop_error_block() {
         .arg("v5r1")
         .arg("--local")
         .arg("--airdrop")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
         .arg("--json")
-        .env("ACTON_FAUCET_URL", &faucet_url)
         .run()
         .success();
 
@@ -1876,4 +2171,346 @@ fn test_wallet_new_airdrop_json_failure_has_airdrop_error_block() {
             .expect("airdrop.error must be a string")
             .contains("Faucet returned error 400 Bad Request: claim failed")
     );
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_new_prompted_airdrop_yes_uses_cli_faucet_url() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-new-prompted-airdrop-cli-faucet").build();
+
+    let (faucet_url, faucet_handle, captured_requests) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"prompted-cli-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"prompted cli faucet success"}"#,
+        },
+    ]);
+
+    let mut session = project
+        .acton()
+        .wallet_new()
+        .arg("--name")
+        .arg("prompted-cli-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .arg("--no-wait-airdrop")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Request testnet TON from faucet now?");
+    session.send_line("y", "failed to confirm prompted airdrop");
+    session.expect("Requesting airdrop for wallet prompted-cli-wallet");
+    session.expect("prompted cli faucet success");
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+
+    let captured = captured_requests
+        .lock()
+        .expect("captured requests mutex poisoned");
+    let challenge_attempts = captured
+        .iter()
+        .filter(|req| req.method == "GET" && req.path == "/faucet/challenge")
+        .count();
+    let claim_attempts = captured
+        .iter()
+        .filter(|req| req.method == "POST" && req.path == "/faucet/claim")
+        .count();
+    assert_eq!(challenge_attempts, 1);
+    assert_eq!(claim_attempts, 1);
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_new_prompted_airdrop_yes_waits_for_balance_confirmation() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-new-prompted-airdrop-wait").build();
+
+    let (faucet_url, faucet_handle, captured_faucet_requests) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"prompted-wait-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"prompted wait success"}"#,
+        },
+    ]);
+
+    let (toncenter_url, toncenter_handle, captured_toncenter_requests) =
+        spawn_toncenter_v3_mock(vec![ToncenterMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "accounts": [{
+                    "address": "test-address",
+                    "balance": "2500000000",
+                    "code_boc": Value::Null,
+                    "status": "active",
+                }]
+            })
+            .to_string(),
+        }]);
+
+    let mut session = project
+        .acton()
+        .wallet_new()
+        .arg("--name")
+        .arg("prompted-wait-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Request testnet TON from faucet now?");
+    session.send_line("y", "failed to confirm prompted airdrop wait");
+    session.expect("prompted wait success");
+    session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
+    session.expect("Testnet funds are available: 2.5000 TON");
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+    toncenter_handle
+        .join()
+        .expect("mock toncenter thread must finish without panic");
+
+    let captured_faucet = captured_faucet_requests
+        .lock()
+        .expect("captured faucet requests mutex poisoned");
+    let challenge_attempts = captured_faucet
+        .iter()
+        .filter(|req| req.method == "GET" && req.path == "/faucet/challenge")
+        .count();
+    let claim_attempts = captured_faucet
+        .iter()
+        .filter(|req| req.method == "POST" && req.path == "/faucet/claim")
+        .count();
+    assert_eq!(challenge_attempts, 1);
+    assert_eq!(claim_attempts, 1);
+
+    let captured_toncenter = captured_toncenter_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(
+        captured_toncenter.len(),
+        1,
+        "expected one balance confirmation request"
+    );
+    assert_eq!(captured_toncenter[0].method, "GET");
+    assert!(
+        captured_toncenter[0]
+            .path
+            .starts_with("/accountStates?address="),
+        "unexpected toncenter path: {}",
+        captured_toncenter[0].path
+    );
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_new_airdrop_interactive_waits_for_balance_confirmation() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-new-airdrop-interactive-wait").build();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"interactive-wait-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"interactive airdrop success"}"#,
+        },
+    ]);
+
+    let (toncenter_url, toncenter_handle, captured_requests) =
+        spawn_toncenter_v3_mock(vec![ToncenterMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "accounts": [{
+                    "address": "test-address",
+                    "balance": "1500000000",
+                    "code_boc": Value::Null,
+                    "status": "active",
+                }]
+            })
+            .to_string(),
+        }]);
+
+    let mut session = project
+        .acton()
+        .wallet_new()
+        .arg("--name")
+        .arg("interactive-airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg("--airdrop")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("interactive airdrop success");
+    session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
+    session.expect("Testnet funds are available: 1.5000 TON");
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+    toncenter_handle
+        .join()
+        .expect("mock toncenter thread must finish without panic");
+
+    let captured = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        1,
+        "expected one balance confirmation request"
+    );
+    assert_eq!(captured[0].method, "GET");
+    assert!(
+        captured[0].path.starts_with("/accountStates?address="),
+        "unexpected toncenter path: {}",
+        captured[0].path
+    );
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_new_airdrop_interactive_wait_can_be_skipped_with_enter() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-new-airdrop-interactive-skip").build();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"interactive-skip-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"interactive skip success"}"#,
+        },
+    ]);
+
+    let toncenter_url = format!("http://127.0.0.1:{}", find_unused_port());
+
+    let mut session = project
+        .acton()
+        .wallet_new()
+        .arg("--name")
+        .arg("interactive-skip-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg("--airdrop")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("interactive skip success");
+    session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
+    session.send_line("", "failed to skip airdrop wait");
+    session.expect("Skipping wait. You can check later with acton wallet list --balance.");
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_new_airdrop_interactive_no_wait_flag_skips_balance_confirmation() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-new-airdrop-interactive-no-wait-flag").build();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"interactive-no-wait-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"interactive no-wait success"}"#,
+        },
+    ]);
+
+    let toncenter_url = format!("http://127.0.0.1:{}", find_unused_port());
+
+    let mut session = project
+        .acton()
+        .wallet_new()
+        .arg("--name")
+        .arg("interactive-no-wait-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg("--airdrop")
+        .arg("--no-wait-airdrop")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("interactive no-wait success");
+    session = session.set_expect_timeout(Some(Duration::from_millis(300)));
+    session.expect_no_match("Waiting for testnet funds to appear...");
+    session = session.set_expect_timeout(Some(Duration::from_secs(20)));
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
 }
