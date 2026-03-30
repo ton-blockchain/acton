@@ -859,10 +859,8 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         &tmp_test_filename,
         need_debug_info,
         &runner.acton_config,
-    );
+    )?;
     let _ = fs::remove_file(&tmp_test_filename);
-    let compilation_result = compilation_result
-        .map_err(|err| anyhow!("Cannot compile test file '{filepath}': {err}"))?;
     debug!(
         "Test file '{filepath}' compilation time: {:?}",
         now.elapsed()
@@ -873,7 +871,7 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
         tolkc::CompilerResult::Error(error) => {
             let normalized_filepath = error.message.replace(".test.tolk.test.tolk", ".test.tolk");
             let trimmed_message = normalized_filepath.trim();
-            anyhow::bail!("Cannot compile test file '{filepath}': {trimmed_message}")
+            anyhow::bail!(trimmed_message.to_string())
         }
     };
 
