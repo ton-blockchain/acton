@@ -1,6 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::compilation::extract_compiled_contracts;
 use crate::support::project::ProjectBuilder;
+use acton_config::color::ColorMode;
 use std::fs;
 
 const SIMPLE_CONTRACT: &str = r"
@@ -1356,6 +1357,30 @@ fn test_up_rejects_conflicting_flag_combinations() {
             output.assert_stderr_contains(needle);
         }
     }
+}
+
+#[test]
+fn test_up_rejects_unicode_dash_flag_in_version_argument() {
+    let project = ProjectBuilder::new("up-unicode-dash-version").build();
+
+    let output = project
+        .acton()
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
+        .arg("up")
+        .arg("\u{2014}trunk")
+        .run()
+        .failure();
+
+    output
+        .assert_stderr_contains("looks like an option typed with a Unicode dash")
+        .assert_stderr_contains("Use --trunk instead");
+
+    let stderr = output.get_stderr();
+    assert!(
+        stderr.contains("\u{1b}[33m—trunk") && stderr.contains("\u{1b}[33m--trunk"),
+        "Expected yellow highlights for typo and suggested flag, got:\n{stderr}"
+    );
 }
 
 #[test]

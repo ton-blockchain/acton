@@ -225,6 +225,25 @@ fn test_custom_version() -> Result<()> {
 }
 
 #[test]
+fn test_validate_version_argument_rejects_unicode_dash_flag_typo() {
+    let err = super::validate_version_argument(Some("\u{2014}trunk"))
+        .expect_err("unicode dash flag typo should be rejected");
+    let err_text = String::from_utf8(strip_ansi_escapes::strip(err.to_string().as_bytes()))
+        .expect("error text should stay utf-8");
+
+    assert_eq!(
+        err_text,
+        "—trunk looks like an option typed with a Unicode dash. Use --trunk instead."
+    );
+}
+
+#[test]
+fn test_validate_version_argument_allows_regular_version() -> Result<()> {
+    super::validate_version_argument(Some("0.1.0"))?;
+    Ok(())
+}
+
+#[test]
 fn test_install_trunk_version_and_then_stable() -> Result<()> {
     let (_dir, bin_path) = setup_env()?;
     let current_version = "0.1.0";

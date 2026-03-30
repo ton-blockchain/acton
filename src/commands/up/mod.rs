@@ -41,6 +41,8 @@ pub fn up_cmd(
         return Ok(());
     }
 
+    validate_version_argument(version.as_deref())?;
+
     let result = run_update(
         &client,
         &current_exe,
@@ -69,4 +71,46 @@ pub fn up_cmd(
     }
 
     Ok(())
+}
+
+fn validate_version_argument(version: Option<&str>) -> Result<()> {
+    let Some(version) = version else {
+        return Ok(());
+    };
+
+    if let Some(expected_flag) = unicode_dash_flag_suggestion(version) {
+        anyhow::bail!(
+            "{} looks like an option typed with a Unicode dash. Use {} instead.",
+            version.yellow(),
+            expected_flag.yellow()
+        );
+    }
+
+    Ok(())
+}
+
+fn unicode_dash_flag_suggestion(arg: &str) -> Option<&'static str> {
+    let stripped = arg.trim_start_matches(is_unicode_dash);
+    if stripped.len() == arg.len() {
+        return None;
+    }
+
+    match stripped.trim_start_matches('-') {
+        "trunk" => Some("--trunk"),
+        "stable" => Some("--stable"),
+        "list" => Some("--list"),
+        "check" => Some("--check"),
+        "yes" => Some("--yes"),
+        "y" => Some("-y"),
+        "help" => Some("--help"),
+        "h" => Some("-h"),
+        _ => None,
+    }
+}
+
+const fn is_unicode_dash(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{2010}' | '\u{2011}' | '\u{2012}' | '\u{2013}' | '\u{2014}' | '\u{2015}' | '\u{2212}'
+    )
 }
