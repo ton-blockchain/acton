@@ -77,7 +77,7 @@ get fun `test-load-opcode-for-bounced-message`() {
         dest,
         body: beginCell()
             .storeUint(0xFFFFFFFF, 32)
-            .storeUint(reflect.serializationPrefixOf<IncreaseCounter>(), 32)
+            .storeUint(reflect.serializationPrefixOf<IncreaseCounter>().0, 32)
             .endCell(),
     });
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
@@ -91,7 +91,7 @@ get fun `test-load-opcode-for-bounced-message`() {
         expect(opcode).toEqual(0xFFFFFFFF);
 
         val actual_opcode = message.loadOpcode(true);
-        expect(actual_opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>().1);
+        expect(actual_opcode).toEqual(reflect.serializationPrefixOf<IncreaseCounter>().0);
     }
 }
 
