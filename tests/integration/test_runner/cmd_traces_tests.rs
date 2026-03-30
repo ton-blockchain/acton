@@ -62,6 +62,7 @@ import "../../lib/testing/expect"
 import "../../lib/build/build"
 import "../../lib/emulation/network"
 import "../../lib/emulation/tracing"
+import "../../lib/types/big_array"
 
 struct Counter {
     address: address

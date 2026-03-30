@@ -7,6 +7,7 @@ const DA_TRANSACTION_IMPORTS: &str = r#"
 import "@stdlib/reflection"
 import "../../lib/emulation/network"
 import "../../lib/testing/expect"
+import "../../lib/tlb/maybe"
 import "../../lib/types/message"
 import "../../lib/types/transaction"
 
