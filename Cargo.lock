@@ -4444,6 +4444,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smallvec",
+ "tolkc",
  "ton-source-map",
  "tycho-types",
 ]

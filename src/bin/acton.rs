@@ -46,7 +46,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm::printer::FormatOptions;
-use ton_source_map::SourceMap;
+use tolkc::{SourceMap as TolkCompilerSourceMap, TolkSourceMap};
 
 #[derive(Parser)]
 #[command(
@@ -1945,7 +1945,7 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<SourceMap>>> {
+fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<TolkSourceMap>>> {
     let source_map_data = if let Some(path) = source_map {
         if !fs::exists(&path).unwrap_or(false) {
             anyhow::bail!(error_fmt::file_not_found(&path));
@@ -1957,8 +1957,12 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Sour
         }
 
         let content = fs::read_to_string(path).expect("Failed to read source map file");
-        let result: SourceMap =
-            serde_json::from_str(content.as_str()).expect("Failed to parse source map JSON");
+        let result = serde_json::from_str::<TolkSourceMap>(content.as_str())
+            .or_else(|_| {
+                serde_json::from_str::<TolkCompilerSourceMap>(content.as_str())
+                    .map(TolkSourceMap::new)
+            })
+            .expect("Failed to parse source map JSON");
         Some(Box::new(result))
     } else {
         None

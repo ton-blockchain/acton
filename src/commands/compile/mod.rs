@@ -8,8 +8,8 @@ use serde_json;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
-use tolkc::SourceMap as TolkSourceMap;
 use tolkc::abi::ContractABI;
+use tolkc::{SourceMap as TolkCompilerSourceMap, TolkSourceMap};
 use tycho_types::boc::Boc;
 
 #[allow(clippy::too_many_arguments)]
@@ -57,6 +57,7 @@ pub fn compile_cmd(
             cached_entry.code_boc64,
             cached_entry.code_hash_hex,
             cached_entry.fift_code,
+            cached_entry.debug_mark_base64,
             cached_entry.new_source_map,
             cached_entry.abi,
             abi,
@@ -100,6 +101,7 @@ pub fn compile_cmd(
                 result.code_boc64,
                 result.code_hash_hex,
                 result.fift_code,
+                result.debug_mark_base64,
                 result.new_source_map,
                 result.abi,
                 abi,
@@ -138,7 +140,8 @@ fn handle_compilation_result(
     code_boc64: String,
     code_hash_hex: String,
     fift_code: String,
-    new_source_map: Option<TolkSourceMap>,
+    debug_mark_base64: Option<String>,
+    new_source_map: Option<TolkCompilerSourceMap>,
     abi: Option<ContractABI>,
     abi_path: Option<String>,
     source_map_path: Option<String>,
@@ -153,7 +156,12 @@ fn handle_compilation_result(
     let code_hex = Boc::encode_hex(&code);
 
     if let Some(source_map_path) = &source_map_path {
-        write_source_map(new_source_map.as_ref(), source_map_path)?;
+        write_source_map(
+            new_source_map.as_ref(),
+            &code,
+            debug_mark_base64.as_deref(),
+            source_map_path,
+        )?;
     }
 
     if let Some(fift_path) = &fift {
@@ -236,7 +244,9 @@ fn handle_compilation_result(
 }
 
 fn write_source_map(
-    new_source_map: Option<&TolkSourceMap>,
+    new_source_map: Option<&TolkCompilerSourceMap>,
+    code: &tycho_types::cell::Cell,
+    debug_mark_base64: Option<&str>,
     source_map_path: &str,
 ) -> anyhow::Result<()> {
     if let Some(parent_dir) = Path::new(source_map_path).parent()
@@ -256,7 +266,9 @@ fn write_source_map(
         )
     })?;
 
-    let json_string = serde_json::to_string_pretty(source_map).map_err(|err| {
+    let tolk_source_map =
+        TolkSourceMap::from_code_cell(source_map.clone(), code, debug_mark_base64)?;
+    let json_string = serde_json::to_string_pretty(&tolk_source_map).map_err(|err| {
         anyhow!(
             "Failed to serialize source map {}: {err}",
             source_map_path.yellow()
@@ -274,10 +286,12 @@ fn write_source_map(
 #[cfg(test)]
 mod tests {
     use super::write_source_map;
+    use tycho_types::cell::Cell;
 
     #[test]
     fn write_source_map_requires_source_map_data() {
-        let error = write_source_map(None, "source-map.json").expect_err("must fail");
+        let error =
+            write_source_map(None, &Cell::empty(), None, "source-map.json").expect_err("must fail");
         let rendered = error.to_string();
 
         assert!(

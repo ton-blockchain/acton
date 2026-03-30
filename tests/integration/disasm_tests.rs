@@ -9,6 +9,8 @@ const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
+const COUNTER_CONTRACT: &str = include_str!("../acton-stdlib/contracts/counter.tolk");
+const COUNTER_TYPES: &str = include_str!("../acton-stdlib/contracts/types.tolk");
 
 #[test]
 fn test_disasm_from_boc_file() {
@@ -24,6 +26,32 @@ fn test_disasm_from_boc_file() {
         .run()
         .success()
         .assert_snapshot_matches("integration/snapshots/test_disasm_from_boc_file.stdout.txt");
+}
+
+#[test]
+fn test_disasm_reads_source_map_emitted_by_compile() {
+    let project = ProjectBuilder::new("disasm-source-map")
+        .raw_file("contracts/counter.tolk", COUNTER_CONTRACT)
+        .raw_file("contracts/types.tolk", COUNTER_TYPES)
+        .build();
+
+    project
+        .acton()
+        .compile("contracts/counter.tolk")
+        .with_boc_output("counter.boc")
+        .with_source_map("counter.source_map.json")
+        .run()
+        .success();
+
+    project
+        .acton()
+        .disasm_file("counter.boc")
+        .with_source_map("counter.source_map.json")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_disasm_reads_source_map_emitted_by_compile.stdout.txt",
+        );
 }
 
 #[test]

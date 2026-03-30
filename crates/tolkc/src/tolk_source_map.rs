@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::sync::Arc;
 use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
@@ -8,6 +9,39 @@ use tycho_types::cell::Cell;
 pub struct TolkSourceMap {
     pub source_map: crate::SourceMap,
     pub marks_dict: Option<Arc<crate::debug_marks_dict::DebugMarksDict>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SerializableTolkSourceMap {
+    source_map: crate::SourceMap,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    marks_dict: Option<crate::debug_marks_dict::DebugMarksDict>,
+}
+
+impl Serialize for TolkSourceMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerializableTolkSourceMap {
+            source_map: self.source_map.clone(),
+            marks_dict: self.marks_dict.as_deref().cloned(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for TolkSourceMap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = SerializableTolkSourceMap::deserialize(deserializer)?;
+        Ok(Self {
+            source_map: value.source_map,
+            marks_dict: value.marks_dict.map(Arc::new),
+        })
+    }
 }
 
 impl TolkSourceMap {

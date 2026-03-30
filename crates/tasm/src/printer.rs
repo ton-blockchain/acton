@@ -1,6 +1,7 @@
 use crate::types::{ArgValue, Instruction};
 use std::fs;
-use ton_source_map::{OffsetAndId, SourceLocation, SourceMap};
+use tolkc::TolkSourceMap;
+use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice};
 
@@ -10,7 +11,7 @@ const OFFSET_PADDING: &str = "    │ ";
 pub struct FormatOptions {
     pub show_hashes: bool,
     pub show_offsets: bool,
-    pub source_map: Option<Box<SourceMap>>,
+    pub source_map: Option<Box<TolkSourceMap>>,
 }
 
 impl Instruction {
@@ -71,22 +72,14 @@ impl Instruction {
 
         if let Some(source_map) = &opts.source_map
             && let Some(off) = offset
-            && let Some(locations) =
-                get_source_locations(source_map, instr.source_cell.as_ref(), off)
-            && !locations.is_empty()
+            && let Some(location) = get_source_location(source_map, instr.source_cell.as_ref(), off)
         {
-            let source_contexts: Vec<String> = locations
-                .iter()
-                .filter_map(|location| format_source_context(location))
-                .collect();
-
-            if !source_contexts.is_empty() {
+            if let Some(source_context) = format_source_context(&location) {
                 let before = format!("    └{}┐\n", "─".repeat(56));
                 let after = format!("    ┌{}┘", "─".repeat(56));
-                let source_output = source_contexts.join("");
                 return format!(
                     "{}{:>padding$}\n{before}{}{after}",
-                    result, "", source_output
+                    result, "", source_context
                 );
             }
         }
@@ -95,45 +88,14 @@ impl Instruction {
     }
 }
 
-fn get_source_locations<'a>(
-    source_map: &'a SourceMap,
+fn get_source_location(
+    source_map: &TolkSourceMap,
     cell: Option<&Cell>,
     offset: u16,
-) -> Option<Vec<&'a SourceLocation>> {
-    if let Some(cell) = cell {
-        let hash = cell.repr_hash().to_string().to_uppercase();
-        if let Some(marks) = source_map.debug_marks.get(&hash) {
-            let debug_ids: Vec<i32> = marks
-                .iter()
-                .filter_map(|OffsetAndId(mark_offset, debug_id)| {
-                    if mark_offset == &offset {
-                        Some(*debug_id)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            if !debug_ids.is_empty() {
-                let locations: Vec<&SourceLocation> = debug_ids
-                    .iter()
-                    .filter_map(|debug_id| {
-                        source_map
-                            .high_level
-                            .locations
-                            .iter()
-                            .find(|loc| loc.idx == *debug_id)
-                            .map(|loc| &loc.loc)
-                    })
-                    .collect();
-
-                if !locations.is_empty() {
-                    return Some(locations);
-                }
-            }
-        }
-    }
-    None
+) -> Option<SourceLocation> {
+    let cell = cell?;
+    let hash = cell.repr_hash().to_string().to_uppercase();
+    source_map.find_source_loc(&hash, offset)
 }
 
 fn format_source_context(location: &SourceLocation) -> Option<String> {
@@ -156,8 +118,8 @@ fn format_source_context(location: &SourceLocation) -> Option<String> {
         "{:<60} │  {}:{}:{}",
         " ",
         SourceLocation::normalize_path(&location.file),
-        location.line + 1,
-        location.column + 2
+        location.line,
+        location.column
     )
     .ok();
 
@@ -165,8 +127,8 @@ fn format_source_context(location: &SourceLocation) -> Option<String> {
         let line_num = i + 1;
         write!(result, "\n{:>60} │  {:>3}: {}", "", line_num, line_content).ok();
 
-        if i == line_idx + 1 {
-            let cursor_pos = location.column as usize + 1;
+        if i == line_idx {
+            let cursor_pos = location.column.saturating_sub(1) as usize;
             write!(
                 result,
                 "\n{:>60} │  {:>3}  {}^",

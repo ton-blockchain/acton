@@ -32,14 +32,90 @@
     "thrownErrors": []
   },
   "name": "simple",
-  "source_map": {
-    "debug_marks": {},
-    "high_level": {
-      "compiler_version": null,
-      "globals": [],
-      "language": null,
-      "locations": [],
-      "version": ""
+  "tolk_source_map": {
+    "source_map": {
+      "debug_marks": [],
+      "declarations": [],
+      "files": [],
+      "functions": [],
+      "unique_ty": [
+        {
+          "ty": {
+            "kind": "void"
+          },
+          "ty_idx": 0
+        },
+        {
+          "ty": {
+            "kind": "int"
+          },
+          "ty_idx": 1
+        },
+        {
+          "ty": {
+            "kind": "slice"
+          },
+          "ty_idx": 2
+        },
+        {
+          "ty": {
+            "kind": "cell"
+          },
+          "ty_idx": 3
+        },
+        {
+          "ty": {
+            "kind": "builder"
+          },
+          "ty_idx": 4
+        },
+        {
+          "ty": {
+            "kind": "bool"
+          },
+          "ty_idx": 5
+        },
+        {
+          "ty": {
+            "kind": "coins"
+          },
+          "ty_idx": 6
+        },
+        {
+          "ty": {
+            "kind": "address"
+          },
+          "ty_idx": 7
+        },
+        {
+          "ty": {
+            "kind": "intN",
+            "n": 32
+          },
+          "ty_idx": 8
+        },
+        {
+          "ty": {
+            "kind": "uintN",
+            "n": 32
+          },
+          "ty_idx": 9
+        },
+        {
+          "ty": {
+            "kind": "intN",
+            "n": 64
+          },
+          "ty_idx": 10
+        },
+        {
+          "ty": {
+            "kind": "uintN",
+            "n": 64
+          },
+          "ty_idx": 11
+        }
+      ]
     }
   }
 }
