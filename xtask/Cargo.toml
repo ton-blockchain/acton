@@ -25,4 +25,7 @@ toml_edit = { workspace = true }
 owo-colors = { workspace = true }
 reqwest = { workspace = true }
 urlencoding = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
+indicatif = { workspace = true }
 parse-changelog = { version = "0.6.15", default-features = false }

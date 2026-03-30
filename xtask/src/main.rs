@@ -20,7 +20,7 @@ enum CliCommand {
     Retag(tasks::retag::RetagArgs),
     Release(tasks::release::ReleaseArgs),
     Schema(tasks::schema::SchemaArgs),
-    SyncArtifactsManifest,
+    SyncArtifacts(tasks::sync_artifacts::SyncArtifactsArgs),
 }
 
 fn main() -> Result<()> {
@@ -33,6 +33,6 @@ fn main() -> Result<()> {
         CliCommand::Retag(args) => tasks::retag::run(args),
         CliCommand::Release(args) => tasks::release::run(args),
         CliCommand::Schema(args) => tasks::schema::run(args),
-        CliCommand::SyncArtifactsManifest => tasks::sync_artifacts_manifest::run(),
+        CliCommand::SyncArtifacts(args) => tasks::sync_artifacts::run(args),
     }
 }
