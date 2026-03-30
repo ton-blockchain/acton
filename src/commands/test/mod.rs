@@ -1,4 +1,3 @@
-use crate::boc_utils::{boc_bytes, decode_optional_boc_base64_bytes};
 use crate::commands::build::build_cmd;
 use crate::commands::common::error_fmt;
 use crate::commands::test::coverage::{
@@ -45,6 +44,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use std::{fs, process};
 use tolk_syntax::{AstNode, HasName, SourceFile};
+use tolkc::TolkSourceMap;
 use ton_abi::{ContractAbi, ContractAbiParseCache, contract_abi, contract_abi_with_file};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
@@ -878,23 +878,22 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     };
 
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
-    let code_boc = boc_bytes(&code_cell);
-    let marks_boc =
-        decode_optional_boc_base64_bytes(result.debug_mark_base64.as_deref(), "debug marks")?;
     let source_map = result.source_map.unwrap_or_default();
-    let new_source_map = result.new_source_map.unwrap_or_default();
+    let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+        result.new_source_map.unwrap_or_default(),
+        &code_cell,
+        result.debug_mark_base64.as_deref(),
+    )?);
     let compiler_abi = result.abi.map(Arc::new);
     let stats = run_file_tests(
         runner,
         filepath,
         tests,
         &code_cell,
-        code_boc,
-        marks_boc,
         Arc::new(abi),
         compiler_abi,
         Arc::new(source_map),
-        Arc::new(new_source_map),
+        tolk_source_map,
     )?;
     Ok(stats)
 }
@@ -905,12 +904,10 @@ fn run_file_tests(
     file_path: &str,
     tests: Vec<TestDescriptor>,
     code: &Cell,
-    code_boc: Arc<[u8]>,
-    marks_boc: Option<Arc<[u8]>>,
     abi: Arc<ContractAbi>,
     compiler_abi: Option<Arc<tolkc::abi::ContractABI>>,
     source_map: Arc<SourceMap>,
-    new_source_map: Arc<tolkc::SourceMap>,
+    tolk_source_map: Arc<TolkSourceMap>,
 ) -> anyhow::Result<TestStats> {
     let file_path = Path::new(file_path).absolutize()?;
     let filtered_tests = if let Some(pattern) = &runner.config.filter {
@@ -960,9 +957,7 @@ fn run_file_tests(
             abi: abi.clone(),
             compiler_abi: compiler_abi.clone(),
             source_map: source_map.clone(),
-            new_source_map: new_source_map.clone(),
-            code_boc: code_boc.clone(),
-            marks_boc: marks_boc.clone(),
+            tolk_source_map: tolk_source_map.clone(),
             show_bodies: runner.config.show_bodies,
             backtrace: runner.config.backtrace,
             execution: None,
@@ -1023,12 +1018,8 @@ fn run_file_tests(
         if let (Some(AssertFailure::GetMethod(failure)), GetMethodResult::Success(result)) =
             (&mut assert_failure, &get_result)
         {
-            failure.caller_trace = crate::retrace::find_execution_trace(
-                &result.vm_log,
-                Some(&new_source_map),
-                code_boc.as_ref(),
-                marks_boc.as_deref(),
-            );
+            failure.caller_trace =
+                crate::retrace::find_execution_trace(&result.vm_log, &tolk_source_map);
         }
 
         let (exit_code, gas_used) = match &get_result {
@@ -1168,11 +1159,9 @@ fn run_file_tests(
                     &test.name,
                     &file_path,
                     &code_boc64,
-                    code_boc.clone(),
-                    marks_boc.clone(),
                     *code.repr_hash(),
                     source_map.clone(),
-                    new_source_map.clone(),
+                    tolk_source_map.clone(),
                     Some(
                         contract_abi(content, file_path.to_string_lossy().as_ref(), &mappings)
                             .into(),

@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tolkc::TolkSourceMap;
 use tolkc::abi::ContractABI as CompilerContractABI;
 use ton::ton_wallet::TonWallet;
 use ton_abi::ContractAbi;
@@ -56,10 +57,7 @@ pub struct GetMethodAssertFailure {
     pub vm_exit_code: i32,
     pub suggested_name: Option<String>,
     pub vm_log: Arc<str>,
-    pub code_boc: Arc<[u8]>,
-    pub marks_boc: Option<Arc<[u8]>>,
-    pub source_map: Option<Arc<SourceMap>>,
-    pub new_source_map: Option<Arc<tolkc::SourceMap>>,
+    pub tolk_source_map: Arc<TolkSourceMap>,
     pub caller_trace: Option<crate::retrace::TolkTraceInfo>,
     pub location: Option<SourceLocation>,
 }
@@ -157,11 +155,9 @@ impl BuildCache {
         name: &str,
         path: &Path,
         code: &str,
-        code_boc: Arc<[u8]>,
-        marks_boc: Option<Arc<[u8]>>,
         code_hash: HashBytes,
         source_map: Arc<SourceMap>,
-        new_source_map: Arc<tolkc::SourceMap>,
+        tolk_source_map: Arc<TolkSourceMap>,
         abi: Option<Arc<ContractAbi>>,
         compiler_abi: Option<Arc<CompilerContractABI>>,
     ) {
@@ -170,11 +166,9 @@ impl BuildCache {
             CompilationResult {
                 name: name.to_owned(),
                 code_boc64: code.to_owned(),
-                code_boc,
-                marks_boc,
                 code_hash,
                 source_map,
-                new_source_map,
+                tolk_source_map,
                 abi,
                 compiler_abi,
             },
@@ -196,11 +190,9 @@ impl BuildCache {
 pub struct CompilationResult {
     pub name: String,
     pub code_boc64: String,
-    pub code_boc: Arc<[u8]>,
-    pub marks_boc: Option<Arc<[u8]>>,
     pub code_hash: HashBytes,
     pub source_map: Arc<SourceMap>,
-    pub new_source_map: Arc<tolkc::SourceMap>,
+    pub tolk_source_map: Arc<TolkSourceMap>,
     pub abi: Option<Arc<ContractAbi>>,
     pub compiler_abi: Option<Arc<CompilerContractABI>>,
 }

@@ -4,6 +4,7 @@ use crate::vmtrace::SkipBlocksMode;
 pub use retrace::trace::{
     ExecutedAction, ExecutedActions, InstalledAction, InstalledActions, InvalidAction,
 };
+use tolkc::TolkSourceMap;
 use ton_source_map::{DebugLocation, SourceLocation, SourceMap};
 use vmlogs::parser::VmLine;
 
@@ -37,17 +38,10 @@ pub struct TolkExceptionInfo {
 #[must_use]
 pub fn find_exception_info(
     vm_logs: &str,
-    source_map: Option<&tolkc::SourceMap>,
-    code_boc: &[u8],
-    marks_boc: Option<&[u8]>,
+    tolk_source_map: &TolkSourceMap,
 ) -> Option<TolkExceptionInfo> {
-    let source_map = source_map?;
-    let marks_boc = marks_boc?;
-    if marks_boc.is_empty() {
-        return None;
-    }
-
-    let marks_dict = tolkc::debug_marks_dict::parse_debug_marks(marks_boc, code_boc);
+    let source_map = &tolk_source_map.source_map;
+    let marks_dict = tolk_source_map.marks_dict.as_deref()?;
     let vm_lines = vmlogs::parser::parse_lines(vm_logs);
     let description = vm_lines
         .iter()
@@ -57,7 +51,7 @@ pub fn find_exception_info(
             _ => None,
         })
         .unwrap_or_default();
-    let mut replayer = TolkReplayer::new(source_map.clone(), &marks_dict, &vm_lines);
+    let mut replayer = TolkReplayer::new(source_map.clone(), marks_dict, &vm_lines);
     replayer.set_exception_breakpoints(ExceptionBreakMode::Uncaught);
 
     while !replayer.is_finished() {
@@ -91,19 +85,12 @@ pub fn find_exception_info(
 #[must_use]
 pub fn find_execution_trace(
     vm_logs: &str,
-    source_map: Option<&tolkc::SourceMap>,
-    code_boc: &[u8],
-    marks_boc: Option<&[u8]>,
+    tolk_source_map: &TolkSourceMap,
 ) -> Option<TolkTraceInfo> {
-    let source_map = source_map?;
-    let marks_boc = marks_boc?;
-    if marks_boc.is_empty() {
-        return None;
-    }
-
-    let marks_dict = tolkc::debug_marks_dict::parse_debug_marks(marks_boc, code_boc);
+    let source_map = &tolk_source_map.source_map;
+    let marks_dict = tolk_source_map.marks_dict.as_deref()?;
     let vm_lines = vmlogs::parser::parse_lines(vm_logs);
-    let mut replayer = TolkReplayer::new(source_map.clone(), &marks_dict, &vm_lines);
+    let mut replayer = TolkReplayer::new(source_map.clone(), marks_dict, &vm_lines);
 
     while !replayer.is_finished() {
         replayer.step(StepMode::StepInto);

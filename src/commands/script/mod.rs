@@ -1,4 +1,3 @@
-use crate::boc_utils::{boc_bytes, decode_optional_boc_base64_bytes};
 use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, AssertsContext, BuildCache, BuildContext, ChainContext, Context, DebugCtx,
@@ -27,6 +26,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::UNIX_EPOCH;
+use tolkc::TolkSourceMap;
 use ton_abi::{ContractAbi, contract_abi};
 use ton_api::Network;
 use ton_emulator::emulator::Emulator;
@@ -152,14 +152,13 @@ fn run_script_file(
     match compiler.compile(Path::new(file_path), need_debug_info) {
         tolkc::CompilerResult::Success(result) => {
             let code_cell = Boc::decode_base64(&result.code_boc64)?;
-            let code_boc = boc_bytes(&code_cell);
-            let marks_boc = decode_optional_boc_base64_bytes(
-                result.debug_mark_base64.as_deref(),
-                "debug marks",
-            )?;
             let data_cell = CellBuilder::new().build()?;
             let source_map = Arc::new(result.source_map.unwrap_or_default());
-            let new_source_map = Arc::new(result.new_source_map.unwrap_or_default());
+            let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+                result.new_source_map.unwrap_or_default(),
+                &code_cell,
+                result.debug_mark_base64.as_deref(),
+            )?);
 
             execute_script(
                 &code_cell,
@@ -167,9 +166,7 @@ fn run_script_file(
                 stack,
                 Arc::new(abi),
                 source_map,
-                new_source_map,
-                code_boc,
-                marks_boc,
+                tolk_source_map,
                 debug,
                 backtrace,
                 debug_listener,
@@ -192,9 +189,7 @@ fn run_script_file(
 
 struct ScriptResult {
     result: GetMethodResult,
-    code_boc: Arc<[u8]>,
-    marks_boc: Option<Arc<[u8]>>,
-    new_source_map: Arc<tolkc::SourceMap>,
+    tolk_source_map: Arc<TolkSourceMap>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -204,9 +199,7 @@ fn execute_script(
     stack: Tuple,
     abi: Arc<ContractAbi>,
     source_map: Arc<SourceMap>,
-    new_source_map: Arc<tolkc::SourceMap>,
-    code_boc: Arc<[u8]>,
-    marks_boc: Option<Arc<[u8]>>,
+    tolk_source_map: Arc<TolkSourceMap>,
     debug: bool,
     backtrace: Option<BacktraceMode>,
     debug_listener: Option<TcpListener>,
@@ -337,9 +330,7 @@ fn execute_script(
             &ctx,
             ScriptResult {
                 result,
-                code_boc,
-                marks_boc,
-                new_source_map,
+                tolk_source_map,
             },
         );
         return Ok(());
@@ -354,9 +345,7 @@ fn execute_script(
         &ctx,
         ScriptResult {
             result,
-            code_boc,
-            marks_boc,
-            new_source_map,
+            tolk_source_map,
         },
     );
     Ok(())
@@ -438,12 +427,8 @@ fn format_nonzero_script_exit_code_details(
 ) -> String {
     let formatter = FormatterContext::from_context(ctx);
     let mut details = String::new();
-    let exit_code_info = retrace::find_exception_info(
-        &result.vm_log,
-        Some(script_result.new_source_map.as_ref()),
-        script_result.code_boc.as_ref(),
-        script_result.marks_boc.as_deref(),
-    );
+    let exit_code_info =
+        retrace::find_exception_info(&result.vm_log, &script_result.tolk_source_map);
 
     if let Some(info) = &exit_code_info {
         writeln!(

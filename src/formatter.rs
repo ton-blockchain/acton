@@ -22,7 +22,7 @@ use ton_abi::abi_serde::Data as ParsedAbiData;
 use ton_abi::compiler_abi_serde;
 use ton_abi::{ContractAbi, TypeAbi};
 use ton_api::Network;
-use ton_source_map::{DebugLocation, SourceLocation};
+use ton_source_map::SourceLocation;
 use tvmffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes, Load};
@@ -1465,12 +1465,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         let code = Self::account_code(&self.accounts, &dst);
         let result = self.build_cache.result_for_code(&code)?;
 
-        let info = retrace::find_exception_info(
-            logs,
-            Some(&result.1.new_source_map),
-            result.1.code_boc.as_ref(),
-            result.1.marks_boc.as_deref(),
-        )?;
+        let info = retrace::find_exception_info(logs, &result.1.tolk_source_map)?;
         let backtrace_result = Self::format_backtrace(&info.backtrace)
             .iter()
             .map(|line| format!("{child_prefix}       {line}"))
@@ -1532,12 +1527,7 @@ See https://ton-blockchain.github.io/acton/docs/setup-wallets/ for more informat
         let code = Boc::decode_base64(failed_get.code.as_ref()).ok()?;
         let build = self.build_cache.result_for_code(&Some(code))?.1;
 
-        retrace::find_exception_info(
-            &failed_get.vm_log,
-            Some(&build.new_source_map),
-            build.code_boc.as_ref(),
-            build.marks_boc.as_deref(),
-        )
+        retrace::find_exception_info(&failed_get.vm_log, &build.tolk_source_map)
     }
 
     fn format_ext_out_message(&self, msg: &RelaxedMessage) -> Option<String> {
@@ -2940,12 +2930,8 @@ impl FormatterContext<'_> {
         )
         .ok();
 
-        let replayed_exception = retrace::find_exception_info(
-            &failure.vm_log,
-            failure.new_source_map.as_deref(),
-            failure.code_boc.as_ref(),
-            failure.marks_boc.as_deref(),
-        );
+        let replayed_exception =
+            retrace::find_exception_info(&failure.vm_log, &failure.tolk_source_map);
 
         if let Some(info) = &replayed_exception {
             writeln!(details, "at {}", Self::format_location(&info.loc)).ok();
@@ -3202,12 +3188,7 @@ impl FormatterContext<'_> {
         let mut output = String::new();
         writeln!(output, "exit_code={exit_code}").ok();
 
-        let exit_code_info = retrace::find_exception_info(
-            &result.vm_log,
-            Some(&test.new_source_map),
-            test.code_boc.as_ref(),
-            test.marks_boc.as_deref(),
-        );
+        let exit_code_info = retrace::find_exception_info(&result.vm_log, &test.tolk_source_map);
         let get_method_info = self.find_failed_get_method_exception(test);
 
         if let Some(info) = &get_method_info {

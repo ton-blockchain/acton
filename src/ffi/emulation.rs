@@ -1,4 +1,3 @@
-use crate::boc_utils::{boc_bytes, decode_optional_boc_base64_bytes};
 use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, Context, GetMethodAssertFailure, KnownAddress, MessageIterState,
@@ -24,6 +23,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
+use tolkc::TolkSourceMap;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_abi::contract_abi;
@@ -123,25 +123,19 @@ fn build_impl(
 
         let code_cell = Boc::decode_base64(&cached_entry.code_boc64)
             .map_err(|e| anyhow::anyhow!("Failed to decode cached code BoC for {path}: {e}"))?;
-        let code_boc = boc_bytes(&code_cell);
-        let marks_boc = decode_optional_boc_base64_bytes(
+        let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+            cached_entry.new_source_map.clone().unwrap_or_default(),
+            &code_cell,
             cached_entry.debug_mark_base64.as_deref(),
-            "cached debug marks",
-        )?;
+        )?);
         let content: Arc<str> = fs::read_to_string(&path).unwrap_or_default().into();
         ctx.build.build_cache.memoize(
             &name,
             Path::new(&path),
             &cached_entry.code_boc64,
-            code_boc,
-            marks_boc,
             HashBytes::from_str(&cached_entry.code_hash_hex)?,
             cached_entry.source_map.clone().unwrap_or_default().into(),
-            cached_entry
-                .new_source_map
-                .clone()
-                .unwrap_or_default()
-                .into(),
+            tolk_source_map,
             Some(contract_abi(content, &path, &mappings).into()),
             cached_entry.abi.clone().map(Into::into),
         );
@@ -175,20 +169,18 @@ fn build_impl(
             let code_cell = Boc::decode_base64(&success.code_boc64).map_err(|e| {
                 anyhow::anyhow!("Failed to decode compiled code BoC for {path}: {e}")
             })?;
-            let code_boc = boc_bytes(&code_cell);
-            let marks_boc = decode_optional_boc_base64_bytes(
+            let tolk_source_map = Arc::new(TolkSourceMap::from_code_cell(
+                success.new_source_map.unwrap_or_default(),
+                &code_cell,
                 success.debug_mark_base64.as_deref(),
-                "compiled debug marks",
-            )?;
+            )?);
             ctx.build.build_cache.memoize(
                 &name,
                 Path::new(&path),
                 &success.code_boc64,
-                code_boc,
-                marks_boc,
                 HashBytes::from_str(&success.code_hash_hex)?,
                 success.source_map.unwrap_or_default().into(),
-                success.new_source_map.unwrap_or_default().into(),
+                tolk_source_map,
                 Some(contract_abi(content, &path, &mappings).into()),
                 success.abi.clone().map(Into::into),
             );
@@ -1333,20 +1325,15 @@ fn run_get_method_impl(
     let compilation_result = ctx
         .build
         .build_cache
-        .result_for_code(&Some(code.clone()))
+        .result_for_code(&Some(code))
         .map(|(_, result)| result);
     let source_map = compilation_result
         .as_ref()
         .map(|result| result.source_map.clone());
-    let new_source_map = compilation_result
+    let tolk_source_map = compilation_result
         .as_ref()
-        .map(|result| result.new_source_map.clone());
-    let marks_boc = compilation_result
-        .as_ref()
-        .and_then(|result| result.marks_boc.clone());
-    let code_boc = compilation_result
-        .as_ref()
-        .map_or_else(|| boc_bytes(&code), |result| result.code_boc.clone());
+        .map(|result| result.tolk_source_map.clone())
+        .unwrap_or_else(|| Arc::new(TolkSourceMap::without_debug_info()));
 
     let config_b64 = world_state.get_config_b64();
     let args_b64 = serialize_tuple(&args)
@@ -1362,7 +1349,7 @@ fn run_get_method_impl(
             .begin_thread(
                 2,
                 AnyExecutor::Get(step_executor.clone()),
-                source_map.clone(),
+                source_map,
                 "Send internal message".to_string(),
                 dbg_ctx.need_to_stop_child_thread_on_start(),
             )
@@ -1441,13 +1428,8 @@ fn run_get_method_impl(
                     None
                 };
 
-                let location = retrace::find_exception_info(
-                    &result.vm_log,
-                    new_source_map.as_deref(),
-                    code_boc.as_ref(),
-                    marks_boc.as_deref(),
-                )
-                .map(|info| info.loc);
+                let location = retrace::find_exception_info(&result.vm_log, &tolk_source_map)
+                    .map(|info| info.loc);
 
                 *ctx.asserts.assert_failure =
                     Some(AssertFailure::GetMethod(GetMethodAssertFailure {
@@ -1455,10 +1437,7 @@ fn run_get_method_impl(
                         vm_exit_code: result.vm_exit_code,
                         suggested_name,
                         vm_log: result.vm_log,
-                        code_boc,
-                        marks_boc,
-                        source_map,
-                        new_source_map,
+                        tolk_source_map,
                         caller_trace: None,
                         location,
                     }));
